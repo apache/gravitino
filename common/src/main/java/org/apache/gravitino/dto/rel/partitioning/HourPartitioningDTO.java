@@ -19,9 +19,11 @@
 package org.apache.gravitino.dto.rel.partitioning;
 
 import com.google.common.base.Preconditions;
+import lombok.EqualsAndHashCode;
 import org.apache.commons.lang3.ArrayUtils;
 
 /** Represents the hour partitioning. */
+@EqualsAndHashCode(callSuper = true)
 public final class HourPartitioningDTO extends Partitioning.SingleFieldPartitioning {
 
   /**

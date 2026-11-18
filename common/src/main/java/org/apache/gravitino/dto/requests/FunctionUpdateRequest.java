@@ -104,8 +104,11 @@ public interface FunctionUpdateRequest extends RESTRequest {
 
     @Override
     public void validate() throws IllegalArgumentException {
-      Preconditions.checkArgument(
-          definition != null, "\"definition\" field is required and cannot be null");
+      validateDefinition("definition");
+    }
+
+    void validateDefinition(String fieldPath) {
+      FunctionDataTypeValidator.validateDefinition(definition, fieldPath);
     }
   }
 

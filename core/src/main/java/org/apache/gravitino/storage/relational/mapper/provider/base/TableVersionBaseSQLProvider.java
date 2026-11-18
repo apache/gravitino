@@ -21,6 +21,10 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.TableVersionMapper.TABLE_NAME;
 
+import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
+import org.apache.gravitino.storage.relational.mapper.provider.MetadataObjectSQL;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.ibatis.annotations.Param;
 
@@ -80,9 +84,72 @@ public class TableVersionBaseSQLProvider {
       @Param("tableId") Long tableId, @Param("version") Long version) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE table_id = #{tableId} AND version = #{version} AND deleted_at = 0";
+  }
+
+  /**
+   * Soft-deletes all active table version rows whose parent table belongs to one of the given
+   * schema IDs. The table_version_info table has no schema_id column, so a sub-query joins
+   * table_meta to find the matching table_ids. The sub-query intentionally does not filter on
+   * table_meta.deleted_at because this method runs after softDeleteTableMetasBySchemaIds within the
+   * same transaction; at that point the table_meta rows already have deleted_at set. IDs with an
+   * active registration outside these schemas are excluded.
+   */
+  public String softDeleteTableVersionsBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE table_id IN (SELECT tm.table_id FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " tm WHERE tm.schema_id IN ("
+        + "<foreach collection='schemaIds' item='schemaId' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + ")"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(TableMetaMapper.TABLE_NAME, "table_id", "tm")
+        + ") AND deleted_at = 0"
+        + "</script>";
+  }
+
+  /**
+   * Soft-deletes active table version rows whose parent table belongs to the given catalog.
+   * table_version_info has no catalog_id column, so a sub-query on table_meta finds the table_ids.
+   * Runs after softDeleteTableMetasByCatalogId in the same transaction, so the sub-query does not
+   * filter table_meta.deleted_at. IDs with an active registration in another catalog are excluded.
+   */
+  public String softDeleteTableVersionsByCatalogId(@Param("catalogId") Long catalogId) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE table_id IN (SELECT tm.table_id FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " tm WHERE tm.catalog_id = #{catalogId}"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(TableMetaMapper.TABLE_NAME, "table_id", "tm")
+        + ") AND deleted_at = 0";
+  }
+
+  /**
+   * Soft-deletes active table version rows whose parent table belongs to the given metalake.
+   * table_version_info has no metalake_id column, so a sub-query on table_meta finds the table_ids.
+   * Runs after softDeleteTableMetasByMetalakeId in the same transaction, so the sub-query does not
+   * filter table_meta.deleted_at. IDs with an active registration in another metalake are excluded.
+   */
+  public String softDeleteTableVersionsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE table_id IN (SELECT tm.table_id FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " tm WHERE tm.metalake_id = #{metalakeId}"
+        + MetadataObjectSQL.excludeOtherActiveMetalakes(
+            TableMetaMapper.TABLE_NAME, "table_id", "tm")
+        + ") AND deleted_at = 0";
   }
 
   public String deleteTableVersionByLegacyTimeline(

@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.catalog.starrocks.utils;
 
+import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
+import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.unescapeSqlLiteral;
+
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.sql.ResultSet;
@@ -30,6 +34,8 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -67,7 +73,9 @@ public class StarRocksUtils {
           "(?:^|\\s|\\))DISTRIBUTED\\s+BY\\s+(?:RANDOM\\b|\\w+\\s*\\()", Pattern.CASE_INSENSITIVE);
 
   private static final Pattern TABLE_COMMENT_PATTERN =
-      Pattern.compile("COMMENT\\s*\"([^\\(]+?)\\s*\\(From Gravitino,.*\\)\"");
+      Pattern.compile(
+          "COMMENT\\s*\"((?:\\\\.|\"\"|[^\"\\\\])*)\\s+"
+              + "\\(From Gravitino, DO NOT EDIT: gravitino\\.v\\d+\\.uid-?\\d+\\)\"");
 
   private static final String PARTITION_TYPE_VALUE_PATTERN_STRING =
       "types: \\[([^\\]]+)\\]; keys: \\[([^\\]]+)\\];";
@@ -91,6 +99,37 @@ public class StarRocksUtils {
   public static final String DATA_SIZE = "DataSize";
   public static final String IS_IN_MEMORY = "IsInMemory";
 
+  /**
+   * Checks StarRocks-specific restrictions on quoted identifiers. Creation-name and metadata-name
+   * restrictions are checked separately by the catalog capability.
+   *
+   * @param identifier the unquoted identifier
+   * @return unsupported if StarRocks would remove backticks from the identifier
+   */
+  public static CapabilityResult checkIdentifier(String identifier) {
+    // StarRocks 3.3's AstBuilder removes all backticks, including doubled ones. Quoting such a
+    // name would target a different object, so reject it instead of applying MySQL escaping.
+    if (identifier.indexOf('`') >= 0) {
+      return CapabilityResult.unsupported(
+          "StarRocks identifiers must not contain backticks because its SQL parser removes them");
+    }
+    return CapabilityResult.SUPPORTED;
+  }
+
+  /**
+   * Quotes a StarRocks identifier without allowing its embedded delimiters to change the name.
+   *
+   * @param identifier the unquoted identifier
+   * @return the backtick-quoted identifier
+   * @throws IllegalArgumentException if the identifier contains a backtick
+   */
+  public static String quoteIdentifier(String identifier) {
+    CapabilityResult result = checkIdentifier(identifier);
+    Preconditions.checkArgument(
+        result.supported(), "%s. Illegal identifier: %s", result.unsupportedMessage(), identifier);
+    return JdbcConnectorUtils.quoteIdentifier(identifier, '`');
+  }
+
   // convert Map<String, String> properties to SQL String
   public static String generatePropertiesSql(Map<String, String> properties) {
     if (properties == null || properties.isEmpty()) {
@@ -99,7 +138,13 @@ public class StarRocksUtils {
     StringBuilder sqlBuilder = new StringBuilder(" PROPERTIES (\n");
     sqlBuilder.append(
         properties.entrySet().stream()
-            .map(entry -> "\"" + entry.getKey() + "\"=\"" + entry.getValue() + "\"")
+            .map(
+                entry ->
+                    "\""
+                        + escapeSqlLiteral(entry.getKey(), '"')
+                        + "\"=\""
+                        + escapeSqlLiteral(entry.getValue(), '"')
+                        + "\"")
             .collect(Collectors.joining(",\n")));
     sqlBuilder.append("\n)");
     return sqlBuilder.toString();
@@ -110,7 +155,9 @@ public class StarRocksUtils {
     String[] lines = createTableSql.split("\n");
 
     boolean isProperties = false;
-    final String sProperties = "\"(.*)\"\\s*=\\s*\"(.*)\",?";
+    // Escape alternatives exclude the closing delimiter, so no backtracking is needed.
+    final String sProperties =
+        "\"((?:\\\\.|\"\"|[^\"\\\\])*+)\"\\s*=\\s*\"((?:\\\\.|\"\"|[^\"\\\\])*+)\",?";
     final Pattern patternProperties = Pattern.compile(sProperties);
 
     for (String line : lines) {
@@ -121,8 +168,10 @@ public class StarRocksUtils {
       if (isProperties) {
         final Matcher matcherProperties = patternProperties.matcher(line);
         if (matcherProperties.find()) {
-          final String key = matcherProperties.group(1).trim();
-          String value = matcherProperties.group(2).trim();
+          // generatePropertiesSql escapes keys and values for double-quoted literals, and SHOW
+          // CREATE echoes them escaped; unescape both so callers observe the original text.
+          final String key = unescapeSqlLiteral(matcherProperties.group(1), '"');
+          String value = unescapeSqlLiteral(matcherProperties.group(2), '"');
           properties.put(key, value);
         }
       }
@@ -196,7 +245,7 @@ public class StarRocksUtils {
   public static String extractTableCommentFromSql(String createTableSql) {
     Matcher matcher = TABLE_COMMENT_PATTERN.matcher(createTableSql.trim());
     if (matcher.find()) {
-      return matcher.group(1);
+      return unescapeSqlLiteral(matcher.group(1), '"');
     }
     return "";
   }
@@ -214,16 +263,16 @@ public class StarRocksUtils {
    * @return The partition sql fragment.
    */
   public static String generatePartitionSqlFragment(Partition partition) {
-    String partitionSqlFragment = "PARTITION `%s` VALUES %s";
+    String partitionSqlFragment = "PARTITION %s VALUES %s";
     if (partition instanceof RangePartition) {
       return String.format(
           partitionSqlFragment,
-          partition.name(),
+          quoteIdentifier(partition.name()),
           generateRangePartitionValues((RangePartition) partition));
     } else if (partition instanceof ListPartition) {
       return String.format(
           partitionSqlFragment,
-          partition.name(),
+          quoteIdentifier(partition.name()),
           generateListPartitionSqlValues((ListPartition) partition));
     } else {
       throw new IllegalArgumentException("Unsupported partition type of StarRocks");
@@ -236,7 +285,8 @@ public class StarRocksUtils {
     if (Literals.NULL.equals(upper)) {
       partitionValues = "LESS THAN MAXVALUE";
     } else {
-      partitionValues = String.format("LESS THAN (\"%s\")", upper.value());
+      partitionValues =
+          String.format("LESS THAN (\"%s\")", escapeSqlLiteral(String.valueOf(upper.value()), '"'));
     }
     return partitionValues;
   }
@@ -251,10 +301,10 @@ public class StarRocksUtils {
             String.format(
                 "(%s)",
                 Arrays.stream(part)
-                    .map(p -> "\"" + p.value() + "\"")
+                    .map(p -> "\"" + escapeSqlLiteral(String.valueOf(p.value()), '"') + "\"")
                     .collect(Collectors.joining(",")));
       } else {
-        values = String.format("\"%s\"", part[0].value());
+        values = String.format("\"%s\"", escapeSqlLiteral(String.valueOf(part[0].value()), '"'));
       }
       listValues.add(values);
     }

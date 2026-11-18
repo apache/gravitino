@@ -70,7 +70,6 @@ import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
-import org.apache.gravitino.utils.ClassLoaderResourceCleanerUtils;
 import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.paimon.catalog.Catalog;
@@ -113,21 +112,31 @@ public class PaimonCatalogOperations
   public void initialize(
       Map<String, String> conf, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
-    // Key format like gravitino.bypass.a.b
-    Map<String, String> prefixMap = MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX);
-
-    // Hold keys that lie in GRAVITINO_CONFIG_TO_PAIMON
-    Map<String, String> gravitinoConfig =
-        ((PaimonCatalogPropertiesMetadata) propertiesMetadata.catalogPropertiesMetadata())
-            .transformProperties(conf);
-
-    Map<String, String> resultConf = Maps.newHashMap(prefixMap);
-    resultConf.putAll(gravitinoConfig);
-
-    this.paimonCatalogOps = new PaimonCatalogOps(new PaimonConfig(resultConf));
+    this.paimonCatalogOps =
+        new PaimonCatalogOps(
+            toPaimonConfig(
+                conf,
+                (PaimonCatalogPropertiesMetadata) propertiesMetadata.catalogPropertiesMetadata()));
     this.paimonViewCatalogOps =
         new PaimonViewCatalogOps(
             paimonCatalogOps, this::buildPaimonNameIdentifier, this::schemaExists);
+  }
+
+  /**
+   * Converts the Gravitino catalog configuration to the Paimon configuration.
+   *
+   * @param conf The Gravitino catalog configuration.
+   * @param catalogPropertiesMetadata The Paimon catalog properties metadata.
+   * @return The Paimon configuration.
+   */
+  static PaimonConfig toPaimonConfig(
+      Map<String, String> conf, PaimonCatalogPropertiesMetadata catalogPropertiesMetadata) {
+    // Key format like gravitino.bypass.a.b
+    Map<String, String> resultConf =
+        Maps.newHashMap(MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX));
+    // Hold keys that lie in GRAVITINO_CONFIG_TO_PAIMON
+    resultConf.putAll(catalogPropertiesMetadata.transformProperties(conf));
+    return new PaimonConfig(resultConf);
   }
 
   /**
@@ -163,6 +172,11 @@ public class PaimonCatalogOperations
       String provider,
       String comment,
       Map<String, String> properties) {
+    testConnection(catalogIdent);
+  }
+
+  @Override
+  public void testConnection(NameIdentifier catalogIdent) {
     try {
       paimonCatalogOps.listDatabases();
     } catch (Exception e) {
@@ -559,7 +573,6 @@ public class PaimonCatalogOperations
     if (paimonCatalogOps != null) {
       try {
         paimonCatalogOps.close();
-        ClassLoaderResourceCleanerUtils.closeClassLoaderResource(this.getClass().getClassLoader());
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -575,7 +588,7 @@ public class PaimonCatalogOperations
         identifier != null
             && identifier.namespace() != null
             && identifier.namespace().levels().length > 0,
-        "Namespace can not be null or empty.");
+        "Namespace cannot be null or empty");
     String[] levels = identifier.namespace().levels();
     return NameIdentifier.of(levels[levels.length - 1], identifier.name());
   }

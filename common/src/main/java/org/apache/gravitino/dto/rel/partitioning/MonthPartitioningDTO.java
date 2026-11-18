@@ -19,12 +19,14 @@
 package org.apache.gravitino.dto.rel.partitioning;
 
 import com.google.common.base.Preconditions;
+import lombok.EqualsAndHashCode;
 import org.apache.commons.lang3.ArrayUtils;
 
 /**
  * Represents a MonthPartitioning Data Transfer Object (DTO) that extends the Partitioning
  * interface.
  */
+@EqualsAndHashCode(callSuper = true)
 public final class MonthPartitioningDTO extends Partitioning.SingleFieldPartitioning {
 
   /**

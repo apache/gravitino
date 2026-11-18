@@ -76,6 +76,22 @@ public class ViewMetaSQLProviderFactory {
     return getProvider().selectViewMetaBySchemaIdAndName(schemaId, name);
   }
 
+  /** Delegates a root-only locking lookup by view natural key. */
+  public static String selectViewMetaBySchemaIdAndNameForUpdate(
+      @Param("schemaId") Long schemaId, @Param("viewName") String name) {
+    return getProvider().selectViewMetaBySchemaIdAndNameForUpdate(schemaId, name);
+  }
+
+  /**
+   * Returns SQL that selects and exclusively locks an active view metadata row.
+   *
+   * @param viewId the view ID
+   * @return the locking select SQL
+   */
+  public static String selectViewMetaByIdForUpdate(@Param("viewId") Long viewId) {
+    return getProvider().selectViewMetaByIdForUpdate(viewId);
+  }
+
   public static String selectViewByFullQualifiedName(
       @Param("metalakeName") String metalakeName,
       @Param("catalogName") String catalogName,
@@ -89,17 +105,29 @@ public class ViewMetaSQLProviderFactory {
     return getProvider().insertViewMeta(viewPO);
   }
 
-  public static String insertViewMetaOnDuplicateKeyUpdate(@Param("viewMeta") ViewPO viewPO) {
-    return getProvider().insertViewMetaOnDuplicateKeyUpdate(viewPO);
-  }
-
   public static String updateViewMeta(
       @Param("newViewMeta") ViewPO newViewPO, @Param("oldViewMeta") ViewPO oldViewPO) {
     return getProvider().updateViewMeta(newViewPO, oldViewPO);
   }
 
-  public static String softDeleteViewMetasByViewId(@Param("viewId") Long viewId) {
-    return getProvider().softDeleteViewMetasByViewId(viewId);
+  /**
+   * Soft-deletes an observed view registration in the same catalog lifetime.
+   *
+   * @param viewId the stable external identity
+   * @param currentVersion the observed row version
+   * @param catalogId the observed parent catalog identity
+   * @param schemaId the observed parent schema identity
+   * @param viewName the observed view name
+   * @return the guarded soft-delete SQL
+   */
+  public static String softDeleteViewMetasByViewId(
+      @Param("viewId") Long viewId,
+      @Param("currentVersion") Long currentVersion,
+      @Param("catalogId") Long catalogId,
+      @Param("schemaId") Long schemaId,
+      @Param("viewName") String viewName) {
+    return getProvider()
+        .softDeleteViewMetasByViewId(viewId, currentVersion, catalogId, schemaId, viewName);
   }
 
   public static String softDeleteViewMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {

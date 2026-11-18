@@ -69,6 +69,15 @@ public interface TopicMetaMapper {
   @SelectProvider(type = TopicMetaSQLProviderFactory.class, method = "selectTopicMetaById")
   TopicPO selectTopicMetaById(@Param("topicId") Long topicId);
 
+  /**
+   * Selects and exclusively locks an active topic metadata row.
+   *
+   * @param topicId the topic ID
+   * @return the active topic metadata, or {@code null} when it no longer exists
+   */
+  @SelectProvider(type = TopicMetaSQLProviderFactory.class, method = "selectTopicMetaByIdForUpdate")
+  TopicPO selectTopicMetaByIdForUpdate(@Param("topicId") Long topicId);
+
   @UpdateProvider(type = TopicMetaSQLProviderFactory.class, method = "updateTopicMeta")
   Integer updateTopicMeta(
       @Param("newTopicMeta") TopicPO newTopicPO, @Param("oldTopicMeta") TopicPO oldTopicPO);
@@ -79,10 +88,25 @@ public interface TopicMetaMapper {
   Long selectTopicIdBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("topicName") String name);
 
+  /**
+   * Soft-deletes an observed topic registration in the same catalog lifetime.
+   *
+   * @param topicId the stable external identity
+   * @param currentVersion the observed row version
+   * @param catalogId the observed parent catalog identity
+   * @param schemaId the observed parent schema identity
+   * @param topicName the observed topic name
+   * @return the number of affected rows
+   */
   @UpdateProvider(
       type = TopicMetaSQLProviderFactory.class,
       method = "softDeleteTopicMetasByTopicId")
-  Integer softDeleteTopicMetasByTopicId(@Param("topicId") Long topicId);
+  Integer softDeleteTopicMetasByTopicId(
+      @Param("topicId") Long topicId,
+      @Param("currentVersion") Long currentVersion,
+      @Param("catalogId") Long catalogId,
+      @Param("schemaId") Long schemaId,
+      @Param("topicName") String topicName);
 
   @UpdateProvider(
       type = TopicMetaSQLProviderFactory.class,

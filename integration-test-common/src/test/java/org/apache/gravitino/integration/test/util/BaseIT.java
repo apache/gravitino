@@ -114,13 +114,15 @@ public class BaseIT {
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.26/mysql-connector-java-8.0.26.jar";
 
   public static final String DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL =
-      "https://jdbc.postgresql.org/download/postgresql-42.7.11.jar";
+      "https://jdbc.postgresql.org/download/postgresql-42.7.14.jar";
 
   public static final String DOWNLOAD_CLICKHOUSE_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/com/clickhouse/clickhouse-jdbc/0.7.1/clickhouse-jdbc-0.7.1-all.jar";
 
   public static final String DOWNLOAD_SQLITE_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.42.0.0/sqlite-jdbc-3.42.0.0.jar";
+
+  public static final String GRAVITINO_ICEBERG_REST_PREFIX = "gravitino.iceberg-rest.";
 
   public static final Map<String, Pattern> SUPPORTED_CLEAN_CONFLICTS_DRIVER_TYPES =
       ImmutableMap.of(
@@ -245,7 +247,13 @@ public class BaseIT {
     containerSuite.startPostgreSQLContainer(META_DATA);
     POSTGRESQL_CONTAINER = containerSuite.getPostgreSQLContainer();
 
-    String pgUrlWithoutSchema = POSTGRESQL_CONTAINER.getJdbcUrl(META_DATA);
+    // The embedded server runs on the test host, which may not route container-internal IPs.
+    String pgUrlWithoutSchema =
+        String.format(
+            "jdbc:postgresql://%s:%d/%s",
+            POSTGRESQL_CONTAINER.getContainer().getHost(),
+            POSTGRESQL_CONTAINER.getMappedPort(PostgreSQLContainer.PG_PORT),
+            META_DATA);
     String randomSchemaName = RandomStringUtils.random(10, true, false);
     // Connect to the PostgreSQL docker and create a schema
     String currentExecuteSql = "";
@@ -296,7 +304,13 @@ public class BaseIT {
     containerSuite.startMySQLContainer(META_DATA);
     MYSQL_CONTAINER = containerSuite.getMySQLContainer();
 
-    String mysqlUrl = MYSQL_CONTAINER.getJdbcUrl(META_DATA);
+    // Use published ports for metadata-store connections from the host JVM.
+    String mysqlUrl =
+        String.format(
+            "jdbc:mysql://%s:%d/%s",
+            MYSQL_CONTAINER.getContainer().getHost(),
+            MYSQL_CONTAINER.getMappedPort(MySQLContainer.MYSQL_PORT),
+            META_DATA);
     LOG.info("MySQL URL: {}", mysqlUrl);
     // Connect to the mysql docker and create a databases
     try (Connection connection =
@@ -409,6 +423,12 @@ public class BaseIT {
       serverConfig.loadFromFile(GravitinoServer.CONF_FILE);
 
       setupJdbcDrivers();
+
+      JettyServerConfig configuredJetty =
+          JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
+      // The readiness check below only asks whether an HTTP server answers, so a Gravitino left
+      // behind by an earlier run would pass it and the suite would run against that process.
+      ITUtils.checkServerPortIsFree(configuredJetty.getHost(), configuredJetty.getHttpPort());
 
       GravitinoITUtils.startGravitinoServer();
 
@@ -674,9 +694,21 @@ public class BaseIT {
     return null;
   }
 
+  /**
+   * Enables the Iceberg REST auxiliary service before the server starts. Callers that hold a {@link
+   * BaseIT} instance rather than extending it use this instead of the protected fields.
+   *
+   * @param icebergRestConfigs extra server configs, typically the dynamic config provider and the
+   *     metalake the Iceberg REST service should serve
+   */
+  public void enableIcebergAuxRestService(Map<String, String> icebergRestConfigs) {
+    this.ignoreIcebergAuxRestService = false;
+    this.customConfigs.putAll(icebergRestConfigs);
+  }
+
   protected String getIcebergRestServiceUri() {
     JettyServerConfig jettyServerConfig =
-        JettyServerConfig.fromConfig(serverConfig, String.format("gravitino.iceberg-rest."));
+        JettyServerConfig.fromConfig(serverConfig, GRAVITINO_ICEBERG_REST_PREFIX);
     return String.format(
         "http://%s:%d/iceberg/", jettyServerConfig.getHost(), jettyServerConfig.getHttpPort());
   }

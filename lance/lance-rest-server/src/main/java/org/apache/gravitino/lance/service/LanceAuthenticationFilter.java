@@ -22,13 +22,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.gravitino.auth.IllegalActiveRolesException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.server.authentication.AuthenticationFilter;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.lance.namespace.model.ErrorResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * An {@link AuthenticationFilter} subclass for the Lance REST server that:
@@ -42,7 +41,6 @@ import org.slf4j.LoggerFactory;
  */
 public class LanceAuthenticationFilter extends AuthenticationFilter {
 
-  private static final Logger LOG = LoggerFactory.getLogger(LanceAuthenticationFilter.class);
   private static final ObjectMapper MAPPER = ObjectMapperProvider.objectMapper();
 
   public LanceAuthenticationFilter() {
@@ -66,9 +64,14 @@ public class LanceAuthenticationFilter extends AuthenticationFilter {
       if (message == null || message.isEmpty()) {
         message = "Access denied";
       }
+    } else if (exception instanceof IllegalActiveRolesException) {
+      status = HttpServletResponse.SC_BAD_REQUEST;
+      message = exception.getMessage();
+      if (message == null || message.isEmpty()) {
+        message = "Bad request";
+      }
     } else {
       status = HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
-      LOG.error("Authentication failure", exception);
       message = "Authentication failed";
     }
 

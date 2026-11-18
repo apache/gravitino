@@ -62,6 +62,24 @@ public class TestTagDTO {
 
     Assertions.assertEquals(properties, deserTagDTO1.properties());
 
+    // Test tag with allowed values and assignment values
+    TagDTO tagWithValues =
+        TagDTO.builder()
+            .withName("tag_test")
+            .withComment("tag comment")
+            .withAudit(audit)
+            .withAllowedValues(new String[] {"finance", "risk"})
+            .withAssignmentValues(new String[] {"finance"})
+            .build();
+
+    serJson = JsonUtils.objectMapper().writeValueAsString(tagWithValues);
+    TagDTO deserTagWithValues = JsonUtils.objectMapper().readValue(serJson, TagDTO.class);
+    Assertions.assertEquals(tagWithValues, deserTagWithValues);
+    Assertions.assertArrayEquals(
+        new String[] {"finance", "risk"}, deserTagWithValues.valueConstraint().allowedValues());
+    Assertions.assertArrayEquals(
+        new String[] {"finance"}, deserTagWithValues.assignment().get().values());
+
     // Test tag with inherited
     TagDTO tagDTO2 =
         TagDTO.builder()
@@ -99,5 +117,31 @@ public class TestTagDTO {
     serJson = JsonUtils.objectMapper().writeValueAsString(tagDTO4);
     TagDTO deserTagDTO4 = JsonUtils.objectMapper().readValue(serJson, TagDTO.class);
     Assertions.assertEquals(Optional.of(true), deserTagDTO4.inherited());
+  }
+
+  @Test
+  public void testAssignmentValuesDoNotAffectEquality() {
+    AuditDTO audit = AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build();
+    TagDTO globalTag =
+        TagDTO.builder().withName("tag_test").withComment("tag comment").withAudit(audit).build();
+    TagDTO assignedTag =
+        TagDTO.builder()
+            .withName("tag_test")
+            .withComment("tag comment")
+            .withAudit(audit)
+            .withAssignmentValues(new String[0])
+            .build();
+    TagDTO valuedAssignedTag =
+        TagDTO.builder()
+            .withName("tag_test")
+            .withComment("tag comment")
+            .withAudit(audit)
+            .withAssignmentValues(new String[] {"finance"})
+            .build();
+
+    Assertions.assertEquals(globalTag, assignedTag);
+    Assertions.assertEquals(globalTag, valuedAssignedTag);
+    Assertions.assertEquals(globalTag.hashCode(), assignedTag.hashCode());
+    Assertions.assertEquals(globalTag.hashCode(), valuedAssignedTag.hashCode());
   }
 }

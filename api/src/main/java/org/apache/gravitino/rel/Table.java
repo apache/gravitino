@@ -25,6 +25,7 @@ import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
+import org.apache.gravitino.domain.SupportsDomains;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -33,6 +34,8 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.secret.SupportsSecrets;
+import org.apache.gravitino.semantic.SupportsSemanticModels;
 import org.apache.gravitino.stats.SupportsPartitionStatistics;
 import org.apache.gravitino.stats.SupportsStatistics;
 import org.apache.gravitino.tag.SupportsTags;
@@ -160,6 +163,16 @@ public interface Table extends Auditable {
   }
 
   /**
+   * Returns the domain operations for this table.
+   *
+   * @return The {@link SupportsDomains} if the table supports domain operations.
+   * @throws UnsupportedOperationException If the table does not support domain operations.
+   */
+  default SupportsDomains supportsDomains() {
+    throw new UnsupportedOperationException("Table does not support domain operations.");
+  }
+
+  /**
    * @return The {@link SupportsPolicies} if the table supports policy operations.
    * @throws UnsupportedOperationException If the table does not support policy operations.
    */
@@ -173,6 +186,14 @@ public interface Table extends Auditable {
    */
   default SupportsRoles supportsRoles() {
     throw new UnsupportedOperationException("Table does not support role operations.");
+  }
+
+  /**
+   * @return the {@link SupportsSecrets} if the table supports secret property operations.
+   * @throws UnsupportedOperationException if the table does not support secret property operations.
+   */
+  default SupportsSecrets supportsSecrets() {
+    throw new UnsupportedOperationException("Table does not support secret property operations.");
   }
 
   /**
@@ -192,5 +213,15 @@ public interface Table extends Auditable {
   default SupportsPartitionStatistics supportsPartitionStatistics() {
     throw new UnsupportedOperationException(
         "Table does not support partition statistics operations.");
+  }
+
+  /**
+   * Returns the Semantic Model dataset lookup operations for this source.
+   *
+   * @return The source-scoped Semantic Model dataset lookup capability.
+   * @throws UnsupportedOperationException If lookup is not supported by this implementation.
+   */
+  default SupportsSemanticModels supportsSemanticModels() {
+    throw new UnsupportedOperationException("Semantic Model dataset lookup is not supported");
   }
 }

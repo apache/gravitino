@@ -25,9 +25,12 @@ import java.nio.file.Files;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import javax.sql.DataSource;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.jdbc.JdbcSchema;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteExceptionConverter;
@@ -82,6 +85,50 @@ public class TestJdbcDatabaseOperations {
   private static void createJdbcDatabaseOperations() {
     JDBC_DATABASE_OPERATIONS = new SqliteDatabaseOperations(BASE_FILE_DIR.getPath());
     JDBC_DATABASE_OPERATIONS.initialize(DATA_SOURCE, EXCEPTION_MAPPER, Collections.emptyMap());
+  }
+
+  @Test
+  public void testCreateWithCommentNamesSchemaInRejection() {
+    // SqliteDatabaseOperations overrides create(), so exercise the shared check through a
+    // minimal subclass that does not support schema comments.
+    JdbcDatabaseOperations operations =
+        new JdbcDatabaseOperations() {
+          @Override
+          public JdbcSchema load(String databaseName) {
+            throw new UnsupportedOperationException();
+          }
+
+          @Override
+          protected String generateCreateDatabaseSql(
+              String databaseName, String comment, Map<String, String> properties) {
+            return "CREATE DATABASE " + databaseName;
+          }
+
+          @Override
+          protected String generateDropDatabaseSql(String databaseName, boolean cascade) {
+            return "DROP DATABASE " + databaseName;
+          }
+
+          @Override
+          protected boolean supportSchemaComment() {
+            return false;
+          }
+
+          @Override
+          protected Set<String> createSysDatabaseNameSet() {
+            return Collections.emptySet();
+          }
+        };
+    // A null DataSource makes any attempt to open a connection fail with an NPE, so the
+    // assertion below also proves the request is rejected before a connection is opened.
+    operations.initialize(null, EXCEPTION_MAPPER, Collections.emptyMap());
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () -> operations.create("commented", "probe", null));
+    Assertions.assertEquals(
+        "Schema commented: catalog does not support schema comments", exception.getMessage());
   }
 
   @Test

@@ -20,10 +20,17 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import javax.annotation.Nullable;
+import org.apache.gravitino.storage.relational.po.TableNamePO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
+import org.apache.ibatis.annotations.Many;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.ResultMap;
+import org.apache.ibatis.annotations.Results;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
@@ -37,6 +44,82 @@ import org.apache.ibatis.annotations.UpdateProvider;
  */
 public interface TableMetaMapper {
   String TABLE_NAME = "table_meta";
+
+  /**
+   * Looks up table and ancestor names in one statement. An absent parent has a null name.
+   *
+   * @param ids Stable table IDs.
+   * @return Name components of the live tables.
+   */
+  @Select({
+    "<script>",
+    "SELECT t.table_id AS tableId, t.table_name AS tableName, s.schema_name AS schemaName,",
+    "c.catalog_name AS catalogName FROM table_meta t",
+    "LEFT JOIN schema_meta s ON s.schema_id = t.schema_id AND s.deleted_at = 0",
+    "LEFT JOIN catalog_meta c ON c.catalog_id = s.catalog_id AND c.deleted_at = 0",
+    "WHERE t.deleted_at = 0 AND t.table_id IN",
+    "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>",
+    "</script>"
+  })
+  List<TableNamePO> listTableNamesByIds(@Param("ids") List<Long> ids);
+
+  /**
+   * Reads table metadata, its current version, and columns from one database statement snapshot.
+   *
+   * @param schemaId the parent schema ID
+   * @param tableName the table name
+   * @return the aggregate snapshot, or null when the table does not exist
+   */
+  @Results(
+      id = "tableWithColumns",
+      value = {
+        @Result(property = "tableId", column = "tableId", id = true),
+        @Result(property = "tableName", column = "tableName"),
+        @Result(property = "metalakeId", column = "metalakeId"),
+        @Result(property = "catalogId", column = "catalogId"),
+        @Result(property = "schemaId", column = "schemaId"),
+        @Result(property = "auditInfo", column = "auditInfo"),
+        @Result(property = "currentVersion", column = "currentVersion"),
+        @Result(property = "lastVersion", column = "lastVersion"),
+        @Result(property = "deletedAt", column = "deletedAt"),
+        @Result(property = "format", column = "format"),
+        @Result(property = "properties", column = "properties"),
+        @Result(property = "partitions", column = "partitions"),
+        @Result(property = "sortOrders", column = "sortOrders"),
+        @Result(property = "distribution", column = "distribution"),
+        @Result(property = "indexes", column = "indexes"),
+        @Result(property = "comment", column = "comment"),
+        @Result(
+            property = "columnPOs",
+            javaType = List.class,
+            many = @Many(resultMap = "tableColumnSnapshot", columnPrefix = "col_"))
+      })
+  @SelectProvider(
+      type = TableMetaSQLProviderFactory.class,
+      method = "selectTableWithColumnsBySchemaIdAndName")
+  @Nullable
+  TablePO selectTableWithColumnsBySchemaIdAndName(
+      @Param("schemaId") Long schemaId, @Param("tableName") String tableName);
+
+  /**
+   * Reads a table aggregate by its full name, retaining missing-parent placeholders.
+   *
+   * @param metalakeName the metalake name
+   * @param catalogName the catalog name
+   * @param schemaName the physical schema name
+   * @param tableName the table name
+   * @return the aggregate or parent placeholder, or null when the metalake or catalog is absent
+   */
+  @ResultMap("tableWithColumns")
+  @SelectProvider(
+      type = TableMetaSQLProviderFactory.class,
+      method = "selectTableWithColumnsByFullQualifiedName")
+  @Nullable
+  TablePO selectTableWithColumnsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("tableName") String tableName);
 
   @SelectProvider(type = TableMetaSQLProviderFactory.class, method = "listTablePOsBySchemaId")
   List<TablePO> listTablePOsBySchemaId(@Param("schemaId") Long schemaId);
@@ -73,6 +156,15 @@ public interface TableMetaMapper {
       @Param("schemaName") String schemaName,
       @Param("tableName") String tableName);
 
+  /**
+   * Selects and exclusively locks an active table metadata row.
+   *
+   * @param tableId the table ID
+   * @return the active table metadata, or {@code null} when it no longer exists
+   */
+  @SelectProvider(type = TableMetaSQLProviderFactory.class, method = "selectTableMetaByIdForUpdate")
+  TablePO selectTableMetaByIdForUpdate(@Param("tableId") Long tableId);
+
   @InsertProvider(type = TableMetaSQLProviderFactory.class, method = "insertTableMeta")
   void insertTableMeta(@Param("tableMeta") TablePO tablePO);
 
@@ -87,10 +179,25 @@ public interface TableMetaMapper {
       @Param("oldTableMeta") TablePO oldTablePO,
       @Param("newSchemaId") Long newSchemaId);
 
+  /**
+   * Soft-deletes an observed table registration in the same catalog lifetime.
+   *
+   * @param tableId the stable external identity
+   * @param currentVersion the observed row version
+   * @param catalogId the observed parent catalog identity
+   * @param schemaId the observed parent schema identity
+   * @param tableName the observed table name
+   * @return the number of affected rows
+   */
   @UpdateProvider(
       type = TableMetaSQLProviderFactory.class,
       method = "softDeleteTableMetasByTableId")
-  Integer softDeleteTableMetasByTableId(@Param("tableId") Long tableId);
+  Integer softDeleteTableMetasByTableId(
+      @Param("tableId") Long tableId,
+      @Param("currentVersion") Long currentVersion,
+      @Param("catalogId") Long catalogId,
+      @Param("schemaId") Long schemaId,
+      @Param("tableName") String tableName);
 
   @UpdateProvider(
       type = TableMetaSQLProviderFactory.class,

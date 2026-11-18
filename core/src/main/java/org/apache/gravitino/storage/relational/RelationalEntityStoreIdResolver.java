@@ -28,6 +28,7 @@ import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.storage.relational.helper.CatalogIds;
 import org.apache.gravitino.storage.relational.helper.SchemaIds;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
+import org.apache.gravitino.storage.relational.service.DomainMetaService;
 import org.apache.gravitino.storage.relational.service.FilesetMetaService;
 import org.apache.gravitino.storage.relational.service.FunctionMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
@@ -37,6 +38,7 @@ import org.apache.gravitino.storage.relational.service.ModelMetaService;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
+import org.apache.gravitino.storage.relational.service.SemanticModelMetaService;
 import org.apache.gravitino.storage.relational.service.TableColumnMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.storage.relational.service.TagMetaService;
@@ -55,7 +57,8 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
           Entity.EntityType.TAG,
           Entity.EntityType.POLICY,
           Entity.EntityType.JOB,
-          Entity.EntityType.JOB_TEMPLATE);
+          Entity.EntityType.JOB_TEMPLATE,
+          Entity.EntityType.DOMAIN);
 
   private static final Set<Entity.EntityType> ENTITY_TYPES_REQUIRING_CATALOG_IDS =
       ImmutableSet.of(Entity.EntityType.CATALOG);
@@ -69,7 +72,8 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
           Entity.EntityType.MODEL,
           Entity.EntityType.COLUMN,
           Entity.EntityType.FUNCTION,
-          Entity.EntityType.VIEW);
+          Entity.EntityType.VIEW,
+          Entity.EntityType.SEMANTIC_MODEL);
 
   @Override
   public NamespacedEntityId getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type) {
@@ -157,6 +161,12 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
                 .getJobTemplateIdByMetalakeIdAndName(metalakeId, nameIdentifier.name());
         return new NamespacedEntityId(jobTemplateId, metalakeId);
 
+      case DOMAIN:
+        long domainId =
+            DomainMetaService.getInstance()
+                .getDomainIdByMetalakeIdAndName(metalakeId, nameIdentifier.name());
+        return new NamespacedEntityId(domainId, metalakeId);
+
       case JOB:
         long jobId =
             Long.parseLong(nameIdentifier.name().substring(JobHandle.JOB_ID_PREFIX.length()));
@@ -234,6 +244,17 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
                 .getViewIdBySchemaIdAndName(schemaIds.getSchemaId(), nameIdentifier.name());
         return new NamespacedEntityId(
             viewId, schemaIds.getMetalakeId(), schemaIds.getCatalogId(), schemaIds.getSchemaId());
+
+      case SEMANTIC_MODEL:
+        long semanticModelId =
+            SemanticModelMetaService.getInstance()
+                .getSemanticModelIdBySchemaIdAndName(
+                    schemaIds.getSchemaId(), nameIdentifier.name());
+        return new NamespacedEntityId(
+            semanticModelId,
+            schemaIds.getMetalakeId(),
+            schemaIds.getCatalogId(),
+            schemaIds.getSchemaId());
 
       case FUNCTION:
         long functionId =

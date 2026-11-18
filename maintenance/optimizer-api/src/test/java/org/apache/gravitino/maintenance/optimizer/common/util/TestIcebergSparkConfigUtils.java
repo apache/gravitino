@@ -42,8 +42,45 @@ public class TestIcebergSparkConfigUtils {
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.type"));
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.uri"));
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.warehouse"));
+    assertEquals("{{catalog_name}}", configs.get("spark.sql.defaultCatalog"));
     assertEquals(
         IcebergSparkConfigUtils.ICEBERG_SPARK_EXTENSIONS, configs.get("spark.sql.extensions"));
+  }
+
+  @Test
+  public void testEnsureIcebergCatalogConfigsSetsDefaultCatalogFromCatalogName() {
+    Map<String, String> configs = new HashMap<>();
+    configs.put("spark.sql.catalog.ice_prod.type", "rest");
+    configs.put("spark.sql.catalog.ice_prod.uri", "http://localhost:9001/iceberg");
+
+    IcebergSparkConfigUtils.ensureIcebergCatalogConfigs(configs, "ice_prod");
+
+    assertEquals(
+        "org.apache.iceberg.spark.SparkCatalog", configs.get("spark.sql.catalog.ice_prod"));
+    assertEquals("ice_prod", configs.get("spark.sql.defaultCatalog"));
+    assertEquals(
+        IcebergSparkConfigUtils.ICEBERG_SPARK_EXTENSIONS, configs.get("spark.sql.extensions"));
+  }
+
+  @Test
+  public void testEnsureIcebergCatalogConfigsRejectsUserDefaultCatalog() {
+    Map<String, String> configs = new HashMap<>();
+    configs.put("spark.sql.catalog.ice_prod.type", "rest");
+    configs.put("spark.sql.defaultCatalog", "spark_catalog");
+
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> IcebergSparkConfigUtils.ensureIcebergCatalogConfigs(configs, "ice_prod"));
+    assertTrue(e.getMessage().contains("spark.sql.defaultCatalog"));
+    assertTrue(e.getMessage().contains("catalog_name"));
+  }
+
+  @Test
+  public void testBuildTemplateSparkConfigsLeavesMasterUnsetByDefault() {
+    Map<String, String> configs = IcebergSparkConfigUtils.buildTemplateSparkConfigs();
+
+    assertEquals("{{spark_master:-}}", configs.get("spark.master"));
   }
 
   @Test

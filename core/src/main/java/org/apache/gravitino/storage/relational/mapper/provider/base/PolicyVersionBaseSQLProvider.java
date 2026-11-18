@@ -18,31 +18,13 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
-import static org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper.POLICY_META_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper.POLICY_VERSION_TABLE_NAME;
 
-import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
 import org.apache.ibatis.annotations.Param;
 
 public class PolicyVersionBaseSQLProvider {
-
-  public String insertPolicyVersionOnDuplicateKeyUpdate(
-      @Param("policyVersion") PolicyVersionPO policyVersion) {
-    return "INSERT INTO "
-        + POLICY_VERSION_TABLE_NAME
-        + " (metalake_id, policy_id, version, policy_comment, enabled, content, deleted_at)"
-        + " VALUES (#{policyVersion.metalakeId}, #{policyVersion.policyId}, #{policyVersion.version}, #{policyVersion.policyComment},"
-        + " #{policyVersion.enabled}, #{policyVersion.content}, #{policyVersion.deletedAt})"
-        + " ON DUPLICATE KEY UPDATE"
-        + " metalake_id = #{policyVersion.metalakeId},"
-        + " policy_id = #{policyVersion.policyId},"
-        + " version = #{policyVersion.version},"
-        + " policy_comment = #{policyVersion.policyComment},"
-        + " enabled = #{policyVersion.enabled},"
-        + " content = #{policyVersion.content},"
-        + " deleted_at = #{policyVersion.deletedAt}";
-  }
 
   public String insertPolicyVersion(@Param("policyVersion") PolicyVersionPO policyVersion) {
     return "INSERT INTO "
@@ -53,25 +35,13 @@ public class PolicyVersionBaseSQLProvider {
         + " #{policyVersion.deletedAt})";
   }
 
-  public String softDeletePolicyVersionByMetalakeAndPolicyName(
-      @Param("metalakeName") String metalakeName, @Param("policyName") String policyName) {
+  /** Returns SQL that soft-deletes every active content snapshot for a policy ID. */
+  public String softDeletePolicyVersionsByPolicyId(@Param("policyId") Long policyId) {
     return "UPDATE "
         + POLICY_VERSION_TABLE_NAME
-        + " pv SET pv.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE pv.metalake_id IN ("
-        + " SELECT mm.metalake_id FROM "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
-        + " AND pv.policy_id IN ("
-        + " SELECT pm.policy_id FROM "
-        + POLICY_META_TABLE_NAME
-        + " pm WHERE pm.policy_name = #{policyName} AND pm.deleted_at = 0"
-        + " AND pm.metalake_id IN ("
-        + " SELECT mm.metalake_id FROM "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0))"
-        + " AND pv.deleted_at = 0";
+        + " WHERE policy_id = #{policyId} AND deleted_at = 0";
   }
 
   public String deletePolicyVersionsByLegacyTimeline(
@@ -97,8 +67,8 @@ public class PolicyVersionBaseSQLProvider {
       @Param("limit") int limit) {
     return "UPDATE "
         + POLICY_VERSION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE policy_id = #{policyId} AND version <= #{versionRetentionLine} AND deleted_at = 0"
         + " LIMIT #{limit}";
   }
@@ -106,8 +76,8 @@ public class PolicyVersionBaseSQLProvider {
   public String softDeletePolicyVersionsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + POLICY_VERSION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 }

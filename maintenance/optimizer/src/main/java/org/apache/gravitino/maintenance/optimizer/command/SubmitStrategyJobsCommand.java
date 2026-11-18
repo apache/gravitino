@@ -36,13 +36,13 @@ public class SubmitStrategyJobsCommand implements OptimizerCommandExecutor {
       if (context.dryRun()) {
         results =
             recommender.recommendForStrategyName(
-                context.parsedIdentifiers(), context.strategyName(), limit);
+                context.parsedTableIdentifiers(), context.strategyName(), limit);
         results.forEach(
             result -> OptimizerOutputPrinter.printDryRunResult(context.output(), result));
       } else {
         results =
             recommender.submitForStrategyName(
-                context.parsedIdentifiers(), context.strategyName(), limit);
+                context.parsedTableIdentifiers(), context.strategyName(), limit);
         results.forEach(
             result -> OptimizerOutputPrinter.printSubmitResult(context.output(), result));
       }

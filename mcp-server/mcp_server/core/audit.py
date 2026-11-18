@@ -17,6 +17,7 @@
 
 import base64
 import binascii
+import hashlib
 import json
 import logging
 from datetime import datetime, timezone
@@ -28,15 +29,23 @@ def _extract_principal(authorization: str) -> str:
     """Derive a display principal from a raw Authorization header value.
 
     - "Basic <base64(user:secret)>" → "<user>"  (Gravitino simple auth)
-    - "Bearer <token>"              → "bearer:<first-8-chars-of-token>"
+    - "Bearer <token>"              → "bearer:<sha256(token)[:16]>"
+    - "<scheme> <credential>"       → "<scheme>:<sha256(credential)[:16]>"
     - empty / missing / unparsable  → "anonymous"
+
+    The credential may itself contain spaces (a custom scheme is free to use a
+    comma-separated parameter list), so only the scheme is split off. Falling
+    back to the scheme name keeps a static custom-scheme identity attributable
+    in the audit log instead of recording it as anonymous.
     """
     if not authorization:
         return "anonymous"
-    parts = authorization.split()
+    parts = authorization.split(None, 1)
     if len(parts) != 2:
         return "anonymous"
-    scheme, credential = parts[0].lower(), parts[1]
+    scheme, credential = parts[0].lower(), parts[1].strip()
+    if not credential:
+        return "anonymous"
     if scheme == "basic":
         try:
             decoded = base64.b64decode(credential, validate=True).decode(
@@ -46,9 +55,8 @@ def _extract_principal(authorization: str) -> str:
             return "anonymous"
         user = decoded.split(":", 1)[0]
         return user if user else "anonymous"
-    if scheme == "bearer":
-        return f"bearer:{credential[:8]}"
-    return "anonymous"
+    digest = hashlib.sha256(credential.encode("utf-8", "surrogatepass"))
+    return f"{scheme}:{digest.hexdigest()[:16]}"
 
 
 def emit(
@@ -57,17 +65,25 @@ def emit(
     tool: str,
     outcome: str,
     error_type: str = "",
+    metalake: str = "",
 ) -> None:
     """Write one structured JSON audit record to the audit logger.
 
     Args:
-        principal: Identity derived from the request (e.g. "bearer:abc12345" or "anonymous").
+        principal: Identity derived from the request (e.g. "bearer:f39dac6cbaba535e" or "anonymous").
         tool:      MCP tool name that was invoked.
         outcome:   "allow" for successful calls, "deny" for failed calls. Note the
                    AuditMiddleware emits "deny" for any tool-call exception (an
                    authorization denial being the common case), not only
                    authorization failures; inspect error_type to disambiguate.
         error_type: Exception class name when outcome is "deny", empty otherwise.
+        metalake:  Metalake the call operated on, resolved - so a call that
+                   relied on the server default records that default. Empty
+                   only for tools that are not metalake-scoped, such as the
+                   metalake listing, which spans every tenant the caller can
+                   see. Recorded because one server can now serve several
+                   metalakes, so "which tenant did this touch" is no longer
+                   answerable from the server config alone.
     """
     record = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -75,6 +91,8 @@ def emit(
         "tool": tool,
         "outcome": outcome,
     }
+    if metalake:
+        record["metalake"] = metalake
     if error_type:
         record["error_type"] = error_type
 

@@ -32,6 +32,9 @@ public final class IdpCredentialValidator {
   /** Matches {@code idp_user_meta.user_name} and {@code idp_group_meta.group_name} column size. */
   private static final int MAX_NAME_LENGTH = 128;
 
+  /** Matches {@code idp_group_meta.group_comment} column size (utf8mb4 VARCHAR(1024)). */
+  private static final int MAX_COMMENT_LENGTH = 1024;
+
   private IdpCredentialValidator() {}
 
   public static void validateUsername(String username) {
@@ -53,9 +56,31 @@ public final class IdpCredentialValidator {
         MAX_NAME_LENGTH);
   }
 
-  public static void validatePassword(String password) {
+  public static void validateGroupComment(String comment) {
+    if (comment == null) {
+      return;
+    }
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(password), "\"password\" field is required and cannot be empty");
+        comment.codePointCount(0, comment.length()) <= MAX_COMMENT_LENGTH,
+        "Group comment must not exceed %s characters",
+        MAX_COMMENT_LENGTH);
+  }
+
+  public static void validatePassword(String password) {
+    validatePassword(password, "password");
+  }
+
+  /**
+   * Validates a password field.
+   *
+   * @param password the password value
+   * @param fieldName the JSON/request field name used in error messages
+   */
+  public static void validatePassword(String password, String fieldName) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(password),
+        "\"%s\" field is required and cannot be empty",
+        fieldName);
     Preconditions.checkArgument(
         password.length() >= MIN_PASSWORD_LENGTH && password.length() <= MAX_PASSWORD_LENGTH,
         "Password must be at least %s characters long and at most %s characters long",

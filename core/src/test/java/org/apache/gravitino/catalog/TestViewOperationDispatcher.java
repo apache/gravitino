@@ -25,8 +25,17 @@ import static org.apache.gravitino.Entity.EntityType.SCHEMA;
 import static org.apache.gravitino.Entity.EntityType.VIEW;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -45,14 +54,18 @@ import java.util.function.Supplier;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.connector.TestCatalogOperations;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.ViewEntity;
@@ -64,6 +77,8 @@ import org.apache.gravitino.rel.ViewChange;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestViewOperationDispatcher extends TestOperationDispatcher {
   static ViewOperationDispatcher viewOperationDispatcher;
@@ -72,10 +87,14 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
   @BeforeAll
   public static void initialize() throws IOException, IllegalAccessException {
     schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     viewOperationDispatcher =
         new ViewOperationDispatcher(
-            catalogManager, entityStore, idGenerator, () -> schemaOperationDispatcher);
+            catalogManager,
+            entityStore,
+            idGenerator,
+            () -> schemaOperationDispatcher,
+            secretManager);
 
     Config config = mock(Config.class);
     doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
@@ -137,6 +156,127 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     };
   }
 
+  /**
+   * Imports write creation audit once and recover safely after competing imports or deletion.
+   *
+   * @param scenario the source audit and competing-import ordering to exercise
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"missing", "reported", "modified", "load", "raced", "deleted"})
+  public void testImportCreationAudit(String scenario) throws Exception {
+    Instant importTime = Instant.EPOCH.plusSeconds(60);
+    AuditInfo importAudit =
+        AuditInfo.builder().withCreator("alice").withCreateTime(importTime).build();
+    AuditInfo catalogAudit =
+        "reported".equals(scenario)
+            ? AuditInfo.builder().withCreator("catalog_user").withCreateTime(Instant.EPOCH).build()
+            : "modified".equals(scenario)
+                ? AuditInfo.builder()
+                    .withCreateTime(Instant.EPOCH)
+                    .withLastModifier("modifier")
+                    .withLastModifiedTime(Instant.EPOCH)
+                    .build()
+                : AuditInfo.EMPTY;
+    String expectedCreator =
+        "reported".equals(scenario) ? "catalog_user" : "load".equals(scenario) ? null : "alice";
+    Instant expectedTime =
+        "reported".equals(scenario) || "modified".equals(scenario)
+            ? Instant.EPOCH
+            : "load".equals(scenario) ? null : importTime;
+    NameIdentifier schemaIdent =
+        NameIdentifier.of(metalake, catalog, "schema_import_audit_view_" + scenario);
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", props);
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations operations = (TestCatalogOperations) testCatalog.ops();
+    NameIdentifier identifier =
+        NameIdentifier.of(metalake, catalog, schemaIdent.name(), "view_import_audit");
+    operations.views.put(identifier, createMockView(identifier.name(), props, catalogAudit));
+    entityStore.delete(identifier, VIEW);
+    clearInvocations(entityStore);
+
+    if ("raced".equals(scenario) || "deleted".equals(scenario)) {
+      viewOperationDispatcher.loadView(identifier);
+      clearInvocations(entityStore);
+    }
+    if ("deleted".equals(scenario)) {
+      doAnswer(
+              call -> {
+                entityStore.delete(identifier, VIEW);
+                throw new OptimisticLockException("Registration deleted during audit recovery");
+              })
+          .when(entityStore)
+          .update(eq(identifier), eq(ViewEntity.class), eq(VIEW), any());
+    }
+    View loaded =
+        "load".equals(scenario)
+            ? viewOperationDispatcher.loadView(identifier)
+            : viewOperationDispatcher.importView(identifier, importAudit);
+
+    if ("deleted".equals(scenario)) {
+      EntityCombinedView combined = (EntityCombinedView) loaded;
+      Assertions.assertFalse(combined.imported());
+      Assertions.assertNull(combined.viewEntity());
+      Assertions.assertNull(loaded.auditInfo().creator());
+      Assertions.assertEquals(identifier.name(), loaded.name());
+      Assertions.assertEquals(props, loaded.properties());
+      verify(entityStore, never()).put(any(ViewEntity.class), anyBoolean());
+      verify(entityStore).update(eq(identifier), eq(ViewEntity.class), eq(VIEW), any());
+      reset(entityStore);
+      viewOperationDispatcher.loadView(identifier);
+      Assertions.assertNull(
+          entityStore.get(identifier, VIEW, ViewEntity.class).auditInfo().creator());
+      return;
+    }
+
+    ViewEntity imported = entityStore.get(identifier, VIEW, ViewEntity.class);
+    Assertions.assertEquals(expectedCreator, imported.auditInfo().creator());
+    Assertions.assertEquals(expectedCreator, loaded.auditInfo().creator());
+    Assertions.assertEquals(expectedTime, loaded.auditInfo().createTime());
+    Assertions.assertEquals(
+        "modified".equals(scenario) ? "modifier" : null, imported.auditInfo().lastModifier());
+    Assertions.assertEquals(
+        "modified".equals(scenario) ? Instant.EPOCH : null,
+        imported.auditInfo().lastModifiedTime());
+    Assertions.assertEquals(expectedTime, imported.auditInfo().createTime());
+    if ("raced".equals(scenario)) {
+      verify(entityStore, never()).put(any(ViewEntity.class), anyBoolean());
+      verify(entityStore).update(eq(identifier), eq(ViewEntity.class), eq(VIEW), any());
+    } else {
+      verify(entityStore).put(any(ViewEntity.class), eq(false));
+      verify(entityStore, never()).update(any(), any(), any(), any());
+    }
+
+    clearInvocations(entityStore);
+    viewOperationDispatcher.importView(
+        identifier,
+        AuditInfo.builder().withCreator("bob").withCreateTime(importTime.plusSeconds(60)).build());
+    Assertions.assertEquals(
+        "load".equals(scenario) ? "bob" : expectedCreator,
+        entityStore.get(identifier, VIEW, ViewEntity.class).auditInfo().creator());
+    Assertions.assertEquals(
+        "load".equals(scenario) ? importTime.plusSeconds(60) : expectedTime,
+        entityStore.get(identifier, VIEW, ViewEntity.class).auditInfo().createTime());
+    verify(entityStore, never()).put(any(), anyBoolean());
+    if ("load".equals(scenario)) {
+      verify(entityStore).update(eq(identifier), eq(ViewEntity.class), eq(VIEW), any());
+    } else {
+      verify(entityStore, never()).update(any(), any(), any(), any());
+    }
+  }
+
+  /** Explicit imports require audit information. */
+  @Test
+  public void testImportRejectsNullAudit() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            viewOperationDispatcher.importView(
+                NameIdentifier.of(metalake, catalog, "schema", "missing"), null));
+  }
+
   @Test
   public void testLoadView() throws IOException {
     Namespace viewNs = Namespace.of(metalake, catalog, "schema61");
@@ -152,7 +292,8 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
 
     // Mock the catalog operations to return the view
     TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
     TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
     testCatalogOperations.views.put(viewIdent1, mockView);
 
@@ -184,7 +325,8 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
 
     // Create multiple views
     TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
     TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
 
     for (int i = 1; i <= 3; i++) {
@@ -207,7 +349,9 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
   public void testViewOperationDispatcherRejectsNullSchemaDispatcherSupplier() {
     Assertions.assertThrows(
         NullPointerException.class,
-        () -> new ViewOperationDispatcher(catalogManager, entityStore, idGenerator, null));
+        () ->
+            new ViewOperationDispatcher(
+                catalogManager, entityStore, idGenerator, null, secretManager));
   }
 
   @Test
@@ -219,7 +363,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     Supplier<SchemaDispatcher> nullSchemaDispatcherSupplier = () -> null;
     ViewOperationDispatcher dispatcher =
         new ViewOperationDispatcher(
-            catalogManager, entityStore, idGenerator, nullSchemaDispatcherSupplier);
+            catalogManager, entityStore, idGenerator, nullSchemaDispatcherSupplier, secretManager);
     NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view_null_dispatcher");
     Representation[] representations =
         new Representation[] {
@@ -252,7 +396,8 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     View mockView = createMockView("auto_import_view", props, auditInfo);
 
     TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
     TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
     testCatalogOperations.views.put(viewIdent, mockView);
 
@@ -301,7 +446,8 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     View mockView = createMockView("already_imported_view", props, auditInfo);
 
     TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
     TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
     testCatalogOperations.views.put(viewIdent, mockView);
 
@@ -322,6 +468,111 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testConcurrentImportViewReusesExistingEntity() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_view_concurrent_import");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view_concurrent_import");
+    View createdView = createViewForLockTest(viewIdent);
+    ViewEntity importedViewEntity = entityStore.get(viewIdent, VIEW, ViewEntity.class);
+
+    ViewEntity concurrentViewEntity =
+        ViewEntity.builder()
+            .withId(importedViewEntity.id())
+            .withName(viewIdent.name())
+            .withNamespace(viewIdent.namespace())
+            .withComment(createdView.comment())
+            .withColumns(createdView.columns())
+            .withRepresentations(createdView.representations())
+            .withProperties(createdView.properties())
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+
+    // Simulate an HA race: the pre-import checks miss, the create-only write conflicts, and the
+    // reload observes the entity imported by the winning node.
+    reset(entityStore);
+    doThrow(new NoSuchEntityException("mock error"))
+        .doThrow(new NoSuchEntityException("mock error"))
+        .doReturn(concurrentViewEntity)
+        .when(entityStore)
+        .get(any(), eq(Entity.EntityType.VIEW), any());
+    doThrow(new EntityAlreadyExistsException("mock conflict"))
+        .when(entityStore)
+        .put(any(), anyBoolean());
+
+    View loadedView =
+        Assertions.assertDoesNotThrow(() -> viewOperationDispatcher.loadView(viewIdent));
+    Assertions.assertEquals(viewIdent.name(), loadedView.name());
+    verify(entityStore).put(any(ViewEntity.class), eq(false));
+  }
+
+  @Test
+  public void testConcurrentImportViewFailsOnMismatchedIdentifier() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_view_import_conflict");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view_import_conflict");
+    View createdView = createViewForLockTest(viewIdent);
+    ViewEntity importedViewEntity = entityStore.get(viewIdent, VIEW, ViewEntity.class);
+
+    ViewEntity mismatchedViewEntity =
+        ViewEntity.builder()
+            .withId(importedViewEntity.id() + 1)
+            .withName(viewIdent.name())
+            .withNamespace(viewIdent.namespace())
+            .withComment(createdView.comment())
+            .withColumns(createdView.columns())
+            .withRepresentations(createdView.representations())
+            .withProperties(createdView.properties())
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+
+    // Simulate an external rename or multi-path conflict: the create-only write fails, and the
+    // entity found during reload has a different stable ID.
+    reset(entityStore);
+    doThrow(new NoSuchEntityException("mock error"))
+        .doThrow(new NoSuchEntityException("mock error"))
+        .doReturn(mismatchedViewEntity)
+        .when(entityStore)
+        .get(any(), eq(Entity.EntityType.VIEW), any());
+    doThrow(new EntityAlreadyExistsException("mock conflict"))
+        .when(entityStore)
+        .put(any(), anyBoolean());
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class, () -> viewOperationDispatcher.loadView(viewIdent));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("does not automatically reconcile conflicting external view registrations"));
+    Assertions.assertTrue(
+        exception.getMessage().contains("metadata-only unregister of an individual external view"));
+    Assertions.assertTrue(exception.getMessage().contains("force-drop and recreate"));
+    Assertions.assertTrue(
+        exception.getMessage().contains("privileges, tags, and other relationships"));
+    Assertions.assertTrue(exception.getMessage().contains("catalog-specific recovery guidance"));
+    verify(entityStore).put(any(ViewEntity.class), eq(false));
+  }
+
+  @Test
+  void testImportViewAfterRegistrationDeletionReusesIdentifier() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_soft_deleted_view_identifier");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view_soft_deleted_identifier");
+    createViewForLockTest(viewIdent);
+    ViewEntity viewEntity = entityStore.get(viewIdent, VIEW, ViewEntity.class);
+    entityStore.delete(viewIdent, VIEW);
+
+    reset(entityStore);
+    Assertions.assertDoesNotThrow(() -> viewOperationDispatcher.loadView(viewIdent));
+    Assertions.assertEquals(
+        viewEntity.id(), entityStore.get(viewIdent, VIEW, ViewEntity.class).id());
+    verify(entityStore).put(any(ViewEntity.class), eq(false));
+  }
+
+  @Test
   public void testLoadViewAutoImportWithMultipleConcurrentLoads() throws Exception {
     Namespace viewNs = Namespace.of(metalake, catalog, "schema66");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
@@ -335,7 +586,8 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     View mockView = createMockView("concurrent_view", props, auditInfo);
 
     TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
     TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
     testCatalogOperations.views.put(viewIdent, mockView);
 
@@ -398,7 +650,8 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     View mockView = createMockView("deleted_view", props, auditInfo);
 
     TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
     TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
     testCatalogOperations.views.put(viewIdent, mockView);
 
@@ -483,6 +736,54 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testImportViewPropagatesOptimisticLockConflict() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_import_view_occ");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view_import_occ");
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    viewOperationDispatcher.createView(
+        viewIdent, null, new Column[0], representations, null, null, ImmutableMap.of("k1", "v1"));
+    entityStore.delete(viewIdent, VIEW);
+
+    doThrow(new NoSuchEntityException("mock error")).when(entityStore).get(any(), eq(VIEW), any());
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(entityStore)
+        .put(any(ViewEntity.class), anyBoolean());
+    try {
+      Assertions.assertThrows(
+          OptimisticLockException.class, () -> viewOperationDispatcher.loadView(viewIdent));
+    } finally {
+      reset(entityStore);
+    }
+  }
+
+  @Test
+  public void testDropViewPropagatesOptimisticLockConflict() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_drop_view_occ");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view_occ");
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    viewOperationDispatcher.createView(
+        viewIdent, null, new Column[0], representations, null, null, ImmutableMap.of("k1", "v1"));
+
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(entityStore)
+        .delete(any(), eq(VIEW), anyBoolean());
+    try {
+      Assertions.assertThrows(
+          OptimisticLockException.class, () -> viewOperationDispatcher.dropView(viewIdent));
+    } finally {
+      reset(entityStore);
+    }
+  }
+
+  @Test
   public void testDropView() throws IOException {
     Namespace viewNs = Namespace.of(metalake, catalog, "schema_drop_view");
     schemaOperationDispatcher.createSchema(
@@ -523,7 +824,8 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
         viewIdent, null, new Column[0], representations, null, null, ImmutableMap.of("k1", "v1"));
 
     TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
     TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
     Assertions.assertTrue(testCatalogOperations.dropSchema(schemaIdent, false));
     Assertions.assertFalse(testCatalogOperations.schemaExists(schemaIdent));
@@ -557,16 +859,19 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     // now-empty namespaces, so the catalog no longer knows the view (dropView returns false),
     // while Gravitino still holds the orphaned schema entities.
     TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
     TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
     Assertions.assertTrue(testCatalogOperations.dropView(viewIdent));
     Assertions.assertTrue(testCatalogOperations.dropSchema(schemaIdent, false));
     Assertions.assertFalse(testCatalogOperations.schemaExists(schemaIdent));
     Assertions.assertFalse(testCatalogOperations.schemaExists(ancestorIdent));
 
-    // dropView returns false because the view is already gone from the catalog, but the
-    // orphaned schema entities must still be cleaned up.
+    // dropView returns false because the view is already gone from the catalog. Preserve the view
+    // entity because the same result can be caused by a concurrent rename, while still cleaning up
+    // orphaned schema entities.
     Assertions.assertFalse(viewOperationDispatcher.dropView(viewIdent));
+    Assertions.assertTrue(entityStore.exists(viewIdent, VIEW));
     Assertions.assertFalse(entityStore.exists(schemaIdent, SCHEMA));
     Assertions.assertFalse(entityStore.exists(ancestorIdent, SCHEMA));
   }
@@ -644,6 +949,69 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testRenameViewSurfacesStoreUpdateFailure() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_rename_view_store_failure");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "c", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    NameIdentifier oldIdent = NameIdentifier.of(viewNs, "view_before_rename");
+    NameIdentifier newIdent = NameIdentifier.of(viewNs, "view_after_rename");
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    viewOperationDispatcher.createView(
+        oldIdent, "c", new Column[0], representations, null, null, ImmutableMap.of("k1", "v1"));
+
+    reset(entityStore);
+    doThrow(new NoSuchEntityException("mock update conflict"))
+        .when(entityStore)
+        .update(any(), any(), any(), any());
+
+    GravitinoRuntimeException exception =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class,
+            () -> viewOperationDispatcher.alterView(oldIdent, ViewChange.rename(newIdent.name())));
+    Assertions.assertTrue(exception.getMessage().contains(oldIdent.toString()));
+    Assertions.assertTrue(exception.getMessage().contains(newIdent.toString()));
+    reset(entityStore);
+  }
+
+  @Test
+  public void testRenameViewFailsBeforeExternalChangeWhenStoreReadFails() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_rename_view_store_read_failure");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "c", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    NameIdentifier oldIdent = NameIdentifier.of(viewNs, "view_before_failed_rename");
+    NameIdentifier newIdent = NameIdentifier.of(viewNs, "view_after_failed_rename");
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    viewOperationDispatcher.createView(
+        oldIdent, "c", new Column[0], representations, null, null, ImmutableMap.of("k1", "v1"));
+
+    reset(entityStore);
+    doThrow(new IOException("mock store read failure"))
+        .when(entityStore)
+        .get(any(), eq(VIEW), any());
+
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class,
+        () -> viewOperationDispatcher.alterView(oldIdent, ViewChange.rename(newIdent.name())));
+
+    catalogManager.doWithCatalog(
+        NameIdentifier.of(metalake, catalog),
+        liveCatalog -> {
+          TestCatalogOperations testCatalogOperations = (TestCatalogOperations) liveCatalog.ops();
+          Assertions.assertDoesNotThrow(() -> testCatalogOperations.loadView(oldIdent));
+          Assertions.assertThrows(
+              NoSuchViewException.class, () -> testCatalogOperations.loadView(newIdent));
+          return null;
+        });
+    reset(entityStore);
+  }
+
+  @Test
   public void testAlterViewReplace() throws IOException {
     Namespace viewNs = Namespace.of(metalake, catalog, "schema_alter_replace");
     schemaOperationDispatcher.createSchema(
@@ -690,5 +1058,81 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
                 AuditInfo.builder().withCreator("tester").withCreateTime(Instant.now()).build())
             .build();
     entityStore.put(entity, true);
+  }
+
+  @Test
+  public void testCreateViewRunsConcurrentlyWithCreateViewOfAnotherView() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_view_lock_1");
+    createSchemaForLockTest(schemaIdent);
+
+    // Another in-flight create holds the WRITE lock on its own view node.
+    try (TreeLockTestSupport.HeldLock inFlightCreate =
+        TreeLockTestSupport.HeldLock.acquire(
+            NameIdentifier.of(metalake, catalog, "schema_view_lock_1", "other_view"),
+            LockType.WRITE)) {
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          inFlightCreate,
+          () ->
+              createViewForLockTest(
+                  NameIdentifier.of(metalake, catalog, "schema_view_lock_1", "view1")));
+    }
+  }
+
+  @Test
+  public void testCreateViewWaitsForCreateViewOfSameName() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_view_lock_2");
+    createSchemaForLockTest(schemaIdent);
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_view_lock_2", "view1");
+
+    TreeLockTestSupport.HeldLock sameNameCreate =
+        TreeLockTestSupport.HeldLock.acquire(ident, LockType.WRITE);
+    TreeLockTestSupport.assertWaitsFor(sameNameCreate, () -> createViewForLockTest(ident));
+  }
+
+  @Test
+  public void testCreateViewWaitsForSchemaWriteLock() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_view_lock_3");
+    createSchemaForLockTest(schemaIdent);
+
+    TreeLockTestSupport.HeldLock schemaWriter =
+        TreeLockTestSupport.HeldLock.acquire(schemaIdent, LockType.WRITE);
+    TreeLockTestSupport.assertWaitsFor(
+        schemaWriter,
+        () ->
+            createViewForLockTest(
+                NameIdentifier.of(metalake, catalog, "schema_view_lock_3", "view1")));
+  }
+
+  @Test
+  public void testCreateViewWaitsForCatalogWriteLock() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_view_lock_4");
+    createSchemaForLockTest(schemaIdent);
+
+    TreeLockTestSupport.HeldLock catalogWriter =
+        TreeLockTestSupport.HeldLock.acquire(NameIdentifier.of(metalake, catalog), LockType.WRITE);
+    TreeLockTestSupport.assertWaitsFor(
+        catalogWriter,
+        () ->
+            createViewForLockTest(
+                NameIdentifier.of(metalake, catalog, "schema_view_lock_4", "view1")));
+  }
+
+  private static void createSchemaForLockTest(NameIdentifier schemaIdent) {
+    schemaOperationDispatcher.createSchema(
+        schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+  }
+
+  private static View createViewForLockTest(NameIdentifier ident) {
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    return viewOperationDispatcher.createView(
+        ident,
+        "comment",
+        new Column[0],
+        representations,
+        null,
+        null,
+        ImmutableMap.of("k1", "v1", "p1", "pv1"));
   }
 }

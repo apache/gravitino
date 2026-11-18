@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.sql.SQLException;
 import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.iceberg.common.ClosableJdbcCatalog;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.iceberg.MetastoreRegisterTableUtils;
 import org.apache.iceberg.Table;
@@ -33,7 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 // Use Iceberg package to reuse JdbcUtil related classes.
-public class JdbcCatalogWithMetadataLocationSupport extends JdbcCatalog
+public class JdbcCatalogWithMetadataLocationSupport extends ClosableJdbcCatalog
     implements SupportsMetadataLocation {
   private static final Logger LOG =
       LoggerFactory.getLogger(JdbcCatalogWithMetadataLocationSupport.class);

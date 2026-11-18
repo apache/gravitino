@@ -36,6 +36,16 @@ public class TestAddGroupRequest {
 
     Assertions.assertEquals(request, deserRequest);
     Assertions.assertEquals("test_group", deserRequest.getGroup());
+    Assertions.assertNull(deserRequest.getComment());
+
+    AddGroupRequest requestWithComment = new AddGroupRequest("test_group", "engineering team");
+    AddGroupRequest deserWithComment =
+        JsonUtils.objectMapper()
+            .readValue(
+                JsonUtils.objectMapper().writeValueAsString(requestWithComment),
+                AddGroupRequest.class);
+    Assertions.assertEquals(requestWithComment, deserWithComment);
+    Assertions.assertEquals("engineering team", deserWithComment.getComment());
 
     // Test with null group
     AddGroupRequest request1 = new AddGroupRequest();
@@ -56,5 +66,10 @@ public class TestAddGroupRequest {
         IllegalArgumentException.class, () -> new AddGroupRequest(" ").validate());
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> new AddGroupRequest("a".repeat(129)).validate());
+    Assertions.assertDoesNotThrow(
+        () -> new AddGroupRequest("test_group", "a".repeat(1024)).validate());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> new AddGroupRequest("test_group", "a".repeat(1025)).validate());
   }
 }

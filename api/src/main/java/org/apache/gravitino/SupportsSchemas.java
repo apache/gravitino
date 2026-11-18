@@ -20,12 +20,15 @@
 
 package org.apache.gravitino;
 
+import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 
 /**
  * The client interface to support schema operations. The server side should use the other one with
@@ -76,6 +79,8 @@ public interface SupportsSchemas {
    *
    * @param schemaName The name of the schema.
    * @return True if the schema exists, false otherwise.
+   * @throws SchemaAlreadyExistsException If loading an external schema detects an identifier owned
+   *     by another existing schema; the conflict is propagated instead of returning false.
    */
   default boolean schemaExists(String schemaName) {
     try {
@@ -93,6 +98,14 @@ public interface SupportsSchemas {
    * need the schema with default values applied, use the {@link #loadSchema(String)} method after
    * creation.
    *
+   * <p>Delegates to {@link #createSchema(String, String, Map, Map, Map)} with empty secret maps.
+   *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, source schema creation can succeed before Gravitino registration fails. Resolve the
+   * reported error, verify the source identity, and call {@link #loadSchema(String)} to import it
+   * instead of repeating creation. An existing Gravitino registration must be reconciled first;
+   * creation never proves that an older source identity was deleted.
+   *
    * @param schemaName The name of the schema.
    * @param comment The comment of the schema.
    * @param properties The properties of the schema.
@@ -100,8 +113,45 @@ public interface SupportsSchemas {
    * @throws NoSuchCatalogException If the catalog does not exist.
    * @throws SchemaAlreadyExistsException If the schema already exists.
    */
-  Schema createSchema(String schemaName, String comment, Map<String, String> properties)
-      throws NoSuchCatalogException, SchemaAlreadyExistsException;
+  default Schema createSchema(String schemaName, String comment, Map<String, String> properties)
+      throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    return createSchema(
+        schemaName, comment, properties, Collections.emptyMap(), Collections.emptyMap());
+  }
+
+  /**
+   * Creates a schema with optional secret maps.
+   *
+   * <p>The default implementation rejects create-time secrets. Implementations that support secrets
+   * must override this method.
+   *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, source schema creation can succeed before Gravitino registration fails. Resolve the
+   * reported error, verify the source identity, and call {@link #loadSchema(String)} to import it
+   * instead of repeating creation. An existing Gravitino registration must be reconciled first;
+   * creation never proves that an older source identity was deleted.
+   *
+   * @param schemaName The name of the schema.
+   * @param comment The comment of the schema.
+   * @param properties The properties of the schema.
+   * @param secretBindings optional property key → binding ({@code provider} + {@code plaintext})
+   *     for write-through
+   * @param secretReferences optional property key → secret locator ({@code provider} plus
+   *     provider-specific attributes)
+   * @return The schema as defined by the caller, without all default values.
+   * @throws NoSuchCatalogException If the catalog does not exist.
+   * @throws SchemaAlreadyExistsException If the schema already exists.
+   * @throws UnsupportedOperationException if create-time secrets are not supported
+   */
+  default Schema createSchema(
+      String schemaName,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    throw new UnsupportedOperationException("Creating a schema with secrets is not supported");
+  }
 
   /**
    * Load metadata properties for a schema.
@@ -109,6 +159,8 @@ public interface SupportsSchemas {
    * @param schemaName The name of the schema.
    * @return A schema.
    * @throws NoSuchSchemaException If the schema does not exist (optional).
+   * @throws SchemaAlreadyExistsException If an external schema carries the identifier of another
+   *     existing schema. Remove the copied source marker before importing an independent copy.
    */
   Schema loadSchema(String schemaName) throws NoSuchSchemaException;
 
@@ -123,17 +175,21 @@ public interface SupportsSchemas {
   Schema alterSchema(String schemaName, SchemaChange... changes) throws NoSuchSchemaException;
 
   /**
-   * Drop a schema from the catalog. If cascade option is true, recursively drop all objects within
-   * the schema.
+   * Drop a schema from the catalog. If cascade is true and supported by the catalog, recursively
+   * drop all objects within the schema.
+   *
+   * <p>A catalog may refuse a non-empty schema even when cascade is requested if it cannot safely
+   * restrict deletion to objects within that schema. PostgreSQL currently refuses such requests.
    *
    * <p>If the catalog implementation does not support this operation, it may throw {@link
    * UnsupportedOperationException}.
    *
    * @param schemaName The name of the schema.
-   * @param cascade If true, recursively drop all objects within the schema.
+   * @param cascade Whether to request recursive deletion, subject to catalog support.
    * @return True if the schema exists and is dropped successfully, false if the schema doesn't
    *     exist.
-   * @throws NonEmptySchemaException If the schema is not empty and cascade is false.
+   * @throws NonEmptySchemaException If the schema is non-empty and cascade is false, or the catalog
+   *     cannot safely cascade within the schema.
    */
   boolean dropSchema(String schemaName, boolean cascade) throws NonEmptySchemaException;
 }

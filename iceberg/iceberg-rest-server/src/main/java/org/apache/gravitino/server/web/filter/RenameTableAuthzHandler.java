@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.server.web.filter;
 
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.DROP_TABLE_AUTHORIZATION_EXPRESSION;
+
 import java.lang.reflect.Parameter;
 import java.util.HashMap;
 import java.util.Map;
@@ -26,13 +28,14 @@ import java.util.Optional;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.apache.iceberg.exceptions.ForbiddenException;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 
 /**
@@ -53,18 +56,26 @@ public class RenameTableAuthzHandler implements AuthorizationHandler {
   @Override
   public void process(Map<EntityType, NameIdentifier> nameIdentifierMap) {
     RenameTableRequest renameTableRequest = null;
+    boolean found = false;
     for (int i = 0; i < parameters.length; i++) {
       IcebergAuthorizationMetadata metadata =
           parameters[i].getAnnotation(IcebergAuthorizationMetadata.class);
       if (metadata != null
           && metadata.type() == IcebergAuthorizationMetadata.RequestType.RENAME_TABLE) {
         renameTableRequest = (RenameTableRequest) args[i];
+        found = true;
         break;
       }
     }
 
-    if (renameTableRequest == null) {
+    if (!found) {
       throw new ForbiddenException("RenameTableRequest not found in parameters");
+    }
+    if (renameTableRequest == null
+        || renameTableRequest.source() == null
+        || renameTableRequest.destination() == null) {
+      throw new BadRequestException(
+          "Invalid table rename request: both source and destination are required");
     }
 
     // Extract metalake and catalog from nameIdentifierMap
@@ -106,6 +117,11 @@ public class RenameTableAuthzHandler implements AuthorizationHandler {
     return crossNamespaceRename;
   }
 
+  @Override
+  public EntityType entityType() {
+    return EntityType.TABLE;
+  }
+
   /**
    * Validates authorization for cross-namespace renames following MySQL privilege model: - Requires
    * ownership on source table (equivalent to DROP privilege) - Requires CREATE_TABLE privilege on
@@ -134,13 +150,8 @@ public class RenameTableAuthzHandler implements AuthorizationHandler {
         EntityType.TABLE,
         NameIdentifierUtil.ofTable(metalakeName, catalog, sourceSchema, sourceTable));
 
-    String sourceExpression =
-        "ANY(OWNER, METALAKE, CATALOG) || "
-            + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-            + "ANY_USE_CATALOG && ANY_USE_SCHEMA && TABLE::OWNER";
-
     AuthorizationExpressionEvaluator sourceEvaluator =
-        new AuthorizationExpressionEvaluator(sourceExpression);
+        new AuthorizationExpressionEvaluator(DROP_TABLE_AUTHORIZATION_EXPRESSION);
 
     boolean sourceAuthorized =
         sourceEvaluator.evaluate(

@@ -67,6 +67,46 @@ public class CredentialConfig extends Config {
                   DEFAULT_CREDENTIAL_CACHE_MAX_SIZE /* default value */,
                   false /* hidden */,
                   false /* reserved */))
+          .put(
+              CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS,
+              PropertyEntry.integerPropertyEntry(
+                  CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS,
+                  "S3 STS token expire time in seconds.",
+                  false /* required */,
+                  false /* immutable */,
+                  null /* default value */,
+                  false /* hidden */,
+                  false /* reserved */))
+          .put(
+              CredentialConstants.OSS_TOKEN_EXPIRE_IN_SECS,
+              PropertyEntry.integerPropertyEntry(
+                  CredentialConstants.OSS_TOKEN_EXPIRE_IN_SECS,
+                  "OSS security token expire time in seconds.",
+                  false /* required */,
+                  false /* immutable */,
+                  null /* default value */,
+                  false /* hidden */,
+                  false /* reserved */))
+          .put(
+              CredentialConstants.ADLS_TOKEN_EXPIRE_IN_SECS,
+              PropertyEntry.integerPropertyEntry(
+                  CredentialConstants.ADLS_TOKEN_EXPIRE_IN_SECS,
+                  "ADLS SAS token expire time in seconds.",
+                  false /* required */,
+                  false /* immutable */,
+                  null /* default value */,
+                  false /* hidden */,
+                  false /* reserved */))
+          .put(
+              CredentialConstants.COS_TOKEN_EXPIRE_IN_SECS,
+              PropertyEntry.integerPropertyEntry(
+                  CredentialConstants.COS_TOKEN_EXPIRE_IN_SECS,
+                  "COS STS token expire time in seconds.",
+                  false /* required */,
+                  false /* immutable */,
+                  null /* default value */,
+                  false /* hidden */,
+                  false /* reserved */))
           .build();
 
   public static final ConfigEntry<List<String>> CREDENTIAL_PROVIDERS =

@@ -22,9 +22,12 @@ package org.apache.gravitino.listener.api.event;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.Enumeration;
 import javax.servlet.http.HttpServletRequest;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.utils.RequestContext;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -67,9 +70,118 @@ class TestIcebergRequestContext {
             .asyncPurge());
   }
 
+  /**
+   * Extras are a parallel map, not headers. A later audit formatter that reads {@code
+   * httpHeaders()} must not see a fact that was never on the wire.
+   */
+  @Test
+  void testExtrasDoNotAppearOnHttpHeaders() {
+    IcebergRequestContext original =
+        new IcebergRequestContext(requestWithHeader("X-Request-Id", "req-1"), "cat");
+    IcebergRequestContext enriched =
+        original.withAuditExtras(ImmutableMap.of("audit.reason", "policy-applied"));
+
+    Assertions.assertNotSame(original, enriched);
+    Assertions.assertTrue(original.auditExtras().isEmpty());
+    Assertions.assertEquals("policy-applied", enriched.auditExtras().get("audit.reason"));
+    Assertions.assertFalse(enriched.httpHeaders().containsKey("audit.reason"));
+    Assertions.assertEquals("req-1", enriched.httpHeaders().get("X-Request-Id"));
+  }
+
+  /**
+   * Today's {@code customInfo()} is the headers map. Empty extras have to keep that identity so
+   * existing callers do not observe a copy.
+   */
+  @Test
+  void testCustomInfoIsHeadersWhenExtrasEmpty() {
+    IcebergRequestContext context =
+        new IcebergRequestContext(requestWithHeader("X-Request-Id", "req-1"), "cat");
+    Assertions.assertSame(context.httpHeaders(), context.customInfo());
+    Assertions.assertSame(
+        context.httpHeaders(), context.withAuditExtras(ImmutableMap.of()).customInfo());
+    Assertions.assertSame(context.httpHeaders(), context.withAuditExtras(null).customInfo());
+  }
+
+  @Test
+  void testCustomInfoMergesHeadersAndExtras() {
+    IcebergRequestContext context =
+        new IcebergRequestContext(requestWithHeader("X-Request-Id", "req-1"), "cat")
+            .withAuditExtras(ImmutableMap.of("audit.reason", "policy-applied"));
+    Assertions.assertEquals("req-1", context.customInfo().get("X-Request-Id"));
+    Assertions.assertEquals("policy-applied", context.customInfo().get("audit.reason"));
+    Assertions.assertFalse(context.httpHeaders().containsKey("audit.reason"));
+  }
+
+  /**
+   * Failure events are the case where the reason matters most. Pins that {@link
+   * IcebergFailureEvent#customInfo()} is headers ∪ extras ∪ any automatically captured request
+   * query parameters, and that extras stay off {@code httpHeaders()}.
+   */
+  @Test
+  void testFailureEventCustomInfoMergesHeadersAndExtras() {
+    IcebergRequestContext context =
+        new IcebergRequestContext(requestWithHeader("X-Request-Id", "req-1"), "cat")
+            .withAuditExtras(ImmutableMap.of("audit.reason", "validation-failed"));
+    IcebergLoadTableFailureEvent event =
+        new IcebergLoadTableFailureEvent(
+            context, NameIdentifier.of("ml", "cat", "ns", "t"), new RuntimeException("boom"));
+
+    Assertions.assertEquals("req-1", event.customInfo().get("X-Request-Id"));
+    Assertions.assertEquals("validation-failed", event.customInfo().get("audit.reason"));
+    Assertions.assertFalse(event.icebergRequestContext().httpHeaders().containsKey("audit.reason"));
+  }
+
+  @Test
+  void testFailureEventCustomInfoIsHeaderOnlyWhenExtrasEmpty() {
+    IcebergRequestContext context =
+        new IcebergRequestContext(requestWithHeader("X-Request-Id", "req-1"), "cat");
+    IcebergLoadTableFailureEvent event =
+        new IcebergLoadTableFailureEvent(
+            context, NameIdentifier.of("ml", "cat", "ns", "t"), new RuntimeException("boom"));
+    // Content equality, not identity: Event.customInfo() now merges in the request's
+    // automatically captured query parameters, so the result is always a freshly built map even
+    // when that automatic contribution is empty.
+    Assertions.assertEquals(context.httpHeaders(), event.customInfo());
+  }
+
+  @Test
+  void testRemoteAddressComesFromRequestContext() {
+    // RequestContextFilter has already applied the trusted-proxy rules; a forged header that
+    // reaches the resource method must not override that result.
+    HttpServletRequest request = requestWithHeader("X-Forwarded-For", "198.51.100.7");
+    RequestContext.setRemoteAddress("203.0.113.5");
+    try {
+      Assertions.assertEquals(
+          "203.0.113.5", new IcebergRequestContext(request, "cat").remoteHostName());
+    } finally {
+      RequestContext.clear();
+    }
+  }
+
+  @Test
+  void testFallbackPeerAddressIsCanonical() {
+    HttpServletRequest request = requestWithoutHeader();
+    when(request.getRemoteAddr()).thenReturn("[0:0:0:0:0:0:0:1]");
+    Assertions.assertEquals("::1", new IcebergRequestContext(request, "cat").remoteHostName());
+  }
+
+  @Test
+  void testMissingPeerAddressIsRecordedAsUnknown() {
+    HttpServletRequest request = requestWithoutHeader();
+    when(request.getRemoteAddr()).thenReturn(null);
+    Assertions.assertEquals("unknown", new IcebergRequestContext(request, "cat").remoteHostName());
+  }
+
+  @Test
+  void testRemoteAddressFallsBackToPeerAndIgnoresForwardedFor() {
+    HttpServletRequest request = requestWithHeader("X-Forwarded-For", "198.51.100.7");
+    Assertions.assertEquals(
+        "127.0.0.1", new IcebergRequestContext(request, "cat").remoteHostName());
+  }
+
   private static HttpServletRequest requestWithoutHeader() {
     HttpServletRequest request = mock(HttpServletRequest.class);
-    when(request.getRemoteHost()).thenReturn("localhost");
+    when(request.getRemoteAddr()).thenReturn("127.0.0.1");
     when(request.getHeaderNames()).thenReturn(Collections.emptyEnumeration());
     return request;
   }
@@ -81,7 +193,7 @@ class TestIcebergRequestContext {
   private static HttpServletRequest requestWithHeader(String name, String value) {
     HttpServletRequest request = mock(HttpServletRequest.class);
     Enumeration<String> headerNames = Collections.enumeration(Collections.singleton(name));
-    when(request.getRemoteHost()).thenReturn("localhost");
+    when(request.getRemoteAddr()).thenReturn("127.0.0.1");
     when(request.getHeaderNames()).thenReturn(headerNames);
     when(request.getHeader(name)).thenReturn(value);
     return request;

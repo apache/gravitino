@@ -18,15 +18,45 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg.integration.test;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import java.util.Map;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
 public class CatalogIcebergRestIT extends CatalogIcebergBaseIT {
+
+  // A named (non-default) catalog registered on the embedded Iceberg REST service so a `warehouse`
+  // selector that resolves to a real catalog can be exercised at create time.
+  private static final String NAMED_CATALOG = "it_named_catalog";
+
+  @Override
+  @BeforeAll
+  public void startup() throws Exception {
+    // Register the named catalog before the server (and its Iceberg REST service) starts, so the
+    // REST service serves `NAMED_CATALOG` in addition to its default catalog. Must run before
+    // super.startup() launches the embedded server.
+    String namedWarehouse = System.getProperty("java.io.tmpdir") + "/" + NAMED_CATALOG + "-wh";
+    String prefix =
+        "gravitino." + IcebergConstants.GRAVITINO_ICEBERG_REST_SERVICE_NAME + ".catalog.";
+    registerCustomConfigs(
+        ImmutableMap.of(
+            prefix + NAMED_CATALOG + "." + IcebergConstants.CATALOG_BACKEND,
+            "memory",
+            prefix + NAMED_CATALOG + "." + IcebergConstants.WAREHOUSE,
+            namedWarehouse));
+    super.startup();
+  }
 
   @Override
   protected void initIcebergCatalogProperties() {
@@ -43,5 +73,105 @@ public class CatalogIcebergRestIT extends CatalogIcebergBaseIT {
             "hdfs://%s:%d/user/hive/warehouse-catalog-iceberg/",
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT);
+  }
+
+  // Checks an Iceberg REST warehouse misconfiguration is caught on create. See issue #11943.
+  @Test
+  void testCreateRestCatalogWithUnresolvableWarehouseFailsAtCreate() {
+    String badCatalogName = GravitinoITUtils.genRandomName("iceberg_rest_bad_warehouse");
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(IcebergConfig.CATALOG_BACKEND.getKey(), "rest");
+    properties.put(IcebergConfig.CATALOG_URI.getKey(), URIS);
+    // A URI-shaped value copied from a hive/jdbc example; the REST server does not know a catalog
+    // by this name, so it cannot be resolved.
+    properties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), "s3://not-a-real-catalog/");
+
+    // A reachable REST server rejecting the warehouse selector is a user/configuration error, so
+    // it surfaces as an IllegalArgumentException (HTTP 400) at create time.
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                metalake.createCatalog(
+                    badCatalogName,
+                    Catalog.Type.RELATIONAL,
+                    "lakehouse-iceberg",
+                    "comment",
+                    properties));
+
+    Assertions.assertTrue(
+        exception.getMessage() != null
+            && exception.getMessage().contains("selects a catalog by name")
+            && exception.getMessage().contains("s3://not-a-real-catalog/"),
+        "expected the REST warehouse name-vs-location hint, but got: " + exception.getMessage());
+
+    Assertions.assertFalse(
+        metalake.catalogExists(badCatalogName),
+        "catalog must not be created when its warehouse cannot be resolved at create time");
+  }
+
+  // A warehouse the REST server serves must still create and be usable. See issue #11943.
+  @Test
+  void testCreateRestCatalogWithValidWarehouseSucceeds() {
+    String catalogName = GravitinoITUtils.genRandomName("iceberg_rest_named_warehouse");
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(IcebergConfig.CATALOG_BACKEND.getKey(), "rest");
+    properties.put(IcebergConfig.CATALOG_URI.getKey(), URIS);
+    // A valid selector: NAMED_CATALOG is a catalog the embedded REST server serves.
+    properties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), NAMED_CATALOG);
+
+    Catalog created =
+        metalake.createCatalog(
+            catalogName, Catalog.Type.RELATIONAL, "lakehouse-iceberg", "comment", properties);
+    try {
+      Assertions.assertTrue(metalake.catalogExists(catalogName));
+      // Resolvable end-to-end: listing schemas against the selected catalog succeeds.
+      Assertions.assertDoesNotThrow(() -> created.asSchemas().listSchemas());
+    } finally {
+      metalake.disableCatalog(catalogName);
+      metalake.dropCatalog(catalogName);
+    }
+  }
+
+  // An unreachable remote at create fails as a ConnectionFailedException and persists nothing.
+  @Test
+  void testCreateRestCatalogWithUnreachableServerAtCreate() {
+    String name = GravitinoITUtils.genRandomName("iceberg_rest_unreachable_server");
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(IcebergConfig.CATALOG_BACKEND.getKey(), "rest");
+    // Port 1 refuses connections fast, so create-time validation cannot reach the REST server.
+    properties.put(IcebergConfig.CATALOG_URI.getKey(), "http://127.0.0.1:1/iceberg/");
+    properties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), "some_warehouse");
+
+    Assertions.assertThrows(
+        ConnectionFailedException.class,
+        () ->
+            metalake.createCatalog(
+                name, Catalog.Type.RELATIONAL, "lakehouse-iceberg", "comment", properties));
+    Assertions.assertFalse(metalake.catalogExists(name));
+  }
+
+  // A catalog with valid config whose backend is unreachable: it is created (no warehouse, so no
+  // create-time validation), but querying the dead backend fails as a ConnectionFailedException.
+  @Test
+  void testOperationOnUnreachableRestCatalogFailsWithConnectionError() {
+    String name = GravitinoITUtils.genRandomName("iceberg_rest_unreachable_op");
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(IcebergConfig.CATALOG_BACKEND.getKey(), "rest");
+    // Port 1 refuses connections fast; no warehouse means create-time validation is skipped.
+    properties.put(IcebergConfig.CATALOG_URI.getKey(), "http://127.0.0.1:1/iceberg/");
+
+    Catalog created =
+        metalake.createCatalog(
+            name, Catalog.Type.RELATIONAL, "lakehouse-iceberg", "comment", properties);
+    try {
+      Assertions.assertTrue(metalake.catalogExists(name));
+      // Config is valid but the backend is down, so querying it is a dependency failure.
+      Assertions.assertThrows(
+          ConnectionFailedException.class, () -> created.asSchemas().listSchemas());
+    } finally {
+      metalake.disableCatalog(name);
+      metalake.dropCatalog(name);
+    }
   }
 }

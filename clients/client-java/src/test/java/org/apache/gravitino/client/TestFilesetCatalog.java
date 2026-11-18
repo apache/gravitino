@@ -62,6 +62,7 @@ import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.file.FilesetChange;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -427,6 +428,30 @@ public class TestFilesetCatalog extends TestBase {
         RuntimeException.class,
         () -> catalog.asFilesetCatalog().alterFileset(fileset, req.filesetChange()),
         "internal error");
+  }
+
+  @Test
+  public void testAlterFilesetType() throws JsonProcessingException {
+    NameIdentifier ident = NameIdentifier.of("schema1", "fileset1");
+    String path =
+        withSlash(
+            FilesetCatalog.formatFilesetRequestPath(
+                    Namespace.of(metalakeName, catalogName, "schema1"))
+                + "/fileset1");
+    for (Fileset.Type type : Fileset.Type.values()) {
+      FilesetDTO expected =
+          mockFilesetDTO("fileset1", type, "comment", "mock location", ImmutableMap.of("k1", "v1"));
+      FilesetUpdateRequest request = new FilesetUpdateRequest.UpdateFilesetTypeRequest(type);
+      buildMockResource(
+          Method.PUT,
+          path,
+          new FilesetUpdatesRequest(ImmutableList.of(request)),
+          new FilesetResponse(expected),
+          SC_OK);
+      Fileset actual =
+          catalog.asFilesetCatalog().alterFileset(ident, FilesetChange.updateType(type));
+      assertFileset(expected, actual);
+    }
   }
 
   @Test

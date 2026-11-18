@@ -20,9 +20,8 @@
 package org.apache.gravitino.server.web;
 
 import com.codahale.metrics.Clock;
-import com.codahale.metrics.SlidingTimeWindowArrayReservoir;
+import com.codahale.metrics.ExponentiallyDecayingReservoir;
 import com.codahale.metrics.jersey2.InstrumentedResourceMethodApplicationListener;
-import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.metrics.source.MetricsSource;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
@@ -34,12 +33,7 @@ public class HttpServerMetricsSource extends MetricsSource {
     super(name);
     resourceConfig.register(
         new InstrumentedResourceMethodApplicationListener(
-            getMetricRegistry(),
-            Clock.defaultClock(),
-            false,
-            () ->
-                new SlidingTimeWindowArrayReservoir(
-                    getTimeSlidingWindowSeconds(), TimeUnit.SECONDS)));
+            getMetricRegistry(), Clock.defaultClock(), false, ExponentiallyDecayingReservoir::new));
 
     // Register QueuedThreadPool specific metrics with instance checks
     ThreadPool threadPool = server.getThreadPool();

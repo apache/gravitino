@@ -18,11 +18,14 @@
  */
 package org.apache.gravitino;
 
+import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 
 /** This class represents a field in the Apache Gravitino framework. */
 @EqualsAndHashCode
 public class Field {
+
+  private static final int UNLIMITED_LENGTH = -1;
 
   private String fieldName;
 
@@ -31,6 +34,8 @@ public class Field {
   private String description;
 
   private boolean optional;
+
+  private int maxLength = UNLIMITED_LENGTH;
 
   private Field() {}
 
@@ -67,6 +72,40 @@ public class Field {
   }
 
   /**
+   * Creates a required String field instance whose value must not exceed the given length.
+   *
+   * @param fieldName The name of the field.
+   * @param description The description of the field.
+   * @param maxLength The maximum number of characters of the field value.
+   * @return A required Field instance.
+   */
+  public static Field required(String fieldName, String description, int maxLength) {
+    return new Builder(false)
+        .withName(fieldName)
+        .withTypeClass(String.class)
+        .withDescription(description)
+        .withMaxLength(maxLength)
+        .build();
+  }
+
+  /**
+   * Creates an optional String field instance whose value must not exceed the given length.
+   *
+   * @param fieldName The name of the field.
+   * @param description The description of the field.
+   * @param maxLength The maximum number of characters of the field value.
+   * @return An optional Field instance.
+   */
+  public static Field optional(String fieldName, String description, int maxLength) {
+    return new Builder(true)
+        .withName(fieldName)
+        .withTypeClass(String.class)
+        .withDescription(description)
+        .withMaxLength(maxLength)
+        .build();
+  }
+
+  /**
    * Creates a required field instance.
    *
    * @param fieldName The name of the field.
@@ -96,6 +135,18 @@ public class Field {
    * @throws IllegalArgumentException If the field value is invalid.
    */
   public <T> void validate(T fieldValue) {
+    validate(fieldValue, null);
+  }
+
+  /**
+   * Validates a field value according to the field's requirements.
+   *
+   * @param fieldValue The value to be validated.
+   * @param entityType The type of the entity owning the field, used in the error message.
+   * @param <T> The type of the field value.
+   * @throws IllegalArgumentException If the field value is invalid.
+   */
+  public <T> void validate(T fieldValue, @Nullable Entity.EntityType entityType) {
     if (fieldValue == null && !optional) {
       throw new IllegalArgumentException("Field " + fieldName + " is required");
     }
@@ -103,6 +154,10 @@ public class Field {
     if (fieldValue != null && !typeClass.isAssignableFrom(fieldValue.getClass())) {
       throw new IllegalArgumentException(
           "Field " + fieldName + " is not of type " + typeClass.getName());
+    }
+
+    if (maxLength != UNLIMITED_LENGTH && fieldValue instanceof String) {
+      EntityFieldLimits.checkMaxLength((String) fieldValue, maxLength, fieldName, entityType);
     }
   }
 
@@ -154,6 +209,17 @@ public class Field {
     }
 
     /**
+     * Sets the maximum number of characters of the field value. It only applies to String values.
+     *
+     * @param maxLength The maximum number of characters of the field value.
+     * @return The Builder instance.
+     */
+    public Builder withMaxLength(int maxLength) {
+      field.maxLength = maxLength;
+      return this;
+    }
+
+    /**
      * Builds and returns the configured Field instance.
      *
      * @return The created Field instance.
@@ -166,6 +232,10 @@ public class Field {
 
       if (field.typeClass == null) {
         throw new IllegalArgumentException("Field type class is required");
+      }
+
+      if (field.maxLength != UNLIMITED_LENGTH && field.maxLength <= 0) {
+        throw new IllegalArgumentException("Field max length must be positive");
       }
 
       return field;

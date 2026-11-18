@@ -26,7 +26,9 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
@@ -35,10 +37,12 @@ import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.meta.ViewEntity;
 
 /**
  * Utility class that provides mapping between entity types and their corresponding entity classes.
@@ -52,6 +56,8 @@ public class EntityClassMapper {
           .put(Entity.EntityType.CATALOG, CatalogEntity.class)
           .put(Entity.EntityType.SCHEMA, SchemaEntity.class)
           .put(Entity.EntityType.TABLE, TableEntity.class)
+          .put(Entity.EntityType.VIEW, ViewEntity.class)
+          .put(Entity.EntityType.FUNCTION, FunctionEntity.class)
           .put(Entity.EntityType.FILESET, FilesetEntity.class)
           .put(Entity.EntityType.MODEL, ModelEntity.class)
           .put(Entity.EntityType.TOPIC, TopicEntity.class)
@@ -63,7 +69,9 @@ public class EntityClassMapper {
           .put(Entity.EntityType.ROLE, RoleEntity.class)
           .put(Entity.EntityType.POLICY, PolicyEntity.class)
           .put(Entity.EntityType.JOB_TEMPLATE, JobTemplateEntity.class)
+          .put(Entity.EntityType.DOMAIN, DomainEntity.class)
           .put(Entity.EntityType.JOB, JobEntity.class)
+          .put(Entity.EntityType.SEMANTIC_MODEL, SemanticModelEntity.class)
           .build();
 
   private EntityClassMapper() {}

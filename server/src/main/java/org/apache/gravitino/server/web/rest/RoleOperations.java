@@ -140,12 +140,24 @@ public class RoleOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       RoleCreateRequest request) {
+    if (request == null) {
+      LOG.warn("Received create role request with null request body");
+      return ExceptionHandlers.handleRoleException(
+          OperationType.CREATE,
+          "",
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String roleName = request.getName();
     try {
 
       return Utils.doAs(
           httpRequest,
           () -> {
             request.validate();
+            NameIdentifierUtil.checkMetadataObjectName(
+                NameIdentifierUtil.ofRole(metalake, request.getName()), Entity.EntityType.ROLE);
             MetalakeManager.checkMetalakeInUse(metalake);
             Set<MetadataObject> metadataObjects = Sets.newHashSet();
             for (SecurableObjectDTO object : request.getSecurableObjects()) {
@@ -166,6 +178,7 @@ public class RoleOperations {
                 for (Privilege privilege : object.privileges()) {
                   AuthorizationUtils.checkPrivilege((PrivilegeDTO) privilege, object, metalake);
                 }
+                TagOperations.checkVisibleTag(metalake, object);
                 MetadataObjectUtil.checkMetadataObject(metalake, object);
               } catch (NoSuchMetadataObjectException nsm) {
                 throw new IllegalMetadataObjectException(nsm);
@@ -197,8 +210,7 @@ public class RoleOperations {
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleRoleException(
-          OperationType.CREATE, request.getName(), metalake, e);
+      return ExceptionHandlers.handleRoleException(OperationType.CREATE, roleName, metalake, e);
     }
   }
 

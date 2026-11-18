@@ -47,19 +47,14 @@ public class PolicyVersionSQLProviderFactory {
     return POLICY_VERSION_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
-  public static String insertPolicyVersionOnDuplicateKeyUpdate(
-      @Param("policyVersion") PolicyVersionPO policyVersionPO) {
-    return getProvider().insertPolicyVersionOnDuplicateKeyUpdate(policyVersionPO);
-  }
-
   public static String insertPolicyVersion(
       @Param("policyVersion") PolicyVersionPO policyVersionPO) {
     return getProvider().insertPolicyVersion(policyVersionPO);
   }
 
-  public static String softDeletePolicyVersionByMetalakeAndPolicyName(
-      @Param("metalakeName") String metalakeName, @Param("policyName") String policyName) {
-    return getProvider().softDeletePolicyVersionByMetalakeAndPolicyName(metalakeName, policyName);
+  /** Delegates cleanup of policy snapshots by policy ID. */
+  public static String softDeletePolicyVersionsByPolicyId(@Param("policyId") Long policyId) {
+    return getProvider().softDeletePolicyVersionsByPolicyId(policyId);
   }
 
   public static String deletePolicyVersionsByLegacyTimeline(

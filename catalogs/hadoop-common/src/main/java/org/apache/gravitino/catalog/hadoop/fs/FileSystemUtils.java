@@ -32,6 +32,7 @@ import java.util.ServiceLoader;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamWriter;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
@@ -158,7 +159,7 @@ public class FileSystemUtils {
       gravitinoFileSystemCredentialsProvider.setConf(conf);
       return gravitinoFileSystemCredentialsProvider;
     } catch (Exception e) {
-      throw new RuntimeException("Failed to create GravitinoFileSystemCredentialProvider", e);
+      throw ExceptionMessages.wrap("Failed to create GravitinoFileSystemCredentialProvider", e);
     }
   }
 
@@ -210,9 +211,14 @@ public class FileSystemUtils {
       writer.writeStartDocument();
       writer.writeStartElement(CONFIG_ROOT);
 
-      config.forEach(
-          (k, v) ->
-              writeProperty(writer, StringUtils.isNotBlank(bypass) ? k.replace(bypass, "") : k, v));
+      // Configuration keeps the last value of a key within one resource. Write the bypass keys
+      // first so that a plain key wins over its bypass twin, as in toHadoopConfigMap.
+      config.entrySet().stream()
+          .filter(e -> StringUtils.isNotBlank(bypass) && e.getKey().startsWith(bypass))
+          .forEach(e -> writeProperty(writer, e.getKey().substring(bypass.length()), e.getValue()));
+      config.entrySet().stream()
+          .filter(e -> StringUtils.isBlank(bypass) || !e.getKey().startsWith(bypass))
+          .forEach(e -> writeProperty(writer, e.getKey(), e.getValue()));
       writer.writeEndElement();
       writer.writeEndDocument();
       writer.close();
@@ -220,7 +226,7 @@ public class FileSystemUtils {
 
       return configuration;
     } catch (Exception e) {
-      throw new RuntimeException("Failed to create configuration", e);
+      throw ExceptionMessages.wrap("Failed to create configuration", e);
     }
   }
 
@@ -231,7 +237,7 @@ public class FileSystemUtils {
       writeElement(writer, VALUE_TAG, value);
       writer.writeEndElement();
     } catch (Exception e) {
-      throw new RuntimeException("Failed to write property: " + key, e);
+      throw ExceptionMessages.wrap("Failed to write property: " + key, e);
     }
   }
 

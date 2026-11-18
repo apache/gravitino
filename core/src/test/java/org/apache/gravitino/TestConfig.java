@@ -173,4 +173,18 @@ public class TestConfig {
     ConfigEntry<Boolean> boolEntry = new ConfigBuilder("boolean.key").booleanConf();
     Assertions.assertTrue(boolEntry.readFrom(props));
   }
+
+  @Test
+  public void testEntityStoreMaxIdleConnections() {
+    Config config = new Config(false) {};
+    Assertions.assertEquals(
+        10, config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS, 0);
+          config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS);
+        });
+  }
 }

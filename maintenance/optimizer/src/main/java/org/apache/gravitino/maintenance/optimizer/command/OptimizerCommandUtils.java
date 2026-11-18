@@ -30,6 +30,7 @@ import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricsProvider;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticsInputContent;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.util.PartitionUtils;
 
@@ -45,6 +46,25 @@ public final class OptimizerCommandUtils {
       return List.of();
     }
     return Arrays.stream(identifiers).map(NameIdentifier::parse).toList();
+  }
+
+  static List<NameIdentifier> parseTableIdentifiers(
+      String[] identifiers, String defaultCatalogName) {
+    if (identifiers == null) {
+      return List.of();
+    }
+    return Arrays.stream(identifiers)
+        .map(
+            identifier ->
+                IdentifierUtils.parseTableIdentifier(identifier, defaultCatalogName)
+                    .orElseThrow(
+                        () ->
+                            new IllegalArgumentException(
+                                String.format(
+                                    "Identifier '%s' is invalid. Use catalog.schema.table, or "
+                                        + "configure %s when using schema.table",
+                                    identifier, OptimizerConfig.GRAVITINO_DEFAULT_CATALOG))))
+        .toList();
   }
 
   static Optional<PartitionPath> parsePartitionPath(String partitionPathStr) {

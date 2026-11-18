@@ -24,7 +24,9 @@ import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
+import org.apache.gravitino.domain.SupportsDomains;
 import org.apache.gravitino.policy.SupportsPolicies;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.SupportsTags;
 
 /**
@@ -86,6 +88,16 @@ public interface Model extends Auditable {
   }
 
   /**
+   * Returns the domain operations for this model.
+   *
+   * @return The {@link SupportsDomains} if the model supports domain operations.
+   * @throws UnsupportedOperationException If the model does not support domain operations.
+   */
+  default SupportsDomains supportsDomains() {
+    throw new UnsupportedOperationException("Model does not support domain operations.");
+  }
+
+  /**
    * @return The {@link SupportsPolicies} if the model supports policy operations.
    * @throws UnsupportedOperationException If the model does not support policy operations.
    */
@@ -99,5 +111,13 @@ public interface Model extends Auditable {
    */
   default SupportsRoles supportsRoles() {
     throw new UnsupportedOperationException("Model does not support role operations.");
+  }
+
+  /**
+   * @return the {@link SupportsSecrets} if the model supports secret property operations.
+   * @throws UnsupportedOperationException if the model does not support secret property operations.
+   */
+  default SupportsSecrets supportsSecrets() {
+    throw new UnsupportedOperationException("Model does not support secret property operations.");
   }
 }

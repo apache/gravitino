@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.catalog;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -27,9 +30,14 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.function.FunctionChange;
 import org.apache.gravitino.function.FunctionDefinition;
+import org.apache.gravitino.function.FunctionDefinitions;
+import org.apache.gravitino.function.FunctionImpl;
 import org.apache.gravitino.function.FunctionType;
+import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,7 +56,7 @@ public class TestFunctionOperationDispatcher {
   private EntityStore store;
 
   @BeforeEach
-  public void setUp() {
+  public void setUp() throws Exception {
     catalogManager = mock(CatalogManager.class);
     schemaOps = mock(SchemaOperationDispatcher.class);
     store = mock(EntityStore.class);
@@ -56,19 +64,24 @@ public class TestFunctionOperationDispatcher {
     CatalogManager.CatalogWrapper icebergWrapper = createMockCatalogWrapper("lakehouse-iceberg");
     CatalogManager.CatalogWrapper hiveWrapper = createMockCatalogWrapper("hive");
 
-    when(catalogManager.loadCatalogAndWrap(NameIdentifier.of(METALAKE, ICEBERG_CATALOG)))
-        .thenReturn(icebergWrapper);
-    when(catalogManager.loadCatalogAndWrap(NameIdentifier.of(METALAKE, HIVE_CATALOG)))
-        .thenReturn(hiveWrapper);
+    mockCatalogWrapper(NameIdentifier.of(METALAKE, ICEBERG_CATALOG), icebergWrapper);
+    mockCatalogWrapper(NameIdentifier.of(METALAKE, HIVE_CATALOG), hiveWrapper);
 
-    dispatcher = new FunctionOperationDispatcher(catalogManager, schemaOps, store, idGenerator);
+    dispatcher =
+        new FunctionOperationDispatcher(
+            catalogManager, schemaOps, store, idGenerator, mock(SecretManager.class));
   }
 
   @Test
   public void testIcebergSystemSchemaRestriction() {
     NameIdentifier icebergSystemFunc =
         NameIdentifier.of(Namespace.of(METALAKE, ICEBERG_CATALOG, "system"), "my_func");
-    FunctionDefinition[] defs = new FunctionDefinition[] {mock(FunctionDefinition.class)};
+    FunctionDefinition[] defs = {
+      FunctionDefinitions.of(
+          FunctionChange.EMPTY_PARAMS,
+          Types.StringType.get(),
+          new FunctionImpl[] {mock(FunctionImpl.class)})
+    };
 
     // All write operations on Iceberg system schema should be rejected
     Assertions.assertThrows(
@@ -115,6 +128,19 @@ public class TestFunctionOperationDispatcher {
 
     CatalogManager.CatalogWrapper wrapper = mock(CatalogManager.CatalogWrapper.class);
     when(wrapper.catalog()).thenReturn(catalog);
-    return wrapper;
+    return CatalogTestUtils.mockDetachConnectorResult(wrapper);
+  }
+
+  @SuppressWarnings("unchecked")
+  private void mockCatalogWrapper(
+      NameIdentifier ident, CatalogManager.CatalogWrapper catalogWrapper) throws Exception {
+    doAnswer(
+            invocation -> {
+              ThrowableFunction<CatalogManager.CatalogWrapper, Object> operation =
+                  invocation.getArgument(1);
+              return operation.apply(catalogWrapper);
+            })
+        .when(catalogManager)
+        .doWithCatalogWrapper(eq(ident), any());
   }
 }

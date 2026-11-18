@@ -25,6 +25,7 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -38,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
@@ -47,6 +49,8 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.lance.common.ops.LanceTableOperations;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
+import org.apache.gravitino.lance.service.LanceExceptionMapper;
+import org.apache.gravitino.lance.service.LanceRequestBodyReaderInterceptor;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.jersey.CommonProperties;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
@@ -56,6 +60,10 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.lance.namespace.errors.ErrorCode;
 import org.lance.namespace.errors.TableNotFoundException;
 import org.lance.namespace.model.AlterColumnsEntry;
 import org.lance.namespace.model.AlterTableAlterColumnsRequest;
@@ -120,6 +128,8 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     JacksonJaxbJsonProvider provider = new JacksonJaxbJsonProvider();
     provider.setMapper(mapper);
     resourceConfig.register(provider);
+    resourceConfig.register(LanceExceptionMapper.class);
+    resourceConfig.register(LanceRequestBodyReaderInterceptor.class);
     resourceConfig.register(LanceNamespaceOperations.class);
     resourceConfig.register(org.apache.gravitino.lance.service.rest.LanceTableOperations.class);
     resourceConfig.register(
@@ -138,6 +148,61 @@ public class TestLanceNamespaceOperations extends JerseyTest {
   public static void setup() {
     when(namespaceWrapper.asNamespaceOps()).thenReturn(namespaceOps);
     when(namespaceWrapper.asTableOps()).thenReturn(tableOps);
+  }
+
+  @Test
+  void testUnsupportedCreateContentTypeReturns415() {
+    try (Response response =
+        target("/v1/table/catalog$schema$table/create").request().post(Entity.json("{}"))) {
+      Assertions.assertEquals(415, response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals("", error.getDetail());
+      Assertions.assertNotEquals(18, error.getCode());
+    }
+  }
+
+  @Test
+  void testInvalidListLimitReturns400() {
+    try (Response response =
+        target("/v1/namespace/catalog$schema/table/list")
+            .queryParam("limit", "x")
+            .request()
+            .get()) {
+      Assertions.assertEquals(400, response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertTrue(error.getError().contains("limit"));
+      Assertions.assertEquals("", error.getDetail());
+      Assertions.assertNotEquals(18, error.getCode());
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("nullRequestInputs")
+  void testNullRequestInputsReturn400(String path, String json, String expectedMessage) {
+    Mockito.clearInvocations(namespaceWrapper, namespaceOps, tableOps);
+    try (Response response = target(path).request().post(Entity.json(json))) {
+      Assertions.assertEquals(400, response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorCode.INVALID_INPUT.getCode(), error.getCode());
+      Assertions.assertTrue(error.getError().contains(expectedMessage), error.getError());
+      Assertions.assertEquals("", error.getDetail());
+    }
+    Mockito.verifyNoInteractions(namespaceWrapper, namespaceOps, tableOps);
+  }
+
+  private static Stream<Arguments> nullRequestInputs() {
+    String namespace = "/v1/namespace/catalog$schema/";
+    String table = "/v1/table/catalog$schema$table/";
+    return Stream.of(
+        Arguments.of(namespace + "create", "null", "Request body"),
+        Arguments.of(namespace + "drop", "null", "Request body"),
+        Arguments.of(table + "declare", "null", "Request body"),
+        Arguments.of(table + "drop_columns", "null", "Request body"),
+        Arguments.of(table + "alter_columns", "null", "Request body"),
+        Arguments.of(table + "drop_columns", "{\"columns\":null}", "columns"),
+        Arguments.of(table + "alter_columns", "{\"alterations\":null}", "alterations"),
+        Arguments.of(table + "alter_columns", "{\"alterations\":[null]}", "alterations[0]"),
+        Arguments.of(table + "drop_columns", "{\"columns\":[null]}", "cannot be blank"));
   }
 
   @Test
@@ -208,10 +273,9 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals(18, errorResp.getCode());
-    Assertions.assertEquals("Test exception", errorResp.getError());
+    Assertions.assertEquals("Internal server error", errorResp.getError());
+    Assertions.assertEquals("", errorResp.getDetail());
     Assertions.assertEquals("ns1.ns2", errorResp.getInstance());
-    Assertions.assertNotNull(errorResp.getDetail());
-    Assertions.assertTrue(errorResp.getDetail().contains("Test exception"));
 
     // root endpoint should use explicit root identifier instead of delimiter in error instance
     resp =
@@ -262,18 +326,22 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals(18, errorResp.getCode());
-    Assertions.assertEquals("Test exception", errorResp.getError());
+    Assertions.assertEquals("Internal server error", errorResp.getError());
+    Assertions.assertEquals("", errorResp.getDetail());
   }
 
   @Test
   public void testDescribeNamespaceOnRootUnsupported() {
     Mockito.clearInvocations(namespaceOps);
 
-    Response resp =
-        target("/v1/namespace/describe").request(MediaType.APPLICATION_JSON_TYPE).post(null);
-
-    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp.getStatus());
-    Mockito.verifyNoInteractions(namespaceOps);
+    try (Response resp =
+        target("/v1/namespace/describe").request(MediaType.APPLICATION_JSON_TYPE).post(null)) {
+      Assertions.assertEquals(Response.Status.NOT_ACCEPTABLE.getStatusCode(), resp.getStatus());
+      ErrorResponse error = resp.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorCode.UNSUPPORTED.getCode(), error.getCode());
+      Assertions.assertEquals("POST v1/namespace/describe", error.getInstance());
+      Mockito.verifyNoInteractions(namespaceOps);
+    }
   }
 
   @Test
@@ -321,7 +389,8 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals(18, errorResp.getCode());
-    Assertions.assertEquals("Test exception", errorResp.getError());
+    Assertions.assertEquals("Internal server error", errorResp.getError());
+    Assertions.assertEquals("", errorResp.getDetail());
   }
 
   @Test
@@ -393,7 +462,8 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals(18, errorResp.getCode());
-    Assertions.assertEquals("Test exception", errorResp.getError());
+    Assertions.assertEquals("Internal server error", errorResp.getError());
+    Assertions.assertEquals("", errorResp.getDetail());
   }
 
   @Test
@@ -457,7 +527,8 @@ public class TestLanceNamespaceOperations extends JerseyTest {
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals("Runtime exception", errorResp.getError());
+    Assertions.assertEquals("Internal server error", errorResp.getError());
+    Assertions.assertEquals("", errorResp.getDetail());
   }
 
   @Test
@@ -513,7 +584,8 @@ public class TestLanceNamespaceOperations extends JerseyTest {
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals("Runtime exception", errorResp.getError());
+    Assertions.assertEquals("Internal server error", errorResp.getError());
+    Assertions.assertEquals("", errorResp.getDetail());
   }
 
   @Test
@@ -620,7 +692,8 @@ public class TestLanceNamespaceOperations extends JerseyTest {
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals("Runtime exception", errorResp.getError());
+    Assertions.assertEquals("Internal server error", errorResp.getError());
+    Assertions.assertEquals("", errorResp.getDetail());
   }
 
   @Test
@@ -677,7 +750,152 @@ public class TestLanceNamespaceOperations extends JerseyTest {
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals("Runtime exception", errorResp.getError());
+    Assertions.assertEquals("Internal server error", errorResp.getError());
+    Assertions.assertEquals("", errorResp.getDetail());
+  }
+
+  @Test
+  void testDescribeTableResponseCarriesEmptyContext() {
+    Mockito.reset(tableOps);
+    String tableIds = "catalog.scheme.describe_table_new_fields";
+    String delimiter = ".";
+
+    DescribeTableResponse describeTableResponse = new DescribeTableResponse();
+    describeTableResponse.setLocation("/path/to/describe_table_new_fields");
+    when(tableOps.describeTable(any(), any(), any(), anyBoolean(), anyBoolean()))
+        .thenReturn(describeTableResponse);
+
+    // Sent as raw JSON rather than a built request object, so the assertion is about the wire
+    // payload a 0.11.1 client produces rather than about the model's getters.
+    String rawRequest =
+        "{\"id\":[\"catalog\",\"scheme\",\"describe_table_new_fields\"],\"version\":3}";
+    Response resp =
+        target(String.format("/v1/table/%s/describe", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(rawRequest, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Mockito.verify(tableOps)
+        .describeTable(eq(tableIds), eq(delimiter), eq(Optional.of(3L)), eq(false), eq(true));
+
+    // The 0.11.1 response models carry a new `context` map. Gravitino never populates it, but the
+    // generated model defaults it to an empty map, so it is serialized as `"context":{}` rather
+    // than omitted. That is still compatible with older clients, which ignore unknown fields
+    // (the 0.7.5 Java client sets FAIL_ON_UNKNOWN_PROPERTIES=false and the Python model uses
+    // pydantic's default extra="ignore"). Pin down that the field stays empty, so the response
+    // carries no context the server did not intend to send.
+    String body = resp.readEntity(String.class);
+    Assertions.assertTrue(body.contains("\"context\":{}"), body);
+  }
+
+  @Test
+  void testDescribeTableRejectsBranchAndTagSelectors() {
+    Mockito.reset(tableOps);
+    String tableIds = "catalog.scheme.describe_table_selectors";
+    String delimiter = ".";
+
+    // lance-namespace 0.11.1 added `branch` and `tag` to DescribeTableRequest. Gravitino resolves
+    // neither, and answering with the table's current state would hand the caller a different
+    // snapshot than it asked for, so both selectors must be refused. Raw JSON, because the point
+    // is what an upgraded client puts on the wire.
+    String withBranch =
+        "{\"id\":[\"catalog\",\"scheme\",\"describe_table_selectors\"],\"branch\":\"dev\"}";
+    Response resp =
+        target(String.format("/v1/table/%s/describe", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(withBranch, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(
+        "Lance table branches are not supported, got branch: dev", errorResp.getError());
+
+    String withTag =
+        "{\"id\":[\"catalog\",\"scheme\",\"describe_table_selectors\"],\"tag\":\"v1\"}";
+    resp =
+        target(String.format("/v1/table/%s/describe", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(withTag, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(
+        "Lance table tags are not supported, got tag: v1", errorResp.getError());
+
+    // Neither request may reach the backing operations.
+    Mockito.verify(tableOps, never())
+        .describeTable(any(), any(), any(), anyBoolean(), anyBoolean());
+  }
+
+  @Test
+  void testBlankVersionSelectorsAreAccepted() {
+    Mockito.reset(tableOps);
+    String tableIds = "catalog.scheme.describe_table_blank_selectors";
+    String delimiter = ".";
+
+    DescribeTableResponse describeTableResponse = new DescribeTableResponse();
+    describeTableResponse.setLocation("/path/to/describe_table_blank_selectors");
+    when(tableOps.describeTable(any(), any(), any(), anyBoolean(), anyBoolean()))
+        .thenReturn(describeTableResponse);
+
+    // A client that serializes unset optional fields as empty strings is not asking for a branch
+    // or a tag, so the selector guard must let it through rather than answer 400. Raw JSON,
+    // because the point is the wire payload: a built request object would leave the fields null
+    // and never exercise the blank case.
+    String blankSelectors =
+        "{\"id\":[\"catalog\",\"scheme\",\"describe_table_blank_selectors\"],"
+            + "\"branch\":\"\",\"tag\":\"\"}";
+    Response resp =
+        target(String.format("/v1/table/%s/describe", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(blankSelectors, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Mockito.verify(tableOps)
+        .describeTable(eq(tableIds), eq(delimiter), eq(Optional.empty()), eq(false), eq(true));
+  }
+
+  @Test
+  void testAlterRequestsRejectBranchSelector() {
+    Mockito.reset(tableOps);
+    String tableIds = "catalog.scheme.alter_table_branch_selector";
+    String delimiter = ".";
+
+    // 0.11.1 also added `branch` to the two alter requests Gravitino serves. A mutation aimed at a
+    // branch must not fall through to the table itself, so assert both the rejection and that no
+    // alterTable call was made at all.
+    AlterTableDropColumnsRequest dropColumnsRequest = new AlterTableDropColumnsRequest();
+    dropColumnsRequest.setColumns(List.of("id"));
+    dropColumnsRequest.setBranch("dev");
+    Response resp =
+        target(String.format("/v1/table/%s/drop_columns", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(dropColumnsRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(
+        "Lance table branches are not supported, got branch: dev", errorResp.getError());
+
+    AlterTableAlterColumnsRequest alterColumnsRequest = new AlterTableAlterColumnsRequest();
+    AlterColumnsEntry columnAlteration = new AlterColumnsEntry();
+    columnAlteration.setPath("col1");
+    columnAlteration.setRename("col1_new");
+    alterColumnsRequest.setAlterations(List.of(columnAlteration));
+    alterColumnsRequest.setBranch("dev");
+    resp =
+        target(String.format("/v1/table/%s/alter_columns", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(alterColumnsRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(
+        "Lance table branches are not supported, got branch: dev", errorResp.getError());
+
+    Mockito.verify(tableOps, never()).alterTable(any(), any(), any());
   }
 
   @Test
@@ -999,6 +1217,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals("Runtime exception", errorResp.getError());
+    Assertions.assertEquals("Internal server error", errorResp.getError());
+    Assertions.assertEquals("", errorResp.getDetail());
   }
 }

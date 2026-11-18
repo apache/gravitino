@@ -16,7 +16,11 @@
 # under the License.
 
 from mcp_server.client import ModelOperation
-from mcp_server.client.plain.utils import encode_path_segment
+from mcp_server.client.plain.utils import (
+    encode_path_segment,
+    extract_content_from_response,
+    extract_response,
+)
 
 
 class PlainRESTClientModelOperation(ModelOperation):
@@ -34,7 +38,7 @@ class PlainRESTClientModelOperation(ModelOperation):
             f"/catalogs/{encode_path_segment(catalog_name)}"
             f"/schemas/{encode_path_segment(schema_name)}/models"
         )
-        return response.json().get("identifiers", [])
+        return extract_content_from_response(response, "identifiers", [])
 
     async def load_model(
         self, catalog_name: str, schema_name: str, model_name: str
@@ -45,7 +49,7 @@ class PlainRESTClientModelOperation(ModelOperation):
             f"/schemas/{encode_path_segment(schema_name)}"
             f"/models/{encode_path_segment(model_name)}"
         )
-        return response.json().get("model", {})
+        return extract_content_from_response(response, "model", {})
 
     async def list_model_versions(
         self, catalog_name: str, schema_name: str, model_name: str
@@ -56,7 +60,7 @@ class PlainRESTClientModelOperation(ModelOperation):
             f"/schemas/{encode_path_segment(schema_name)}"
             f"/models/{encode_path_segment(model_name)}/versions?details=true"
         )
-        return response.json().get("infos", [])
+        return extract_content_from_response(response, "infos", [])
 
     async def load_model_version(
         self, catalog_name: str, schema_name: str, model_name: str, version: int
@@ -68,7 +72,7 @@ class PlainRESTClientModelOperation(ModelOperation):
             f"/models/{encode_path_segment(model_name)}"
             f"/versions/{encode_path_segment(version)}"
         )
-        return response.json().get("modelVersion", {})
+        return extract_content_from_response(response, "modelVersion", {})
 
     async def load_model_version_by_alias(
         self, catalog_name: str, schema_name: str, model_name: str, alias: str
@@ -80,4 +84,135 @@ class PlainRESTClientModelOperation(ModelOperation):
             f"/models/{encode_path_segment(model_name)}"
             f"/aliases/{encode_path_segment(alias)}"
         )
-        return response.json().get("modelVersion", {})
+        return extract_content_from_response(response, "modelVersion", {})
+
+    # pylint: disable=too-many-positional-arguments
+    async def register_model(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        name: str,
+        comment: str,
+        properties: dict,
+    ) -> str:
+        response = await self.rest_client.post(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}/models",
+            json={"name": name, "comment": comment, "properties": properties},
+        )
+        return extract_content_from_response(response, "model", {})
+
+    async def delete_model(
+        self, catalog_name: str, schema_name: str, model_name: str
+    ) -> str:
+        response = await self.rest_client.delete(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/models/{encode_path_segment(model_name)}"
+        )
+        return extract_content_from_response(response, "dropped", False)
+
+    # pylint: disable=too-many-positional-arguments
+    async def link_model_version(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        model_name: str,
+        uri: str,
+        aliases: list,
+        comment: str,
+        properties: dict,
+    ) -> str:
+        response = await self.rest_client.post(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/models/{encode_path_segment(model_name)}/versions",
+            json={
+                "uri": uri,
+                "aliases": aliases,
+                "comment": comment,
+                "properties": properties,
+            },
+        )
+        return extract_response(response)
+
+    async def delete_model_version(
+        self, catalog_name: str, schema_name: str, model_name: str, version: int
+    ) -> str:
+        response = await self.rest_client.delete(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/models/{encode_path_segment(model_name)}"
+            f"/versions/{encode_path_segment(version)}"
+        )
+        return extract_content_from_response(response, "dropped", False)
+
+    async def delete_model_version_by_alias(
+        self, catalog_name: str, schema_name: str, model_name: str, alias: str
+    ) -> str:
+        response = await self.rest_client.delete(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/models/{encode_path_segment(model_name)}"
+            f"/aliases/{encode_path_segment(alias)}"
+        )
+        return extract_content_from_response(response, "dropped", False)
+
+    async def alter_model(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        model_name: str,
+        updates: list,
+    ) -> str:
+        response = await self.rest_client.put(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/models/{encode_path_segment(model_name)}",
+            json={"updates": updates},
+        )
+        return extract_content_from_response(response, "model", {})
+
+    # pylint: disable=too-many-positional-arguments
+    async def alter_model_version(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        model_name: str,
+        version: int,
+        updates: list,
+    ) -> str:
+        response = await self.rest_client.put(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/models/{encode_path_segment(model_name)}"
+            f"/versions/{encode_path_segment(version)}",
+            json={"updates": updates},
+        )
+        return extract_content_from_response(response, "modelVersion", {})
+
+    # pylint: disable=too-many-positional-arguments
+    async def alter_model_version_by_alias(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        model_name: str,
+        alias: str,
+        updates: list,
+    ) -> str:
+        response = await self.rest_client.put(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/models/{encode_path_segment(model_name)}"
+            f"/aliases/{encode_path_segment(alias)}",
+            json={"updates": updates},
+        )
+        return extract_content_from_response(response, "modelVersion", {})

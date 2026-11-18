@@ -48,11 +48,13 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
@@ -77,6 +79,8 @@ public abstract class TestOperationDispatcher {
 
   protected static CatalogManager catalogManager;
 
+  protected static SecretManager secretManager;
+
   private static Config config;
 
   @BeforeAll
@@ -97,7 +101,8 @@ public abstract class TestOperationDispatcher {
             .build();
     entityStore.put(metalakeEntity, true);
 
-    catalogManager = new CatalogManager(config, entityStore, idGenerator);
+    secretManager = new SecretManager(config);
+    catalogManager = new CatalogManager(config, entityStore, idGenerator, secretManager);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
 
     Config config = mock(Config.class);
@@ -154,8 +159,11 @@ public abstract class TestOperationDispatcher {
         (k, v) -> {
           Assertions.assertEquals(v, testProps.get(k));
         });
+    // Reserved+hidden keys are omitted; editable hidden keys stay masked.
     Assertions.assertFalse(testProps.containsKey(StringIdentifier.ID_KEY));
-    Assertions.assertFalse(testProps.containsKey(TEST_FILESET_HIDDEN_KEY));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        testProps.getOrDefault(TEST_FILESET_HIDDEN_KEY, HiddenPropertyMaskUtils.MASKED_VALUE));
   }
 
   void testPropertyException(Executable operation, String... errorMessage) {
@@ -163,6 +171,14 @@ public abstract class TestOperationDispatcher {
     for (String msg : errorMessage) {
       Assertions.assertTrue(exception.getMessage().contains(msg));
     }
+  }
+
+  void testMaskedPlaceholderRejected(Executable operation, String propertyKey) {
+    testPropertyException(
+        operation,
+        propertyKey,
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        "cannot be set to the masked placeholder value");
   }
 
   public static void withMockedAuthorizationUtils(Runnable testCode) {

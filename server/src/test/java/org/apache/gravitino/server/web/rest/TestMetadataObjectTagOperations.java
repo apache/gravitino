@@ -36,27 +36,37 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.dto.requests.TagValuesAssociateRequest;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.MetadataObjectTagListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
+import org.apache.gravitino.dto.responses.TagNameListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagAssignment;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.tag.TagManager;
+import org.apache.gravitino.tag.TagValue;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mockito;
 
 public class TestMetadataObjectTagOperations extends BaseOperationsTest {
 
@@ -100,6 +110,71 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
     return resourceConfig;
   }
 
+  /** Verifies that both association request versions reject internal tag names. */
+  @Test
+  public void testInternalTagAssociationsAreHidden() throws Exception {
+    MetadataObjectTagOperations operations = new MetadataObjectTagOperations(tagManager);
+    operations.setHttpRequest(mock(HttpServletRequest.class));
+    String name = "GRAVITINO_HIDDEN_123";
+    try (Response response = operations.getTagForObject(metalake, "catalog", "catalog", name)) {
+      Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    }
+    for (boolean adding : new boolean[] {true, false}) {
+      String[] names = new String[] {name};
+      TagValue[] values = new TagValue[] {TagValue.noValue(name)};
+      try (Response v1 =
+              operations.associateTagsForObject(
+                  metalake,
+                  "catalog",
+                  "catalog",
+                  new TagsAssociateRequest(adding ? names : null, adding ? null : names));
+          Response v2 =
+              operations.associateTagValuesForObject(
+                  metalake,
+                  "catalog",
+                  "catalog",
+                  new TagValuesAssociateRequest(adding ? values : null, adding ? null : values))) {
+        Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), v1.getStatus());
+        Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), v2.getStatus());
+      }
+    }
+    Mockito.verifyNoInteractions(tagManager);
+  }
+
+  /**
+   * Hidden tag path objects return the same error as missing tags in both response formats.
+   *
+   * @param verbose Whether to request detailed tag metadata.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testTagPathObjectVisibility(boolean verbose) {
+    MetadataObject hidden = MetadataObjects.parse("gravitino_hidden_123", MetadataObject.Type.TAG);
+    MetadataObject missing = MetadataObjects.parse("missing_tag", MetadataObject.Type.TAG);
+    when(tagManager.listTagsInfoForMetadataObject(metalake, hidden)).thenReturn(new Tag[0]);
+    when(tagManager.listTagsInfoForMetadataObject(metalake, missing))
+        .thenThrow(new NoSuchMetadataObjectException("Tag does not exist"));
+
+    for (MetadataObject object : new MetadataObject[] {hidden, missing}) {
+      try (Response response =
+          target(basePath(metalake))
+              .path("tag")
+              .path(object.fullName())
+              .path("tags")
+              .queryParam("details", verbose)
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .accept("application/vnd.gravitino.v1+json")
+              .get()) {
+        Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+        ErrorResponse error = response.readEntity(ErrorResponse.class);
+        Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, error.getCode());
+        Assertions.assertEquals(
+            NoSuchMetadataObjectException.class.getSimpleName(), error.getType());
+      }
+    }
+    Mockito.verify(tagManager, Mockito.never()).listTagsInfoForMetadataObject(metalake, hidden);
+  }
+
   @Test
   public void testListTagsForObject() {
     MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
@@ -108,12 +183,22 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
         MetadataObjects.parse("object1.object2.object3", MetadataObject.Type.TABLE);
     MetadataObject column =
         MetadataObjects.parse("object1.object2.object3.object4", MetadataObject.Type.COLUMN);
+    MetadataObject view = MetadataObjects.parse("object1.object2.view1", MetadataObject.Type.VIEW);
+    MetadataObject function =
+        MetadataObjects.parse("object1.object2.function1", MetadataObject.Type.FUNCTION);
 
+    Tag hidden =
+        TagEntity.builder()
+            .withName("GRAVITINO_HIDDEN_123")
+            .withId(123L)
+            .withAuditInfo(testAuditInfo1)
+            .build();
     Tag[] catalogTagInfos =
         new Tag[] {
           TagEntity.builder().withName("tag1").withId(1L).withAuditInfo(testAuditInfo1).build()
         };
-    when(tagManager.listTagsInfoForMetadataObject(metalake, catalog)).thenReturn(catalogTagInfos);
+    when(tagManager.listTagsInfoForMetadataObject(metalake, catalog))
+        .thenReturn(ArrayUtils.add(catalogTagInfos, hidden));
 
     Tag[] schemaTagInfos =
         new Tag[] {
@@ -125,13 +210,26 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
         new Tag[] {
           TagEntity.builder().withName("tag5").withId(1L).withAuditInfo(testAuditInfo1).build()
         };
-    when(tagManager.listTagsInfoForMetadataObject(metalake, table)).thenReturn(tableTagInfos);
+    when(tagManager.listTagsInfoForMetadataObject(metalake, table))
+        .thenReturn(ArrayUtils.add(tableTagInfos, hidden));
 
     Tag[] columnTagInfos =
         new Tag[] {
           TagEntity.builder().withName("tag7").withId(1L).withAuditInfo(testAuditInfo1).build()
         };
     when(tagManager.listTagsInfoForMetadataObject(metalake, column)).thenReturn(columnTagInfos);
+
+    Tag[] viewTagInfos =
+        new Tag[] {
+          TagEntity.builder().withName("tag9").withId(1L).withAuditInfo(testAuditInfo1).build()
+        };
+    when(tagManager.listTagsInfoForMetadataObject(metalake, view)).thenReturn(viewTagInfos);
+
+    Tag[] functionTagInfos =
+        new Tag[] {
+          TagEntity.builder().withName("tag11").withId(1L).withAuditInfo(testAuditInfo1).build()
+        };
+    when(tagManager.listTagsInfoForMetadataObject(metalake, function)).thenReturn(functionTagInfos);
 
     // Test catalog tags
     Response response =
@@ -146,9 +244,11 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
 
-    TagListResponse tagListResponse = response.readEntity(TagListResponse.class);
+    MetadataObjectTagListResponse tagListResponse =
+        response.readEntity(MetadataObjectTagListResponse.class);
     Assertions.assertEquals(0, tagListResponse.getCode());
     Assertions.assertEquals(catalogTagInfos.length, tagListResponse.getTags().length);
+    Assertions.assertFalse(tagListResponse.hasInaccessibleTags());
 
     Map<String, Tag> resultTags =
         Arrays.stream(tagListResponse.getTags())
@@ -168,9 +268,10 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response1.getStatus());
 
-    NameListResponse nameListResponse = response1.readEntity(NameListResponse.class);
+    TagNameListResponse nameListResponse = response1.readEntity(TagNameListResponse.class);
     Assertions.assertEquals(0, nameListResponse.getCode());
     Assertions.assertEquals(catalogTagInfos.length, nameListResponse.getNames().length);
+    Assertions.assertFalse(nameListResponse.hasInaccessibleTags());
     Assertions.assertArrayEquals(
         Arrays.stream(catalogTagInfos).map(Tag::name).toArray(String[]::new),
         nameListResponse.getNames());
@@ -275,6 +376,113 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
     Assertions.assertTrue(resultNames1.contains("tag3"));
     Assertions.assertTrue(resultNames1.contains("tag5"));
 
+    // Test view tags
+    Response viewResponse =
+        target(basePath(metalake))
+            .path(view.type().toString())
+            .path(view.fullName())
+            .path("tags")
+            .queryParam("details", true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), viewResponse.getStatus());
+
+    TagListResponse viewTagListResponse = viewResponse.readEntity(TagListResponse.class);
+    Assertions.assertEquals(0, viewTagListResponse.getCode());
+    Assertions.assertEquals(
+        schemaTagInfos.length + catalogTagInfos.length + viewTagInfos.length,
+        viewTagListResponse.getTags().length);
+
+    Map<String, Tag> viewResultTags =
+        Arrays.stream(viewTagListResponse.getTags())
+            .collect(Collectors.toMap(Tag::name, Function.identity()));
+
+    Assertions.assertTrue(viewResultTags.containsKey("tag1"));
+    Assertions.assertTrue(viewResultTags.containsKey("tag3"));
+    Assertions.assertTrue(viewResultTags.containsKey("tag9"));
+
+    Assertions.assertTrue(viewResultTags.get("tag1").inherited().get());
+    Assertions.assertTrue(viewResultTags.get("tag3").inherited().get());
+    Assertions.assertFalse(viewResultTags.get("tag9").inherited().get());
+
+    Response viewNameResponse =
+        target(basePath(metalake))
+            .path(view.type().toString())
+            .path(view.fullName())
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), viewNameResponse.getStatus());
+
+    NameListResponse viewNameListResponse = viewNameResponse.readEntity(NameListResponse.class);
+    Assertions.assertEquals(0, viewNameListResponse.getCode());
+    Assertions.assertEquals(
+        schemaTagInfos.length + catalogTagInfos.length + viewTagInfos.length,
+        viewNameListResponse.getNames().length);
+
+    Set<String> viewResultNames = Sets.newHashSet(viewNameListResponse.getNames());
+    Assertions.assertTrue(viewResultNames.contains("tag1"));
+    Assertions.assertTrue(viewResultNames.contains("tag3"));
+    Assertions.assertTrue(viewResultNames.contains("tag9"));
+
+    // Test function tags
+    Response functionResponse =
+        target(basePath(metalake))
+            .path(function.type().toString())
+            .path(function.fullName())
+            .path("tags")
+            .queryParam("details", true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), functionResponse.getStatus());
+
+    TagListResponse functionTagListResponse = functionResponse.readEntity(TagListResponse.class);
+    Assertions.assertEquals(0, functionTagListResponse.getCode());
+    Assertions.assertEquals(
+        schemaTagInfos.length + catalogTagInfos.length + functionTagInfos.length,
+        functionTagListResponse.getTags().length);
+
+    Map<String, Tag> functionResultTags =
+        Arrays.stream(functionTagListResponse.getTags())
+            .collect(Collectors.toMap(Tag::name, Function.identity()));
+
+    Assertions.assertTrue(functionResultTags.containsKey("tag1"));
+    Assertions.assertTrue(functionResultTags.containsKey("tag3"));
+    Assertions.assertTrue(functionResultTags.containsKey("tag11"));
+
+    Assertions.assertTrue(functionResultTags.get("tag1").inherited().get());
+    Assertions.assertTrue(functionResultTags.get("tag3").inherited().get());
+    Assertions.assertFalse(functionResultTags.get("tag11").inherited().get());
+
+    Response functionNameResponse =
+        target(basePath(metalake))
+            .path(function.type().toString())
+            .path(function.fullName())
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), functionNameResponse.getStatus());
+
+    NameListResponse functionNameListResponse =
+        functionNameResponse.readEntity(NameListResponse.class);
+    Assertions.assertEquals(0, functionNameListResponse.getCode());
+    Assertions.assertEquals(
+        schemaTagInfos.length + catalogTagInfos.length + functionTagInfos.length,
+        functionNameListResponse.getNames().length);
+
+    Set<String> functionResultNames = Sets.newHashSet(functionNameListResponse.getNames());
+    Assertions.assertTrue(functionResultNames.contains("tag1"));
+    Assertions.assertTrue(functionResultNames.contains("tag3"));
+    Assertions.assertTrue(functionResultNames.contains("tag11"));
+
     // Test column tags
     Response response6 =
         target(basePath(metalake))
@@ -378,6 +586,58 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
     Assertions.assertFalse(resultTags8.get("tag3").inherited().get());
     Assertions.assertFalse(resultTags8.get("tag5").inherited().get());
     Assertions.assertFalse(resultTags8.get("tag0").inherited().get());
+  }
+
+  @Test
+  public void testListTagsDeduplicatesDifferentAssignmentValues() {
+    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
+    MetadataObject schema = MetadataObjects.parse("object1.object2", MetadataObject.Type.SCHEMA);
+    MetadataObject table =
+        MetadataObjects.parse("object1.object2.object3", MetadataObject.Type.TABLE);
+    Tag directTag =
+        TagEntity.builder()
+            .withName("tag1")
+            .withId(1L)
+            .withAuditInfo(testAuditInfo1)
+            .withAssignment(TagAssignment.ofValues("finance"))
+            .build();
+    Tag inheritedTag =
+        TagEntity.builder()
+            .withName("tag1")
+            .withId(1L)
+            .withAuditInfo(testAuditInfo1)
+            .withAssignment(TagAssignment.ofValues("engineering"))
+            .build();
+    when(tagManager.listTagsInfoForMetadataObject(metalake, table))
+        .thenReturn(new Tag[] {directTag});
+    when(tagManager.listTagsInfoForMetadataObject(metalake, schema))
+        .thenReturn(new Tag[] {inheritedTag});
+    when(tagManager.listTagsInfoForMetadataObject(metalake, catalog)).thenReturn(new Tag[0]);
+
+    Response detailedResponse =
+        target(basePath(metalake))
+            .path(table.type().toString())
+            .path(table.fullName())
+            .path("tags")
+            .queryParam("details", true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    TagListResponse detailedResult = detailedResponse.readEntity(TagListResponse.class);
+    Assertions.assertEquals(1, detailedResult.getTags().length);
+    Assertions.assertFalse(detailedResult.getTags()[0].inherited().get());
+    Assertions.assertArrayEquals(
+        new String[] {"finance"}, detailedResult.getTags()[0].assignment().get().values());
+
+    Response namesResponse =
+        target(basePath(metalake))
+            .path(table.type().toString())
+            .path(table.fullName())
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(1, namesResponse.readEntity(NameListResponse.class).getNames().length);
   }
 
   @Test
@@ -509,6 +769,17 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
     MetadataObject column =
         MetadataObjects.parse("object1.object2.object3.object4", MetadataObject.Type.COLUMN);
     when(tagManager.getTagForMetadataObject(metalake, column, "tag4")).thenReturn(tag4);
+
+    TagEntity tag5 =
+        TagEntity.builder().withName("tag5").withId(1L).withAuditInfo(testAuditInfo1).build();
+    MetadataObject view = MetadataObjects.parse("object1.object2.view1", MetadataObject.Type.VIEW);
+    when(tagManager.getTagForMetadataObject(metalake, view, "tag5")).thenReturn(tag5);
+
+    TagEntity tag6 =
+        TagEntity.builder().withName("tag6").withId(1L).withAuditInfo(testAuditInfo1).build();
+    MetadataObject function =
+        MetadataObjects.parse("object1.object2.function1", MetadataObject.Type.FUNCTION);
+    when(tagManager.getTagForMetadataObject(metalake, function, "tag6")).thenReturn(tag6);
 
     // Test catalog tag
     Response response =
@@ -657,6 +928,92 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
     Assertions.assertEquals(tag3.comment(), respTag6.comment());
     Assertions.assertTrue(respTag6.inherited().get());
 
+    // Test view tag
+    Response viewResponse =
+        target(basePath(metalake))
+            .path(view.type().toString())
+            .path(view.fullName())
+            .path("tags")
+            .path("tag5")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), viewResponse.getStatus());
+
+    TagResponse viewTagResponse = viewResponse.readEntity(TagResponse.class);
+    Assertions.assertEquals(0, viewTagResponse.getCode());
+
+    Tag viewRespTag = viewTagResponse.getTag();
+    Assertions.assertEquals(tag5.name(), viewRespTag.name());
+    Assertions.assertEquals(tag5.comment(), viewRespTag.comment());
+    Assertions.assertFalse(viewRespTag.inherited().get());
+
+    // Test get view inherited tag
+    Response viewInheritedResponse =
+        target(basePath(metalake))
+            .path(view.type().toString())
+            .path(view.fullName())
+            .path("tags")
+            .path("tag2")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), viewInheritedResponse.getStatus());
+
+    TagResponse viewInheritedTagResponse = viewInheritedResponse.readEntity(TagResponse.class);
+    Assertions.assertEquals(0, viewInheritedTagResponse.getCode());
+
+    Tag viewInheritedRespTag = viewInheritedTagResponse.getTag();
+    Assertions.assertEquals(tag2.name(), viewInheritedRespTag.name());
+    Assertions.assertEquals(tag2.comment(), viewInheritedRespTag.comment());
+    Assertions.assertTrue(viewInheritedRespTag.inherited().get());
+
+    // Test function tag
+    Response functionResponse =
+        target(basePath(metalake))
+            .path(function.type().toString())
+            .path(function.fullName())
+            .path("tags")
+            .path("tag6")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), functionResponse.getStatus());
+
+    TagResponse functionTagResponse = functionResponse.readEntity(TagResponse.class);
+    Assertions.assertEquals(0, functionTagResponse.getCode());
+
+    Tag functionRespTag = functionTagResponse.getTag();
+    Assertions.assertEquals(tag6.name(), functionRespTag.name());
+    Assertions.assertEquals(tag6.comment(), functionRespTag.comment());
+    Assertions.assertFalse(functionRespTag.inherited().get());
+
+    // Test get function inherited tag
+    Response functionInheritedResponse =
+        target(basePath(metalake))
+            .path(function.type().toString())
+            .path(function.fullName())
+            .path("tags")
+            .path("tag2")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(
+        Response.Status.OK.getStatusCode(), functionInheritedResponse.getStatus());
+
+    TagResponse functionInheritedTagResponse =
+        functionInheritedResponse.readEntity(TagResponse.class);
+    Assertions.assertEquals(0, functionInheritedTagResponse.getCode());
+
+    Tag functionInheritedRespTag = functionInheritedTagResponse.getTag();
+    Assertions.assertEquals(tag2.name(), functionInheritedRespTag.name());
+    Assertions.assertEquals(tag2.comment(), functionInheritedRespTag.comment());
+    Assertions.assertTrue(functionInheritedRespTag.inherited().get());
+
     // Test catalog tag throw NoSuchTagException
     Response response7 =
         target(basePath(metalake))
@@ -696,10 +1053,9 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
   public void testAssociateTagsForObject() {
     String[] tagsToAdd = new String[] {"tag1", "tag2"};
     String[] tagsToRemove = new String[] {"tag3", "tag4"};
-
     MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
     when(tagManager.associateTagsForMetadataObject(metalake, catalog, tagsToAdd, tagsToRemove))
-        .thenReturn(tagsToAdd);
+        .thenReturn(new String[] {"tag1", "gravitino_hidden_123", "tag2"});
 
     TagsAssociateRequest request = new TagsAssociateRequest(tagsToAdd, tagsToRemove);
     Response response =
@@ -758,12 +1114,50 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
     Assertions.assertEquals(
         TagAlreadyAssociatedException.class.getSimpleName(), errorResponse.getType());
 
+    // Test associate tags for view
+    MetadataObject view = MetadataObjects.parse("object1.object2.view1", MetadataObject.Type.VIEW);
+    when(tagManager.associateTagsForMetadataObject(metalake, view, tagsToAdd, tagsToRemove))
+        .thenReturn(tagsToAdd);
+
+    Response response3 =
+        target(basePath(metalake))
+            .path(view.type().toString())
+            .path(view.fullName())
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response3.getStatus());
+    Assertions.assertArrayEquals(
+        tagsToAdd, response3.readEntity(NameListResponse.class).getNames());
+
+    // Test associate tags for function
+    MetadataObject function =
+        MetadataObjects.parse("object1.object2.function1", MetadataObject.Type.FUNCTION);
+    when(tagManager.associateTagsForMetadataObject(metalake, function, tagsToAdd, tagsToRemove))
+        .thenReturn(tagsToAdd);
+
+    Response response4 =
+        target(basePath(metalake))
+            .path(function.type().toString())
+            .path(function.fullName())
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response4.getStatus());
+    Assertions.assertArrayEquals(
+        tagsToAdd, response4.readEntity(NameListResponse.class).getNames());
+
     // Test throw RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(tagManager)
-        .associateTagsForMetadataObject(any(), any(), any(), any());
+        .associateTagsForMetadataObject(
+            any(String.class), any(MetadataObject.class), any(String[].class), any(String[].class));
 
-    Response response3 =
+    Response response5 =
         target(basePath(metalake))
             .path(catalog.type().toString())
             .path(catalog.fullName())
@@ -773,11 +1167,202 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
             .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(
-        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response3.getStatus());
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response5.getStatus());
 
-    ErrorResponse errorResponse1 = response3.readEntity(ErrorResponse.class);
+    ErrorResponse errorResponse1 = response5.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
+  }
+
+  @Test
+  public void testAssociateTagValuesForObjectV2() {
+    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
+    TagValue[] tagsToAdd = {TagValue.noValue("pii"), TagValue.of("data_domain", "finance")};
+    TagValue[] tagsToRemove = {TagValue.of("data_domain", "old")};
+    when(tagManager.associateTagValuesForMetadataObject(metalake, catalog, tagsToAdd, tagsToRemove))
+        .thenReturn(new String[] {"pii", "GRAVITINO_HIDDEN_123", "data_domain"});
+
+    TagValuesAssociateRequest request = new TagValuesAssociateRequest(tagsToAdd, tagsToRemove);
+    Response response =
+        target(basePath(metalake))
+            .path(catalog.type().toString())
+            .path(catalog.fullName())
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v2+json")
+            .post(Entity.entity(request, "application/vnd.gravitino.v2+json"));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    Assertions.assertEquals(
+        MediaType.valueOf("application/vnd.gravitino.v2+json"), response.getMediaType());
+    Assertions.assertArrayEquals(
+        new String[] {"pii", "data_domain"},
+        response.readEntity(NameListResponse.class).getNames());
+  }
+
+  @Test
+  public void testAssociateTagsForObjectWithNullRequest() {
+    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
+
+    Response response =
+        target(basePath(metalake))
+            .path(catalog.type().toString())
+            .path(catalog.fullName())
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(response);
+  }
+
+  @Test
+  public void testAssociateTagValuesForObjectWithNullRequest() {
+    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
+
+    Response response =
+        target(basePath(metalake))
+            .path(catalog.type().toString())
+            .path(catalog.fullName())
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v2+json")
+            .post(Entity.entity("null", "application/vnd.gravitino.v2+json"));
+
+    assertNullRequestBodyRejected(response);
+    Assertions.assertEquals(
+        MediaType.valueOf("application/vnd.gravitino.v2+json"), response.getMediaType());
+  }
+
+  @Test
+  public void testV2ErrorMediaType() {
+    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
+    TagValuesAssociateRequest request = new TagValuesAssociateRequest(null, null);
+
+    Response response =
+        target(basePath(metalake))
+            .path(catalog.type().toString())
+            .path(catalog.fullName())
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v2+json")
+            .post(Entity.entity(request, "application/vnd.gravitino.v2+json"));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    Assertions.assertEquals(
+        MediaType.valueOf("application/vnd.gravitino.v2+json"), response.getMediaType());
+  }
+
+  @Test
+  public void testAssociateTagsRejectsRequestShapeFromOtherVersion() {
+    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
+    String v1Json = "{\"tagsToAdd\":[\"data_domain\"]}";
+    String v2Json = "{\"tagsToAdd\":[{\"name\":\"data_domain\",\"value\":\"finance\"}]}";
+
+    Response v1WithV2Shape =
+        target(basePath(metalake))
+            .path(catalog.type().toString())
+            .path(catalog.fullName())
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(v2Json, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), v1WithV2Shape.getStatus());
+
+    Response v2WithV1Shape =
+        target(basePath(metalake))
+            .path(catalog.type().toString())
+            .path(catalog.fullName())
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v2+json")
+            .post(Entity.entity(v1Json, "application/vnd.gravitino.v2+json"));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), v2WithV1Shape.getStatus());
+  }
+
+  @Test
+  public void testTagsForSemanticModel() {
+    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
+    MetadataObject schema = MetadataObjects.parse("object1.object2", MetadataObject.Type.SCHEMA);
+    MetadataObject semanticModel =
+        MetadataObjects.parse("object1.object2.sales", MetadataObject.Type.SEMANTIC_MODEL);
+
+    when(tagManager.listTagsInfoForMetadataObject(metalake, catalog))
+        .thenReturn(tagInfos("catalogTag"));
+    when(tagManager.listTagsInfoForMetadataObject(metalake, schema))
+        .thenReturn(tagInfos("schemaTag"));
+    when(tagManager.listTagsInfoForMetadataObject(metalake, semanticModel))
+        .thenReturn(tagInfos("semanticModelTag"));
+
+    // A Semantic Model shows its own tags plus the tags inherited from its schema and catalog.
+    Response listResponse =
+        target(basePath(metalake))
+            .path(semanticModel.type().toString())
+            .path(semanticModel.fullName())
+            .path("tags")
+            .queryParam("details", true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), listResponse.getStatus());
+    TagListResponse tagListResponse = listResponse.readEntity(TagListResponse.class);
+    Assertions.assertEquals(0, tagListResponse.getCode());
+    Assertions.assertEquals(3, tagListResponse.getTags().length);
+
+    Map<String, Tag> resultTags =
+        Arrays.stream(tagListResponse.getTags())
+            .collect(Collectors.toMap(Tag::name, Function.identity()));
+    Assertions.assertFalse(resultTags.get("semanticModelTag").inherited().get());
+    Assertions.assertTrue(resultTags.get("schemaTag").inherited().get());
+    Assertions.assertTrue(resultTags.get("catalogTag").inherited().get());
+
+    // Getting a single tag on a Semantic Model.
+    TagEntity semanticModelTag =
+        TagEntity.builder()
+            .withName("semanticModelTag")
+            .withId(1L)
+            .withAuditInfo(testAuditInfo1)
+            .build();
+    when(tagManager.getTagForMetadataObject(metalake, semanticModel, "semanticModelTag"))
+        .thenReturn(semanticModelTag);
+
+    Response getResponse =
+        target(basePath(metalake))
+            .path(semanticModel.type().toString())
+            .path(semanticModel.fullName())
+            .path("tags")
+            .path("semanticModelTag")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), getResponse.getStatus());
+    Tag respTag = getResponse.readEntity(TagResponse.class).getTag();
+    Assertions.assertEquals("semanticModelTag", respTag.name());
+    Assertions.assertFalse(respTag.inherited().get());
+
+    // Associating and disassociating tags on a Semantic Model.
+    String[] tagsToAdd = new String[] {"semanticModelTag"};
+    String[] tagsToRemove = new String[] {"staleTag"};
+    when(tagManager.associateTagsForMetadataObject(
+            metalake, semanticModel, tagsToAdd, tagsToRemove))
+        .thenReturn(tagsToAdd);
+
+    TagsAssociateRequest request = new TagsAssociateRequest(tagsToAdd, tagsToRemove);
+    Response associateResponse =
+        target(basePath(metalake))
+            .path(semanticModel.type().toString())
+            .path(semanticModel.fullName())
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), associateResponse.getStatus());
+    NameListResponse nameListResponse = associateResponse.readEntity(NameListResponse.class);
+    Assertions.assertEquals(0, nameListResponse.getCode());
+    Assertions.assertArrayEquals(tagsToAdd, nameListResponse.getNames());
   }
 
   private String basePath(String metalake) {

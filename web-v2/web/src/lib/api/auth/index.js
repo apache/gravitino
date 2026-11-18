@@ -21,9 +21,12 @@ import { defHttp } from '@/lib/utils/axios'
 import { ContentTypeEnum } from '@/lib/enums/httpEnum'
 
 export const getAuthConfigsApi = () => {
-  return defHttp.get({
-    url: '/configs'
-  })
+  return defHttp.get(
+    {
+      url: '/configs'
+    },
+    { withToken: false }
+  )
 }
 
 export const getAuthMeApi = () => {
@@ -39,6 +42,20 @@ export const loginApi = (url, params) => {
       data: params,
       headers: {
         'Content-Type': ContentTypeEnum.FORM_URLENCODED
+      }
+    },
+    { withToken: false }
+  )
+}
+
+export const basicLoginApi = basicToken => {
+  return defHttp.get(
+    {
+      url: '/api/version',
+      headers: {
+        Authorization: basicToken,
+        Accept: 'application/vnd.gravitino.v1+json',
+        'Content-Type': 'application/json'
       }
     },
     { withToken: false }

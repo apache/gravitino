@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.s3.credential;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
@@ -32,10 +34,13 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.credential.CredentialContext;
 import org.apache.gravitino.credential.CredentialGenerator;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
+import org.apache.gravitino.credential.RoleSessionNameUtils;
 import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.credential.config.S3CredentialConfig;
+import org.apache.gravitino.storage.S3Properties;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.policybuilder.iam.IamConditionOperator;
 import software.amazon.awssdk.policybuilder.iam.IamEffect;
@@ -65,7 +70,7 @@ public class S3TokenGenerator implements CredentialGenerator<S3TokenCredential> 
     this.externalID = s3CredentialConfig.externalID();
     this.tokenExpireSecs = s3CredentialConfig.tokenExpireInSecs();
     this.listLocationPrefix = s3CredentialConfig.listLocationPrefix();
-    this.stsClient = createStsClient(s3CredentialConfig);
+    this.stsClient = createStsClient(s3CredentialConfig, stsCallerCredentials(properties));
   }
 
   @Override
@@ -87,11 +92,32 @@ public class S3TokenGenerator implements CredentialGenerator<S3TokenCredential> 
         s3Token.expiration().toEpochMilli());
   }
 
-  private StsClient createStsClient(S3CredentialConfig s3CredentialConfig) {
-    AwsCredentialsProvider credentialsProvider =
-        StaticCredentialsProvider.create(
-            AwsBasicCredentials.create(
-                s3CredentialConfig.accessKeyID(), s3CredentialConfig.secretAccessKey()));
+  /**
+   * Returns the credentials Gravitino uses to call STS. With a static access key pair configured,
+   * those keys are used. With neither key configured, the AWS default credential chain is used, so
+   * a server running with an instance profile, an EKS service account or environment credentials
+   * can assume the vending role without storing keys in the catalog.
+   */
+  @VisibleForTesting
+  static AwsCredentialsProvider stsCallerCredentials(Map<String, String> properties) {
+    String accessKeyId = properties.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID);
+    String secretAccessKey = properties.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY);
+    boolean hasAccessKeyId = StringUtils.isNotBlank(accessKeyId);
+    boolean hasSecretAccessKey = StringUtils.isNotBlank(secretAccessKey);
+    if (!hasAccessKeyId && !hasSecretAccessKey) {
+      return DefaultCredentialsProvider.builder().build();
+    }
+    Preconditions.checkArgument(
+        hasAccessKeyId && hasSecretAccessKey,
+        "Set both %s and %s, or neither to use the AWS default credential chain",
+        S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+        S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY);
+    return StaticCredentialsProvider.create(
+        AwsBasicCredentials.create(accessKeyId, secretAccessKey));
+  }
+
+  private StsClient createStsClient(
+      S3CredentialConfig s3CredentialConfig, AwsCredentialsProvider credentialsProvider) {
     StsClientBuilder builder = StsClient.builder().credentialsProvider(credentialsProvider);
 
     if (StringUtils.isNotBlank(s3CredentialConfig.region())) {
@@ -109,7 +135,7 @@ public class S3TokenGenerator implements CredentialGenerator<S3TokenCredential> 
     AssumeRoleRequest.Builder builder =
         AssumeRoleRequest.builder()
             .roleArn(roleArn)
-            .roleSessionName("gravitino_" + userName)
+            .roleSessionName(RoleSessionNameUtils.create("gravitino_", userName))
             .durationSeconds(tokenExpireSecs)
             .policy(policy.toJson());
 

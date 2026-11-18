@@ -27,6 +27,7 @@ import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.job.JobOperationDispatcher;
+import org.apache.gravitino.job.JobRuntimeTemplateMaskUtils;
 import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.listener.api.event.job.AlterJobTemplateEvent;
 import org.apache.gravitino.listener.api.event.job.AlterJobTemplateFailureEvent;
@@ -201,12 +202,15 @@ public class JobEventDispatcher implements JobOperationDispatcher {
   }
 
   @Override
-  public JobEntity getJob(String metalake, String jobId) throws NoSuchJobException {
+  public JobEntity getJob(
+      String metalake, String jobId, boolean includeOutput, Integer maxLines, Integer maxBytes)
+      throws NoSuchJobException {
     eventBus.dispatchEvent(
         new GetJobPreEvent(PrincipalUtils.getCurrentUserName(), metalake, jobId));
 
     try {
-      JobEntity job = jobOperationDispatcher.getJob(metalake, jobId);
+      JobEntity job =
+          jobOperationDispatcher.getJob(metalake, jobId, includeOutput, maxLines, maxBytes);
       eventBus.dispatchEvent(
           new GetJobEvent(
               PrincipalUtils.getCurrentUserName(), metalake, JobInfo.fromJobEntity(job)));
@@ -221,9 +225,12 @@ public class JobEventDispatcher implements JobOperationDispatcher {
   @Override
   public JobEntity runJob(String metalake, String jobTemplateName, Map<String, String> jobConf)
       throws NoSuchJobTemplateException {
+    // Events carry a masked copy of the Spark updater_options / spark_conf JSON. Execution below
+    // still uses the caller's plaintext jobConf.
+    Map<String, String> maskedJobConf = JobRuntimeTemplateMaskUtils.maskSensitiveJobConf(jobConf);
     eventBus.dispatchEvent(
         new RunJobPreEvent(
-            PrincipalUtils.getCurrentUserName(), metalake, jobTemplateName, jobConf));
+            PrincipalUtils.getCurrentUserName(), metalake, jobTemplateName, maskedJobConf));
 
     try {
       JobEntity job = jobOperationDispatcher.runJob(metalake, jobTemplateName, jobConf);
@@ -232,13 +239,13 @@ public class JobEventDispatcher implements JobOperationDispatcher {
               PrincipalUtils.getCurrentUserName(),
               metalake,
               jobTemplateName,
-              jobConf,
+              maskedJobConf,
               JobInfo.fromJobEntity(job)));
       return job;
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new RunJobFailureEvent(
-              PrincipalUtils.getCurrentUserName(), metalake, jobTemplateName, jobConf, e));
+              PrincipalUtils.getCurrentUserName(), metalake, jobTemplateName, maskedJobConf, e));
       throw e;
     }
   }

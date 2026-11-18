@@ -29,16 +29,27 @@ val scalaVersion: String =
 val sparkVersion: String = libs.versions.spark35.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 // Comma-separated list of lance-spark-bundle versions to test against.
-// The default is the latest supported version; the integration test matrix
-// (`:lance:lance-rest-server:lanceSparkMatrixTest`) covers every version in
-// this list. Override via `-PlanceSparkBundleVersions=0.2.0,0.4.0`.
+// Without an explicit property, the integration test matrix covers every
+// declared version and the normal test task uses 0.8.0 as its primary bundle,
+// since 0.8.0 is the bundle built on lance-core 12.0.0 / lance-namespace 0.11.1.
+// The default list spans every lance-namespace generation a released bundle
+// speaks: pre-0.7 (0.2.0, 0.4.0), 0.7.5 (0.5.1), 0.8.6 (0.6.1, 0.7.1) and
+// 0.11.1 (0.8.0).
+// An explicit property is a targeted diagnostic override; its first version
+// remains the primary bundle for compatibility with the existing behavior.
+val lanceSparkBundleVersionsProperty = project.properties["lanceSparkBundleVersions"] as? String
 val lanceSparkBundleVersions: List<String> =
-  ((project.properties["lanceSparkBundleVersions"] as? String) ?: "0.4.0")
+  (lanceSparkBundleVersionsProperty ?: "0.2.0,0.4.0,0.5.1,0.6.1,0.7.1,0.8.0")
     .split(",").map { it.trim() }.filter { it.isNotEmpty() }.distinct()
 if (lanceSparkBundleVersions.isEmpty()) {
   throw GradleException("lanceSparkBundleVersions must contain at least one version")
 }
-val primaryLanceSparkBundleVersion: String = lanceSparkBundleVersions.first()
+val primaryLanceSparkBundleVersion: String =
+  if (lanceSparkBundleVersionsProperty == null) {
+    "0.8.0"
+  } else {
+    lanceSparkBundleVersions.first()
+  }
 val lanceSparkBundleJarPathProperty = "gravitino.lance.spark.bundle.jar"
 
 fun lanceSparkBundleConfigName(version: String): String =
@@ -58,7 +69,23 @@ lanceSparkBundleVersions.forEach { version ->
   }
 }
 
+// Keeps the Jackson line brought in by Arrow on its latest patch release. The BOM sits in a
+// dedicated configuration so that it only applies to this module and is not exported to the
+// modules that depend on it.
+val jacksonBom: Configuration by configurations.creating {
+  isCanBeConsumed = false
+  isCanBeResolved = false
+}
+listOf(
+  "compileClasspath",
+  "runtimeClasspath",
+  "testCompileClasspath",
+  "testRuntimeClasspath"
+).forEach {
+  configurations.named(it) { extendsFrom(jacksonBom) }
+}
 dependencies {
+  jacksonBom(platform(libs.jackson.bom.v218))
   implementation(project(":api"))
   implementation(project(":common")) {
     exclude("*")
@@ -102,8 +129,16 @@ dependencies {
 
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":server"))
+  testImplementation(project(":spark-connector:spark-3.5"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
-  testImplementation(libs.lance)
+  testImplementation(project(":server-common", "testArtifacts"))
+  // The distribution excludes io.opentelemetry from lance-core (see core/build.gradle.kts),
+  // so exclude it here too: a test classpath that still carries it would hide a new reference
+  // to org.lance.otel.* that then fails at runtime with NoClassDefFoundError.
+  testImplementation(libs.lance) {
+    exclude(group = "io.opentelemetry", module = "*")
+  }
+  testImplementation(libs.lance.namespace.apache.client)
 
   lanceSparkBundleVersions.forEach { version ->
     add(
@@ -156,6 +191,7 @@ tasks {
       into(lanceSparkBundleDirFor(version))
     }
   }
+
   val primaryPrepareLanceSparkBundle =
     named(lanceSparkPrepareTaskName(primaryLanceSparkBundleVersion))
 
@@ -192,6 +228,7 @@ tasks {
 
     val primaryBundleDir = lanceSparkBundleDirFor(primaryLanceSparkBundleVersion)
     doFirst {
+      systemProperty("lance.test.runtimeClasspath", sourceSets["main"].runtimeClasspath.asPath)
       val bundleJar =
         primaryBundleDir.get().asFile.listFiles()?.singleOrNull { it.extension == "jar" }
           ?: throw GradleException(
@@ -257,7 +294,7 @@ tasks {
     group = "verification"
     description =
       "Run LanceSparkRESTServiceIT against every version in -PlanceSparkBundleVersions " +
-      "(default: $primaryLanceSparkBundleVersion). Reports land under " +
+      "(default: ${lanceSparkBundleVersions.joinToString(", ")}). Reports land under " +
       "build/reports/lance-spark-matrix/<version>/."
     dependsOn(
       lanceSparkBundleVersions.map { named(lanceSparkTestTaskName(it)) }

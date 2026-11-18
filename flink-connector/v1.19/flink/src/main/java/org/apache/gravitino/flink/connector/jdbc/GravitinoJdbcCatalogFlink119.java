@@ -19,16 +19,13 @@
 
 package org.apache.gravitino.flink.connector.jdbc;
 
-import java.util.Optional;
 import org.apache.flink.connector.jdbc.core.database.catalog.factory.JdbcCatalogFactory;
-import org.apache.flink.connector.jdbc.core.table.JdbcDynamicTableFactory;
 import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.factories.CatalogFactory;
-import org.apache.flink.table.factories.Factory;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.utils.CatalogCompat;
-import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
+import org.apache.gravitino.flink.connector.utils.CatalogCompatFlink119;
 
 /**
  * {@link GravitinoJdbcCatalog} implementation for Flink 1.19. Uses the relocated {@code
@@ -51,12 +48,7 @@ public class GravitinoJdbcCatalogFlink119 extends GravitinoJdbcCatalog {
   }
 
   @Override
-  public Optional<Factory> getFactory() {
-    return Optional.of(new JdbcDynamicTableFactory());
-  }
-
-  @Override
   protected CatalogCompat catalogCompat() {
-    return DefaultCatalogCompat.INSTANCE;
+    return CatalogCompatFlink119.INSTANCE;
   }
 }

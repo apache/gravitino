@@ -18,11 +18,14 @@
  */
 package org.apache.gravitino.catalog;
 
+import java.util.Collections;
 import java.util.Map;
+import java.util.OptionalLong;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
+import org.apache.gravitino.connector.MaskAndOmitKeys;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
@@ -43,8 +46,10 @@ public final class EntityCombinedTable implements Table {
 
   private final TableEntity tableEntity;
 
-  // Sets of properties that should be hidden from the user.
-  private Set<String> hiddenProperties;
+  // Editable hidden/secret keys are masked; reserved+hidden keys are omitted.
+  private Set<String> keysToMask = Collections.emptySet();
+
+  private Set<String> keysToOmit = Collections.emptySet();
 
   // Field "imported" is used to indicate whether the entity has been imported to Gravitino
   // managed storage backend. If "imported" is true, it means that storage backend have stored
@@ -52,6 +57,13 @@ public final class EntityCombinedTable implements Table {
   // This is used for tag/access control related purposes, only the imported entities have the
   // unique id, and based on this id, we can label and control the access to the entities.
   private boolean imported;
+
+  // Present only when this create request inserted the metadata object. Loading an existing table
+  // (including EXIST_OK) must never make its caller the owner, even if that table has no owner.
+  private OptionalLong createdTableId = OptionalLong.empty();
+
+  // The columns to report instead of the catalog's, set only when the catalog reports none.
+  private Column[] columnsOverride;
 
   private EntityCombinedTable(Table table, TableEntity tableEntity) {
     this.table = table;
@@ -67,14 +79,47 @@ public final class EntityCombinedTable implements Table {
     return new EntityCombinedTable(table, null);
   }
 
-  public EntityCombinedTable withHiddenProperties(Set<String> hiddenProperties) {
-    this.hiddenProperties = hiddenProperties;
+  public EntityCombinedTable withHiddenProperties(MaskAndOmitKeys keys) {
+    MaskAndOmitKeys classification = keys == null ? MaskAndOmitKeys.empty() : keys;
+    this.keysToMask = classification.keysToMask();
+    this.keysToOmit = classification.keysToOmit();
+    return this;
+  }
+
+  /**
+   * Reports the given columns instead of the catalog table's. Used when the catalog returns a table
+   * without a column list and the stored columns stand in for it.
+   *
+   * @param columns The columns to report.
+   * @return This EntityCombinedTable.
+   */
+  EntityCombinedTable withColumns(Column[] columns) {
+    this.columnsOverride = columns;
     return this;
   }
 
   public EntityCombinedTable withImported(boolean imported) {
     this.imported = imported;
     return this;
+  }
+
+  EntityCombinedTable withCreatedTableId(long id) {
+    this.createdTableId = OptionalLong.of(id);
+    return this;
+  }
+
+  /**
+   * Returns the ID inserted by this create request, or empty for an existing table or a read. This
+   * server-internal outcome is not a table property and is not serialized to clients.
+   *
+   * @return the newly created metadata object's ID, if this request created it
+   */
+  public OptionalLong createdTableId() {
+    return createdTableId;
+  }
+
+  MaskAndOmitKeys hiddenProperties() {
+    return MaskAndOmitKeys.of(keysToMask, keysToOmit);
   }
 
   @Override
@@ -89,15 +134,12 @@ public final class EntityCombinedTable implements Table {
 
   @Override
   public Column[] columns() {
-    return table.columns();
+    return columnsOverride != null ? columnsOverride : table.columns();
   }
 
   @Override
   public Map<String, String> properties() {
-    return table.properties().entrySet().stream()
-        .filter(p -> !hiddenProperties.contains(p.getKey()))
-        .filter(entry -> entry.getKey() != null && entry.getValue() != null)
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    return HiddenPropertyMaskUtils.maskHiddenProperties(table.properties(), keysToMask, keysToOmit);
   }
 
   @Override

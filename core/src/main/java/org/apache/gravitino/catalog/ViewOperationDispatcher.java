@@ -29,6 +29,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -39,9 +40,11 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -51,8 +54,10 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewChange;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.WritableDataTypeValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,10 +74,19 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
    * @param catalogManager The CatalogManager instance to be used for view operations.
    * @param store The EntityStore instance to be used for view operations.
    * @param idGenerator The IdGenerator instance to be used for view operations.
+   * @param secretManager The SecretManager instance to be used for secret operations.
    */
   public ViewOperationDispatcher(
-      CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
-    this(catalogManager, store, idGenerator, () -> GravitinoEnv.getInstance().schemaDispatcher());
+      CatalogManager catalogManager,
+      EntityStore store,
+      IdGenerator idGenerator,
+      SecretManager secretManager) {
+    this(
+        catalogManager,
+        store,
+        idGenerator,
+        () -> GravitinoEnv.getInstance().internalSchemaDispatcher(),
+        secretManager);
   }
 
   /**
@@ -82,13 +96,15 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
    * @param store The EntityStore instance to be used for view operations.
    * @param idGenerator The IdGenerator instance to be used for view operations.
    * @param schemaDispatcherSupplier The SchemaDispatcher supplier to ensure schemas are imported.
+   * @param secretManager The SecretManager instance to be used for secret operations.
    */
   public ViewOperationDispatcher(
       CatalogManager catalogManager,
       EntityStore store,
       IdGenerator idGenerator,
-      Supplier<SchemaDispatcher> schemaDispatcherSupplier) {
-    super(catalogManager, store, idGenerator);
+      Supplier<SchemaDispatcher> schemaDispatcherSupplier,
+      SecretManager secretManager) {
+    super(catalogManager, store, idGenerator, secretManager);
     this.schemaDispatcherSupplier =
         Preconditions.checkNotNull(
             schemaDispatcherSupplier, "schemaDispatcherSupplier must not be null");
@@ -123,21 +139,14 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
    */
   @Override
   public View loadView(NameIdentifier ident) throws NoSuchViewException {
-    LOG.info("Loading view: {}", ident);
+    return loadAndImportView(ident, AuditInfo.EMPTY);
+  }
 
-    EntityCombinedView entityCombinedView =
-        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadView(ident));
-
-    if (!entityCombinedView.imported()) {
-      SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
-      NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
-      schemaDispatcher.loadSchema(schemaIdent);
-
-      entityCombinedView =
-          TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importView(ident));
-    }
-
-    return entityCombinedView;
+  /** {@inheritDoc} */
+  @Override
+  public View importView(NameIdentifier ident, AuditInfo auditInfo) throws NoSuchViewException {
+    Preconditions.checkArgument(auditInfo != null, "auditInfo must not be null");
+    return loadAndImportView(ident, auditInfo);
   }
 
   /**
@@ -168,14 +177,19 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     Preconditions.checkArgument(
         representations != null && representations.length >= 1,
         "representations must not be null or empty");
+    if (columns != null) {
+      WritableDataTypeValidator.validateColumns(columns, "columns");
+    }
 
     // Load the schema to make sure the schema exists.
     SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
     schemaDispatcher.loadSchema(schemaIdent);
 
+    // Lock the view node, not the schema, so views in the same schema can be created
+    // concurrently. See TableOperationDispatcher#createTable for the reasoning and trade-off.
     return TreeLockUtils.doWithTreeLock(
-        schemaIdent,
+        ident,
         LockType.WRITE,
         () ->
             internalCreateView(
@@ -197,11 +211,21 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
    * @return The altered {@link View} object after applying the changes.
    * @throws NoSuchViewException If the view to alter does not exist.
    * @throws IllegalArgumentException If an unsupported or invalid change is specified.
+   * @throws GravitinoRuntimeException If a rename succeeds in the external catalog but Gravitino
+   *     cannot update the stored view registration consistently.
    */
   @Override
   public View alterView(NameIdentifier ident, ViewChange... changes)
       throws NoSuchViewException, IllegalArgumentException {
+    for (int i = 0; i < changes.length; i++) {
+      if (changes[i] instanceof ViewChange.ReplaceView) {
+        WritableDataTypeValidator.validateColumns(
+            ((ViewChange.ReplaceView) changes[i]).getColumns(), "updates[" + i + "].columns");
+      }
+    }
     validateAlterProperties(ident, HasPropertyMetadata::tablePropertiesMetadata, changes);
+    boolean isRenameView =
+        Arrays.stream(changes).anyMatch(change -> change instanceof ViewChange.RenameView);
     NameIdentifier lockIdent = ident;
     for (ViewChange change : changes) {
       if (change instanceof ViewChange.RenameView) {
@@ -216,6 +240,9 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
         nameIdentifierForLock.equals(ident) ? LockType.READ : LockType.WRITE,
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+          boolean isManagedView = isManagedEntity(catalogIdent, Capability.Scope.VIEW);
+          Optional<ViewEntity> viewEntityBeforeRename =
+              isRenameView && !isManagedView ? getViewEntityBeforeRename(ident) : Optional.empty();
           View alteredView =
               doWithCatalog(
                   catalogIdent,
@@ -225,11 +252,10 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
                   NoSuchViewException.class,
                   IllegalArgumentException.class);
 
-          boolean isManagedView = isManagedEntity(catalogIdent, Capability.Scope.VIEW);
           if (isManagedView) {
             return EntityCombinedView.of(alteredView)
                 .withHiddenProperties(
-                    getHiddenPropertyNames(
+                    getMaskAndOmitKeys(
                         catalogIdent,
                         HasPropertyMetadata::tablePropertiesMetadata,
                         alteredView.properties()));
@@ -237,13 +263,15 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
           StringIdentifier stringId = getStringIdFromProperties(alteredView.properties());
           // Case 1: The view is not created by Gravitino and this view is never imported.
-          ViewEntity existing = null;
+          ViewEntity existing = viewEntityBeforeRename.orElse(null);
           if (stringId == null) {
-            existing = getEntity(ident, VIEW, ViewEntity.class);
+            if (existing == null) {
+              existing = getEntity(ident, VIEW, ViewEntity.class);
+            }
             if (existing == null) {
               return EntityCombinedView.of(alteredView)
                   .withHiddenProperties(
-                      getHiddenPropertyNames(
+                      getMaskAndOmitKeys(
                           catalogIdent,
                           HasPropertyMetadata::tablePropertiesMetadata,
                           alteredView.properties()));
@@ -263,9 +291,19 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
                   "UPDATE",
                   viewId);
 
+          // operateOnEntity returns null if the store update fails or if the returned entity ID
+          // does not match the ID from the external catalog.
+          if (isRenameView && updatedViewEntity == null) {
+            NameIdentifier newIdent = NameIdentifier.of(ident.namespace(), alteredView.name());
+            throw new GravitinoRuntimeException(
+                "View %s was renamed to %s in the external catalog, but its registration in "
+                    + "Gravitino could not be updated consistently",
+                ident, newIdent);
+          }
+
           return EntityCombinedView.of(alteredView, updatedViewEntity)
               .withHiddenProperties(
-                  getHiddenPropertyNames(
+                  getMaskAndOmitKeys(
                       catalogIdent,
                       HasPropertyMetadata::tablePropertiesMetadata,
                       alteredView.properties()));
@@ -299,20 +337,20 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
             return droppedFromCatalog;
           }
 
-          // For unmanaged view, it could happen that the view:
-          // 1. Is not found in the catalog (dropped directly from underlying sources)
-          // 2. Is found in the catalog but not in the store (not managed by Gravitino)
-          // 3. Is found in the catalog and the store (managed by Gravitino)
-          // 4. Neither found in the catalog nor in the store.
-          // In all situations, we try to delete the view from the store, but we don't take the
-          // return value of the store operation into account. We only take the return value of the
-          // catalog into account.
-          try {
-            store.delete(ident, VIEW);
-          } catch (NoSuchEntityException e) {
-            LOG.warn("The view to be dropped does not exist in the store: {}", ident, e);
-          } catch (Exception e) {
-            throw new RuntimeException(e);
+          // A false result is ambiguous: the external view may have been renamed or dropped out of
+          // band. Preserve the registration because deleting it after a rename would lose
+          // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
+          // registration that requires separate cleanup.
+          if (droppedFromCatalog) {
+            try {
+              store.delete(ident, VIEW);
+            } catch (NoSuchEntityException e) {
+              LOG.warn("The view to be dropped does not exist in the store: {}", ident, e);
+            } catch (OptimisticLockException e) {
+              throw e;
+            } catch (Exception e) {
+              throw new RuntimeException(e);
+            }
           }
           // Run unconditionally: an out-of-band drop may have left orphaned schema entities. The
           // cleanup is best-effort and stops as soon as a schema still exists.
@@ -371,7 +409,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     if (isManagedView) {
       return EntityCombinedView.of(catalogView)
           .withHiddenProperties(
-              getHiddenPropertyNames(
+              getMaskAndOmitKeys(
                   catalogIdent,
                   HasPropertyMetadata::tablePropertiesMetadata,
                   catalogView.properties()));
@@ -403,7 +441,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedView.of(catalogView)
           .withHiddenProperties(
-              getHiddenPropertyNames(
+              getMaskAndOmitKeys(
                   catalogIdent,
                   HasPropertyMetadata::tablePropertiesMetadata,
                   catalogView.properties()));
@@ -412,10 +450,21 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     // Merge both the metadata from catalog operation and the metadata from entity store.
     return EntityCombinedView.of(catalogView, viewEntity)
         .withHiddenProperties(
-            getHiddenPropertyNames(
+            getMaskAndOmitKeys(
                 catalogIdent,
                 HasPropertyMetadata::tablePropertiesMetadata,
                 catalogView.properties()));
+  }
+
+  private Optional<ViewEntity> getViewEntityBeforeRename(NameIdentifier ident) {
+    try {
+      return Optional.of(store.get(ident, VIEW, ViewEntity.class));
+    } catch (NoSuchEntityException e) {
+      return Optional.empty();
+    } catch (Exception e) {
+      throw new GravitinoRuntimeException(
+          e, "Failed to read the stored registration for view %s before renaming it", ident);
+    }
   }
 
   private EntityCombinedView internalLoadView(NameIdentifier ident) throws NoSuchViewException {
@@ -430,7 +479,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     if (isManagedView) {
       return EntityCombinedView.of(view)
           .withHiddenProperties(
-              getHiddenPropertyNames(
+              getMaskAndOmitKeys(
                   catalogIdentifier,
                   HasPropertyMetadata::tablePropertiesMetadata,
                   view.properties()))
@@ -446,7 +495,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
       if (viewEntity == null) {
         return EntityCombinedView.of(view)
             .withHiddenProperties(
-                getHiddenPropertyNames(
+                getMaskAndOmitKeys(
                     catalogIdentifier,
                     HasPropertyMetadata::tablePropertiesMetadata,
                     view.properties()))
@@ -458,7 +507,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
       return EntityCombinedView.of(view, viewEntity)
           .withHiddenProperties(
-              getHiddenPropertyNames(
+              getMaskAndOmitKeys(
                   catalogIdentifier,
                   HasPropertyMetadata::tablePropertiesMetadata,
                   view.properties()))
@@ -477,12 +526,71 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
     return EntityCombinedView.of(view, viewEntity)
         .withHiddenProperties(
-            getHiddenPropertyNames(
+            getMaskAndOmitKeys(
                 catalogIdentifier, HasPropertyMetadata::tablePropertiesMetadata, view.properties()))
         .withImported(viewEntity != null);
   }
 
-  private EntityCombinedView importView(NameIdentifier ident) throws NoSuchViewException {
+  private View loadAndImportView(NameIdentifier ident, AuditInfo importAudit)
+      throws NoSuchViewException {
+    LOG.info("Loading view: {}", ident);
+
+    EntityCombinedView entityCombinedView =
+        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadView(ident));
+
+    if (!entityCombinedView.imported()) {
+      SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
+      NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
+      schemaDispatcher.loadSchema(schemaIdent);
+
+      try {
+        entityCombinedView =
+            TreeLockUtils.doWithTreeLock(
+                schemaIdent, LockType.WRITE, () -> importViewFromCatalog(ident, importAudit));
+      } catch (EntityAlreadyExistsException e) {
+        // A create-only import can conflict either because another Gravitino node won an HA race,
+        // or because the external identifier is already stored under another Gravitino path.
+        // Reload to distinguish a successful concurrent import from an identity conflict.
+        LOG.info(
+            "View {} import conflicted with existing metadata; reloading from store: {}",
+            ident,
+            e.getMessage());
+        entityCombinedView =
+            TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadView(ident));
+        if (!entityCombinedView.imported()) {
+          throw retainedExternalIdentifierConflictException(ident, VIEW);
+        }
+      }
+    }
+
+    ViewEntity entity =
+        fillMissingCreationAudit(
+            entityCombinedView.viewEntity(),
+            ViewEntity.class,
+            entityCombinedView.viewFromCatalog().auditInfo(),
+            importAudit,
+            (current, audit) ->
+                ViewEntity.builder()
+                    .withId(current.id())
+                    .withName(current.name())
+                    .withNamespace(current.namespace())
+                    .withComment(current.comment())
+                    .withColumns(current.columns())
+                    .withRepresentations(current.representations())
+                    .withDefaultCatalog(current.defaultCatalog())
+                    .withDefaultSchema(current.defaultSchema())
+                    .withProperties(current.properties())
+                    .withAuditInfo(audit)
+                    .build());
+    return EntityCombinedView.of(entityCombinedView.viewFromCatalog(), entity)
+        .withHiddenProperties(entityCombinedView.hiddenProperties())
+        .withImported(
+            entityCombinedView.imported()
+                && (entityCombinedView.viewEntity() == null || entity != null));
+  }
+
+  private EntityCombinedView importViewFromCatalog(NameIdentifier ident, AuditInfo importAudit)
+      throws NoSuchViewException {
     EntityCombinedView entityCombinedView = internalLoadView(ident);
 
     if (entityCombinedView.imported()) {
@@ -494,13 +602,17 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
     long uid;
     if (stringId != null) {
-      // If the entity in the store doesn't match the external system, we use the data
-      // of external system to correct it.
+      // An external identifier may already be stored under another Gravitino path because the
+      // view was renamed outside Gravitino or because multiple catalogs expose one metastore.
+      // Those cases are indistinguishable here, so Gravitino must not automatically reassign the
+      // stored identity because doing so can silently move the view between paths. The create-only
+      // write below reports the conflict for manual identifier cleanup.
       LOG.warn(
-          "The View uid {} existed but still need to be imported, this could happen "
-              + "when View is renamed by external systems not controlled by Gravitino. In this "
-              + "case, we need to overwrite the stored entity to keep the consistency.",
-          stringId);
+          "View uid {} exists externally but is not imported at {}. Gravitino will use a "
+              + "create-only import; if this uid is already stored under another identifier, "
+              + "manual identifier cleanup is required.",
+          stringId,
+          ident);
       uid = stringId.id();
     } else {
       // If entity doesn't exist, we import the entity from the external system.
@@ -515,6 +627,9 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
             .withLastModifier(catalogView.auditInfo().lastModifier())
             .withLastModifiedTime(catalogView.auditInfo().lastModifiedTime())
             .build();
+    if (audit.creator() == null) {
+      audit = audit.merge(importAudit, false /* overwrite */);
+    }
     ViewEntity viewEntity =
         ViewEntity.builder()
             .withId(uid)
@@ -532,23 +647,22 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
             .withAuditInfo(audit)
             .build();
     try {
-      store.put(viewEntity, true /* overwrite */);
+      // Never overwrite imported view metadata. In particular, an overwrite by stable ID can
+      // silently change schema or catalog ownership and make existing privileges refer to the
+      // wrong path.
+      store.put(viewEntity, false);
     } catch (EntityAlreadyExistsException e) {
-      LOG.error("Failed to import view {} with id {} to the store.", ident, uid, e);
-      throw new UnsupportedOperationException(
-          "View managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
-              + "To resolve: Remove all catalogs managing this view, then recreate one catalog to ensure single-catalog management.");
+      throw e;
+    } catch (OptimisticLockException e) {
+      // A conflict with a concurrent writer, such as a lock wait timeout; the load can be retried.
+      throw e;
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
-      throw new RuntimeException("Fail to import the view entity to the store.", e);
+      throw new RuntimeException("Failed to import the view entity to the store", e);
     }
 
     return EntityCombinedView.of(catalogView, viewEntity)
-        .withHiddenProperties(
-            getHiddenPropertyNames(
-                getCatalogIdentifier(ident),
-                HasPropertyMetadata::tablePropertiesMetadata,
-                catalogView.properties()))
+        .withHiddenProperties(entityCombinedView.hiddenProperties())
         .withImported(true);
   }
 

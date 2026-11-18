@@ -46,8 +46,10 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.PrincipalMapper;
 import org.apache.gravitino.exceptions.TokenExpiredException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.junit.jupiter.api.BeforeEach;
@@ -769,6 +771,59 @@ public class TestJwksTokenValidator {
               TokenExpiredException.class,
               () -> validator.validateToken(tokenString, "test-service"));
       assertTrue(exception.getMessage().contains("expired"));
+    }
+  }
+
+  @Test
+  public void testValidateTokenPreservesUnauthorizedExceptionFromPrincipalMapper()
+      throws Exception {
+    RSAKey rsaKey =
+        new RSAKeyGenerator(2048).keyID("test-key-id").algorithm(JWSAlgorithm.RS256).generate();
+
+    JWTClaimsSet claimsSet =
+        new JWTClaimsSet.Builder()
+            .subject("disabled-user")
+            .audience("test-service")
+            .issuer("https://test-issuer.com")
+            .expirationTime(Date.from(Instant.now().plusSeconds(3600)))
+            .issueTime(Date.from(Instant.now()))
+            .build();
+
+    SignedJWT signedJWT =
+        new SignedJWT(
+            new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("test-key-id").build(), claimsSet);
+    signedJWT.sign(new RSASSASigner(rsaKey));
+    String tokenString = signedJWT.serialize();
+
+    try (MockedStatic<JWKSourceBuilder> mockedBuilder = mockStatic(JWKSourceBuilder.class)) {
+      @SuppressWarnings("unchecked")
+      JWKSource<SecurityContext> mockJwkSource = mock(JWKSource.class);
+      @SuppressWarnings("unchecked")
+      JWKSourceBuilder<SecurityContext> mockBuilder = mock(JWKSourceBuilder.class);
+
+      mockedBuilder.when(() -> JWKSourceBuilder.create(any(URL.class))).thenReturn(mockBuilder);
+      when(mockBuilder.build()).thenReturn(mockJwkSource);
+      when(mockJwkSource.get(any(), any())).thenReturn(Arrays.asList(rsaKey));
+
+      Map<String, String> config = new HashMap<>();
+      config.put(
+          "gravitino.authenticator.oauth.jwksUri", "https://test-jwks.com/.well-known/jwks.json");
+      config.put("gravitino.authenticator.oauth.authority", "https://test-issuer.com");
+      config.put("gravitino.authenticator.oauth.principalMapper", "regex");
+      config.put("gravitino.authenticator.oauth.principalMapper.regex.pattern", "(.*)");
+      config.put("gravitino.authenticator.oauth.allowSkewSecs", "120");
+
+      validator.initialize(createConfig(config));
+
+      PrincipalMapper rejectingMapper = mock(PrincipalMapper.class);
+      when(rejectingMapper.map(any())).thenThrow(new UnauthorizedException("Invalid access token"));
+      FieldUtils.writeField(validator, "principalMapper", rejectingMapper, true);
+
+      UnauthorizedException exception =
+          assertThrows(
+              UnauthorizedException.class,
+              () -> validator.validateToken(tokenString, "test-service"));
+      assertEquals("Invalid access token", exception.getMessage());
     }
   }
 }

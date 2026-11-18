@@ -381,6 +381,7 @@ public class TestUserGroup extends TestBase {
 
   private UserDTO mockUserDTO(String name) {
     return UserDTO.builder()
+        .withId(1L)
         .withName(name)
         .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();
@@ -388,6 +389,7 @@ public class TestUserGroup extends TestBase {
 
   private GroupDTO mockGroupDTO(String name) {
     return GroupDTO.builder()
+        .withId(1L)
         .withName(name)
         .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();

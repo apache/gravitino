@@ -43,9 +43,26 @@ public class KafkaCatalog extends BaseCatalog<KafkaCatalog> {
   }
 
   @Override
+  public boolean supportsPathBasedCredentials() {
+    return false;
+  }
+
+  @Override
   protected CatalogOperations newOps(Map<String, String> config) {
     KafkaCatalogOperations ops = new KafkaCatalogOperations();
     return ops;
+  }
+
+  /**
+   * Rejects the Kafka config provider properties, so that a catalog using them cannot be created or
+   * altered.
+   *
+   * @param configuration the complete proposed catalog configuration
+   * @throws IllegalArgumentException if the configuration sets a config provider property
+   */
+  @Override
+  public void validateConfiguration(Map<String, String> configuration) {
+    KafkaCatalogOperations.checkNoConfigProviders(configuration);
   }
 
   @Override

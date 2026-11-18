@@ -15,7 +15,56 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from pathlib import Path
+
 from setuptools import find_packages, setup
+
+CLIENT_PYTHON_ROOT = Path(__file__).resolve().parent
+
+
+def read_requirements(file_name):
+    """Read active requirement lines from a project file."""
+    requirements_path = CLIENT_PYTHON_ROOT / file_name
+    with requirements_path.open(encoding="utf-8") as requirements_file:
+        return [
+            line.strip()
+            for line in requirements_file
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+
+
+def combine_requirements(*requirement_groups):
+    """Combine requirement groups and remove duplicates without reordering."""
+    return list(
+        dict.fromkeys(
+            requirement
+            for requirement_group in requirement_groups
+            for requirement in requirement_group
+        )
+    )
+
+
+gvfs_requirements = read_requirements("requirements-gvfs.txt")
+provider_requirement_files = {
+    "hdfs": "requirements-hdfs.txt",
+    "s3": "requirements-s3.txt",
+    "gcs": "requirements-gcs.txt",
+    "oss": "requirements-oss.txt",
+    "azure": "requirements-azure.txt",
+}
+provider_requirements = {
+    extra_name: combine_requirements(
+        gvfs_requirements, read_requirements(requirements_file)
+    )
+    for extra_name, requirements_file in provider_requirement_files.items()
+}
+storage_requirements = combine_requirements(
+    gvfs_requirements,
+    *(
+        read_requirements(file_name)
+        for file_name in provider_requirement_files.values()
+    ),
+)
 
 
 try:
@@ -53,10 +102,13 @@ setup(
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
     ],
-    install_requires=open("requirements.txt").read(),
+    install_requires=read_requirements("requirements.txt"),
     extras_require={
-        "dev": open("requirements-dev.txt").read(),
-        "lance": open("requirements-lance.txt").read(),
+        "dev": read_requirements("requirements-dev.txt"),
+        "lance": read_requirements("requirements-lance.txt"),
+        "gvfs": gvfs_requirements,
+        **provider_requirements,
+        "storage": storage_requirements,
     },
     include_package_data=True,
 )

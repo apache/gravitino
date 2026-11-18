@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.mysql;
 
 import java.util.Set;
+import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 
@@ -43,6 +44,18 @@ public class MysqlCatalogCapability implements Capability {
   /** Reserved schema andtable names in MySQL that cannot be used for user-defined schemas. */
   private static final Set<String> MYSQL_RESERVED_SCHEMAS =
       Set.of("mysql", "information_schema", "performance_schema", "sys");
+
+  /** {@inheritDoc} */
+  @Override
+  public CapabilityResult specificationOnExistingName(Scope scope, String name) {
+    if (scope == Scope.TABLE) {
+      return JdbcConnectorUtils.existingQuotedTableName(name);
+    }
+    if (scope == Scope.COLUMN) {
+      return JdbcConnectorUtils.existingQuotedColumnName(name);
+    }
+    return specificationOnName(scope, name);
+  }
 
   @Override
   public CapabilityResult specificationOnName(Scope scope, String name) {

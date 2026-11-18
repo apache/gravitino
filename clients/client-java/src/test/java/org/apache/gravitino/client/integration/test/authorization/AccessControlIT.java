@@ -27,6 +27,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.MetadataObject;
@@ -735,5 +736,48 @@ public class AccessControlIT extends BaseIT {
 
     // Cleanup.
     metalake.deleteRole(roleName);
+  }
+
+  @Test
+  void testUserGroupAndRoleNameLength() {
+    String tooLongName = StringUtils.repeat("n", 129);
+    String maxLengthName = StringUtils.repeat("n", 128);
+
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> metalake.addUser(tooLongName));
+    Assertions.assertTrue(
+        e.getMessage().contains("The name of the user must not exceed 128 characters"),
+        e.getMessage());
+    Assertions.assertEquals(maxLengthName, metalake.addUser(maxLengthName).name());
+    Assertions.assertTrue(metalake.removeUser(maxLengthName));
+
+    e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> metalake.addGroup(tooLongName));
+    Assertions.assertTrue(
+        e.getMessage().contains("The name of the group must not exceed 128 characters"),
+        e.getMessage());
+    Assertions.assertEquals(maxLengthName, metalake.addGroup(maxLengthName).name());
+    Assertions.assertTrue(metalake.removeGroup(maxLengthName));
+
+    SecurableObject metalakeObject =
+        SecurableObjects.ofMetalake(
+            metalakeName, Lists.newArrayList(Privileges.CreateCatalog.allow()));
+    e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                metalake.createRole(
+                    tooLongName, Collections.emptyMap(), Lists.newArrayList(metalakeObject)));
+    Assertions.assertTrue(
+        e.getMessage().contains("The name of the role must not exceed 128 characters"),
+        e.getMessage());
+    Assertions.assertEquals(
+        maxLengthName,
+        metalake
+            .createRole(maxLengthName, Collections.emptyMap(), Lists.newArrayList(metalakeObject))
+            .name());
+    Assertions.assertTrue(metalake.deleteRole(maxLengthName));
   }
 }

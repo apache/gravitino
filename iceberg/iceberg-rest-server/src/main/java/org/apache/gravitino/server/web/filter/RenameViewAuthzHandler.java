@@ -26,13 +26,15 @@ import java.util.Optional;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.apache.iceberg.exceptions.ForbiddenException;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 
 /**
@@ -53,18 +55,26 @@ public class RenameViewAuthzHandler implements AuthorizationHandler {
   @Override
   public void process(Map<EntityType, NameIdentifier> nameIdentifierMap) {
     RenameTableRequest renameViewRequest = null;
+    boolean found = false;
     for (int i = 0; i < parameters.length; i++) {
       IcebergAuthorizationMetadata metadata =
           parameters[i].getAnnotation(IcebergAuthorizationMetadata.class);
       if (metadata != null
           && metadata.type() == IcebergAuthorizationMetadata.RequestType.RENAME_VIEW) {
         renameViewRequest = (RenameTableRequest) args[i];
+        found = true;
         break;
       }
     }
 
-    if (renameViewRequest == null) {
+    if (!found) {
       throw new ForbiddenException("RenameViewRequest not found in parameters");
+    }
+    if (renameViewRequest == null
+        || renameViewRequest.source() == null
+        || renameViewRequest.destination() == null) {
+      throw new BadRequestException(
+          "Invalid view rename request: both source and destination are required");
     }
 
     // Extract metalake and catalog from nameIdentifierMap
@@ -106,10 +116,15 @@ public class RenameViewAuthzHandler implements AuthorizationHandler {
     return crossNamespaceRename;
   }
 
+  @Override
+  public EntityType entityType() {
+    return EntityType.VIEW;
+  }
+
   /**
-   * Validates authorization for cross-namespace view renames following MySQL privilege model: -
-   * Requires ownership on source view (equivalent to DROP privilege) - Requires CREATE_VIEW
-   * privilege on destination schema
+   * Validates authorization for cross-namespace view renames: ownership is required on the source
+   * view, and {@code CREATE_VIEW} is required on the destination schema. Gravitino does not define
+   * a {@code DROP_VIEW} privilege.
    *
    * @param catalog The catalog name
    * @param metalakeName The metalake name
@@ -134,10 +149,7 @@ public class RenameViewAuthzHandler implements AuthorizationHandler {
         EntityType.VIEW,
         NameIdentifierUtil.ofView(metalakeName, catalog, sourceSchema, sourceView));
 
-    String sourceExpression =
-        "ANY(OWNER, METALAKE, CATALOG) || "
-            + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-            + "ANY_USE_CATALOG && ANY_USE_SCHEMA && VIEW::OWNER";
+    String sourceExpression = AuthorizationExpressionConstants.VIEW_OWNER_AUTHORIZATION_EXPRESSION;
 
     AuthorizationExpressionEvaluator sourceEvaluator =
         new AuthorizationExpressionEvaluator(sourceExpression);
@@ -162,10 +174,7 @@ public class RenameViewAuthzHandler implements AuthorizationHandler {
     destContext.put(
         EntityType.SCHEMA, NameIdentifierUtil.ofSchema(metalakeName, catalog, destSchema));
 
-    String destExpression =
-        "ANY(OWNER, METALAKE, CATALOG) || "
-            + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-            + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_VIEW";
+    String destExpression = AuthorizationExpressionConstants.CREATE_VIEW_AUTHORIZATION_EXPRESSION;
 
     AuthorizationExpressionEvaluator destEvaluator =
         new AuthorizationExpressionEvaluator(destExpression);

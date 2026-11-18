@@ -22,6 +22,9 @@ package org.apache.gravitino.rel;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.apache.gravitino.annotation.Evolving;
@@ -450,7 +453,22 @@ public interface TableChange {
    * @return A TableChange for the add index.
    */
   static TableChange addIndex(IndexType type, String name, String[][] fieldNames) {
-    return new AddIndex(type, name, fieldNames);
+    return addIndex(type, name, fieldNames, Collections.emptyMap());
+  }
+
+  /**
+   * Create a TableChange for adding an index with extra properties.
+   *
+   * @param type The type of the index.
+   * @param name The name of the index.
+   * @param fieldNames The field names of the index.
+   * @param properties Extra properties for index configuration (e.g., granularity for ClickHouse
+   *     data skipping indexes). If {@code null}, an empty map is used.
+   * @return A TableChange for the add index.
+   */
+  static TableChange addIndex(
+      IndexType type, String name, String[][] fieldNames, Map<String, String> properties) {
+    return new AddIndex(type, name, fieldNames, properties);
   }
 
   /**
@@ -746,6 +764,7 @@ public interface TableChange {
     private final String name;
 
     private final String[][] fieldNames;
+    private final Map<String, String> properties;
 
     /**
      * @param type The type of the index.
@@ -753,9 +772,25 @@ public interface TableChange {
      * @param fieldNames The field names of the index.
      */
     public AddIndex(IndexType type, String name, String[][] fieldNames) {
+      this(type, name, fieldNames, Collections.emptyMap());
+    }
+
+    /**
+     * @param type The type of the index.
+     * @param name The name of the index.
+     * @param fieldNames The field names of the index.
+     * @param properties Extra properties for index configuration. A defensive copy is made; if
+     *     {@code null}, an empty map is used.
+     */
+    public AddIndex(
+        IndexType type, String name, String[][] fieldNames, Map<String, String> properties) {
       this.type = type;
       this.name = name;
       this.fieldNames = fieldNames;
+      this.properties =
+          properties == null
+              ? Collections.emptyMap()
+              : Collections.unmodifiableMap(new HashMap<>(properties));
     }
 
     /**
@@ -779,6 +814,13 @@ public interface TableChange {
       return fieldNames;
     }
 
+    /**
+     * @return Extra properties for index configuration. An unmodifiable map; never {@code null}.
+     */
+    public Map<String, String> getProperties() {
+      return properties;
+    }
+
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;
@@ -786,14 +828,21 @@ public interface TableChange {
       AddIndex addIndex = (AddIndex) o;
       return type == addIndex.type
           && Objects.equals(name, addIndex.name)
-          && Arrays.deepEquals(fieldNames, addIndex.fieldNames);
+          && Arrays.deepEquals(fieldNames, addIndex.fieldNames)
+          && Objects.equals(properties, addIndex.properties);
     }
 
     @Override
     public int hashCode() {
-      int result = Objects.hash(type, name);
-      result = 31 * result + Arrays.hashCode(fieldNames);
+      int result = Objects.hash(type, name, properties);
+      result = 31 * result + Arrays.deepHashCode(fieldNames);
       return result;
+    }
+
+    /** Returns a readable description of this change. */
+    @Override
+    public String toString() {
+      return "ADDINDEX " + getName();
     }
   }
 
@@ -840,6 +889,12 @@ public interface TableChange {
     @Override
     public int hashCode() {
       return Objects.hash(name, ifExists);
+    }
+
+    /** Returns a readable description of this change. */
+    @Override
+    public String toString() {
+      return "DELETEINDEX " + getName();
     }
   }
 
@@ -900,7 +955,7 @@ public interface TableChange {
 
     private After(String column) {
       if (null == column) {
-        throw new IllegalArgumentException("column can not be null.");
+        throw new IllegalArgumentException("column cannot be null");
       }
       this.column = column;
     }
@@ -1109,6 +1164,12 @@ public interface TableChange {
     public String[] fieldName() {
       return fieldName;
     }
+
+    /** Returns a readable description of this change. */
+    @Override
+    public String toString() {
+      return "ADDCOLUMN " + String.join(".", fieldName()) + " " + dataType.simpleString();
+    }
   }
 
   /**
@@ -1178,6 +1239,12 @@ public interface TableChange {
     public String[] fieldName() {
       return fieldName;
     }
+
+    /** Returns a readable description of this change. */
+    @Override
+    public String toString() {
+      return "RENAMECOLUMN " + String.join(".", fieldName()) + " TO " + newName;
+    }
   }
 
   /**
@@ -1242,6 +1309,13 @@ public interface TableChange {
       int result = Objects.hash(newDefaultValue);
       result = 31 * result + Arrays.hashCode(fieldName);
       return result;
+    }
+
+    /** Returns a readable description of this change. */
+    @Override
+    public String toString() {
+      // Default expressions may be connector-defined and have no user-facing renderer.
+      return "UPDATECOLUMNDEFAULTVALUE " + String.join(".", fieldName());
     }
   }
 
@@ -1312,6 +1386,15 @@ public interface TableChange {
     public String[] fieldName() {
       return fieldName;
     }
+
+    /** Returns a readable description of this change. */
+    @Override
+    public String toString() {
+      return "UPDATECOLUMNTYPE "
+          + String.join(".", fieldName())
+          + " TO "
+          + newDataType.simpleString();
+    }
   }
 
   /**
@@ -1380,6 +1463,12 @@ public interface TableChange {
     @Override
     public String[] fieldName() {
       return fieldName;
+    }
+
+    /** Returns a readable description of this change. */
+    @Override
+    public String toString() {
+      return "UPDATECOLUMNCOMMENT " + String.join(".", fieldName()) + " TO " + newComment;
     }
   }
 
@@ -1451,6 +1540,12 @@ public interface TableChange {
     public String[] fieldName() {
       return fieldName;
     }
+
+    /** Returns a readable description of this change. */
+    @Override
+    public String toString() {
+      return "UPDATECOLUMNPOSITION " + String.join(".", fieldName()) + " TO " + position;
+    }
   }
 
   /**
@@ -1517,6 +1612,12 @@ public interface TableChange {
     public String[] fieldName() {
       return fieldName;
     }
+
+    /** Returns a readable description of this change. */
+    @Override
+    public String toString() {
+      return "DELETECOLUMN " + String.join(".", fieldName());
+    }
   }
 
   /**
@@ -1573,6 +1674,12 @@ public interface TableChange {
       result = 31 * result + Arrays.hashCode(fieldName);
       return result;
     }
+
+    /** Returns a readable description of this change. */
+    @Override
+    public String toString() {
+      return "UPDATECOLUMNNULLABILITY " + String.join(".", fieldName()) + " TO " + nullable;
+    }
   }
 
   /**
@@ -1627,6 +1734,12 @@ public interface TableChange {
       int result = Objects.hash(autoIncrement);
       result = 31 * result + Arrays.hashCode(fieldName);
       return result;
+    }
+
+    /** Returns a readable description of this change. */
+    @Override
+    public String toString() {
+      return "UPDATECOLUMNAUTOINCREMENT " + String.join(".", fieldName()) + " TO " + autoIncrement;
     }
   }
 }

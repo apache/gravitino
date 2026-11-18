@@ -20,25 +20,19 @@
 package org.apache.gravitino.iceberg.common;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Lists;
 import java.io.Closeable;
-import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.security.PrivilegedExceptionAction;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
-import lombok.Getter;
 import org.apache.commons.lang3.reflect.FieldUtils;
-import org.apache.gravitino.catalog.hadoop.auth.KerberosAuthUtils;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosClient;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
-import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.iceberg.common.utils.CaffeineSchedulerExtractorUtils;
 import org.apache.gravitino.iceberg.common.utils.IcebergHiveCachedClientPool;
-import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.iceberg.common.utils.KerberosCatalogUtils;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.thrift.DelegationTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -57,16 +51,10 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ClosableHiveCatalog.class);
 
-  @Getter private final List<Closeable> resources = Lists.newArrayList();
-
   private KerberosClient kerberosClient;
 
   public ClosableHiveCatalog() {
     super();
-  }
-
-  public void addResource(Closeable resource) {
-    resources.add(resource);
   }
 
   /**
@@ -83,7 +71,7 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
 
     AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties);
     if (authenticationConfig.isKerberosAuth()) {
-      this.kerberosClient = initKerberosClient();
+      this.kerberosClient = KerberosCatalogUtils.initKerberosClient(properties, getConf(), name());
     }
 
     try {
@@ -95,53 +83,35 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
 
   @Override
   public void close() throws IOException {
-    if (kerberosClient != null) {
-      try {
-        kerberosClient.close();
-      } catch (Exception e) {
-        LOGGER.warn("Failed to close KerberosClient", e);
-      }
-    }
+    KerberosCatalogUtils.closeKerberosClient(kerberosClient, LOGGER);
 
     // Do clean up work here. We need a mechanism to close the HiveCatalog; however, HiveCatalog
     // doesn't implement the Closeable interface.
 
     // First, close the internal HiveCatalog client pool to prevent resource leaks
     closeInternalClientPool();
-
-    // Then close any additional resources added via addResource()
-    resources.forEach(
-        resource -> {
-          try {
-            if (resource != null) {
-              resource.close();
-            }
-          } catch (Exception e) {
-            LOGGER.warn("Failed to close resource: {}", resource, e);
-          }
-        });
   }
 
   @Override
   public <R> R doKerberosOperations(Executable<R> executable) throws Throwable {
-    Map<String, String> properties = this.properties();
-    AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties);
-
-    final String finalPrincipalName;
-    String proxyKerberosPrincipalName = PrincipalUtils.getCurrentPrincipal().getName();
-
-    if (!proxyKerberosPrincipalName.contains("@")) {
-      finalPrincipalName =
-          String.format("%s@%s", proxyKerberosPrincipalName, kerberosClient.getRealm());
-    } else {
-      finalPrincipalName = proxyKerberosPrincipalName;
+    AuthenticationConfig authenticationConfig = new AuthenticationConfig(this.properties());
+    if (!authenticationConfig.isKerberosAuth()) {
+      return executable.execute();
+    }
+    if (kerberosClient == null) {
+      throw new IllegalStateException(
+          "Kerberos is configured but KerberosClient is not initialized");
     }
 
+    if (!authenticationConfig.isImpersonationEnabled()) {
+      // The login user is shared by all requests, so it must not carry any user's token.
+      return KerberosCatalogUtils.executeAs(kerberosClient.getLoginUser(), executable);
+    }
+
+    String finalPrincipalName = KerberosCatalogUtils.resolveProxyPrincipal(kerberosClient);
     UserGroupInformation realUser =
-        authenticationConfig.isImpersonationEnabled()
-            ? UserGroupInformation.createProxyUser(
-                finalPrincipalName, kerberosClient.getLoginUser())
-            : kerberosClient.getLoginUser();
+        KerberosCatalogUtils.createRealUser(
+            authenticationConfig, kerberosClient, finalPrincipalName);
     try {
       ClientPool<IMetaStoreClient, TException> newClientPool =
           (ClientPool<IMetaStoreClient, TException>) FieldUtils.readField(this, "clients", true);
@@ -166,18 +136,7 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
       throw new RuntimeException(
           "Failed to get delegation token for principal: " + finalPrincipalName, e);
     }
-    return realUser.doAs(
-        (PrivilegedExceptionAction<R>)
-            () -> {
-              try {
-                return executable.execute();
-              } catch (Throwable e) {
-                if (RuntimeException.class.isAssignableFrom(e.getClass())) {
-                  throw (RuntimeException) e;
-                }
-                throw new RuntimeException("Failed to invoke method", e);
-              }
-            });
+    return KerberosCatalogUtils.executeAs(realUser, executable);
   }
 
   private ClientPool<IMetaStoreClient, TException> resetIcebergHiveClientPool()
@@ -192,16 +151,6 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
 
     // Then try to close the old pool to release resources
     if (oldPool != null) {
-      // Try standard close method if available
-      if (oldPool instanceof AutoCloseable) {
-        try {
-          ((AutoCloseable) oldPool).close();
-          LOGGER.info("Successfully closed old Hive client pool");
-        } catch (Exception e) {
-          LOGGER.warn("Failed to close old Hive client pool", e);
-        }
-      }
-
       // Additionally, try to shutdown the internal scheduler thread pool in Iceberg's
       // CachedClientPool to prevent memory leak. This is necessary because Iceberg's
       // CachedClientPool does not implement Closeable and does not properly clean up
@@ -249,8 +198,7 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
 
   /**
    * Close the internal HiveCatalog client pool using reflection. This is necessary because
-   * HiveCatalog doesn't provide a public API to close its client pool. We need to avoid closing
-   * IcebergHiveCachedClientPool twice (once here and once in resources list).
+   * HiveCatalog doesn't provide a public API to close its client pool.
    */
   private void closeInternalClientPool() {
     try {
@@ -258,43 +206,15 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
       clientsField.setAccessible(true);
       Object clientPool = clientsField.get(this);
 
-      if (clientPool != null && clientPool instanceof AutoCloseable) {
-        // Only close if it's NOT IcebergHiveCachedClientPool
-        if (!(clientPool instanceof IcebergHiveCachedClientPool)) {
-          ((AutoCloseable) clientPool).close();
-          LOGGER.info(
-              "Closed HiveCatalog internal client pool: {}", clientPool.getClass().getSimpleName());
-        }
+      if (clientPool instanceof AutoCloseable) {
+        ((AutoCloseable) clientPool).close();
+        LOGGER.info(
+            "Closed HiveCatalog internal client pool: {}", clientPool.getClass().getSimpleName());
       }
     } catch (NoSuchFieldException e) {
       LOGGER.warn("Could not find 'clients' field in HiveCatalog, skipping cleanup", e);
     } catch (Exception e) {
       LOGGER.warn("Failed to close HiveCatalog internal client pool", e);
-    }
-  }
-
-  private KerberosClient initKerberosClient() {
-    try {
-      KerberosConfig kerberosConfig = new KerberosConfig(this.properties());
-      KerberosClient kerberosClient =
-          KerberosClient.builder(kerberosConfig.getPrincipalName(), this.getConf())
-              .loginMode(KerberosAuthUtils.LoginMode.CURRENT_USER)
-              .checkIntervalSec(kerberosConfig.getCheckIntervalSec())
-              .build();
-      // catalog_uuid always exists for Gravitino managed catalogs, `0` is just a fallback value.
-      String catalogUUID = properties().getOrDefault("catalog_uuid", "0");
-      File keytabFile =
-          new File(String.format(KerberosConfig.GRAVITINO_KEYTAB_FORMAT, catalogUUID));
-      KerberosAuthUtils.saveKeytabFromUri(
-          kerberosConfig.getKeytab(),
-          keytabFile,
-          kerberosConfig.getFetchTimeoutSec(),
-          false,
-          this.getConf());
-      kerberosClient.login(keytabFile.getAbsolutePath());
-      return kerberosClient;
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to login with kerberos", e);
     }
   }
 }

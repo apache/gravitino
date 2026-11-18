@@ -24,9 +24,11 @@ import com.google.common.collect.ImmutableMap;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
+import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
 import org.apache.gravitino.dto.requests.MetalakeCreateRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdateRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdatesRequest;
+import org.apache.gravitino.dto.requests.SchemaUpdateRequest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -155,5 +157,35 @@ public class TestRequestJsonSerDe {
     CatalogUpdateRequest deserReq3 =
         JsonUtils.objectMapper().readValue(serJson3, CatalogUpdateRequest.class);
     Assertions.assertEquals(req3, deserReq3);
+  }
+
+  @Test
+  public void testSecretUpdateRequestSerDe() throws JsonProcessingException {
+    roundTrip(
+        new CatalogUpdateRequest.SetCatalogSecretBindingRequest("password", "env", "secret"),
+        CatalogUpdateRequest.class);
+    roundTrip(
+        new CatalogUpdateRequest.SetCatalogSecretReferenceRequest(
+            "password", "vault", ImmutableMap.of("path", "secret/data/my-password")),
+        CatalogUpdateRequest.class);
+    roundTrip(
+        new SchemaUpdateRequest.SetSchemaSecretBindingRequest("password", "env", "secret"),
+        SchemaUpdateRequest.class);
+    roundTrip(
+        new SchemaUpdateRequest.SetSchemaSecretReferenceRequest(
+            "password", "vault", ImmutableMap.of("path", "secret/data/my-password")),
+        SchemaUpdateRequest.class);
+    roundTrip(
+        new FilesetUpdateRequest.SetFilesetSecretBindingRequest("password", "env", "secret"),
+        FilesetUpdateRequest.class);
+    roundTrip(
+        new FilesetUpdateRequest.SetFilesetSecretReferenceRequest(
+            "password", "vault", ImmutableMap.of("path", "secret/data/my-password")),
+        FilesetUpdateRequest.class);
+  }
+
+  private static <T> void roundTrip(T request, Class<T> type) throws JsonProcessingException {
+    String json = JsonUtils.objectMapper().writeValueAsString(request);
+    Assertions.assertEquals(request, JsonUtils.objectMapper().readValue(json, type));
   }
 }

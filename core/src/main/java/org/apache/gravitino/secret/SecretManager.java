@@ -1,0 +1,789 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.secret;
+
+import static org.apache.gravitino.secret.SecretConstants.ATTR_ENTITY_ID;
+import static org.apache.gravitino.secret.SecretConstants.ATTR_ENTITY_TYPE;
+import static org.apache.gravitino.secret.SecretConstants.ATTR_PROPERTY_KEY;
+import static org.apache.gravitino.secret.SecretPropertyUtils.validateSecretBindings;
+import static org.apache.gravitino.secret.SecretPropertyUtils.validateSecretReferences;
+
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
+import java.io.Closeable;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * SecretManager owns write-through / external-reference secret lifecycle against configured
+ * providers. For an entity create or alter, it stages the write-through secret versions for the
+ * caller to commit or roll back.
+ */
+public class SecretManager implements Closeable {
+
+  private static final Logger LOG = LoggerFactory.getLogger(SecretManager.class);
+
+  private final SecretProviderRegistry registry;
+
+  public SecretManager(Config config) {
+    this.registry = new SecretProviderRegistry(config);
+  }
+
+  public SecretManager(SecretProviderRegistry registry) {
+    this.registry = registry;
+  }
+
+  /**
+   * Returns the secrets-provider registry owned by this manager.
+   *
+   * @return the registry
+   */
+  public SecretProviderRegistry getRegistry() {
+    return registry;
+  }
+
+  /**
+   * Ensures each property key appears at most once across {@code properties}, {@code
+   * secretBindings}, and {@code secretReferences}, and that {@code properties} do not contain raw
+   * secret URN values.
+   *
+   * <p>{@code null} maps are treated as empty. Callers must bind/reference secrets via the typed
+   * maps rather than embedding {@code urn:gravitino-secret:} values in properties.
+   *
+   * @param properties entity properties from the create request (may be null)
+   * @param secretBindings property key → write-through binding (may be null)
+   * @param secretReferences property key → secret locator (may be null)
+   */
+  public void checkSecretKeys(
+      @Nullable Map<String, String> properties,
+      @Nullable Map<String, SecretBinding> secretBindings,
+      @Nullable Map<String, SecretReference> secretReferences) {
+    // Reject raw URNs in request properties: they bypass typed secretBindings/secretReferences
+    // and can be used to resolve another entity's secret.
+    if (properties != null && !properties.isEmpty()) {
+      for (Map.Entry<String, String> entry : properties.entrySet()) {
+        String key = entry.getKey();
+        String value = entry.getValue();
+        if (SecretPropertyUtils.isSecretProperty(key, value)) {
+          throw new IllegalArgumentException(
+              "Property \""
+                  + key
+                  + "\" must not contain a raw gravitino secret URN; use secretBindings or"
+                  + " secretReferences instead");
+        }
+      }
+    }
+    Set<String> keys = new HashSet<>();
+    int count = 0;
+    if (properties != null) {
+      keys.addAll(properties.keySet());
+      count += properties.size();
+    }
+    if (secretBindings != null) {
+      keys.addAll(secretBindings.keySet());
+      count += secretBindings.size();
+    }
+    if (secretReferences != null) {
+      keys.addAll(secretReferences.keySet());
+      count += secretReferences.size();
+    }
+    if (keys.size() != count) {
+      throw new IllegalArgumentException(
+          "Duplicate property key across properties, secretBindings and secretReferences");
+    }
+  }
+
+  /**
+   * Checks secret keys and puts reference / write-through URN strings into {@code
+   * targetProperties}.
+   *
+   * <p>Callers typically invoke {@link #validateProposedSecrets} on {@code targetProperties} and
+   * the returned plaintexts, then {@link #stageSecrets}, and call {@link #commitSecrets} after the
+   * entity is created or {@link #rollbackSecrets(SecretVersionChanges)} on failure. {@code
+   * properties} is used only for key uniqueness checks (e.g. the original request map); {@code
+   * targetProperties} is the mutable map that will be stored (may already contain merged catalog
+   * conf).
+   *
+   * @param properties properties used for key uniqueness checks (may be null)
+   * @param targetProperties mutable properties that receive URN values (may be null only when both
+   *     secret maps are null or empty)
+   * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
+   * @param entityId stable numeric entity id
+   * @param secretBindings property key → write-through binding (may be null)
+   * @param secretReferences property key → secret locator (may be null)
+   * @return property key → plaintext of each write-through binding, for {@link #stageSecrets}
+   *     (empty when there are no bindings)
+   */
+  public Map<String, String> assembleSecretPlaintexts(
+      @Nullable Map<String, String> properties,
+      @Nullable Map<String, String> targetProperties,
+      String entityType,
+      long entityId,
+      @Nullable Map<String, SecretBinding> secretBindings,
+      @Nullable Map<String, SecretReference> secretReferences) {
+    checkSecretKeys(properties, secretBindings, secretReferences);
+    if (!SecretPropertyUtils.hasSecretMaps(secretBindings, secretReferences)) {
+      return Map.of();
+    }
+    Preconditions.checkArgument(
+        targetProperties != null, "targetProperties must not be null when secrets are present");
+    Map<String, SecretBinding> bindings = secretBindings == null ? Map.of() : secretBindings;
+    Map<String, SecretReference> references =
+        secretReferences == null ? Map.of() : secretReferences;
+    SecretPropertyUtils.putSecretUrns(targetProperties, buildSecretReferenceUrns(references));
+    List<SecretUrn> bindingUrns = buildSecretBindingUrns(entityType, entityId, bindings);
+    SecretPropertyUtils.putSecretUrns(targetProperties, bindingUrns);
+    return toPlaintexts(bindingUrns, bindings);
+  }
+
+  /**
+   * Builds external-reference URNs from {@code secretReferences} without writing secret material.
+   *
+   * <p>Callers must put the returned URN strings into properties themselves (e.g. via {@link
+   * SecretPropertyUtils#putSecretUrns}).
+   *
+   * @param secretReferences property key → secret locator (empty returns an empty list; must not be
+   *     null)
+   * @return external-reference URNs (insertion order)
+   */
+  public List<SecretUrn> buildSecretReferenceUrns(Map<String, SecretReference> secretReferences) {
+    Preconditions.checkArgument(secretReferences != null, "secretReferences must not be null");
+    if (secretReferences.isEmpty()) {
+      return List.of();
+    }
+    validateSecretReferences(secretReferences);
+
+    List<SecretUrn> urns = new ArrayList<>(secretReferences.size());
+    for (Map.Entry<String, SecretReference> entry : secretReferences.entrySet()) {
+      String key = entry.getKey();
+      SecretReference locator = entry.getValue();
+      String providerName = locator.provider();
+      SecretProvider provider = registry.getProvider(providerName);
+      try {
+        SecretUrn urn = provider.buildReferenceUrn(key, locator.attributes());
+        validateUrnEndsWithPropertyKey(urn, key);
+        urns.add(urn);
+      } catch (UnsupportedOperationException e) {
+        throw new IllegalArgumentException(
+            "Provider \""
+                + providerName
+                + "\" does not support secretReferences for key \""
+                + key
+                + "\"",
+            e);
+      }
+    }
+    return List.copyOf(urns);
+  }
+
+  /**
+   * Validates write-through secret bindings and their URNs without writing secret material.
+   *
+   * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
+   * @param entityId stable numeric entity id
+   * @param secretBindings property key → write-through binding (empty is valid; must not be null)
+   */
+  public void validateSecretBindingUrns(
+      String entityType, long entityId, Map<String, SecretBinding> secretBindings) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(entityType), "entityType must not be blank");
+    Preconditions.checkArgument(secretBindings != null, "secretBindings must not be null");
+    if (secretBindings.isEmpty()) {
+      return;
+    }
+    validateSecretBindings(secretBindings);
+
+    for (Map.Entry<String, SecretBinding> entry : secretBindings.entrySet()) {
+      String key = entry.getKey();
+      String providerName = entry.getValue().provider();
+      // Ensure the provider is registered before building the URN.
+      registry.getProvider(providerName);
+      validateUrnEndsWithPropertyKey(
+          buildWriteThroughUrn(entityType, entityId, key, providerName), key);
+    }
+  }
+
+  /**
+   * Builds write-through URNs from {@code secretBindings} without writing secret material.
+   *
+   * <p>Callers typically use {@link #assembleSecretPlaintexts}, which puts these URNs into the
+   * properties, or put URN strings into properties themselves (e.g. via {@link
+   * SecretPropertyUtils#putSecretUrns}).
+   *
+   * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
+   * @param entityId stable numeric entity id
+   * @param secretBindings property key → write-through binding (empty returns an empty list; must
+   *     not be null)
+   * @return write-through URNs (insertion order)
+   */
+  public List<SecretUrn> buildSecretBindingUrns(
+      String entityType, long entityId, Map<String, SecretBinding> secretBindings) {
+    validateSecretBindingUrns(entityType, entityId, secretBindings);
+    if (secretBindings.isEmpty()) {
+      return List.of();
+    }
+
+    List<SecretUrn> urns = new ArrayList<>(secretBindings.size());
+    for (Map.Entry<String, SecretBinding> entry : secretBindings.entrySet()) {
+      String key = entry.getKey();
+      String providerName = entry.getValue().provider();
+      urns.add(buildWriteThroughUrn(entityType, entityId, key, providerName));
+    }
+    return List.copyOf(urns);
+  }
+
+  /**
+   * Makes the staged versions current and deletes the versions they replaced.
+   *
+   * <p>Call only after the entity create or alter committed. Failures are logged and do not fail
+   * the committed create or alter. If making a written version current fails and the provider then
+   * reports it as current, the previous version is deleted; otherwise the written version is
+   * deleted. If the current version cannot be looked up, both versions are kept. Running the same
+   * change again writes a new version and makes it current.
+   *
+   * @param changes changes returned by {@link #stageSecrets} or a {@code
+   *     SecretAlterChanges.prepare*Changes} method
+   */
+  public void commitSecrets(SecretVersionChanges changes) {
+    Preconditions.checkArgument(changes != null, "changes must not be null");
+    for (SecretVersionChanges.WrittenVersion written : changes.written()) {
+      // Without a previous version the write already made the new version current.
+      if (written.previousId() == null) {
+        continue;
+      }
+      SecretUrn urn = written.version().urn();
+      SecretProvider provider = null;
+      try {
+        provider = registry.getProvider(urn.providerName());
+        provider.setCurrentSecretVersion(urn, written.version().id());
+      } catch (RuntimeException e) {
+        LOG.error(
+            "Failed to make version {} of secret {} current after the alter committed",
+            written.version().id(),
+            urn,
+            e);
+        if (provider != null) {
+          deleteUnusedVersionAfterFailedSwitch(provider, written);
+        }
+        continue;
+      }
+      try {
+        provider.deleteSecretVersion(urn, written.previousId());
+      } catch (RuntimeException e) {
+        LOG.warn("Failed to delete replaced version {} of secret {}", written.previousId(), urn, e);
+      }
+    }
+    deleteSecretVersions(changes.released());
+  }
+
+  /**
+   * Deletes the version a failed switch left unused. The switch may have taken effect before it
+   * failed, so the version that is current now is kept; if the current version cannot be looked up,
+   * both versions are kept.
+   */
+  private static void deleteUnusedVersionAfterFailedSwitch(
+      SecretProvider provider, SecretVersionChanges.WrittenVersion written) {
+    SecretUrn urn = written.version().urn();
+    String writtenId = written.version().id();
+    String current;
+    try {
+      current = provider.currentSecretVersion(urn);
+    } catch (RuntimeException e) {
+      LOG.warn(
+          "Could not look up the current version of secret {} after a failed switch; keeping"
+              + " versions {} and {}",
+          urn,
+          written.previousId(),
+          writtenId,
+          e);
+      return;
+    }
+    String unused;
+    if (writtenId.equals(current)) {
+      LOG.info(
+          "Version {} of secret {} is current although making it current failed", writtenId, urn);
+      unused = written.previousId();
+    } else {
+      unused = writtenId;
+    }
+    try {
+      provider.deleteSecretVersion(urn, unused);
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to delete unused version {} of secret {}", unused, urn, e);
+    }
+  }
+
+  /**
+   * Best-effort delete of the staged versions, after the entity create or alter failed.
+   *
+   * <p>The versions that were current before an alter are kept, so the entity's own write-through
+   * secrets keep the values it still references. A secret that {@link #alterSetProperty} rewrote
+   * right away is not restored.
+   *
+   * @param changes changes returned by {@link #stageSecrets} or a {@code
+   *     SecretAlterChanges.prepare*Changes} method
+   */
+  public void rollbackSecrets(SecretVersionChanges changes) {
+    Preconditions.checkArgument(changes != null, "changes must not be null");
+    List<SecretVersionChanges.Version> versions = new ArrayList<>(changes.written().size());
+    for (SecretVersionChanges.WrittenVersion written : changes.written()) {
+      versions.add(written.version());
+    }
+    deleteSecretVersions(versions);
+  }
+
+  /**
+   * Validates the proposed secret property view for a create or alter batch.
+   *
+   * <p>Checks each write-through plaintext (non-blank, not the masked placeholder), then overlays
+   * {@code plaintexts} onto a copy of {@code finalProperties} and resolves that view with {@link
+   * #toPlaintextProperties(Map)}. New bindings are therefore checked as plaintext (same idea as
+   * {@link SecretAlterChanges#prepareCatalogChangesForTest}) while references and any other secret
+   * URNs are read through their providers. Callers should invoke this before {@link #stageSecrets}
+   * so a blank binding or missing reference fails without writing secret versions.
+   *
+   * @param finalProperties entity properties after the create or alter (URNs for secrets; may be
+   *     null when there are no secrets)
+   * @param plaintexts property key → plaintext that {@link #stageSecrets} will write
+   * @throws IllegalArgumentException if a plaintext is blank or masked, or a secret cannot be read
+   */
+  public void validateProposedSecrets(
+      @Nullable Map<String, String> finalProperties, Map<String, String> plaintexts) {
+    Preconditions.checkArgument(plaintexts != null, "plaintexts must not be null");
+    if ((finalProperties == null || finalProperties.isEmpty()) && plaintexts.isEmpty()) {
+      return;
+    }
+    Preconditions.checkArgument(
+        finalProperties != null, "finalProperties must not be null when secrets are present");
+    for (String plaintext : plaintexts.values()) {
+      SecretPropertyUtils.validateAlterSecretBindingPlaintext(plaintext);
+    }
+    Map<String, String> view = new HashMap<>(finalProperties);
+    view.putAll(plaintexts);
+    toPlaintextProperties(view);
+  }
+
+  /**
+   * Stages an entity create or alter batch: writes its plaintexts as new versions and finds the
+   * versions it releases.
+   *
+   * <p>Works from the properties before and after the whole batch, so a batch that changes one key
+   * several times is treated by its net effect. A URN that has a current version keeps it readable
+   * until {@link #commitSecrets}. If a write fails, the versions already written are deleted.
+   *
+   * <p>Callers must invoke {@link #validateProposedSecrets} first. This method only writes and
+   * records versions.
+   *
+   * @param startProperties entity properties before the alter, or {@code null} for a create
+   * @param finalProperties entity properties after the create or alter
+   * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
+   * @param entityId stable numeric entity id
+   * @param plaintexts property key → plaintext to write; each key holds a write-through URN of this
+   *     entity in {@code finalProperties}
+   * @return the written and released versions
+   * @throws UnsupportedOperationException if a provider of a written or released secret does not
+   *     support secret versions
+   */
+  public SecretVersionChanges stageSecrets(
+      @Nullable Map<String, String> startProperties,
+      Map<String, String> finalProperties,
+      String entityType,
+      long entityId,
+      Map<String, String> plaintexts) {
+    // Look up the released versions first, so an unsupported provider of a released URN fails
+    // before any version is written.
+    List<SecretVersionChanges.Version> released =
+        releasedVersions(startProperties, finalProperties, entityType, entityId);
+    List<SecretVersionChanges.WrittenVersion> written = new ArrayList<>(plaintexts.size());
+    try {
+      for (Map.Entry<String, String> entry : plaintexts.entrySet()) {
+        SecretUrn urn = SecretUrn.parse(finalProperties.get(entry.getKey()));
+        SecretProvider provider = registry.getProvider(urn.providerName());
+        String previousId;
+        String id;
+        try {
+          previousId = provider.currentSecretVersion(urn);
+          id = provider.writeSecretVersion(urn, entry.getValue());
+        } catch (UnsupportedOperationException e) {
+          throw unsupportedVersions(urn, e);
+        }
+        written.add(
+            new SecretVersionChanges.WrittenVersion(
+                new SecretVersionChanges.Version(urn, id), previousId));
+      }
+    } catch (RuntimeException e) {
+      List<SecretVersionChanges.Version> versions = new ArrayList<>(written.size());
+      written.forEach(w -> versions.add(w.version()));
+      deleteSecretVersions(versions);
+      throw e;
+    }
+    return new SecretVersionChanges(written, released);
+  }
+
+  /** Current versions of this entity's write-through URNs that {@code finalProperties} dropped. */
+  private List<SecretVersionChanges.Version> releasedVersions(
+      @Nullable Map<String, String> startProperties,
+      Map<String, String> finalProperties,
+      String entityType,
+      long entityId) {
+    if (startProperties == null || startProperties.isEmpty()) {
+      return List.of();
+    }
+    List<SecretVersionChanges.Version> released = new ArrayList<>();
+    for (Map.Entry<String, String> entry : startProperties.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+      if (Objects.equals(value, finalProperties.get(key))
+          || !SecretPropertyUtils.isWriteThroughForEntity(key, value, entityType, entityId)) {
+        continue;
+      }
+      SecretUrn urn = SecretUrn.parse(value);
+      try {
+        String id = registry.getProvider(urn.providerName()).currentSecretVersion(urn);
+        if (id != null) {
+          released.add(new SecretVersionChanges.Version(urn, id));
+        }
+      } catch (UnsupportedOperationException e) {
+        throw unsupportedVersions(urn, e);
+      } catch (RuntimeException e) {
+        // Releasing only frees material, so a failed lookup must not block the alter.
+        LOG.warn("Failed to look up the current version of released secret {}", urn, e);
+      }
+    }
+    return released;
+  }
+
+  private static UnsupportedOperationException unsupportedVersions(
+      SecretUrn urn, UnsupportedOperationException cause) {
+    return new UnsupportedOperationException(
+        String.format(
+            "Secret provider \"%s\" does not support secret versions, which the write-through"
+                + " secret of property \"%s\" requires",
+            urn.providerName(), urn.propertyKey()),
+        cause);
+  }
+
+  private void deleteSecretVersions(List<SecretVersionChanges.Version> versions) {
+    for (SecretVersionChanges.Version version : versions) {
+      SecretUrn urn = version.urn();
+      try {
+        registry.getProvider(urn.providerName()).deleteSecretVersion(urn, version.id());
+      } catch (Exception e) {
+        LOG.warn("Failed to delete version {} of secret {}", version.id(), urn, e);
+      }
+    }
+  }
+
+  private void deleteSecrets(List<SecretUrn> secretUrns) {
+    if (secretUrns.isEmpty()) {
+      return;
+    }
+    for (SecretUrn urn : secretUrns) {
+      try {
+        registry.getProvider(urn.providerName()).deleteSecret(urn);
+      } catch (Exception e) {
+        LOG.warn("Failed to delete secret {}", urn, e);
+      }
+    }
+  }
+
+  /**
+   * Best-effort delete of write-through secrets whose URN values appear in entity properties.
+   *
+   * <p>Used when dropping an entity so create-time write-through secrets are not left orphaned
+   * (including CatalogHookDispatcher post-hook rollback via {@code dropCatalog}). External
+   * reference URNs from {@code secretReferences} are left untouched.
+   *
+   * @param properties persisted entity properties (may be null)
+   */
+  public void deleteSecretsFromProperties(@Nullable Map<String, String> properties) {
+    if (properties == null || properties.isEmpty()) {
+      return;
+    }
+    List<SecretUrn> writeThrough = new ArrayList<>();
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      if (!SecretPropertyUtils.isSecretProperty(entry.getKey(), entry.getValue())) {
+        continue;
+      }
+      try {
+        SecretUrn urn = SecretUrn.parse(entry.getValue());
+        // Write-through URNs are entityType:entityId:propertyKey (3 segments).
+        if (urn.identifierSegments().size() == 3) {
+          writeThrough.add(urn);
+        }
+      } catch (IllegalArgumentException e) {
+        LOG.warn("Skipping invalid secret URN in properties for key {}", entry.getKey(), e);
+      }
+    }
+    deleteSecrets(writeThrough);
+  }
+
+  /**
+   * Applies alter setSecretBinding to {@code properties} and records the plaintext to write.
+   *
+   * <p>Nothing is written to the provider here: {@link #stageSecrets} writes the plaintexts
+   * recorded for the whole batch.
+   *
+   * @param properties mutable properties map updated as changes are applied
+   * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
+   * @param entityId stable numeric entity id
+   * @param property property key
+   * @param binding write-through secret binding
+   * @param plaintexts property key → plaintext to write, updated as changes are applied
+   * @return the URN string stored in properties
+   */
+  public String alterSetSecretBinding(
+      Map<String, String> properties,
+      String entityType,
+      long entityId,
+      String property,
+      SecretBinding binding,
+      Map<String, String> plaintexts) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(property), "property must not be blank");
+    Preconditions.checkArgument(binding != null, "binding must not be null");
+    SecretPropertyUtils.validateAlterSecretBindingPlaintext(binding.plaintext());
+    Map<String, SecretBinding> bindings = ImmutableMap.of(property, binding);
+    SecretPropertyUtils.putSecretUrns(
+        properties, buildSecretBindingUrns(entityType, entityId, bindings));
+    plaintexts.put(property, binding.plaintext());
+    return properties.get(property);
+  }
+
+  /**
+   * Applies alter setSecretReference to {@code properties}.
+   *
+   * @param properties mutable properties map updated as changes are applied
+   * @param property property key
+   * @param reference external secret reference
+   * @param plaintexts property key → plaintext to write, updated as changes are applied
+   * @return the URN string stored in properties
+   */
+  public String alterSetSecretReference(
+      Map<String, String> properties,
+      String property,
+      SecretReference reference,
+      Map<String, String> plaintexts) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(property), "property must not be blank");
+    Preconditions.checkArgument(reference != null, "reference must not be null");
+    Map<String, SecretReference> refs = ImmutableMap.of(property, reference);
+    List<SecretUrn> urns = buildSecretReferenceUrns(refs);
+    SecretPropertyUtils.putSecretUrns(properties, urns);
+    plaintexts.remove(property);
+    return properties.get(property);
+  }
+
+  /**
+   * Handles alter setProperty.
+   *
+   * <p>If the current value is a write-through URN owned by this entity, records {@code value} as
+   * the plaintext to write for it, like {@link #alterSetSecretBinding}. If it is another secret
+   * URN, rewrites that secret through its provider right away, outside secret versions, so a failed
+   * alter does not undo that write. Otherwise puts plaintext into properties.
+   *
+   * @param properties mutable properties map updated as changes are applied
+   * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
+   * @param entityId stable numeric entity id, or null if the entity has none yet
+   * @param property property key
+   * @param value new property value (plaintext when rewriting a secret, or plain value)
+   * @param plaintexts property key → plaintext to write, updated as changes are applied
+   * @return value to use in SetProperty change (URN or plaintext)
+   * @throws IllegalArgumentException if {@code entityId} is null and the current value is a
+   *     write-through secret URN
+   */
+  public String alterSetProperty(
+      Map<String, String> properties,
+      String entityType,
+      @Nullable Long entityId,
+      String property,
+      String value,
+      Map<String, String> plaintexts) {
+    SecretPropertyUtils.validateAlterSetPropertyValue(property, value);
+    String current = properties.get(property);
+    if (SecretPropertyUtils.isSecretProperty(property, current)) {
+      SecretPropertyUtils.checkWriteThroughHasEntityId(entityId, entityType, property, current);
+      SecretUrn currentUrn = SecretUrn.parse(current);
+      SecretBinding binding = new SecretBinding(currentUrn.providerName(), value);
+      if (entityId != null
+          && SecretPropertyUtils.isWriteThroughForEntity(property, current, entityType, entityId)) {
+        return alterSetSecretBinding(
+            properties, entityType, entityId, property, binding, plaintexts);
+      }
+      List<String> segments = currentUrn.identifierSegments();
+      Preconditions.checkArgument(
+          !segments.isEmpty(), "Secret URN must contain identifier segments: %s", currentUrn);
+      Map<String, String> attributes = new HashMap<>();
+      if (segments.size() == 3) {
+        attributes.put(ATTR_ENTITY_TYPE, segments.get(0));
+        attributes.put(ATTR_ENTITY_ID, segments.get(1));
+        attributes.put(ATTR_PROPERTY_KEY, segments.get(2));
+      } else {
+        attributes.put(ATTR_PROPERTY_KEY, property);
+      }
+      SecretUrn writtenUrn =
+          getRegistry().getProvider(currentUrn.providerName()).writeSecret(value, attributes);
+      properties.put(property, writtenUrn.toString());
+      return writtenUrn.toString();
+    }
+    properties.put(property, value);
+    return value;
+  }
+
+  /**
+   * Applies alter removeProperty to {@code properties}.
+   *
+   * @param properties mutable properties map updated as changes are applied
+   * @param property property key to remove
+   * @param plaintexts property key → plaintext to write, updated as changes are applied
+   */
+  public void alterRemoveProperty(
+      Map<String, String> properties, String property, Map<String, String> plaintexts) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(property), "property must not be blank");
+    properties.remove(property);
+    plaintexts.remove(property);
+  }
+
+  /**
+   * Reads plaintext for a secret URN via the provider named in the URN.
+   *
+   * @param urn the secret URN
+   * @return the secret plaintext
+   */
+  public String readSecret(SecretUrn urn) {
+    Preconditions.checkArgument(urn != null, "urn must not be null");
+    return registry.getProvider(urn.providerName()).readSecret(urn);
+  }
+
+  /**
+   * Returns a copy of {@code properties} with secret URN values replaced by plaintext.
+   *
+   * <p>Used so connectors receive plaintext conf while entity storage keeps URN strings. Non-secret
+   * entries are copied unchanged. Missing secrets fail with {@link IllegalArgumentException}.
+   *
+   * @param properties entity or request properties (may be null)
+   * @return a new map with secret URNs replaced by plaintext; empty map when {@code properties} is
+   *     null
+   */
+  public Map<String, String> toPlaintextProperties(@Nullable Map<String, String> properties) {
+    return resolvePlaintextProperties(properties, true);
+  }
+
+  /**
+   * Like {@link #toPlaintextProperties(Map)}, but unresolved secrets become {@link
+   * HiddenPropertyMaskUtils#MASKED_VALUE} instead of throwing.
+   *
+   * <p>Catalog load for disable / drop / re-bind / listing uses this so a deleted or rotated secret
+   * does not block management of the catalog.
+   *
+   * @param properties entity or request properties (may be null)
+   * @return a new map with secret URNs replaced by plaintext or the masked placeholder
+   */
+  public Map<String, String> toPlaintextOrMasked(@Nullable Map<String, String> properties) {
+    return resolvePlaintextProperties(properties, false);
+  }
+
+  /**
+   * Replaces secret URN values with plaintext, or with {@link HiddenPropertyMaskUtils#MASKED_VALUE}
+   * when {@code failOnMissing} is false and a secret cannot be read.
+   */
+  private Map<String, String> resolvePlaintextProperties(
+      @Nullable Map<String, String> properties, boolean failOnMissing) {
+    if (properties == null || properties.isEmpty()) {
+      return properties == null ? Map.of() : Map.copyOf(properties);
+    }
+    Map<String, String> plaintext = new HashMap<>(properties.size());
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+      if (SecretPropertyUtils.isSecretProperty(key, value)) {
+        try {
+          plaintext.put(key, readSecret(SecretUrn.parse(value)));
+        } catch (IllegalArgumentException e) {
+          if (failOnMissing) {
+            throw e;
+          }
+          LOG.warn(
+              "Secret for property '{}' could not be resolved during catalog load; "
+                  + "using masked placeholder so management operations can proceed: {}",
+              key,
+              e.getMessage());
+          plaintext.put(key, HiddenPropertyMaskUtils.MASKED_VALUE);
+        }
+      } else {
+        plaintext.put(key, value);
+      }
+    }
+    return plaintext;
+  }
+
+  @Override
+  public void close() {
+    registry.close();
+  }
+
+  private static Map<String, String> toPlaintexts(
+      List<SecretUrn> bindingUrns, Map<String, SecretBinding> bindings) {
+    Map<String, String> plaintexts = new LinkedHashMap<>();
+    for (SecretUrn urn : bindingUrns) {
+      String propertyKey = urn.propertyKey();
+      SecretBinding binding = bindings.get(propertyKey);
+      Preconditions.checkArgument(
+          binding != null, "No secretBindings entry for property key \"%s\"", propertyKey);
+      String plaintext = binding.plaintext();
+      // Same rule as alter setSecretBinding: never persist the read-path mask as a real secret.
+      if (HiddenPropertyMaskUtils.isMaskedPlaceholder(plaintext)) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Property '%s' cannot be set to the masked placeholder value '%s'",
+                propertyKey, HiddenPropertyMaskUtils.MASKED_VALUE));
+      }
+      plaintexts.put(propertyKey, plaintext);
+    }
+    return Collections.unmodifiableMap(plaintexts);
+  }
+
+  private static SecretUrn buildWriteThroughUrn(
+      String entityType, long entityId, String propertyKey, String providerName) {
+    Map<String, String> attributes =
+        ImmutableMap.of(
+            ATTR_ENTITY_TYPE, entityType,
+            ATTR_ENTITY_ID, String.valueOf(entityId),
+            ATTR_PROPERTY_KEY, propertyKey);
+    return SecretUrn.buildWriteThrough(providerName, attributes);
+  }
+
+  private static void validateUrnEndsWithPropertyKey(SecretUrn urn, String propertyKey) {
+    Preconditions.checkArgument(
+        urn.toString().endsWith(propertyKey),
+        "Built secret URN must end with property key \"%s\": %s",
+        propertyKey,
+        urn);
+  }
+}

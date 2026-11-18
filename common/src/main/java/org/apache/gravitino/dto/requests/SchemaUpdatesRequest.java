@@ -57,6 +57,10 @@ public class SchemaUpdatesRequest implements RESTRequest {
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(updates != null, "updates must not be null");
-    updates.forEach(RESTRequest::validate);
+    updates.forEach(
+        update -> {
+          Preconditions.checkArgument(update != null, "updates must not contain null elements");
+          update.validate();
+        });
   }
 }

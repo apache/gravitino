@@ -23,12 +23,16 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.rest.RESTRequest;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 
 /** Represents a request to update a schema. */
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -39,7 +43,13 @@ import org.apache.gravitino.rest.RESTRequest;
       name = "setProperty"),
   @JsonSubTypes.Type(
       value = SchemaUpdateRequest.RemoveSchemaPropertyRequest.class,
-      name = "removeProperty")
+      name = "removeProperty"),
+  @JsonSubTypes.Type(
+      value = SchemaUpdateRequest.SetSchemaSecretBindingRequest.class,
+      name = "setSecretBinding"),
+  @JsonSubTypes.Type(
+      value = SchemaUpdateRequest.SetSchemaSecretReferenceRequest.class,
+      name = "setSecretReference")
 })
 public interface SchemaUpdateRequest extends RESTRequest {
 
@@ -145,6 +155,119 @@ public interface SchemaUpdateRequest extends RESTRequest {
     @Override
     public SchemaChange schemaChange() {
       return SchemaChange.removeProperty(property);
+    }
+  }
+
+  /** Represents a request to bind a write-through secret for a schema property. */
+  @EqualsAndHashCode
+  @ToString(exclude = "plaintext")
+  class SetSchemaSecretBindingRequest implements SchemaUpdateRequest {
+
+    @Getter
+    @JsonProperty("property")
+    private final String property;
+
+    @Getter
+    @JsonProperty("provider")
+    private final String provider;
+
+    @Getter
+    @JsonProperty("plaintext")
+    private final String plaintext;
+
+    /**
+     * Creates a new SetSchemaSecretBindingRequest.
+     *
+     * @param property The property to bind.
+     * @param provider The registered secrets-provider instance name.
+     * @param plaintext The plaintext secret to write through.
+     */
+    public SetSchemaSecretBindingRequest(String property, String provider, String plaintext) {
+      this.property = property;
+      this.provider = provider;
+      this.plaintext = plaintext;
+    }
+
+    /** Default constructor for Jackson deserialization. */
+    public SetSchemaSecretBindingRequest() {
+      this(null, null, null);
+    }
+
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(property), "\"property\" field is required and cannot be empty");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(provider), "\"provider\" field is required and cannot be empty");
+      Preconditions.checkArgument(
+          plaintext != null, "\"plaintext\" field is required and cannot be null");
+    }
+
+    @Override
+    public SchemaChange schemaChange() {
+      return SchemaChange.setSecretBinding(property, new SecretBinding(provider, plaintext));
+    }
+  }
+
+  /** Represents a request to bind an external secret reference for a schema property. */
+  @EqualsAndHashCode
+  @ToString
+  class SetSchemaSecretReferenceRequest implements SchemaUpdateRequest {
+
+    @Getter
+    @JsonProperty("property")
+    private final String property;
+
+    @Getter
+    @JsonProperty("provider")
+    private final String provider;
+
+    @Getter
+    @JsonProperty("attributes")
+    private final Map<String, String> attributes;
+
+    /**
+     * Creates a new SetSchemaSecretReferenceRequest.
+     *
+     * @param property The property to bind.
+     * @param provider The registered secrets-provider instance name.
+     * @param attributes Provider-specific locator attributes.
+     */
+    public SetSchemaSecretReferenceRequest(
+        String property, String provider, Map<String, String> attributes) {
+      this.property = property;
+      this.provider = provider;
+      this.attributes = attributes;
+    }
+
+    /** Default constructor for Jackson deserialization. */
+    public SetSchemaSecretReferenceRequest() {
+      this(null, null, null);
+    }
+
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(property), "\"property\" field is required and cannot be empty");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(provider), "\"provider\" field is required and cannot be empty");
+    }
+
+    @Override
+    public SchemaChange schemaChange() {
+      return SchemaChange.setSecretReference(
+          property,
+          new SecretReference(provider, attributes == null ? ImmutableMap.of() : attributes));
     }
   }
 }

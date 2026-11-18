@@ -20,13 +20,16 @@
 package org.apache.gravitino.meta;
 
 import com.google.common.base.Objects;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
+import javax.annotation.Nullable;
 import lombok.ToString;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -40,12 +43,14 @@ import org.apache.gravitino.rel.types.Type;
 public class ColumnEntity implements Entity, Auditable {
 
   public static final Field ID = Field.required("id", Long.class, "The column's unique identifier");
-  public static final Field NAME = Field.required("name", String.class, "The column's name");
+  public static final Field NAME =
+      Field.required("name", "The column's name", EntityFieldLimits.MAX_COLUMN_NAME_LENGTH);
   public static final Field POSITION =
       Field.required("position", Integer.class, "The column's position");
   public static final Field TYPE = Field.required("dataType", Type.class, "The column's data type");
   public static final Field COMMENT =
-      Field.optional("comment", String.class, "The column's comment");
+      Field.optional(
+          "comment", "The column's comment", EntityFieldLimits.MAX_COLUMN_COMMENT_LENGTH);
   public static final Field NULLABLE =
       Field.required("nullable", Boolean.class, "The column's nullable property");
   public static final Field AUTO_INCREMENT =
@@ -160,13 +165,55 @@ public class ColumnEntity implements Entity, Auditable {
     return new Builder();
   }
 
+  /**
+   * Validates a user-supplied column comment before writing source or managed metadata. H2 counts
+   * UTF-16 units in VARCHAR limits, so accepted comments must fit that portable bound without the
+   * lossy projection used for external imports.
+   *
+   * @param columnName the column name used in validation errors
+   * @param comment the requested comment, which may be null
+   * @throws IllegalArgumentException if the comment contains NUL or exceeds the storage limit
+   */
+  public static void validateCommentForWrite(String columnName, @Nullable String comment) {
+    Preconditions.checkArgument(
+        comment == null || comment.indexOf('\0') < 0,
+        "Column comment for %s must not contain NUL characters",
+        columnName);
+    COMMENT.validate(comment, EntityType.COLUMN);
+    Preconditions.checkArgument(
+        comment == null || comment.length() <= EntityFieldLimits.MAX_COLUMN_COMMENT_LENGTH,
+        "Column comment for %s must not exceed %s UTF-16 units",
+        columnName,
+        EntityFieldLimits.MAX_COLUMN_COMMENT_LENGTH);
+  }
+
+  /**
+   * Projects a source column comment into the portable entity-store representation. The full source
+   * comment remains available from the connector table.
+   *
+   * @param comment the source comment
+   * @return a NUL-free comment bounded by the storage capacity
+   */
+  @Nullable
+  public static String commentForStorage(@Nullable String comment) {
+    if (comment == null) {
+      return null;
+    }
+    String safe = comment.replace("\0", "");
+    int end = Math.min(safe.length(), EntityFieldLimits.MAX_COLUMN_COMMENT_LENGTH);
+    if (end < safe.length() && end > 0 && Character.isHighSurrogate(safe.charAt(end - 1))) {
+      end--;
+    }
+    return safe.substring(0, end);
+  }
+
   public static ColumnEntity toColumnEntity(
       Column column, int position, long uid, AuditInfo audit) {
     return builder()
         .withId(uid)
         .withName(column.name())
         .withPosition(position)
-        .withComment(column.comment())
+        .withComment(commentForStorage(column.comment()))
         .withDataType(column.dataType())
         .withNullable(column.nullable())
         .withAutoIncrement(column.autoIncrement())

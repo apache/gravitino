@@ -39,6 +39,9 @@ gravitino.lance-rest.threadPoolWorkQueueSize = 100
 gravitino.lance-rest.requestHeaderSize = 131072
 # The response header size of the built-in web server
 gravitino.lance-rest.responseHeaderSize = 131072
+# Whether to include server-side stack traces in HTTP error responses. Set this to false in new
+# deployments. It remains true by default only to preserve legacy response behavior.
+gravitino.lance-rest.includeErrorStackTrace = true
 
 # THE CONFIGURATION FOR Lance namespace backend
 # The backend Lance namespace for Lance REST service, it's recommended to use Gravitino

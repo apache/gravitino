@@ -63,6 +63,20 @@ public enum TestDatabaseName {
   /** Represents the MySQL database used for testing catalog credential integration. */
   MYSQL_CATALOG_CREDENTIAL_IT,
 
+  /**
+   * Represents the first MySQL-backed database used by
+   * lakehouse.iceberg.integration.test.IcebergClassLoaderPoolIT to verify ClassLoader isolation and
+   * sharing across Iceberg catalogs whose JDBC backend URI differs only by database name.
+   */
+  MYSQL_TEST_ICEBERG_CLASSLOADER_POOL_A,
+
+  /**
+   * Represents the second MySQL-backed database used by
+   * lakehouse.iceberg.integration.test.IcebergClassLoaderPoolIT (different {@code uri} than {@link
+   * #MYSQL_TEST_ICEBERG_CLASSLOADER_POOL_A}).
+   */
+  MYSQL_TEST_ICEBERG_CLASSLOADER_POOL_B,
+
   PG_JDBC_BACKEND,
 
   /** Represents the PostgreSQL database for CatalogPostgreSqlIT. */
@@ -118,6 +132,12 @@ public enum TestDatabaseName {
     }
   },
   PG_ICEBERG_AUTHZ_IT,
+
+  /** Represents the PostgreSQL database for experimental Iceberg authorization tests. */
+  PG_ICEBERG_EXPERIMENTAL_AUTHZ_IT,
+
+  /** Represents the PostgreSQL database for Iceberg read-restriction tests. */
+  PG_ICEBERG_READ_RESTRICTION_IT,
 
   PG_ICEBERG_ASYNC_CLEANUP_IT,
 

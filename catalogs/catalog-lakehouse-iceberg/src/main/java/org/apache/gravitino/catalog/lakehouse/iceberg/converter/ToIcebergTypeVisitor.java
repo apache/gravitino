@@ -53,6 +53,9 @@ public class ToIcebergTypeVisitor<T> {
         fieldResults.add(visitor.field(field, visit(field.type(), visitor)));
       }
       return visitor.struct((Types.StructType) type, fieldResults);
+    } else if (type instanceof Types.NullType) {
+      // NullType implements Type directly rather than PrimitiveType, so it needs its own dispatch.
+      return visitor.nullType((Types.NullType) type);
     } else {
       return visitor.atomic((Type.PrimitiveType) type);
     }
@@ -79,6 +82,10 @@ public class ToIcebergTypeVisitor<T> {
   }
 
   public T atomic(Type.PrimitiveType primitive) {
+    throw new UnsupportedOperationException();
+  }
+
+  public T nullType(Types.NullType nullType) {
     throw new UnsupportedOperationException();
   }
 }

@@ -21,6 +21,7 @@ package org.apache.gravitino.dto.authorization;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -95,7 +96,9 @@ public class RoleDTO implements Role {
    */
   @Override
   public List<SecurableObject> securableObjects() {
-    return Arrays.asList(securableObjects);
+    // Jackson deserialization can leave the array null (field absent in the payload) because it
+    // bypasses the builder's null check.
+    return securableObjects == null ? Collections.emptyList() : Arrays.asList(securableObjects);
   }
 
   /**

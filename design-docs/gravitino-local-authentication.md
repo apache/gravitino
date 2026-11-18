@@ -146,7 +146,7 @@ dependency model explicitly:
 For example, `password_hash` should store a PHC-style string such as:
 
 ```text
-$sha3-512$i=100000$<salt>$<hash>
+$sha3-512$i=5000$<salt>$<hash>
 ```
 
 This keeps verification logic simple and allows future upgrades of SHA3-512 cost parameters without
@@ -201,6 +201,7 @@ CREATE TABLE IF NOT EXISTS `idp_user_meta` (
 CREATE TABLE IF NOT EXISTS `idp_group_meta` (
     `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
     `group_name` VARCHAR(128) NOT NULL COMMENT 'group name',
+    `group_comment` VARCHAR(1024) DEFAULT '' COMMENT 'group comment',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'group deleted at',
@@ -459,19 +460,33 @@ http://localhost:8090/api/idp/users/alice
 ```
 
 
-#### 9.1.4 Reset a local user password
+#### 9.1.4 Change a local user password
 
-`PUT /api/idp/users/{user}` — administrator-only reset (`password` only; no `oldPassword`). Usernames
-must not contain `:`. Password length is 12–64 characters.
+`PUT /api/idp/users/{user}/password` — service admins may reset any user's password with
+`newPassword` only (must omit `oldPassword`). Authenticated non-admin users may change only their
+own password and must also send `oldPassword`. Usernames must not contain `:`. Password length is
+12–64 characters.
 
 ```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "password": "Passw0rd-For-Gravitino-Alice-V2"
-}' http://localhost:8090/api/idp/users/alice
+  "newPassword": "Passw0rd-For-Gravitino-Alice-V2"
+}' http://localhost:8090/api/idp/users/alice/password
 ```
 
-#### 9.1.5 Get a local group
+#### 9.1.5 Update a local user enabled flag
+
+`PUT /api/idp/users/{user}/enabled` — service-admin only. Users listed in
+`gravitino.authorization.serviceAdmins` cannot have their enabled flag changed.
+
+```shell
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "enabled": false
+}' http://localhost:8090/api/idp/users/alice/enabled
+```
+
+#### 9.1.6 Get a local group
 
 `GET /api/idp/groups/{group}`
 
@@ -481,7 +496,7 @@ http://localhost:8090/api/idp/groups/engineering
 ```
 
 
-#### 9.1.6 Add a local group
+#### 9.1.7 Add a local group
 
 `POST /api/idp/groups`
 
@@ -493,7 +508,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 ```
 
 
-#### 9.1.7 Remove a local group
+#### 9.1.8 Remove a local group
 
 `DELETE /api/idp/groups/{group}?force={true|false}` — soft-delete. Use `force=true` when the group
 still has members.
@@ -504,7 +519,7 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 ```
 
 
-#### 9.1.8 Change local group membership
+#### 9.1.9 Change local group membership
 
 `PUT /api/idp/groups/{group}/users` — at least one of `usersToAdd` or `usersToRemove` is required.
 

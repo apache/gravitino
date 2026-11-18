@@ -19,10 +19,18 @@ from random import randint
 
 from gravitino import Catalog, GravitinoAdminClient, GravitinoClient, GravitinoMetalake
 from gravitino.api.file.fileset import Fileset
+from gravitino.api.function.function import Function
+from gravitino.api.function.function_definition import FunctionDefinitions
+from gravitino.api.function.function_type import FunctionType
+from gravitino.api.function.sql_impl import SQLImpl
 from gravitino.api.model.model import Model
+from gravitino.api.rel.column import Column
+from gravitino.api.rel.dialects import Dialects
+from gravitino.api.rel.sql_representation import SQLRepresentation
 from gravitino.api.rel.table import Table
 from gravitino.api.rel.table_catalog import TableCatalog
 from gravitino.api.rel.types.types import Types
+from gravitino.api.rel.view import View
 from gravitino.api.tag import Tag
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.dto.rel.column_dto import ColumnDTO
@@ -60,6 +68,8 @@ class TestSupportsTags(IntegrationTestEnv):
     _schema_name = "tag_it_schema" + str(randint(0, 1000))
     # OTHER
     _table_name: str = "tag_it_table" + str(randint(0, 1000))
+    _view_name: str = "tag_it_view" + str(randint(0, 1000))
+    _function_name: str = "tag_it_function" + str(randint(0, 1000))
     _fileset_name: str = "tag_it_fileset" + str(randint(0, 1000))
     _model_name: str = "tag_it_model" + str(randint(0, 1000))
 
@@ -81,6 +91,8 @@ class TestSupportsTags(IntegrationTestEnv):
     _tag4: Tag
 
     _table_ident: NameIdentifier
+    _view_ident: NameIdentifier
+    _function_ident: NameIdentifier
     _fileset_ident: NameIdentifier
     _model_ident: NameIdentifier
     _hdfs_container: HDFSContainer
@@ -160,6 +172,14 @@ class TestSupportsTags(IntegrationTestEnv):
         self._table_ident: NameIdentifier = NameIdentifier.of(
             self._schema_name,
             self._table_name,
+        )
+        self._view_ident: NameIdentifier = NameIdentifier.of(
+            self._schema_name,
+            self._view_name,
+        )
+        self._function_ident: NameIdentifier = NameIdentifier.of(
+            self._schema_name,
+            self._function_name,
         )
         self._fileset_ident: NameIdentifier = NameIdentifier.of(
             self._schema_name,
@@ -324,6 +344,93 @@ class TestSupportsTags(IntegrationTestEnv):
             tags_to_remove=[self._tag_name1, self._tag_name2],
         )
         self._check_no_tag_associated(relational_table.supports_tags())
+
+    def test_view_tag_operations(self) -> None:
+        """Test tag operations (associate, list, get, dissociate) on view."""
+        self._relational_catalog.as_schemas().create_schema(
+            schema_name=self._schema_name,
+            comment="view it schema",
+            properties={},
+        )
+        table = self.create_test_table()
+        view: View = self._relational_catalog.as_view_catalog().create_view(
+            identifier=self._view_ident,
+            columns=[
+                Column.of("dt", Types.DateType.get()),
+                Column.of("country", Types.StringType.get()),
+            ],
+            representations=[
+                SQLRepresentation(
+                    Dialects.HIVE,
+                    f"SELECT dt, country FROM {table.name()}",
+                )
+            ],
+            comment="view for tag operations",
+            properties={},
+        )
+
+        view.supports_tags().associate_tags(
+            tags_to_add=[self._tag_name3, self._tag_name4],
+            tags_to_remove=[],
+        )
+        view.supports_tags().associate_tags(
+            tags_to_add=[self._tag_name1, self._tag_name2],
+            tags_to_remove=[self._tag_name3, self._tag_name4],
+        )
+        self._test_list_tags(view.supports_tags())
+        self._test_list_tags_info(view.supports_tags())
+        self._test_get_tag(view.supports_tags())
+
+        view.supports_tags().associate_tags(
+            tags_to_add=[],
+            tags_to_remove=[self._tag_name1, self._tag_name2],
+        )
+        self._check_no_tag_associated(view.supports_tags())
+
+    def test_function_tag_operations(self) -> None:
+        """Test tag operations (associate, list, get, dissociate) on function."""
+        self._relational_catalog.as_schemas().create_schema(
+            schema_name=self._schema_name,
+            comment="function it schema",
+            properties={},
+        )
+        implementation = (
+            SQLImpl.builder()
+            .with_runtime_type(SQLImpl.RuntimeType.SPARK)
+            .with_sql("SELECT 1")
+            .build()
+        )
+        definition = FunctionDefinitions.of(
+            [],
+            Types.IntegerType.get(),
+            [implementation],
+        )
+        function_catalog = self._relational_catalog.as_function_catalog()
+        function: Function = function_catalog.register_function(
+            ident=self._function_ident,
+            comment="function for tag operations",
+            function_type=FunctionType.SCALAR,
+            deterministic=True,
+            definitions=[definition],
+        )
+
+        function.supports_tags().associate_tags(
+            tags_to_add=[self._tag_name3, self._tag_name4],
+            tags_to_remove=[],
+        )
+        function.supports_tags().associate_tags(
+            tags_to_add=[self._tag_name1, self._tag_name2],
+            tags_to_remove=[self._tag_name3, self._tag_name4],
+        )
+        self._test_list_tags(function.supports_tags())
+        self._test_list_tags_info(function.supports_tags())
+        self._test_get_tag(function.supports_tags())
+
+        function.supports_tags().associate_tags(
+            tags_to_add=[],
+            tags_to_remove=[self._tag_name1, self._tag_name2],
+        )
+        self._check_no_tag_associated(function.supports_tags())
 
     def test_column_tag_operations(self) -> None:
         """Test tag operations (associate, list, get, dissociate) on column."""

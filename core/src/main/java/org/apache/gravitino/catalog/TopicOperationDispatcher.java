@@ -26,6 +26,7 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier
 import java.time.Instant;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -36,14 +37,17 @@ import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.messaging.DataLayout;
 import org.apache.gravitino.messaging.Topic;
+import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
@@ -58,10 +62,30 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
    * @param catalogManager The CatalogManager instance to be used for catalog operations.
    * @param store The EntityStore instance to be used for catalog operations.
    * @param idGenerator The IdGenerator instance to be used for catalog operations.
+   * @param secretManager The SecretManager instance to be used for secret operations.
    */
   public TopicOperationDispatcher(
-      CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
-    super(catalogManager, store, idGenerator);
+      CatalogManager catalogManager,
+      EntityStore store,
+      IdGenerator idGenerator,
+      SecretManager secretManager) {
+    super(catalogManager, store, idGenerator, secretManager);
+  }
+
+  /**
+   * Checks whether a topic exists in a catalog that supports topics.
+   *
+   * @param ident the topic identifier
+   * @return whether the topic exists
+   */
+  @Override
+  public boolean topicExists(NameIdentifier ident) {
+    boolean supportsTopics =
+        doWithCatalog(
+            getCatalogIdentifier(ident),
+            wrapper -> wrapper.doWithCatalog(catalog -> catalog.ops() instanceof TopicCatalog),
+            RuntimeException.class);
+    return supportsTopics && TopicDispatcher.super.topicExists(ident);
   }
 
   /**
@@ -102,14 +126,20 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
       NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
       schemaDispatcher.loadSchema(schemaIdent);
 
-      // Import the topic
-      TreeLockUtils.doWithTreeLock(
-          schemaIdent,
-          LockType.WRITE,
-          () -> {
-            importTopic(ident);
-            return null;
-          });
+      try {
+        topic = TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importTopic(ident));
+      } catch (EntityAlreadyExistsException e) {
+        // A create-only import can conflict either because another Gravitino node won an HA race,
+        // or because the Kafka UUID is actively registered under another Gravitino path.
+        LOG.info(
+            "Topic {} import conflicted with existing metadata; reloading from store: {}",
+            ident,
+            e.getMessage());
+        topic = TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTopic(ident));
+        if (!topic.imported()) {
+          throw retainedExternalIdentifierConflictException(ident, TOPIC);
+        }
+      }
     }
 
     return topic;
@@ -138,10 +168,10 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
     schemaDispatcher.loadSchema(schemaIdent);
 
+    // Lock the topic node, not the schema, so topics in the same schema can be created
+    // concurrently. See TableOperationDispatcher#createTable for the reasoning and trade-off.
     return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(ident.namespace().levels()),
-        LockType.WRITE,
-        () -> internalCreateTopic(ident, comment, dataLayout, properties));
+        ident, LockType.WRITE, () -> internalCreateTopic(ident, comment, dataLayout, properties));
   }
 
   /**
@@ -207,7 +237,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
 
           return EntityCombinedTopic.of(alteredTopic, updatedTopicEntity)
               .withHiddenProperties(
-                  getHiddenPropertyNames(
+                  getMaskAndOmitKeys(
                       catalogIdent,
                       HasPropertyMetadata::topicPropertiesMetadata,
                       alteredTopic.properties()));
@@ -249,6 +279,8 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
             droppedFromStore = store.delete(ident, TOPIC);
           } catch (NoSuchEntityException e) {
             LOG.warn("The topic to be dropped does not exist in the store: {}", ident, e);
+          } catch (OptimisticLockException e) {
+            throw e;
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
@@ -259,12 +291,12 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
         });
   }
 
-  private void importTopic(NameIdentifier identifier) {
+  private EntityCombinedTopic importTopic(NameIdentifier identifier) {
 
     EntityCombinedTopic topic = internalLoadTopic(identifier);
 
     if (topic.imported()) {
-      return;
+      return topic;
     }
 
     StringIdentifier stringId = null;
@@ -304,11 +336,23 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
             .build();
 
     try {
-      store.put(topicEntity, true);
+      store.put(topicEntity, false);
+    } catch (EntityAlreadyExistsException e) {
+      throw e;
+    } catch (OptimisticLockException e) {
+      // A conflict with a concurrent writer, such as a lock wait timeout; the load can be retried.
+      throw e;
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
-      throw new RuntimeException("Fail to import topic entity to store.", e);
+      throw new RuntimeException("Failed to import topic entity to the store", e);
     }
+
+    return EntityCombinedTopic.of(topic, topicEntity)
+        .withHiddenProperties(
+            getMaskAndOmitKeys(
+                getCatalogIdentifier(identifier),
+                HasPropertyMetadata::topicPropertiesMetadata,
+                topic.properties()));
   }
 
   private EntityCombinedTopic internalLoadTopic(NameIdentifier ident) {
@@ -325,14 +369,14 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
       if (topicEntity == null) {
         return EntityCombinedTopic.of(topic)
             .withHiddenProperties(
-                getHiddenPropertyNames(
+                getMaskAndOmitKeys(
                     catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()))
             .withImported(false);
       }
 
       return EntityCombinedTopic.of(topic, topicEntity)
           .withHiddenProperties(
-              getHiddenPropertyNames(
+              getMaskAndOmitKeys(
                   catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()))
           .withImported(true);
     }
@@ -346,7 +390,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
 
     return EntityCombinedTopic.of(topic, topicEntity)
         .withHiddenProperties(
-            getHiddenPropertyNames(
+            getMaskAndOmitKeys(
                 catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()))
         .withImported(topicEntity != null);
   }
@@ -397,13 +441,13 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
       LOG.error(OperationDispatcher.FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedTopic.of(topic)
           .withHiddenProperties(
-              getHiddenPropertyNames(
+              getMaskAndOmitKeys(
                   catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()));
     }
 
     return EntityCombinedTopic.of(topic, topicEntity)
         .withHiddenProperties(
-            getHiddenPropertyNames(
+            getMaskAndOmitKeys(
                 catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()));
   }
 }

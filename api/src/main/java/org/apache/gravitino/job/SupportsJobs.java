@@ -80,10 +80,13 @@ public interface SupportsJobs {
    * @param changes the changes to apply to the job template
    * @return the updated job template after applying the changes
    * @throws NoSuchJobTemplateException if no job template with the specified name exists
+   * @throws JobTemplateAlreadyExistsException if the job template is renamed to a name that already
+   *     exists
    * @throws IllegalArgumentException if any of the changes cannot be applied to the job template
    */
   default JobTemplate alterJobTemplate(String jobTemplateName, JobTemplateChange... changes)
-      throws NoSuchJobTemplateException, IllegalArgumentException {
+      throws NoSuchJobTemplateException, JobTemplateAlreadyExistsException,
+          IllegalArgumentException {
     throw new UnsupportedOperationException("Not implemented");
   }
 
@@ -125,6 +128,35 @@ public interface SupportsJobs {
    * @throws NoSuchJobException if the job with the specified ID does not exist
    */
   JobHandle getJob(String jobId) throws NoSuchJobException;
+
+  /**
+   * Retrieves a job by its ID, optionally including its captured stdout/stderr output (see {@link
+   * JobHandle#stdout()}/{@link JobHandle#stderr()}).
+   *
+   * <p>Output is fetched live from the job executor on every call, not persisted, so {@code
+   * includeOutput} should only be set to {@code true} when the output is actually needed.
+   *
+   * <p>The default implementation delegates to {@link #getJob(String)} when {@code includeOutput}
+   * is {@code false} - equivalent to a plain lookup, so existing implementors of this interface
+   * keep compiling and behaving correctly without any changes - but throws {@link
+   * UnsupportedOperationException} when {@code includeOutput} is {@code true}, rather than silently
+   * ignoring the request and returning a job with no output. Implementors that support output
+   * retrieval should override this method directly.
+   *
+   * @param jobId the ID of the job to retrieve
+   * @param includeOutput whether to also fetch and populate the job's stdout/stderr output
+   * @return a handle to the job
+   * @throws NoSuchJobException if the job with the specified ID does not exist
+   * @throws UnsupportedOperationException if {@code includeOutput} is {@code true} and this
+   *     implementor does not support output retrieval
+   */
+  default JobHandle getJob(String jobId, boolean includeOutput) throws NoSuchJobException {
+    if (!includeOutput) {
+      return getJob(jobId);
+    }
+    throw new UnsupportedOperationException(
+        "getJob(jobId, includeOutput=true) is not supported by " + getClass().getName());
+  }
 
   /**
    * Cancel a job by its ID. This operation will attempt to cancel the job if it is still running.

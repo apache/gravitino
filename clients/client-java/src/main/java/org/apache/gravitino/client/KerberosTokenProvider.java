@@ -82,7 +82,7 @@ public final class KerberosTokenProvider implements AuthDataProvider {
     try {
       return getTokenInternal();
     } catch (Exception e) {
-      throw new IllegalStateException("Fail to get the Kerberos token", e);
+      throw new IllegalStateException("Failed to get the Kerberos token", e);
     }
   }
 
@@ -130,7 +130,7 @@ public final class KerberosTokenProvider implements AuthDataProvider {
         subjectProvider.close();
       }
     } catch (LoginException le) {
-      throw new IOException("Fail to close login context", le);
+      throw new IOException("Failed to close login context", le);
     }
   }
 

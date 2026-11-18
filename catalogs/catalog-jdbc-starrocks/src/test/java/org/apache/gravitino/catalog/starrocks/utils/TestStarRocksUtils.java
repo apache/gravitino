@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literal;
@@ -37,8 +38,44 @@ import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 public class TestStarRocksUtils {
+
+  @Test
+  void testQuotedIdentifiersRejectBackticks() {
+    for (String name : new String[] {"vic`tim", "`victim`", "vic``tim"}) {
+      Assertions.assertFalse(StarRocksUtils.checkIdentifier(name).supported());
+      IllegalArgumentException error =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> StarRocksUtils.quoteIdentifier(name));
+      Assertions.assertTrue(error.getMessage().contains(name));
+      Assertions.assertTrue(error.getMessage().contains("must not contain backticks"));
+    }
+    String name = "native column\\path; --";
+    Assertions.assertTrue(StarRocksUtils.checkIdentifier(name).supported());
+    Assertions.assertEquals("`" + name + "`", StarRocksUtils.quoteIdentifier(name));
+  }
+
+  @Test
+  void testPartitionFragmentsRejectBackticks() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            StarRocksUtils.generatePartitionSqlFragment(
+                Partitions.range(
+                    "p`1", Literals.integerLiteral(10), null, Collections.emptyMap())));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            StarRocksUtils.generatePartitionSqlFragment(
+                Partitions.list(
+                    "p`1",
+                    new Literal<?>[][] {{Literals.integerLiteral(1)}},
+                    Collections.emptyMap())));
+  }
 
   @Test
   public void testGeneratePropertiesSql() {
@@ -56,6 +93,11 @@ public class TestStarRocksUtils {
     properties = Collections.singletonMap("key", "value");
     result = StarRocksUtils.generatePropertiesSql(properties);
     assertEquals(" PROPERTIES (\n\"key\"=\"value\"\n)", result);
+
+    properties = Collections.singletonMap("key\"name", "owner's \"comment\" C:\\tmp; --");
+    result = StarRocksUtils.generatePropertiesSql(properties);
+    assertEquals(
+        " PROPERTIES (\n\"key\"\"name\"=\"owner's \"\"comment\"\" C:\\\\tmp; --\"\n)", result);
 
     // Test when properties has multiple entries
     properties = new HashMap<>();
@@ -95,6 +137,80 @@ public class TestStarRocksUtils {
     result = StarRocksUtils.extractPropertiesFromSql(createTableSql);
     assertEquals("value1", result.get("property1"));
     assertEquals("comment", result.get("comment"));
+
+    // Escaped SHOW CREATE output (doubled quotes and backslashes, as generatePropertiesSql
+    // emits) round-trips back to the original key/value text.
+    createTableSql =
+        "CREATE DATABASE `test`\nPROPERTIES (\n"
+            + "\"key\"\"name\" = \"owner's \"\"comment\"\" D:\\\\data; --\"\n)";
+    result = StarRocksUtils.extractPropertiesFromSql(createTableSql);
+    assertEquals("owner's \"comment\" D:\\data; --", result.get("key\"name"));
+
+    // Backslash-style escaping (\" and \\) is unescaped too.
+    createTableSql =
+        "CREATE DATABASE `test`\nPROPERTIES (\n" + "\"plain\" = \"owner\\\\s \\\"comment\\\"\"\n)";
+    result = StarRocksUtils.extractPropertiesFromSql(createTableSql);
+    assertEquals("owner\\s \"comment\"", result.get("plain"));
+  }
+
+  /** Verifies large escaped properties are parsed without recursive regex stack growth. */
+  @Test
+  public void testLongEscapedPropertiesRoundTrip() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("key".repeat(10000), "value\" = \"part\\".repeat(2000));
+    assertEquals(
+        properties,
+        StarRocksUtils.extractPropertiesFromSql(StarRocksUtils.generatePropertiesSql(properties)));
+  }
+
+  /** Verifies escaped quotes cannot be mistaken for the property key/value separator. */
+  @Test
+  public void testPropertiesWithQuotedSeparatorsRoundTrip() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("k", "a\" = \"b");
+    properties.put("key\" = \"part", "value\" = \"part\\");
+    properties.put(" spaced key ", " spaced value ");
+    properties.put("empty", "");
+    properties.put("\\\"", "\\\" = \"\\");
+
+    assertEquals(
+        properties,
+        StarRocksUtils.extractPropertiesFromSql(StarRocksUtils.generatePropertiesSql(properties)));
+  }
+
+  /** Verifies backslash-escaped quotes around an equals sign remain in the property value. */
+  @Test
+  public void testPropertiesWithBackslashEscapedSeparators() {
+    String sql = "PROPERTIES (\n\"k\" = \"a\\\" = \\\"b\",\n\"end\" = \"tail\\\\\"\n)";
+    Map<String, String> expected = new HashMap<>();
+    expected.put("k", "a\" = \"b");
+    expected.put("end", "tail\\");
+    assertEquals(expected, StarRocksUtils.extractPropertiesFromSql(sql));
+  }
+
+  @Test
+  public void testExtractEscapedTableCommentFromSql() {
+    String createTableSql =
+        "CREATE TABLE `testTable` (\n"
+            + "`col1` INT COMMENT \"column comment\"\n"
+            + ")\n"
+            + "COMMENT \"owner's \\\"comment\\\" (nested) C:\\\\tmp; -- "
+            + "(From Gravitino, DO NOT EDIT: gravitino.v1.uid-1)\"";
+
+    assertEquals(
+        "owner's \"comment\" (nested) C:\\tmp; --",
+        StarRocksUtils.extractTableCommentFromSql(createTableSql));
+
+    createTableSql =
+        "CREATE TABLE `testTable` (\n"
+            + "`col1` INT\n"
+            + ")\n"
+            + "COMMENT \"owner's \"\"comment\"\" D:\\\\data; -- "
+            + "(From Gravitino, DO NOT EDIT: gravitino.v1.uid-1)\"";
+
+    assertEquals(
+        "owner's \"comment\" D:\\data; --",
+        StarRocksUtils.extractTableCommentFromSql(createTableSql));
   }
 
   @Test
@@ -225,5 +341,42 @@ public class TestStarRocksUtils {
     Assertions.assertThrows(
         RuntimeException.class,
         () -> StarRocksUtils.extractDistributionInfoFromSql(createTableSqlWithInvalidDistribution));
+  }
+
+  @ParameterizedTest
+  @MethodSource("partitionLiteralValues")
+  void testPartitionLiteralEscaping(String value, String escaped) {
+    Literal<String> literal = Literals.stringLiteral(value);
+    assertEquals(
+        "PARTITION `p` VALUES LESS THAN (\"" + escaped + "\")",
+        StarRocksUtils.generatePartitionSqlFragment(
+            Partitions.range("p", literal, Literals.NULL, Collections.emptyMap())));
+
+    assertEquals(
+        "PARTITION `p` VALUES IN (\"" + escaped + "\",\"plain\")",
+        StarRocksUtils.generatePartitionSqlFragment(
+            Partitions.list(
+                "p",
+                new Literal<?>[][] {{literal}, {Literals.stringLiteral("plain")}},
+                Collections.emptyMap())));
+    assertEquals(
+        "PARTITION `p` VALUES IN ((\"" + escaped + "\",\"plain\"),(\"plain\",\"" + escaped + "\"))",
+        StarRocksUtils.generatePartitionSqlFragment(
+            Partitions.list(
+                "p",
+                new Literal<?>[][] {
+                  {literal, Literals.stringLiteral("plain")},
+                  {Literals.stringLiteral("plain"), literal}
+                },
+                Collections.emptyMap())));
+  }
+
+  private static Stream<Arguments> partitionLiteralValues() {
+    return Stream.of(
+        Arguments.of("say \"hi\"", "say \"\"hi\"\""),
+        Arguments.of("C:\\temp\\", "C:\\\\temp\\\\"),
+        Arguments.of("5\" pipe' ; --", "5\"\" pipe' ; --"),
+        Arguments.of("slash\\\"quote", "slash\\\\\"\"quote"),
+        Arguments.of("line\nnext\tvalue", "line\nnext\tvalue"));
   }
 }

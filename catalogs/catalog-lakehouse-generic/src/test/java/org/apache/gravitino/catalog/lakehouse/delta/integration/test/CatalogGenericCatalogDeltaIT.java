@@ -146,6 +146,12 @@ public class CatalogGenericCatalogDeltaIT extends BaseIT {
   }
 
   @Test
+  void testExistingCatalogConnectionIsUnsupported() {
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> metalake.testConnection(catalogName));
+  }
+
+  @Test
   public void testCreateDeltaTableAndRegisterToGravitino() throws Exception {
     String tableLocation = tempDirectory + "/" + tableName;
 

@@ -22,9 +22,15 @@ package org.apache.gravitino.maintenance.optimizer.recommender.job;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.dto.rel.ColumnDTO;
+import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
+import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
+import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionJobContext;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -40,10 +46,125 @@ public class TestGravitinoCompactionJobAdapter {
             "sort_order", "",
             "strategy", "binpack",
             "options", "{\"target_file_size_bytes\":\"1073741824\"}"),
-        jobAdapter.jobConfig(mockCompactionJobContext()));
+        jobAdapter.jobConfig(mockCompactionJobContext("binpack", "")));
   }
 
-  private CompactionJobContext mockCompactionJobContext() {
+  @Test
+  public void testSortStrategyAndSortOrder() {
+    GravitinoCompactionJobAdapter jobAdapter = new GravitinoCompactionJobAdapter();
+    Assertions.assertEquals(
+        Map.of(
+            "table_identifier", "db.table",
+            "where_clause", "",
+            "sort_order", "zorder(c1,c2)",
+            "strategy", "sort",
+            "options", "{\"target_file_size_bytes\":\"1073741824\"}"),
+        jobAdapter.jobConfig(mockCompactionJobContext("sort", "zorder(c1,c2)")));
+  }
+
+  @Test
+  public void testWhereClauseForDayPartitionUsesIsoDateFromStatsPath() {
+    // Mirrors CLI submit-strategy-jobs: update-stats stores day as ISO date, adapter builds where.
+    Column[] columns =
+        new Column[] {
+          ColumnDTO.builder()
+              .withName("ts")
+              .withDataType(Types.TimestampType.withoutTimeZone())
+              .build()
+        };
+    Transform[] partitioning = new Transform[] {Transforms.day("ts")};
+    List<PartitionPath> partitions =
+        List.of(PartitionPath.of(List.of(new PartitionEntryImpl("ts_day", "2026-01-01"))));
+
+    Map<String, String> conf =
+        new GravitinoCompactionJobAdapter()
+            .jobConfig(
+                new CompactionJobContext(
+                    NameIdentifier.of("catalog", "db", "table"),
+                    Map.of("target_file_size_bytes", "1073741824"),
+                    "compaction-job-template",
+                    "binpack",
+                    "",
+                    columns,
+                    partitioning,
+                    partitions));
+
+    Assertions.assertEquals(
+        "(`catalog`.system.days(`ts`) = DATE '2026-01-01')", conf.get("where_clause"));
+  }
+
+  @Test
+  public void testWhereClauseUsesSubmitterSparkCatalogWhenNamesDiffer() {
+    // Gravitino table catalog "lake" vs Spark CALL catalog_name "ice" from jobSubmitterConfig.
+    Column[] columns =
+        new Column[] {
+          ColumnDTO.builder()
+              .withName("ts")
+              .withDataType(Types.TimestampType.withoutTimeZone())
+              .build()
+        };
+    Transform[] partitioning = new Transform[] {Transforms.day("ts")};
+    List<PartitionPath> partitions =
+        List.of(PartitionPath.of(List.of(new PartitionEntryImpl("ts_day", "2026-01-01"))));
+    CompactionJobContext context =
+        new CompactionJobContext(
+            NameIdentifier.of("lake", "db", "events"),
+            Map.of("target_file_size_bytes", "1073741824"),
+            "compaction-job-template",
+            "binpack",
+            "",
+            columns,
+            partitioning,
+            partitions);
+    OptimizerConfig config =
+        new OptimizerConfig(
+            Map.of(OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX + "catalog_name", "ice"));
+
+    Map<String, String> conf =
+        GravitinoJobSubmitter.buildJobConfig(config, context, new GravitinoCompactionJobAdapter());
+
+    Assertions.assertEquals("ice", conf.get("catalog_name"));
+    Assertions.assertEquals(
+        "(`ice`.system.days(`ts`) = DATE '2026-01-01')", conf.get("where_clause"));
+  }
+
+  @Test
+  public void testStructInStructHyphenatedFieldWhere() {
+    Column[] columns =
+        new Column[] {
+          ColumnDTO.builder()
+              .withName("event")
+              .withDataType(
+                  Types.StructType.of(
+                      Types.StructType.Field.notNullField(
+                          "meta",
+                          Types.StructType.of(
+                              Types.StructType.Field.notNullField(
+                                  "user-id", Types.IntegerType.get())))))
+              .build()
+        };
+    Transform[] partitioning =
+        new Transform[] {Transforms.identity(new String[] {"event", "meta", "user-id"})};
+    List<PartitionPath> partitions =
+        List.of(PartitionPath.of(List.of(new PartitionEntryImpl("event.meta.user-id", "7"))));
+
+    Map<String, String> conf =
+        new GravitinoCompactionJobAdapter()
+            .jobConfig(
+                new CompactionJobContext(
+                    NameIdentifier.of("catalog", "db", "events"),
+                    Map.of("target_file_size_bytes", "1073741824"),
+                    "compaction-job-template",
+                    "binpack",
+                    "",
+                    columns,
+                    partitioning,
+                    partitions));
+
+    Assertions.assertEquals("(`event`.`meta`.`user-id` = 7)", conf.get("where_clause"));
+  }
+
+  private CompactionJobContext mockCompactionJobContext(String rewriteStrategy, String sortOrder) {
     String jobTemplateName = "compaction-job-template";
     Column[] columns = new Column[0];
     Transform[] partitioning = new Transform[0];
@@ -52,6 +173,8 @@ public class TestGravitinoCompactionJobAdapter {
         NameIdentifier.of("catalog", "db", "table"),
         jobOptions,
         jobTemplateName,
+        rewriteStrategy,
+        sortOrder,
         columns,
         partitioning,
         List.of());

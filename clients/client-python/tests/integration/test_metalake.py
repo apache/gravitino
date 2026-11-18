@@ -75,7 +75,7 @@ class TestMetalake(IntegrationTestEnv):
         metalake = self.create_metalake(self.metalake_name)
         self.assertEqual(metalake.name(), self.metalake_name)
         self.assertEqual(metalake.comment(), self.metalake_comment)
-        self.assertEqual(metalake.properties(), self.metalake_properties)
+        self.assert_properties_equal(self.metalake_properties, metalake.properties())
         self.assertEqual(metalake.audit_info().creator(), "anonymous")
 
     def create_metalake(self, metalake_name) -> GravitinoMetalake:
@@ -160,8 +160,8 @@ class TestMetalake(IntegrationTestEnv):
         self.assertIsNotNone(metalake)
         self.assertEqual(metalake.name(), self.metalake_name)
         self.assertEqual(metalake.comment(), self.metalake_comment)
-        self.assertEqual(
-            metalake.properties(), {**self.metalake_properties, "in-use": "true"}
+        self.assert_properties_equal(
+            {**self.metalake_properties, "in-use": "true"}, metalake.properties()
         )
         self.assertEqual(metalake.audit_info().creator(), "anonymous")
 

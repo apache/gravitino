@@ -83,6 +83,16 @@ public class FilesetVersionSQLProviderFactory {
     return getProvider().deleteFilesetVersionsByLegacyTimeline(legacyTimeline, limit);
   }
 
+  /**
+   * Returns SQL that finds the highest active snapshot version for a fileset.
+   *
+   * @param filesetId the fileset ID
+   * @return the maximum-version query for the configured database
+   */
+  public static String selectMaxFilesetVersion(@Param("filesetId") Long filesetId) {
+    return getProvider().selectMaxFilesetVersion(filesetId);
+  }
+
   public static String selectFilesetVersionsByRetentionCount(
       @Param("versionRetentionCount") Long versionRetentionCount) {
     return getProvider().selectFilesetVersionsByRetentionCount(versionRetentionCount);

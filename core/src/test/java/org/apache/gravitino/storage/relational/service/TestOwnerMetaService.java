@@ -41,15 +41,18 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
@@ -62,6 +65,52 @@ class TestOwnerMetaService extends TestJDBCBackend {
   private static final String TABLE_NAME = "table_for_owner_test";
   private static final String FILESET_NAME = "fileset_for_owner_test";
   private static final String TOPIC_NAME = "topic_for_owner_test";
+
+  /** Existing dotted tag/policy names support owner lookup and single/batch owner changes. */
+  @TestTemplate
+  void testOwnersForLegacyDottedNames() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            "legacy_owner",
+            AUDIT_INFO);
+    GroupEntity group =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(METALAKE_NAME),
+            "legacy_group",
+            AUDIT_INFO);
+    backend.insert(user, false);
+    backend.insert(group, false);
+    TagEntity tag = createAndInsertTagEntity("legacy.tag", "", METALAKE_NAME);
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "legacy.policy",
+            AUDIT_INFO);
+    backend.insert(policy, false);
+    OwnerMetaService service = OwnerMetaService.getInstance();
+    Map<NameIdentifier, Entity.EntityType> objects =
+        Map.of(
+            tag.nameIdentifier(), Entity.EntityType.TAG,
+            policy.nameIdentifier(), Entity.EntityType.POLICY);
+    for (Map.Entry<NameIdentifier, Entity.EntityType> object : objects.entrySet()) {
+      service.setOwner(object.getKey(), object.getValue(), user.nameIdentifier(), user.type());
+      UserEntity loadedUser =
+          (UserEntity) service.getOwner(object.getKey(), object.getValue()).orElseThrow();
+      Assertions.assertEquals(user.id(), loadedUser.id());
+      service.batchSetOwners(
+          List.of(object.getKey()), object.getValue(), group.nameIdentifier(), group.type());
+      GroupEntity loadedGroup =
+          (GroupEntity) service.getOwner(object.getKey(), object.getValue()).orElseThrow();
+      Assertions.assertEquals(group.id(), loadedGroup.id());
+      Assertions.assertEquals(
+          1, service.batchGetOwner(List.of(object.getKey()), object.getValue()).size());
+    }
+  }
 
   @TestTemplate
   void testDifferentOwners() throws IOException {
@@ -725,6 +774,113 @@ class TestOwnerMetaService extends TestJDBCBackend {
       Assertions.assertEquals(Entity.EntityType.SCHEMA, rel.sourceType());
       Assertions.assertEquals(Entity.EntityType.USER, rel.targetEntity().type());
     }
+  }
+
+  @TestTemplate
+  void testBatchGetOwnerWithGroupOwners() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    SchemaEntity schema1 = createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
+    SchemaEntity schema2 = createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME + "_2");
+    SchemaEntity schema3 = createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME + "_3");
+
+    GroupEntity group1 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(METALAKE_NAME),
+            "group1",
+            AUDIT_INFO);
+    GroupEntity group2 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(METALAKE_NAME),
+            "group2",
+            AUDIT_INFO);
+    backend.insert(group1, false);
+    backend.insert(group2, false);
+
+    OwnerMetaService.getInstance()
+        .setOwner(schema1.nameIdentifier(), schema1.type(), group1.nameIdentifier(), group1.type());
+    OwnerMetaService.getInstance()
+        .setOwner(schema2.nameIdentifier(), schema2.type(), group2.nameIdentifier(), group2.type());
+
+    List<RelationalEntity<?>> relations =
+        OwnerMetaService.getInstance()
+            .batchGetOwner(
+                List.of(
+                    schema1.nameIdentifier(), schema2.nameIdentifier(), schema3.nameIdentifier()),
+                Entity.EntityType.SCHEMA);
+
+    Assertions.assertEquals(2, relations.size());
+    Map<NameIdentifier, NameIdentifier> sourceToTarget =
+        relations.stream()
+            .collect(
+                Collectors.toMap(
+                    RelationalEntity::source,
+                    relation -> relation.targetEntity().nameIdentifier()));
+    Assertions.assertEquals(group1.nameIdentifier(), sourceToTarget.get(schema1.nameIdentifier()));
+    Assertions.assertEquals(group2.nameIdentifier(), sourceToTarget.get(schema2.nameIdentifier()));
+    Assertions.assertFalse(sourceToTarget.containsKey(schema3.nameIdentifier()));
+    relations.forEach(
+        relation -> {
+          Assertions.assertEquals(SupportsRelationOperations.Type.OWNER_REL, relation.type());
+          Assertions.assertEquals(Entity.EntityType.SCHEMA, relation.sourceType());
+          Assertions.assertEquals(Entity.EntityType.GROUP, relation.targetEntity().type());
+        });
+  }
+
+  @TestTemplate
+  void testBatchGetOwnerWithMixedOwnerTypes() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    SchemaEntity userOwnedSchema = createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
+    SchemaEntity groupOwnedSchema =
+        createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME + "_2");
+
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            "user",
+            AUDIT_INFO);
+    GroupEntity group =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(METALAKE_NAME),
+            "group",
+            AUDIT_INFO);
+    backend.insert(user, false);
+    backend.insert(group, false);
+
+    OwnerMetaService.getInstance()
+        .setOwner(
+            userOwnedSchema.nameIdentifier(),
+            userOwnedSchema.type(),
+            user.nameIdentifier(),
+            user.type());
+    OwnerMetaService.getInstance()
+        .setOwner(
+            groupOwnedSchema.nameIdentifier(),
+            groupOwnedSchema.type(),
+            group.nameIdentifier(),
+            group.type());
+
+    List<RelationalEntity<?>> relations =
+        OwnerMetaService.getInstance()
+            .batchGetOwner(
+                List.of(userOwnedSchema.nameIdentifier(), groupOwnedSchema.nameIdentifier()),
+                Entity.EntityType.SCHEMA);
+
+    Assertions.assertEquals(2, relations.size());
+    Map<NameIdentifier, Entity.EntityType> ownerTypes =
+        relations.stream()
+            .collect(
+                Collectors.toMap(
+                    RelationalEntity::source, relation -> relation.targetEntity().type()));
+    Assertions.assertEquals(
+        Entity.EntityType.USER, ownerTypes.get(userOwnedSchema.nameIdentifier()));
+    Assertions.assertEquals(
+        Entity.EntityType.GROUP, ownerTypes.get(groupOwnedSchema.nameIdentifier()));
   }
 
   @TestTemplate

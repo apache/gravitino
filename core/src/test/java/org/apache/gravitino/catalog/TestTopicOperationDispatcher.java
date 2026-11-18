@@ -22,6 +22,7 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.apache.gravitino.Entity.EntityType.SCHEMA;
+import static org.apache.gravitino.Entity.EntityType.TOPIC;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.apache.gravitino.TestCatalog.PROPERTY_KEY1;
@@ -33,6 +34,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -42,14 +44,19 @@ import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.meta.AuditInfo;
@@ -66,9 +73,9 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
   @BeforeAll
   public static void initialize() throws IOException, IllegalAccessException {
     schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     topicOperationDispatcher =
-        new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new TopicOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
 
     Config config = mock(Config.class);
     doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
@@ -164,14 +171,64 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
                 AuditInfo.builder().withCreator("gravitino").withCreateTime(Instant.now()).build())
             .build();
     doReturn(unmatchedEntity).when(entityStore).get(any(), eq(Entity.EntityType.TOPIC), any());
-    Topic loadedTopic4 = topicOperationDispatcher.loadTopic(topicIdent1);
-    // Succeed to import the topic entity
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () -> topicOperationDispatcher.loadTopic(topicIdent1));
+    Assertions.assertTrue(exception.getMessage().contains("topic " + topicIdent1));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("metadata-only unregister of an individual external topic"));
+    Assertions.assertTrue(exception.getMessage().contains("catalog-specific recovery guidance"));
+    verify(entityStore).put(any(TopicEntity.class), eq(false));
     reset(entityStore);
     TopicEntity topicEntity =
         entityStore.get(topicIdent1, Entity.EntityType.TOPIC, TopicEntity.class);
     Assertions.assertEquals("test", topicEntity.auditInfo().creator());
-    // Audit info is gotten from the catalog, not from the entity store
-    Assertions.assertEquals("test", loadedTopic4.auditInfo().creator());
+  }
+
+  @Test
+  public void testConcurrentImportTopicReusesExistingEntity() throws IOException {
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema_topic_concurrent_import");
+    NameIdentifier schemaIdent = NameIdentifier.of(topicNs.levels());
+    schemaOperationDispatcher.createSchema(
+        schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic_concurrent_import");
+    createTopicForLockTest(topicIdent);
+    TopicEntity importedTopicEntity = entityStore.get(topicIdent, TOPIC, TopicEntity.class);
+
+    reset(entityStore);
+    doThrow(new NoSuchEntityException("mock error"))
+        .doThrow(new NoSuchEntityException("mock error"))
+        .doReturn(importedTopicEntity)
+        .when(entityStore)
+        .get(any(), eq(TOPIC), any());
+    doThrow(new EntityAlreadyExistsException("mock conflict"))
+        .when(entityStore)
+        .put(any(TopicEntity.class), eq(false));
+
+    Topic loadedTopic =
+        Assertions.assertDoesNotThrow(() -> topicOperationDispatcher.loadTopic(topicIdent));
+    Assertions.assertEquals(topicIdent.name(), loadedTopic.name());
+  }
+
+  @Test
+  void testImportTopicAfterRegistrationDeletionReusesIdentifier() throws IOException {
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema_reimport_topic_identifier");
+    NameIdentifier schemaIdent = NameIdentifier.of(topicNs.levels());
+    schemaOperationDispatcher.createSchema(
+        schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic_reimport_identifier");
+    createTopicForLockTest(topicIdent);
+    TopicEntity topicEntity = entityStore.get(topicIdent, TOPIC, TopicEntity.class);
+    entityStore.delete(topicIdent, TOPIC);
+
+    reset(entityStore);
+    Assertions.assertDoesNotThrow(() -> topicOperationDispatcher.loadTopic(topicIdent));
+    Assertions.assertEquals(
+        topicEntity.id(), entityStore.get(topicIdent, TOPIC, TopicEntity.class).id());
+    verify(entityStore).put(any(TopicEntity.class), eq(false));
   }
 
   @Test
@@ -260,12 +317,78 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testImportTopicPropagatesOptimisticLockConflict() throws IOException {
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema_import_topic_occ");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
+    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic_import_occ");
+    topicOperationDispatcher.createTopic(topicIdent, "comment", null, props);
+    entityStore.delete(topicIdent, Entity.EntityType.TOPIC);
+
+    doThrow(new NoSuchEntityException(""))
+        .when(entityStore)
+        .get(any(), eq(Entity.EntityType.TOPIC), any());
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(entityStore)
+        .put(any(TopicEntity.class), anyBoolean());
+    try {
+      Assertions.assertThrows(
+          OptimisticLockException.class, () -> topicOperationDispatcher.loadTopic(topicIdent));
+    } finally {
+      reset(entityStore);
+    }
+  }
+
+  @Test
+  public void testImportTopicRejectsOversizedName() throws IOException {
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema_import_topic_long_name");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
+
+    // Create the topic directly in the catalog, as if it was created externally. A Kafka topic name
+    // can be longer than the topic_name column of the entity store.
+    NameIdentifier topicIdent =
+        NameIdentifier.of(topicNs, "t".repeat(EntityFieldLimits.MAX_NAME_LENGTH + 1));
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    ((TestCatalogOperations) testCatalog.ops()).createTopic(topicIdent, "comment", null, props);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> topicOperationDispatcher.loadTopic(topicIdent));
+    Assertions.assertEquals(
+        "The name of the topic must not exceed 128 characters", exception.getMessage());
+    Assertions.assertFalse(entityStore.exists(topicIdent, Entity.EntityType.TOPIC));
+  }
+
+  @Test
+  public void testDropTopicPropagatesOptimisticLockConflict() throws IOException {
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema_drop_topic_occ");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
+    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic_occ");
+    topicOperationDispatcher.createTopic(topicIdent, "comment", null, props);
+
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(entityStore)
+        .delete(any(), any(), anyBoolean());
+    try {
+      Assertions.assertThrows(
+          OptimisticLockException.class, () -> topicOperationDispatcher.dropTopic(topicIdent));
+    } finally {
+      reset(entityStore);
+    }
+  }
+
+  @Test
   public void testCreateTopicNeedImportingSchema() throws IOException {
     Namespace topicNs = Namespace.of(metalake, catalog, "schema161");
     NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic61");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
     TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
     testCatalogOperations.createSchema(
         NameIdentifier.of(topicNs.levels()), "", Collections.emptyMap());
@@ -274,11 +397,99 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertTrue(entityStore.exists(topicIdent, Entity.EntityType.TOPIC));
   }
 
+  @Test
+  public void testCreateAndAlterTopicRejectMaskedPlaceholder() throws IOException {
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema_masked_topic");
+    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic_masked");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(topicNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    Map<String, String> createProps =
+        ImmutableMap.of("k1", HiddenPropertyMaskUtils.MASKED_VALUE, "k2", "v2");
+    testMaskedPlaceholderRejected(
+        () -> topicOperationDispatcher.createTopic(topicIdent, "comment", null, createProps), "k1");
+
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    topicOperationDispatcher.createTopic(topicIdent, "comment", null, props);
+    testMaskedPlaceholderRejected(
+        () ->
+            topicOperationDispatcher.alterTopic(
+                topicIdent, TopicChange.setProperty("k3", HiddenPropertyMaskUtils.MASKED_VALUE)),
+        "k3");
+  }
+
   public static SchemaOperationDispatcher getSchemaOperationDispatcher() {
     return schemaOperationDispatcher;
   }
 
   public static TopicOperationDispatcher getTopicOperationDispatcher() {
     return topicOperationDispatcher;
+  }
+
+  @Test
+  public void testCreateTopicRunsConcurrentlyWithCreateTopicOfAnotherTopic() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_topic_lock_1");
+    createSchemaForLockTest(schemaIdent);
+
+    // Another in-flight create holds the WRITE lock on its own topic node.
+    try (TreeLockTestSupport.HeldLock inFlightCreate =
+        TreeLockTestSupport.HeldLock.acquire(
+            NameIdentifier.of(metalake, catalog, "schema_topic_lock_1", "other_topic"),
+            LockType.WRITE)) {
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          inFlightCreate,
+          () ->
+              createTopicForLockTest(
+                  NameIdentifier.of(metalake, catalog, "schema_topic_lock_1", "topic1")));
+    }
+  }
+
+  @Test
+  public void testCreateTopicWaitsForCreateTopicOfSameName() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_topic_lock_2");
+    createSchemaForLockTest(schemaIdent);
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_topic_lock_2", "topic1");
+
+    TreeLockTestSupport.HeldLock sameNameCreate =
+        TreeLockTestSupport.HeldLock.acquire(ident, LockType.WRITE);
+    TreeLockTestSupport.assertWaitsFor(sameNameCreate, () -> createTopicForLockTest(ident));
+  }
+
+  @Test
+  public void testCreateTopicWaitsForSchemaWriteLock() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_topic_lock_3");
+    createSchemaForLockTest(schemaIdent);
+
+    TreeLockTestSupport.HeldLock schemaWriter =
+        TreeLockTestSupport.HeldLock.acquire(schemaIdent, LockType.WRITE);
+    TreeLockTestSupport.assertWaitsFor(
+        schemaWriter,
+        () ->
+            createTopicForLockTest(
+                NameIdentifier.of(metalake, catalog, "schema_topic_lock_3", "topic1")));
+  }
+
+  @Test
+  public void testCreateTopicWaitsForCatalogWriteLock() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_topic_lock_4");
+    createSchemaForLockTest(schemaIdent);
+
+    TreeLockTestSupport.HeldLock catalogWriter =
+        TreeLockTestSupport.HeldLock.acquire(NameIdentifier.of(metalake, catalog), LockType.WRITE);
+    TreeLockTestSupport.assertWaitsFor(
+        catalogWriter,
+        () ->
+            createTopicForLockTest(
+                NameIdentifier.of(metalake, catalog, "schema_topic_lock_4", "topic1")));
+  }
+
+  private static void createSchemaForLockTest(NameIdentifier schemaIdent) {
+    schemaOperationDispatcher.createSchema(
+        schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+  }
+
+  private static Topic createTopicForLockTest(NameIdentifier ident) {
+    return topicOperationDispatcher.createTopic(
+        ident, "comment", null, ImmutableMap.of("k1", "v1", "k2", "v2"));
   }
 }

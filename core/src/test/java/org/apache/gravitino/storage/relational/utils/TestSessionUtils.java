@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.utils;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 
@@ -28,6 +29,16 @@ import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
 public class TestSessionUtils {
+
+  @Test
+  public void testIsInTransactionDelegatesToSqlSessions() {
+    try (MockedStatic<SqlSessions> mockedSqlSessions = mockStatic(SqlSessions.class)) {
+      mockedSqlSessions.when(SqlSessions::hasActiveSession).thenReturn(true);
+
+      assertTrue(SessionUtils.isInTransaction());
+      mockedSqlSessions.verify(SqlSessions::hasActiveSession);
+    }
+  }
 
   @Test
   public void testDoWithCommitShouldRollbackOnAssertionError() {

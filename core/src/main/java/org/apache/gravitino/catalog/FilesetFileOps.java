@@ -34,10 +34,16 @@ public interface FilesetFileOps {
   /**
    * List the files in a fileset with a specific location name and sub path.
    *
+   * <p>Leading and trailing whitespace in the sub path is trimmed. An empty path or {@code /}
+   * refers to the selected storage location. A leading slash is relative to that location.
+   *
    * @param ident A fileset identifier.
    * @param locationName The location name. If null, the default location will be used.
    * @param subPath The sub path under the fileset.
    * @return An array of file information objects.
+   * @throws IllegalArgumentException If the sub path contains a complete {@code ..} path segment or
+   *     a NUL character ({@code U+0000}), resolves outside the selected storage location, or refers
+   *     to a path that does not exist.
    */
   default FileInfo[] listFiles(NameIdentifier ident, String locationName, String subPath)
       throws NoSuchFilesetException, IOException {

@@ -66,6 +66,7 @@ import org.mockito.Mockito;
 public class TestMemoryEntityStore {
 
   public static class InMemoryEntityStore implements EntityStore {
+
     private final Map<NameIdentifier, Entity> entityMap;
     private final Lock lock;
 

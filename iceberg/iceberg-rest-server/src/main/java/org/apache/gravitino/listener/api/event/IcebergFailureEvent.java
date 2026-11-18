@@ -53,8 +53,9 @@ public abstract class IcebergFailureEvent extends FailureEvent {
     return icebergRequestContext.remoteHostName();
   }
 
+  /** {@inheritDoc} */
   @Override
-  public Map<String, String> customInfo() {
-    return icebergRequestContext.httpHeaders();
+  protected Map<String, String> ownCustomInfo() {
+    return icebergRequestContext.customInfo();
   }
 }

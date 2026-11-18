@@ -26,11 +26,13 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.OAuth2ErrorResponse;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
+import org.apache.gravitino.exceptions.BackingTagAlreadyBoundException;
 import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.DomainAlreadyExistsException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.FunctionAlreadyExistsException;
@@ -39,6 +41,7 @@ import org.apache.gravitino.exceptions.IllegalJobTemplateOperationException;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
+import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.IllegalStatisticNameException;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
@@ -48,6 +51,7 @@ import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchFunctionException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -63,22 +67,27 @@ import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
+import org.apache.gravitino.exceptions.NonEmptyDomainException;
 import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
+import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
@@ -230,6 +239,15 @@ public class ErrorHandlers {
   }
 
   /**
+   * Returns the error handler for domain operations.
+   *
+   * @return The domain error handler.
+   */
+  public static Consumer<ErrorResponse> domainErrorHandler() {
+    return DomainErrorHandler.INSTANCE;
+  }
+
+  /**
    * Creates an error handler specific to policy operations.
    *
    * @return A Consumer representing the policy error handler.
@@ -245,6 +263,15 @@ public class ErrorHandlers {
    */
   public static Consumer<ErrorResponse> credentialErrorHandler() {
     return CredentialErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to secret property operations.
+   *
+   * @return A Consumer representing the secret error handler.
+   */
+  public static Consumer<ErrorResponse> secretErrorHandler() {
+    return SecretErrorHandler.INSTANCE;
   }
 
   /**
@@ -290,6 +317,15 @@ public class ErrorHandlers {
    */
   public static Consumer<ErrorResponse> functionErrorHandler() {
     return FunctionErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to Semantic Model operations.
+   *
+   * @return A Consumer representing the Semantic Model error handler.
+   */
+  public static Consumer<ErrorResponse> semanticModelErrorHandler() {
+    return SemanticModelErrorHandler.INSTANCE;
   }
 
   private ErrorHandlers() {}
@@ -562,6 +598,9 @@ public class ErrorHandlers {
         case ErrorConstants.CONNECTION_FAILED_CODE:
           throw new ConnectionFailedException(errorMessage);
 
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
+
         case ErrorConstants.NOT_FOUND_CODE:
           if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
             throw new NoSuchMetalakeException(errorMessage);
@@ -786,6 +825,9 @@ public class ErrorHandlers {
 
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new TopicAlreadyExistsException(errorMessage);
+
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
 
         case ErrorConstants.FORBIDDEN_CODE:
           throw new ForbiddenException(errorMessage);
@@ -1036,6 +1078,71 @@ public class ErrorHandlers {
     }
   }
 
+  /** Error handler specific to secret property operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class SecretErrorHandler extends RestErrorHandler {
+
+    private static final SecretErrorHandler INSTANCE = new SecretErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
+            throw new NoSuchMetalakeException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to domain operations. */
+  private static class DomainErrorHandler extends TagErrorHandler {
+    private static final DomainErrorHandler INSTANCE = new DomainErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse response) {
+      String message = formatErrorMessage(response);
+      if (response.getCode() == ErrorConstants.NOT_FOUND_CODE) {
+        if (response.getType().equals(NoSuchDomainException.class.getSimpleName())) {
+          throw new NoSuchDomainException("%s", message);
+        }
+        if (response.getType().equals(NoSuchMetadataObjectException.class.getSimpleName())) {
+          throw new NoSuchMetadataObjectException("%s", message);
+        }
+      }
+      if (response.getCode() == ErrorConstants.ALREADY_EXISTS_CODE) {
+        if (response.getType().equals(DomainAlreadyExistsException.class.getSimpleName())) {
+          throw new DomainAlreadyExistsException("%s", message);
+        }
+        if (response.getType().equals(BackingTagAlreadyBoundException.class.getSimpleName())) {
+          throw new BackingTagAlreadyBoundException("%s", message);
+        }
+      }
+      if ((response.getCode() == ErrorConstants.UNSUPPORTED_OPERATION_CODE
+              || response.getCode() == ErrorConstants.NON_EMPTY_CODE)
+          && response.getType().equals(NonEmptyDomainException.class.getSimpleName())) {
+        throw new NonEmptyDomainException("%s", message);
+      }
+      super.accept(response);
+    }
+  }
+
   /** Error handler specific to Tag operations. */
   @SuppressWarnings("FormatStringAnnotation")
   private static class TagErrorHandler extends RestErrorHandler {
@@ -1066,6 +1173,10 @@ public class ErrorHandlers {
               .getType()
               .equals(TagAlreadyAssociatedException.class.getSimpleName())) {
             throw new TagAlreadyAssociatedException(errorMessage);
+          } else if (errorResponse
+              .getType()
+              .equals(PolicyAlreadyAssociatedException.class.getSimpleName())) {
+            throw new PolicyAlreadyAssociatedException(errorMessage);
           } else {
             throw new AlreadyExistsException(errorMessage);
           }
@@ -1374,6 +1485,15 @@ public class ErrorHandlers {
 
     @Override
     public void accept(ErrorResponse errorResponse) {
+      if (errorResponse.getCode() == ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE) {
+        throw new OptimisticLockException("%s", formatErrorMessage(errorResponse));
+      }
+      if (errorResponse.getCode() == ErrorConstants.SERVICE_UNAVAILABLE_CODE) {
+        throw new ServiceUnavailableException("%s", formatErrorMessage(errorResponse));
+      }
+      if (errorResponse.getCode() == ErrorConstants.CONNECTION_FAILED_CODE) {
+        throw new ConnectionFailedException("%s", formatErrorMessage(errorResponse));
+      }
       if (errorResponse.getCode() == ErrorConstants.FORBIDDEN_CODE) {
         throw new ForbiddenException("Forbidden error :%s", errorResponse.getMessage());
       }
@@ -1435,6 +1555,76 @@ public class ErrorHandlers {
           } else {
             throw new NotInUseException(errorMessage);
           }
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to Semantic Model operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class SemanticModelErrorHandler extends RestErrorHandler {
+
+    private static final SemanticModelErrorHandler INSTANCE = new SemanticModelErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          if (IllegalSemanticModelException.class.getSimpleName().equals(errorResponse.getType())) {
+            throw new IllegalSemanticModelException(errorMessage);
+          }
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (NoSuchMetadataObjectException.class.getSimpleName().equals(errorResponse.getType())) {
+            throw new NoSuchMetadataObjectException(errorMessage);
+          }
+          if (NoSuchMetalakeException.class.getSimpleName().equals(errorResponse.getType())) {
+            throw new NoSuchMetalakeException(errorMessage);
+          } else if (NoSuchCatalogException.class.getSimpleName().equals(errorResponse.getType())) {
+            throw new NoSuchCatalogException(errorMessage);
+          } else if (NoSuchSchemaException.class.getSimpleName().equals(errorResponse.getType())) {
+            throw new NoSuchSchemaException(errorMessage);
+          } else if (NoSuchSemanticModelException.class
+              .getSimpleName()
+              .equals(errorResponse.getType())) {
+            throw new NoSuchSemanticModelException(errorMessage);
+          }
+          throw new NotFoundException(errorMessage);
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          if (SemanticModelAlreadyExistsException.class
+              .getSimpleName()
+              .equals(errorResponse.getType())) {
+            throw new SemanticModelAlreadyExistsException(errorMessage);
+          }
+          throw new AlreadyExistsException(errorMessage);
+
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
+
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        case ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE:
+          throw new OptimisticLockException(errorMessage);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (CatalogNotInUseException.class.getSimpleName().equals(errorResponse.getType())) {
+            throw new CatalogNotInUseException(errorMessage);
+          } else if (MetalakeNotInUseException.class
+              .getSimpleName()
+              .equals(errorResponse.getType())) {
+            throw new MetalakeNotInUseException(errorMessage);
+          }
+          throw new NotInUseException(errorMessage);
 
         default:
           super.accept(errorResponse);

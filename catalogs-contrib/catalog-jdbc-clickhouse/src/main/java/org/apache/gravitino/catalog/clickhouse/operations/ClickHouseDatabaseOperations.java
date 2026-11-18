@@ -43,6 +43,7 @@ import org.apache.gravitino.catalog.jdbc.JdbcSchema;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.meta.AuditInfo;
 
 public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
@@ -64,6 +65,15 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
   @Override
   protected Set<String> createSysDatabaseNameSet() {
     return CLICK_HOUSE_SYSTEM_DATABASES;
+  }
+
+  @Override
+  protected String generateDatabaseExistSql(String databaseName) {
+    // Escape single quotes to prevent SQL injection.
+    // JdbcDatabaseOperations#exist executes this query via Statement (no parameters), so we must
+    // escape values embedded in string literals.
+    String escaped = escapeSingleQuotes(databaseName);
+    return String.format("SELECT name FROM system.databases WHERE name = '%s'", escaped);
   }
 
   @Override
@@ -96,7 +106,7 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
     String originComment = StringIdentifier.removeIdFromComment(comment);
     if (!supportSchemaComment() && StringUtils.isNotEmpty(originComment)) {
       throw new UnsupportedOperationException(
-          "Doesn't support setting schema comment: " + originComment);
+          "Schema " + databaseName + ": catalog does not support schema comments");
     }
 
     StringBuilder createDatabaseSql =
@@ -123,7 +133,7 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
     String originComment = StringIdentifier.removeIdFromComment(comment);
     if (!supportSchemaComment() && StringUtils.isNotEmpty(originComment)) {
       throw new UnsupportedOperationException(
-          "Doesn't support setting schema comment: " + originComment);
+          "Schema " + databaseName + ": catalog does not support schema comments");
     }
 
     try (final Connection connection = getConnection()) {
@@ -187,10 +197,8 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
           checkStmt.setString(1, databaseName);
           try (ResultSet rs = checkStmt.executeQuery()) {
             if (rs.next()) {
-              throw new IllegalArgumentException(
-                  String.format(
-                      "Database %s is not empty, you can drop it with CASCADE option.",
-                      databaseName));
+              throw new NonEmptySchemaException(
+                  "Database %s is not empty, you can drop it with CASCADE option.", databaseName);
             }
           }
         }

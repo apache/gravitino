@@ -1,0 +1,83 @@
+CREATE SCHEMA
+
+CREATE TABLE
+
+INSERT: 2 rows
+
+CREATE VIEW
+
+"t01"
+"v01"
+
+"2","bob"
+
+"CREATE VIEW gt_hive.gt_hive_view_db.v01 SECURITY DEFINER AS
+SELECT
+  id
+, name
+FROM
+  gt_hive.gt_hive_view_db.t01
+WHERE (salary > 100)"
+
+CREATE VIEW
+
+"1","alice","100"
+"2","bob","200"
+
+RENAME VIEW
+
+"t01"
+"v02"
+
+DROP VIEW
+
+"t01"
+
+USE
+
+CREATE VIEW
+
+USE
+
+"2","bob"
+
+DROP VIEW
+
+<QUERY_FAILED> View 'gt_hive.gt_hive_view_db.nonexistent_view' does not exist
+
+<QUERY_FAILED> Table already exists: 'gt_hive.gt_hive_view_db.t01'
+
+CREATE VIEW
+
+"native_v01"
+"t01"
+
+"1","alice"
+"2","bob"
+
+DROP VIEW
+
+CREATE TABLE
+
+INSERT: 2 rows
+
+CREATE VIEW
+
+"CREATE VIEW native_hive.gt_hive_view_db.v04 SECURITY DEFINER AS
+SELECT
+  id
+, name
+, created_at
+FROM
+  gt_hive.gt_hive_view_db.t02
+WHERE (id = 2)"
+
+"2","bob","2024-01-02 00:00:00.000"
+
+DROP VIEW
+
+DROP TABLE
+
+DROP TABLE
+
+DROP SCHEMA

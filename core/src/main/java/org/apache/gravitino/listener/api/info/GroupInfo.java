@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.info;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.Group;
@@ -26,6 +27,7 @@ import org.apache.gravitino.authorization.Group;
 /** Provides read-only access to group information for event listeners. */
 @DeveloperApi
 public class GroupInfo {
+  private final Long id;
   private final String name;
   private List<String> roles;
 
@@ -35,8 +37,18 @@ public class GroupInfo {
    * @param group the {@link Group} object from which to create the {@link GroupInfo}.
    */
   public GroupInfo(Group group) {
+    this.id = Preconditions.checkNotNull(group.id(), "group id");
     this.name = group.name();
     this.roles = group.roles();
+  }
+
+  /**
+   * Returns the Gravitino-assigned id of the group.
+   *
+   * @return the group id
+   */
+  public Long id() {
+    return id;
   }
 
   /**
@@ -49,7 +61,7 @@ public class GroupInfo {
   }
 
   /**
-   * Returns the roles of the roles.
+   * Returns the roles of the group.
    *
    * @return The roles of the group.
    */

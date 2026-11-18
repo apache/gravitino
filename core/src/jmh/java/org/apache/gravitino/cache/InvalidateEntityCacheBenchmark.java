@@ -21,7 +21,6 @@ package org.apache.gravitino.cache;
 
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.meta.ModelEntity;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Setup;
@@ -49,7 +48,7 @@ public class InvalidateEntityCacheBenchmark extends AbstractEntityBenchmark {
   @Setup(Level.Invocation)
   @SuppressWarnings("unchecked")
   public void prepareCacheForClear() {
-    entities.forEach(e -> cache.put((ModelEntity) e));
+    entities.forEach(e -> cache.put(e));
   }
 
   @Benchmark

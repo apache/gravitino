@@ -27,12 +27,15 @@ import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rest.RESTRequest;
+import org.apache.gravitino.tag.TagValueConstraint;
 
 /** Represents a request to create a tag. */
 @Getter
 @EqualsAndHashCode
 @ToString
 public class TagCreateRequest implements RESTRequest {
+
+  private static final int MAX_ALLOWED_VALUE_LENGTH = 256;
 
   @JsonProperty("name")
   private final String name;
@@ -45,6 +48,10 @@ public class TagCreateRequest implements RESTRequest {
   @Nullable
   private Map<String, String> properties;
 
+  @JsonProperty("allowedValues")
+  @Nullable
+  private final String[] allowedValues;
+
   /**
    * Creates a new TagCreateRequest.
    *
@@ -53,14 +60,43 @@ public class TagCreateRequest implements RESTRequest {
    * @param properties The properties of the tag.
    */
   public TagCreateRequest(String name, String comment, Map<String, String> properties) {
+    this(name, comment, properties, null);
+  }
+
+  /**
+   * Creates a new TagCreateRequest.
+   *
+   * @param name The name of the tag.
+   * @param comment The comment of the tag.
+   * @param properties The properties of the tag.
+   * @param allowedValues The allowed assignment values of the tag.
+   */
+  public TagCreateRequest(
+      String name, String comment, Map<String, String> properties, String[] allowedValues) {
     this.name = name;
     this.comment = comment;
     this.properties = properties;
+    this.allowedValues = allowedValues;
   }
 
   /** This is the constructor that is used by Jackson deserializer */
   public TagCreateRequest() {
-    this(null, null, null);
+    this(null, null, null, null);
+  }
+
+  /**
+   * Returns the tag value constraint represented by this request.
+   *
+   * @return The tag value constraint.
+   */
+  public TagValueConstraint valueConstraint() {
+    if (allowedValues == null) {
+      return TagValueConstraint.anyValue();
+    }
+    if (allowedValues.length == 0) {
+      return TagValueConstraint.noValue();
+    }
+    return TagValueConstraint.ofAllowedValues(allowedValues);
   }
 
   /**
@@ -72,5 +108,16 @@ public class TagCreateRequest implements RESTRequest {
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "\"name\" is required and cannot be empty");
+
+    if (allowedValues != null) {
+      for (String value : allowedValues) {
+        Preconditions.checkArgument(
+            StringUtils.isNotBlank(value), "allowedValues cannot contain null or empty values");
+        Preconditions.checkArgument(
+            value.length() <= MAX_ALLOWED_VALUE_LENGTH,
+            "Each allowed value must not exceed %s characters",
+            MAX_ALLOWED_VALUE_LENGTH);
+      }
+    }
   }
 }

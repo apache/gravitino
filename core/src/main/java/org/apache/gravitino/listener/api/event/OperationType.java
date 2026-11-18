@@ -27,11 +27,45 @@ public enum OperationType {
   LOAD_TABLE,
   LOAD_TABLE_CREDENTIAL,
   PLAN_TABLE_SCAN,
+  FETCH_SCAN_TASKS,
   LIST_TABLE,
   ALTER_TABLE,
   RENAME_TABLE,
   REGISTER_TABLE,
   TABLE_EXISTS,
+  REPORT_TABLE_METRICS,
+
+  // Domain operations
+  /** Domain operation: ListDomains. */
+  LIST_DOMAIN,
+  /** Domain operation: ListDomainsInfo. */
+  LIST_DOMAINS_INFO,
+  /** Domain operation: GetDomain. */
+  GET_DOMAIN,
+  /** Domain operation: CreateDomain. */
+  CREATE_DOMAIN,
+  /** Domain operation: AlterDomain. */
+  ALTER_DOMAIN,
+  /** Domain operation: DeleteDomain. */
+  DELETE_DOMAIN,
+  /** Domain operation: PublishDomain. */
+  PUBLISH_DOMAIN,
+  /** Domain operation: UnpublishDomain. */
+  UNPUBLISH_DOMAIN,
+  /** Domain operation: UpdateDomainBackingTag. */
+  UPDATE_DOMAIN_BACKING_TAG,
+  /** Domain operation: AttachDomain. */
+  ATTACH_DOMAIN,
+  /** Domain operation: DetachDomain. */
+  DETACH_DOMAIN,
+  /** Domain operation: ListSubdomains. */
+  LIST_SUBDOMAINS,
+  /** Domain operation: ListSubdomainsInfo. */
+  LIST_SUBDOMAINS_INFO,
+  /** Domain operation: ListDomainMembers. */
+  LIST_DOMAIN_MEMBERS,
+  /** Domain operation: ListDomainsForMetadataObject. */
+  LIST_DOMAINS_FOR_METADATA_OBJECT,
 
   // Tag operations
   CREATE_TAG,
@@ -45,6 +79,8 @@ public enum OperationType {
   LIST_TAGS_INFO_FOR_METADATA_OBJECT,
   LIST_METADATA_OBJECTS_FOR_TAG,
   LIST_TAGS_INFO,
+  ADD_POLICY_FOR_TAG,
+  REMOVE_POLICY_FROM_TAG,
 
   // Schema operations
   CREATE_SCHEMA,
@@ -71,6 +107,7 @@ public enum OperationType {
   LIST_CATALOG,
   ENABLE_CATALOG,
   DISABLE_CATALOG,
+  TEST_CONNECTION_CATALOG,
 
   // Partition event
   ADD_PARTITION,
@@ -99,6 +136,7 @@ public enum OperationType {
 
   // View event
   CREATE_VIEW,
+  REGISTER_VIEW,
   ALTER_VIEW,
   REPLACE_VIEW,
   DROP_VIEW,
@@ -128,7 +166,16 @@ public enum OperationType {
   ADD_USER,
   REMOVE_USER,
   GET_USER,
+  GET_USER_BY_EXTERNAL_ID,
+  REMOVE_USER_BY_EXTERNAL_ID,
+  GET_USER_BY_ID,
+  REMOVE_USER_BY_ID,
+  ALTER_USER,
+  ENABLE_USER,
+  DISABLE_USER,
   LIST_USERS,
+  LIST_USERS_PAGED,
+  COUNT_USERS,
   LIST_USER_NAMES,
   GRANT_USER_ROLES,
   REVOKE_USER_ROLES,
@@ -137,7 +184,14 @@ public enum OperationType {
   ADD_GROUP,
   REMOVE_GROUP,
   GET_GROUP,
+  GET_GROUP_BY_EXTERNAL_ID,
+  REMOVE_GROUP_BY_EXTERNAL_ID,
+  GET_GROUP_BY_ID,
+  REMOVE_GROUP_BY_ID,
+  ALTER_GROUP,
   LIST_GROUPS,
+  LIST_GROUPS_PAGED,
+  COUNT_GROUPS,
   LIST_GROUP_NAMES,
   GRANT_GROUP_ROLES,
   REVOKE_GROUP_ROLES,
@@ -188,6 +242,23 @@ public enum OperationType {
   LIST_POLICY_INFOS_FOR_METADATA_OBJECT,
   ASSOCIATE_POLICIES_FOR_METADATA_OBJECT,
   GET_POLICY_FOR_METADATA_OBJECT,
+
+  // Semantic Model operations
+  CREATE_SEMANTIC_MODEL,
+  ALTER_SEMANTIC_MODEL,
+  DROP_SEMANTIC_MODEL,
+  LOAD_SEMANTIC_MODEL,
+  LIST_SEMANTIC_MODEL,
+  /** List identifiers of metrics contained in Semantic Models. */
+  LIST_SEMANTIC_MODEL_METRIC,
+  /** Lists datasets associated with a source table or View. */
+  LIST_SEMANTIC_MODEL_DATASETS_BY_SOURCE,
+  /** List complete metrics contained in Semantic Models. */
+  LIST_SEMANTIC_MODEL_METRIC_INFOS,
+  /** Import a Semantic Model from an Ossie document. */
+  IMPORT_SEMANTIC_MODEL,
+  /** Export a Semantic Model as an Ossie document. */
+  EXPORT_SEMANTIC_MODEL,
 
   // Function operations
   REGISTER_FUNCTION,

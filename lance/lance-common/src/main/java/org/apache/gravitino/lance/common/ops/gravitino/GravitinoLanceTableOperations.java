@@ -50,6 +50,7 @@ import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.lance.namespace.errors.InvalidInputException;
 import org.lance.namespace.errors.TableNotFoundException;
 import org.lance.namespace.model.AlterTableAlterColumnsRequest;
 import org.lance.namespace.model.AlterTableDropColumnsRequest;
@@ -129,7 +130,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
     Table table;
     try {
-      table = catalog.asTableCatalog().loadTable(tableIdentifier);
+      table = loadAndValidateLanceTable(catalog, tableIdentifier, tableId);
     } catch (NoSuchTableException e) {
       throw new TableNotFoundException(
           "Table not found: " + tableId, CommonUtil.formatCurrentStackTrace(), tableId);
@@ -146,7 +147,8 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
             .map(Long::valueOf)
             .orElse(null));
     response.setStorageOptions(
-        LancePropertiesUtils.resolveLanceStorageOptions(catalog.properties(), table.properties()));
+        LancePropertiesUtils.resolveLanceStorageOptions(
+            namespaceWrapper.propsWithSecrets(catalog), table.properties()));
     response.setManagedVersioning(false);
     if (checkDeclared) {
       response.setIsOnlyDeclared(
@@ -167,11 +169,11 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     Preconditions.checkArgument(
         nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
 
-    // Parser column information.
+    // Reject unsupported record batches before any metadata or storage mutation.
     List<Column> columns = Lists.newArrayList();
     if (arrowStreamBody != null) {
       org.apache.arrow.vector.types.pojo.Schema schema =
-          ArrowUtils.parseArrowIpcStream(arrowStreamBody);
+          ArrowUtils.parseSchemaOnlyIpcStream(arrowStreamBody);
       columns = extractColumns(schema);
     }
 
@@ -194,13 +196,14 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
     // Single call - mode is handled server-side
     Table t =
-        catalog
-            .asTableCatalog()
+        namespaceWrapper
+            .asTableCatalog(catalog)
             .createTable(
                 tableIdentifier, columns.toArray(new Column[0]), null, createTableProperties);
     Map<String, String> properties = t.properties();
     Map<String, String> effectiveStorageOptions =
-        LancePropertiesUtils.resolveLanceStorageOptions(catalog.properties(), properties);
+        LancePropertiesUtils.resolveLanceStorageOptions(
+            namespaceWrapper.propsWithSecrets(catalog), properties);
 
     CreateTableResponse response = new CreateTableResponse();
     response.setStorageOptions(effectiveStorageOptions);
@@ -252,8 +255,8 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
     // Single call - mode is handled server-side
     Table t =
-        catalog
-            .asTableCatalog()
+        namespaceWrapper
+            .asTableCatalog(catalog)
             .createTable(tableIdentifier, new Column[] {}, null, copiedTableProperties);
 
     RegisterTableResponse response = new RegisterTableResponse();
@@ -275,14 +278,25 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
         NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
     Table t;
     try {
-      t = catalog.asTableCatalog().loadTable(tableIdentifier);
+      t = loadAndValidateLanceTable(catalog, tableIdentifier, tableId);
     } catch (NoSuchTableException e) {
       throw new TableNotFoundException(
           "Table not found: " + tableId, CommonUtil.formatCurrentStackTrace(), tableId);
     }
     Map<String, String> properties = t.properties();
-    // TODO Support real deregister API.
-    boolean result = catalog.asTableCatalog().dropTable(tableIdentifier);
+
+    // Verify the table is external before deregistering. For non-external (managed) tables,
+    // dropTable would delete the underlying Lance data, violating the deregister contract
+    // ("It will not delete the underlying lance data"). The TableCatalog interface does not
+    // expose a metadata-only removal path, so we fail fast rather than risk silent data loss.
+    boolean external = LancePropertiesUtils.isExternalTable(properties);
+    if (!external) {
+      throw new UnsupportedOperationException(
+          "deregisterTable only supports external tables, but table " + tableId + " is managed");
+    }
+
+    // External tables: dropTable removes catalog metadata only, preserving Lance data.
+    boolean result = namespaceWrapper.asTableCatalog(catalog).dropTable(tableIdentifier);
     if (!result) {
       throw new TableNotFoundException(
           "Table not found: " + tableId, CommonUtil.formatCurrentStackTrace(), tableId);
@@ -307,7 +321,16 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     NameIdentifier tableIdentifier =
         NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
 
-    return catalog.asTableCatalog().tableExists(tableIdentifier);
+    try {
+      return LancePropertiesUtils.isLanceTableFormat(
+          namespaceWrapper
+              .asTableCatalog(catalog)
+              .loadTable(tableIdentifier)
+              .properties()
+              .get(Table.PROPERTY_TABLE_FORMAT));
+    } catch (NoSuchTableException e) {
+      return false;
+    }
   }
 
   @Override
@@ -324,13 +347,13 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
     Table table;
     try {
-      table = catalog.asTableCatalog().loadTable(tableIdentifier);
+      table = loadAndValidateLanceTable(catalog, tableIdentifier, tableId);
     } catch (NoSuchTableException e) {
       throw new TableNotFoundException(
           "Table not found: " + tableId, CommonUtil.formatCurrentStackTrace(), tableId);
     }
 
-    boolean deleted = catalog.asTableCatalog().purgeTable(tableIdentifier);
+    boolean deleted = namespaceWrapper.asTableCatalog(catalog).purgeTable(tableIdentifier);
     if (!deleted) {
       throw new TableNotFoundException(
           "Table not found: " + tableId, CommonUtil.formatCurrentStackTrace(), tableId);
@@ -362,7 +385,8 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     }
     TableChange[] changes = handler.buildGravitinoTableChange(request);
 
-    Table table = catalog.asTableCatalog().alterTable(tableIdentifier, changes);
+    loadAndValidateLanceTable(catalog, tableIdentifier, tableId);
+    Table table = namespaceWrapper.asTableCatalog(catalog).alterTable(tableIdentifier, changes);
 
     return handler.handle(table, request);
   }
@@ -371,6 +395,17 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
   private static <REQUEST, RESPONSE> GravitinoLanceTableAlterHandler<REQUEST, RESPONSE> getHandler(
       Class<?> requestClass) {
     return (GravitinoLanceTableAlterHandler<REQUEST, RESPONSE>) ALTER_HANDLERS.get(requestClass);
+  }
+
+  private Table loadAndValidateLanceTable(
+      Catalog catalog, NameIdentifier tableIdentifier, String tableId) {
+    Table table = namespaceWrapper.asTableCatalog(catalog).loadTable(tableIdentifier);
+    if (!LancePropertiesUtils.isLanceTableFormat(
+        table.properties().get(Table.PROPERTY_TABLE_FORMAT))) {
+      throw new InvalidInputException(
+          "Table is not a Lance table: " + tableId, CommonUtil.formatCurrentStackTrace(), tableId);
+    }
+    return table;
   }
 
   private List<Column> extractColumns(org.apache.arrow.vector.types.pojo.Schema arrowSchema) {

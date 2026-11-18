@@ -21,6 +21,8 @@ package org.apache.gravitino.dto.responses;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -46,9 +48,11 @@ import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.authorization.UserDTO;
 import org.apache.gravitino.dto.model.ModelDTO;
 import org.apache.gravitino.dto.model.ModelVersionDTO;
+import org.apache.gravitino.dto.policy.PolicyDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.TableDTO;
 import org.apache.gravitino.dto.rel.partitioning.Partitioning;
+import org.apache.gravitino.dto.secret.SecretProviderDTO;
 import org.apache.gravitino.dto.stats.PartitionStatisticsDTO;
 import org.apache.gravitino.dto.stats.StatisticDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
@@ -233,6 +237,34 @@ public class TestResponses {
   }
 
   @Test
+  void testThrowableErrorResponsesRetainStackTrace() throws IllegalArgumentException {
+    Throwable throwable = new RuntimeException("private error details");
+    String message = "public error message";
+    ErrorResponse[] responses = {
+      ErrorResponse.illegalArguments(message, throwable),
+      ErrorResponse.connectionFailed(message, throwable),
+      ErrorResponse.serviceUnavailable(message, throwable),
+      ErrorResponse.notFound("error type", message, throwable),
+      ErrorResponse.internalError(message, throwable),
+      ErrorResponse.alreadyExists("error type", message, throwable),
+      ErrorResponse.notInUse("error type", message, throwable),
+      ErrorResponse.inUse("error type", message, throwable),
+      ErrorResponse.nonEmpty("error type", message, throwable),
+      ErrorResponse.unsupportedOperation(message, throwable),
+      ErrorResponse.forbidden(message, throwable),
+      ErrorResponse.unauthorized("error type", message, throwable)
+    };
+
+    for (ErrorResponse response : responses) {
+      response.validate();
+      assertEquals(message, response.getMessage());
+      assertNotNull(response.getStack());
+      assertTrue(
+          response.getStack().stream().anyMatch(line -> line.contains("private error details")));
+    }
+  }
+
+  @Test
   void testNotFoundErrorResponse() throws IllegalArgumentException {
     ErrorResponse error = ErrorResponse.notFound("error type", "not found error");
     error.validate(); // No exception thrown
@@ -242,6 +274,16 @@ public class TestResponses {
   void testAlreadyExistsErrorResponse() throws IllegalArgumentException {
     ErrorResponse error = ErrorResponse.alreadyExists("error type", "already exists error");
     error.validate(); // No exception thrown
+  }
+
+  @Test
+  void testOptimisticLockConflictErrorResponse() throws IllegalArgumentException {
+    ErrorResponse error =
+        ErrorResponse.optimisticLockConflict(
+            "OptimisticLockException", "optimistic lock conflict", null);
+    error.validate(); // No exception thrown
+    assertEquals(ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE, error.getCode());
+    assertEquals("OptimisticLockException", error.getType());
   }
 
   @Test
@@ -285,7 +327,7 @@ public class TestResponses {
   void testUserResponse() throws IllegalArgumentException {
     AuditDTO audit =
         AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-    UserDTO user = UserDTO.builder().withName("user1").withAudit(audit).build();
+    UserDTO user = UserDTO.builder().withId(1L).withName("user1").withAudit(audit).build();
     UserResponse response = new UserResponse(user);
     response.validate(); // No exception thrown
   }
@@ -300,7 +342,7 @@ public class TestResponses {
   void testGroupResponse() throws IllegalArgumentException {
     AuditDTO audit =
         AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-    GroupDTO group = GroupDTO.builder().withName("group1").withAudit(audit).build();
+    GroupDTO group = GroupDTO.builder().withId(1L).withName("group1").withAudit(audit).build();
     GroupResponse response = new GroupResponse(group);
     response.validate(); // No exception thrown
   }
@@ -351,6 +393,46 @@ public class TestResponses {
   }
 
   @Test
+  void testTagNameListResponse() throws JsonProcessingException {
+    String[] names = new String[] {"tag1", "tag2"};
+    TagNameListResponse response = new TagNameListResponse(names, true);
+    assertDoesNotThrow(response::validate);
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(response);
+    TagNameListResponse deserResponse =
+        JsonUtils.objectMapper().readValue(serJson, TagNameListResponse.class);
+    assertEquals(response, deserResponse);
+    assertArrayEquals(names, deserResponse.getNames());
+    assertTrue(deserResponse.hasInaccessibleTags());
+
+    NameListResponse backwardCompatibleResponse =
+        JsonUtils.objectMapper().readValue(serJson, NameListResponse.class);
+    assertArrayEquals(names, backwardCompatibleResponse.getNames());
+
+    assertFalse(new TagNameListResponse(new String[0], false).hasInaccessibleTags());
+  }
+
+  @Test
+  void testPolicyNameListResponse() throws JsonProcessingException {
+    String[] names = new String[] {"policy1", "policy2"};
+    PolicyNameListResponse response = new PolicyNameListResponse(names, true);
+    assertDoesNotThrow(response::validate);
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(response);
+    PolicyNameListResponse deserResponse =
+        JsonUtils.objectMapper().readValue(serJson, PolicyNameListResponse.class);
+    assertEquals(response, deserResponse);
+    assertArrayEquals(names, deserResponse.getNames());
+    assertTrue(deserResponse.hasInaccessiblePolicies());
+
+    NameListResponse backwardCompatibleResponse =
+        JsonUtils.objectMapper().readValue(serJson, NameListResponse.class);
+    assertArrayEquals(names, backwardCompatibleResponse.getNames());
+
+    assertFalse(new PolicyNameListResponse(new String[0], false).hasInaccessiblePolicies());
+  }
+
+  @Test
   void testTagListResponse() throws JsonProcessingException {
     TagDTO tag1 = TagDTO.builder().withName("tag1").withComment("comment1").build();
     TagDTO tag2 = TagDTO.builder().withName("tag2").withComment("comment2").build();
@@ -367,6 +449,43 @@ public class TestResponses {
     TagListResponse response1 = new TagListResponse();
     Exception e = assertThrows(IllegalArgumentException.class, response1::validate);
     assertEquals("\"tags\" must not be null", e.getMessage());
+  }
+
+  @Test
+  void testMetadataObjectTagListResponse() throws JsonProcessingException {
+    TagDTO tag = TagDTO.builder().withName("tag1").build();
+    MetadataObjectTagListResponse response =
+        new MetadataObjectTagListResponse(new TagDTO[] {tag}, true);
+    assertDoesNotThrow(response::validate);
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(response);
+    MetadataObjectTagListResponse deserResponse =
+        JsonUtils.objectMapper().readValue(serJson, MetadataObjectTagListResponse.class);
+    assertEquals(response, deserResponse);
+    assertArrayEquals(new TagDTO[] {tag}, deserResponse.getTags());
+    assertTrue(deserResponse.hasInaccessibleTags());
+
+    TagListResponse backwardCompatibleResponse =
+        JsonUtils.objectMapper().readValue(serJson, TagListResponse.class);
+    assertArrayEquals(new TagDTO[] {tag}, backwardCompatibleResponse.getTags());
+  }
+
+  @Test
+  void testMetadataObjectPolicyListResponse() throws JsonProcessingException {
+    MetadataObjectPolicyListResponse response =
+        new MetadataObjectPolicyListResponse(new PolicyDTO[0], true);
+    assertDoesNotThrow(response::validate);
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(response);
+    MetadataObjectPolicyListResponse deserResponse =
+        JsonUtils.objectMapper().readValue(serJson, MetadataObjectPolicyListResponse.class);
+    assertEquals(response, deserResponse);
+    assertArrayEquals(new PolicyDTO[0], deserResponse.getPolicies());
+    assertTrue(deserResponse.hasInaccessiblePolicies());
+
+    PolicyListResponse backwardCompatibleResponse =
+        JsonUtils.objectMapper().readValue(serJson, PolicyListResponse.class);
+    assertArrayEquals(new PolicyDTO[0], backwardCompatibleResponse.getPolicies());
   }
 
   @Test
@@ -516,16 +635,18 @@ public class TestResponses {
 
   @Test
   void testAuthMeResponse() throws JsonProcessingException {
-    AuthMeResponse response = new AuthMeResponse("test-user");
+    AuthMeResponse response = new AuthMeResponse("test-user", true);
     response.validate();
     assertEquals(0, response.getCode());
     assertEquals("test-user", response.getPrincipal());
+    assertTrue(response.isServiceAdmin());
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(response);
     AuthMeResponse deserResponse =
         JsonUtils.objectMapper().readValue(serJson, AuthMeResponse.class);
     assertEquals(response.getCode(), deserResponse.getCode());
     assertEquals(response.getPrincipal(), deserResponse.getPrincipal());
+    assertEquals(response.isServiceAdmin(), deserResponse.isServiceAdmin());
   }
 
   @Test
@@ -533,6 +654,30 @@ public class TestResponses {
     AuthMeResponse response = new AuthMeResponse();
     assertDoesNotThrow(response::validate);
     assertNull(response.getPrincipal());
+    assertFalse(response.isServiceAdmin());
+  }
+
+  @Test
+  void testSecretProviderListResponse() throws JsonProcessingException {
+    SecretProviderListResponse response =
+        new SecretProviderListResponse(
+            new SecretProviderDTO[] {
+              SecretProviderDTO.builder().withName("memory").withType("memory").build()
+            });
+    response.validate();
+    assertEquals(0, response.getCode());
+    assertEquals(1, response.getProviders().length);
+    assertEquals("memory", response.getProviders()[0].getName());
+    assertEquals("memory", response.getProviders()[0].getType());
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(response);
+    assertFalse(serJson.contains("uri"));
+    SecretProviderListResponse deserResponse =
+        JsonUtils.objectMapper().readValue(serJson, SecretProviderListResponse.class);
+    assertEquals(response, deserResponse);
+
+    SecretProviderListResponse empty = new SecretProviderListResponse();
+    assertThrows(IllegalArgumentException.class, empty::validate);
   }
 
   @Test

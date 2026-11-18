@@ -36,9 +36,11 @@ import org.apache.gravitino.authorization.common.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationHDFSPlugin;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationHadoopSQLPlugin;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
+import org.apache.gravitino.authorization.ranger.RangerClientExtension;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
+import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.RangerContainer;
@@ -62,6 +64,8 @@ public class RangerITEnv {
   public static final String RANGER_HIVE_REPO_NAME = "hiveDev";
   private static final String RANGER_HIVE_TYPE = "hive";
   public static final String RANGER_HDFS_REPO_NAME = "hdfsDev";
+  public static final String METALAKE_ID = "1000";
+  public static final String CATALOG_ID = "1001";
   private static final String RANGER_HDFS_TYPE = "hdfs";
   public static RangerClient rangerClient;
   public static final String HADOOP_USER_NAME = "gravitino";
@@ -96,7 +100,14 @@ public class RangerITEnv {
         String.format(
             "http://%s:%d",
             containerSuite.getRangerContainer().getContainerIpAddress(), RANGER_SERVER_PORT);
-    rangerClient = containerSuite.getRangerContainer().rangerClient;
+    // Use the client of the plugin, so that test updates of policies fetched from Ranger Admin
+    // are sent in a format that every supported Ranger Admin version accepts.
+    rangerClient =
+        new RangerClientExtension(
+            RANGER_ADMIN_URL,
+            RangerContainer.authType,
+            RangerContainer.rangerUserName,
+            RangerContainer.rangerPassword);
 
     rangerAuthHivePlugin =
         new RangerAuthorizationHadoopSQLPlugin(
@@ -118,7 +129,11 @@ public class RangerITEnv {
                 RangerAuthorizationProperties.RANGER_SERVICE_NAME,
                 RangerITEnv.RANGER_HIVE_REPO_NAME,
                 RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT,
-                "true"));
+                "true",
+                BaseAuthorization.METALAKE_ID,
+                METALAKE_ID,
+                BaseAuthorization.CATALOG_ID,
+                CATALOG_ID));
 
     RangerAuthorizationHDFSPlugin spyRangerAuthorizationHDFSPlugin =
         Mockito.spy(
@@ -141,7 +156,11 @@ public class RangerITEnv {
                     RangerAuthorizationProperties.RANGER_SERVICE_NAME,
                     RangerITEnv.RANGER_HDFS_REPO_NAME,
                     RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT,
-                    "true")));
+                    "true",
+                    BaseAuthorization.METALAKE_ID,
+                    METALAKE_ID,
+                    BaseAuthorization.CATALOG_ID,
+                    CATALOG_ID)));
     rangerAuthHDFSPlugin = spyRangerAuthorizationHDFSPlugin;
 
     rangerHelper =
@@ -506,7 +525,7 @@ public class RangerITEnv {
       Assertions.assertTrue(policies.size() <= 1);
       if (!policies.isEmpty()) {
         RangerPolicy policy = policies.get(0);
-        policy.getPolicyItems().addAll(policyItems);
+        policyItems.forEach(policy::addPolicyItem);
         rangerClient.updatePolicy(policy.getId(), policy);
       } else {
         RangerPolicy policy = new RangerPolicy();

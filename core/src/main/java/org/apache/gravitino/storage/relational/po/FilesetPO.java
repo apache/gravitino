@@ -32,6 +32,7 @@ public class FilesetPO {
   private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
+  private Long occVersion;
   private Long deletedAt;
   private List<FilesetVersionPO> filesetVersionPOs;
 
@@ -71,6 +72,15 @@ public class FilesetPO {
     return lastVersion;
   }
 
+  /**
+   * Returns the concurrency token advanced by every metadata update.
+   *
+   * @return the optimistic concurrency version
+   */
+  public Long getOccVersion() {
+    return occVersion;
+  }
+
   public Long getDeletedAt() {
     return deletedAt;
   }
@@ -97,6 +107,7 @@ public class FilesetPO {
         && Objects.equal(getAuditInfo(), filesetPO.getAuditInfo())
         && Objects.equal(getCurrentVersion(), filesetPO.getCurrentVersion())
         && Objects.equal(getLastVersion(), filesetPO.getLastVersion())
+        && Objects.equal(getOccVersion(), filesetPO.getOccVersion())
         && Objects.equal(getDeletedAt(), filesetPO.getDeletedAt())
         && Objects.equal(getFilesetVersionPOs(), filesetPO.getFilesetVersionPOs());
   }
@@ -113,6 +124,7 @@ public class FilesetPO {
         getAuditInfo(),
         getCurrentVersion(),
         getLastVersion(),
+        getOccVersion(),
         getDeletedAt(),
         getFilesetVersionPOs());
   }
@@ -169,6 +181,17 @@ public class FilesetPO {
       return this;
     }
 
+    /**
+     * Sets the concurrency token, independently of the content snapshot version.
+     *
+     * @param occVersion the optimistic concurrency version
+     * @return this builder
+     */
+    public FilesetPO.Builder withOccVersion(Long occVersion) {
+      filesetPO.occVersion = occVersion;
+      return this;
+    }
+
     public FilesetPO.Builder withDeletedAt(Long deletedAt) {
       filesetPO.deletedAt = deletedAt;
       return this;
@@ -203,10 +226,16 @@ public class FilesetPO {
       Preconditions.checkArgument(filesetPO.auditInfo != null, "Audit info is required");
       Preconditions.checkArgument(filesetPO.currentVersion != null, "Current version is required");
       Preconditions.checkArgument(filesetPO.lastVersion != null, "Last version is required");
+      Preconditions.checkArgument(filesetPO.occVersion != null, "OCC version is required");
       Preconditions.checkArgument(filesetPO.deletedAt != null, "Deleted at is required");
+      // An alter that leaves every stored field untouched allocates no snapshot and keeps
+      // current_version pointing at the one already stored, so the list is empty rather than null.
+      //
+      // This used to reject an empty list, which also stopped a create from storing a row with no
+      // snapshot for current_version to resolve. That case cannot arise: a create builds one
+      // snapshot per storage location, and FilesetEntity.validate rejects an entity that has none.
       Preconditions.checkArgument(
-          filesetPO.filesetVersionPOs != null && !filesetPO.filesetVersionPOs.isEmpty(),
-          "Fileset version is required");
+          filesetPO.filesetVersionPOs != null, "Fileset version is required");
     }
 
     public FilesetPO build() {

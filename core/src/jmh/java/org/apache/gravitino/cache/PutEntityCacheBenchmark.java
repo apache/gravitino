@@ -19,38 +19,21 @@
 
 package org.apache.gravitino.cache;
 
-import java.util.List;
-import org.apache.gravitino.Entity;
-import org.apache.gravitino.HasIdentifier;
-import org.apache.gravitino.SupportsRelationOperations;
-import org.apache.gravitino.meta.ModelEntity;
-import org.apache.gravitino.meta.RoleEntity;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Setup;
 
 /**
- * EntityCachePutBenchmark benchmarks the performance of {@link EntityCache#put} operations for both
- * standard entities and relation-based entity groups.
+ * EntityCachePutBenchmark benchmarks the performance of {@link EntityCache#put} operations for
+ * standard entities.
  *
  * <p>Each benchmark invocation starts with a cleared cache to ensure that measurements reflect
  * fresh insertions without side effects from previous state.
  *
- * <p>This benchmark covers two insertion scenarios:
- *
- * <ul>
- *   <li>{@code benchmarkPut}: Inserts a batch of {@link ModelEntity} instances into the cache.
- *   <li>{@code benchmarkPutWithRelation}: Inserts relation mappings between {@link RoleEntity} and
- *       related entities (e.g., users), using a relation type as part of the cache key.
- * </ul>
- *
- * @param <E> the type of related entity, extending {@link Entity} and implementing {@link
- *     HasIdentifier}
  * @see org.apache.gravitino.cache.EntityCache
  * @see org.openjdk.jmh.annotations.Benchmark
  */
-public class PutEntityCacheBenchmark<E extends Entity & HasIdentifier>
-    extends AbstractEntityBenchmark {
+public class PutEntityCacheBenchmark extends AbstractEntityBenchmark {
 
   @Setup(Level.Invocation)
   public void prepareForCachePut() {
@@ -58,20 +41,7 @@ public class PutEntityCacheBenchmark<E extends Entity & HasIdentifier>
   }
 
   @Benchmark
-  @SuppressWarnings("unchecked")
   public void benchmarkPut() {
-    entities.forEach(e -> cache.put((ModelEntity) e));
-  }
-
-  @Benchmark
-  @SuppressWarnings("unchecked")
-  public void benchmarkPutWithRelation() {
-    entitiesWithRelations.forEach(
-        (role, relationEntities) ->
-            cache.put(
-                ((RoleEntity) role).nameIdentifier(),
-                ((RoleEntity) role).type(),
-                SupportsRelationOperations.Type.ROLE_USER_REL,
-                (List<E>) relationEntities));
+    entities.forEach(e -> cache.put(e));
   }
 }

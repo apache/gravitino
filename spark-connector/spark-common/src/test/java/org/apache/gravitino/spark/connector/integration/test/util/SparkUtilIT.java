@@ -135,10 +135,9 @@ public abstract class SparkUtilIT extends BaseIT {
   }
 
   // Create SparkTableInfo from SparkBaseTable retrieved from LogicalPlan.
-  // In Spark 3.3/3.5: DESC TABLE EXTENDED returns DescribeRelation.
-  // In Spark 3.4: DESC TABLE EXTENDED returns DescribeTableCommand (different class hierarchy).
-  // Use the v2 Catalog API (CatalogManager + TableCatalog.loadTable) for cross-version
-  // compatibility.
+  // Read the table through the v2 Catalog API (CatalogManager + TableCatalog.loadTable) rather than
+  // parsing the DESC TABLE EXTENDED plan: the plan node that returns differs across Spark versions,
+  // while the v2 API is stable.
   protected SparkTableInfo getTableInfo(String tableName) {
     CatalogManager catalogManager = getSparkSession().sessionState().catalogManager();
 
@@ -149,9 +148,8 @@ public abstract class SparkUtilIT extends BaseIT {
     TableCatalog tableCatalog;
     if (parts.length == 1) {
       // Short table name: use current catalog + current V2 namespace.
-      // catalog().currentDatabase() returns the V1 Hive session catalog database and is NOT
-      // updated when USE <db> is issued against a V2 catalog (e.g. Glue) in Spark 3.3.
-      // catalogManager.currentNamespace() reflects the V2 namespace correctly.
+      // catalog().currentDatabase() tracks the V1 session catalog and does not reliably follow
+      // USE <db> against a V2 catalog; catalogManager.currentNamespace() does.
       CatalogPlugin currentCatalog = catalogManager.currentCatalog();
       String[] currentNamespace = catalogManager.currentNamespace();
       identifier = Identifier.of(currentNamespace, parts[0]);

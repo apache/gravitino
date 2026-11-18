@@ -20,15 +20,20 @@ package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitiveOnName;
-import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
+import static org.apache.gravitino.catalog.CapabilityHelpers.withCapability;
 
-import java.util.Arrays;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.rel.partitions.Partition;
 
+/**
+ * Note on list operations: names returned by list methods (e.g. {@link
+ * #listPartitionNames(NameIdentifier)}, {@link #listPartitions(NameIdentifier)}) are assumed to
+ * already be in their canonical, legal form and are not re-normalized here.
+ */
 public class PartitionNormalizeDispatcher implements PartitionDispatcher {
   private final CatalogManager catalogManager;
   private final PartitionDispatcher dispatcher;
@@ -41,58 +46,63 @@ public class PartitionNormalizeDispatcher implements PartitionDispatcher {
 
   @Override
   public String[] listPartitionNames(NameIdentifier tableIdent) {
-    Capability capabilities = getCapability(tableIdent, catalogManager);
-    String[] partitionNames =
-        dispatcher.listPartitionNames(
-            applyCaseSensitive(tableIdent, Capability.Scope.TABLE, capabilities));
-    return Arrays.stream(partitionNames)
-        .map(
-            partitionName ->
-                applyCaseSensitiveOnName(Capability.Scope.PARTITION, partitionName, capabilities))
-        .toArray(String[]::new);
+    return dispatcher.listPartitionNames(normalizeTableIdent(tableIdent));
   }
 
   @Override
   public Partition[] listPartitions(NameIdentifier tableIdent) {
-    Capability capabilities = getCapability(tableIdent, catalogManager);
-    Partition[] partitions =
-        dispatcher.listPartitions(
-            CapabilityHelpers.applyCaseSensitive(tableIdent, Capability.Scope.TABLE, capabilities));
-    return applyCaseSensitive(partitions, capabilities);
+    return dispatcher.listPartitions(normalizeTableIdent(tableIdent));
   }
 
   @Override
   public Partition getPartition(NameIdentifier tableIdent, String partitionName)
       throws NoSuchPartitionException {
-    Capability capabilities = getCapability(tableIdent, catalogManager);
-    return dispatcher.getPartition(
-        CapabilityHelpers.applyCaseSensitive(tableIdent, Capability.Scope.TABLE, capabilities),
-        applyCaseSensitiveOnName(Capability.Scope.PARTITION, partitionName, capabilities));
+    Pair<NameIdentifier, String> normalized = normalizePartitionName(tableIdent, partitionName);
+    return dispatcher.getPartition(normalized.getLeft(), normalized.getRight());
   }
 
   @Override
   public Partition addPartition(NameIdentifier tableIdent, Partition partition)
       throws PartitionAlreadyExistsException {
-    Capability capabilities = getCapability(tableIdent, catalogManager);
-    return dispatcher.addPartition(
-        CapabilityHelpers.applyCaseSensitive(tableIdent, Capability.Scope.TABLE, capabilities),
-        applyCaseSensitive(partition, capabilities));
+    Pair<NameIdentifier, Partition> normalized =
+        withCapability(
+            tableIdent,
+            catalogManager,
+            capabilities ->
+                Pair.of(
+                    applyCaseSensitive(tableIdent, Capability.Scope.TABLE, capabilities),
+                    applyCaseSensitive(partition, capabilities)));
+    return dispatcher.addPartition(normalized.getLeft(), normalized.getRight());
   }
 
   @Override
   public boolean dropPartition(NameIdentifier tableIdent, String partitionName) {
-    Capability capabilities = getCapability(tableIdent, catalogManager);
-    return dispatcher.dropPartition(
-        CapabilityHelpers.applyCaseSensitive(tableIdent, Capability.Scope.TABLE, capabilities),
-        applyCaseSensitiveOnName(Capability.Scope.PARTITION, partitionName, capabilities));
+    Pair<NameIdentifier, String> normalized = normalizePartitionName(tableIdent, partitionName);
+    return dispatcher.dropPartition(normalized.getLeft(), normalized.getRight());
   }
 
   @Override
   public boolean purgePartition(NameIdentifier tableIdent, String partitionName)
       throws UnsupportedOperationException {
-    Capability capabilities = getCapability(tableIdent, catalogManager);
-    return dispatcher.purgePartition(
-        CapabilityHelpers.applyCaseSensitive(tableIdent, Capability.Scope.TABLE, capabilities),
-        applyCaseSensitiveOnName(Capability.Scope.PARTITION, partitionName, capabilities));
+    Pair<NameIdentifier, String> normalized = normalizePartitionName(tableIdent, partitionName);
+    return dispatcher.purgePartition(normalized.getLeft(), normalized.getRight());
+  }
+
+  private NameIdentifier normalizeTableIdent(NameIdentifier tableIdent) {
+    return withCapability(
+        tableIdent,
+        catalogManager,
+        capabilities -> applyCaseSensitive(tableIdent, Capability.Scope.TABLE, capabilities));
+  }
+
+  private Pair<NameIdentifier, String> normalizePartitionName(
+      NameIdentifier tableIdent, String partitionName) {
+    return withCapability(
+        tableIdent,
+        catalogManager,
+        capabilities ->
+            Pair.of(
+                applyCaseSensitive(tableIdent, Capability.Scope.TABLE, capabilities),
+                applyCaseSensitiveOnName(Capability.Scope.PARTITION, partitionName, capabilities)));
   }
 }

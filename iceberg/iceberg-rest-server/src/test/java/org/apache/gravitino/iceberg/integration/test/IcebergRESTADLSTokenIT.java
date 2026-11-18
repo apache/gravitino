@@ -38,7 +38,6 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 public class IcebergRESTADLSTokenIT extends IcebergRESTJdbcCatalogIT {
 
   private String storageAccountName;
-  private String storageAccountKey;
   private String tenantId;
   private String clientId;
   private String clientSecret;
@@ -49,9 +48,6 @@ public class IcebergRESTADLSTokenIT extends IcebergRESTJdbcCatalogIT {
     this.storageAccountName =
         System.getenv()
             .getOrDefault("GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME", "{STORAGE_ACCOUNT_NAME}");
-    this.storageAccountKey =
-        System.getenv()
-            .getOrDefault("GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY", "{STORAGE_ACCOUNT_KEY}");
     this.tenantId = System.getenv().getOrDefault("GRAVITINO_AZURE_TENANT_ID", "{TENANT_ID}");
     this.clientId = System.getenv().getOrDefault("GRAVITINO_AZURE_CLIENT_ID", "{CLIENT_ID}");
     this.clientSecret =
@@ -89,9 +85,6 @@ public class IcebergRESTADLSTokenIT extends IcebergRESTJdbcCatalogIT {
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
         storageAccountName);
-    configMap.put(
-        IcebergConfig.ICEBERG_CONFIG_PREFIX + AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
-        storageAccountKey);
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + AzureProperties.GRAVITINO_AZURE_TENANT_ID, tenantId);
     configMap.put(

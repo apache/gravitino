@@ -199,6 +199,7 @@ components:
             - CREATE_SCHEMA
             - USE_SCHEMA
             - CREATE_TABLE
+            - PROBE_TABLE_LIKE
             - MODIFY_TABLE
             - SELECT_TABLE
             - CREATE_FILESET
@@ -214,16 +215,28 @@ components:
             - REGISTER_MODEL
             - LINK_MODEL_VERSION
             - USE_MODEL
+            - USE_SECRETS
+            - INCLUDE_CREDENTIAL_SECRETS
             - REGISTER_FUNCTION
             - EXECUTE_FUNCTION
             - MODIFY_FUNCTION
             - CREATE_TAG
             - APPLY_TAG
+            - VIEW_TAG
             - CREATE_POLICY
             - APPLY_POLICY
+            - VIEW_POLICY
+            - VIEW_SECRET_PROVIDERS
             - REGISTER_JOB_TEMPLATE
             - USE_JOB_TEMPLATE
             - RUN_JOB
+            - CREATE_VIEW
+            - SELECT_VIEW
+            - CREATE_SEMANTIC_MODEL
+            - USE_SEMANTIC_MODEL
+            - MODIFY_SEMANTIC_MODEL
+            - MANAGE_DOMAIN
+            - USE_DOMAIN
           description: The name of the privilege
         condition:
           type: string
@@ -234,17 +247,26 @@ components:
 
     SecurableObject:
       type: object
+      example:
+        fullName: Finance_v1
+        type: DOMAIN
+        privileges:
+          - name: MANAGE_DOMAIN
+            condition: ALLOW
+          - name: USE_DOMAIN
+            condition: DENY
       required:
         - fullName
         - type
       properties:
         fullName:
           type: string
-          description: The full name of the securable object
+          description: The full name of the securable object. For DOMAIN, use the domain name, without its parent or metalake prefix.
         type:
           type: string
           enum:
             - "METALAKE"
+            - "DOMAIN"
             - "CATALOG"
             - "SCHEMA"
             - "TABLE"
@@ -252,6 +274,7 @@ components:
             - "TOPIC"
             - "ROLE"
             - "MODEL"
+            - "SEMANTIC_MODEL"
             - "FUNCTION"
             - "TAG"
             - "POLICY"
@@ -423,6 +446,8 @@ components:
           - "TOPIC"
           - "ROLE"
           - "MODEL"
+          - "SEMANTIC_MODEL"
+          - "DOMAIN"
           - "FUNCTION"
           - "TAG"
           - "POLICY"

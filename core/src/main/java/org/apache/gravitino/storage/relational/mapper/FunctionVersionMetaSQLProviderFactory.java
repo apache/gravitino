@@ -57,11 +57,6 @@ public class FunctionVersionMetaSQLProviderFactory {
     return getProvider().insertFunctionVersionMeta(functionVersionPO);
   }
 
-  public static String insertFunctionVersionMetaOnDuplicateKeyUpdate(
-      @Param("functionVersionMeta") FunctionVersionPO functionVersionPO) {
-    return getProvider().insertFunctionVersionMetaOnDuplicateKeyUpdate(functionVersionPO);
-  }
-
   public static String softDeleteFunctionVersionMetasBySchemaIds(
       @Param("schemaIds") List<Long> schemaIds) {
     return getProvider().softDeleteFunctionVersionMetasBySchemaIds(schemaIds);

@@ -25,17 +25,30 @@ plugins {
 }
 
 dependencies {
+  // aliyun-sdk-oss 3.10.2 pulls in jettison 1.1. Declare it directly so that both the shaded jar
+  // and the published POM resolve the version in the catalog.
+  implementation(libs.jettison)
   implementation(libs.aliyun.credentials.sdk)
-  implementation(libs.aliyun.sdk.oss)
+  implementation(libs.aliyun.sdk.oss) {
+    // aliyun-sdk-oss 3.13.0 pulls aliyun-java-sdk-core 4.5.10, which depends on ini4j 0.5.4.
+    // ini4j only backs the core SDK's local profile credentials provider, and OSSFileIO
+    // authenticates with a static key or a session token, so keep it out of the bundle
+    // (HIGH CVE-2022-41404, tracked in #14777).
+    exclude(group = "org.ini4j", module = "ini4j")
+  }
   // Aliyun oss SDK depends on this package, and JDK >= 9 requires manual add
   // https://www.alibabacloud.com/help/en/oss/developer-reference/java-installation?spm=a2c63.p38356.0.i1
   implementation(libs.sun.activation)
   // Include Gravitino Aliyun credential providers (OSSSecretKeyProvider, etc.) for credential vending
   implementation(project(":bundles:aliyun"))
+
+  testImplementation(libs.junit.jupiter.api)
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks.withType(ShadowJar::class.java) {
   isZip64 = true
+  includeEmptyDirs = false
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
 
@@ -48,10 +61,36 @@ tasks.withType(ShadowJar::class.java) {
     exclude(project(":catalogs:hadoop-common"))
   }
 
+  // :bundles:aliyun pulls Jackson into this fat jar. Relocate it so the bundle remains
+  // self-contained without exposing com.fasterxml.jackson classes on the server classpath.
+  relocate(
+    "com.fasterxml.jackson",
+    "org.apache.gravitino.iceberg.aliyun.shaded.com.fasterxml.jackson"
+  )
+
+  // POM metadata is not relocated by shadow and would still advertise the original
+  // Jackson coordinates.
+  exclude("META-INF/maven/com.fasterxml.jackson.core/**")
+  exclude("META-INF/maven/com.fasterxml.jackson.datatype/**")
+  exclude("META-INF/maven/com.fasterxml.jackson.module/**")
+  exclude("META-INF/maven/com.fasterxml.jackson/**")
+
   mergeServiceFiles()
 }
 
 tasks.jar {
   dependsOn(tasks.named("shadowJar"))
   archiveClassifier.set("empty")
+}
+
+tasks.test {
+  val shadowJar = tasks.named<ShadowJar>("shadowJar")
+  dependsOn(shadowJar)
+  inputs.file(shadowJar.flatMap { it.archiveFile })
+  doFirst {
+    systemProperty(
+      "shadowJarPath",
+      shadowJar.get().archiveFile.get().asFile.absolutePath
+    )
+  }
 }

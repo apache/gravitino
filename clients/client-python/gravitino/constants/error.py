@@ -29,6 +29,9 @@ from gravitino.exceptions.base import (
     ForbiddenException,
     NotInUseException,
     InUseException,
+    OptimisticLockException,
+    ServiceUnavailableException,
+    UnauthorizedException,
 )
 
 
@@ -68,6 +71,15 @@ class ErrorConstants(IntEnum):
     # Error codes for drop an in use entity.
     IN_USE_CODE = 1010
 
+    # Error codes for unauthorized access.
+    UNAUTHORIZED_CODE = 1011
+
+    # Error codes for optimistic-lock conflicts.
+    OPTIMISTIC_LOCK_CONFLICT_CODE = 1012
+
+    # Error codes for service unavailable.
+    SERVICE_UNAVAILABLE_CODE = 1013
+
     # Error codes for invalid state.
     UNKNOWN_ERROR_CODE = 1100
 
@@ -84,6 +96,9 @@ EXCEPTION_MAPPING = {
     ForbiddenException: ErrorConstants.FORBIDDEN_CODE,
     NotInUseException: ErrorConstants.NOT_IN_USE_CODE,
     InUseException: ErrorConstants.IN_USE_CODE,
+    OptimisticLockException: ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE,
+    ServiceUnavailableException: ErrorConstants.SERVICE_UNAVAILABLE_CODE,
+    UnauthorizedException: ErrorConstants.UNAUTHORIZED_CODE,
 }
 
 ERROR_CODE_MAPPING = {v: k for k, v in EXCEPTION_MAPPING.items()}

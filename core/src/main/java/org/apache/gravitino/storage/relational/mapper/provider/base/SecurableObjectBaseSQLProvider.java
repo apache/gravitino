@@ -27,9 +27,13 @@ import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
+import org.apache.gravitino.storage.relational.mapper.provider.MetadataObjectSQL;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -61,8 +65,8 @@ public class SecurableObjectBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE FALSE "
         + "<foreach collection='securableObjects' item='item' separator=' '>"
         + " OR (metadata_object_id = #{item.metadataObjectId} AND"
@@ -74,16 +78,16 @@ public class SecurableObjectBaseSQLProvider {
   public String softDeleteSecurableObjectsByRoleId(@Param("roleId") Long roleId) {
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE role_id = #{roleId} AND deleted_at = 0";
   }
 
   public String softDeleteSecurableObjectsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " ob SET ob.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " ob SET ob.deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE exists (SELECT * FROM "
         + ROLE_TABLE_NAME
         + " ro WHERE ro.metalake_id = #{metalakeId} AND ro.role_id = ob.role_id"
@@ -95,8 +99,8 @@ public class SecurableObjectBaseSQLProvider {
       @Param("metadataObjectType") String metadataObjectType) {
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metadata_object_id = #{metadataObjectId} AND deleted_at = 0"
         + " AND type = #{metadataObjectType}";
   }
@@ -104,8 +108,8 @@ public class SecurableObjectBaseSQLProvider {
   public String softDeleteObjectRelsByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " sect SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " sect SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE sect.deleted_at = 0 AND EXISTS ("
         + " SELECT ct.catalog_id FROM "
         + CatalogMetaMapper.TABLE_NAME
@@ -116,36 +120,61 @@ public class SecurableObjectBaseSQLProvider {
         + SchemaMetaMapper.TABLE_NAME
         + " st WHERE st.catalog_id = #{catalogId} AND"
         + " st.schema_id = sect.metadata_object_id AND sect.type = 'SCHEMA'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            SchemaMetaMapper.TABLE_NAME, "schema_id", "st")
         + " UNION"
         + " SELECT tt.catalog_id FROM "
         + TopicMetaMapper.TABLE_NAME
         + " tt WHERE tt.catalog_id = #{catalogId} AND"
         + " tt.topic_id = sect.metadata_object_id AND sect.type = 'TOPIC'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(TopicMetaMapper.TABLE_NAME, "topic_id", "tt")
         + " UNION"
         + " SELECT tat.catalog_id FROM "
         + TableMetaMapper.TABLE_NAME
         + " tat WHERE tat.catalog_id = #{catalogId} AND"
         + " tat.table_id = sect.metadata_object_id AND sect.type = 'TABLE'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            TableMetaMapper.TABLE_NAME, "table_id", "tat")
         + " UNION"
         + " SELECT ft.catalog_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
         + " ft WHERE ft.catalog_id = #{catalogId} AND"
         + " ft.fileset_id = sect.metadata_object_id AND sect.type = 'FILESET'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            FilesetMetaMapper.META_TABLE_NAME, "fileset_id", "ft")
         + " UNION"
         + " SELECT mt.catalog_id FROM "
         + ModelMetaMapper.TABLE_NAME
         + " mt WHERE mt.catalog_id = #{catalogId} AND"
         + " mt.model_id = sect.metadata_object_id AND sect.type = 'MODEL'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(ModelMetaMapper.TABLE_NAME, "model_id", "mt")
         + " UNION"
         + " SELECT vt.catalog_id FROM "
         + ViewMetaMapper.TABLE_NAME
         + " vt WHERE vt.catalog_id = #{catalogId} AND"
         + " vt.view_id = sect.metadata_object_id AND sect.type = 'VIEW'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(ViewMetaMapper.TABLE_NAME, "view_id", "vt")
         + " UNION"
         + " SELECT fnt.catalog_id FROM "
         + FunctionMetaMapper.TABLE_NAME
         + " fnt WHERE fnt.catalog_id = #{catalogId} AND"
         + " fnt.function_id = sect.metadata_object_id AND sect.type = 'FUNCTION'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            FunctionMetaMapper.TABLE_NAME, "function_id", "fnt")
+        + " UNION"
+        + " SELECT cot.catalog_id FROM "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " cot WHERE cot.catalog_id = #{catalogId} AND"
+        + " cot.column_id = sect.metadata_object_id AND sect.type = 'COLUMN'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            TableColumnMapper.COLUMN_TABLE_NAME, "column_id", "cot")
+        + " UNION"
+        + " SELECT smt.catalog_id FROM "
+        + SemanticModelMetaMapper.TABLE_NAME
+        + " smt WHERE smt.catalog_id = #{catalogId} AND"
+        + " smt.semantic_model_id = sect.metadata_object_id AND sect.type = 'SEMANTIC_MODEL'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            SemanticModelMetaMapper.TABLE_NAME, "semantic_model_id", "smt")
         + ")";
   }
 
@@ -153,8 +182,8 @@ public class SecurableObjectBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " sect SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " sect SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE sect.deleted_at = 0 AND EXISTS ("
         + " SELECT st.schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME
@@ -171,6 +200,7 @@ public class SecurableObjectBaseSQLProvider {
         + "#{schemaId}"
         + "</foreach>"
         + " AND tt.topic_id = sect.metadata_object_id AND sect.type = 'TOPIC'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(TopicMetaMapper.TABLE_NAME, "topic_id", "tt")
         + " UNION"
         + " SELECT tat.schema_id FROM "
         + TableMetaMapper.TABLE_NAME
@@ -179,6 +209,7 @@ public class SecurableObjectBaseSQLProvider {
         + "#{schemaId}"
         + "</foreach>"
         + " AND tat.table_id = sect.metadata_object_id AND sect.type = 'TABLE'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(TableMetaMapper.TABLE_NAME, "table_id", "tat")
         + " UNION"
         + " SELECT ft.schema_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
@@ -187,6 +218,8 @@ public class SecurableObjectBaseSQLProvider {
         + "#{schemaId}"
         + "</foreach>"
         + " AND ft.fileset_id = sect.metadata_object_id AND sect.type = 'FILESET'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(
+            FilesetMetaMapper.META_TABLE_NAME, "fileset_id", "ft")
         + " UNION"
         + " SELECT mt.schema_id FROM "
         + ModelMetaMapper.TABLE_NAME
@@ -195,6 +228,7 @@ public class SecurableObjectBaseSQLProvider {
         + "#{schemaId}"
         + "</foreach>"
         + " AND mt.model_id = sect.metadata_object_id AND sect.type = 'MODEL'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(ModelMetaMapper.TABLE_NAME, "model_id", "mt")
         + " UNION"
         + " SELECT vt.schema_id FROM "
         + ViewMetaMapper.TABLE_NAME
@@ -203,6 +237,7 @@ public class SecurableObjectBaseSQLProvider {
         + "#{schemaId}"
         + "</foreach>"
         + " AND vt.view_id = sect.metadata_object_id AND sect.type = 'VIEW'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(ViewMetaMapper.TABLE_NAME, "view_id", "vt")
         + " UNION"
         + " SELECT fnt.schema_id FROM "
         + FunctionMetaMapper.TABLE_NAME
@@ -211,6 +246,28 @@ public class SecurableObjectBaseSQLProvider {
         + "#{schemaId}"
         + "</foreach>"
         + " AND fnt.function_id = sect.metadata_object_id AND sect.type = 'FUNCTION'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(
+            FunctionMetaMapper.TABLE_NAME, "function_id", "fnt")
+        + " UNION"
+        + " SELECT cot.schema_id FROM "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " cot WHERE cot.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach> AND"
+        + " cot.column_id = sect.metadata_object_id AND sect.type = 'COLUMN'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(
+            TableColumnMapper.COLUMN_TABLE_NAME, "column_id", "cot")
+        + " UNION"
+        + " SELECT smt.schema_id FROM "
+        + SemanticModelMetaMapper.TABLE_NAME
+        + " smt WHERE smt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach> AND"
+        + " smt.semantic_model_id = sect.metadata_object_id AND sect.type = 'SEMANTIC_MODEL'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(
+            SemanticModelMetaMapper.TABLE_NAME, "semantic_model_id", "smt")
         + ")"
         + "</script>";
   }

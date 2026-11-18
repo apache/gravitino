@@ -31,6 +31,7 @@ import java.lang.reflect.Method;
 import java.security.PrivilegedExceptionAction;
 import java.util.Locale;
 import java.util.Map;
+import javax.annotation.Nullable;
 import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
 import net.sf.cglib.proxy.MethodProxy;
@@ -39,17 +40,23 @@ import org.apache.gravitino.catalog.hadoop.auth.KerberosClient;
 import org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig;
 import org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** A FileSystem wrapper that runs all operations under a specific UGI (UserGroupInformation). */
 public class HDFSFileSystemProxy implements MethodInterceptor {
 
+  private static final Logger LOG = LoggerFactory.getLogger(HDFSFileSystemProxy.class);
+
   public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s";
   private static final String GRAVITINO_ID_KEY = "gravitino.identifier";
 
+  @Nullable private KerberosClient kerberosClient;
   protected UserGroupInformation initUgi;
   private FileSystem fs;
   private Configuration configuration;
@@ -98,8 +105,10 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
                   () -> FileSystem.newInstance(path.toUri(), conf));
 
     } catch (GravitinoRuntimeException e) {
+      close();
       throw e;
     } catch (Exception e) {
+      close();
       throw new GravitinoRuntimeException(e, "Failed to create HDFS FileSystem with UGI: %s", path);
     }
   }
@@ -159,12 +168,21 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
                 if (RuntimeException.class.isAssignableFrom(e.getClass())) {
                   throw (RuntimeException) e;
                 }
-                throw new RuntimeException("Failed to invoke method", e);
+                throw ExceptionMessages.wrap("Failed to invoke method", e);
               }
             });
   }
 
-  private void close() {}
+  private synchronized void close() {
+    if (kerberosClient != null) {
+      try {
+        kerberosClient.close();
+      } catch (Exception e) {
+        LOG.warn("Failed to stop the Kerberos ticket refresh for {}", kerberosRealm, e);
+      }
+      kerberosClient = null;
+    }
+  }
 
   private UserGroupInformation initKerberosUgi(
       Map<String, String> properties, Configuration configuration) {
@@ -187,10 +205,12 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
               false,
               configuration);
       UserGroupInformation ugi = client.login(keytabFile.getAbsolutePath());
+      // login() starts the ticket refresh, so record the client before anything else can fail.
+      this.kerberosClient = client;
       this.kerberosRealm = client.getRealm();
       return ugi;
     } catch (IOException e) {
-      throw new RuntimeException("Failed to login with Kerberos", e);
+      throw ExceptionMessages.wrap("Failed to login with Kerberos", e);
     }
   }
 }

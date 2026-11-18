@@ -40,7 +40,7 @@ public class AccessControlNotAllowedFilter implements ContainerRequestFilter {
   @Override
   public void filter(ContainerRequestContext requestContext) throws IOException {
     requestContext.abortWith(
-        Utils.unsupportedOperation(
+        Utils.methodNotAllowed(
             String.format(
                 "You should set '%s' to true in the server side `gravitino.conf`"
                     + " to enable the authorization of the system, otherwise these interfaces can't work.",

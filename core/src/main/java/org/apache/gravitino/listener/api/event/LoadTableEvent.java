@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.TableInfo;
@@ -36,7 +37,20 @@ public final class LoadTableEvent extends TableEvent {
    * @param tableInfo The state of the table post-loading.
    */
   public LoadTableEvent(String user, NameIdentifier identifier, TableInfo tableInfo) {
-    super(user, identifier);
+    this(user, identifier, tableInfo, null);
+  }
+
+  /**
+   * Constructs an instance of {@code LoadTableEvent} with optional audit extras.
+   *
+   * @param user The username of the individual who initiated the table loading.
+   * @param identifier The unique identifier of the table that was loaded.
+   * @param tableInfo The state of the table post-loading.
+   * @param customInfo optional audit facts contributed by an inner dispatcher
+   */
+  public LoadTableEvent(
+      String user, NameIdentifier identifier, TableInfo tableInfo, Map<String, String> customInfo) {
+    super(user, identifier, customInfo);
     this.loadedTableInfo = tableInfo;
   }
 

@@ -227,12 +227,12 @@ class TestFilesetCatalog(IntegrationTestEnv):
         self.assertIsNotNone(fileset)
         self.assertEqual(fileset.type(), Fileset.Type.MANAGED)
         self.assertEqual(fileset.comment(), self.fileset_comment)
-        self.assertEqual(
-            fileset.properties(),
+        self.assert_properties_equal(
             {
                 Fileset.PROPERTY_DEFAULT_LOCATION_NAME: Fileset.LOCATION_NAME_UNKNOWN,
                 **self.fileset_properties,
             },
+            fileset.properties(),
         )
         self.assertEqual(fileset.storage_location(), f"file:{self.fileset_location}")
 
@@ -241,8 +241,8 @@ class TestFilesetCatalog(IntegrationTestEnv):
         self.assertIsNotNone(fileset)
         self.assertEqual(fileset.type(), Fileset.Type.MANAGED)
         self.assertEqual(fileset.comment(), self.fileset_comment)
-        self.assertEqual(
-            fileset.properties(), self.multiple_locations_fileset_properties
+        self.assert_properties_equal(
+            self.multiple_locations_fileset_properties, fileset.properties()
         )
         self.assertEqual(
             fileset.storage_location(),
@@ -283,12 +283,12 @@ class TestFilesetCatalog(IntegrationTestEnv):
         self.assertIsNotNone(fileset)
         self.assertEqual(fileset.name(), self.fileset_name)
         self.assertEqual(fileset.comment(), self.fileset_comment)
-        self.assertEqual(
-            fileset.properties(),
+        self.assert_properties_equal(
             {
                 Fileset.PROPERTY_DEFAULT_LOCATION_NAME: Fileset.LOCATION_NAME_UNKNOWN,
                 **self.fileset_properties,
             },
+            fileset.properties(),
         )
         self.assertEqual(fileset.audit_info().creator(), "anonymous")
 
@@ -350,12 +350,28 @@ class TestFilesetCatalog(IntegrationTestEnv):
             "location2": "/tmp/test_get_file_location2",
         }
         self.create_custom_fileset(fileset_ident, None, locations, "location1")
+        caller_context = CallerContext(
+            {
+                FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION: FilesetDataOperation.GET_FILE_STATUS.name
+            }
+        )
+        CallerContextHolder.set(caller_context)
         actual_file_location = (
             self.gravitino_client.load_catalog(name=self.catalog_name)
             .as_fileset_catalog()
             .get_file_location(fileset_ident, "/test/test.txt")
         )
 
+        self.assertEqual(
+            actual_file_location, f"file:{locations['location1']}/test/test.txt"
+        )
+        self.assertIsNone(CallerContextHolder.get())
+
+        actual_file_location = (
+            self.gravitino_client.load_catalog(name=self.catalog_name)
+            .as_fileset_catalog()
+            .get_file_location(fileset_ident, "/test/test.txt")
+        )
         self.assertEqual(
             actual_file_location, f"file:{locations['location1']}/test/test.txt"
         )
@@ -373,3 +389,13 @@ class TestFilesetCatalog(IntegrationTestEnv):
                 .as_fileset_catalog()
                 .get_file_location(fileset_ident, "")
             )
+
+        self.assertIsNone(CallerContextHolder.get())
+        actual_file_location = (
+            self.gravitino_client.load_catalog(name=self.catalog_name)
+            .as_fileset_catalog()
+            .get_file_location(fileset_ident, "/test/test.txt")
+        )
+        self.assertEqual(
+            actual_file_location, f"file:{locations['location1']}/test/test.txt"
+        )

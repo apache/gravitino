@@ -70,5 +70,9 @@ public class MockAuthorizationExpressionEvaluator {
     public boolean authorize(String metadataPrivilege) {
       return mockPrivilege.contains(metadataPrivilege);
     }
+
+    public boolean isServiceAdmin() {
+      return mockPrivilege.contains("SERVICE_ADMIN");
+    }
   }
 }

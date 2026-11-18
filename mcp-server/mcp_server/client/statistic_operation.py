@@ -25,12 +25,11 @@ class StatisticOperation(ABC):
 
     @abstractmethod
     async def list_of_statistics(
-        self, metalake_name: str, metadata_type: str, metadata_fullname: str
+        self, metadata_type: str, metadata_fullname: str
     ) -> str:
         """
         Retrieve the list of statistics for a specific metadata type and fullname within a metalake.
         Args:
-            metalake_name: Name of the metalake
             metadata_type: Type of metadata (e.g., table, column)
             metadata_fullname: Full name of the metadata item
 
@@ -43,7 +42,6 @@ class StatisticOperation(ABC):
     @abstractmethod
     async def list_statistic_for_partition(
         self,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
         from_partition_name: str,
@@ -57,7 +55,6 @@ class StatisticOperation(ABC):
             So `metadata_type` should always be "table".
 
         Args:
-            metalake_name: Name of the metalake
             metadata_type: Type of metadata, should be "table" for partition statistics
             metadata_fullname: Full name of the metadata item, the format should be
                 "{catalog}.{schema}.{table}".

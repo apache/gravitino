@@ -19,6 +19,11 @@
 package org.apache.gravitino.trino.connector;
 
 import io.trino.spi.connector.ConnectorNodePartitioningProvider;
+import io.trino.spi.connector.ConnectorPartitioningHandle;
+import io.trino.spi.connector.ConnectorSession;
+import io.trino.spi.connector.ConnectorSplit;
+import io.trino.spi.connector.ConnectorTransactionHandle;
+import java.util.function.ToIntFunction;
 
 /**
  * Trino 469+ NodePartitioningProvider implementation with the new split bucket function signature.
@@ -28,5 +33,20 @@ public class GravitinoNodePartitioningProvider469 extends GravitinoNodePartition
   public GravitinoNodePartitioningProvider469(
       ConnectorNodePartitioningProvider nodePartitioningProvider) {
     super(nodePartitioningProvider);
+  }
+
+  @Override
+  public ToIntFunction<ConnectorSplit> getSplitBucketFunction(
+      ConnectorTransactionHandle transactionHandle,
+      ConnectorSession session,
+      ConnectorPartitioningHandle partitioningHandle,
+      int bucketCount) {
+    ToIntFunction<ConnectorSplit> splitBucketFunction =
+        nodePartitioningProvider.getSplitBucketFunction(
+            GravitinoHandle.unWrap(transactionHandle),
+            session,
+            GravitinoHandle.unWrap(partitioningHandle),
+            bucketCount);
+    return split -> splitBucketFunction.applyAsInt(GravitinoHandle.unWrap(split));
   }
 }

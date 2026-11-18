@@ -21,6 +21,7 @@ package org.apache.gravitino.client;
 import static org.apache.gravitino.dto.util.DTOConverters.toDTO;
 import static org.apache.gravitino.dto.util.DTOConverters.toFunctionArg;
 
+import com.google.common.base.Preconditions;
 import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -31,6 +32,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.domain.DomainChange;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
@@ -47,6 +49,7 @@ import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
 import org.apache.gravitino.dto.job.SparkTemplateUpdateDTO;
 import org.apache.gravitino.dto.job.TemplateUpdateDTO;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
+import org.apache.gravitino.dto.requests.DomainUpdateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
 import org.apache.gravitino.dto.requests.FunctionUpdateRequest;
 import org.apache.gravitino.dto.requests.JobTemplateUpdateRequest;
@@ -55,9 +58,11 @@ import org.apache.gravitino.dto.requests.ModelUpdateRequest;
 import org.apache.gravitino.dto.requests.ModelVersionUpdateRequest;
 import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
 import org.apache.gravitino.dto.requests.SchemaUpdateRequest;
+import org.apache.gravitino.dto.requests.SemanticModelUpdateRequest;
 import org.apache.gravitino.dto.requests.TableUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TopicUpdateRequest;
+import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.function.FunctionChange;
 import org.apache.gravitino.function.FunctionColumn;
@@ -74,6 +79,7 @@ import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.tag.TagChange;
 
 class DTOConverters {
@@ -85,6 +91,7 @@ class DTOConverters {
         .withComment(metalake.comment())
         .withProperties(metalake.properties())
         .withAudit((AuditDTO) metalake.auditInfo())
+        .withOwner(metalake.owner())
         .withRestClient(client)
         .build();
   }
@@ -187,6 +194,21 @@ class DTOConverters {
       return new CatalogUpdateRequest.RemoveCatalogPropertyRequest(
           ((CatalogChange.RemoveProperty) change).getProperty());
 
+    } else if (change instanceof CatalogChange.SetSecretBinding) {
+      CatalogChange.SetSecretBinding setSecretBinding = (CatalogChange.SetSecretBinding) change;
+      return new CatalogUpdateRequest.SetCatalogSecretBindingRequest(
+          setSecretBinding.getProperty(),
+          setSecretBinding.getBinding().provider(),
+          setSecretBinding.getBinding().plaintext());
+
+    } else if (change instanceof CatalogChange.SetSecretReference) {
+      CatalogChange.SetSecretReference setSecretReference =
+          (CatalogChange.SetSecretReference) change;
+      return new CatalogUpdateRequest.SetCatalogSecretReferenceRequest(
+          setSecretReference.getProperty(),
+          setSecretReference.getReference().provider(),
+          setSecretReference.getReference().attributes());
+
     } else {
       throw new IllegalArgumentException(
           "Unknown change type: " + change.getClass().getSimpleName());
@@ -202,6 +224,20 @@ class DTOConverters {
     } else if (change instanceof SchemaChange.RemoveProperty) {
       return new SchemaUpdateRequest.RemoveSchemaPropertyRequest(
           ((SchemaChange.RemoveProperty) change).getProperty());
+
+    } else if (change instanceof SchemaChange.SetSecretBinding) {
+      SchemaChange.SetSecretBinding setSecretBinding = (SchemaChange.SetSecretBinding) change;
+      return new SchemaUpdateRequest.SetSchemaSecretBindingRequest(
+          setSecretBinding.getProperty(),
+          setSecretBinding.getBinding().provider(),
+          setSecretBinding.getBinding().plaintext());
+
+    } else if (change instanceof SchemaChange.SetSecretReference) {
+      SchemaChange.SetSecretReference setSecretReference = (SchemaChange.SetSecretReference) change;
+      return new SchemaUpdateRequest.SetSchemaSecretReferenceRequest(
+          setSecretReference.getProperty(),
+          setSecretReference.getReference().provider(),
+          setSecretReference.getReference().attributes());
 
     } else {
       throw new IllegalArgumentException(
@@ -235,7 +271,8 @@ class DTOConverters {
       return new TableUpdateRequest.AddTableIndexRequest(
           ((TableChange.AddIndex) change).getType(),
           ((TableChange.AddIndex) change).getName(),
-          ((TableChange.AddIndex) change).getFieldNames());
+          ((TableChange.AddIndex) change).getFieldNames(),
+          ((TableChange.AddIndex) change).getProperties());
     } else if (change instanceof TableChange.DeleteIndex) {
       return new TableUpdateRequest.DeleteTableIndexRequest(
           ((TableChange.DeleteIndex) change).getName(),
@@ -253,6 +290,9 @@ class DTOConverters {
     } else if (change instanceof FilesetChange.UpdateFilesetComment) {
       return new FilesetUpdateRequest.UpdateFilesetCommentRequest(
           ((FilesetChange.UpdateFilesetComment) change).getNewComment());
+    } else if (change instanceof FilesetChange.UpdateFilesetType) {
+      return new FilesetUpdateRequest.UpdateFilesetTypeRequest(
+          ((FilesetChange.UpdateFilesetType) change).getNewType());
     } else if (change instanceof FilesetChange.RemoveComment) {
       return new FilesetUpdateRequest.RemoveFilesetCommentRequest();
     } else if (change instanceof FilesetChange.SetProperty) {
@@ -262,6 +302,19 @@ class DTOConverters {
     } else if (change instanceof FilesetChange.RemoveProperty) {
       return new FilesetUpdateRequest.RemoveFilesetPropertiesRequest(
           ((FilesetChange.RemoveProperty) change).getProperty());
+    } else if (change instanceof FilesetChange.SetSecretBinding) {
+      FilesetChange.SetSecretBinding setSecretBinding = (FilesetChange.SetSecretBinding) change;
+      return new FilesetUpdateRequest.SetFilesetSecretBindingRequest(
+          setSecretBinding.getProperty(),
+          setSecretBinding.getBinding().provider(),
+          setSecretBinding.getBinding().plaintext());
+    } else if (change instanceof FilesetChange.SetSecretReference) {
+      FilesetChange.SetSecretReference setSecretReference =
+          (FilesetChange.SetSecretReference) change;
+      return new FilesetUpdateRequest.SetFilesetSecretReferenceRequest(
+          setSecretReference.getProperty(),
+          setSecretReference.getReference().provider(),
+          setSecretReference.getReference().attributes());
     } else {
       throw new IllegalArgumentException(
           "Unknown change type: " + change.getClass().getSimpleName());
@@ -377,6 +430,31 @@ class DTOConverters {
     } else if (change instanceof TagChange.RemoveProperty) {
       return new TagUpdateRequest.RemoveTagPropertyRequest(
           ((TagChange.RemoveProperty) change).getProperty());
+
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown change type: " + change.getClass().getSimpleName());
+    }
+  }
+
+  static DomainUpdateRequest toDomainUpdateRequest(DomainChange change) {
+    Preconditions.checkArgument(change != null, "domain change must not be null");
+    if (change instanceof DomainChange.RenameDomain) {
+      String newName = ((DomainChange.RenameDomain) change).getNewName();
+      return new DomainUpdateRequest.RenameDomainRequest(newName);
+
+    } else if (change instanceof DomainChange.UpdateDomainComment) {
+      return new DomainUpdateRequest.UpdateDomainCommentRequest(
+          ((DomainChange.UpdateDomainComment) change).getNewComment());
+
+    } else if (change instanceof DomainChange.SetProperty) {
+      return new DomainUpdateRequest.SetDomainPropertyRequest(
+          ((DomainChange.SetProperty) change).getProperty(),
+          ((DomainChange.SetProperty) change).getValue());
+
+    } else if (change instanceof DomainChange.RemoveProperty) {
+      return new DomainUpdateRequest.RemoveDomainPropertyRequest(
+          ((DomainChange.RemoveProperty) change).getProperty());
 
     } else {
       throw new IllegalArgumentException(
@@ -597,6 +675,40 @@ class DTOConverters {
     } else {
       throw new IllegalArgumentException(
           "Unknown function change type: " + change.getClass().getSimpleName());
+    }
+  }
+
+  static SemanticModelUpdateRequest toSemanticModelUpdateRequest(SemanticModelChange change) {
+    if (change == null) {
+      throw new IllegalArgumentException("Semantic Model change must not be null");
+    }
+
+    if (change instanceof SemanticModelChange.RenameSemanticModel) {
+      return new SemanticModelUpdateRequest.RenameSemanticModelRequest(
+          ((SemanticModelChange.RenameSemanticModel) change).getNewName());
+
+    } else if (change instanceof SemanticModelChange.UpdateComment) {
+      return new SemanticModelUpdateRequest.UpdateSemanticModelCommentRequest(
+          ((SemanticModelChange.UpdateComment) change).getNewComment());
+
+    } else if (change instanceof SemanticModelChange.SetProperty) {
+      SemanticModelChange.SetProperty setProperty = (SemanticModelChange.SetProperty) change;
+      return new SemanticModelUpdateRequest.SetSemanticModelPropertyRequest(
+          setProperty.getProperty(), setProperty.getValue());
+
+    } else if (change instanceof SemanticModelChange.RemoveProperty) {
+      return new SemanticModelUpdateRequest.RemoveSemanticModelPropertyRequest(
+          ((SemanticModelChange.RemoveProperty) change).getProperty());
+
+    } else if (change instanceof SemanticModelChange.ReplaceDefinition) {
+      SemanticModelChange.ReplaceDefinition replaceDefinition =
+          (SemanticModelChange.ReplaceDefinition) change;
+      return new SemanticModelUpdateRequest.ReplaceSemanticModelDefinitionRequest(
+          SemanticModelDefinitionDTO.fromDefinition(replaceDefinition.getDefinition()));
+
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown Semantic Model change type: " + change.getClass().getSimpleName());
     }
   }
 

@@ -23,9 +23,15 @@ import static org.apache.gravitino.integration.test.util.TestDatabaseName.MYSQL_
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
 import java.util.Map;
 import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.types.Row;
+import org.apache.flink.util.CloseableIterator;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.flink.connector.integration.test.FlinkCommonIT;
@@ -54,6 +60,11 @@ public abstract class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
 
   @Override
   protected boolean supportTablePropertiesOperation() {
+    return false;
+  }
+
+  @Override
+  protected boolean supportsCustomTableProperties() {
     return false;
   }
 
@@ -154,9 +165,12 @@ public abstract class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
     org.apache.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
     Map<String, String> properties = gravitinoCatalog.properties();
     Assertions.assertEquals(mysqlUrl, properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_URL));
-    // jdbc-user and jdbc-password are hidden properties and not returned by catalog.properties()
-    Assertions.assertFalse(properties.containsKey(JdbcPropertiesConstants.GRAVITINO_JDBC_USER));
-    Assertions.assertFalse(properties.containsKey(JdbcPropertiesConstants.GRAVITINO_JDBC_PASSWORD));
+    // jdbc-user is visible; jdbc-password is hidden and returned as a masked placeholder.
+    Assertions.assertEquals(
+        mysqlUsername, properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_USER));
+    Assertions.assertEquals(
+        org.apache.gravitino.connector.HiddenPropertyMaskUtils.MASKED_VALUE,
+        properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_PASSWORD));
     Assertions.assertEquals(mysqlDefaultDatabase, properties.get(FLINK_BYPASS_DEFAULT_DATABASE));
     Assertions.assertEquals(
         "com.mysql.jdbc.Driver", properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER));
@@ -188,6 +202,55 @@ public abstract class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
   }
 
   @Test
+  public void testSelectFullyQualifiedTableWithoutDefaultDatabase() throws Exception {
+    String catalogName = "gravitino_mysql_jdbc_catalog_without_default_database";
+    String schemaName = "test_no_default_database";
+    String tableName = "test_fully_qualified_table";
+    Catalog catalogWithoutDefaultDatabase = null;
+    try {
+      catalog.asSchemas().createSchema(schemaName, null, ImmutableMap.of());
+      tableEnv.useCatalog(CATALOG_NAME);
+      // Prepare an external table without registering its ID under a different Gravitino catalog.
+      try (Connection connection =
+              DriverManager.getConnection(mysqlUrl, mysqlUsername, mysqlPassword);
+          Statement statement = connection.createStatement()) {
+        String mysqlTableName = schemaName + "." + tableName;
+        statement.execute("CREATE TABLE " + mysqlTableName + " (id INT)");
+        statement.executeUpdate("INSERT INTO " + mysqlTableName + " VALUES (1)");
+      }
+
+      catalogWithoutDefaultDatabase =
+          metalake.createCatalog(
+              catalogName,
+              org.apache.gravitino.Catalog.Type.RELATIONAL,
+              getProvider(),
+              null,
+              ImmutableMap.of(
+                  JdbcPropertiesConstants.GRAVITINO_JDBC_USER,
+                  mysqlUsername,
+                  JdbcPropertiesConstants.GRAVITINO_JDBC_PASSWORD,
+                  mysqlPassword,
+                  JdbcPropertiesConstants.GRAVITINO_JDBC_URL,
+                  mysqlUrl,
+                  JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER,
+                  mysqlDriver));
+
+      try (CloseableIterator<Row> rows =
+          tableEnv
+              .executeSql("SELECT * FROM " + catalogName + "." + schemaName + "." + tableName)
+              .collect()) {
+        Assertions.assertEquals(Row.of(1), rows.next());
+        Assertions.assertFalse(rows.hasNext());
+      }
+    } finally {
+      if (catalogWithoutDefaultDatabase != null) {
+        metalake.dropCatalog(catalogName, true);
+      }
+      catalog.asSchemas().dropSchema(schemaName, true);
+    }
+  }
+
+  @Test
   public void testCreateGravitinoJdbcCatalogUsingSQLMissingOptions() {
     tableEnv.useCatalog(DEFAULT_CATALOG);
     String catalogName = "gravitino_mysql_jdbc_catalog_missing_options";
@@ -204,5 +267,31 @@ public abstract class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
                         + ")",
                     catalogName, mysqlUrl, mysqlUsername, mysqlDefaultDatabase)),
         "Missing required options are:\n" + "\n" + "password");
+  }
+
+  @Test
+  public void testCreateTableLikeDoesNotForwardConnectorOptions() {
+    String databaseName = "test_create_table_like_db";
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          sql("CREATE TABLE source_table (id INT COMMENT 'id', name STRING COMMENT 'name')");
+          // LIKE copies the options that getTable() exposes for the source table, which include the
+          // JDBC connection options the connector injects for scans.
+          sql("CREATE TABLE like_table LIKE source_table");
+
+          Map<String, String> properties =
+              catalog
+                  .asTableCatalog()
+                  .loadTable(NameIdentifier.of(databaseName, "like_table"))
+                  .properties();
+          Assertions.assertFalse(
+              properties.containsKey(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD));
+          Assertions.assertFalse(
+              properties.containsKey(JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL));
+        },
+        true,
+        supportDropCascade());
   }
 }

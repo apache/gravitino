@@ -112,6 +112,21 @@ public final class JettyServerConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(128 * 1024);
 
+  /**
+   * Whether HTTP error responses include server-side stack traces. Defaults to {@code true} for
+   * compatibility with clients that read the {@code stack} field.
+   */
+  public static final ConfigEntry<Boolean> INCLUDE_ERROR_STACK_TRACE =
+      new ConfigBuilder("includeErrorStackTrace")
+          .doc(
+              "Whether to include server-side stack traces in HTTP error responses. Set this to "
+                  + "false in new deployments because stack traces can expose internal "
+                  + "implementation details. It remains true by default only to avoid breaking "
+                  + "legacy clients that expect the stack field")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .booleanConf()
+          .createWithDefault(true);
+
   public static final ConfigEntry<Integer> WEBSERVER_THREAD_POOL_WORK_QUEUE_SIZE =
       new ConfigBuilder("threadPoolWorkQueueSize")
           .doc("The size of the queue in the thread pool used by Jetty webserver")
@@ -297,6 +312,26 @@ public final class JettyServerConfig {
           .booleanConf()
           .createWithDefault(true);
 
+  /**
+   * The proxies whose {@code X-Forwarded-For} header is honored when resolving the client address
+   * for audit events. Empty by default, which means the header is ignored and the TCP peer address
+   * is recorded.
+   */
+  public static final ConfigEntry<List<String>> TRUSTED_PROXIES =
+      new ConfigBuilder("trustedProxies")
+          .doc(
+              "Comma separated list of IP addresses or CIDR blocks (IPv4 or IPv6) of reverse "
+                  + "proxies whose X-Forwarded-For header is trusted when resolving the client "
+                  + "address recorded in audit events. Host names are not allowed. When the "
+                  + "request comes from a trusted proxy, the right-most X-Forwarded-For entry "
+                  + "that is not a trusted proxy is used as the client address. Empty by "
+                  + "default, which means X-Forwarded-For is ignored and the address of the TCP "
+                  + "peer is used")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .toSequence()
+          .createWithDefault(Collections.emptyList());
+
   private final String host;
 
   private final int httpPort;
@@ -312,6 +347,8 @@ public final class JettyServerConfig {
   private final int requestHeaderSize;
 
   private final int responseHeaderSize;
+
+  private final boolean includeErrorStackTrace;
 
   private final int threadPoolWorkQueueSize;
 
@@ -337,10 +374,12 @@ public final class JettyServerConfig {
   private final boolean allowCredentials;
   private final String exposedHeaders;
   private final boolean chainPreflight;
+  private final List<String> trustedProxies;
+  private final ClientAddressResolver clientAddressResolver;
 
   private final Config internalConfig;
 
-  private JettyServerConfig(Map<String, String> configs) {
+  private JettyServerConfig(Map<String, String> configs, String keyPrefix) {
     this.internalConfig = new Config(false) {};
     internalConfig.loadFromMap(configs, t -> true);
 
@@ -368,6 +407,7 @@ public final class JettyServerConfig {
     this.idleTimeout = internalConfig.get(WEBSERVER_IDLE_TIMEOUT);
     this.requestHeaderSize = internalConfig.get(WEBSERVER_REQUEST_HEADER_SIZE);
     this.responseHeaderSize = internalConfig.get(WEBSERVER_RESPONSE_HEADER_SIZE);
+    this.includeErrorStackTrace = internalConfig.get(INCLUDE_ERROR_STACK_TRACE);
     this.threadPoolWorkQueueSize = internalConfig.get(WEBSERVER_THREAD_POOL_WORK_QUEUE_SIZE);
 
     this.enableHttps = internalConfig.get(ENABLE_HTTPS);
@@ -414,18 +454,35 @@ public final class JettyServerConfig {
     this.allowCredentials = internalConfig.get(ALLOW_CREDENTIALS);
     this.exposedHeaders = internalConfig.get(EXPOSED_HEADERS);
     this.chainPreflight = internalConfig.get(CHAIN_PREFLIGHT);
+
+    this.trustedProxies = Collections.unmodifiableList(internalConfig.get(TRUSTED_PROXIES));
+    try {
+      this.clientAddressResolver = new ClientAddressResolver(trustedProxies);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          String.format("%s%s: %s", keyPrefix, TRUSTED_PROXIES.getKey(), e.getMessage()), e);
+    }
   }
 
   public static JettyServerConfig fromConfig(Config config, String prefix) {
-    Map<String, String> configs = config.getConfigsWithPrefix(prefix);
-    if (config instanceof OverwriteDefaultConfig) {
-      configs = overwriteJettyDefaultConfig(configs, (OverwriteDefaultConfig) config);
-    }
-    return new JettyServerConfig(configs);
+    return fromConfig(config, prefix, prefix);
   }
 
   public static JettyServerConfig fromConfig(Config config) {
     return fromConfig(config, "");
+  }
+
+  /**
+   * Creates the Jetty server configuration of an auxiliary service whose configuration keys have
+   * already had the service prefix removed, such as an Iceberg or Lance REST service configuration.
+   *
+   * @param config the service configuration, with keys relative to {@code servicePrefix}
+   * @param servicePrefix the prefix the keys have in the configuration file, for example {@code
+   *     gravitino.iceberg-rest.}; only used to name the full key in error messages
+   * @return the Jetty server configuration
+   */
+  public static JettyServerConfig fromServiceConfig(Config config, String servicePrefix) {
+    return fromConfig(config, "", servicePrefix);
   }
 
   public String getHost() {
@@ -454,6 +511,15 @@ public final class JettyServerConfig {
 
   public int getResponseHeaderSize() {
     return responseHeaderSize;
+  }
+
+  /**
+   * Returns whether HTTP error responses include server-side stack traces.
+   *
+   * @return {@code true} if HTTP error responses include server-side stack traces
+   */
+  public boolean isIncludeErrorStackTrace() {
+    return includeErrorStackTrace;
   }
 
   public int getThreadPoolWorkQueueSize() {
@@ -562,6 +628,25 @@ public final class JettyServerConfig {
     return allowedHeaders;
   }
 
+  /**
+   * Returns the configured trusted proxies, each entry trimmed and blank entries dropped.
+   *
+   * @return the trusted proxy IP addresses and CIDR blocks; empty when none are configured
+   */
+  public List<String> getTrustedProxies() {
+    return trustedProxies;
+  }
+
+  /**
+   * Returns the resolver that derives the client address of a request from the configured trusted
+   * proxies.
+   *
+   * @return the client address resolver for this server
+   */
+  public ClientAddressResolver getClientAddressResolver() {
+    return clientAddressResolver;
+  }
+
   private SSLContext getDefaultSSLContext() {
     try {
       return SSLContext.getDefault();
@@ -588,6 +673,14 @@ public final class JettyServerConfig {
       return Collections.emptySet();
     }
     return Sets.newHashSet(context.getServerSocketFactory().getSupportedCipherSuites());
+  }
+
+  private static JettyServerConfig fromConfig(Config config, String prefix, String keyPrefix) {
+    Map<String, String> configs = config.getConfigsWithPrefix(prefix);
+    if (config instanceof OverwriteDefaultConfig) {
+      configs = overwriteJettyDefaultConfig(configs, (OverwriteDefaultConfig) config);
+    }
+    return new JettyServerConfig(configs, keyPrefix);
   }
 
   private static Map<String, String> overwriteJettyDefaultConfig(

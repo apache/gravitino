@@ -23,11 +23,13 @@ import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 
 /**
@@ -110,4 +112,15 @@ public interface IcebergNamespaceOperationDispatcher {
       IcebergRequestContext context,
       Namespace namespace,
       RegisterTableRequest registerTableRequest);
+
+  /**
+   * Register an Iceberg view using an existing metadata file.
+   *
+   * @param context Iceberg REST request context information.
+   * @param namespace The Iceberg namespace.
+   * @param registerViewRequest The request object containing the details for registering the view.
+   * @return A {@link LoadViewResponse} object containing the result of the operation.
+   */
+  LoadViewResponse registerView(
+      IcebergRequestContext context, Namespace namespace, RegisterViewRequest registerViewRequest);
 }

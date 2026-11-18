@@ -17,12 +17,14 @@
 
 package org.apache.gravitino.server.authorization.expression;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.security.Principal;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import ognl.Ognl;
 import ognl.OgnlContext;
 import ognl.OgnlException;
@@ -31,6 +33,8 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
+import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
+import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -40,11 +44,27 @@ import org.slf4j.LoggerFactory;
 /** Evaluate the runtime result of the AuthorizationExpression. */
 public class AuthorizationExpressionEvaluator {
 
-  private final String ognlAuthorizationExpression;
-  private final GravitinoAuthorizer authorizer;
-
   private static final Logger LOGGER =
       LoggerFactory.getLogger(AuthorizationExpressionEvaluator.class);
+
+  /**
+   * Caches the OGNL AST parsed from an authorization expression string, so a single parsed tree can
+   * be reused across evaluators and threads instead of re-parsing on every {@link #evaluate} call.
+   *
+   * <p>The shared tree is evaluated concurrently (see {@code MetadataAuthzHelper.doFilter}, which
+   * evaluates on a thread pool). This is safe even though OGNL nodes lazily memoize constant
+   * subexpressions during evaluation: only context-independent nodes are folded, every thread
+   * writes the same immutable value, the write is published through a volatile flag, and each
+   * evaluation builds its own {@link OgnlContext}, so no per-request state is shared.
+   *
+   * <p>The keys are the converted OGNL expression strings, which all originate from compile-time
+   * constants in {@link AuthorizationExpressionConstants} and {@code @AuthorizationExpression}
+   * annotations, so the cache is naturally bounded.
+   */
+  private static final Map<String, Object> PARSED_EXPRESSION_CACHE = new ConcurrentHashMap<>();
+
+  private final Object ognlAuthorizationExpressionTree;
+  private final GravitinoAuthorizer authorizer;
 
   /**
    * Use {@link AuthorizationExpressionConverter} to convert the authorization expression into an
@@ -64,9 +84,29 @@ public class AuthorizationExpressionEvaluator {
    * @param authorizer GravitinoAuthorizer instance
    */
   public AuthorizationExpressionEvaluator(String expression, GravitinoAuthorizer authorizer) {
-    this.ognlAuthorizationExpression =
-        AuthorizationExpressionConverter.convertToOgnlExpression(expression);
+    this.ognlAuthorizationExpressionTree =
+        parseExpression(AuthorizationExpressionConverter.convertToOgnlExpression(expression));
     this.authorizer = authorizer;
+  }
+
+  /**
+   * Parses the OGNL expression into an AST, reusing the cached tree when the same expression was
+   * parsed before.
+   *
+   * @param ognlExpression the converted OGNL expression string
+   * @return the parsed OGNL AST, shared across evaluators for the same expression
+   */
+  private static Object parseExpression(String ognlExpression) {
+    return PARSED_EXPRESSION_CACHE.computeIfAbsent(
+        ognlExpression,
+        expression -> {
+          try {
+            return Ognl.parseExpression(expression);
+          } catch (OgnlException e) {
+            throw new RuntimeException(
+                "Failed to parse OGNL authorization expression: " + expression, e);
+          }
+        });
   }
 
   /**
@@ -145,8 +185,15 @@ public class AuthorizationExpressionEvaluator {
     metadataNames.forEach(
         (type, entityNameIdent) -> {
           if (isMetadataType(type)) {
-            MetadataObject metadataObject =
-                NameIdentifierUtil.toMetadataObject(entityNameIdent, type);
+            MetadataObject metadataObject;
+            try {
+              metadataObject = NameIdentifierUtil.toMetadataObjectForRead(entityNameIdent, type);
+            } catch (IllegalNameIdentifierException e) {
+              throw e;
+            } catch (IllegalArgumentException e) {
+              // Only metadata-name parsing failures are client errors, not authorizer failures.
+              throw new IllegalMetadataObjectException(e, "%s", e.getMessage());
+            }
             ognlContext.put(type.name(), metadataObject);
           }
           ognlContext.put(type.name() + "_NAME_IDENT", entityNameIdent);
@@ -155,7 +202,7 @@ public class AuthorizationExpressionEvaluator {
     ognlContext.put(
         "METALAKE_NAME", Optional.ofNullable(nameIdentifier).map(NameIdentifier::name).orElse(""));
     try {
-      return (boolean) Ognl.getValue(ognlAuthorizationExpression, ognlContext);
+      return (boolean) Ognl.getValue(ognlAuthorizationExpressionTree, ognlContext);
     } catch (OgnlException e) {
       throw new RuntimeException(e);
     }
@@ -164,5 +211,22 @@ public class AuthorizationExpressionEvaluator {
   private static boolean isMetadataType(Entity.EntityType type) {
     return Arrays.stream(MetadataObject.Type.values())
         .anyMatch(e -> Objects.equals(e.name(), type.name()));
+  }
+
+  /**
+   * Returns the parsed OGNL AST backing this evaluator, for tests asserting that the same
+   * expression reuses one cached tree.
+   *
+   * @return the parsed OGNL AST
+   */
+  @VisibleForTesting
+  Object getOgnlAuthorizationExpressionTree() {
+    return ognlAuthorizationExpressionTree;
+  }
+
+  /** Clears the parsed-expression cache so tests can run in isolation. */
+  @VisibleForTesting
+  static void clearParsedExpressionCache() {
+    PARSED_EXPRESSION_CACHE.clear();
   }
 }

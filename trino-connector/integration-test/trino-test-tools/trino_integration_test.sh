@@ -60,6 +60,8 @@ fi
 # --trino_version is forwarded to Gradle and also used for patch selection.
 auto_patch=false
 trino_version=""
+test_set=""
+has_test_containers=false
 args=""
 for arg in "$@"; do
     case "$arg" in
@@ -70,6 +72,14 @@ for arg in "$@"; do
             trino_version="${arg#*=}"
             args="$args $arg"
             ;;
+        --test_set=*)
+            test_set="${arg#*=}"
+            args="$args $arg"
+            ;;
+        --test_containers=*)
+            has_test_containers=true
+            args="$args $arg"
+            ;;
         *)
             args="$args $arg"
             ;;
@@ -77,20 +87,31 @@ for arg in "$@"; do
 done
 args="${args# }"
 
+# Auto-map a testset to its dedicated docker compose container subset, unless
+# --test_containers was already given explicitly on the command line.
+declare -A TESTSET_CONTAINERS_MAP=(
+    ["jdbc-mysql"]="mysql"
+)
+if [ "$has_test_containers" = false ] && [ -n "${TESTSET_CONTAINERS_MAP[$test_set]:-}" ]; then
+    args="$args --test_containers=${TESTSET_CONTAINERS_MAP[$test_set]}"
+fi
+
 TESTSETS_DIR="$GRAVITINO_ROOT_DIR/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets"
 
 # Apply version-specific patches cumulatively based on the target Trino version.
 # Patches are applied in descending order (newest first):
-#   version <= 473: apply trino-478-473.patch
-#   version <= 452: also apply trino-473-452.patch
-#   version <= 446: also apply trino-452-446.patch
+#   version <= 481: apply trino-481-469.patch
+#   version <= 473: also apply trino-478-473.patch
 apply_version_patches() {
     local version=$1
     # Each entry is "max_version:patch_file"; patches are applied in order.
     local patches=(
+        # MySQL's CHAR columns still return space-padded values through Trino's jdbc-mysql
+        # connector up to 481; 482 changed to return them trimmed. The committed .txt fixtures
+        # follow 482 (the newest supported version), so this patch restores the padded form for
+        # everything at or below 481.
+        "481:trino-481-469.patch"
         "473:trino-478-473.patch"
-        "452:trino-473-452.patch"
-        "446:trino-452-446.patch"
     )
     for entry in "${patches[@]}"; do
         local max_ver="${entry%%:*}"

@@ -35,7 +35,9 @@ class TestTagDTO(unittest.TestCase):
                     "key2": "value2",
                 }
             )
-            .audit_info(AuditDTO("test_user", 1640995200000))
+            .allowed_values(["finance", "risk"])
+            .assignment_values(["finance"])
+            .audit_info(AuditDTO("test_user", "2022-01-01T00:00:00Z"))
             .inherited(True)
             .build()
         )
@@ -45,8 +47,19 @@ class TestTagDTO(unittest.TestCase):
         self.assertEqual(deser_dict["comment"], "test_comment")
         self.assertEqual(deser_dict["properties"], {"key1": "value1", "key2": "value2"})
         self.assertTrue(deser_dict["inherited"])
+        self.assertEqual(["finance", "risk"], deser_dict["allowedValues"])
+        self.assertEqual(["finance"], deser_dict["assignmentValues"])
         self.assertEqual(deser_dict["audit"]["creator"], "test_user")
-        self.assertEqual(deser_dict["audit"]["createTime"], 1640995200000)
+        self.assertEqual(deser_dict["audit"]["createTime"], "2022-01-01T00:00:00Z")
+
+    def test_positional_constructor_keeps_audit_and_inherited_compatibility(self):
+        audit = AuditDTO("test_user", "2022-01-01T00:00:00Z")
+        tag_dto = TagDTO("test_tag", "test_comment", {}, audit, False)
+
+        self.assertEqual(audit, tag_dto.audit_info())
+        self.assertFalse(tag_dto.inherited())
+        self.assertIsNone(tag_dto.allowed_values())
+        self.assertIsNone(tag_dto.assignment_values())
 
     def test_equality_and_hash(self):
         builder = TagDTO.builder()
@@ -59,7 +72,7 @@ class TestTagDTO(unittest.TestCase):
                     "key2": "value2",
                 }
             )
-            .audit_info(AuditDTO("test_user", 1640995200000))
+            .audit_info(AuditDTO("test_user", "2022-01-01T00:00:00Z"))
             .inherited(True)
             .build()
         )
@@ -72,7 +85,7 @@ class TestTagDTO(unittest.TestCase):
                     "key2": "value2",
                 }
             )
-            .audit_info(AuditDTO("test_user", 1640995200000))
+            .audit_info(AuditDTO("test_user", "2022-01-01T00:00:00Z"))
             .inherited(True)
             .build()
         )
@@ -85,7 +98,7 @@ class TestTagDTO(unittest.TestCase):
                     "key2": "value3",
                 }
             )
-            .audit_info(AuditDTO("test_user", 1640995200000))
+            .audit_info(AuditDTO("test_user", "2022-01-01T00:00:00Z"))
             .inherited(False)
             .build()
         )
@@ -98,3 +111,59 @@ class TestTagDTO(unittest.TestCase):
 
         self.assertNotEqual(tag_dto2, tag_dto3)
         self.assertNotEqual(hash(tag_dto2), hash(tag_dto3))
+
+    def test_assignment_values_do_not_affect_equality(self):
+        tag_dto1 = (
+            TagDTO.builder()
+            .name("test_tag")
+            .comment("test_comment")
+            .properties({"key1": "value1"})
+            .audit_info(AuditDTO("test_user", "2022-01-01T00:00:00Z"))
+            .build()
+        )
+        tag_dto2 = (
+            TagDTO.builder()
+            .name("test_tag")
+            .comment("test_comment")
+            .properties({"key1": "value1"})
+            .assignment_values([])
+            .audit_info(AuditDTO("test_user", "2022-01-01T00:00:00Z"))
+            .build()
+        )
+        tag_dto3 = (
+            TagDTO.builder()
+            .name("test_tag")
+            .comment("test_comment")
+            .properties({"key1": "value1"})
+            .assignment_values(["finance"])
+            .audit_info(AuditDTO("test_user", "2022-01-01T00:00:00Z"))
+            .build()
+        )
+
+        self.assertEqual(tag_dto1, tag_dto2)
+        self.assertEqual(tag_dto1, tag_dto3)
+        self.assertEqual(hash(tag_dto1), hash(tag_dto2))
+        self.assertEqual(hash(tag_dto1), hash(tag_dto3))
+
+    def test_allowed_values_affect_equality(self):
+        tag_dto1 = (
+            TagDTO.builder()
+            .name("test_tag")
+            .comment("test_comment")
+            .properties({"key1": "value1"})
+            .allowed_values(["finance"])
+            .audit_info(AuditDTO("test_user", "2022-01-01T00:00:00Z"))
+            .build()
+        )
+        tag_dto2 = (
+            TagDTO.builder()
+            .name("test_tag")
+            .comment("test_comment")
+            .properties({"key1": "value1"})
+            .allowed_values(["risk"])
+            .audit_info(AuditDTO("test_user", "2022-01-01T00:00:00Z"))
+            .build()
+        )
+
+        self.assertNotEqual(tag_dto1, tag_dto2)
+        self.assertNotEqual(hash(tag_dto1), hash(tag_dto2))

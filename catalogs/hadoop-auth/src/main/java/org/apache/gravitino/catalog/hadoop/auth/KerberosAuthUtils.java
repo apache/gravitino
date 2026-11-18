@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
@@ -104,9 +105,8 @@ public final class KerberosAuthUtils {
         "HDFS URIs are not supported for keytab files");
 
     File parentFile = keytabFile.getParentFile();
-    if (parentFile != null && !parentFile.exists() && !parentFile.mkdirs()) {
-      throw new IOException(
-          String.format("Failed to create keytab directory %s", parentFile.getAbsolutePath()));
+    if (parentFile != null) {
+      Files.createDirectories(parentFile.toPath());
     }
 
     FileFetcher.get().fetchFileFromUri(keytabUri, keytabFile, timeoutSec * 1000, hadoopConf);
@@ -137,7 +137,7 @@ public final class KerberosAuthUtils {
     keytabFile.deleteOnExit();
     if (keytabFile.exists() && !keytabFile.delete()) {
       throw new IllegalStateException(
-          String.format("Fail to delete keytab file %s", keytabFile.getAbsolutePath()));
+          String.format("Failed to delete keytab file %s", keytabFile.getAbsolutePath()));
     }
     return fetchKeytabFromUri(keytabUri, keytabFile, timeoutSec, allowHdfsKeytabUri, hadoopConf);
   }
@@ -234,7 +234,7 @@ public final class KerberosAuthUtils {
     try {
       loginUgi.checkTGTAndReloginFromKeytab();
     } catch (Exception e) {
-      log.error("Fail to refresh ugi token: ", e);
+      log.error("Failed to refresh UGI token: ", e);
     }
   }
 

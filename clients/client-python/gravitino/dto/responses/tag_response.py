@@ -20,7 +20,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from dataclasses_json import config, dataclass_json
-
 from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.dto.tag_dto import TagDTO
 from gravitino.utils.precondition import Precondition
@@ -32,9 +31,15 @@ class TagNamesListResponse(BaseResponse):
     """Represents a response for a Tag Names List request."""
 
     _tags: list[str] = field(default_factory=list, metadata=config(field_name="names"))
+    _has_inaccessible_tags: bool = field(
+        default=False, metadata=config(field_name="hasInaccessibleTags")
+    )
 
     def tag_names(self) -> list[str]:
         return self._tags
+
+    def has_inaccessible_tags(self) -> bool:
+        return self._has_inaccessible_tags
 
     def validate(self) -> None:
         Precondition.check_argument(
@@ -55,9 +60,15 @@ class TagListResponse(BaseResponse):
     _tags: list[TagDTO] = field(
         default_factory=list, metadata=config(field_name="tags")
     )
+    _has_inaccessible_tags: bool = field(
+        default=False, metadata=config(field_name="hasInaccessibleTags")
+    )
 
     def tags(self) -> list[TagDTO]:
         return self._tags
+
+    def has_inaccessible_tags(self) -> bool:
+        return self._has_inaccessible_tags
 
 
 @dataclass_json

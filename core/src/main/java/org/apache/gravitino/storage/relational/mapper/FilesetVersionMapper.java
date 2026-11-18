@@ -74,6 +74,15 @@ public interface FilesetVersionMapper {
   Integer deleteFilesetVersionsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 
+  /**
+   * Returns the highest live version recorded for a fileset, or {@code null} when it has none.
+   *
+   * @param filesetId the fileset whose versions are inspected
+   * @return the highest version still present in the version table
+   */
+  @SelectProvider(type = FilesetVersionSQLProviderFactory.class, method = "selectMaxFilesetVersion")
+  Long selectMaxFilesetVersion(@Param("filesetId") Long filesetId);
+
   @SelectProvider(
       type = FilesetVersionSQLProviderFactory.class,
       method = "selectFilesetVersionsByRetentionCount")

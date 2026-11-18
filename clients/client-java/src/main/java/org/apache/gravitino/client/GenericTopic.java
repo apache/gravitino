@@ -26,24 +26,37 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.SupportsRoles;
+import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.domain.SupportsDomains;
 import org.apache.gravitino.dto.messaging.TopicDTO;
-import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
-import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyList;
 import org.apache.gravitino.policy.SupportsPolicies;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagList;
+import org.apache.gravitino.tag.TagValue;
 
 /** Represents a generic topic. */
-class GenericTopic implements Topic, SupportsTags, SupportsRoles, SupportsPolicies {
+class GenericTopic
+    implements Topic,
+        SupportsTags,
+        SupportsDomains,
+        SupportsRoles,
+        SupportsPolicies,
+        SupportsSecrets {
 
   private final TopicDTO topicDTO;
+
+  private final MetadataObjectDomainOperations objectDomainOperations;
 
   private final MetadataObjectTagOperations objectTagOperations;
   private final MetadataObjectRoleOperations objectRoleOperations;
   private final MetadataObjectPolicyOperations objectPolicyOperations;
+  private final MetadataObjectSecretOperations objectSecretOperations;
 
   GenericTopic(TopicDTO topicDTO, RESTClient restClient, Namespace topicNs) {
     this.topicDTO = topicDTO;
@@ -52,10 +65,14 @@ class GenericTopic implements Topic, SupportsTags, SupportsRoles, SupportsPolici
     MetadataObject topicObject = MetadataObjects.of(topicFullName, MetadataObject.Type.TOPIC);
     this.objectTagOperations =
         new MetadataObjectTagOperations(topicNs.level(0), topicObject, restClient);
+    this.objectDomainOperations =
+        new MetadataObjectDomainOperations(topicNs.level(0), topicObject, restClient);
     this.objectRoleOperations =
         new MetadataObjectRoleOperations(topicNs.level(0), topicObject, restClient);
     this.objectPolicyOperations =
         new MetadataObjectPolicyOperations(topicNs.level(0), topicObject, restClient);
+    this.objectSecretOperations =
+        new MetadataObjectSecretOperations(topicNs.level(0), topicObject, restClient);
   }
 
   @Override
@@ -78,6 +95,24 @@ class GenericTopic implements Topic, SupportsTags, SupportsRoles, SupportsPolici
     return topicDTO.properties();
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public SupportsDomains supportsDomains() {
+    return this;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String[] listDomains() {
+    return objectDomainOperations.listDomains();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Domain[] listDomainsInfo() {
+    return objectDomainOperations.listDomainsInfo();
+  }
+
   @Override
   public SupportsTags supportsTags() {
     return this;
@@ -94,13 +129,33 @@ class GenericTopic implements Topic, SupportsTags, SupportsRoles, SupportsPolici
   }
 
   @Override
+  public SupportsSecrets supportsSecrets() {
+    return this;
+  }
+
+  @Override
+  public Map<String, String> getSecrets() {
+    return objectSecretOperations.getSecrets();
+  }
+
+  @Override
   public String[] listTags() {
     return objectTagOperations.listTags();
   }
 
   @Override
+  public TagList<String> listTagsWithVisibility() {
+    return objectTagOperations.listTagsWithVisibility();
+  }
+
+  @Override
   public Tag[] listTagsInfo() {
     return objectTagOperations.listTagsInfo();
+  }
+
+  @Override
+  public TagList<Tag> listTagsInfoWithVisibility() {
+    return objectTagOperations.listTagsInfoWithVisibility();
   }
 
   @Override
@@ -114,8 +169,18 @@ class GenericTopic implements Topic, SupportsTags, SupportsRoles, SupportsPolici
   }
 
   @Override
+  public String[] associateTags(TagValue[] tagsToAdd, TagValue[] tagsToRemove) {
+    return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
+  }
+
+  @Override
   public String[] listPolicies() {
     return objectPolicyOperations.listPolicies();
+  }
+
+  @Override
+  public PolicyList<String> listPoliciesWithVisibility() {
+    return objectPolicyOperations.listPoliciesWithVisibility();
   }
 
   @Override
@@ -124,14 +189,8 @@ class GenericTopic implements Topic, SupportsTags, SupportsRoles, SupportsPolici
   }
 
   @Override
-  public Policy getPolicy(String name) throws NoSuchPolicyException {
-    return objectPolicyOperations.getPolicy(name);
-  }
-
-  @Override
-  public String[] associatePolicies(String[] policiesToAdd, String[] policiesToRemove)
-      throws PolicyAlreadyAssociatedException {
-    return objectPolicyOperations.associatePolicies(policiesToAdd, policiesToRemove);
+  public PolicyList<Policy> listPolicyInfosWithVisibility() {
+    return objectPolicyOperations.listPolicyInfosWithVisibility();
   }
 
   @Override

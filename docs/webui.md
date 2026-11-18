@@ -12,13 +12,13 @@ license: "This software is licensed under the Apache License version 2."
 
 This document primarily outlines how users can manage metadata within Apache Gravitino using the web UI, the graphical interface is accessible through a web browser as an alternative to writing code or using the REST interface.
 
-Integrate [OAuth settings](security/security.md) to view, add, modify, and delete metalakes, create catalogs, and view catalogs, schemas, and tables, among other functions.
+Integrate [OAuth settings](security/how-to-authenticate.md) to view, add, modify, and delete metalakes, create catalogs, and view catalogs, schemas, and tables, among other functions.
 
 [Build](./how-to-build.md#quick-start) and [deploy](./getting-started/index.md#local-workstation) the Gravitino Web UI and open it in a browser at `http://<gravitino-host>:<gravitino-port>`, by default is [http://localhost:8090](http://localhost:8090).
 
 ## Initial Page
 
-The web UI homepage displayed in Gravitino depends on the configuration parameter for OAuth mode, see the details in [Security](security/security.md).
+The web UI homepage displayed in Gravitino depends on the configuration parameter for OAuth mode, see the details in [Security](security/how-to-authenticate.md).
 
 Set parameter for `gravitino.authenticators`: [`simple`](#simple-mode), [`basic`](../security/how-to-authenticate.md#basic-mode), or [`oauth`](#oauth-mode). Simple mode is the default authentication option. If multiple authenticators are set, the first one is taken by default.
 
@@ -59,7 +59,7 @@ Such as Safari need to enable the developer menu, and select `Disable Cross-Orig
 
 ![webui-login-with-oauth](./assets/webui/login-with-oauth.png)
 
-1. Enter the values corresponding to your specific configuration. For detailed instructions, refer to [Security](security/security.md).
+1. Enter the values corresponding to your specific configuration. For detailed instructions, refer to [Security](security/how-to-authenticate.md).
 
 2. Click on the `LOGIN` button takes you to the homepage.
 

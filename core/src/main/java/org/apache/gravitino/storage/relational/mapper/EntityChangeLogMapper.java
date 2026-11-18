@@ -36,9 +36,33 @@ public interface EntityChangeLogMapper {
 
   String ENTITY_CHANGE_LOG_TABLE_NAME = "entity_change_log";
 
+  /** Max expired rows removed in one cleanup transaction. */
+  int ENTITY_CHANGE_LOG_PRUNE_BATCH_SIZE = 1000;
+
   @SelectProvider(type = EntityChangeLogSQLProviderFactory.class, method = "selectEntityChanges")
   List<EntityChangeRecord> selectEntityChanges(
       @Param("lastConsumedId") long lastConsumedId, @Param("maxRows") int maxRows);
+
+  /**
+   * Reads a page of recent rows at or behind the incremental cursor using the database clock.
+   * Timestamp and ID together preserve page boundaries when timestamps are equal.
+   *
+   * @param afterCreatedAt exclusive timestamp/ID page cursor timestamp
+   * @param afterId exclusive timestamp/ID page cursor ID
+   * @param upperId inclusive incremental high-water ID captured at the start of the sweep
+   * @param windowMs maximum recorded created_at age in milliseconds
+   * @param maxRows maximum rows in this page
+   * @return recent records ordered by recorded created_at timestamp and ID
+   */
+  @SelectProvider(
+      type = EntityChangeLogSQLProviderFactory.class,
+      method = "selectRecentEntityChanges")
+  List<EntityChangeRecord> selectRecentEntityChanges(
+      @Param("afterCreatedAt") long afterCreatedAt,
+      @Param("afterId") long afterId,
+      @Param("upperId") long upperId,
+      @Param("windowMs") long windowMs,
+      @Param("maxRows") int maxRows);
 
   @SelectProvider(type = EntityChangeLogSQLProviderFactory.class, method = "selectMaxChangeId")
   Long selectMaxChangeId();
@@ -51,5 +75,5 @@ public interface EntityChangeLogMapper {
       @Param("operateType") OperateType operateType);
 
   @DeleteProvider(type = EntityChangeLogSQLProviderFactory.class, method = "pruneOldEntityChanges")
-  void pruneOldEntityChanges(@Param("before") long before);
+  int pruneOldEntityChanges(@Param("retentionMs") long retentionMs);
 }

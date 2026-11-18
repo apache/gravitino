@@ -20,8 +20,13 @@ package org.apache.gravitino.authorization;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.bulk.BulkItemResult;
+import org.apache.gravitino.bulk.GroupAdd;
+import org.apache.gravitino.bulk.RoleAdd;
+import org.apache.gravitino.bulk.UserAdd;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -52,6 +57,18 @@ public interface AccessControlDispatcher {
       throws UserAlreadyExistsException, NoSuchMetalakeException;
 
   /**
+   * Adds users in bulk.
+   *
+   * @param metalake The Metalake of the Users.
+   * @param users The Users to add.
+   * @return The item-level bulk results.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If adding the Users encounters storage issues.
+   */
+  List<BulkItemResult<User>> addUsers(String metalake, List<UserAdd> users)
+      throws NoSuchMetalakeException;
+
+  /**
    * Removes a User.
    *
    * @param metalake The Metalake of the User.
@@ -62,6 +79,20 @@ public interface AccessControlDispatcher {
    * @throws RuntimeException If removing the User encounters storage issues.
    */
   boolean removeUser(String metalake, String user) throws NoSuchMetalakeException;
+
+  /**
+   * Removes Users in bulk.
+   *
+   * @param metalake The Metalake of the Users.
+   * @param users The names of the Users.
+   * @param metalakeOwner The Metalake owner.
+   * @return The item-level bulk results.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If removing the Users encounters storage issues.
+   */
+  List<BulkItemResult<String>> removeUsers(
+      String metalake, List<String> users, Optional<Owner> metalakeOwner)
+      throws NoSuchMetalakeException;
 
   /**
    * Gets a User.
@@ -83,6 +114,27 @@ public interface AccessControlDispatcher {
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    */
   User[] listUsers(String metalake) throws NoSuchMetalakeException;
+
+  /**
+   * Lists users with pagination.
+   *
+   * @param metalake The Metalake of the User.
+   * @param offset The number of users to skip.
+   * @param limit The maximum number of users to return.
+   * @return The paginated User result.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  PagedResult<User> listUsers(String metalake, int offset, int limit)
+      throws NoSuchMetalakeException;
+
+  /**
+   * Counts users in a metalake.
+   *
+   * @param metalake The Metalake of the User.
+   * @return The total number of users.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  long countUsers(String metalake) throws NoSuchMetalakeException;
 
   /**
    * Lists the usernames.
@@ -107,6 +159,18 @@ public interface AccessControlDispatcher {
       throws GroupAlreadyExistsException, NoSuchMetalakeException;
 
   /**
+   * Adds groups in bulk.
+   *
+   * @param metalake The Metalake of the Groups.
+   * @param groups The Groups to add.
+   * @return The item-level bulk results.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If adding the Groups encounters storage issues.
+   */
+  List<BulkItemResult<Group>> addGroups(String metalake, List<GroupAdd> groups)
+      throws NoSuchMetalakeException;
+
+  /**
    * Removes a Group.
    *
    * @param metalake The Metalake of the Group.
@@ -117,6 +181,20 @@ public interface AccessControlDispatcher {
    * @throws RuntimeException If removing the Group encounters storage issues.
    */
   boolean removeGroup(String metalake, String group) throws NoSuchMetalakeException;
+
+  /**
+   * Removes Groups in bulk.
+   *
+   * @param metalake The Metalake of the Groups.
+   * @param groups The names of the Groups.
+   * @param metalakeOwner The Metalake owner.
+   * @return The item-level bulk results.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If removing the Groups encounters storage issues.
+   */
+  List<BulkItemResult<String>> removeGroups(
+      String metalake, List<String> groups, Optional<Owner> metalakeOwner)
+      throws NoSuchMetalakeException;
 
   /**
    * Gets a Group.
@@ -139,6 +217,26 @@ public interface AccessControlDispatcher {
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    */
   Group[] listGroups(String metalake);
+
+  /**
+   * Lists groups with pagination.
+   *
+   * @param metalake The Metalake of the Group.
+   * @param offset The number of groups to skip.
+   * @param limit The maximum number of groups to return.
+   * @return The paginated Group result.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  PagedResult<Group> listGroups(String metalake, int offset, int limit);
+
+  /**
+   * Counts groups in a metalake.
+   *
+   * @param metalake The Metalake of the Group.
+   * @return The total number of groups.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  long countGroups(String metalake);
 
   /**
    * List group names
@@ -237,6 +335,18 @@ public interface AccessControlDispatcher {
       throws RoleAlreadyExistsException, NoSuchMetalakeException;
 
   /**
+   * Creates roles in bulk.
+   *
+   * @param metalake The Metalake of the Roles.
+   * @param roles The Roles to create.
+   * @return The item-level bulk results.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If creating the Roles encounters storage issues.
+   */
+  List<BulkItemResult<Role>> createRoles(String metalake, List<RoleAdd> roles)
+      throws NoSuchMetalakeException;
+
+  /**
    * Gets a Role.
    *
    * @param metalake The Metalake of the Role.
@@ -259,6 +369,18 @@ public interface AccessControlDispatcher {
    * @throws RuntimeException If deleting the Role encounters storage issues.
    */
   boolean deleteRole(String metalake, String role) throws NoSuchMetalakeException;
+
+  /**
+   * Deletes Roles in bulk.
+   *
+   * @param metalake The Metalake of the Roles.
+   * @param roles The names of the Roles.
+   * @return The item-level bulk results.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If deleting the Roles encounters storage issues.
+   */
+  List<BulkItemResult<String>> deleteRoles(String metalake, List<String> roles)
+      throws NoSuchMetalakeException;
 
   Role overridePrivilegesInRole(
       String metalake, String role, List<SecurableObject> securableObjectsToOverride)

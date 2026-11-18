@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.TableInfo;
@@ -37,7 +38,23 @@ public final class CreateTableEvent extends TableEvent {
    * @param createdTableInfo The final state of the table post-creation.
    */
   public CreateTableEvent(String user, NameIdentifier identifier, TableInfo createdTableInfo) {
-    super(user, identifier);
+    this(user, identifier, createdTableInfo, null);
+  }
+
+  /**
+   * Constructs an instance of {@code CreateTableEvent} with optional audit extras.
+   *
+   * @param user The username of the individual who initiated the table creation.
+   * @param identifier The unique identifier of the table that was created.
+   * @param createdTableInfo The final state of the table post-creation.
+   * @param customInfo optional audit facts contributed by an inner dispatcher
+   */
+  public CreateTableEvent(
+      String user,
+      NameIdentifier identifier,
+      TableInfo createdTableInfo,
+      Map<String, String> customInfo) {
+    super(user, identifier, customInfo);
     this.createdTableInfo = createdTableInfo;
   }
 

@@ -71,13 +71,31 @@ The current implementation materializes all view results on the Spark driver usi
 SELECT * FROM employee_view;
 ```
 
+## Dynamic Partition Pruning
+
+Dynamic partition pruning (DPP) is supported for partitioned Hive tables that are read through the Hive SerDe reader.
+
+| Table storage format                      | Supports DPP                                                                               |
+|-------------------------------------------|--------------------------------------------------------------------------------------------|
+| Text, Avro, CSV, JSON, SequenceFile, etc. | Yes                                                                                        |
+| Parquet                                   | Only when `spark.sql.kyuubi.hive.connector.read.convertMetastoreParquet` is set to `false` |
+| ORC                                       | Only when `spark.sql.kyuubi.hive.connector.read.convertMetastoreOrc` is set to `false`     |
+
+Both `convertMetastore*` options default to `true`, which reads Parquet and ORC tables with Spark's native readers. The native readers are faster but don't support DPP. Setting an option to `false` enables DPP for that format, but reads the data with the Hive SerDe reader instead.
+
+```sql
+SET spark.sql.kyuubi.hive.connector.read.convertMetastoreParquet=false;
+```
+
+DPP only prunes partitions, and the query must also meet Spark's own conditions for dynamic partition pruning, see `spark.sql.optimizer.dynamicPartitionPruning.enabled` in [Spark configuration](https://spark.apache.org/docs/latest/configuration.html#runtime-sql-configuration).
+
 ## Catalog Properties
 
 Gravitino spark connector will transform below property names which are defined in catalog properties to Spark Hive connector configuration.
 
-| Property name in Gravitino catalog properties | Spark Hive connector configuration | Description                | Since Version |
-|-----------------------------------------------|------------------------------------|----------------------------|---------------|
-| `metastore.uris`                              | `hive.metastore.uris`              | Hive metastore uri address | 0.5.0         |
+| Property name in Gravitino catalog properties | Spark Hive connector configuration | Description                |
+|-----------------------------------------------|------------------------------------|----------------------------|
+| `metastore.uris`                              | `hive.metastore.uris`              | Hive metastore uri address |
 
 Gravitino catalog property names with the prefix `spark.bypass.` are passed to Spark Hive connector. For example, using `spark.bypass.hive.exec.dynamic.partition.mode` to pass the `hive.exec.dynamic.partition.mode` to the Spark Hive connector.
 

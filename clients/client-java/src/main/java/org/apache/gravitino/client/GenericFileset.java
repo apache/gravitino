@@ -29,25 +29,38 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.SupportsCredentials;
+import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.domain.SupportsDomains;
 import org.apache.gravitino.dto.file.FilesetDTO;
-import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
-import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyList;
 import org.apache.gravitino.policy.SupportsPolicies;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagList;
+import org.apache.gravitino.tag.TagValue;
 
 /** Represents a generic fileset. */
 class GenericFileset
-    implements Fileset, SupportsTags, SupportsRoles, SupportsCredentials, SupportsPolicies {
+    implements Fileset,
+        SupportsTags,
+        SupportsDomains,
+        SupportsRoles,
+        SupportsCredentials,
+        SupportsSecrets,
+        SupportsPolicies {
 
   private final FilesetDTO filesetDTO;
+
+  private final MetadataObjectDomainOperations objectDomainOperations;
 
   private final MetadataObjectTagOperations objectTagOperations;
   private final MetadataObjectRoleOperations objectRoleOperations;
   private final MetadataObjectCredentialOperations objectCredentialOperations;
+  private final MetadataObjectSecretOperations objectSecretOperations;
   private final MetadataObjectPolicyOperations objectPolicyOperations;
 
   GenericFileset(FilesetDTO filesetDTO, RESTClient restClient, Namespace filesetNs) {
@@ -57,10 +70,14 @@ class GenericFileset
     MetadataObject filesetObject = MetadataObjects.of(filesetFullName, MetadataObject.Type.FILESET);
     this.objectTagOperations =
         new MetadataObjectTagOperations(filesetNs.level(0), filesetObject, restClient);
+    this.objectDomainOperations =
+        new MetadataObjectDomainOperations(filesetNs.level(0), filesetObject, restClient);
     this.objectRoleOperations =
         new MetadataObjectRoleOperations(filesetNs.level(0), filesetObject, restClient);
     this.objectCredentialOperations =
         new MetadataObjectCredentialOperations(filesetNs.level(0), filesetObject, restClient);
+    this.objectSecretOperations =
+        new MetadataObjectSecretOperations(filesetNs.level(0), filesetObject, restClient);
     this.objectPolicyOperations =
         new MetadataObjectPolicyOperations(filesetNs.level(0), filesetObject, restClient);
   }
@@ -96,6 +113,24 @@ class GenericFileset
     return filesetDTO.properties();
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public SupportsDomains supportsDomains() {
+    return this;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String[] listDomains() {
+    return objectDomainOperations.listDomains();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Domain[] listDomainsInfo() {
+    return objectDomainOperations.listDomainsInfo();
+  }
+
   @Override
   public SupportsTags supportsTags() {
     return this;
@@ -117,13 +152,28 @@ class GenericFileset
   }
 
   @Override
+  public SupportsSecrets supportsSecrets() {
+    return this;
+  }
+
+  @Override
   public String[] listTags() {
     return objectTagOperations.listTags();
   }
 
   @Override
+  public TagList<String> listTagsWithVisibility() {
+    return objectTagOperations.listTagsWithVisibility();
+  }
+
+  @Override
   public Tag[] listTagsInfo() {
     return objectTagOperations.listTagsInfo();
+  }
+
+  @Override
+  public TagList<Tag> listTagsInfoWithVisibility() {
+    return objectTagOperations.listTagsInfoWithVisibility();
   }
 
   @Override
@@ -137,8 +187,18 @@ class GenericFileset
   }
 
   @Override
+  public String[] associateTags(TagValue[] tagsToAdd, TagValue[] tagsToRemove) {
+    return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
+  }
+
+  @Override
   public String[] listPolicies() {
     return objectPolicyOperations.listPolicies();
+  }
+
+  @Override
+  public PolicyList<String> listPoliciesWithVisibility() {
+    return objectPolicyOperations.listPoliciesWithVisibility();
   }
 
   @Override
@@ -147,14 +207,8 @@ class GenericFileset
   }
 
   @Override
-  public Policy getPolicy(String name) throws NoSuchPolicyException {
-    return objectPolicyOperations.getPolicy(name);
-  }
-
-  @Override
-  public String[] associatePolicies(String[] policiesToAdd, String[] policiesToRemove)
-      throws PolicyAlreadyAssociatedException {
-    return objectPolicyOperations.associatePolicies(policiesToAdd, policiesToRemove);
+  public PolicyList<Policy> listPolicyInfosWithVisibility() {
+    return objectPolicyOperations.listPolicyInfosWithVisibility();
   }
 
   @Override
@@ -165,6 +219,11 @@ class GenericFileset
   @Override
   public Credential[] getCredentials() {
     return objectCredentialOperations.getCredentials();
+  }
+
+  @Override
+  public Map<String, String> getSecrets() {
+    return objectSecretOperations.getSecrets();
   }
 
   @Override

@@ -65,6 +65,8 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/FunctionResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "409":
           description: Conflict - The target function already exists
           content:
@@ -185,11 +187,11 @@ components:
           description: The name of the function
         functionType:
           type: string
-          description: The type of the function
+          description: The type of the function. Responses always use lowercase values.
           enum:
-            - SCALAR
-            - AGGREGATE
-            - TABLE
+            - scalar
+            - aggregate
+            - table
         deterministic:
           type: boolean
           description: Whether the function is deterministic
@@ -208,6 +210,9 @@ components:
 
     FunctionDefinition:
       type: object
+      description: >-
+        A function definition returned by Gravitino. Its data types can include
+        UnparsedType when reading legacy or otherwise unresolved metadata.
       properties:
         parameters:
           type: array
@@ -260,6 +265,69 @@ components:
           description: The name of the return column
         dataType:
           $ref: "./datatype.yaml#/components/schemas/DataType"
+          description: The data type of the return column
+        comment:
+          type: string
+          description: The comment of the return column
+          nullable: true
+
+    WritableFunctionDefinition:
+      type: object
+      description: >-
+        A new function definition. Every parameter, return type, and return
+        column type must be a native Gravitino type or an explicit ExternalType.
+      properties:
+        parameters:
+          type: array
+          description: The parameters of the function definition
+          items:
+            $ref: "#/components/schemas/WritableFunctionParam"
+        returnType:
+          $ref: "./datatype.yaml#/components/schemas/WritableDataType"
+          description: The return type of the function (for SCALAR and AGGREGATE functions)
+        returnColumns:
+          type: array
+          description: The return columns of the function (for TABLE functions)
+          nullable: true
+          items:
+            $ref: "#/components/schemas/WritableFunctionColumn"
+        impls:
+          type: array
+          description: The implementations of the function definition
+          items:
+            $ref: "#/components/schemas/FunctionImpl"
+
+    WritableFunctionParam:
+      type: object
+      required:
+        - name
+        - dataType
+      properties:
+        name:
+          type: string
+          description: The name of the parameter
+        dataType:
+          $ref: "./datatype.yaml#/components/schemas/WritableDataType"
+          description: The data type of the parameter
+        comment:
+          type: string
+          description: The comment of the parameter
+          nullable: true
+        defaultValue:
+          $ref: "./expression.yaml#/components/schemas/WritableFunctionArg"
+          description: The default value expression of the parameter
+
+    WritableFunctionColumn:
+      type: object
+      required:
+        - name
+        - dataType
+      properties:
+        name:
+          type: string
+          description: The name of the return column
+        dataType:
+          $ref: "./datatype.yaml#/components/schemas/WritableDataType"
           description: The data type of the return column
         comment:
           type: string
@@ -346,6 +414,7 @@ components:
       required:
         - language
         - runtime
+        - handler
       properties:
         language:
           type: string
@@ -359,11 +428,11 @@ components:
             - TRINO
         handler:
           type: string
-          description: The Python handler function
-          nullable: true
+          description: The Python handler entrypoint. Cannot be null or blank.
+          pattern: '\S'
         codeBlock:
           type: string
-          description: The Python code block
+          description: The inline Python code block. Optional; it does not replace the handler.
           nullable: true
         resources:
           $ref: "#/components/schemas/FunctionResources"
@@ -427,7 +496,7 @@ components:
           description: The function definitions. Must contain at least one definition.
           minItems: 1
           items:
-            $ref: "#/components/schemas/FunctionDefinition"
+            $ref: "#/components/schemas/WritableFunctionDefinition"
 
     FunctionUpdatesRequest:
       type: object
@@ -462,6 +531,7 @@ components:
       type: object
       required:
         - "@type"
+        - newComment
       properties:
         "@type":
           type: string
@@ -469,8 +539,8 @@ components:
             - "updateComment"
         newComment:
           type: string
-          description: The new comment of the function. Can be null to clear the comment.
-          nullable: true
+          description: The new comment of the function. Cannot be null or blank.
+          pattern: '\S'
       example: {
         "@type": "updateComment",
         "newComment": "This is a new comment"
@@ -487,7 +557,7 @@ components:
           enum:
             - "addDefinition"
         definition:
-          $ref: "#/components/schemas/FunctionDefinition"
+          $ref: "#/components/schemas/WritableFunctionDefinition"
       example: {
         "@type": "addDefinition",
         "definition": {
@@ -732,7 +802,7 @@ components:
         "code": 0,
         "function": {
           "name": "add_one",
-          "functionType": "SCALAR",
+          "functionType": "scalar",
           "deterministic": true,
           "comment": "A simple scalar function that adds one",
           "definitions": [
@@ -764,7 +834,7 @@ components:
         "code": 0,
         "function": {
           "name": "generate_series",
-          "functionType": "TABLE",
+          "functionType": "table",
           "deterministic": true,
           "comment": "A table function that generates a series of integers",
           "definitions": [
@@ -803,7 +873,7 @@ components:
         "functions": [
           {
             "name": "add_one",
-            "functionType": "SCALAR",
+            "functionType": "scalar",
             "deterministic": true,
             "comment": "A simple scalar function",
             "definitions": [

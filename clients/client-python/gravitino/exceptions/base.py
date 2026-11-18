@@ -20,21 +20,51 @@ class GravitinoRuntimeException(RuntimeError):
     """Base class for all Gravitino runtime exceptions."""
 
     def __init__(self, message, *args):
-        super().__init__(message % args)
+        super().__init__(message % args if args else message)
 
 
 class RESTException(RuntimeError):
     """An exception thrown when a REST request fails."""
 
     def __init__(self, message, *args):
-        super().__init__(message % args)
+        super().__init__(message % args if args else message)
+
+
+class HTTPResponseException(RESTException):
+    """An HTTP failure whose response cannot be used as a domain error.
+
+    Attributes:
+        status_code: The HTTP status received from the server.
+        request_method: The original client request's HTTP method.
+        endpoint: The request origin, without credentials, path or query parameters.
+    """
+
+    def __init__(
+        self, status_code: int, request_method: str, endpoint: str, reason: str
+    ):
+        """Create an error from safe context and a fixed diagnostic reason."""
+        self.status_code = status_code
+        self.request_method = request_method
+        self.endpoint = endpoint
+        self._reason = reason
+        super().__init__(
+            "HTTP %s for %s %s: %s", status_code, request_method, endpoint, reason
+        )
+
+    def __reduce__(self):
+        """Reconstruct the exception with its safe context and instance state."""
+        return (
+            type(self),
+            (self.status_code, self.request_method, self.endpoint, self._reason),
+            self.__dict__,
+        )
 
 
 class IllegalArgumentException(ValueError):
     """Base class for all exceptions thrown when arguments are invalid."""
 
     def __init__(self, message, *args):
-        super().__init__(message % args)
+        super().__init__(message % args if args else message)
 
 
 class IllegalNameIdentifierException(IllegalArgumentException):
@@ -157,6 +187,14 @@ class ConnectionFailedException(GravitinoRuntimeException):
     """An exception thrown when connect to catalog failed."""
 
 
+class ServiceUnavailableException(GravitinoRuntimeException):
+    """An exception thrown when a configured dependency is temporarily unavailable."""
+
+
+class OptimisticLockException(GravitinoRuntimeException):
+    """Raised when another update changes an entity before a write completes."""
+
+
 class UnauthorizedException(GravitinoRuntimeException):
     """An exception thrown when a user is not authorized to perform an action."""
 
@@ -179,6 +217,18 @@ class TagAlreadyExistsException(AlreadyExistsException):
 
 class TagAlreadyAssociatedException(AlreadyExistsException):
     """Exception thrown when a tag with specified name already associated to a metadata object."""
+
+
+class NoSuchPolicyException(NotFoundException):
+    """An exception thrown when a policy with specified name is not existed."""
+
+
+class PolicyAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a policy with specified name already exists."""
+
+
+class PolicyAlreadyAssociatedException(AlreadyExistsException):
+    """Exception thrown when a policy with specified name already associated to a tag."""
 
 
 class JobTemplateAlreadyExistsException(AlreadyExistsException):
@@ -217,6 +267,10 @@ class NoSuchTableException(NotFoundException):
     """An exception thrown when a table with specified name is not existed."""
 
 
+class NoSuchViewException(NotFoundException):
+    """An exception thrown when a view with specified name is not found."""
+
+
 class NoSuchPartitionException(NotFoundException):
     """An exception thrown when a partition with specified name is not existed."""
 
@@ -229,12 +283,28 @@ class TableAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a table already exists."""
 
 
+class ViewAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a view already exists."""
+
+
 class NoSuchFunctionException(NotFoundException):
     """An exception thrown when a function with specified name is not found."""
 
 
 class FunctionAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a function already exists."""
+
+
+class NoSuchSemanticModelException(NotFoundException):
+    """An exception thrown when a Semantic Model with specified name is not found."""
+
+
+class SemanticModelAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a Semantic Model already exists."""
+
+
+class IllegalSemanticModelException(IllegalArgumentException):
+    """An exception thrown when a Semantic Model definition is invalid."""
 
 
 class IllegalPrivilegeException(IllegalArgumentException):
@@ -275,3 +345,19 @@ class NoSuchGroupException(NotFoundException):
 
 class GroupAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a group already exists."""
+
+
+class NoSuchDomainException(NotFoundException):
+    """The domain does not exist or is not visible to the caller."""
+
+
+class DomainAlreadyExistsException(AlreadyExistsException):
+    """A domain with the requested name already exists."""
+
+
+class BackingTagAlreadyBoundException(AlreadyExistsException):
+    """The backing tag conflicts with another domain's binding."""
+
+
+class NonEmptyDomainException(NotEmptyException):
+    """A domain with subdomains cannot be deleted."""

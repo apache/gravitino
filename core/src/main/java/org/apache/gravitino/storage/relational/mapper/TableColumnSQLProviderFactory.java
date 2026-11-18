@@ -92,6 +92,12 @@ public class TableColumnSQLProviderFactory {
     return getProvider().selectColumnIdByTableIdAndName(tableId, name);
   }
 
+  /** Returns the SQL for a batched active-column lookup. */
+  public static String selectColumnIdsByTableIdAndNames(
+      @Param("tableId") Long tableId, @Param("columnNames") List<String> columnNames) {
+    return getProvider().selectColumnIdsByTableIdAndNames(tableId, columnNames);
+  }
+
   public static String selectColumnPOById(@Param("columnId") Long columnId) {
     return getProvider().selectColumnPOById(columnId);
   }

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog;
 
+import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -31,6 +32,8 @@ import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 
 /**
  * Interface for supporting catalogs. It includes methods for listing, loading, creating, altering
@@ -56,6 +59,31 @@ public interface SupportsCatalogs {
    * @throws NoSuchMetalakeException If the metalake with namespace does not exist.
    */
   Catalog[] listCatalogsInfo(Namespace namespace) throws NoSuchMetalakeException;
+
+  /**
+   * List all catalogs with their information in the metalake under the namespace {@link Namespace}.
+   *
+   * <p>When {@code includeProperties} is {@code false}, catalog properties are omitted and {@link
+   * Catalog#properties()} contains only {@code in-use}, read directly from stored metadata and
+   * defaulting to {@code "true"} when absent. Other properties are omitted, and catalog wrappers
+   * are not initialized. Name, type, provider, comment, and audit information are still populated.
+   *
+   * <p>Use lightweight descriptors for discovery only. Call {@link #loadCatalog(NameIdentifier)}
+   * before reading, comparing, or altering catalog properties.
+   *
+   * <p>The default implementation throws {@link UnsupportedOperationException}.
+   *
+   * @param namespace The namespace to list the catalogs under it.
+   * @param includeProperties whether to include resolved catalog properties
+   * @return The list of catalog's information.
+   * @throws NoSuchMetalakeException If the metalake with namespace does not exist.
+   * @throws UnsupportedOperationException If the implementation does not support this overload.
+   */
+  default Catalog[] listCatalogsInfo(Namespace namespace, boolean includeProperties)
+      throws NoSuchMetalakeException {
+    throw new UnsupportedOperationException(
+        "Listing catalogs with includeProperties is unsupported");
+  }
 
   /**
    * Load a catalog by its identifier.
@@ -88,6 +116,9 @@ public interface SupportsCatalogs {
    * catalog should be created. The short name should be the same as the {@link CatalogProvider}
    * interface provided.
    *
+   * <p>Delegates to {@link #createCatalog(NameIdentifier, Catalog.Type, String, String, Map, Map,
+   * Map)} with empty secret maps.
+   *
    * @param ident the identifier of the catalog.
    * @param type the type of the catalog.
    * @param comment the comment of the catalog.
@@ -97,13 +128,48 @@ public interface SupportsCatalogs {
    * @throws NoSuchMetalakeException If the metalake does not exist.
    * @throws CatalogAlreadyExistsException If the catalog already exists.
    */
-  Catalog createCatalog(
+  default Catalog createCatalog(
       NameIdentifier ident,
       Catalog.Type type,
       String provider,
       String comment,
       Map<String, String> properties)
-      throws NoSuchMetalakeException, CatalogAlreadyExistsException;
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    return createCatalog(
+        ident, type, provider, comment, properties, Collections.emptyMap(), Collections.emptyMap());
+  }
+
+  /**
+   * Create a catalog with optional secret maps.
+   *
+   * <p>The default implementation rejects create-time secrets. Implementations that support secrets
+   * must override this method.
+   *
+   * @param ident the identifier of the catalog.
+   * @param type the type of the catalog.
+   * @param comment the comment of the catalog.
+   * @param provider the provider of the catalog.
+   * @param properties the properties of the catalog.
+   * @param secretBindings optional property key → binding ({@code provider} + {@code plaintext})
+   *     for write-through
+   * @param secretReferences optional property key → secret locator ({@code provider} plus
+   *     provider-specific attributes).
+   * @return The created catalog.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
+   * @throws CatalogAlreadyExistsException If the catalog already exists.
+   * @throws UnsupportedOperationException if create-time secrets are not supported
+   */
+  default Catalog createCatalog(
+      NameIdentifier ident,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    throw new UnsupportedOperationException("Creating a catalog with secrets is not supported");
+  }
 
   /**
    * Alter a catalog with specified identifier.
@@ -175,6 +241,25 @@ public interface SupportsCatalogs {
       String comment,
       Map<String, String> properties)
       throws Exception;
+
+  /**
+   * Test the connection of an existing catalog using its stored configuration.
+   *
+   * @param ident The identifier of the existing catalog.
+   * @throws NoSuchCatalogException If the catalog does not exist.
+   * @throws Exception If the connection test fails.
+   */
+  void testConnection(NameIdentifier ident) throws Exception;
+
+  /**
+   * Test the connection of an existing catalog with proposed changes without persisting them.
+   *
+   * @param ident The identifier of the existing catalog.
+   * @param changes The proposed changes to apply temporarily.
+   * @throws NoSuchCatalogException If the catalog does not exist.
+   * @throws Exception If the connection test fails.
+   */
+  void testConnection(NameIdentifier ident, CatalogChange... changes) throws Exception;
 
   /**
    * Enable a catalog. If the catalog is already enabled, this method does nothing.

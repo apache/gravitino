@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
@@ -31,31 +32,91 @@ import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogDatabase;
 import org.apache.flink.table.catalog.CatalogDatabaseImpl;
+import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.CatalogView;
 import org.apache.flink.table.catalog.Column;
+import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedCatalogView;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.TableChange;
+import org.apache.flink.table.catalog.WatermarkSpec;
+import org.apache.flink.table.catalog.exceptions.CatalogException;
+import org.apache.flink.table.catalog.exceptions.TableNotExistException;
+import org.apache.flink.table.expressions.ResolvedExpression;
+import org.apache.flink.table.types.DataType;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
+import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
-import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
+import org.apache.gravitino.flink.connector.utils.CatalogCompat;
 import org.apache.gravitino.rel.Dialects;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
+import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
-public class TestBaseCatalog {
+/**
+ * Base test for {@link BaseCatalog}. Concrete Flink version modules extend this and supply their
+ * own {@link CatalogCompat}, since some fixtures require a Flink-version-specific {@code
+ * CatalogTable} constructor.
+ */
+public abstract class TestBaseCatalog {
+
+  protected abstract CatalogCompat catalogCompat();
+
+  @Test
+  void testDefaultFlinkTypeConversion() {
+    BaseCatalog catalog = new TestableBaseCatalog(null, null);
+    Assertions.assertEquals(DataTypes.INT(), catalog.toFlinkType(Types.IntegerType.get()));
+    Assertions.assertEquals(DataTypes.STRING(), catalog.toFlinkType(Types.StringType.get()));
+    Assertions.assertEquals(
+        DataTypes.DECIMAL(10, 2), catalog.toFlinkType(Types.DecimalType.of(10, 2)));
+  }
+
+  @Test
+  void testSchemaUsesCatalogTypeConversion() {
+    Type nativeType = Types.ExternalType.of("native_text");
+    BaseCatalog catalog =
+        new TestableBaseCatalog(null, null) {
+          /** {@inheritDoc} */
+          @Override
+          protected DataType toFlinkType(Type type) {
+            return type.equals(nativeType) ? DataTypes.STRING() : super.toFlinkType(type);
+          }
+        };
+    org.apache.gravitino.rel.Column[] columns = {
+      org.apache.gravitino.rel.Column.of("text", nativeType, "source comment"),
+      org.apache.gravitino.rel.Column.of("required_text", nativeType, null, false, false, null),
+      org.apache.gravitino.rel.Column.of("id", Types.IntegerType.get(), null)
+    };
+    Schema schema = catalog.buildSchemaFromColumns(columns).build();
+    Schema.UnresolvedPhysicalColumn text =
+        (Schema.UnresolvedPhysicalColumn) schema.getColumns().get(0);
+    Schema.UnresolvedPhysicalColumn requiredText =
+        (Schema.UnresolvedPhysicalColumn) schema.getColumns().get(1);
+    Schema.UnresolvedPhysicalColumn id =
+        (Schema.UnresolvedPhysicalColumn) schema.getColumns().get(2);
+    Assertions.assertEquals("text", text.getName());
+    Assertions.assertEquals(DataTypes.STRING(), text.getDataType());
+    Assertions.assertEquals("source comment", text.getComment().orElseThrow());
+    Assertions.assertEquals(DataTypes.STRING().notNull(), requiredText.getDataType());
+    Assertions.assertEquals(DataTypes.INT(), id.getDataType());
+    Assertions.assertEquals(nativeType, columns[0].dataType());
+  }
 
   @Test
   public void testHiveSchemaChanges() {
@@ -116,8 +177,9 @@ public class TestBaseCatalog {
             org.apache.gravitino.rel.TableChange.setProperty("key", "value"),
             org.apache.gravitino.rel.TableChange.removeProperty("key"));
 
+    BaseCatalog catalog = new TestableBaseCatalog(null, null);
     org.apache.gravitino.rel.TableChange[] gravitinoTableChanges =
-        BaseCatalog.getGravitinoTableChanges(tableChanges);
+        catalog.getGravitinoTableChanges(tableChanges);
     Assertions.assertArrayEquals(expected.toArray(), gravitinoTableChanges);
   }
 
@@ -125,11 +187,16 @@ public class TestBaseCatalog {
   public void testTableChangesWithoutColumnChange() {
     Schema schema = Schema.newBuilder().column("test", "INT").build();
     CatalogBaseTable table =
-        DefaultCatalogCompat.INSTANCE.createCatalogTable(
-            schema, "test", ImmutableList.of(), ImmutableMap.of("key", "value", "key2", "value2"));
+        catalogCompat()
+            .createCatalogTable(
+                schema,
+                "test",
+                ImmutableList.of(),
+                ImmutableMap.of("key", "value", "key2", "value2"));
     CatalogBaseTable newTable =
-        DefaultCatalogCompat.INSTANCE.createCatalogTable(
-            schema, "new comment", ImmutableList.of(), ImmutableMap.of("key", "new value"));
+        catalogCompat()
+            .createCatalogTable(
+                schema, "new comment", ImmutableList.of(), ImmutableMap.of("key", "new value"));
     org.apache.gravitino.rel.TableChange[] tableChanges =
         BaseCatalog.getGravitinoTableChanges(table, newTable);
     List<org.apache.gravitino.rel.TableChange> expected =
@@ -179,14 +246,49 @@ public class TestBaseCatalog {
   }
 
   @Test
+  public void testGetTableThrowsCatalogExceptionWhenForbidden() throws Exception {
+    Catalog gravitinoCatalog = Mockito.mock(Catalog.class);
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    ForbiddenException forbiddenException = new ForbiddenException("denied");
+    Mockito.when(gravitinoCatalog.asTableCatalog()).thenReturn(tableCatalog);
+    Mockito.when(tableCatalog.loadTable(Mockito.any())).thenThrow(forbiddenException);
+    BaseCatalog catalog =
+        new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), gravitinoCatalog);
+
+    CatalogException catalogException =
+        Assertions.assertThrows(
+            CatalogException.class, () -> catalog.getTable(new ObjectPath("db", "tbl")));
+
+    Assertions.assertSame(forbiddenException, catalogException.getCause());
+  }
+
+  @Test
+  public void testTableExistsThrowsCatalogExceptionWhenForbidden() throws Exception {
+    Catalog gravitinoCatalog = Mockito.mock(Catalog.class);
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    ForbiddenException forbiddenException = new ForbiddenException("denied");
+    Mockito.when(gravitinoCatalog.asTableCatalog()).thenReturn(tableCatalog);
+    Mockito.when(tableCatalog.tableExists(Mockito.any())).thenThrow(forbiddenException);
+    BaseCatalog catalog =
+        new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), gravitinoCatalog);
+
+    CatalogException catalogException =
+        Assertions.assertThrows(
+            CatalogException.class, () -> catalog.tableExists(new ObjectPath("db", "tbl")));
+
+    Assertions.assertSame(forbiddenException, catalogException.getCause());
+  }
+
+  @Test
   public void testGetGravitinoViewChangesSetAndRemoveProperty() {
     List<TableChange> tableChanges =
         ImmutableList.of(TableChange.set("k1", "v1"), TableChange.reset("k2"));
 
     Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
 
+    BaseCatalog catalog = new TestableBaseCatalog(null, null);
     ViewChange[] changes =
-        BaseCatalog.toReplaceViewChange(
+        catalog.toReplaceViewChange(
             tableChanges, resolveView(schema, "SELECT 1", "comment"), Dialects.FLINK);
 
     Assertions.assertEquals(2, changes.length);
@@ -206,8 +308,9 @@ public class TestBaseCatalog {
 
     Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
 
+    BaseCatalog catalog = new TestableBaseCatalog(null, null);
     ViewChange[] changes =
-        BaseCatalog.toReplaceViewChange(
+        catalog.toReplaceViewChange(
             tableChanges, resolveView(schema, "SELECT id FROM t", "new comment"), Dialects.FLINK);
 
     // Should have exactly one SetProperty and one ReplaceView (order may vary)
@@ -241,8 +344,9 @@ public class TestBaseCatalog {
     CatalogView existing =
         CatalogView.of(schema, "old comment", "SELECT 1", "SELECT 1", Collections.emptyMap());
 
+    BaseCatalog catalog = new TestableBaseCatalog(null, null);
     ViewChange[] changes =
-        BaseCatalog.toReplaceViewChange(
+        catalog.toReplaceViewChange(
             existing, resolveView(schema, "SELECT 2", "new comment"), Dialects.FLINK);
 
     Assertions.assertEquals(1, changes.length);
@@ -336,7 +440,7 @@ public class TestBaseCatalog {
   }
 
   /** Simulates a Paimon-like catalog that overrides dialect hooks. */
-  private static class PaimonLikeBaseCatalog extends BaseCatalog {
+  private class PaimonLikeBaseCatalog extends BaseCatalog {
 
     PaimonLikeBaseCatalog() {
       super(
@@ -345,6 +449,11 @@ public class TestBaseCatalog {
           "default",
           Mockito.mock(SchemaAndTablePropertiesConverter.class),
           Mockito.mock(PartitionConverter.class));
+    }
+
+    @Override
+    protected CatalogCompat catalogCompat() {
+      return TestBaseCatalog.this.catalogCompat();
     }
 
     @Override
@@ -372,12 +481,427 @@ public class TestBaseCatalog {
     }
   }
 
-  private static class TestableBaseCatalog extends BaseCatalog {
+  @Test
+  public void testAlterTableWithEmptyTableChangesSkipsAlterCall() throws Exception {
+    // Flink may invoke alterTable with an empty change list (a no-op alter). The connector must
+    // not forward an empty update list to Gravitino, which would fail server-side with
+    // "updates must not be empty".
+    Catalog gravitinoCatalog = Mockito.mock(Catalog.class);
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Mockito.when(gravitinoCatalog.asTableCatalog()).thenReturn(tableCatalog);
+
+    Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
+    CatalogBaseTable table =
+        catalogCompat()
+            .createCatalogTable(
+                schema, "comment", ImmutableList.of(), ImmutableMap.of("key", "value"));
+
+    TestableBaseCatalog catalog =
+        new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), gravitinoCatalog, table);
+
+    catalog.alterTable(new ObjectPath("db", "tbl"), table, Collections.emptyList(), false);
+
+    Mockito.verify(tableCatalog, Mockito.never()).alterTable(Mockito.any(), Mockito.any());
+  }
+
+  @Test
+  public void testAlterTableWithCommentOnlyAndUnchangedCommentSkipsAlterCall() throws Exception {
+    // The two-argument alterTable diffs only the comment. When the comment is unchanged no
+    // TableChange is produced, so the connector must skip the alter call instead of forwarding an
+    // empty update list.
+    Catalog gravitinoCatalog = Mockito.mock(Catalog.class);
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Mockito.when(gravitinoCatalog.asTableCatalog()).thenReturn(tableCatalog);
+
+    Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
+    CatalogBaseTable table =
+        catalogCompat()
+            .createCatalogTable(
+                schema, "comment", ImmutableList.of(), ImmutableMap.of("key", "value"));
+
+    TestableBaseCatalog catalog =
+        new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), gravitinoCatalog, table);
+
+    catalog.alterTable(new ObjectPath("db", "tbl"), table, false);
+
+    Mockito.verify(tableCatalog, Mockito.never()).alterTable(Mockito.any(), Mockito.any());
+  }
+
+  @Test
+  public void testAlterTableWithCommentChangeForwardsAlterCall() throws Exception {
+    // A comment change produces a TableChange, so the alter must be forwarded to Gravitino.
+    Catalog gravitinoCatalog = Mockito.mock(Catalog.class);
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Mockito.when(gravitinoCatalog.asTableCatalog()).thenReturn(tableCatalog);
+
+    Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
+    CatalogBaseTable existingTable =
+        catalogCompat()
+            .createCatalogTable(
+                schema, "old comment", ImmutableList.of(), ImmutableMap.of("key", "value"));
+    CatalogBaseTable newTable =
+        catalogCompat()
+            .createCatalogTable(
+                schema, "new comment", ImmutableList.of(), ImmutableMap.of("key", "value"));
+
+    TestableBaseCatalog catalog =
+        new TestableBaseCatalog(
+            Mockito.mock(AbstractCatalog.class), gravitinoCatalog, existingTable);
+
+    catalog.alterTable(new ObjectPath("db", "tbl"), newTable, false);
+
+    Mockito.verify(tableCatalog, Mockito.times(1)).alterTable(Mockito.any(), Mockito.any());
+  }
+
+  /**
+   * Computed columns, metadata columns and watermarks cannot be represented by Gravitino columns.
+   * createTable must reject them instead of storing plain physical columns without the watermark.
+   */
+  @Test
+  void testCreateTableRejectsComputedAndMetadataColumnsAndWatermarks() {
+    TestableBaseCatalog catalog =
+        new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), mockedCatalogHandle());
+
+    // computed column: b AS a + 1
+    List<Column> computed =
+        Arrays.asList(
+            Column.physical("a", DataTypes.INT()),
+            Column.computed("b", resolvedExpression("a", DataTypes.INT())));
+    ResolvedCatalogTable computedTable =
+        resolvedCatalogTable(resolvedSchema(computed, Collections.emptyList()));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> catalog.createTable(new ObjectPath("db", "t1"), computedTable, false));
+    // Flink calls createTable for CREATE TABLE IF NOT EXISTS even when the table exists, and the
+    // check runs before the Gravitino call, so IF NOT EXISTS is rejected too.
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> catalog.createTable(new ObjectPath("db", "t1"), computedTable, true));
+
+    // metadata column: m INT METADATA
+    List<Column> metadata =
+        Arrays.asList(
+            Column.physical("a", DataTypes.INT()),
+            Column.metadata("m", DataTypes.INT(), null, false));
+    ResolvedCatalogTable metadataTable =
+        resolvedCatalogTable(resolvedSchema(metadata, Collections.emptyList()));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> catalog.createTable(new ObjectPath("db", "t4"), metadataTable, false));
+
+    // watermark spec on a timestamp column
+    List<WatermarkSpec> watermarkSpecs =
+        Collections.singletonList(
+            WatermarkSpec.of("a", resolvedExpression("a", DataTypes.TIMESTAMP_LTZ(3))));
+    ResolvedCatalogTable watermarkedTable =
+        resolvedCatalogTable(
+            resolvedSchema(
+                Collections.singletonList(Column.physical("a", DataTypes.TIMESTAMP_LTZ(3))),
+                watermarkSpecs));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> catalog.createTable(new ObjectPath("db", "t2"), watermarkedTable, false));
+
+    // plain physical column still creates
+    ResolvedCatalogTable plainTable =
+        resolvedCatalogTable(
+            resolvedSchema(
+                Collections.singletonList(Column.physical("a", DataTypes.INT())),
+                Collections.emptyList()));
+    Assertions.assertDoesNotThrow(
+        () -> catalog.createTable(new ObjectPath("db", "t3"), plainTable, false));
+  }
+
+  /**
+   * ALTER TABLE ... ADD of a computed or metadata column must be rejected like createTable does,
+   * while adding a physical column still goes through.
+   */
+  @Test
+  void testAlterTableRejectsComputedAndMetadataColumns() throws Exception {
+    Catalog gravitinoCatalogHandle = Mockito.mock(Catalog.class);
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Mockito.when(gravitinoCatalogHandle.asTableCatalog()).thenReturn(tableCatalog);
+
+    Schema schema = Schema.newBuilder().column("a", DataTypes.INT()).build();
+    CatalogTable existing =
+        catalogCompat().createCatalogTable(schema, null, ImmutableList.of(), ImmutableMap.of());
+    TestableBaseCatalog catalog =
+        new TestableBaseCatalog(
+            Mockito.mock(AbstractCatalog.class), gravitinoCatalogHandle, existing);
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            catalog.alterTable(
+                new ObjectPath("db", "t"),
+                existing,
+                Collections.singletonList(
+                    TableChange.add(
+                        Column.computed("b", resolvedExpression("a", DataTypes.INT())))),
+                false));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            catalog.alterTable(
+                new ObjectPath("db", "t"),
+                existing,
+                Collections.singletonList(
+                    TableChange.add(Column.metadata("m", DataTypes.INT(), null, false))),
+                false));
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog.alterTable(
+                new ObjectPath("db", "t"),
+                existing,
+                Collections.singletonList(TableChange.add(Column.physical("c", DataTypes.INT()))),
+                false));
+  }
+
+  /**
+   * The generic table advice is only given by catalogs that support generic tables, which is only
+   * the Hive catalog.
+   */
+  @Test
+  void testUnsupportedSchemaAdviceMentionsGenericTablesOnlyWhenSupported() {
+    TestableBaseCatalog plain =
+        new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), mockedCatalogHandle());
+    TestableBaseCatalog genericLike =
+        new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), mockedCatalogHandle()) {
+          @Override
+          protected boolean supportsGenericTables() {
+            return true;
+          }
+        };
+
+    UnsupportedOperationException plainError =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                plain.createTable(
+                    new ObjectPath("db", "t"),
+                    resolvedCatalogTable(
+                        resolvedSchema(
+                            Collections.singletonList(
+                                Column.computed("b", resolvedExpression("a", DataTypes.INT()))),
+                            Collections.emptyList())),
+                    false));
+    Assertions.assertFalse(
+        plainError.getMessage().contains("generic table"), plainError.getMessage());
+
+    UnsupportedOperationException genericLikeError =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                genericLike.createTable(
+                    new ObjectPath("db", "t"),
+                    resolvedCatalogTable(
+                        resolvedSchema(
+                            Collections.singletonList(
+                                Column.computed("b", resolvedExpression("a", DataTypes.INT()))),
+                            Collections.emptyList())),
+                    false));
+    Assertions.assertTrue(
+        genericLikeError.getMessage().contains("generic table"), genericLikeError.getMessage());
+
+    // the watermark message follows the same conditional advice
+    ResolvedCatalogTable watermarked =
+        resolvedCatalogTable(
+            resolvedSchema(
+                Collections.singletonList(Column.physical("ts", DataTypes.TIMESTAMP_LTZ(3))),
+                Collections.singletonList(
+                    WatermarkSpec.of("ts", resolvedExpression("ts", DataTypes.TIMESTAMP_LTZ(3))))));
+    UnsupportedOperationException plainWatermarkError =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () -> plain.createTable(new ObjectPath("db", "t"), watermarked, false));
+    Assertions.assertFalse(
+        plainWatermarkError.getMessage().contains("generic table"),
+        plainWatermarkError.getMessage());
+    Assertions.assertTrue(
+        plainWatermarkError.getMessage().contains("column 'ts'"), plainWatermarkError.getMessage());
+    UnsupportedOperationException genericLikeWatermarkError =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () -> genericLike.createTable(new ObjectPath("db", "t"), watermarked, false));
+    Assertions.assertTrue(
+        genericLikeWatermarkError.getMessage().contains("generic table"),
+        genericLikeWatermarkError.getMessage());
+  }
+
+  private static Catalog mockedCatalogHandle() {
+    Catalog handle = Mockito.mock(Catalog.class);
+    Mockito.doReturn(Mockito.mock(TableCatalog.class)).when(handle).asTableCatalog();
+    return handle;
+  }
+
+  private static ResolvedExpression resolvedExpression(String column, DataType dataType) {
+    ResolvedExpression expression = Mockito.mock(ResolvedExpression.class);
+    Mockito.when(expression.getOutputDataType()).thenReturn(dataType);
+    Mockito.when(expression.asSerializableString()).thenReturn("`" + column + "`");
+    return expression;
+  }
+
+  /**
+   * Builds a resolved schema. The 3-argument constructor is deprecated from Flink 2.1 in favor of
+   * the 4-argument one taking indexes, but it is the only signature shared by every supported Flink
+   * version, so the deprecation is suppressed rather than routed through {@link CatalogCompat}.
+   *
+   * @param columns the schema columns
+   * @param watermarkSpecs the watermark specs
+   * @return a resolved schema
+   */
+  @SuppressWarnings("deprecation")
+  private static ResolvedSchema resolvedSchema(
+      List<Column> columns, List<WatermarkSpec> watermarkSpecs) {
+    return new ResolvedSchema(columns, watermarkSpecs, null);
+  }
+
+  /**
+   * Builds a resolved table from the given schema. The unresolved {@link CatalogTable} is created
+   * through {@link #catalogCompat()}, because {@code CatalogTable.of(...)} was removed in Flink 2.x
+   * while {@code CatalogTable.newBuilder()} only exists from Flink 1.20.
+   *
+   * @param schema the resolved schema to wrap
+   * @return a resolved catalog table carrying the schema
+   */
+  private ResolvedCatalogTable resolvedCatalogTable(ResolvedSchema schema) {
+    Schema.Builder builder = Schema.newBuilder();
+    schema.getColumns().forEach(c -> builder.column(c.getName(), c.getDataType()));
+    schema
+        .getWatermarkSpecs()
+        .forEach(
+            w ->
+                builder.watermark(
+                    w.getRowtimeAttribute(), w.getWatermarkExpression().asSerializableString()));
+    CatalogTable unresolved =
+        catalogCompat()
+            .createCatalogTable(
+                builder.build(), null, Collections.emptyList(), Collections.emptyMap());
+    return new ResolvedCatalogTable(unresolved, schema);
+  }
+
+  /**
+   * The Gravitino catalog handle must be fetched once per catalog instance: the client has no
+   * catalog cache and Flink consults catalog() on every table resolution, so a per-call fetch
+   * doubled the REST traffic of each query.
+   */
+  @Test
+  void testCatalogHandleFetchedOncePerInstance() {
+    AtomicInteger loadCalls = new AtomicInteger();
+    Catalog info = Mockito.mock(Catalog.class);
+    GravitinoCatalogManager manager = Mockito.mock(GravitinoCatalogManager.class);
+    Mockito.doAnswer(
+            inv -> {
+              loadCalls.incrementAndGet();
+              return info;
+            })
+        .when(manager)
+        .getGravitinoCatalogInfo(Mockito.anyString());
+
+    try (MockedStatic<GravitinoCatalogManager> mocked =
+        Mockito.mockStatic(GravitinoCatalogManager.class)) {
+      mocked.when(GravitinoCatalogManager::get).thenReturn(manager);
+      BaseCatalog catalog = catalogWithoutCatalogOverride();
+
+      Assertions.assertSame(info, catalog.catalog());
+      Assertions.assertSame(info, catalog.catalog());
+      Assertions.assertSame(info, catalog.catalog());
+
+      Assertions.assertEquals(1, loadCalls.get(), "catalog handle must be fetched exactly once");
+    }
+  }
+
+  /**
+   * A failed load must not be cached. On Flink 2.x, CREATE CATALOG opens the catalog before the
+   * catalog store creates it in Gravitino, so the first catalog() call in open() fails with
+   * NoSuchCatalogException and later calls must load the catalog again.
+   */
+  @Test
+  void testCatalogHandleLoadFailureIsNotCached() {
+    Catalog info = Mockito.mock(Catalog.class);
+    GravitinoCatalogManager manager = Mockito.mock(GravitinoCatalogManager.class);
+    Mockito.when(manager.getGravitinoCatalogInfo(Mockito.anyString()))
+        .thenThrow(new NoSuchCatalogException("catalog test does not exist"))
+        .thenReturn(info);
+
+    try (MockedStatic<GravitinoCatalogManager> mocked =
+        Mockito.mockStatic(GravitinoCatalogManager.class)) {
+      mocked.when(GravitinoCatalogManager::get).thenReturn(manager);
+      BaseCatalog catalog = catalogWithoutCatalogOverride();
+
+      Assertions.assertThrows(NoSuchCatalogException.class, catalog::catalog);
+      Assertions.assertSame(info, catalog.catalog());
+      Assertions.assertSame(info, catalog.catalog());
+
+      Mockito.verify(manager, Mockito.times(2)).getGravitinoCatalogInfo("test");
+    }
+  }
+
+  /**
+   * The handle keeps using the REST client of the manager that loaded it, so the catalog must be
+   * loaded again after the shared manager is closed and created again.
+   */
+  @Test
+  void testCatalogHandleReloadedWhenManagerIsReplaced() {
+    Catalog first = Mockito.mock(Catalog.class);
+    Catalog second = Mockito.mock(Catalog.class);
+    GravitinoCatalogManager firstManager = Mockito.mock(GravitinoCatalogManager.class);
+    GravitinoCatalogManager secondManager = Mockito.mock(GravitinoCatalogManager.class);
+    Mockito.when(firstManager.getGravitinoCatalogInfo("test")).thenReturn(first);
+    Mockito.when(secondManager.getGravitinoCatalogInfo("test")).thenReturn(second);
+
+    try (MockedStatic<GravitinoCatalogManager> mocked =
+        Mockito.mockStatic(GravitinoCatalogManager.class)) {
+      mocked.when(GravitinoCatalogManager::get).thenReturn(firstManager);
+      BaseCatalog catalog = catalogWithoutCatalogOverride();
+      Assertions.assertSame(first, catalog.catalog());
+      Assertions.assertSame(first, catalog.catalog());
+
+      mocked.when(GravitinoCatalogManager::get).thenReturn(secondManager);
+      Assertions.assertSame(second, catalog.catalog());
+      Assertions.assertSame(second, catalog.catalog());
+
+      Mockito.verify(firstManager, Mockito.times(1)).getGravitinoCatalogInfo("test");
+      Mockito.verify(secondManager, Mockito.times(1)).getGravitinoCatalogInfo("test");
+    }
+  }
+
+  /**
+   * Builds a catalog that does not override catalog(), so tests exercise the memoization in
+   * BaseCatalog.catalog() itself.
+   */
+  private BaseCatalog catalogWithoutCatalogOverride() {
+    return new BaseCatalog(
+        "test",
+        Collections.emptyMap(),
+        "default",
+        Mockito.mock(SchemaAndTablePropertiesConverter.class),
+        Mockito.mock(PartitionConverter.class)) {
+      @Override
+      protected AbstractCatalog realCatalog() {
+        return null;
+      }
+
+      @Override
+      protected CatalogCompat catalogCompat() {
+        return TestBaseCatalog.this.catalogCompat();
+      }
+    };
+  }
+
+  private class TestableBaseCatalog extends BaseCatalog {
 
     private final AbstractCatalog delegate;
     private final Catalog gravitinoCatalog;
+    private final CatalogBaseTable existingTable;
 
     TestableBaseCatalog(AbstractCatalog delegate, Catalog gravitinoCatalog) {
+      this(delegate, gravitinoCatalog, null);
+    }
+
+    TestableBaseCatalog(
+        AbstractCatalog delegate, Catalog gravitinoCatalog, CatalogBaseTable existingTable) {
       super(
           "test",
           Collections.emptyMap(),
@@ -386,6 +910,12 @@ public class TestBaseCatalog {
           Mockito.mock(PartitionConverter.class));
       this.delegate = delegate;
       this.gravitinoCatalog = gravitinoCatalog;
+      this.existingTable = existingTable;
+    }
+
+    @Override
+    protected CatalogCompat catalogCompat() {
+      return TestBaseCatalog.this.catalogCompat();
     }
 
     @Override
@@ -396,6 +926,19 @@ public class TestBaseCatalog {
     @Override
     protected Catalog catalog() {
       return gravitinoCatalog;
+    }
+
+    @Override
+    public CatalogBaseTable getTable(ObjectPath tablePath) throws TableNotExistException {
+      if (existingTable != null) {
+        return existingTable;
+      }
+      return super.getTable(tablePath);
+    }
+
+    @Override
+    protected void invalidateTable(ObjectPath tablePath) {
+      // No-op: the native cache is not exercised in these unit tests.
     }
   }
 }

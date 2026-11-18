@@ -153,5 +153,6 @@ public class TestLanceAuthenticationFilter {
     ErrorResponse errorResponse = MAPPER.readValue(json, ErrorResponse.class);
     Assertions.assertEquals(500, errorResponse.getCode());
     Assertions.assertEquals("Authentication failed", errorResponse.getError());
+    Assertions.assertEquals("", errorResponse.getDetail());
   }
 }

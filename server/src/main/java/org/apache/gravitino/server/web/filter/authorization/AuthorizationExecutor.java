@@ -17,9 +17,19 @@
 
 package org.apache.gravitino.server.web.filter.authorization;
 
+import java.util.Optional;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 
 public interface AuthorizationExecutor {
+
+  /**
+   * Returns the metalake dynamically resolved from the authorization request.
+   *
+   * @return the metalake that requires user and active-role validation
+   */
+  default Optional<String> getAuthorizationMetalake() {
+    return Optional.empty();
+  }
 
   boolean execute(AuthorizationRequestContext authorizationRequestContext) throws Exception;
 }

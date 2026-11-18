@@ -58,6 +58,7 @@ dependencies {
   testImplementation(project(":bundles:aws-bundle", configuration = "shadow"))
   testImplementation(project(":bundles:azure-bundle", configuration = "shadow"))
   testImplementation(project(":bundles:gcp-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:tencent-bundle", configuration = "shadow"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":common"))
   testImplementation(project(":core"))
@@ -78,6 +79,8 @@ dependencies {
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
 
+  // The RustFS fixture uses the S3 SDK v2; Hadoop's AWS bundle supplies the S3 SDK v1.
+  testRuntimeOnly(libs.aws.s3)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
@@ -146,6 +149,7 @@ tasks.test {
   dependsOn(":bundles:aws-bundle:jar")
   dependsOn(":bundles:aliyun-bundle:jar")
   dependsOn(":bundles:gcp-bundle:jar")
+  dependsOn(":bundles:tencent-bundle:jar")
 }
 
 tasks.getByName("generateMetadataFileForMavenJavaPublication") {

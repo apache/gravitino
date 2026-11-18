@@ -27,15 +27,8 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.policy.PolicyManager;
 
-/**
- * A generic entity that mainly used for temporary transactions or internal operations.
- *
- * <p>For example, it can be used to represent different types of entities for {@link
- * PolicyManager#listMetadataObjectsForPolicy(String, String)} intermediate result then can be
- * converted to metadata objects.
- */
+/** A generic entity that mainly used for temporary transactions or internal operations. */
 @EqualsAndHashCode
 @ToString
 public class GenericEntity implements Entity, HasIdentifier {

@@ -34,11 +34,20 @@ on:
         description: 'Original commit message'
         required: true
         type: string
+      merged-by:
+        description: 'Login of the committer who merged the original PR'
+        required: false
+        type: string
+        default: ''
 
 jobs:
   cherry-pick:
     runs-on: ubuntu-latest
     name: Cherry-pick to ${{ inputs.target-branch }}
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -83,52 +92,192 @@ jobs:
             git commit --no-edit || git commit -m "Cherry-pick ${{ inputs.commit-sha }} to ${{ inputs.target-branch }} (with conflicts)"
           fi
 
-      - name: Push branch
-        if: steps.cherry-pick.outputs.branch-name != ''
-        run: |
-          git push origin ${{ steps.cherry-pick.outputs.branch-name }}
-
-      - name: Create Pull Request
+      # Target branches with Fork CI get their cherry-pick PR from a committer's fork, so CI runs on
+      # that fork's runners instead of apache/gravitino's. The merging committer's token is preferred
+      # and the fallback committer's token is used when it is missing or unusable.
+      - name: Resolve pull request head
+        id: head
         if: steps.cherry-pick.outputs.branch-name != ''
         env:
-          GH_TOKEN: ${{ secrets.CHERRY_PICK_TOKEN || secrets.GITHUB_TOKEN }}
+          TARGET_BRANCH: ${{ inputs.target-branch }}
+          MERGED_BY: ${{ inputs.merged-by }}
+          FALLBACK_LOGIN: ${{ vars.CHERRY_PICK_FALLBACK_LOGIN || 'jerryshao' }}
+        run: |
+          secret_name() {
+            # Secret names allow only letters, digits and underscores; logins never contain '_'.
+            if [[ "$1" =~ ^[A-Za-z0-9-]+$ ]]; then
+              echo "CHERRY_PICK_TOKEN_$(echo "$1" | tr 'a-z-' 'A-Z_')"
+            fi
+          }
+          if git cat-file -e "origin/${TARGET_BRANCH}:.github/workflows/fork-ci.yml" 2>/dev/null; then
+            echo "mode=fork" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=upstream" >> "$GITHUB_OUTPUT"
+          fi
+          echo "merger-secret=$(secret_name "${MERGED_BY}")" >> "$GITHUB_OUTPUT"
+          echo "fallback-secret=$(secret_name "${FALLBACK_LOGIN}")" >> "$GITHUB_OUTPUT"
+
+      - name: Push branch and create pull request
+        if: steps.cherry-pick.outputs.branch-name != ''
+        env:
+          MODE: ${{ steps.head.outputs.mode }}
+          BRANCH_NAME: ${{ steps.cherry-pick.outputs.branch-name }}
+          MERGED_BY: ${{ inputs.merged-by }}
+          FALLBACK_LOGIN: ${{ vars.CHERRY_PICK_FALLBACK_LOGIN || 'jerryshao' }}
+          MERGER_TOKEN: ${{ steps.head.outputs.merger-secret && secrets[steps.head.outputs.merger-secret] || '' }}
+          FALLBACK_TOKEN: ${{ steps.head.outputs.fallback-secret && secrets[steps.head.outputs.fallback-secret] || '' }}
+          UPSTREAM_TOKEN: ${{ secrets.CHERRY_PICK_TOKEN || secrets.GITHUB_TOKEN }}
           COMMIT_MESSAGE: ${{ inputs.commit-message }}
           TARGET_BRANCH: ${{ inputs.target-branch }}
           COMMIT_SHA: ${{ inputs.commit-sha }}
           SUCCESS: ${{ steps.cherry-pick.outputs.success }}
         run: |
+          set -euo pipefail
+
+          # Prints the token owner when it can open the PR from "$2/gravitino"; otherwise fails.
+          usable_fork() {
+            local token="$1" login="$2" actual fork actions
+            if [ -z "$token" ] || [ -z "$login" ]; then
+              echo "- \`${login:-?}\`: no token secret" >> "$GITHUB_STEP_SUMMARY"
+              return 1
+            fi
+            actual=$(GH_TOKEN="$token" gh api user --jq .login 2>/dev/null) || actual=""
+            if [ "${actual,,}" != "${login,,}" ]; then
+              echo "- \`${login}\`: token is invalid, expired or belongs to \`${actual:-nobody}\`" >> "$GITHUB_STEP_SUMMARY"
+              return 1
+            fi
+            fork=$(GH_TOKEN="$token" gh api "repos/${actual}/gravitino" \
+              --jq '"\(.fork) \(.parent.full_name // "")"' 2>/dev/null) || fork=""
+            if [ "$fork" != "true apache/gravitino" ]; then
+              echo "- \`${login}\`: \`${actual}/gravitino\` does not exist or is not a fork of apache/gravitino" \
+                "(the fork must be named gravitino)" >> "$GITHUB_STEP_SUMMARY"
+              return 1
+            fi
+            # A fork whose workflows were never enabled or were disabled would never run Fork CI.
+            # The workflow is unknown (404) until the fork has been synced; accept that case.
+            actions=$(GH_TOKEN="$token" gh api "repos/${actual}/gravitino/actions/workflows/fork-ci.yml" \
+              --jq .state 2>/dev/null) || actions=""
+            if [ -n "$actions" ] && [ "$actions" != "active" ]; then
+              echo "- \`${login}\`: Fork CI is \`${actions}\` in \`${actual}/gravitino\`; enable it in the fork's Actions tab" \
+                >> "$GITHUB_STEP_SUMMARY"
+              return 1
+            fi
+            echo "$actual"
+          }
+
+          if [ "${MODE}" = "fork" ]; then
+            echo "### Cherry-pick PR head" >> "$GITHUB_STEP_SUMMARY"
+            if HEAD_OWNER=$(usable_fork "${MERGER_TOKEN}" "${MERGED_BY}"); then
+              PR_TOKEN="${MERGER_TOKEN}"
+            elif HEAD_OWNER=$(usable_fork "${FALLBACK_TOKEN}" "${FALLBACK_LOGIN}"); then
+              PR_TOKEN="${FALLBACK_TOKEN}"
+            else
+              echo "::error::No usable committer token for a fork PR; see the job summary."
+              exit 1
+            fi
+            echo "- Using \`${HEAD_OWNER}/gravitino\`" >> "$GITHUB_STEP_SUMMARY"
+            # Drop the checkout credentials so git authenticates with the committer's token.
+            FORK_URL="https://x-access-token:${PR_TOKEN}@github.com/${HEAD_OWNER}/gravitino.git"
+            if git -c http.https://github.com/.extraheader= ls-remote --exit-code --heads \
+              "${FORK_URL}" "${BRANCH_NAME}" >/dev/null; then
+              # A re-run must not replace the branch: someone may have pushed conflict fixes to it.
+              echo "::notice::${HEAD_OWNER}/gravitino already has ${BRANCH_NAME}; keeping it."
+            else
+              git -c http.https://github.com/.extraheader= push "${FORK_URL}" "HEAD:refs/heads/${BRANCH_NAME}"
+            fi
+            HEAD_REF="${HEAD_OWNER}:${BRANCH_NAME}"
+          else
+            git push origin "${BRANCH_NAME}"
+            PR_TOKEN="${UPSTREAM_TOKEN}"
+            HEAD_OWNER=""
+            HEAD_REF="${BRANCH_NAME}"
+          fi
+          export GH_TOKEN="${PR_TOKEN}"
+
           # Use original commit message with branch prefix
           TITLE="[Cherry-pick to ${TARGET_BRANCH}] ${COMMIT_MESSAGE}"
-          
+          LABELS=(cherry-pick)
+
           # Prepare body with cherry-pick info
           if [ "${SUCCESS}" = "true" ]; then
             BODY=$(cat <<'EOF'
           **Cherry-pick Information:**
           - Original commit: ${COMMIT_SHA}
           - Target branch: `${TARGET_BRANCH}`
-          - Status: ✅ Clean cherry-pick (no conflicts)
+          - Status: ✅ Clean cherry-pick (no conflicts)${FORK_CI}
           EOF
           )
           else
+            # Make conflicts visible in the PR list (title + label), not only in the body.
+            TITLE="[DO NOT MERGE] ${TITLE}"
+            LABELS+=(cherry-pick-conflict)
+
             BODY=$(cat <<'EOF'
           **Cherry-pick Information:**
           - Original commit: ${COMMIT_SHA}
           - Target branch: `${TARGET_BRANCH}`
-          - Status: ⚠️ **Has conflicts - manual resolution required**
-          
+          - Status: ⚠️ **Has conflicts - manual resolution required**${FORK_CI}
+
+          **Do not merge** until conflict markers are resolved and the
+          `cherry-pick-conflict` label is removed.
+
           Please review and resolve the conflicts before merging.
           EOF
           )
           fi
-          
+
           # Replace placeholders with actual values
           BODY="${BODY//\$\{COMMIT_SHA\}/${COMMIT_SHA}}"
           BODY="${BODY//\$\{TARGET_BRANCH\}/${TARGET_BRANCH}}"
-          
-          gh pr create \
-            --title "$TITLE" \
-            --body "$BODY" \
-            --base ${{ inputs.target-branch }} \
-            --head ${{ steps.cherry-pick.outputs.branch-name }} \
-            --label cherry-pick \
-            --reviewer jerryshao || echo "Failed to create PR, may already exist"
+          FORK_CI=""
+          if [ -n "${HEAD_OWNER}" ]; then
+            FORK_CI=$'\n'"- Fork CI: runs in \`${HEAD_OWNER}/gravitino\`; re-run it there or push to this PR branch"
+          fi
+          BODY="${BODY//\$\{FORK_CI\}/${FORK_CI}}"
+
+          # Create the labels if they are missing; existing labels are left as they are.
+          gh label create cherry-pick --repo "${{ github.repository }}" \
+            --description "Automatically opened cherry-pick PR" \
+            --color 1D76DB >/dev/null 2>&1 || true
+          if [ "${SUCCESS}" != "true" ]; then
+            gh label create cherry-pick-conflict --repo "${{ github.repository }}" \
+              --description "Cherry-pick has conflicts; needs human resolution before merge" \
+              --color B60205 >/dev/null 2>&1 || true
+          fi
+
+          LABEL_ARGS=()
+          for label in "${LABELS[@]}"; do
+            LABEL_ARGS+=(--label "$label")
+          done
+
+          CREATE_ARGS=(
+            --repo "${{ github.repository }}"
+            --title "$TITLE"
+            --body "$BODY"
+            --base "${TARGET_BRANCH}"
+            --head "${HEAD_REF}"
+            "${LABEL_ARGS[@]}"
+          )
+          # Reviewer is only valid on apache/gravitino, and a PR author cannot review their own PR.
+          if [ "${{ github.repository }}" = "apache/gravitino" ]; then
+            AUTHOR="${HEAD_OWNER:-}"
+            if [ "${AUTHOR,,}" != "jerryshao" ]; then
+              CREATE_ARGS+=(--reviewer jerryshao)
+            # Bot and app logins (e.g. "name[bot]") cannot be requested as reviewers.
+            elif [[ "${MERGED_BY}" =~ ^[A-Za-z0-9-]+$ ]] && [ "${MERGED_BY,,}" != "${AUTHOR,,}" ]; then
+              CREATE_ARGS+=(--reviewer "${MERGED_BY}")
+            fi
+          fi
+          if ! gh pr create "${CREATE_ARGS[@]}"; then
+            # A re-run finds the PR it opened before; any other failure must fail the job.
+            OWNER="${HEAD_OWNER:-${{ github.repository_owner }}}"
+            EXISTING=$(gh pr list --repo "${{ github.repository }}" --head "${BRANCH_NAME}" --state open \
+              --json url,headRepositoryOwner \
+              --jq ".[] | select((.headRepositoryOwner.login | ascii_downcase) == \"${OWNER,,}\") | .url" \
+              ) || EXISTING=""
+            if [ -z "${EXISTING}" ]; then
+              echo "::error::Failed to create the cherry-pick PR for ${HEAD_REF}."
+              exit 1
+            fi
+            echo "Cherry-pick PR already exists: ${EXISTING}"
+          fi

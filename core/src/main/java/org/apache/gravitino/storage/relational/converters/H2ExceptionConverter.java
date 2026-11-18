@@ -31,6 +31,9 @@ public class H2ExceptionConverter implements SQLExceptionConverter {
   /** It means found a duplicated primary key or unique key entry in H2. */
   private static final int DUPLICATED_ENTRY_ERROR_CODE = 23505;
 
+  /** It means a value is too long for its column in H2. */
+  private static final int VALUE_TOO_LONG_ERROR_CODE = 22001;
+
   @SuppressWarnings("FormatStringAnnotation")
   @Override
   public void toGravitinoException(SQLException se, Entity.EntityType type, String name)
@@ -41,6 +44,8 @@ public class H2ExceptionConverter implements SQLExceptionConverter {
       case MySQLExceptionConverter.DUPLICATED_ENTRY_ERROR_CODE:
         throw new EntityAlreadyExistsException(
             se, "The %s entity: %s already exists.", type.name(), name);
+      case VALUE_TOO_LONG_ERROR_CODE:
+        throw ValueTooLongExceptions.of(se, type, name);
       default:
         throw new IOException("error code: " + se.getErrorCode(), se);
     }

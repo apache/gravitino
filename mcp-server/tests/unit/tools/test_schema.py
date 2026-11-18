@@ -42,3 +42,72 @@ class TestSchemaTool(unittest.TestCase):
                 self.assertEqual("mock_schemas", result.content[0].text)
 
         asyncio.run(_test_list_schemas(self.mcp))
+
+    def test_create_schema(self):
+        async def _test(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "create_schema",
+                    {
+                        "catalog_name": "cat",
+                        "name": "sch",
+                        "comment": "c",
+                        "properties": {"k": "v"},
+                    },
+                )
+                self.assertEqual(
+                    "mock_schema_created: cat.sch", result.content[0].text
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_alter_schema(self):
+        async def _test(mcp_server):
+            updates = [{"@type": "setProperty", "property": "k", "value": "v"}]
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "alter_schema",
+                    {
+                        "catalog_name": "cat",
+                        "schema_name": "sch",
+                        "updates": updates,
+                    },
+                )
+                self.assertEqual(
+                    f"mock_schema_altered: cat.sch with updates {updates}",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_drop_schema(self):
+        async def _test(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "drop_schema",
+                    {"catalog_name": "cat", "schema_name": "sch"},
+                )
+                self.assertEqual(
+                    "mock_schema_dropped: cat.sch, cascade=False",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_drop_schema_cascade(self):
+        async def _test(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "drop_schema",
+                    {
+                        "catalog_name": "cat",
+                        "schema_name": "sch",
+                        "cascade": True,
+                    },
+                )
+                self.assertEqual(
+                    "mock_schema_dropped: cat.sch, cascade=True",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test(self.mcp))

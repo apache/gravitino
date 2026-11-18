@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.idp.model.IdpGroup;
 import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
@@ -104,14 +105,15 @@ public class IdpGroupMetaService {
    * @param force when false, rejects deletion if the group still has members; when true, removes
    *     memberships and deletes the group
    * @return true if the group was deleted
+   * @throws NonEmptyEntityException if the group has members and force is false
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteIdpGroup")
   public boolean deleteIdpGroup(String groupName, boolean force) {
     if (!force && !listUsernamesByGroupName(groupName).isEmpty()) {
-      throw new IllegalStateException(
-          String.format("IdP group %s is not empty, use force=true to delete it", groupName));
+      throw new NonEmptyEntityException(
+          "IdP group %s is not empty, use force=true to delete it", groupName);
     }
 
     int[] deletedCount = new int[] {0};
@@ -221,6 +223,7 @@ public class IdpGroupMetaService {
         .withId(RandomIdGenerator.INSTANCE.nextId())
         .withUserId(userId)
         .withGroupId(groupId)
+        .withAuditInfo(IdpPOConverters.newCreateAuditInfoJson())
         .withCurrentVersion(1L)
         .withLastVersion(0L)
         .withDeletedAt(0L)

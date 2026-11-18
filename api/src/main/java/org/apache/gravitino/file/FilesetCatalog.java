@@ -21,6 +21,7 @@ package org.apache.gravitino.file;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -30,6 +31,8 @@ import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.file.FilesetChange.RenameFileset;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 
 /**
  * The FilesetCatalog interface defines the public API for managing fileset objects in a schema. If
@@ -106,6 +109,71 @@ public interface FilesetCatalog {
   }
 
   /**
+   * Create a fileset metadata with a default location and optional create-time secrets.
+   *
+   * @param ident A fileset identifier.
+   * @param comment The comment of the fileset.
+   * @param type The type of the fileset.
+   * @param storageLocation The storage location of the fileset.
+   * @param properties The properties of the fileset.
+   * @param secretBindings optional property key → binding ({@code provider} + {@code plaintext})
+   *     for write-through
+   * @param secretReferences optional property key → secret locator ({@code provider} plus
+   *     provider-specific attributes).
+   * @return The created fileset metadata
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws FilesetAlreadyExistsException If the fileset already exists.
+   */
+  default Fileset createFileset(
+      NameIdentifier ident,
+      String comment,
+      Fileset.Type type,
+      String storageLocation,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchSchemaException, FilesetAlreadyExistsException {
+    return createMultipleLocationFileset(
+        ident,
+        comment,
+        type,
+        storageLocation == null
+            ? ImmutableMap.of()
+            : ImmutableMap.of(LOCATION_NAME_UNKNOWN, storageLocation),
+        properties,
+        secretBindings,
+        secretReferences);
+  }
+
+  /**
+   * Create a fileset metadata with multiple storage locations in the catalog.
+   *
+   * @param ident A fileset identifier.
+   * @param comment The comment of the fileset.
+   * @param type The type of the fileset.
+   * @param storageLocations The location names and storage locations of the fileset.
+   * @param properties The properties of the fileset.
+   * @param secretBindings optional property key → binding ({@code provider} + {@code plaintext})
+   *     for write-through
+   * @param secretReferences optional property key → secret locator ({@code provider} plus
+   *     provider-specific attributes).
+   * @return The created fileset metadata
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws FilesetAlreadyExistsException If the fileset already exists.
+   */
+  default Fileset createMultipleLocationFileset(
+      NameIdentifier ident,
+      String comment,
+      Fileset.Type type,
+      Map<String, String> storageLocations,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchSchemaException, FilesetAlreadyExistsException {
+    throw new UnsupportedOperationException("Creating a fileset with secrets is not supported");
+  }
+
+  /**
    * Create a fileset metadata with multiple storage locations in the catalog.
    *
    * @param ident A fileset identifier.
@@ -124,7 +192,14 @@ public interface FilesetCatalog {
       Map<String, String> storageLocations,
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
-    throw new UnsupportedOperationException("Not implemented");
+    return createMultipleLocationFileset(
+        ident,
+        comment,
+        type,
+        storageLocations,
+        properties,
+        Collections.emptyMap(),
+        Collections.emptyMap());
   }
 
   /**
@@ -140,10 +215,11 @@ public interface FilesetCatalog {
    * @param changes The changes to apply to the fileset.
    * @return The altered fileset metadata.
    * @throws NoSuchFilesetException If the fileset does not exist.
+   * @throws FilesetAlreadyExistsException If the new name is already used by another fileset.
    * @throws IllegalArgumentException If the change is rejected by the implementation.
    */
   Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
-      throws NoSuchFilesetException, IllegalArgumentException;
+      throws NoSuchFilesetException, FilesetAlreadyExistsException, IllegalArgumentException;
 
   /**
    * Drop a fileset from the catalog.
@@ -160,9 +236,15 @@ public interface FilesetCatalog {
    * Get the actual location of a file or directory based on the default storage location of Fileset
    * and the sub path.
    *
+   * <p>Leading and trailing whitespace in the sub path is trimmed. An empty path or {@code /}
+   * refers to the default storage location. A leading slash is relative to that location.
+   *
    * @param ident A fileset identifier.
    * @param subPath The sub path to the file or directory.
    * @return The actual location of the file or directory.
+   * @throws IllegalArgumentException If the sub path contains a complete {@code ..} path segment or
+   *     a NUL character ({@code U+0000}), or its normalized path is outside the default storage
+   *     location.
    * @throws NoSuchFilesetException If the fileset does not exist.
    */
   default String getFileLocation(NameIdentifier ident, String subPath)
@@ -174,15 +256,21 @@ public interface FilesetCatalog {
    * Get the actual location of a file or directory based on the storage location of Fileset and the
    * sub path by the location name.
    *
+   * <p>Leading and trailing whitespace in the sub path is trimmed. An empty path or {@code /}
+   * refers to the selected storage location. A leading slash is relative to that location.
+   *
    * @param ident A fileset identifier.
    * @param subPath The sub path to the file or directory.
    * @param locationName The location name. If null, the default location will be used.
    * @return The actual location of the file or directory.
+   * @throws IllegalArgumentException If the sub path contains a complete {@code ..} path segment or
+   *     a NUL character ({@code U+0000}), or its normalized path is outside the selected storage
+   *     location.
    * @throws NoSuchFilesetException If the fileset does not exist.
    * @throws NoSuchLocationNameException If the location name does not exist.
    */
   default String getFileLocation(NameIdentifier ident, String subPath, String locationName)
       throws NoSuchFilesetException, NoSuchLocationNameException {
-    throw new UnsupportedOperationException("Not implemented");
+    throw new UnsupportedOperationException("getFileLocation is not supported");
   }
 }

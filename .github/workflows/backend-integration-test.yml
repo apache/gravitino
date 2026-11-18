@@ -2,13 +2,31 @@ name: Backend Integration Test
 
 # Controls when the workflow will run
 on:
-  push:
-    branches: [ "main", "branch-*" ]
-  pull_request:
-    branches: [ "main", "branch-*" ]
+  workflow_call:
+    inputs:
+      base-ref:
+        type: string
+        required: false
+        default: ''
+      base-sha:
+        type: string
+        required: false
+        default: ''
+      head-repository:
+        type: string
+        required: false
+        default: ''
+      head-sha:
+        type: string
+        required: false
+        default: ''
+      sync:
+        type: string
+        required: false
+        default: ''
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: fork-ci-backend-${{ inputs.head-sha || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -17,17 +35,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          persist-credentials: false
           fetch-depth: 0
-      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
+        id: checkout
+      - name: Disable Git automatic maintenance
+        run: git config --local maintenance.auto false
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d
         id: filter
         with:
+          base: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.base-sha || steps.checkout.outputs.base-ref }}
+          ref: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.head-sha || github.ref }}
           filters: |
             source_changes:
               - .github/**
               - api/**
               - bin/**
               - catalogs/**
-              - catalogs-contrib/**
               - clients/client-java/**
               - clients/client-java-runtime/**
               - clients/filesystem-hadoop3/**
@@ -49,42 +79,12 @@ jobs:
               - gradle.properties
               - gradlew
               - settings.gradle.kts
-      - name: Detect changed catalogs-contrib modules
-        id: contrib
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE_SHA="${{ github.event.pull_request.base.sha }}"
-            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-          else
-            BASE_SHA="${{ github.event.before }}"
-            HEAD_SHA="${{ github.sha }}"
-          fi
-
-          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
-            BASE_SHA="$(git rev-list --max-parents=0 "$HEAD_SHA" | tail -n 1)"
-          fi
-
-          MERGE_BASE_SHA="$(git merge-base "$BASE_SHA" "$HEAD_SHA" || true)"
-          if [ -z "$MERGE_BASE_SHA" ]; then
-            MERGE_BASE_SHA="$BASE_SHA"
-          fi
-
-          CHANGED_FILES="$(git diff --name-only "$MERGE_BASE_SHA" "$HEAD_SHA")"
-          CHANGED_MODULES="$(echo "$CHANGED_FILES" | awk -F/ '/^catalogs-contrib\/[^/]+\// {print $2}' | sort -u | xargs)"
-
-          # If shared catalogs-contrib build logic changes, run all contrib catalog tests.
-          if echo "$CHANGED_FILES" | grep -q '^catalogs-contrib/build.gradle.kts$'; then
-            CHANGED_MODULES="__all__"
-          fi
-
-          echo "changed_catalogs_contrib_modules=$CHANGED_MODULES" >> "$GITHUB_OUTPUT"
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
-      changed_catalogs_contrib_modules: ${{ steps.contrib.outputs.changed_catalogs_contrib_modules }}
 
-  BackendIT-on-push:
+  BackendIT:
     needs: changes
-    if: (github.event_name == 'push' && needs.changes.outputs.source_changes == 'true')
+    if: needs.changes.outputs.source_changes == 'true'
     strategy:
       matrix:
         architecture: [linux/amd64]
@@ -100,32 +100,12 @@ jobs:
             backend: 'h2'
     uses: ./.github/workflows/backend-integration-test-action.yml
     with:
+      base-ref: ${{ inputs.base-ref }}
+      base-sha: ${{ inputs.base-sha }}
+      head-repository: ${{ inputs.head-repository }}
+      head-sha: ${{ inputs.head-sha }}
+      sync: ${{ inputs.sync }}
       architecture: ${{ matrix.architecture }}
       java-version: ${{ matrix.java-version }}
       backend: ${{ matrix.backend }}
       test-mode: ${{ matrix.test-mode }}
-      changed-catalogs-contrib-modules: ${{ needs.changes.outputs.changed_catalogs_contrib_modules }}
-
-  BackendIT-on-pr:
-    needs: changes
-    if: (github.event_name == 'pull_request' && needs.changes.outputs.source_changes == 'true')
-    strategy:
-      matrix:
-        architecture: [ linux/amd64 ]
-        java-version: [ 17 ]
-        backend: [ h2, mysql, postgresql ]
-        test-mode: [ embedded, deploy ]
-        exclude:
-          - test-mode: 'embedded'
-            backend: 'mysql'
-          - test-mode: 'embedded'
-            backend: 'postgresql'
-          - test-mode: 'deploy'
-            backend: 'h2'
-    uses: ./.github/workflows/backend-integration-test-action.yml
-    with:
-      architecture: ${{ matrix.architecture }}
-      java-version: ${{ matrix.java-version }}
-      backend: ${{ matrix.backend }}
-      test-mode: ${{ matrix.test-mode }}
-      changed-catalogs-contrib-modules: ${{ needs.changes.outputs.changed_catalogs_contrib_modules }}

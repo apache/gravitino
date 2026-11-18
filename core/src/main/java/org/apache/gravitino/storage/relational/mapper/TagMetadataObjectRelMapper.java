@@ -19,16 +19,61 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import java.util.Set;
+import javax.annotation.Nullable;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.storage.relational.po.DomainAssignmentPO;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.TagPO;
+import org.apache.gravitino.storage.relational.po.TagRelationTagPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
 public interface TagMetadataObjectRelMapper {
   String TAG_METADATA_OBJECT_RELATION_TABLE_NAME = "tag_relation_meta";
+
+  /**
+   * Reads selected domain assignments before resolving object names.
+   *
+   * @param metalake The containing metalake.
+   * @param domainIds Selected domain IDs.
+   * @param types Selected object types.
+   * @param candidateDomainIds Domains supplying the candidate objects, or empty for all.
+   * @return Assignment rows with the matching domain ID.
+   */
+  @Select({
+    "<script>",
+    "SELECT d.domain_id AS domainId, r.tag_id AS tagId, r.tag_value AS tagValue,",
+    "r.metadata_object_id AS metadataObjectId, r.metadata_object_type AS metadataObjectType",
+    "FROM domain_meta d JOIN metalake_meta m ON m.metalake_id = d.metalake_id",
+    "JOIN tag_meta t ON t.tag_id = d.backing_tag_id AND t.metalake_id = m.metalake_id",
+    "JOIN tag_relation_meta r ON r.tag_id = t.tag_id",
+    "WHERE m.metalake_name = #{metalake} AND m.deleted_at = 0 AND d.deleted_at = 0",
+    "AND t.deleted_at = 0 AND r.deleted_at = 0",
+    "AND (d.backing_tag_value IS NULL OR d.backing_tag_value = r.tag_value)",
+    "AND d.domain_id IN",
+    "<foreach collection='domainIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>",
+    "AND r.metadata_object_type IN",
+    "<foreach collection='types' item='type' open='(' separator=',' close=')'>#{type}</foreach>",
+    "<if test='candidateDomainIds.size > 0'>",
+    "AND EXISTS (SELECT 1 FROM domain_meta sd JOIN tag_relation_meta sr ON sr.tag_id = sd.backing_tag_id",
+    "WHERE sd.metalake_id = m.metalake_id AND sd.deleted_at = 0 AND sr.deleted_at = 0",
+    "AND sr.metadata_object_id = r.metadata_object_id AND sr.metadata_object_type = r.metadata_object_type",
+    "AND (sd.backing_tag_value IS NULL OR sd.backing_tag_value = sr.tag_value)",
+    "AND sd.domain_id IN",
+    "<foreach collection='candidateDomainIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>)",
+    "</if>",
+    "</script>"
+  })
+  List<DomainAssignmentPO> listDomainAssignments(
+      @Param("metalake") String metalake,
+      @Param("domainIds") Set<Long> domainIds,
+      @Param("types") Set<MetadataObject.Type> types,
+      @Param("candidateDomainIds") Set<Long> candidateDomainIds);
 
   @SelectProvider(
       type = TagMetadataObjectRelSQLProviderFactory.class,
@@ -37,10 +82,26 @@ public interface TagMetadataObjectRelMapper {
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType);
 
+  /**
+   * Selects tag assignment rows for multiple objects of one type.
+   *
+   * @param metalakeName the metalake containing the objects
+   * @param metadataObjectIds the source object IDs
+   * @param metadataObjectType the source object type
+   * @return the tag rows with source IDs
+   */
+  @SelectProvider(
+      type = TagMetadataObjectRelSQLProviderFactory.class,
+      method = "listTagPOsByMetadataObjectIdsAndType")
+  List<TagRelationTagPO> listTagPOsByMetadataObjectIdsAndType(
+      @Param("metalakeName") String metalakeName,
+      @Param("metadataObjectIds") List<Long> metadataObjectIds,
+      @Param("metadataObjectType") String metadataObjectType);
+
   @SelectProvider(
       type = TagMetadataObjectRelSQLProviderFactory.class,
       method = "getTagPOsByMetadataObjectAndTagName")
-  TagPO getTagPOsByMetadataObjectAndTagName(
+  List<TagPO> getTagPOsByMetadataObjectAndTagName(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType,
       @Param("tagName") String tagName);
@@ -50,6 +111,30 @@ public interface TagMetadataObjectRelMapper {
       method = "listTagMetadataObjectRelsByMetalakeAndTagName")
   List<TagMetadataObjectRelPO> listTagMetadataObjectRelsByMetalakeAndTagName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName);
+
+  @SelectProvider(
+      type = TagMetadataObjectRelSQLProviderFactory.class,
+      method = "listTagMetadataObjectRelsByMetalakeAndTagNameAndValue")
+  List<TagMetadataObjectRelPO> listTagMetadataObjectRelsByMetalakeAndTagNameAndValue(
+      @Param("metalakeName") String metalakeName,
+      @Param("tagName") String tagName,
+      @Param("tagValue") String tagValue);
+
+  /**
+   * Lists live assignments by stable tag ID, optionally narrowed by value.
+   *
+   * @param metalakeName The metalake of the tag.
+   * @param tagId The stable tag ID.
+   * @param tagValue The assignment value, or null for every value.
+   * @return The matching live assignments.
+   */
+  @SelectProvider(
+      type = TagMetadataObjectRelSQLProviderFactory.class,
+      method = "listTagMetadataObjectRelsByTagId")
+  List<TagMetadataObjectRelPO> listTagMetadataObjectRelsByTagId(
+      @Param("metalakeName") String metalakeName,
+      @Param("tagId") Long tagId,
+      @Param("tagValue") @Nullable String tagValue);
 
   @InsertProvider(
       type = TagMetadataObjectRelSQLProviderFactory.class,
@@ -66,9 +151,28 @@ public interface TagMetadataObjectRelMapper {
 
   @UpdateProvider(
       type = TagMetadataObjectRelSQLProviderFactory.class,
+      method = "batchDeleteTagMetadataObjectRelsByTagIdsAndValuesAndMetadataObject")
+  void batchDeleteTagMetadataObjectRelsByTagIdsAndValuesAndMetadataObject(
+      @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType,
+      @Param("tagRels") List<TagMetadataObjectRelPO> tagRelPOs);
+
+  @UpdateProvider(
+      type = TagMetadataObjectRelSQLProviderFactory.class,
       method = "softDeleteTagMetadataObjectRelsByMetalakeAndTagName")
   Integer softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName);
+
+  /**
+   * Soft-deletes all active metadata-object assignments for a tag.
+   *
+   * @param tagId The tag ID.
+   * @return The number of affected rows.
+   */
+  @UpdateProvider(
+      type = TagMetadataObjectRelSQLProviderFactory.class,
+      method = "softDeleteTagMetadataObjectRelsByTagId")
+  Integer softDeleteTagMetadataObjectRelsByTagId(@Param("tagId") Long tagId);
 
   @UpdateProvider(
       type = TagMetadataObjectRelSQLProviderFactory.class,
@@ -80,6 +184,13 @@ public interface TagMetadataObjectRelMapper {
       method = "softDeleteTagMetadataObjectRelsByMetadataObject")
   void softDeleteTagMetadataObjectRelsByMetadataObject(
       @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType);
+
+  @UpdateProvider(
+      type = TagMetadataObjectRelSQLProviderFactory.class,
+      method = "softDeleteTagMetadataObjectRelsByMetadataObjects")
+  void softDeleteTagMetadataObjectRelsByMetadataObjects(
+      @Param("metadataObjectIds") List<Long> metadataObjectIds,
       @Param("metadataObjectType") String metadataObjectType);
 
   @UpdateProvider(

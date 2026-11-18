@@ -22,6 +22,7 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREAT
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_LOCATION;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_DECLARED;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -55,7 +56,16 @@ class TestGravitinoLanceModeParsing {
   void testNormalizeTokenPreservesSpecialCharacters() {
     Assertions.assertEquals("CREATE", CommonUtil.normalizeToken(" create "));
     Assertions.assertEquals("EXIST_OK", CommonUtil.normalizeToken("exist_ok"));
+    Assertions.assertEquals("OVERWRITE", CommonUtil.normalizeToken(" OverWrite "));
     Assertions.assertEquals("#CREATE$", CommonUtil.normalizeToken("#create$"));
+  }
+
+  @Test
+  void testNormalizeTokenMapsPascalCaseExistOk() {
+    Assertions.assertEquals("EXIST_OK", CommonUtil.normalizeToken("ExistOk"));
+    Assertions.assertEquals("EXIST_OK", CommonUtil.normalizeToken(" ExistOk "));
+    Assertions.assertEquals("EXIST_OK", CommonUtil.normalizeToken("existOk"));
+    Assertions.assertEquals("EXIST_OK", CommonUtil.normalizeToken("EXISTOK"));
   }
 
   @Test
@@ -63,6 +73,9 @@ class TestGravitinoLanceModeParsing {
     Assertions.assertEquals(
         TestMode.EXIST_OK,
         CommonUtil.parseEnumToken(TestMode.class, "exist_ok", "Unknown mode: ", "table"));
+    Assertions.assertEquals(
+        TestMode.EXIST_OK,
+        CommonUtil.parseEnumToken(TestMode.class, "ExistOk", "Unknown mode: ", "table"));
 
     InvalidInputException exception =
         Assertions.assertThrows(
@@ -110,12 +123,16 @@ class TestGravitinoLanceModeParsing {
     GravitinoLanceTableOperations operations = newTableOperations(tableCatalog);
 
     operations.createTable("catalog.schema.table", " exist_ok ", ".", null, Map.of(), null);
+    operations.createTable("catalog.schema.table", "ExistOk", ".", null, Map.of(), null);
 
     ArgumentCaptor<Map<String, String>> propertiesCaptor = propertiesCaptor();
-    Mockito.verify(tableCatalog)
+    Mockito.verify(tableCatalog, Mockito.times(2))
         .createTable(
             any(NameIdentifier.class), any(Column[].class), isNull(), propertiesCaptor.capture());
-    Assertions.assertEquals("EXIST_OK", propertiesCaptor.getValue().get(LANCE_CREATION_MODE));
+    Assertions.assertEquals(
+        "EXIST_OK", propertiesCaptor.getAllValues().get(0).get(LANCE_CREATION_MODE));
+    Assertions.assertEquals(
+        "EXIST_OK", propertiesCaptor.getAllValues().get(1).get(LANCE_CREATION_MODE));
   }
 
   @Test
@@ -169,6 +186,37 @@ class TestGravitinoLanceModeParsing {
   }
 
   @Test
+  void testClientPropertyCannotOverrideAuthorizedMode() {
+    // The REST interceptor authorizes an overwrite from the request mode alone. A caller-supplied
+    // lance.creation-mode table property must therefore never reach the catalog in place of that
+    // mode, or CREATE_TABLE plus a property would be enough to replace an existing table.
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Table table = Mockito.mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(LANCE_LOCATION, "/tmp/table"));
+    when(tableCatalog.createTable(
+            any(NameIdentifier.class), any(Column[].class), isNull(), anyMap()))
+        .thenReturn(table);
+    GravitinoLanceTableOperations operations = newTableOperations(tableCatalog);
+    Map<String, String> smuggled = Map.of(LANCE_CREATION_MODE, "OVERWRITE");
+
+    operations.createTable("catalog.schema.table", "create", ".", null, smuggled, null);
+    operations.declareTable("catalog.schema.table", ".", null, smuggled);
+    operations.registerTable(
+        "catalog.schema.table",
+        "create",
+        ".",
+        Map.of(LANCE_LOCATION, "/tmp/table", LANCE_CREATION_MODE, "OVERWRITE"));
+
+    ArgumentCaptor<Map<String, String>> propertiesCaptor = propertiesCaptor();
+    Mockito.verify(tableCatalog, Mockito.times(3))
+        .createTable(
+            any(NameIdentifier.class), any(Column[].class), isNull(), propertiesCaptor.capture());
+    for (Map<String, String> properties : propertiesCaptor.getAllValues()) {
+      Assertions.assertEquals("CREATE", properties.get(LANCE_CREATION_MODE));
+    }
+  }
+
+  @Test
   void testCreateTableReturnsPropertiesAndStorageOptions() {
     TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
     Table table = Mockito.mock(Table.class);
@@ -206,6 +254,8 @@ class TestGravitinoLanceModeParsing {
             Map.of(
                 LANCE_LOCATION,
                 "/tmp/table",
+                Table.PROPERTY_TABLE_FORMAT,
+                LANCE_TABLE_FORMAT,
                 LANCE_TABLE_DECLARED,
                 "true",
                 LANCE_STORAGE_OPTIONS_PREFIX + "region",
@@ -227,8 +277,11 @@ class TestGravitinoLanceModeParsing {
     GravitinoLanceNamespaceWrapper namespaceWrapper =
         Mockito.mock(GravitinoLanceNamespaceWrapper.class);
     Catalog catalog = Mockito.mock(Catalog.class);
+    when(catalog.name()).thenReturn("catalog");
+    when(catalog.properties()).thenReturn(Map.of());
     when(namespaceWrapper.loadAndValidateLakehouseCatalog("catalog")).thenReturn(catalog);
-    when(catalog.asTableCatalog()).thenReturn(tableCatalog);
+    when(namespaceWrapper.propsWithSecrets(catalog)).thenReturn(Map.of());
+    when(namespaceWrapper.asTableCatalog(catalog)).thenReturn(tableCatalog);
     return new GravitinoLanceTableOperations(namespaceWrapper);
   }
 

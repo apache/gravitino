@@ -552,8 +552,8 @@ public abstract class FlinkHiveCatalogIT extends FlinkCommonIT {
     String key = "test key";
     String value = "test value";
 
-    // 1. The NOT NULL constraint for column is only supported since Hive 3.0,
-    // but the current Gravitino Hive catalog only supports Hive 2.x.
+    // 1. The NOT NULL constraint for column is only supported since Hive 3.0, and the test
+    // environment runs a Hive 2.x metastore.
     // 2. Hive doesn't support Time and Timestamp with timezone type.
     // 3. Flink SQL only support to create Interval Month and Second(3).
     doWithSchema(

@@ -46,6 +46,11 @@ public class ModelCatalogImpl extends BaseCatalog<ModelCatalogImpl> {
   }
 
   @Override
+  public boolean supportsPathBasedCredentials() {
+    return false;
+  }
+
+  @Override
   protected CatalogOperations newOps(Map<String, String> config) {
     EntityStore store = GravitinoEnv.getInstance().entityStore();
     return new ModelCatalogOperations(store);

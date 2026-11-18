@@ -43,6 +43,9 @@ import org.apache.gravitino.listener.api.event.IcebergNamespaceExistsPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRegisterTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergRegisterTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergRegisterTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergRegisterViewEvent;
+import org.apache.gravitino.listener.api.event.IcebergRegisterViewFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergRegisterViewPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceFailureEvent;
@@ -51,11 +54,13 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 
 /**
@@ -251,5 +256,31 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
         new IcebergRegisterTableEvent(
             context, nameIdentifier, registerTableRequest, loadTableResponse));
     return loadTableResponse;
+  }
+
+  @Override
+  public LoadViewResponse registerView(
+      IcebergRequestContext context, Namespace namespace, RegisterViewRequest registerViewRequest) {
+    TableIdentifier viewIdentifier = TableIdentifier.of(namespace, registerViewRequest.name());
+    NameIdentifier nameIdentifier =
+        IcebergRESTUtils.getGravitinoNameIdentifier(
+            metalakeName, context.catalogName(), viewIdentifier);
+
+    eventBus.dispatchEvent(
+        new IcebergRegisterViewPreEvent(context, nameIdentifier, registerViewRequest));
+
+    LoadViewResponse loadViewResponse;
+    try {
+      loadViewResponse = operationDispatcher.registerView(context, namespace, registerViewRequest);
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new IcebergRegisterViewFailureEvent(context, nameIdentifier, registerViewRequest, e));
+      throw e;
+    }
+
+    eventBus.dispatchEvent(
+        new IcebergRegisterViewEvent(
+            context, nameIdentifier, registerViewRequest, loadViewResponse));
+    return loadViewResponse;
   }
 }

@@ -22,21 +22,38 @@ import static org.apache.gravitino.catalog.glue.GlueIcebergTableHelper.fromIcebe
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.FunctionExpression;
+import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.expressions.sorts.SortOrders;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.iceberg.HasTableOperations;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.SortOrder;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.aws.AwsClientProperties;
+import org.apache.iceberg.aws.glue.GlueCatalog;
 import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.inmemory.InMemoryCatalog;
 import org.apache.iceberg.types.Types.BooleanType;
 import org.apache.iceberg.types.Types.DateType;
 import org.apache.iceberg.types.Types.DecimalType;
@@ -55,6 +72,8 @@ import org.apache.iceberg.types.Types.TimestampType;
 import org.junit.jupiter.api.Test;
 
 class TestGlueIcebergTableHelper {
+
+  private static final String METADATA_FILE = "s3://bucket/db1/t1/metadata/00001.metadata.json";
 
   // -------------------------------------------------------------------------
   // fromIcebergType — primitive types
@@ -210,8 +229,9 @@ class TestGlueIcebergTableHelper {
     when(mockIcebergTable.sortOrder()).thenReturn(SortOrder.unsorted());
     when(mockIcebergTable.properties()).thenReturn(new HashMap<>());
 
-    Catalog mockCatalog = mock(Catalog.class);
-    when(mockCatalog.loadTable(any(TableIdentifier.class))).thenReturn(mockIcebergTable);
+    GravitinoGlueCatalog mockCatalog = mock(GravitinoGlueCatalog.class);
+    when(mockCatalog.loadStaticTable(TableIdentifier.of("db1", "t1"), METADATA_FILE))
+        .thenReturn(mockIcebergTable);
 
     // GlueTable with wrong Hive-style column types (as Glue would store them).
     GlueColumn[] glueCols = {
@@ -227,12 +247,439 @@ class TestGlueIcebergTableHelper {
             .withAuditInfo(AuditInfo.EMPTY)
             .build();
 
-    GlueIcebergTableHelper.loadTable(mockCatalog, "db1", "t1", table);
+    GlueIcebergTableHelper.loadTable(mockCatalog, "db1", "t1", METADATA_FILE, table);
 
     Column[] cols = table.columns();
     assertEquals(3, cols.length);
     assertEquals(Types.TimestampType.withTimeZone(6), cols[0].dataType());
     assertEquals(Types.TimeType.of(6), cols[1].dataType());
     assertEquals(Types.DecimalType.of(10, 2), cols[2].dataType());
+  }
+
+  @Test
+  void testCreateGlueCatalog() throws IOException {
+    Map<String, String> config = new HashMap<>();
+    config.put(GlueConstants.AWS_REGION, "us-east-1");
+    config.put(GlueConstants.WAREHOUSE, "s3://test-bucket/warehouse");
+
+    Catalog catalog = GlueIcebergTableHelper.createGlueCatalog(config);
+    GlueCatalog glueCatalog = assertInstanceOf(GlueCatalog.class, catalog);
+    glueCatalog.close();
+  }
+
+  @Test
+  void testBuildIcebergCatalogPropertiesWithoutStaticCredentials() {
+    Map<String, String> config = new HashMap<>();
+    config.put(GlueConstants.AWS_REGION, "us-east-1");
+    config.put(GlueConstants.WAREHOUSE, "s3://test-bucket/warehouse");
+
+    Map<String, String> icebergProps = GlueIcebergTableHelper.buildIcebergCatalogProperties(config);
+    assertFalse(icebergProps.containsKey(AwsClientProperties.CLIENT_CREDENTIALS_PROVIDER));
+    assertFalse(
+        icebergProps.containsKey(
+            AwsClientProperties.CLIENT_CREDENTIALS_PROVIDER + ".access-key-id"));
+    assertFalse(
+        icebergProps.containsKey(
+            AwsClientProperties.CLIENT_CREDENTIALS_PROVIDER + ".secret-access-key"));
+    assertFalse(icebergProps.containsKey(IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID));
+    assertFalse(icebergProps.containsKey(IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY));
+
+    config.put(GlueConstants.AWS_ACCESS_KEY_ID, "");
+    config.put(GlueConstants.AWS_SECRET_ACCESS_KEY, " ");
+    icebergProps = GlueIcebergTableHelper.buildIcebergCatalogProperties(config);
+    assertFalse(icebergProps.containsKey(AwsClientProperties.CLIENT_CREDENTIALS_PROVIDER));
+    assertFalse(
+        icebergProps.containsKey(
+            AwsClientProperties.CLIENT_CREDENTIALS_PROVIDER + ".access-key-id"));
+    assertFalse(
+        icebergProps.containsKey(
+            AwsClientProperties.CLIENT_CREDENTIALS_PROVIDER + ".secret-access-key"));
+    assertFalse(icebergProps.containsKey(IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID));
+    assertFalse(icebergProps.containsKey(IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY));
+  }
+
+  @Test
+  void testBuildIcebergCatalogPropertiesWithStaticCredentials() {
+    Map<String, String> config = new HashMap<>();
+    config.put(GlueConstants.AWS_REGION, "us-east-1");
+    config.put(GlueConstants.WAREHOUSE, "s3://test-bucket/warehouse");
+    config.put(GlueConstants.AWS_ACCESS_KEY_ID, "test-access-key");
+    config.put(GlueConstants.AWS_SECRET_ACCESS_KEY, "test-secret-key");
+
+    Map<String, String> icebergProps = GlueIcebergTableHelper.buildIcebergCatalogProperties(config);
+    assertEquals(
+        GravitinoGlueCredentialsProvider.class.getName(),
+        icebergProps.get(AwsClientProperties.CLIENT_CREDENTIALS_PROVIDER));
+    assertEquals(
+        "test-access-key",
+        icebergProps.get(AwsClientProperties.CLIENT_CREDENTIALS_PROVIDER + ".access-key-id"));
+    assertEquals(
+        "test-secret-key",
+        icebergProps.get(AwsClientProperties.CLIENT_CREDENTIALS_PROVIDER + ".secret-access-key"));
+    assertEquals("test-access-key", icebergProps.get(IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID));
+    assertEquals(
+        "test-secret-key", icebergProps.get(IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY));
+  }
+
+  @Test
+  void testBuildIcebergCatalogPropertiesWithOnlyAccessKey() {
+    Map<String, String> config = new HashMap<>();
+    config.put(GlueConstants.AWS_REGION, "us-east-1");
+    config.put(GlueConstants.WAREHOUSE, "s3://test-bucket/warehouse");
+    config.put(GlueConstants.AWS_ACCESS_KEY_ID, "test-access-key");
+
+    assertEquals(
+        "Both 'aws-access-key-id' and 'aws-secret-access-key' must be set together. Either provide both keys for static authentication, or omit both to use the default credential chain.",
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> GlueIcebergTableHelper.buildIcebergCatalogProperties(config))
+            .getMessage());
+  }
+
+  @Test
+  void testBuildIcebergCatalogPropertiesWithOnlySecretKey() {
+    Map<String, String> config = new HashMap<>();
+    config.put(GlueConstants.AWS_REGION, "us-east-1");
+    config.put(GlueConstants.WAREHOUSE, "s3://test-bucket/warehouse");
+    config.put(GlueConstants.AWS_SECRET_ACCESS_KEY, "test-secret-key");
+
+    assertEquals(
+        "Both 'aws-access-key-id' and 'aws-secret-access-key' must be set together. Either provide both keys for static authentication, or omit both to use the default credential chain.",
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> GlueIcebergTableHelper.buildIcebergCatalogProperties(config))
+            .getMessage());
+  }
+
+  @Test
+  void testBuildIcebergCatalogPropertiesAppliesHttpTimeouts() {
+    Map<String, String> config = new HashMap<>();
+    config.put(GlueConstants.AWS_REGION, "us-east-1");
+    config.put(GlueConstants.WAREHOUSE, "s3://test-bucket/warehouse");
+    config.put(GlueConstants.AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS, "2500");
+
+    Map<String, String> icebergProps = GlueIcebergTableHelper.buildIcebergCatalogProperties(config);
+
+    assertEquals("apache", icebergProps.get("http-client.type"));
+    assertEquals("2500", icebergProps.get("http-client.apache.connection-timeout-ms"));
+    assertEquals("2500", icebergProps.get("http-client.apache.socket-timeout-ms"));
+  }
+
+  @Test
+  void testAlterTableKeepsTheCaseOfColumnNames() throws IOException {
+    try (InMemoryCatalog catalog = new InMemoryCatalog()) {
+      catalog.initialize("test", new HashMap<>());
+      catalog.createNamespace(Namespace.of("db"));
+      catalog.createTable(
+          TableIdentifier.of("db", "events"),
+          new Schema(
+              NestedField.optional(1, "UserId", LongType.get()),
+              NestedField.optional(2, "EventTime", TimestampType.withoutZone())));
+
+      GlueIcebergTableHelper.alterTable(
+          catalog,
+          "db",
+          "events",
+          TableChange.deleteColumn(new String[] {"UserId"}, false),
+          TableChange.renameColumn(new String[] {"EventTime"}, "eventAt"),
+          TableChange.addColumn(new String[] {"newCol"}, Types.StringType.get()));
+
+      Schema schema = catalog.loadTable(TableIdentifier.of("db", "events")).schema();
+      assertEquals(
+          List.of("eventAt", "newCol"),
+          schema.columns().stream().map(NestedField::name).collect(Collectors.toList()));
+
+      // Column names match exactly, so a name in another case is not found.
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              GlueIcebergTableHelper.alterTable(
+                  catalog,
+                  "db",
+                  "events",
+                  TableChange.deleteColumn(new String[] {"eventat"}, false)));
+    }
+  }
+
+  @Test
+  void testFromIcebergTypeV3Types() {
+    assertEquals(
+        Types.TimestampType.withTimeZone(9),
+        fromIcebergType(org.apache.iceberg.types.Types.TimestampNanoType.withZone()));
+    assertEquals(
+        Types.TimestampType.withoutTimeZone(9),
+        fromIcebergType(org.apache.iceberg.types.Types.TimestampNanoType.withoutZone()));
+    assertEquals(
+        Types.VariantType.get(), fromIcebergType(org.apache.iceberg.types.Types.VariantType.get()));
+    assertEquals(
+        Types.NullType.get(), fromIcebergType(org.apache.iceberg.types.Types.UnknownType.get()));
+    assertEquals(
+        Types.GeometryType.of("srid:3857"),
+        fromIcebergType(org.apache.iceberg.types.Types.GeometryType.of("srid:3857")));
+    assertEquals(
+        Types.GeographyType.of("srid:4269", "karney"),
+        fromIcebergType(
+            org.apache.iceberg.types.Types.GeographyType.of(
+                "srid:4269", org.apache.iceberg.types.EdgeAlgorithm.KARNEY)));
+  }
+
+  @Test
+  void testToIcebergSchemaMatchesIcebergCatalogTypes() {
+    Schema schema =
+        GlueIcebergTableHelper.toIcebergSchema(
+            new Column[] {
+              column("f", Types.FixedType.of(16)),
+              column("ts_ns", Types.TimestampType.withoutTimeZone(9)),
+              column("v", Types.VariantType.get()),
+              column("g", Types.GeometryType.of("srid:3857"))
+            });
+    assertEquals(FixedType.ofLength(16), schema.findType("f"));
+    assertEquals(
+        org.apache.iceberg.types.Types.TimestampNanoType.withoutZone(), schema.findType("ts_ns"));
+    assertEquals(org.apache.iceberg.types.Types.VariantType.get(), schema.findType("v"));
+    assertEquals(org.apache.iceberg.types.Types.GeometryType.of("srid:3857"), schema.findType("g"));
+  }
+
+  @Test
+  void testToIcebergSchemaRefusesTypesIcebergCannotStore() {
+    for (org.apache.gravitino.rel.types.Type type :
+        new org.apache.gravitino.rel.types.Type[] {
+          Types.ByteType.get(), Types.ShortType.get(), Types.IntegerType.unsigned()
+        }) {
+      IllegalArgumentException e =
+          assertThrows(
+              IllegalArgumentException.class,
+              () -> GlueIcebergTableHelper.toIcebergSchema(new Column[] {column("c", type)}));
+      assertTrue(e.getMessage().contains(type.simpleString()), e.getMessage());
+    }
+  }
+
+  @Test
+  void testInvalidPartitionIsRefusedWithTheRequestedTransform() {
+    Schema schema = partitionTestSchema();
+    IllegalArgumentException year =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                GlueIcebergTableHelper.toPartitionSpec(
+                    schema, new Transform[] {Transforms.year("name")}));
+    assertTrue(year.getMessage().contains("year(name)"), year.getMessage());
+
+    IllegalArgumentException bucket =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                GlueIcebergTableHelper.toPartitionSpec(
+                    schema,
+                    new Transform[] {
+                      Transforms.bucket(4, new String[] {"id"}, new String[] {"name"})
+                    }));
+    assertTrue(bucket.getMessage().contains("bucket(4, id, name)"), bucket.getMessage());
+    assertFalse(bucket.getMessage().contains("@"), bucket.getMessage());
+  }
+
+  @Test
+  void testInvalidSortOrderIsRefusedWithTheRequestedTerm() {
+    Schema schema = partitionTestSchema();
+    IllegalArgumentException year =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                GlueIcebergTableHelper.toSortOrder(
+                    schema,
+                    new org.apache.gravitino.rel.expressions.sorts.SortOrder[] {
+                      SortOrders.ascending(
+                          FunctionExpression.of("year", NamedReference.field("name")))
+                    }));
+    assertTrue(year.getMessage().contains("year(name)"), year.getMessage());
+
+    IllegalArgumentException literal =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                GlueIcebergTableHelper.toSortOrder(
+                    schema,
+                    new org.apache.gravitino.rel.expressions.sorts.SortOrder[] {
+                      SortOrders.ascending(Literals.integerLiteral(1))
+                    }));
+    assertFalse(literal.getMessage().contains("LiteralImpl"), literal.getMessage());
+  }
+
+  @Test
+  void testConvertPartitionSpecSkipsVoidFields() throws IOException {
+    try (InMemoryCatalog catalog = newCatalog()) {
+      Table table =
+          catalog
+              .buildTable(TableIdentifier.of("db", "t"), partitionTestSchema())
+              .withPartitionSpec(
+                  PartitionSpec.builderFor(partitionTestSchema())
+                      .identity("name")
+                      .identity("id")
+                      .build())
+              .withProperty("format-version", "1")
+              .create();
+      table.updateSpec().removeField("name").commit();
+      table.refresh();
+
+      Transform[] transforms =
+          GlueIcebergTableHelper.convertPartitionSpec(table.spec(), table.schema());
+      assertEquals(1, transforms.length);
+      assertEquals(Transforms.identity("id"), transforms[0]);
+    }
+  }
+
+  @Test
+  void testAlterTableAppliesColumnPositions() throws IOException {
+    try (InMemoryCatalog catalog = newCatalog()) {
+      catalog.createTable(TableIdentifier.of("db", "t"), partitionTestSchema());
+
+      GlueIcebergTableHelper.alterTable(
+          catalog,
+          "db",
+          "t",
+          TableChange.addColumn(
+              new String[] {"first_col"},
+              Types.IntegerType.get(),
+              null,
+              TableChange.ColumnPosition.first()),
+          TableChange.updateColumnPosition(
+              new String[] {"id"}, TableChange.ColumnPosition.after("name")));
+
+      List<String> names =
+          catalog.loadTable(TableIdentifier.of("db", "t")).schema().columns().stream()
+              .map(NestedField::name)
+              .collect(Collectors.toList());
+      assertEquals(List.of("first_col", "name", "id"), names);
+    }
+  }
+
+  @Test
+  void testDefaultPositionLeavesAddedColumnLast() throws IOException {
+    assertColumnsAfterAlter(
+        List.of("name", "id", "added"),
+        TableChange.addColumn(new String[] {"added"}, Types.IntegerType.get()),
+        TableChange.updateColumnPosition(
+            new String[] {"id"}, TableChange.ColumnPosition.after("name")));
+  }
+
+  @Test
+  void testDefaultPositionLeavesReaddedColumnLast() throws IOException {
+    assertColumnsAfterAlter(
+        List.of("name", "added", "id"),
+        TableChange.deleteColumn(new String[] {"id"}, false),
+        TableChange.addColumn(new String[] {"added"}, Types.IntegerType.get()),
+        TableChange.addColumn(new String[] {"id"}, Types.LongType.get()));
+  }
+
+  @Test
+  void testExistingColumnCannotMoveToDefaultPosition() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            TableChange.updateColumnPosition(
+                new String[] {"id"}, TableChange.ColumnPosition.defaultPos()));
+  }
+
+  @Test
+  void testAlterTableIsAppliedAsAWhole() throws IOException {
+    try (InMemoryCatalog catalog = newCatalog()) {
+      Table table = catalog.createTable(TableIdentifier.of("db", "t"), partitionTestSchema());
+      String before = ((HasTableOperations) table).operations().current().metadataFileLocation();
+
+      // Iceberg refuses to downgrade a v2 table to v1 when the property change is staged.
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              GlueIcebergTableHelper.alterTable(
+                  catalog,
+                  "db",
+                  "t",
+                  TableChange.addColumn(new String[] {"partial"}, Types.StringType.get()),
+                  TableChange.setProperty("format-version", "1")));
+      Table reloaded = catalog.loadTable(TableIdentifier.of("db", "t"));
+      assertEquals(
+          before, ((HasTableOperations) reloaded).operations().current().metadataFileLocation());
+      assertEquals(2, reloaded.schema().columns().size());
+
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              GlueIcebergTableHelper.alterTable(
+                  catalog,
+                  "db",
+                  "t",
+                  TableChange.updateColumnAutoIncrement(new String[] {"id"}, true)));
+    }
+  }
+
+  @Test
+  void testAlterTableUpdatesColumnNullability() throws IOException {
+    try (InMemoryCatalog catalog = newCatalog()) {
+      catalog.createTable(
+          TableIdentifier.of("db", "t"),
+          new Schema(
+              NestedField.required(1, "id", LongType.get()),
+              NestedField.optional(2, "name", StringType.get())));
+
+      GlueIcebergTableHelper.alterTable(
+          catalog, "db", "t", TableChange.updateColumnNullability(new String[] {"id"}, true));
+      assertTrue(
+          catalog.loadTable(TableIdentifier.of("db", "t")).schema().findField("id").isOptional());
+
+      // Iceberg refuses optional -> required as an incompatible change.
+      IllegalArgumentException e =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  GlueIcebergTableHelper.alterTable(
+                      catalog,
+                      "db",
+                      "t",
+                      TableChange.updateColumnNullability(new String[] {"name"}, false)));
+      assertTrue(e.getMessage().contains("optional -> required"), e.getMessage());
+
+      e =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  GlueIcebergTableHelper.alterTable(
+                      catalog,
+                      "db",
+                      "t",
+                      TableChange.addColumn(new String[] {"c"}, Types.StringType.get(), false)));
+      assertTrue(e.getMessage().contains("optional -> required"), e.getMessage());
+    }
+  }
+
+  private static void assertColumnsAfterAlter(List<String> expected, TableChange... changes)
+      throws IOException {
+    try (InMemoryCatalog catalog = newCatalog()) {
+      catalog.createTable(TableIdentifier.of("db", "t"), partitionTestSchema());
+
+      GlueIcebergTableHelper.alterTable(catalog, "db", "t", changes);
+
+      List<String> names =
+          catalog.loadTable(TableIdentifier.of("db", "t")).schema().columns().stream()
+              .map(NestedField::name)
+              .collect(Collectors.toList());
+      assertEquals(expected, names);
+    }
+  }
+
+  private static InMemoryCatalog newCatalog() {
+    InMemoryCatalog catalog = new InMemoryCatalog();
+    catalog.initialize("test", new HashMap<>());
+    catalog.createNamespace(Namespace.of("db"));
+    return catalog;
+  }
+
+  private static Schema partitionTestSchema() {
+    return new Schema(
+        NestedField.optional(1, "id", LongType.get()),
+        NestedField.optional(2, "name", StringType.get()));
+  }
+
+  private static Column column(String name, org.apache.gravitino.rel.types.Type type) {
+    return GlueColumn.builder().withName(name).withType(type).withNullable(true).build();
   }
 }

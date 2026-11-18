@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.cli.commands;
 
-import java.util.Map;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
@@ -56,8 +55,6 @@ public class ListMetalakeProperties extends ListProperties {
       exitWithError(exp.getMessage());
     }
 
-    Map<String, String> properties = gMetalake.properties();
-
-    printProperties(properties);
+    printProperties(propertiesWithSecrets(gMetalake.properties(), gMetalake.supportsSecrets()));
   }
 }

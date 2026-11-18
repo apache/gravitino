@@ -48,7 +48,8 @@ public class MetadataObjects {
           MetadataObject.Type.TAG,
           MetadataObject.Type.JOB,
           MetadataObject.Type.JOB_TEMPLATE,
-          MetadataObject.Type.POLICY);
+          MetadataObject.Type.POLICY,
+          MetadataObject.Type.DOMAIN);
 
   private static final Set<MetadataObject.Type> VALID_TWO_LEVEL_NAME_TYPES =
       Sets.newHashSet(MetadataObject.Type.SCHEMA);
@@ -60,7 +61,8 @@ public class MetadataObjects {
           MetadataObject.Type.VIEW,
           MetadataObject.Type.TOPIC,
           MetadataObject.Type.MODEL,
-          MetadataObject.Type.FUNCTION);
+          MetadataObject.Type.FUNCTION,
+          MetadataObject.Type.SEMANTIC_MODEL);
 
   private static final Set<MetadataObject.Type> VALID_FOUR_LEVEL_NAME_TYPES =
       Sets.newHashSet(MetadataObject.Type.COLUMN);
@@ -153,6 +155,7 @@ public class MetadataObjects {
       case TOPIC:
       case MODEL:
       case FUNCTION:
+      case SEMANTIC_MODEL:
         parentType = MetadataObject.Type.SCHEMA;
         break;
       case SCHEMA:

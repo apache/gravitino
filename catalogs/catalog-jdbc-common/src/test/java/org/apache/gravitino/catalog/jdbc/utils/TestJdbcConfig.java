@@ -46,4 +46,47 @@ public class TestJdbcConfig {
     jdbcConfig = new JdbcConfig(immutableMap);
     Assertions.assertEquals(60000L, jdbcConfig.getMaxWaitMs());
   }
+
+  @Test
+  void testConnectTimeoutMs() {
+    JdbcConfig jdbcConfig = new JdbcConfig(Maps.newHashMap());
+    Assertions.assertEquals(30000L, jdbcConfig.getConnectTimeoutMs());
+
+    ImmutableMap immutableMap = ImmutableMap.of("jdbc.pool.connect-timeout-ms", "5000");
+    jdbcConfig = new JdbcConfig(immutableMap);
+    Assertions.assertEquals(5000L, jdbcConfig.getConnectTimeoutMs());
+  }
+
+  @Test
+  void testConnectTimeoutMsRejectsNonPositiveAndOverIntMax() {
+    // Config validation is lazy (checkValue runs on get()), so assert via the getter.
+    // Zero / negative are rejected (must be positive).
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new JdbcConfig(ImmutableMap.of("jdbc.pool.connect-timeout-ms", "0"))
+                .getConnectTimeoutMs());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new JdbcConfig(ImmutableMap.of("jdbc.pool.connect-timeout-ms", "-1"))
+                .getConnectTimeoutMs());
+
+    // Integer.MAX_VALUE is the inclusive upper bound (the MySQL/PostgreSQL driver timeouts are
+    // ints), so it is accepted and one more is rejected.
+    Assertions.assertEquals(
+        (long) Integer.MAX_VALUE,
+        new JdbcConfig(
+                ImmutableMap.of(
+                    "jdbc.pool.connect-timeout-ms", Long.toString((long) Integer.MAX_VALUE)))
+            .getConnectTimeoutMs());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new JdbcConfig(
+                    ImmutableMap.of(
+                        "jdbc.pool.connect-timeout-ms",
+                        Long.toString((long) Integer.MAX_VALUE + 1L)))
+                .getConnectTimeoutMs());
+  }
 }

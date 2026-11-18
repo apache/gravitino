@@ -50,6 +50,11 @@ public class HiveTablePropertiesMetadata extends BasePropertiesMetadata {
     List<PropertyEntry<?>> propertyEntries =
         ImmutableList.of(
             stringReservedPropertyEntry(COMMENT, "table comment", true),
+            stringReservedPropertyEntry(
+                TrinoNativeViewCodec.PRESTO_VIEW_FLAG,
+                "Marks a view stored using Trino's native \"Presto View\" HMS format; managed "
+                    + "internally by the Trino dialect view encoding, not settable by users",
+                true),
             stringReservedPropertyEntry(NUM_FILES, "number of files", false),
             stringReservedPropertyEntry(TOTAL_SIZE, "total size of the table", false),
             booleanReservedPropertyEntry(

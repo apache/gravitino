@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.net.URLConnection;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.logging.log4j.LogManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -151,6 +153,33 @@ public final class HiveClientClassLoader extends URLClassLoader {
   }
 
   @Override
+  public void close() throws IOException {
+    try {
+      shutdownLog4jContext();
+    } finally {
+      super.close();
+    }
+  }
+
+  /**
+   * When a barrier class defined by this loader (e.g. {@link Util}, {@link HiveClientImpl}) first
+   * logs, log4j-slf4j2-impl's {@code Log4jLoggerFactory} resolves the caller class and creates a
+   * {@link org.apache.logging.log4j.spi.LoggerContext} keyed by that class's defining classloader,
+   * i.e. this loader. That factory keeps a strong reference from the {@code LoggerContext} to its
+   * internal per-logger registry, so the context - and transitively this classloader - stays
+   * reachable even after {@link #close()} closes the jar handles, preventing the classloader and
+   * its loaded classes from ever being collected. Explicitly shutting the context down here removes
+   * that registration.
+   */
+  private void shutdownLog4jContext() {
+    try {
+      LogManager.shutdown(LogManager.getContext(this, false));
+    } catch (Throwable t) {
+      LOG.warn("Failed to shut down Log4j context for classloader {}", getName(), t);
+    }
+  }
+
+  @Override
   protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
     Class<?> loaded = findLoadedClass(name);
     if (loaded != null) {
@@ -169,12 +198,19 @@ public final class HiveClientClassLoader extends URLClassLoader {
   private Class<?> loadBarrierClass(String name) throws ClassNotFoundException {
     LOG.debug("Classloader {} loading barrier class {}", getName(), name);
     String classFileName = name.replace(".", "/") + ".class";
-    try (InputStream is = baseClassLoader.getResourceAsStream(classFileName)) {
-      if (is == null) {
-        throw new ClassNotFoundException("Cannot load barrier class: " + name);
+    URL resource = baseClassLoader.getResource(classFileName);
+    if (resource == null) {
+      throw new ClassNotFoundException("Cannot load barrier class: " + name);
+    }
+    try {
+      URLConnection connection = resource.openConnection();
+      // Another catalog loader can close the same cached JarFile during catalog replacement.
+      // Keep this read independent, and release its JAR handle when the stream closes.
+      connection.setUseCaches(false);
+      try (InputStream is = connection.getInputStream()) {
+        byte[] bytes = is.readAllBytes();
+        return defineClass(name, bytes, 0, bytes.length);
       }
-      byte[] bytes = is.readAllBytes();
-      return defineClass(name, bytes, 0, bytes.length);
     } catch (IOException e) {
       throw new ClassNotFoundException("Failed to load barrier class: " + name, e);
     }
@@ -222,8 +258,14 @@ public final class HiveClientClassLoader extends URLClassLoader {
       return true;
     }
 
-    // Gravitino classes
-    if (name.startsWith("org.apache.gravitino.")) {
+    // Gravitino classes, except the version-specific shim implementations (HiveShimV2/HiveShimV3):
+    // those are compiled only into their own hive-metastore{2,3}-libs module and are not on the
+    // base classloader's classpath, so sharing them would always miss and fall through to the
+    // isolated classloader anyway; excluding them here makes that isolated loading deterministic
+    // instead of relying on the ClassNotFoundException fallback in loadSharedClass.
+    if (name.startsWith("org.apache.gravitino.")
+        && !name.startsWith("org.apache.gravitino.hive.client.hive2.")
+        && !name.startsWith("org.apache.gravitino.hive.client.hive3.")) {
       return true;
     }
 

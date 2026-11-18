@@ -116,9 +116,9 @@ components:
         status:
           type: string
           enum:
-            - UP
-            - DOWN
-          description: Aggregate health status
+            - up
+            - down
+          description: Aggregate health status, serialized in lowercase by the Gravitino server
         checks:
           type: array
           description: Per-component check results
@@ -138,9 +138,9 @@ components:
         status:
           type: string
           enum:
-            - UP
-            - DOWN
-          description: Status of the component
+            - up
+            - down
+          description: Status of the component, serialized in lowercase by the Gravitino server
         details:
           type: object
           additionalProperties:
@@ -151,24 +151,24 @@ components:
     HealthUp:
       value:
         code: 0
-        status: UP
+        status: up
         checks:
           - name: httpServer
-            status: UP
+            status: up
             details: {}
           - name: entityStore
-            status: UP
+            status: up
             details: {}
 
     HealthDown:
       value:
         code: 0
-        status: DOWN
+        status: down
         checks:
           - name: httpServer
-            status: UP
+            status: up
             details: {}
           - name: entityStore
-            status: DOWN
+            status: down
             details:
               reason: timeout

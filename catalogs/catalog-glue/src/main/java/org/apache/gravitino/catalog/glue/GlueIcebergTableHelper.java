@@ -28,10 +28,13 @@ import static org.apache.gravitino.rel.types.Types.ExternalType;
 import static org.apache.gravitino.rel.types.Types.FixedCharType;
 import static org.apache.gravitino.rel.types.Types.FixedType;
 import static org.apache.gravitino.rel.types.Types.FloatType;
+import static org.apache.gravitino.rel.types.Types.GeographyType;
+import static org.apache.gravitino.rel.types.Types.GeometryType;
 import static org.apache.gravitino.rel.types.Types.IntegerType;
 import static org.apache.gravitino.rel.types.Types.ListType;
 import static org.apache.gravitino.rel.types.Types.LongType;
 import static org.apache.gravitino.rel.types.Types.MapType;
+import static org.apache.gravitino.rel.types.Types.NullType;
 import static org.apache.gravitino.rel.types.Types.ShortType;
 import static org.apache.gravitino.rel.types.Types.StringType;
 import static org.apache.gravitino.rel.types.Types.StructType;
@@ -39,20 +42,25 @@ import static org.apache.gravitino.rel.types.Types.TimeType;
 import static org.apache.gravitino.rel.types.Types.TimestampType;
 import static org.apache.gravitino.rel.types.Types.UUIDType;
 import static org.apache.gravitino.rel.types.Types.VarCharType;
+import static org.apache.gravitino.rel.types.Types.VariantType;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
-import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
-import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -71,15 +79,19 @@ import org.apache.iceberg.NullOrder;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.Transaction;
 import org.apache.iceberg.UpdateProperties;
 import org.apache.iceberg.UpdateSchema;
-import org.apache.iceberg.aws.glue.GlueCatalog;
+import org.apache.iceberg.aws.AwsProperties;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.ValidationException;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.expressions.UnboundTerm;
+import org.apache.iceberg.transforms.PartitionSpecVisitor;
+import org.apache.iceberg.transforms.SortOrderVisitor;
+import org.apache.iceberg.types.EdgeAlgorithm;
 import org.apache.iceberg.types.Types;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,20 +106,53 @@ import org.slf4j.LoggerFactory;
  */
 final class GlueIcebergTableHelper {
 
+  /** Name of the internal Iceberg catalog; it never reaches users. */
+  static final String ICEBERG_CATALOG_NAME = "gravitino-glue-iceberg";
+
   private static final Logger LOG = LoggerFactory.getLogger(GlueIcebergTableHelper.class);
 
   private static final String DOT = ".";
+
+  private static final int MICROSECOND_PRECISION = 6;
+
+  private static final int NANOSECOND_PRECISION = 9;
+
+  private static final Set<String> S3_SCHEMES = ImmutableSet.of("s3", "s3a", "s3n");
 
   // Iceberg GlueCatalog properties (not defined in IcebergConstants).
   private static final String CATALOG_IMPL = "catalog-impl";
   private static final String GLUE_CATALOG = "GlueCatalog";
   private static final String GLUE_ID = "glue.id";
   private static final String GLUE_ENDPOINT = "glue.endpoint";
+  private static final String HTTP_CLIENT_TYPE = "http-client.type";
+  private static final String HTTP_CLIENT_APACHE_CONNECTION_TIMEOUT_MS =
+      "http-client.apache.connection-timeout-ms";
+  private static final String HTTP_CLIENT_APACHE_SOCKET_TIMEOUT_MS =
+      "http-client.apache.socket-timeout-ms";
   private static final String CLIENT_CREDENTIALS_PROVIDER = "client.credentials-provider";
   private static final String CLIENT_CREDENTIALS_PROVIDER_ACCESS_KEY_ID =
       "client.credentials-provider.access-key-id";
   private static final String CLIENT_CREDENTIALS_PROVIDER_SECRET_ACCESS_KEY =
       "client.credentials-provider.secret-access-key";
+
+  /** Catalog properties the Glue client of the Iceberg catalog is built from. */
+  private static final Set<String> GLUE_CLIENT_CONFIG_KEYS =
+      ImmutableSet.of(
+          GlueConstants.AWS_REGION,
+          GlueConstants.AWS_ACCESS_KEY_ID,
+          GlueConstants.AWS_SECRET_ACCESS_KEY,
+          GlueConstants.AWS_GLUE_ENDPOINT,
+          GlueConstants.AWS_GLUE_API_CALL_TIMEOUT_MS,
+          GlueConstants.AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS,
+          GlueConstants.AWS_GLUE_MAX_ATTEMPTS);
+
+  /** Table properties that Glue holds about the table, which Iceberg properties cannot shadow. */
+  private static final Set<String> GLUE_OWNED_PROPS =
+      ImmutableSet.of(
+          GlueConstants.TABLE_TYPE_PARAM,
+          GlueConstants.TABLE_FORMAT,
+          GlueConstants.METADATA_LOCATION,
+          GlueConstants.REGISTERED_ICEBERG_TABLE_PARAM);
 
   private static final Set<String> EXCLUDED_TABLE_PROPS =
       Set.of(
@@ -116,9 +161,6 @@ final class GlueIcebergTableHelper {
           GlueConstants.INPUT_FORMAT_CLASS,
           GlueConstants.OUTPUT_FORMAT,
           GlueConstants.SERDE_LIB);
-
-  // Iceberg 1.10+ uses "bucket[n]" / "truncate[w]" format for Transform.toString().
-  private static final Pattern TRANSFORM_PARAM_PATTERN = Pattern.compile(".*\\[(\\d+)\\]");
 
   private GlueIcebergTableHelper() {}
 
@@ -142,7 +184,34 @@ final class GlueIcebergTableHelper {
    * @return an initialized Iceberg Glue catalog
    * @throws IllegalArgumentException if {@code aws-region} or {@code warehouse} is not configured
    */
-  static Catalog createGlueCatalog(Map<String, String> config) {
+  static GravitinoGlueCatalog createGlueCatalog(Map<String, String> config) {
+    Map<String, String> icebergProps = buildIcebergCatalogProperties(config);
+
+    GravitinoGlueCatalog glueCatalog = new GravitinoGlueCatalog();
+    glueCatalog.initialize(ICEBERG_CATALOG_NAME, icebergProps);
+    LOG.info("Initialized Iceberg GlueCatalog for region {}", config.get(GlueConstants.AWS_REGION));
+    return glueCatalog;
+  }
+
+  /**
+   * Whether {@code location} is an S3 URI with a bucket, the only kind of location S3FileIO can
+   * write Iceberg metadata to.
+   *
+   * @param location the table location
+   * @return true for an {@code s3://}, {@code s3a://} or {@code s3n://} URI with a bucket
+   */
+  static boolean isS3Location(String location) {
+    try {
+      URI uri = new URI(location);
+      return uri.getScheme() != null
+          && S3_SCHEMES.contains(uri.getScheme().toLowerCase(Locale.ROOT))
+          && StringUtils.isNotBlank(uri.getRawAuthority());
+    } catch (URISyntaxException e) {
+      return false;
+    }
+  }
+
+  static Map<String, String> buildIcebergCatalogProperties(Map<String, String> config) {
     String region = config.get(GlueConstants.AWS_REGION);
     Preconditions.checkArgument(region != null, "AWS region is required for Iceberg Glue catalog");
 
@@ -164,11 +233,14 @@ final class GlueIcebergTableHelper {
 
     String accessKey = config.get(GlueConstants.AWS_ACCESS_KEY_ID);
     String secretKey = config.get(GlueConstants.AWS_SECRET_ACCESS_KEY);
-    if (accessKey != null && secretKey != null) {
+    boolean hasCredential = GlueClientProvider.hasAwsStaticCredentials(accessKey, secretKey);
+    if (hasCredential) {
       icebergProps.put(
           CLIENT_CREDENTIALS_PROVIDER, GravitinoGlueCredentialsProvider.class.getName());
       icebergProps.put(CLIENT_CREDENTIALS_PROVIDER_ACCESS_KEY_ID, accessKey);
       icebergProps.put(CLIENT_CREDENTIALS_PROVIDER_SECRET_ACCESS_KEY, secretKey);
+      icebergProps.put(IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID, accessKey);
+      icebergProps.put(IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY, secretKey);
     }
 
     String endpoint = config.get(GlueConstants.AWS_GLUE_ENDPOINT);
@@ -176,17 +248,25 @@ final class GlueIcebergTableHelper {
       icebergProps.put(GLUE_ENDPOINT, endpoint);
     }
 
-    if (accessKey != null && secretKey != null) {
-      icebergProps.put(IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID, accessKey);
-      icebergProps.put(IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY, secretKey);
-    }
+    // The Glue client is built like the catalog's own, with its call timeout and retries.
+    icebergProps.put(AwsProperties.CLIENT_FACTORY, GlueIcebergAwsClientFactory.class.getName());
+    GLUE_CLIENT_CONFIG_KEYS.forEach(
+        key -> {
+          String value = config.get(key);
+          if (value != null) {
+            icebergProps.put(GlueIcebergAwsClientFactory.GLUE_CONFIG_PREFIX + key, value);
+          }
+        });
+
+    // The Iceberg S3 client takes no total call timeout, so bound each connection and read by the
+    // per-attempt timeout of the Glue client.
+    String attemptTimeoutMs = String.valueOf(GlueClientProvider.apiCallAttemptTimeoutMs(config));
+    icebergProps.put(HTTP_CLIENT_TYPE, "apache");
+    icebergProps.put(HTTP_CLIENT_APACHE_CONNECTION_TIMEOUT_MS, attemptTimeoutMs);
+    icebergProps.put(HTTP_CLIENT_APACHE_SOCKET_TIMEOUT_MS, attemptTimeoutMs);
 
     icebergProps.put(IcebergConstants.IO_IMPL, "org.apache.iceberg.aws.s3.S3FileIO");
-
-    GlueCatalog glueCatalog = new GlueCatalog();
-    glueCatalog.initialize("gravitino-glue-iceberg", icebergProps);
-    LOG.info("Initialized Iceberg GlueCatalog for region {}", region);
-    return glueCatalog;
+    return icebergProps;
   }
 
   /**
@@ -195,19 +275,30 @@ final class GlueIcebergTableHelper {
    * @param icebergCatalog the Iceberg Glue catalog
    * @param dbName the Glue database name
    * @param tableName the table name
+   * @param metadataLocation the metadata file location recorded in Glue
    * @param table the GlueTable to populate with recovered metadata
    */
-  static void loadTable(Catalog icebergCatalog, String dbName, String tableName, GlueTable table) {
-    Table icebergTable = icebergCatalog.loadTable(TableIdentifier.of(dbName, tableName));
-    if (icebergTable == null) {
-      throw new NoSuchTableException(
-          "Iceberg table %s.%s not found in Iceberg catalog", dbName, tableName);
-    }
+  static void loadTable(
+      GravitinoGlueCatalog icebergCatalog,
+      String dbName,
+      String tableName,
+      String metadataLocation,
+      GlueTable table) {
+    Table icebergTable =
+        icebergCatalog.loadStaticTable(TableIdentifier.of(dbName, tableName), metadataLocation);
 
     // Merge Iceberg table properties (stored in metadata.json) into the Gravitino properties.
-    // Iceberg properties take precedence over Glue parameters for overlapping keys.
+    // Iceberg properties take precedence over Glue parameters for overlapping keys, except for the
+    // ones Glue holds about the table itself, such as its format and metadata file.
     Map<String, String> mergedProps = new HashMap<>(table.properties());
-    mergedProps.putAll(icebergTable.properties());
+    icebergTable
+        .properties()
+        .forEach(
+            (key, value) -> {
+              if (!GLUE_OWNED_PROPS.contains(key)) {
+                mergedProps.put(key, value);
+              }
+            });
     table.setProperties(mergedProps);
 
     // Overwrite Glue's Hive-style column types with the accurate types from the Iceberg schema.
@@ -238,12 +329,13 @@ final class GlueIcebergTableHelper {
   /**
    * Converts an Iceberg type to the equivalent Gravitino type.
    *
-   * <p>TIME and TIMESTAMP types are always returned with microsecond (6) precision, matching
-   * Iceberg's internal representation.
+   * <p>TIME and TIMESTAMP types are returned with microsecond (6) precision and the nanosecond
+   * timestamp types with precision 9, as the Iceberg catalog reports them.
    */
   // TODO: the Iceberg-to-Gravitino conversions in this class (type mapping, partition spec,
-  // sort order, etc.) duplicate logic in catalog-lakehouse-iceberg. Consider extracting them
-  // to a shared layer (e.g. catalog-common) so both catalogs can reuse the code.
+  // sort order, etc.) duplicate logic in catalog-lakehouse-iceberg and must give the same results.
+  // Consider extracting them to a shared layer (e.g. catalog-common) so both catalogs can reuse
+  // the code.
   // The parameter uses FQN because org.apache.iceberg.types.Type and
   // org.apache.gravitino.rel.types.Type share the same simple name.
   static Type fromIcebergType(org.apache.iceberg.types.Type icebergType) {
@@ -267,12 +359,28 @@ final class GlueIcebergTableHelper {
       case DATE:
         return DateType.get();
       case TIME:
-        return TimeType.of(6);
+        return TimeType.of(MICROSECOND_PRECISION);
       case TIMESTAMP:
         Types.TimestampType ts = (Types.TimestampType) icebergType;
         return ts.shouldAdjustToUTC()
-            ? TimestampType.withTimeZone(6)
-            : TimestampType.withoutTimeZone(6);
+            ? TimestampType.withTimeZone(MICROSECOND_PRECISION)
+            : TimestampType.withoutTimeZone(MICROSECOND_PRECISION);
+      case TIMESTAMP_NANO:
+        Types.TimestampNanoType tsNano = (Types.TimestampNanoType) icebergType;
+        return tsNano.shouldAdjustToUTC()
+            ? TimestampType.withTimeZone(NANOSECOND_PRECISION)
+            : TimestampType.withoutTimeZone(NANOSECOND_PRECISION);
+      case VARIANT:
+        return VariantType.get();
+      case UNKNOWN:
+        // Iceberg v3 unknown is the null-only placeholder type.
+        return NullType.get();
+      case GEOMETRY:
+        return GeometryType.of(((Types.GeometryType) icebergType).crs());
+      case GEOGRAPHY:
+        Types.GeographyType geography = (Types.GeographyType) icebergType;
+        // EdgeAlgorithm.toString() is the lower-case spec name, which GeographyType requires.
+        return GeographyType.of(geography.crs(), geography.algorithm().toString());
       case DECIMAL:
         Types.DecimalType decimal = (Types.DecimalType) icebergType;
         return DecimalType.of(decimal.precision(), decimal.scale());
@@ -346,15 +454,18 @@ final class GlueIcebergTableHelper {
     String location = properties.get(GlueConstants.LOCATION);
     Preconditions.checkArgument(
         location != null, "Location is required for Iceberg table creation");
+    // Iceberg metadata is written through S3FileIO only, so any other scheme can never work.
+    Preconditions.checkArgument(
+        isS3Location(location),
+        "Iceberg tables need an s3://, s3a:// or s3n:// location; got '%s'. Set '%s' on the"
+            + " table, or an S3 '%s' on the catalog or LocationUri on the database.",
+        location,
+        GlueConstants.LOCATION,
+        GlueConstants.WAREHOUSE);
 
     String format = properties.get(GlueConstants.FORMAT);
     if (format != null) {
       tableProps.put("write.format.default", format.toLowerCase(Locale.ROOT));
-    }
-
-    String tableFormat = properties.get(GlueConstants.TABLE_FORMAT);
-    if (tableFormat != null) {
-      tableProps.put(GlueConstants.TABLE_FORMAT, tableFormat);
     }
 
     TableIdentifier tableId = TableIdentifier.of(dbName, tableName);
@@ -384,9 +495,9 @@ final class GlueIcebergTableHelper {
    * TableChange.SetProperty}, and {@link TableChange.RemoveProperty}. A rename is an exclusive
    * operation and cannot be combined with other changes.
    *
-   * <p><b>Note:</b> Schema changes and property changes are committed in two separate transactions.
-   * If the schema commit succeeds but the property commit fails, the table is left in a partially
-   * altered state. This is a known limitation of the current Iceberg SDK integration.
+   * <p>Schema and property changes are committed in one Iceberg transaction. Column changes that
+   * Iceberg cannot apply, such as auto-increment or default values, are refused before anything is
+   * staged.
    *
    * @param icebergCatalog the Iceberg Glue catalog
    * @param dbName the Glue database name
@@ -411,12 +522,11 @@ final class GlueIcebergTableHelper {
       }
     }
 
-    Table table = icebergCatalog.loadTable(TableIdentifier.of(dbName, tableName));
-
     boolean hasSchemaChange = false;
     boolean hasPropChange = false;
     for (TableChange change : changes) {
       if (change instanceof TableChange.ColumnChange) {
+        checkColumnChange((TableChange.ColumnChange) change);
         hasSchemaChange = true;
       } else if (change instanceof TableChange.SetProperty
           || change instanceof TableChange.RemoveProperty) {
@@ -427,17 +537,25 @@ final class GlueIcebergTableHelper {
       }
     }
 
+    Table table = icebergCatalog.loadTable(TableIdentifier.of(dbName, tableName));
+    // Schema and property changes are staged in one transaction, so a request is applied as a
+    // whole or not at all.
+    Transaction transaction = table.newTransaction();
+
     if (hasSchemaChange) {
-      UpdateSchema update = table.updateSchema();
+      UpdateSchema update = transaction.updateSchema();
       for (TableChange change : changes) {
         if (change instanceof TableChange.AddColumn) {
           TableChange.AddColumn add = (TableChange.AddColumn) change;
-          Preconditions.checkArgument(
-              add.fieldName().length == 1, "Nested column additions are not supported");
-          update.addColumn(add.fieldName()[0], toIcebergType(add.getDataType()), add.getComment());
+          String name = add.fieldName()[0];
+          update.addColumn(name, toIcebergType(add.getDataType()), add.getComment());
           if (!add.isNullable()) {
-            update.requireColumn(add.fieldName()[0]);
+            update.requireColumn(name);
           }
+          moveColumn(update, name, add.getPosition());
+        } else if (change instanceof TableChange.UpdateColumnPosition) {
+          TableChange.UpdateColumnPosition move = (TableChange.UpdateColumnPosition) change;
+          moveColumn(update, move.fieldName()[0], move.getPosition());
         } else if (change instanceof TableChange.DeleteColumn) {
           TableChange.DeleteColumn del = (TableChange.DeleteColumn) change;
           Preconditions.checkArgument(
@@ -484,11 +602,10 @@ final class GlueIcebergTableHelper {
         }
       }
       update.commit();
-      LOG.info("Altered Iceberg table {}.{} schema via Iceberg SDK", dbName, tableName);
     }
 
     if (hasPropChange) {
-      UpdateProperties update = table.updateProperties();
+      UpdateProperties update = transaction.updateProperties();
       for (TableChange change : changes) {
         if (change instanceof TableChange.SetProperty) {
           TableChange.SetProperty sp = (TableChange.SetProperty) change;
@@ -499,9 +616,60 @@ final class GlueIcebergTableHelper {
         }
       }
       update.commit();
-      LOG.info("Altered Iceberg table {}.{} properties via Iceberg SDK", dbName, tableName);
     }
+
+    transaction.commitTransaction();
+    LOG.info("Altered Iceberg table {}.{} via Iceberg SDK", dbName, tableName);
     return TableIdentifier.of(dbName, tableName);
+  }
+
+  /**
+   * Refuses column changes that Iceberg cannot apply through this catalog, before anything is
+   * staged, so that no change of a request is skipped without an error.
+   */
+  private static void checkColumnChange(TableChange.ColumnChange change) {
+    String[] fieldName = change.fieldName();
+    Preconditions.checkArgument(
+        fieldName != null && fieldName.length > 0, "Column change field name cannot be empty");
+    String name = String.join(DOT, fieldName);
+    Preconditions.checkArgument(
+        fieldName.length == 1,
+        "Iceberg tables in Glue do not support changes to nested field %s",
+        name);
+    if (change instanceof TableChange.AddColumn) {
+      TableChange.AddColumn add = (TableChange.AddColumn) change;
+      Preconditions.checkArgument(
+          !add.isAutoIncrement(), "Iceberg does not support auto-increment columns: %s", name);
+      Preconditions.checkArgument(
+          add.getDefaultValue() == null
+              || Column.DEFAULT_VALUE_NOT_SET.equals(add.getDefaultValue()),
+          "Iceberg tables in Glue do not support column default values: %s",
+          name);
+      return;
+    }
+    Preconditions.checkArgument(
+        change instanceof TableChange.UpdateColumnPosition
+            || change instanceof TableChange.DeleteColumn
+            || change instanceof TableChange.RenameColumn
+            || change instanceof TableChange.UpdateColumnType
+            || change instanceof TableChange.UpdateColumnComment
+            || change instanceof TableChange.UpdateColumnNullability,
+        "Iceberg tables in Glue do not support %s on column %s",
+        change.getClass().getSimpleName(),
+        name);
+  }
+
+  /**
+   * Moves a column to the requested position. The default position applies only to added columns,
+   * which Iceberg already places at the end.
+   */
+  private static void moveColumn(
+      UpdateSchema update, String name, TableChange.ColumnPosition position) {
+    if (position instanceof TableChange.First) {
+      update.moveFirst(name);
+    } else if (position instanceof TableChange.After) {
+      update.moveAfter(name, ((TableChange.After) position).getColumn());
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -511,90 +679,181 @@ final class GlueIcebergTableHelper {
   /**
    * Converts an Iceberg {@link org.apache.iceberg.PartitionSpec} to Gravitino {@link Transform}s.
    *
-   * <p>Supports identity, year, month, day, hour, bucket, and truncate transforms.
+   * <p>Fields with the {@code void} transform, which Iceberg v1 tables keep for dropped partition
+   * fields, no longer partition data and are left out. A transform Gravitino has no type for is
+   * reported by its Iceberg name.
    */
   static Transform[] convertPartitionSpec(PartitionSpec spec, Schema schema) {
+    PartitionSpecVisitor<Transform> visitor =
+        new PartitionSpecVisitor<Transform>() {
+          @Override
+          public Transform identity(int fieldId, String sourceName, int sourceId) {
+            return Transforms.identity(columnName(schema, sourceId));
+          }
+
+          @Override
+          public Transform bucket(int fieldId, String sourceName, int sourceId, int numBuckets) {
+            return Transforms.bucket(numBuckets, new String[] {columnName(schema, sourceId)});
+          }
+
+          @Override
+          public Transform truncate(int fieldId, String sourceName, int sourceId, int width) {
+            return Transforms.truncate(width, columnName(schema, sourceId));
+          }
+
+          @Override
+          public Transform year(int fieldId, String sourceName, int sourceId) {
+            return Transforms.year(columnName(schema, sourceId));
+          }
+
+          @Override
+          public Transform month(int fieldId, String sourceName, int sourceId) {
+            return Transforms.month(columnName(schema, sourceId));
+          }
+
+          @Override
+          public Transform day(int fieldId, String sourceName, int sourceId) {
+            return Transforms.day(columnName(schema, sourceId));
+          }
+
+          @Override
+          public Transform hour(int fieldId, String sourceName, int sourceId) {
+            return Transforms.hour(columnName(schema, sourceId));
+          }
+
+          @Override
+          public Transform alwaysNull(int fieldId, String sourceName, int sourceId) {
+            return null;
+          }
+
+          @Override
+          public Transform unknown(int fieldId, String sourceName, int sourceId, String transform) {
+            return Transforms.apply(
+                transform, new Expression[] {NamedReference.field(columnName(schema, sourceId))});
+          }
+        };
     return spec.fields().stream()
-        .map(
-            field -> {
-              String colName = resolveColumnName(schema, field.sourceId());
-              String transformStr = field.transform().toString().toLowerCase(Locale.ROOT);
-              if (transformStr.startsWith("identity")) {
-                return Transforms.identity(colName);
-              } else if (transformStr.startsWith("year")) {
-                return Transforms.year(colName);
-              } else if (transformStr.startsWith("month")) {
-                return Transforms.month(colName);
-              } else if (transformStr.startsWith("day")) {
-                return Transforms.day(colName);
-              } else if (transformStr.startsWith("hour")) {
-                return Transforms.hour(colName);
-              } else if (transformStr.startsWith("bucket")) {
-                int numBuckets = extractTransformParam(field.transform().toString());
-                return Transforms.bucket(numBuckets, new String[] {colName});
-              } else if (transformStr.startsWith("truncate")) {
-                int width = extractTransformParam(field.transform().toString());
-                return Transforms.truncate(width, new String[] {colName});
-              } else {
-                throw new IllegalArgumentException(
-                    "Unsupported partition transform: " + transformStr);
-              }
-            })
+        .map(field -> PartitionSpecVisitor.visit(schema, field, visitor))
+        .filter(Objects::nonNull)
         .toArray(Transform[]::new);
   }
 
-  /** Converts an Iceberg {@link org.apache.iceberg.SortOrder} to Gravitino {@link SortOrder}s. */
+  /**
+   * Converts an Iceberg {@link org.apache.iceberg.SortOrder} to Gravitino {@link SortOrder}s. A
+   * transform Gravitino has no function for is reported by its Iceberg name.
+   */
   static SortOrder[] convertIcebergSortOrder(
       org.apache.iceberg.SortOrder iceSortOrder, Schema schema) {
     if (iceSortOrder == null || iceSortOrder.fields().isEmpty()) {
       return new SortOrder[0];
     }
-    return iceSortOrder.fields().stream()
-        .map(
-            field -> {
-              String colName = resolveColumnName(schema, field.sourceId());
-              SortDirection direction =
-                  field.direction() == org.apache.iceberg.SortDirection.ASC
-                      ? SortDirection.ASCENDING
-                      : SortDirection.DESCENDING;
-              NullOrdering nullOrdering =
-                  field.nullOrder() == org.apache.iceberg.NullOrder.NULLS_FIRST
-                      ? NullOrdering.NULLS_FIRST
-                      : NullOrdering.NULLS_LAST;
+    SortOrderVisitor<SortOrder> visitor =
+        new SortOrderVisitor<SortOrder>() {
+          @Override
+          public SortOrder field(
+              String sourceName,
+              int sourceId,
+              org.apache.iceberg.SortDirection direction,
+              NullOrder nullOrder) {
+            return sortOrder(column(sourceId), direction, nullOrder);
+          }
 
-              org.apache.iceberg.transforms.Transform<?, ?> transform = field.transform();
-              String transformStr = transform.toString().toLowerCase(Locale.ROOT);
-              if (transformStr.startsWith("identity")) {
-                return SortOrders.of(NamedReference.field(colName), direction, nullOrdering);
-              }
+          @Override
+          public SortOrder bucket(
+              String sourceName,
+              int sourceId,
+              int numBuckets,
+              org.apache.iceberg.SortDirection direction,
+              NullOrder nullOrder) {
+            return sortOrder(
+                FunctionExpression.of(
+                    "bucket", Literals.integerLiteral(numBuckets), column(sourceId)),
+                direction,
+                nullOrder);
+          }
 
-              Expression expr;
-              if (transformStr.startsWith("year")) {
-                expr = FunctionExpression.of("year", NamedReference.field(colName));
-              } else if (transformStr.startsWith("month")) {
-                expr = FunctionExpression.of("month", NamedReference.field(colName));
-              } else if (transformStr.startsWith("day")) {
-                expr = FunctionExpression.of("day", NamedReference.field(colName));
-              } else if (transformStr.startsWith("hour")) {
-                expr = FunctionExpression.of("hour", NamedReference.field(colName));
-              } else if (transformStr.startsWith("bucket")) {
-                int numBuckets = extractTransformParam(transformStr);
-                expr =
-                    FunctionExpression.of(
-                        "bucket",
-                        Literals.integerLiteral(numBuckets),
-                        NamedReference.field(colName));
-              } else if (transformStr.startsWith("truncate")) {
-                int width = extractTransformParam(transformStr);
-                expr =
-                    FunctionExpression.of(
-                        "truncate", Literals.integerLiteral(width), NamedReference.field(colName));
-              } else {
-                expr = NamedReference.field(colName);
-              }
-              return SortOrders.of(expr, direction, nullOrdering);
-            })
-        .toArray(SortOrder[]::new);
+          @Override
+          public SortOrder truncate(
+              String sourceName,
+              int sourceId,
+              int width,
+              org.apache.iceberg.SortDirection direction,
+              NullOrder nullOrder) {
+            return sortOrder(
+                FunctionExpression.of("truncate", Literals.integerLiteral(width), column(sourceId)),
+                direction,
+                nullOrder);
+          }
+
+          @Override
+          public SortOrder year(
+              String sourceName,
+              int sourceId,
+              org.apache.iceberg.SortDirection direction,
+              NullOrder nullOrder) {
+            return function("year", sourceId, direction, nullOrder);
+          }
+
+          @Override
+          public SortOrder month(
+              String sourceName,
+              int sourceId,
+              org.apache.iceberg.SortDirection direction,
+              NullOrder nullOrder) {
+            return function("month", sourceId, direction, nullOrder);
+          }
+
+          @Override
+          public SortOrder day(
+              String sourceName,
+              int sourceId,
+              org.apache.iceberg.SortDirection direction,
+              NullOrder nullOrder) {
+            return function("day", sourceId, direction, nullOrder);
+          }
+
+          @Override
+          public SortOrder hour(
+              String sourceName,
+              int sourceId,
+              org.apache.iceberg.SortDirection direction,
+              NullOrder nullOrder) {
+            return function("hour", sourceId, direction, nullOrder);
+          }
+
+          @Override
+          public SortOrder unknown(
+              String sourceName,
+              int sourceId,
+              String transform,
+              org.apache.iceberg.SortDirection direction,
+              NullOrder nullOrder) {
+            return function(transform, sourceId, direction, nullOrder);
+          }
+
+          private SortOrder function(
+              String name,
+              int sourceId,
+              org.apache.iceberg.SortDirection direction,
+              NullOrder nullOrder) {
+            return sortOrder(FunctionExpression.of(name, column(sourceId)), direction, nullOrder);
+          }
+
+          private NamedReference column(int sourceId) {
+            return NamedReference.field(columnName(schema, sourceId));
+          }
+        };
+    return SortOrderVisitor.visit(iceSortOrder, visitor).toArray(new SortOrder[0]);
+  }
+
+  private static SortOrder sortOrder(
+      Expression expression, org.apache.iceberg.SortDirection direction, NullOrder nullOrder) {
+    return SortOrders.of(
+        expression,
+        direction == org.apache.iceberg.SortDirection.ASC
+            ? SortDirection.ASCENDING
+            : SortDirection.DESCENDING,
+        nullOrder == NullOrder.NULLS_FIRST ? NullOrdering.NULLS_FIRST : NullOrdering.NULLS_LAST);
   }
 
   // ---------------------------------------------------------------------------
@@ -659,7 +918,18 @@ final class GlueIcebergTableHelper {
     if (type instanceof BooleanType) {
       return Types.BooleanType.get();
     }
-    if (type instanceof ByteType || type instanceof ShortType || type instanceof IntegerType) {
+    if (type instanceof Type.IntegralType && !((Type.IntegralType) type).signed()) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Unsigned type %s is not supported by Iceberg; use a signed type",
+              type.simpleString()));
+    }
+    if (type instanceof ByteType || type instanceof ShortType) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Type %s is not supported by Iceberg; use integer instead", type.simpleString()));
+    }
+    if (type instanceof IntegerType) {
       return Types.IntegerType.get();
     }
     if (type instanceof LongType) {
@@ -681,7 +951,7 @@ final class GlueIcebergTableHelper {
     }
     if (type instanceof TimeType) {
       TimeType timeType = (TimeType) type;
-      if (!timeType.hasPrecisionSet() || timeType.precision() == 6) {
+      if (!timeType.hasPrecisionSet() || timeType.precision() == MICROSECOND_PRECISION) {
         return Types.TimeType.get();
       }
       throw new IllegalArgumentException(
@@ -690,94 +960,146 @@ final class GlueIcebergTableHelper {
     }
     if (type instanceof TimestampType) {
       TimestampType tsType = (TimestampType) type;
-      if (!tsType.hasPrecisionSet() || tsType.precision() == 6) {
+      if (!tsType.hasPrecisionSet() || tsType.precision() == MICROSECOND_PRECISION) {
         return tsType.hasTimeZone()
             ? Types.TimestampType.withZone()
             : Types.TimestampType.withoutZone();
       }
+      // Nanosecond timestamps need Iceberg format version 3, which Iceberg checks at create.
+      if (tsType.precision() == NANOSECOND_PRECISION) {
+        return tsType.hasTimeZone()
+            ? Types.TimestampNanoType.withZone()
+            : Types.TimestampNanoType.withoutZone();
+      }
       throw new IllegalArgumentException(
-          "Iceberg only supports microsecond precision (6) for timestamp type, got: "
+          "Iceberg only supports microsecond (6) or nanosecond (9) precision for timestamp type,"
+              + " got: "
               + tsType.precision());
     }
     if (type instanceof DecimalType) {
       DecimalType dt = (DecimalType) type;
       return Types.DecimalType.of(dt.precision(), dt.scale());
     }
-    if (type instanceof BinaryType || type instanceof FixedType) {
+    if (type instanceof BinaryType) {
       return Types.BinaryType.get();
+    }
+    if (type instanceof FixedType) {
+      return Types.FixedType.ofLength(((FixedType) type).length());
     }
     if (type instanceof UUIDType) {
       return Types.UUIDType.get();
     }
-    throw new UnsupportedOperationException("Unsupported type for Iceberg: " + type.simpleString());
+    if (type instanceof VariantType) {
+      return Types.VariantType.get();
+    }
+    if (type instanceof GeometryType) {
+      return Types.GeometryType.of(((GeometryType) type).crs());
+    }
+    if (type instanceof GeographyType) {
+      GeographyType geography = (GeographyType) type;
+      return Types.GeographyType.of(geography.crs(), EdgeAlgorithm.fromName(geography.algorithm()));
+    }
+    if (type instanceof NullType) {
+      return Types.UnknownType.get();
+    }
+    throw new IllegalArgumentException(
+        String.format("Type %s is not supported by Iceberg tables", type.simpleString()));
   }
 
   // ---------------------------------------------------------------------------
   // Partition / sort conversion (Gravitino -> Iceberg)
   // ---------------------------------------------------------------------------
 
-  private static PartitionSpec toPartitionSpec(Schema schema, Transform[] partitions) {
+  @VisibleForTesting
+  static PartitionSpec toPartitionSpec(Schema schema, @Nullable Transform[] partitions) {
     if (partitions == null || partitions.length == 0) {
       return PartitionSpec.unpartitioned();
     }
     PartitionSpec.Builder builder = PartitionSpec.builderFor(schema);
     for (Transform transform : partitions) {
       Preconditions.checkArgument(transform != null, "Partition transform cannot be null");
-      if (transform instanceof Transforms.IdentityTransform) {
-        String colName = String.join(DOT, ((Transforms.IdentityTransform) transform).fieldName());
-        builder.identity(colName);
-      } else if (transform instanceof Transforms.BucketTransform) {
-        Transforms.BucketTransform bucket = (Transforms.BucketTransform) transform;
-        String[][] fieldNames = bucket.fieldNames();
-        Preconditions.checkArgument(
-            fieldNames.length == 1,
-            "Iceberg partition does not support multi-field bucket: %s",
-            transform);
-        builder.bucket(String.join(DOT, fieldNames[0]), bucket.numBuckets());
-      } else if (transform instanceof Transforms.TruncateTransform) {
-        Transforms.TruncateTransform truncate = (Transforms.TruncateTransform) transform;
-        builder.truncate(String.join(DOT, truncate.fieldName()), truncate.width());
-      } else if (transform instanceof Transforms.YearTransform) {
-        builder.year(String.join(DOT, ((Transforms.YearTransform) transform).fieldName()));
-      } else if (transform instanceof Transforms.MonthTransform) {
-        builder.month(String.join(DOT, ((Transforms.MonthTransform) transform).fieldName()));
-      } else if (transform instanceof Transforms.DayTransform) {
-        builder.day(String.join(DOT, ((Transforms.DayTransform) transform).fieldName()));
-      } else if (transform instanceof Transforms.HourTransform) {
-        builder.hour(String.join(DOT, ((Transforms.HourTransform) transform).fieldName()));
-      } else {
-        throw new UnsupportedOperationException("Transform is not supported: " + transform.name());
+      // Iceberg checks the source type only when the spec is built, so each field is first built
+      // alone to name the field that does not fit.
+      try {
+        addPartitionField(PartitionSpec.builderFor(schema), transform).build();
+        addPartitionField(builder, transform);
+      } catch (ValidationException | IllegalArgumentException e) {
+        throw new IllegalArgumentException(
+            String.format("Invalid partition %s: %s", describe(transform), e.getMessage()), e);
       }
     }
-    return builder.build();
+    try {
+      return builder.build();
+    } catch (ValidationException | IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          String.format("Invalid partitioning %s: %s", describe(partitions), e.getMessage()), e);
+    }
   }
 
-  private static org.apache.iceberg.SortOrder toSortOrder(Schema schema, SortOrder[] sortOrders) {
+  private static PartitionSpec.Builder addPartitionField(
+      PartitionSpec.Builder builder, Transform transform) {
+    if (transform instanceof Transforms.IdentityTransform) {
+      return builder.identity(
+          String.join(DOT, ((Transforms.IdentityTransform) transform).fieldName()));
+    } else if (transform instanceof Transforms.BucketTransform) {
+      Transforms.BucketTransform bucket = (Transforms.BucketTransform) transform;
+      String[][] fieldNames = bucket.fieldNames();
+      Preconditions.checkArgument(
+          fieldNames.length == 1, "Iceberg buckets take exactly one column");
+      return builder.bucket(String.join(DOT, fieldNames[0]), bucket.numBuckets());
+    } else if (transform instanceof Transforms.TruncateTransform) {
+      Transforms.TruncateTransform truncate = (Transforms.TruncateTransform) transform;
+      return builder.truncate(String.join(DOT, truncate.fieldName()), truncate.width());
+    } else if (transform instanceof Transforms.YearTransform) {
+      return builder.year(String.join(DOT, ((Transforms.YearTransform) transform).fieldName()));
+    } else if (transform instanceof Transforms.MonthTransform) {
+      return builder.month(String.join(DOT, ((Transforms.MonthTransform) transform).fieldName()));
+    } else if (transform instanceof Transforms.DayTransform) {
+      return builder.day(String.join(DOT, ((Transforms.DayTransform) transform).fieldName()));
+    } else if (transform instanceof Transforms.HourTransform) {
+      return builder.hour(String.join(DOT, ((Transforms.HourTransform) transform).fieldName()));
+    }
+    throw new IllegalArgumentException(
+        "Iceberg supports identity, bucket, truncate, year, month, day and hour partitions");
+  }
+
+  @VisibleForTesting
+  static org.apache.iceberg.SortOrder toSortOrder(Schema schema, @Nullable SortOrder[] sortOrders) {
     if (sortOrders == null || sortOrders.length == 0) {
       return org.apache.iceberg.SortOrder.unsorted();
     }
     org.apache.iceberg.SortOrder.Builder builder = org.apache.iceberg.SortOrder.builderFor(schema);
     for (SortOrder sortOrder : sortOrders) {
-      if (sortOrder.expression() instanceof NamedReference.FieldReference) {
-        String fieldName =
-            String.join(DOT, ((NamedReference.FieldReference) sortOrder.expression()).fieldName());
-        builder.sortBy(
-            fieldName,
-            toIcebergDirection(sortOrder.direction()),
-            toIcebergNullOrder(sortOrder.nullOrdering()));
-      } else if (sortOrder.expression() instanceof FunctionExpression) {
-        FunctionExpression func = (FunctionExpression) sortOrder.expression();
-        UnboundTerm<Object> term = toIcebergSortTerm(func);
-        builder.sortBy(
-            term,
-            toIcebergDirection(sortOrder.direction()),
-            toIcebergNullOrder(sortOrder.nullOrdering()));
-      } else {
-        throw new UnsupportedOperationException(
-            "Sort expression is not supported: " + sortOrder.expression());
+      Preconditions.checkArgument(sortOrder != null, "Sort order cannot be null");
+      // The term is bound to the schema when the order is built, so each term is first built
+      // alone to name the term that does not fit.
+      try {
+        addSortField(org.apache.iceberg.SortOrder.builderFor(schema), sortOrder).build();
+        addSortField(builder, sortOrder);
+      } catch (ValidationException | IllegalArgumentException e) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Invalid sort order %s: %s", describe(sortOrder.expression()), e.getMessage()),
+            e);
       }
     }
     return builder.build();
+  }
+
+  private static org.apache.iceberg.SortOrder.Builder addSortField(
+      org.apache.iceberg.SortOrder.Builder builder, SortOrder sortOrder) {
+    Expression expression = sortOrder.expression();
+    org.apache.iceberg.SortDirection direction = toIcebergDirection(sortOrder.direction());
+    NullOrder nullOrder = toIcebergNullOrder(sortOrder.nullOrdering());
+    if (expression instanceof NamedReference.FieldReference) {
+      String fieldName = String.join(DOT, ((NamedReference.FieldReference) expression).fieldName());
+      return builder.sortBy(fieldName, direction, nullOrder);
+    } else if (expression instanceof FunctionExpression) {
+      return builder.sortBy(
+          toIcebergSortTerm((FunctionExpression) expression), direction, nullOrder);
+    }
+    throw new IllegalArgumentException(
+        "Iceberg sorts by a column or by a bucket, truncate, year, month, day or hour of a column");
   }
 
   private static UnboundTerm<Object> toIcebergSortTerm(FunctionExpression func) {
@@ -785,53 +1107,84 @@ final class GlueIcebergTableHelper {
     switch (name) {
       case "bucket":
         Preconditions.checkArgument(
-            func.arguments().length == 2, "Bucket sort must have 2 arguments");
+            func.arguments().length == 2, "bucket takes a bucket count and a column");
         int numBuckets = getIntLiteral(func.arguments()[0]);
         String bucketField = getFieldName(func.arguments()[1]);
         return Expressions.bucket(bucketField, numBuckets);
       case "truncate":
         Preconditions.checkArgument(
-            func.arguments().length == 2, "Truncate sort must have 2 arguments");
+            func.arguments().length == 2, "truncate takes a width and a column");
         int width = getIntLiteral(func.arguments()[0]);
         String truncateField = getFieldName(func.arguments()[1]);
         return Expressions.truncate(truncateField, width);
       case "year":
-        return Expressions.year(getSingleField(func.arguments()));
+        return Expressions.year(getSingleField(func));
       case "month":
-        return Expressions.month(getSingleField(func.arguments()));
+        return Expressions.month(getSingleField(func));
       case "day":
-        return Expressions.day(getSingleField(func.arguments()));
+        return Expressions.day(getSingleField(func));
       case "hour":
-        return Expressions.hour(getSingleField(func.arguments()));
+        return Expressions.hour(getSingleField(func));
       default:
-        throw new UnsupportedOperationException(
-            "Sort function not supported: " + func.functionName());
+        throw new IllegalArgumentException(
+            "Iceberg sorts by a column or by a bucket, truncate, year, month, day or hour of a"
+                + " column");
     }
   }
 
-  private static String getSingleField(Expression[] args) {
-    Preconditions.checkArgument(args.length == 1, "Sort function must have 1 argument");
-    return getFieldName(args[0]);
+  private static String getSingleField(FunctionExpression func) {
+    Preconditions.checkArgument(
+        func.arguments().length == 1, "%s takes one column", func.functionName());
+    return getFieldName(func.arguments()[0]);
   }
 
   private static String getFieldName(Expression expr) {
     Preconditions.checkArgument(
-        expr instanceof NamedReference.FieldReference,
-        "Expected field reference, got: %s",
-        expr.getClass().getSimpleName());
+        expr instanceof NamedReference.FieldReference, "expected a column, got %s", describe(expr));
     return String.join(DOT, ((NamedReference.FieldReference) expr).fieldName());
   }
 
   private static int getIntLiteral(Expression expr) {
     Preconditions.checkArgument(
-        expr instanceof Literal, "Expected literal, got: %s", expr.getClass().getSimpleName());
+        expr instanceof Literal, "expected an integer, got %s", describe(expr));
     Object value = ((Literal<?>) expr).value();
     try {
       return Integer.parseInt(String.valueOf(value));
     } catch (NumberFormatException e) {
-      throw new IllegalArgumentException(
-          "Expected integer literal, got: " + value + " in expression: " + expr, e);
+      throw new IllegalArgumentException("expected an integer, got " + value, e);
     }
+  }
+
+  /** Renders partition transforms the way a user writes them, such as {@code bucket(4, id)}. */
+  private static String describe(Transform[] transforms) {
+    return Arrays.stream(transforms)
+        .map(t -> t == null ? "null" : describe(t))
+        .collect(Collectors.joining(", ", "[", "]"));
+  }
+
+  private static String describe(Transform transform) {
+    return transform.name()
+        + Arrays.stream(transform.arguments())
+            .map(GlueIcebergTableHelper::describe)
+            .collect(Collectors.joining(", ", "(", ")"));
+  }
+
+  /** Renders a column reference, literal or function the way a user writes it. */
+  private static String describe(Expression expr) {
+    if (expr instanceof NamedReference.FieldReference) {
+      return String.join(DOT, ((NamedReference.FieldReference) expr).fieldName());
+    }
+    if (expr instanceof Literal) {
+      return String.valueOf(((Literal<?>) expr).value());
+    }
+    if (expr instanceof FunctionExpression) {
+      FunctionExpression func = (FunctionExpression) expr;
+      return func.functionName()
+          + Arrays.stream(func.arguments())
+              .map(GlueIcebergTableHelper::describe)
+              .collect(Collectors.joining(", ", "(", ")"));
+    }
+    return expr.getClass().getSimpleName();
   }
 
   private static org.apache.iceberg.SortDirection toIcebergDirection(SortDirection direction) {
@@ -848,32 +1201,12 @@ final class GlueIcebergTableHelper {
    * Returns the column name for the given Iceberg field ID, throwing if the field is not found in
    * the schema.
    */
-  private static String resolveColumnName(Schema schema, int sourceId) {
+  private static String columnName(Schema schema, int sourceId) {
     String colName = schema.findColumnName(sourceId);
     Preconditions.checkState(
         colName != null,
         "No column found for Iceberg field ID %s; schema may be out of sync",
         sourceId);
     return colName;
-  }
-
-  /**
-   * Extracts an integer parameter from an Iceberg transform string (e.g. "bucket[16]" or
-   * "truncate[8]").
-   *
-   * <p>Iceberg does not expose transform parameters through a typed API, so string parsing is used.
-   */
-  private static int extractTransformParam(String transformStr) {
-    String param = TRANSFORM_PARAM_PATTERN.matcher(transformStr).replaceAll("$1");
-    if (param.equals(transformStr)) {
-      throw new IllegalArgumentException(
-          "Cannot extract numeric parameter from transform: " + transformStr);
-    }
-    try {
-      return Integer.parseInt(param);
-    } catch (NumberFormatException e) {
-      throw new IllegalArgumentException(
-          "Invalid numeric parameter in transform: " + transformStr, e);
-    }
   }
 }

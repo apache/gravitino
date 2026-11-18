@@ -11,30 +11,42 @@ This document guides you through developing the Apache Gravitino Trino connector
 
 ## Multi-version Architecture
 
-The Gravitino Trino connector supports multiple Trino versions (see [Requirements](requirements.md)). The source code is organized into a shared base module and several version-segment modules:
+The Gravitino Trino connector supports multiple Trino versions (see [Requirements](requirements.md)). The source code is organized into shared shape source directories and several version-segment modules:
 
 ```text
 trino-connector/
-├── trino-connector/              # Shared base source code
-│   └── src/main/java/            # Common implementation used by all versions
-├── trino-connector-435-439/      # Version-specific adapters for Trino 435-439
-│   └── src/main/java/
-├── trino-connector-440-445/      # Version-specific adapters for Trino 440-445
-│   └── src/main/java/
-├── trino-connector-446-451/      # Version-specific adapters for Trino 446-451
-│   └── src/main/java/
-├── trino-connector-452-468/      # Version-specific adapters for Trino 452-468
-│   └── src/main/java/
+├── src/
+│   ├── common/                   # Version-agnostic shared source used by all versions
+│   │   └── main/java/
+│   ├── common-469-479/           # Shared source for the pre-480 SPI shape
+│   │   └── main/java/
+│   ├── common-469-481/           # Shared source for the pre-482 SPI shape (e.g. Constraint)
+│   │   └── main/java/
+│   ├── common-480-481/           # Shared source for the 480/481 SPI shape
+│   │   └── main/java/
+│   ├── common-480-483/           # Shared source for the 480+ SPI shape
+│   │   └── main/java/
+│   └── common-482-483/           # Shared source for the 482+ SPI shape
+│       └── main/java/
+├── segment.gradle                # Shared build config for the version-segment modules
 ├── trino-connector-469-472/      # Version-specific adapters for Trino 469-472
 │   └── src/main/java/
-├── trino-connector-473-478/      # Version-specific adapters for Trino 473-478
+├── trino-connector-473-477/      # Version-specific adapters for Trino 473-477
+│   └── src/main/java/
+├── trino-connector-478-479/      # Version-specific adapters for Trino 478-479
+│   └── src/main/java/
+├── trino-connector-480/          # Version-specific adapters for Trino 480
+│   └── src/main/java/
+├── trino-connector-481/          # Version-specific adapters for Trino 481
+│   └── src/main/java/
+├── trino-connector-482-483/      # Version-specific adapters for Trino 482-483
 │   └── src/main/java/
 └── integration-test/             # Integration tests
 ```
 
-Each version-segment module includes the shared base source via Gradle `sourceSets` and adds version-specific adapter classes (e.g., `GravitinoConnector469.java`, `GravitinoPlugin469.java`) to handle Trino SPI differences across versions.
+Each version-segment module lists the shape source directories its Trino versions compile against in its Gradle `sourceSets`, applies the shared `../segment.gradle` build config, and adds only the classes whose SPI shape genuinely differs (e.g., `GravitinoConnector469.java`, `GravitinoPlugin469.java`) to handle Trino SPI differences across versions.
 
-When developing against a specific Trino version in the Trino project, you need to include **both** the shared base source and the matching version-segment source as source directories in the Maven `pom.xml`.
+When developing against a specific Trino version in the Trino project, you need to include **both** the shared shape source directories and the matching version-segment source as source directories in the Maven `pom.xml`.
 
 ## Prerequisites
 
@@ -71,12 +83,12 @@ Change `localhost`, `port`, and the names of metalake and catalogs to match your
 
    | Trino Version | Version-Segment Module    |
    |---------------|---------------------------|
-   | 435-439       | `trino-connector-435-439` |
-   | 440-445       | `trino-connector-440-445` |
-   | 446-451       | `trino-connector-446-451` |
-   | 452-468       | `trino-connector-452-468` |
    | 469-472       | `trino-connector-469-472` |
-   | 473-478       | `trino-connector-473-478` |
+   | 473-477       | `trino-connector-473-477` |
+   | 478-479       | `trino-connector-478-479` |
+   | 480           | `trino-connector-480`     |
+   | 481           | `trino-connector-481`     |
+   | 482-483       | `trino-connector-482-483` |
 
 5. Add `<module>plugin/trino-gravitino</module>` to `trino/pom.xml` and create the `pom.xml` for the `trino-gravitino` module. The example below uses Trino `469`. Ensure the `trino-root` version matches the Trino version you are developing against.
 
@@ -178,27 +190,14 @@ Change `localhost`, `port`, and the names of metalake and catalogs to match your
         </dependency>
 
         <dependency>
+            <groupId>io.airlift</groupId>
+            <artifactId>log</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <version>2.0.9</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.logging.log4j</groupId>
-            <artifactId>log4j-slf4j2-impl</artifactId>
-            <version>2.22.0</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.logging.log4j</groupId>
-            <artifactId>log4j-api</artifactId>
-            <version>2.22.0</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.logging.log4j</groupId>
-            <artifactId>log4j-core</artifactId>
-            <version>2.22.0</version>
+            <artifactId>slf4j-jdk14</artifactId>
+            <version>2.0.17</version>
         </dependency>
 
         <dependency>
@@ -235,8 +234,12 @@ Change `localhost`, `port`, and the names of metalake and catalogs to match your
                         </goals>
                         <configuration>
                             <sources>
-                                <!-- Shared base source -->
-                                <source>/path/to/gravitino/trino-connector/trino-connector/src/main/java</source>
+                                <!-- Shared shape sources (for Trino 469-472; other version ranges use
+                                     a different combination of src/common-* dirs — see the matching
+                                     module's `sourceSets` in build.gradle.kts) -->
+                                <source>/path/to/gravitino/trino-connector/src/common/main/java</source>
+                                <source>/path/to/gravitino/trino-connector/src/common-469-481/main/java</source>
+                                <source>/path/to/gravitino/trino-connector/src/common-469-479/main/java</source>
                                 <!-- Version-segment source (change to match your Trino version) -->
                                 <source>/path/to/gravitino/trino-connector/trino-connector-469-472/src/main/java</source>
                             </sources>
@@ -325,7 +328,7 @@ If a compile error occurs due to `The following artifacts could not be resolved:
    ```
 
    :::note
-   Remove `/etc/catalogs/xxx.properties` if the corresponding `plugin/trino-xxx/pom.xml` is not listed in `plugin.bundles`. For the Hive plugin, use `plugin/trino-hive/pom.xml` for Trino 435 and later; for earlier versions, use `plugin/trino-hive-hadoop2/pom.xml`.
+   Remove `/etc/catalogs/xxx.properties` if the corresponding `plugin/trino-xxx/pom.xml` is not listed in `plugin.bundles`. For the Hive plugin, use `plugin/trino-hive/pom.xml`.
    :::
 
 8. Start the Trino server and connect to the Gravitino server.

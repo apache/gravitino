@@ -22,40 +22,11 @@ import static org.apache.gravitino.storage.relational.mapper.ViewMetaMapper.TABL
 import static org.apache.gravitino.storage.relational.mapper.ViewMetaMapper.VERSION_TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.ViewMetaBaseSQLProvider;
-import org.apache.gravitino.storage.relational.po.ViewPO;
 import org.apache.ibatis.annotations.Param;
 
 public class ViewMetaPostgreSQLProvider extends ViewMetaBaseSQLProvider {
-
-  @Override
-  public String insertViewMetaOnDuplicateKeyUpdate(@Param("viewMeta") ViewPO viewPO) {
-    return "INSERT INTO "
-        + TABLE_NAME
-        + " (view_id, view_name, metalake_id,"
-        + " catalog_id, schema_id,"
-        + " current_version, last_version, audit_info, deleted_at)"
-        + " VALUES ("
-        + " #{viewMeta.viewId},"
-        + " #{viewMeta.viewName},"
-        + " #{viewMeta.metalakeId},"
-        + " #{viewMeta.catalogId},"
-        + " #{viewMeta.schemaId},"
-        + " #{viewMeta.currentVersion},"
-        + " #{viewMeta.lastVersion},"
-        + " #{viewMeta.auditInfo},"
-        + " #{viewMeta.deletedAt}"
-        + " )"
-        + " ON CONFLICT (view_id) DO UPDATE SET"
-        + " view_name = #{viewMeta.viewName},"
-        + " metalake_id = #{viewMeta.metalakeId},"
-        + " catalog_id = #{viewMeta.catalogId},"
-        + " schema_id = #{viewMeta.schemaId},"
-        + " current_version = #{viewMeta.currentVersion},"
-        + " last_version = #{viewMeta.lastVersion},"
-        + " audit_info = #{viewMeta.auditInfo},"
-        + " deleted_at = #{viewMeta.deletedAt}";
-  }
 
   @Override
   public String listViewPOsBySchemaId(@Param("schemaId") Long schemaId) {
@@ -93,19 +64,39 @@ public class ViewMetaPostgreSQLProvider extends ViewMetaBaseSQLProvider {
         + " AND vm.deleted_at = 0 AND vi.deleted_at = 0";
   }
 
+  /**
+   * Soft-deletes an observed view registration in the same catalog lifetime.
+   *
+   * @param viewId the stable external identity
+   * @param currentVersion the observed row version
+   * @param catalogId the observed parent catalog identity
+   * @param schemaId the observed parent schema identity
+   * @param viewName the observed view name
+   * @return the guarded soft-delete SQL
+   */
   @Override
-  public String softDeleteViewMetasByViewId(@Param("viewId") Long viewId) {
+  public String softDeleteViewMetasByViewId(
+      @Param("viewId") Long viewId,
+      @Param("currentVersion") Long currentVersion,
+      @Param("catalogId") Long catalogId,
+      @Param("schemaId") Long schemaId,
+      @Param("viewName") String viewName) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE view_id = #{viewId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE view_id = #{viewId}"
+        + " AND catalog_id = #{catalogId}"
+        + " AND schema_id = #{schemaId} AND view_name = #{viewName}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   @Override
   public String softDeleteViewMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -113,7 +104,8 @@ public class ViewMetaPostgreSQLProvider extends ViewMetaBaseSQLProvider {
   public String softDeleteViewMetasByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
@@ -122,7 +114,8 @@ public class ViewMetaPostgreSQLProvider extends ViewMetaBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE schema_id IN ("
         + "<foreach collection='schemaIds' item='schemaId' separator=','>"
         + "#{schemaId}"
@@ -136,7 +129,7 @@ public class ViewMetaPostgreSQLProvider extends ViewMetaBaseSQLProvider {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "
         + TABLE_NAME
-        + " WHERE view_id IN (SELECT view_id FROM "
+        + " WHERE ctid IN (SELECT ctid FROM "
         + TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }

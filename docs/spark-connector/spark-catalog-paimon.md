@@ -14,6 +14,12 @@ The Apache Gravitino Spark connector offers the capability to read and write Pai
 1. Set `spark.sql.gravitino.enablePaimonSupport` to `true` in Spark configuration.
 2. Download Paimon Spark runtime jar to Spark classpath.
 
+:::info
+The Paimon catalog is available on Spark 3.5 only. Paimon first published `paimon-spark-4.0` in
+Paimon 1.3.0, above the version Gravitino currently depends on, so the Spark 4 connector builds
+without the Paimon classes.
+:::
+
 ## Capabilities
 
 ### DDL and DML Operations
@@ -24,7 +30,9 @@ The Apache Gravitino Spark connector offers the capability to read and write Pai
 - `LOAD NAMESPACE`
   - Returning user-specified configs is not supported; the spark-connector currently only supports FilesystemCatalog.
 - `CREATE TABLE`
-  - Doesn't support distribution and sort orders.
+  - Supports primary keys and bucket options through `TBLPROPERTIES`.
+  - Supports fixed buckets through `CLUSTERED BY ... INTO ... BUCKETS`.
+  - Doesn't support sort orders.
 - `DROP TABLE`
 - `ALTER TABLE`
 - `LIST TABLE`
@@ -81,14 +89,51 @@ SHOW PARTITIONS employee;
 ALTER TABLE employee DROP PARTITION (`name`='Alice');
 ```
 
+## Creating primary-key tables
+
+Specify Paimon primary keys and buckets in `TBLPROPERTIES`. For example, this creates a table with a composite primary key and dynamic buckets:
+
+```sql
+CREATE TABLE source_events (
+  source STRING NOT NULL,
+  event_id BIGINT NOT NULL,
+  payload STRING,
+  dt STRING
+)
+PARTITIONED BY (dt)
+TBLPROPERTIES (
+  'primary-key' = 'source,event_id',
+  'bucket' = '-1',
+  'merge-engine' = 'deduplicate'
+);
+```
+
+Primary-key column order is preserved, and primary-key columns become non-nullable, matching Paimon's behavior. Other column definitions are preserved. Use `bucket = '-1'` for dynamic buckets without an explicit `bucket-key`. For fixed buckets, specify a positive bucket count. An optional `bucket-key` specifies comma-separated top-level bucket columns.
+
+Column references are resolved to the schema's actual names according to `spark.sql.caseSensitive`. Ambiguous or missing names are rejected. The connector checks property parsing and conflicting bucket declarations; Paimon validates primary-key, bucket and partition combinations when the server creates the table.
+
+Use `PARTITIONED BY` for identity partitions. Fixed buckets can also be specified with `CLUSTERED BY`:
+
+```sql
+CREATE TABLE bucketed_events (
+  event_id BIGINT,
+  payload STRING,
+  dt STRING
+) USING paimon
+PARTITIONED BY (dt)
+CLUSTERED BY (event_id) INTO 4 BUCKETS;
+```
+
+If `CLUSTERED BY` and `TBLPROPERTIES` both specify a bucket count or bucket keys, their values must match. Bucket columns are represented as Paimon bucket metadata, separately from identity partitions. `SORTED BY` and non-identity partition transforms are not supported.
+
 ## Catalog Properties
 
 Gravitino spark connector will transform below property names which are defined in catalog properties to Spark Paimon connector configuration.
 
-| Gravitino catalog property name | Spark Paimon connector configuration | Description                                                                                                                                                                                                         | Since Version     |
-|---------------------------------|--------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------|
-| `catalog-backend`               | `metastore`                          | Catalog backend type                                                                                                                                                                                                | 0.8.0-incubating  |
-| `uri`                           | `uri`                                | Catalog backend uri                                                                                                                                                                                                 | 0.8.0-incubating  |
-| `warehouse`                     | `warehouse`                          | Catalog backend warehouse                                                                                                                                                                                           | 0.8.0-incubating  |
+| Gravitino catalog property name | Spark Paimon connector configuration | Description               |
+|---------------------------------|--------------------------------------|---------------------------|
+| `catalog-backend`               | `metastore`                          | Catalog backend type      |
+| `uri`                           | `uri`                                | Catalog backend uri       |
+| `warehouse`                     | `warehouse`                          | Catalog backend warehouse |
 
 Gravitino catalog property names with the prefix `spark.bypass.` are passed to Spark Paimon connector. For example, using `spark.bypass.client-pool-size` to pass the `client-pool-size` to the Spark Paimon connector.

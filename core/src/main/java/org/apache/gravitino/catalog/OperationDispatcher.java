@@ -23,8 +23,10 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier
 
 import com.google.common.collect.Maps;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.function.BiFunction;
+import javax.annotation.Nullable;
+import org.apache.gravitino.Audit;
+import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
@@ -32,14 +34,21 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
+import org.apache.gravitino.connector.MaskAndOmitKeys;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.messaging.TopicChange;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.model.ModelChange;
+import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.ViewChange;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.slf4j.Logger;
@@ -58,18 +67,139 @@ public abstract class OperationDispatcher {
 
   protected final IdGenerator idGenerator;
 
+  protected final SecretManager secretManager;
+
   /**
    * Creates a new CatalogOperationDispatcher instance.
    *
    * @param catalogManager The CatalogManager instance to be used for catalog operations.
    * @param store The EntityStore instance to be used for catalog operations.
    * @param idGenerator The IdGenerator instance to be used for catalog operations.
+   * @param secretManager The SecretManager instance to be used for secret operations.
    */
   protected OperationDispatcher(
-      CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
+      CatalogManager catalogManager,
+      EntityStore store,
+      IdGenerator idGenerator,
+      SecretManager secretManager) {
     this.catalogManager = catalogManager;
     this.store = store;
     this.idGenerator = idGenerator;
+    this.secretManager = secretManager;
+  }
+
+  /**
+   * Creates the user-facing error for an external identifier conflict with active metadata.
+   *
+   * <p>The error describes the supported recovery choices without implying that Gravitino offers
+   * object-level metadata-only unregister operations.
+   *
+   * @param ident the external entity identifier
+   * @param entityType the type of the external entity
+   * @return an exception containing conflict recovery instructions
+   */
+  protected UnsupportedOperationException retainedExternalIdentifierConflictException(
+      NameIdentifier ident, Entity.EntityType entityType) {
+    String entityName;
+    switch (entityType) {
+      case SCHEMA:
+        entityName = "schema";
+        break;
+      case TABLE:
+        entityName = "table";
+        break;
+      case VIEW:
+        entityName = "view";
+        break;
+      case TOPIC:
+        entityName = "topic";
+        break;
+      default:
+        entityName = "object";
+    }
+
+    return new UnsupportedOperationException(
+        String.format(
+            "%s %s cannot be imported because its name or external identifier is already managed "
+                + "under a different Gravitino identifier. Gravitino does not automatically "
+                + "reconcile conflicting external %s registrations, and it does not support "
+                + "metadata-only unregister of an individual external %s. Recovery requires an "
+                + "administrator to force-drop and recreate the containing Gravitino catalog "
+                + "registration. This catalog-wide reset removes every stored registration and "
+                + "its privileges, tags, and other relationships in that Gravitino catalog. "
+                + "Follow the catalog-specific recovery guidance to confirm that external objects "
+                + "are retained. Their existing external identifiers can be imported again after "
+                + "the conflicting catalog registration has been dropped.",
+            entityName, ident, entityName, entityName));
+  }
+
+  /**
+   * Fills missing creation fields when another node imported the same object first. The cold import
+   * already carries these fields in its initial write and needs no additional update. Ordinary
+   * loads pass an empty requested audit, leaving an unknown source creator unknown.
+   *
+   * @param entity the imported registration, or null for a managed object
+   * @param type the entity class
+   * @param reported the audit reported by the source catalog
+   * @param requested the creation audit supplied by the create operation, or empty for ordinary
+   *     loads
+   * @param withAudit copies the current entity with the new audit
+   * @param <E> the auditable entity type
+   * @return the current registration, with missing creation fields filled if it still matches, or
+   *     null if the registration disappeared during recovery; callers then return the source
+   *     snapshot as not imported
+   */
+  @Nullable
+  protected <E extends Entity & HasIdentifier & Auditable> E fillMissingCreationAudit(
+      @Nullable E entity,
+      Class<E> type,
+      Audit reported,
+      AuditInfo requested,
+      BiFunction<E, AuditInfo, E> withAudit) {
+    if (entity == null || entity.auditInfo().creator() != null || requested.creator() == null) {
+      return entity;
+    }
+    try {
+      return store.update(
+          entity.nameIdentifier(),
+          type,
+          entity.type(),
+          current -> {
+            // Recheck inside the store's optimistic update, including identity: the name may
+            // have been dropped and recreated since the source snapshot was read.
+            if (!current.id().equals(entity.id())) {
+              throw new OptimisticLockException("Entity identity changed during audit import");
+            }
+            Audit audit = current.auditInfo();
+            if (audit.creator() != null) {
+              return current;
+            }
+            AuditInfo filled =
+                AuditInfo.builder()
+                    .withCreator(
+                        reported.creator() == null ? requested.creator() : reported.creator())
+                    .withCreateTime(
+                        audit.createTime() != null
+                            ? audit.createTime()
+                            : reported.createTime() != null
+                                ? reported.createTime()
+                                : requested.createTime())
+                    .withLastModifier(audit.lastModifier())
+                    .withLastModifiedTime(audit.lastModifiedTime())
+                    .build();
+            return withAudit.apply(current, filled);
+          });
+    } catch (NoSuchEntityException e) {
+      // A rename or drop can remove the observed registration before the store read or CAS.
+      // Return the source snapshot without a registration; never resurrect it with the old audit.
+      return null;
+    } catch (OptimisticLockException e) {
+      LOG.warn("Failed to import creation audit for {}", entity.nameIdentifier(), e);
+      return getEntity(entity.nameIdentifier(), entity.type(), type);
+    } catch (Exception e) {
+      LOG.warn("Failed to import creation audit for {}", entity.nameIdentifier(), e);
+      return entity;
+    }
   }
 
   protected <R, E extends Throwable> R doWithTable(
@@ -77,8 +207,9 @@ public abstract class OperationDispatcher {
       throws E {
     try {
       NameIdentifier catalogIdent = getCatalogIdentifier(tableIdent);
-      CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(catalogIdent);
-      return c.doWithPartitionOps(tableIdent, fn);
+      return catalogManager.doWithCatalogWrapper(
+          catalogIdent,
+          wrapper -> wrapper.detachConnectorResult(wrapper.doWithPartitionOps(tableIdent, fn)));
     } catch (Exception exception) {
       if (ex.isInstance(exception)) {
         throw ex.cast(exception);
@@ -94,8 +225,8 @@ public abstract class OperationDispatcher {
       NameIdentifier ident, ThrowableFunction<CatalogManager.CatalogWrapper, R> fn, Class<E> ex)
       throws E {
     try {
-      CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
-      return fn.apply(c);
+      return catalogManager.doWithCatalogWrapper(
+          ident, wrapper -> wrapper.detachConnectorResult(fn.apply(wrapper)));
     } catch (Exception exception) {
       if (ex.isInstance(exception)) {
         throw ex.cast(exception);
@@ -114,8 +245,8 @@ public abstract class OperationDispatcher {
       Class<E2> ex2)
       throws E1, E2 {
     try {
-      CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
-      return fn.apply(c);
+      return catalogManager.doWithCatalogWrapper(
+          ident, wrapper -> wrapper.detachConnectorResult(fn.apply(wrapper)));
     } catch (Exception exception) {
       if (ex1.isInstance(exception)) {
         throw ex1.cast(exception);
@@ -130,21 +261,33 @@ public abstract class OperationDispatcher {
     }
   }
 
-  protected Set<String> getHiddenPropertyNames(
+  protected MaskAndOmitKeys getMaskAndOmitKeys(
       NameIdentifier catalogIdent,
       ThrowableFunction<HasPropertyMetadata, PropertiesMetadata> provider,
       Map<String, String> properties) {
     return doWithCatalog(
         catalogIdent,
-        c ->
-            c.doWithPropertiesMeta(
-                p -> {
-                  PropertiesMetadata propertiesMetadata = provider.apply(p);
-                  return properties.keySet().stream()
-                      .filter(propertiesMetadata::isHiddenProperty)
-                      .collect(Collectors.toSet());
-                }),
+        c -> getMaskAndOmitKeys(c, provider, properties),
         IllegalArgumentException.class);
+  }
+
+  /**
+   * Classifies hidden properties using metadata from the supplied leased catalog wrapper.
+   *
+   * @param catalog the leased catalog wrapper
+   * @param provider the metadata provider for the entity type
+   * @param properties the properties to classify
+   * @return the keys to mask and omit
+   * @throws Exception if reading the connector metadata fails
+   */
+  protected MaskAndOmitKeys getMaskAndOmitKeys(
+      CatalogManager.CatalogWrapper catalog,
+      ThrowableFunction<HasPropertyMetadata, PropertiesMetadata> provider,
+      Map<String, String> properties)
+      throws Exception {
+    return catalog.doWithPropertiesMeta(
+        metadata ->
+            HiddenPropertyMaskUtils.classifyHiddenProperties(properties, provider.apply(metadata)));
   }
 
   protected <T> void validateAlterProperties(
@@ -153,15 +296,34 @@ public abstract class OperationDispatcher {
       T... changes) {
     doWithCatalog(
         getCatalogIdentifier(ident),
-        c ->
-            c.doWithPropertiesMeta(
-                p -> {
-                  Map<String, String> upserts = getPropertiesForSet(changes);
-                  Map<String, String> deletes = getPropertiesForDelete(changes);
-                  validatePropertyForAlter(provider.apply(p), upserts, deletes);
-                  return null;
-                }),
+        c -> {
+          validateAlterProperties(c, provider, changes);
+          return null;
+        },
         IllegalArgumentException.class);
+  }
+
+  /**
+   * Validates property changes using metadata from the supplied leased catalog wrapper.
+   *
+   * @param catalog the leased catalog wrapper
+   * @param provider the metadata provider for the entity type
+   * @param changes the requested changes
+   * @param <T> the change type
+   * @throws Exception if reading the connector metadata fails
+   */
+  protected <T> void validateAlterProperties(
+      CatalogManager.CatalogWrapper catalog,
+      ThrowableFunction<HasPropertyMetadata, PropertiesMetadata> provider,
+      T... changes)
+      throws Exception {
+    catalog.doWithPropertiesMeta(
+        metadata -> {
+          Map<String, String> upserts = getPropertiesForSet(changes);
+          Map<String, String> deletes = getPropertiesForDelete(changes);
+          validatePropertyForAlter(provider.apply(metadata), upserts, deletes);
+          return null;
+        });
   }
 
   private <T> Map<String, String> getPropertiesForDelete(T... t) {
@@ -201,11 +363,29 @@ public abstract class OperationDispatcher {
     }
   }
 
+  /**
+   * Runs a store operation as a best-effort side effect of the request.
+   *
+   * <p>Every failure is logged and reported as a null result, because the external catalog is the
+   * source of truth on these paths: a load that imports or repairs the Gravitino copy must still
+   * return the entity it read, and the next load repairs what this one could not write.
+   */
   protected <R extends HasIdentifier> R operateOnEntity(
       NameIdentifier ident, ThrowableFunction<NameIdentifier, R> fn, String opName, long id) {
     R ret = null;
     try {
       ret = fn.apply(ident);
+    } catch (OptimisticLockException e) {
+      // Only external entities reach this point, so swallowing the conflict is safe: alterTable,
+      // alterSchema and alterView return before calling this helper when the entity is managed,
+      // and no catalog reports managed storage for topics (KafkaCatalogCapability). A managed
+      // alter therefore hits the store directly and its conflict still reaches the caller.
+      //
+      // For an external entity the catalog was already changed and remains the source of truth.
+      // Failing the request would invite a retry that re-applies the external change, and some
+      // changes are not idempotent, so the stale Gravitino copy is the lesser problem: the next
+      // load imports the entity again.
+      LOG.warn(FormattedErrorMessages.STORE_OP_FAILURE, opName, ident, e);
     } catch (NoSuchEntityException e) {
       // Case 2: The table is created by Gravitino, but has no corresponding entity in Gravitino.
       LOG.error(FormattedErrorMessages.ENTITY_NOT_FOUND, ident);
@@ -227,9 +407,14 @@ public abstract class OperationDispatcher {
 
   boolean isManagedEntity(NameIdentifier catalogIdent, Capability.Scope scope) {
     return doWithCatalog(
-        catalogIdent,
-        c -> c.capabilities().managedStorage(scope).supported(),
-        IllegalArgumentException.class);
+        catalogIdent, c -> isManagedEntity(c, scope), IllegalArgumentException.class);
+  }
+
+  boolean isManagedEntity(CatalogManager.CatalogWrapper catalog, Capability.Scope scope)
+      throws Exception {
+    // Read the capability and interpret it in one pass under the catalog ClassLoader: a connector
+    // CapabilityResult can load classes of its own on the first call.
+    return catalog.doWithCatalog(c -> c.capability().managedStorage(scope).supported());
   }
 
   protected <E extends Entity & HasIdentifier> E getEntity(
@@ -255,15 +440,34 @@ public abstract class OperationDispatcher {
       } else if (item instanceof SchemaChange.SetProperty) {
         SchemaChange.SetProperty setProperty = (SchemaChange.SetProperty) item;
         properties.put(setProperty.getProperty(), setProperty.getValue());
+      } else if (item instanceof SchemaChange.SetSecretBinding) {
+        SchemaChange.SetSecretBinding setSecretBinding = (SchemaChange.SetSecretBinding) item;
+        properties.put(setSecretBinding.getProperty(), setSecretBinding.getBinding().plaintext());
+      } else if (item instanceof SchemaChange.SetSecretReference) {
+        SchemaChange.SetSecretReference setSecretReference = (SchemaChange.SetSecretReference) item;
+        properties.put(setSecretReference.getProperty(), setSecretReference.getProperty());
       } else if (item instanceof FilesetChange.SetProperty) {
         FilesetChange.SetProperty setProperty = (FilesetChange.SetProperty) item;
         properties.put(setProperty.getProperty(), setProperty.getValue());
+      } else if (item instanceof FilesetChange.SetSecretBinding) {
+        FilesetChange.SetSecretBinding setSecretBinding = (FilesetChange.SetSecretBinding) item;
+        properties.put(setSecretBinding.getProperty(), setSecretBinding.getBinding().plaintext());
+      } else if (item instanceof FilesetChange.SetSecretReference) {
+        FilesetChange.SetSecretReference setSecretReference =
+            (FilesetChange.SetSecretReference) item;
+        properties.put(setSecretReference.getProperty(), setSecretReference.getProperty());
       } else if (item instanceof TopicChange.SetProperty) {
         TopicChange.SetProperty setProperty = (TopicChange.SetProperty) item;
         properties.put(setProperty.getProperty(), setProperty.getValue());
       } else if (item instanceof ViewChange.SetProperty) {
         ViewChange.SetProperty setProperty = (ViewChange.SetProperty) item;
         properties.put(setProperty.getProperty(), setProperty.getValue());
+      } else if (item instanceof ModelChange.SetProperty) {
+        ModelChange.SetProperty setProperty = (ModelChange.SetProperty) item;
+        properties.put(setProperty.property(), setProperty.value());
+      } else if (item instanceof ModelVersionChange.SetProperty) {
+        ModelVersionChange.SetProperty setProperty = (ModelVersionChange.SetProperty) item;
+        properties.put(setProperty.property(), setProperty.value());
       }
     }
 

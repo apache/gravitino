@@ -19,17 +19,28 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
+import org.apache.gravitino.server.web.ClientAddressResolver;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.RequestContext;
 
-/** The general request context information for Iceberg REST operations. */
+/**
+ * The general request context information for Iceberg REST operations.
+ *
+ * <p>Optional {@link #auditExtras()} are facts an inner dispatcher wants on the terminal Iceberg
+ * event. They are not HTTP headers and never appear in {@link #httpHeaders()}.
+ */
 public class IcebergRequestContext {
 
   /** Header that opts a drop purge request into asynchronous file cleanup. */
   public static final String ASYNC_PURGE_HEADER = "X-Gravitino-Async-Purge";
+
+  private static final String UNKNOWN_ADDRESS = "unknown";
 
   /**
    * @deprecated Kept only for backward-compatibility and will be removed in the next major release.
@@ -41,6 +52,7 @@ public class IcebergRequestContext {
   private final String remoteHostName;
   private final Map<String, String> httpHeaders;
   private final boolean requestCredentialVending;
+  private final Map<String, String> auditExtras;
 
   /**
    * Constructs a new {@code IcebergRequestContext} instance.
@@ -61,23 +73,44 @@ public class IcebergRequestContext {
    */
   public IcebergRequestContext(
       HttpServletRequest httpRequest, String catalogName, boolean requestCredentialVending) {
-    this.httpServletRequest = httpRequest;
-    this.remoteHostName = resolveClientAddress(httpRequest);
-    this.httpHeaders = IcebergRESTUtils.getHttpHeaders(httpRequest);
+    this(
+        httpRequest,
+        catalogName,
+        PrincipalUtils.getCurrentUserName(),
+        resolveClientAddress(httpRequest),
+        IcebergRESTUtils.getHttpHeaders(httpRequest),
+        requestCredentialVending,
+        ImmutableMap.of());
+  }
+
+  private IcebergRequestContext(
+      HttpServletRequest httpServletRequest,
+      String catalogName,
+      String userName,
+      String remoteHostName,
+      Map<String, String> httpHeaders,
+      boolean requestCredentialVending,
+      Map<String, String> auditExtras) {
+    this.httpServletRequest = httpServletRequest;
     this.catalogName = catalogName;
-    this.userName = PrincipalUtils.getCurrentUserName();
+    this.userName = userName;
+    this.remoteHostName = remoteHostName;
+    this.httpHeaders = httpHeaders;
     this.requestCredentialVending = requestCredentialVending;
+    this.auditExtras = auditExtras;
   }
 
   private static String resolveClientAddress(HttpServletRequest request) {
-    // X-Forwarded-For is trusted unconditionally; callers in environments where the server is
-    // reachable directly (not only via a trusted proxy) should be aware that this header can be
-    // spoofed by clients.
-    String xForwardedFor = request.getHeader("X-Forwarded-For");
-    if (StringUtils.isNotBlank(xForwardedFor)) {
-      return xForwardedFor.split(",")[0].trim();
-    }
-    return request.getRemoteHost();
+    // RequestContextFilter, installed ahead of every Iceberg REST endpoint, has already resolved
+    // the client address with the server's trusted-proxy rules. Without it, use the TCP peer
+    // address, in the same canonical form: X-Forwarded-For cannot be trusted here because the
+    // trusted proxies are unknown. A missing address is recorded as "unknown", as other events do.
+    String contextAddress = RequestContext.getRemoteAddress();
+    String address =
+        contextAddress != null
+            ? contextAddress
+            : ClientAddressResolver.noTrustedProxies().resolve(request);
+    return StringUtils.isBlank(address) ? UNKNOWN_ADDRESS : address;
   }
 
   /**
@@ -99,9 +132,11 @@ public class IcebergRequestContext {
   }
 
   /**
-   * Returns the hostname of the HTTP client.
+   * Returns the address of the HTTP client, resolved with the server's trusted-proxy rules (see
+   * {@code trustedProxies} in the Jetty server configuration). Despite the method name, this is an
+   * IP address, never a resolved host name.
    *
-   * @return The remote host name.
+   * @return The remote client address.
    */
   public String remoteHostName() {
     return remoteHostName;
@@ -114,6 +149,49 @@ public class IcebergRequestContext {
    */
   public Map<String, String> httpHeaders() {
     return httpHeaders;
+  }
+
+  /**
+   * Returns the immutable audit extras attached to this context. Empty when none were attached.
+   *
+   * @return audit extras, never {@code null}
+   */
+  public Map<String, String> auditExtras() {
+    return auditExtras;
+  }
+
+  /**
+   * Returns a copy of this context with the given audit extras. Extras are not part of {@link
+   * #httpHeaders()}. A {@code null} or empty map yields a context with empty extras.
+   *
+   * @param extras optional facts for {@code customInfo()}, or {@code null} for none
+   * @return a new context; this instance is unchanged
+   */
+  public IcebergRequestContext withAuditExtras(Map<String, String> extras) {
+    return new IcebergRequestContext(
+        httpServletRequest,
+        catalogName,
+        userName,
+        remoteHostName,
+        httpHeaders,
+        requestCredentialVending,
+        copyAuditExtras(extras));
+  }
+
+  /**
+   * Returns HTTP headers merged with {@link #auditExtras()}. When extras are empty, returns {@link
+   * #httpHeaders()} unchanged so existing callers keep today's header-only map. Extra keys overlay
+   * headers on conflict.
+   *
+   * @return headers, or headers overlaid with extras
+   */
+  public Map<String, String> customInfo() {
+    if (auditExtras.isEmpty()) {
+      return httpHeaders;
+    }
+    Map<String, String> merged = new LinkedHashMap<>(httpHeaders);
+    merged.putAll(auditExtras);
+    return ImmutableMap.copyOf(merged);
   }
 
   /**
@@ -153,5 +231,12 @@ public class IcebergRequestContext {
   @Deprecated
   public HttpServletRequest getHttpServletRequest() {
     return httpServletRequest;
+  }
+
+  private static Map<String, String> copyAuditExtras(Map<String, String> extras) {
+    if (extras == null || extras.isEmpty()) {
+      return ImmutableMap.of();
+    }
+    return ImmutableMap.copyOf(extras);
   }
 }

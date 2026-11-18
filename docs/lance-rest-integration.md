@@ -20,10 +20,11 @@ This documentation assumes familiarity with the Lance REST service setup as desc
 
 The following table outlines the tested compatibility between Gravitino versions and Lance connector versions:
 
-| Gravitino Version (Lance REST) | Supported lance-spark Versions | Supported lance-ray Versions                  |
-|--------------------------------|--------------------------------|-----------------------------------------------|
-| 1.1.1 - 1.2.1                  | 0.0.10 - 0.0.15                | 0.0.6 - 0.0.8                                 |
-| 1.3.0                          | 0.2.0, 0.4.0, 0.5.1            | 0.3.0 - 0.4.2 (0.2.0 conditionally supported) |
+| Gravitino Version (Lance REST) | Supported lance-spark Versions           | Supported lance-ray Versions                                             |
+| ------------------------------ | ---------------------------------------- | ------------------------------------------------------------------------ |
+| 1.1.1 - 1.2.1                  | 0.0.10 - 0.0.15                          | 0.0.6 - 0.0.8                                                            |
+| 1.3.0                          | 0.2.0, 0.4.0, 0.5.1                      | 0.3.0 - 0.4.2 (0.2.0 conditionally supported)                            |
+| 2.0.0                          | 0.2.0, 0.4.0, 0.5.1, 0.6.1, 0.7.1, 0.8.0 | 0.2.0 + `lance-namespace` 0.4.5; 0.3.0 and 0.4.2 + 0.7.5; 0.5.0 + 0.11.1 |
 
 :::note
 - These version entries show which versions are expected to work together.
@@ -37,9 +38,10 @@ The following table outlines the tested compatibility between Gravitino versions
   exposes — the table-declaration path was consolidated onto
   `POST /lance/v1/table/{id}/declare` (`LanceTableOperations#declareTable`)
   when the deprecated `createEmptyTable` API was removed during the
-  `lance-namespace-core` 0.7.5 upgrade. Running 0.1.x against 1.3.0 surfaces
-  as `404 Not Found` on every table-creation flow; the small set of
-  list/describe-only tests still works, but any write path will fail.
+  `lance-namespace-core` 0.7.5 upgrade. Every table-creation flow fails; the
+  small set of list/describe-only tests still works. The failure surfaces as
+  `500 Internal Server Error`, not `404 Not Found` — see the note on
+  unimplemented endpoints below, which applies to 1.3.0 as well.
 - **`lance-ray` 0.1.0 is not supported on Gravitino 1.3.0.** It exposes
   `write_lance(... namespace=<LanceNamespace>)`, whereas the 0.2.0+ test path
   uses the new `write_lance(... namespace_impl="rest",
@@ -53,21 +55,70 @@ The following table outlines the tested compatibility between Gravitino versions
   raising `ImportError: cannot import name
   'LanceNamespaceStorageOptionsProvider' from 'lance'`. You can use
   `lance-ray` 0.2.0 with Gravitino 1.3.0 by pinning `pylance` to 3.x or 4.x.
+- **Gravitino 2.0.0 embeds `lance-core` 12.0.0 and `lance-namespace-core` 0.11.1**, the pair
+  `lance-spark` 0.8.0 is built on. Older clients keep working: none of the 0.11.1 spec changes
+  reaches the endpoints Gravitino serves, and responses only gained an empty `context` map, which
+  older clients ignore. Lance branches and tags are not implemented, so a request setting `branch`
+  or `tag` is rejected with `400`.
+- **`lance-spark` 0.2.0 cannot write to a table created through the Gravitino table API**, on
+  2.0.0 and on every earlier release alike. It passes no data storage version to Lance, so it
+  writes at its own `lance-core` 2.0.0 default of file format version 2.0 while such a dataset is
+  pinned at the server's `lance-core` default — 2.2 on 2.0.0, 2.1 on 1.3.0 — and Lance refuses the
+  commit. Reads are unaffected, and so are tables a connector created itself through
+  `POST /lance/v1/table/{id}/declare`, which the connector writes at its own version.
+  `lance-spark` 0.4.0 and later read the dataset's version before writing and have no such limit.
+- **An unimplemented endpoint answers `500`, not `404`**, because `LanceExceptionMapper` matches
+  only Gravitino's own `NotFoundException`. A call to a removed endpoint therefore looks like an
+  internal error.
 - Before using in production, test the exact connector versions in your own environment.
 - The Lance ecosystem is changing quickly, so some versions may introduce breaking changes.
 :::
+
+## Format boundary
+
+The Lance REST service is a Lance table namespace, even when its metadata backend is a
+format-agnostic Generic Catalog. The REST table operations therefore validate the stored
+`format` property before returning Lance metadata or applying a table mutation.
+
+When an identifier is occupied by a known non-Lance table, direct Lance table operations fail
+with HTTP `400` and an `INVALID_INPUT` error. `TableExists` presents that entry as absent and
+returns the normal table-not-found response. The underlying Generic Catalog metadata and storage
+location remain unchanged.
+
+The same boundary applies to create requests that target an existing entity through the Lance
+delegator:
+
+| Request mode         | Existing non-Lance entity                            |
+| -------------------- | ---------------------------------------------------- |
+| `CREATE`             | `409` conflict, as for any existing table name       |
+| `EXIST_OK`           | `400 INVALID_INPUT`                                  |
+| `OVERWRITE`          | `400 INVALID_INPUT`; metadata and data are preserved |
+| Register `OVERWRITE` | `400 INVALID_INPUT`; metadata and data are preserved |
+
+The validation is performed after the normal authorization checks. It does not convert existing
+Generic Catalog unknown-format loading errors or change the Generic Catalog's format-agnostic
+`ListTables` behavior.
 
 ### Reproducing the matrix locally
 
 Both connectors ship with a multi-version integration test driver so the
 matrix can be re-verified (and extended) without ad-hoc scripting:
 
+For Lance Spark, the default `test` task uses the explicitly verified `0.8.0`
+bundle, while `lanceSparkMatrixTest` uses the declared matrix
+(`0.2.0`, `0.4.0`, `0.5.1`, `0.6.1`, `0.7.1`, and `0.8.0`), which spans every
+`lance-namespace` generation a released bundle speaks. Passing
+`-PlanceSparkBundleVersions=...` is a targeted diagnostic override; the supplied
+versions form the matrix and the first supplied version remains the primary for
+the normal `test` task.
+
 ```bash
 # lance-spark — runs LanceSparkRESTServiceIT once per bundle version.
 # The default list intentionally omits 0.1.0 / 0.1.1: those bundles call the
-# removed /create-empty endpoint and will fail with 404 against 1.3.0+.
+# removed /create-empty endpoint and will fail against 1.3.0+ (as a 500, see the
+# note on unimplemented endpoints in the Compatibility Matrix section).
 ./gradlew :lance:lance-rest-server:lanceSparkMatrixTest \
-    -PlanceSparkBundleVersions=0.2.0,0.4.0,0.5.1 \
+    -PlanceSparkBundleVersions=0.2.0,0.4.0,0.5.1,0.6.1,0.7.1,0.8.0 \
     -PskipDockerTests=true
 # Per-version JUnit reports land under
 # lance/lance-rest-server/build/reports/lance-spark-matrix/<version>/.
@@ -75,9 +126,11 @@ matrix can be re-verified (and extended) without ad-hoc scripting:
 # lance-ray — provisions a venv per version under
 # clients/client-python/build/lance-ray-matrix/.venv-<version>/ and runs
 # tests/integration/test_lance_ray.py against each. The Gradle wrapper
-# below starts / stops Gravitino automatically.
+# below starts / stops Gravitino automatically. Each entry is
+# <lance-ray-version>=<lance-namespace-version>; `lance-ray` does not bound
+# `lance-namespace` itself, so the pairing has to be given per version.
 ./gradlew :clients:client-python:lanceRayMatrixTest \
-    -PlanceRayVersions=0.4.2,0.3.0
+    -PlanceRayVersions=0.5.0=0.11.1,0.4.2=0.7.5,0.3.0=0.7.5,0.2.0=0.4.5
 ```
 
 ### Rationale
@@ -109,6 +162,56 @@ Before proceeding, ensure the following requirements are met:
     - For Spark integration: `pyspark`
     - For Ray integration: `ray`, `lance-namespace`, `lance-ray`
 
+## Authentication and authorization
+
+For per-user metadata authorization, connect engines to the auxiliary Lance REST service with
+`gravitino.authorization.enable=true`. Configure each engine's REST client to send the caller's
+`Authorization` header on every namespace and table request. If supported by that client version,
+`X-Gravitino-Active-Roles` can restrict the active roles. See the
+[Lance REST authentication and privilege matrix](./lance-rest-service.md#authentication-and-authorization).
+
+For example, with development-only `simple` authentication, this request lists only tables that
+`user1` may access (the password is not validated):
+
+```shell
+curl --user 'user1:unused' \
+  -H 'X-Gravitino-Active-Roles: ALL' \
+  'http://localhost:9101/lance/v1/namespace/lance_catalog.sales/table/list?delimiter=.'
+```
+
+Connector header configuration depends on the connector version. The Spark and Ray examples
+below omit credentials and assume the default simple-authentication setup; in auxiliary mode
+such requests use the configured Lance service identity. They do not demonstrate per-user
+access control. In standalone mode, all metadata requests to Gravitino use the backend service
+identity even when an engine supplies its own incoming credentials.
+
+Engines that probe before creating need the corresponding creation privileges. Reading table
+metadata requires `SELECT_TABLE` or `MODIFY_TABLE` with parent access, while overwriting requires
+`MODIFY_TABLE` and dropping requires ownership. Metadata authorization does not authorize direct
+reads or writes to object storage: configure storage access independently. Lance REST responses
+can return shared storage credentials configured on the catalog or table; it does not issue
+per-user, scoped storage credentials.
+
+### Verify authentication and authorization locally
+
+The HTTP integration suites start Gravitino with the Lance auxiliary service and exercise
+caller identity, service identity fallback, active roles, namespace and table privileges,
+filtered listings, denied mutations, and rejection of non-empty Arrow creates without side effects.
+They also start standalone Lance REST through its production entry point in a separate JVM to verify
+its outbound service identity and propagation of backend authorization denials through the Gravitino
+HTTP API.
+
+```shell
+./gradlew :lance:lance-rest-server:test \
+  --tests '*LanceRESTServiceAuthIT' \
+  --tests '*LanceNamespaceAuthorizationIT' \
+  --tests '*LanceTableAuthorizationIT' \
+  -PskipDockerTests=true
+```
+
+These suites use `simple` authentication and local storage. They do not validate an external
+OAuth2/Kerberos provider or object-store access policies.
+
 ## Spark Integration
 
 ### Configuration
@@ -127,7 +230,7 @@ logging.basicConfig(level=logging.INFO)
 # Replace /path/to/lance-spark-bundle-3.5_2.12-X.X.XX.jar with your actual JAR path and version;
 # refer to the compatibility matrix for supported lance-spark versions.
 os.environ["PYSPARK_SUBMIT_ARGS"] = (
-    "--jars /path/to/lance-spark-bundle-3.5_2.12-0.4.0.jar "
+    "--jars /path/to/lance-spark-bundle-3.5_2.12-0.5.1.jar "
     "--conf \"spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" "
     "--conf \"spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" "
     "--master local[1] pyspark-shell"
@@ -138,7 +241,7 @@ os.environ["PYSPARK_SUBMIT_ARGS"] = (
 # it via Lance REST API `CreateNamespace` or Gravitino REST API `CreateCatalog`.
 spark = SparkSession.builder \
     .appName("lance_rest_integration") \
-    .config("spark.sql.catalog.lance", "com.lancedb.lance.spark.LanceNamespaceSparkCatalog") \
+    .config("spark.sql.catalog.lance", "org.lance.spark.LanceNamespaceSparkCatalog") \
     .config("spark.sql.catalog.lance.impl", "rest") \
     .config("spark.sql.catalog.lance.uri", "http://localhost:9101/lance") \
     .config("spark.sql.catalog.lance.parent", "lance_catalog") \
@@ -224,7 +327,8 @@ pip install lance-ray
 :::info
 - Ray will be automatically installed if not already present
 - For Gravitino 1.3.0, use a `lance-namespace` client compatible with
-  server-side `lance-namespace-core` 0.7.5 or newer.
+  server-side `lance-namespace-core` 0.7.5 or newer; Gravitino 2.0.0 serves
+  `lance-namespace-core` 0.11.1, which also accepts those older clients.
 - Ensure Ray version compatibility in your environment before deployment
 :::
 

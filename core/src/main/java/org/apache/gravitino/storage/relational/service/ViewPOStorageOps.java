@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -31,13 +32,19 @@ public class ViewPOStorageOps extends BasePOStorageOps<ViewPO, ViewMetaMapper> {
 
   public ViewPOStorageOps() {}
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Overwrite is not supported here. {@link ViewMetaService} replaces an existing view by
+   * locking its root row and advancing it with a version compare-and-set, which keeps the stored ID
+   * and the version sequence identical on every database. A database-specific upsert would bypass
+   * that and is rejected instead of silently taking a second code path.
+   */
   @Override
   public void insertPO(ViewMetaMapper mapper, ViewPO viewPO, boolean overwrite) {
-    if (overwrite) {
-      mapper.insertViewMetaOnDuplicateKeyUpdate(viewPO);
-    } else {
-      mapper.insertViewMeta(viewPO);
-    }
+    Preconditions.checkArgument(
+        !overwrite, "View overwrite is handled by ViewMetaService, not by an upsert");
+    mapper.insertViewMeta(viewPO);
   }
 
   @Override

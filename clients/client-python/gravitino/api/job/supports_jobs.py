@@ -144,12 +144,17 @@ class SupportsJobs(ABC):
         pass
 
     @abstractmethod
-    def get_job(self, job_id: str) -> JobHandle:
+    def get_job(self, job_id: str, include_output: bool = False) -> JobHandle:
         """
-        Retrieves a job by its ID.
+        Retrieves a job by its ID, optionally including its captured stdout/stderr output (see
+        ``JobHandle.stdout``/``JobHandle.stderr``).
+
+        Output is fetched live from the job executor on every call, not persisted, so
+        ``include_output`` should only be set to ``True`` when the output is actually needed.
 
         Args:
             job_id: The ID of the job to retrieve.
+            include_output: Whether to also fetch and populate the job's stdout/stderr output.
 
         Returns:
             JobHandle: The handle representing the job with the specified ID.

@@ -39,6 +39,9 @@ dependencies {
   implementation(libs.jackson.datatype.jsr310)
   implementation(libs.jackson.databind)
   implementation(libs.metrics.jersey2)
+  implementation(libs.openlineage.java) {
+    isTransitive = false
+  }
 
   // As of Java 9 or newer, the javax.activation package (needed by the jetty server) is no longer part of the JDK. It was removed because it was part of the
   // JavaBeans Activation Framework (JAF) which has been removed from Java SE. So we need to add it as a dependency. For more,
@@ -51,6 +54,7 @@ dependencies {
   testCompileOnly(libs.lombok)
 
   testImplementation(libs.commons.io)
+  testImplementation(project(":server-common", "testArtifacts"))
   testImplementation(libs.jersey.test.framework.core) {
     exclude(group = "org.junit.jupiter")
   }
@@ -64,25 +68,6 @@ dependencies {
   testImplementation(libs.ognl)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
-}
-
-fun getGitCommitId(): String {
-  var gitCommitId: String
-  try {
-    val gitFolder = rootDir.path + "/.git/"
-    val head = File(gitFolder + "HEAD").readText().split(":")
-    val isCommit = head.size == 1
-    gitCommitId = if (isCommit) {
-      head[0].trim()
-    } else {
-      val refHead = File(gitFolder + head[1].trim())
-      refHead.readText().trim()
-    }
-  } catch (e: Exception) {
-    println("WARN: Unable to get Git commit id : ${e.message}")
-    gitCommitId = ""
-  }
-  return gitCommitId
 }
 
 tasks {

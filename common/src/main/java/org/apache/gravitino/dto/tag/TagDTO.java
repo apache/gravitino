@@ -20,10 +20,13 @@ package org.apache.gravitino.dto.tag;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Objects;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagAssignment;
+import org.apache.gravitino.tag.TagValueConstraint;
 
 /** Represents a Tag Data Transfer Object (DTO). */
 public class TagDTO implements Tag {
@@ -36,6 +39,12 @@ public class TagDTO implements Tag {
 
   @JsonProperty("properties")
   private Map<String, String> properties;
+
+  @JsonProperty("allowedValues")
+  private String[] allowedValues;
+
+  @JsonProperty("assignmentValues")
+  private String[] assignmentValues;
 
   @JsonProperty("audit")
   private AuditDTO audit;
@@ -61,6 +70,28 @@ public class TagDTO implements Tag {
   }
 
   @Override
+  public TagValueConstraint valueConstraint() {
+    if (allowedValues == null) {
+      return TagValueConstraint.anyValue();
+    }
+    if (allowedValues.length == 0) {
+      return TagValueConstraint.noValue();
+    }
+    return TagValueConstraint.ofAllowedValues(allowedValues);
+  }
+
+  @Override
+  public Optional<TagAssignment> assignment() {
+    if (assignmentValues == null) {
+      return Optional.empty();
+    }
+    if (assignmentValues.length == 0) {
+      return Optional.of(TagAssignment.noValue());
+    }
+    return Optional.of(TagAssignment.ofValues(assignmentValues));
+  }
+
+  @Override
   public AuditDTO auditInfo() {
     return audit;
   }
@@ -83,12 +114,15 @@ public class TagDTO implements Tag {
     return Objects.equal(name, tagDTO.name)
         && Objects.equal(comment, tagDTO.comment)
         && Objects.equal(properties, tagDTO.properties)
+        && Arrays.equals(allowedValues, tagDTO.allowedValues)
         && Objects.equal(audit, tagDTO.audit);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(name, comment, properties, audit);
+    int result = Objects.hashCode(name, comment, properties, audit);
+    result = 31 * result + Arrays.hashCode(allowedValues);
+    return result;
   }
 
   /**
@@ -136,6 +170,28 @@ public class TagDTO implements Tag {
      */
     public Builder withProperties(Map<String, String> properties) {
       tagDTO.properties = properties;
+      return this;
+    }
+
+    /**
+     * Sets the allowed assignment values for the tag.
+     *
+     * @param allowedValues The allowed assignment values for the tag.
+     * @return The builder instance.
+     */
+    public Builder withAllowedValues(String[] allowedValues) {
+      tagDTO.allowedValues = allowedValues == null ? null : allowedValues.clone();
+      return this;
+    }
+
+    /**
+     * Sets the assignment values for the tag.
+     *
+     * @param assignmentValues The assignment values for the tag on a metadata object.
+     * @return The builder instance.
+     */
+    public Builder withAssignmentValues(String[] assignmentValues) {
+      tagDTO.assignmentValues = assignmentValues == null ? null : assignmentValues.clone();
       return this;
     }
 

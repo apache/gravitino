@@ -29,20 +29,19 @@ import org.apache.ibatis.annotations.UpdateProvider;
 public interface PolicyVersionMapper {
   String POLICY_VERSION_TABLE_NAME = "policy_version_info";
 
-  @InsertProvider(
-      type = PolicyVersionSQLProviderFactory.class,
-      method = "insertPolicyVersionOnDuplicateKeyUpdate")
-  void insertPolicyVersionOnDuplicateKeyUpdate(
-      @Param("policyVersion") PolicyVersionPO policyVersionPO);
-
   @InsertProvider(type = PolicyVersionSQLProviderFactory.class, method = "insertPolicyVersion")
   void insertPolicyVersion(@Param("policyVersion") PolicyVersionPO policyVersionPO);
 
+  /**
+   * Soft-deletes all active content snapshots for a policy.
+   *
+   * @param policyId The policy ID.
+   * @return The number of affected rows.
+   */
   @UpdateProvider(
       type = PolicyVersionSQLProviderFactory.class,
-      method = "softDeletePolicyVersionByMetalakeAndPolicyName")
-  Integer softDeletePolicyVersionByMetalakeAndPolicyName(
-      @Param("metalakeName") String metalakeName, @Param("policyName") String policyName);
+      method = "softDeletePolicyVersionsByPolicyId")
+  Integer softDeletePolicyVersionsByPolicyId(@Param("policyId") Long policyId);
 
   @UpdateProvider(
       type = PolicyVersionSQLProviderFactory.class,

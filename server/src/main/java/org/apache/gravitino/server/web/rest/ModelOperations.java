@@ -172,12 +172,17 @@ public class ModelOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       ModelRegisterRequest request) {
-    LOG.info(
-        "Received register model request: {}.{}.{}.{}",
-        metalake,
-        catalog,
-        schema,
-        request.getName());
+    if (request == null) {
+      LOG.warn("Received register model request with null request body");
+      return ExceptionHandlers.handleModelException(
+          OperationType.REGISTER,
+          "",
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String modelName = request.getName();
+    LOG.info("Received register model request: {}.{}.{}.{}", metalake, catalog, schema, modelName);
 
     try {
       return Utils.doAs(
@@ -194,8 +199,7 @@ public class ModelOperations {
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleModelException(
-          OperationType.REGISTER, request.getName(), schema, e);
+      return ExceptionHandlers.handleModelException(OperationType.REGISTER, modelName, schema, e);
     }
   }
 
@@ -262,52 +266,38 @@ public class ModelOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            // All versions are filtered in one call so the authorization state loaded for the
+            // request (user, roles, model id, owner) is resolved once instead of once per version.
             if (verbose) {
               ModelVersion[] modelVersions = modelDispatcher.listModelVersionInfos(modelId);
               modelVersions = modelVersions == null ? new ModelVersion[0] : modelVersions;
               modelVersions =
-                  Arrays.stream(modelVersions)
-                      .filter(
-                          modelVersion -> {
-                            NameIdentifier[] nameIdentifiers =
-                                new NameIdentifier[] {
-                                  NameIdentifierUtil.ofModelVersion(
-                                      metalake, catalog, schema, model, modelVersion.version())
-                                };
-                            return MetadataAuthzHelper.filterByExpression(
-                                        metalake,
-                                        AuthorizationExpressionConstants
-                                            .LOAD_MODEL_AUTHORIZATION_EXPRESSION,
-                                        Entity.EntityType.MODEL_VERSION,
-                                        nameIdentifiers)
-                                    .length
-                                > 0;
-                          })
-                      .toArray(ModelVersion[]::new);
+                  MetadataAuthzHelper.filterByExpression(
+                      metalake,
+                      AuthorizationExpressionConstants.LOAD_MODEL_AUTHORIZATION_EXPRESSION,
+                      Entity.EntityType.MODEL_VERSION,
+                      modelVersions,
+                      modelVersion ->
+                          NameIdentifierUtil.ofModelVersion(
+                              metalake, catalog, schema, model, modelVersion.version()));
               LOG.info("List {} versions of model {}", modelVersions.length, modelId);
               return Utils.ok(
                   new ModelVersionInfoListResponse(DTOConverters.toDTOs(modelVersions)));
             } else {
               int[] versions = modelDispatcher.listModelVersions(modelId);
               versions = versions == null ? new int[0] : versions;
+              Integer[] boxedVersions = Arrays.stream(versions).boxed().toArray(Integer[]::new);
               versions =
-                  Arrays.stream(versions)
-                      .filter(
-                          modelVersion -> {
-                            NameIdentifier[] nameIdentifiers =
-                                new NameIdentifier[] {
+                  Arrays.stream(
+                          MetadataAuthzHelper.filterByExpression(
+                              metalake,
+                              AuthorizationExpressionConstants.LOAD_MODEL_AUTHORIZATION_EXPRESSION,
+                              Entity.EntityType.MODEL_VERSION,
+                              boxedVersions,
+                              version ->
                                   NameIdentifierUtil.ofModelVersion(
-                                      metalake, catalog, schema, model, modelVersion)
-                                };
-                            return MetadataAuthzHelper.filterByExpression(
-                                        metalake,
-                                        AuthorizationExpressionConstants
-                                            .LOAD_MODEL_AUTHORIZATION_EXPRESSION,
-                                        Entity.EntityType.MODEL_VERSION,
-                                        nameIdentifiers)
-                                    .length
-                                > 0;
-                          })
+                                      metalake, catalog, schema, model, version)))
+                      .mapToInt(Integer::intValue)
                       .toArray();
               LOG.info("List {} versions of model {}", versions.length, modelId);
               return Utils.ok(new ModelVersionListResponse(versions));
@@ -419,6 +409,13 @@ public class ModelOperations {
       ModelVersionLinkRequest request) {
     LOG.info("Received link model version request: {}.{}.{}.{}", metalake, catalog, schema, model);
     NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, model);
+    if (request == null) {
+      return ExceptionHandlers.handleModelException(
+          OperationType.LINK,
+          model,
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
 
     try {
       return Utils.doAs(
@@ -573,6 +570,13 @@ public class ModelOperations {
         schema,
         model,
         version);
+    if (request == null) {
+      return ExceptionHandlers.handleModelException(
+          OperationType.ALTER,
+          versionString(model, version),
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
 
     try {
       NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, model);
@@ -627,6 +631,13 @@ public class ModelOperations {
         schema,
         model,
         alias);
+    if (request == null) {
+      return ExceptionHandlers.handleModelException(
+          OperationType.ALTER,
+          aliasString(model, alias),
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
 
     try {
       NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, model);
@@ -673,6 +684,14 @@ public class ModelOperations {
       @PathParam("model") @AuthorizationMetadata(type = Entity.EntityType.MODEL) String model,
       ModelUpdatesRequest request) {
     LOG.info("Received alter model request: {}.{}.{}.{}", metalake, catalog, schema, model);
+    if (request == null) {
+      return ExceptionHandlers.handleModelException(
+          OperationType.ALTER,
+          model,
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,

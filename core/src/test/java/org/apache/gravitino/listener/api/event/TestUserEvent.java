@@ -19,14 +19,21 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.PagedResult;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.bulk.BulkItemResult;
+import org.apache.gravitino.bulk.UserAdd;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
@@ -76,8 +83,6 @@ public class TestUserEvent {
     this.dispatcher = new AccessControlEventDispatcher(eventBus, mockUserDispatcher());
     this.failureDispatcher =
         new AccessControlEventDispatcher(eventBus, mockExceptionUserDispatcher());
-
-    System.out.println(failureDispatcher);
   }
 
   @Test
@@ -85,6 +90,7 @@ public class TestUserEvent {
     User mockUser = getMockUser("mock_user", ImmutableList.of("admin"));
     UserInfo info = new UserInfo(mockUser);
 
+    Assertions.assertEquals(1L, info.id());
     Assertions.assertEquals("mock_user", info.name());
     Assertions.assertEquals(ImmutableList.of("admin"), info.roles());
   }
@@ -257,6 +263,91 @@ public class TestUserEvent {
   }
 
   @Test
+  void testListUsersPagedPreEvent() {
+    dispatcher.listUsers(METALAKE, 0, 10);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(ListUsersPagedPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+    Assertions.assertEquals(OperationType.LIST_USERS_PAGED, preEvent.operationType());
+
+    ListUsersPagedPreEvent pagedPreEvent = (ListUsersPagedPreEvent) preEvent;
+    Assertions.assertEquals(NameIdentifier.of(METALAKE), pagedPreEvent.identifier());
+    Assertions.assertEquals(0, pagedPreEvent.offset());
+    Assertions.assertEquals(10, pagedPreEvent.limit());
+  }
+
+  @Test
+  void testListUsersPagedEvent() {
+    dispatcher.listUsers(METALAKE, 0, 10);
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(ListUsersPagedEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.LIST_USERS_PAGED, event.operationType());
+
+    ListUsersPagedEvent pagedEvent = (ListUsersPagedEvent) event;
+    Assertions.assertEquals(NameIdentifier.of(METALAKE), pagedEvent.identifier());
+    Assertions.assertEquals(0, pagedEvent.offset());
+    Assertions.assertEquals(10, pagedEvent.limit());
+    Assertions.assertEquals(2, pagedEvent.resultCount());
+    Assertions.assertEquals(2L, pagedEvent.totalCount());
+  }
+
+  @Test
+  void testListUsersPagedFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> failureDispatcher.listUsers(METALAKE, 1, 5));
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(ListUsersPagedFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    Assertions.assertEquals(OperationType.LIST_USERS_PAGED, event.operationType());
+
+    ListUsersPagedFailureEvent failureEvent = (ListUsersPagedFailureEvent) event;
+    Assertions.assertEquals(NameIdentifier.of(METALAKE), failureEvent.identifier());
+    Assertions.assertEquals(1, failureEvent.offset());
+    Assertions.assertEquals(5, failureEvent.limit());
+  }
+
+  @Test
+  void testCountUsersPreEvent() {
+    dispatcher.countUsers(METALAKE);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(CountUsersPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+    Assertions.assertEquals(OperationType.COUNT_USERS, preEvent.operationType());
+    Assertions.assertEquals(NameIdentifier.of(METALAKE), preEvent.identifier());
+  }
+
+  @Test
+  void testCountUsersEvent() {
+    dispatcher.countUsers(METALAKE);
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(CountUsersEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.COUNT_USERS, event.operationType());
+
+    CountUsersEvent countEvent = (CountUsersEvent) event;
+    Assertions.assertEquals(NameIdentifier.of(METALAKE), countEvent.identifier());
+    Assertions.assertEquals(2L, countEvent.count());
+  }
+
+  @Test
+  void testCountUsersFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> failureDispatcher.countUsers(INEXIST_METALAKE));
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(CountUsersFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    Assertions.assertEquals(OperationType.COUNT_USERS, event.operationType());
+    Assertions.assertEquals(NameIdentifier.of(INEXIST_METALAKE), event.identifier());
+  }
+
+  @Test
   void testListUserNamesPreEvent() {
     dispatcher.listUserNames(METALAKE);
 
@@ -393,6 +484,8 @@ public class TestUserEvent {
 
     GrantUserRolesEvent grantUserRolesEvent = (GrantUserRolesEvent) event;
     Assertions.assertEquals(identifier, grantUserRolesEvent.identifier());
+    Assertions.assertEquals(
+        String.join(",", grantedRoles), grantUserRolesEvent.customInfo().get("roleNames"));
     UserInfo userInfo = grantUserRolesEvent.grantUserInfo();
 
     validateUserInfo(userInfo, user);
@@ -416,6 +509,8 @@ public class TestUserEvent {
         grantUserRolesFailureEvent.identifier());
     Assertions.assertEquals(inExistUserName, grantUserRolesFailureEvent.userName());
     Assertions.assertEquals(grantedRoles, grantUserRolesFailureEvent.roles());
+    Assertions.assertEquals(
+        String.join(",", grantedRoles), grantUserRolesFailureEvent.customInfo().get("roleNames"));
   }
 
   @Test
@@ -447,6 +542,8 @@ public class TestUserEvent {
 
     RevokeUserRolesEvent revokeUserRolesEvent = (RevokeUserRolesEvent) event;
     Assertions.assertEquals(otherIdentifier, revokeUserRolesEvent.identifier());
+    Assertions.assertEquals(
+        String.join(",", revokedRoles), revokeUserRolesEvent.customInfo().get("roleNames"));
     UserInfo userInfo = revokeUserRolesEvent.revokedUserInfo();
 
     validateUserInfo(userInfo, otherUser);
@@ -470,17 +567,91 @@ public class TestUserEvent {
         revokeUserRolesFailureEvent.identifier());
     Assertions.assertEquals(inExistUserName, revokeUserRolesFailureEvent.userName());
     Assertions.assertEquals(revokedRoles, revokeUserRolesFailureEvent.roles());
+    Assertions.assertEquals(
+        String.join(",", revokedRoles), revokeUserRolesFailureEvent.customInfo().get("roleNames"));
+  }
+
+  @Test
+  void testBulkAddUsersDispatchesPerUserEvents() {
+    dummyEventListener.clear();
+
+    dispatcher.addUsers(METALAKE, Arrays.asList(new UserAdd(userName), new UserAdd(otherUserName)));
+
+    Assertions.assertEquals(2, dummyEventListener.getPreEvents().size());
+    PreEvent firstPreEvent = dummyEventListener.getPreEvents().get(0);
+    Assertions.assertEquals(AddUserPreEvent.class, firstPreEvent.getClass());
+    Assertions.assertEquals(identifier, firstPreEvent.identifier());
+    Assertions.assertEquals(userName, ((AddUserPreEvent) firstPreEvent).userName());
+    PreEvent secondPreEvent = dummyEventListener.getPreEvents().get(1);
+    Assertions.assertEquals(AddUserPreEvent.class, secondPreEvent.getClass());
+    Assertions.assertEquals(otherIdentifier, secondPreEvent.identifier());
+    Assertions.assertEquals(otherUserName, ((AddUserPreEvent) secondPreEvent).userName());
+
+    Assertions.assertEquals(2, dummyEventListener.getPostEvents().size());
+    Event firstEvent = dummyEventListener.getPostEvents().get(0);
+    Assertions.assertEquals(AddUserEvent.class, firstEvent.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, firstEvent.operationStatus());
+    validateUserInfo(((AddUserEvent) firstEvent).addedUserInfo(), user);
+    Event secondEvent = dummyEventListener.getPostEvents().get(1);
+    Assertions.assertEquals(AddUserFailureEvent.class, secondEvent.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, secondEvent.operationStatus());
+    Assertions.assertEquals(otherIdentifier, secondEvent.identifier());
+    Assertions.assertEquals(otherUserName, ((AddUserFailureEvent) secondEvent).userName());
+  }
+
+  @Test
+  void testBulkRemoveUsersDispatchesPerUserEvents() {
+    dummyEventListener.clear();
+
+    dispatcher.removeUsers(METALAKE, Arrays.asList(userName, inExistUserName), Optional.empty());
+
+    Assertions.assertEquals(2, dummyEventListener.getPreEvents().size());
+    PreEvent firstPreEvent = dummyEventListener.getPreEvents().get(0);
+    Assertions.assertEquals(RemoveUserPreEvent.class, firstPreEvent.getClass());
+    Assertions.assertEquals(identifier, firstPreEvent.identifier());
+    Assertions.assertEquals(userName, ((RemoveUserPreEvent) firstPreEvent).userName());
+    PreEvent secondPreEvent = dummyEventListener.getPreEvents().get(1);
+    Assertions.assertEquals(RemoveUserPreEvent.class, secondPreEvent.getClass());
+    Assertions.assertEquals(inExistIdentifier, secondPreEvent.identifier());
+    Assertions.assertEquals(inExistUserName, ((RemoveUserPreEvent) secondPreEvent).userName());
+
+    Assertions.assertEquals(2, dummyEventListener.getPostEvents().size());
+    Event firstEvent = dummyEventListener.getPostEvents().get(0);
+    Assertions.assertEquals(RemoveUserEvent.class, firstEvent.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, firstEvent.operationStatus());
+    Assertions.assertEquals(userName, ((RemoveUserEvent) firstEvent).removedUserName());
+    Assertions.assertTrue(((RemoveUserEvent) firstEvent).isExists());
+    Event secondEvent = dummyEventListener.getPostEvents().get(1);
+    Assertions.assertEquals(RemoveUserFailureEvent.class, secondEvent.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, secondEvent.operationStatus());
+    Assertions.assertEquals(inExistIdentifier, secondEvent.identifier());
+    Assertions.assertEquals(inExistUserName, ((RemoveUserFailureEvent) secondEvent).userName());
   }
 
   private AccessControlEventDispatcher mockUserDispatcher() {
     AccessControlEventDispatcher dispatcher = mock(AccessControlEventDispatcher.class);
     when(dispatcher.addUser(METALAKE, userName)).thenReturn(user);
     when(dispatcher.addUser(METALAKE, otherUserName)).thenReturn(otherUser);
+    when(dispatcher.addUsers(eq(METALAKE), any()))
+        .thenReturn(
+            Arrays.asList(
+                BulkItemResult.success(0, userName, user),
+                BulkItemResult.failure(
+                    1, otherUserName, new GravitinoRuntimeException("Failed to add user"))));
 
     when(dispatcher.removeUser(METALAKE, userName)).thenReturn(true);
     when(dispatcher.removeUser(METALAKE, inExistUserName)).thenReturn(false);
+    when(dispatcher.removeUsers(eq(METALAKE), any(), any()))
+        .thenReturn(
+            Arrays.asList(
+                BulkItemResult.success(0, userName),
+                BulkItemResult.failure(
+                    1, inExistUserName, new NoSuchUserException("user not found"))));
 
     when(dispatcher.listUsers(METALAKE)).thenReturn(new User[] {user, otherUser});
+    when(dispatcher.listUsers(eq(METALAKE), eq(0), eq(10)))
+        .thenReturn(new PagedResult<>(2, Arrays.asList(user, otherUser)));
+    when(dispatcher.countUsers(METALAKE)).thenReturn(2L);
     when(dispatcher.listUserNames(METALAKE)).thenReturn(new String[] {userName, otherUserName});
 
     when(dispatcher.getUser(METALAKE, userName)).thenReturn(user);
@@ -505,6 +676,7 @@ public class TestUserEvent {
 
   private User getMockUser(String name, List<String> roles) {
     User user = mock(User.class);
+    when(user.id()).thenReturn(1L);
     when(user.name()).thenReturn(name);
     when(user.roles()).thenReturn(roles);
 
@@ -512,6 +684,7 @@ public class TestUserEvent {
   }
 
   private void validateUserInfo(UserInfo userInfo, User expectedUser) {
+    Assertions.assertEquals(expectedUser.id(), userInfo.id());
     Assertions.assertEquals(userInfo.name(), expectedUser.name());
     Assertions.assertEquals(userInfo.roles(), expectedUser.roles());
   }

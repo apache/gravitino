@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.TagMetadataObjectRelBaseSQLProvider;
 import org.apache.gravitino.storage.relational.mapper.provider.postgresql.TagMetadataObjectRelPostgreSQLProvider;
@@ -58,6 +59,14 @@ public class TagMetadataObjectRelSQLProviderFactory {
     return getProvider().listTagPOsByMetadataObjectIdAndType(metadataObjectId, metadataObjectType);
   }
 
+  /** Returns the SQL for a batched tag assignment lookup. */
+  public static String listTagPOsByMetadataObjectIdsAndType(
+      @Param("metadataObjectIds") List<Long> metadataObjectIds,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return getProvider()
+        .listTagPOsByMetadataObjectIdsAndType(metadataObjectIds, metadataObjectType);
+  }
+
   public static String getTagPOsByMetadataObjectAndTagName(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType,
@@ -69,6 +78,29 @@ public class TagMetadataObjectRelSQLProviderFactory {
   public static String listTagMetadataObjectRelsByMetalakeAndTagName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName) {
     return getProvider().listTagMetadataObjectRelsByMetalakeAndTagName(metalakeName, tagName);
+  }
+
+  public static String listTagMetadataObjectRelsByMetalakeAndTagNameAndValue(
+      @Param("metalakeName") String metalakeName,
+      @Param("tagName") String tagName,
+      @Param("tagValue") String tagValue) {
+    return getProvider()
+        .listTagMetadataObjectRelsByMetalakeAndTagNameAndValue(metalakeName, tagName, tagValue);
+  }
+
+  /**
+   * Delegates a live assignment lookup by stable tag ID.
+   *
+   * @param metalakeName The metalake of the tag.
+   * @param tagId The stable tag ID.
+   * @param tagValue The value, or null to match every value.
+   * @return The lookup SQL.
+   */
+  public static String listTagMetadataObjectRelsByTagId(
+      @Param("metalakeName") String metalakeName,
+      @Param("tagId") Long tagId,
+      @Param("tagValue") @Nullable String tagValue) {
+    return getProvider().listTagMetadataObjectRelsByTagId(metalakeName, tagId, tagValue);
   }
 
   public static String batchInsertTagMetadataObjectRels(
@@ -85,9 +117,23 @@ public class TagMetadataObjectRelSQLProviderFactory {
             metadataObjectId, metadataObjectType, tagIds);
   }
 
+  public static String batchDeleteTagMetadataObjectRelsByTagIdsAndValuesAndMetadataObject(
+      @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType,
+      @Param("tagRels") List<TagMetadataObjectRelPO> tagRelPOs) {
+    return getProvider()
+        .batchDeleteTagMetadataObjectRelsByTagIdsAndValuesAndMetadataObject(
+            metadataObjectId, metadataObjectType, tagRelPOs);
+  }
+
   public static String softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName) {
     return getProvider().softDeleteTagMetadataObjectRelsByMetalakeAndTagName(metalakeName, tagName);
+  }
+
+  /** Delegates cleanup of metadata-object assignments by tag ID. */
+  public static String softDeleteTagMetadataObjectRelsByTagId(@Param("tagId") Long tagId) {
+    return getProvider().softDeleteTagMetadataObjectRelsByTagId(tagId);
   }
 
   public static String softDeleteTagMetadataObjectRelsByMetalakeId(
@@ -100,6 +146,13 @@ public class TagMetadataObjectRelSQLProviderFactory {
       @Param("metadataObjectType") String metadataObjectType) {
     return getProvider()
         .softDeleteTagMetadataObjectRelsByMetadataObject(metadataObjectId, metadataObjectType);
+  }
+
+  public static String softDeleteTagMetadataObjectRelsByMetadataObjects(
+      @Param("metadataObjectIds") List<Long> metadataObjectIds,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return getProvider()
+        .softDeleteTagMetadataObjectRelsByMetadataObjects(metadataObjectIds, metadataObjectType);
   }
 
   public static String softDeleteTagMetadataObjectRelsByCatalogId(

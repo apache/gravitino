@@ -19,6 +19,7 @@
 package org.apache.gravitino;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -29,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.junit.jupiter.api.Test;
 
 public class TestBasePropertiesMetadata extends BasePropertiesMetadata {
@@ -92,5 +94,15 @@ public class TestBasePropertiesMetadata extends BasePropertiesMetadata {
     IllegalArgumentException emptyException =
         assertThrows(IllegalArgumentException.class, () -> metadata.getPropertyEntry(""));
     assertTrue(emptyException.getMessage().contains("Property is not defined"));
+  }
+
+  @Test
+  public void testCredentialPropertyEntriesAreDeclaredForAllEntities() {
+    TestBasePropertiesMetadata metadata = new TestBasePropertiesMetadata();
+
+    assertTrue(metadata.containsProperty(CredentialConstants.CREDENTIAL_PROVIDERS));
+    assertTrue(metadata.containsProperty(CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS));
+    assertFalse(metadata.isHiddenProperty(CredentialConstants.CREDENTIAL_PROVIDERS));
+    assertFalse(metadata.isHiddenProperty(CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS));
   }
 }

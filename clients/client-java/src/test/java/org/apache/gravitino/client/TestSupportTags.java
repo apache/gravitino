@@ -30,33 +30,54 @@ import java.util.Locale;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.SchemaDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
+import org.apache.gravitino.dto.function.FunctionDTO;
+import org.apache.gravitino.dto.function.FunctionDefinitionDTO;
 import org.apache.gravitino.dto.messaging.TopicDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
+import org.apache.gravitino.dto.rel.SQLRepresentationDTO;
 import org.apache.gravitino.dto.rel.TableDTO;
+import org.apache.gravitino.dto.rel.ViewDTO;
+import org.apache.gravitino.dto.requests.TagValuesAssociateRequest;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.MetadataObjectTagListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
-import org.apache.gravitino.dto.responses.TagListResponse;
+import org.apache.gravitino.dto.responses.TagNameListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
+import org.apache.gravitino.dto.semantic.SemanticModelDTO;
+import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.function.Function;
+import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Dialects;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.semantic.Dataset;
+import org.apache.gravitino.semantic.SemanticModel;
+import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagList;
+import org.apache.gravitino.tag.TagValue;
+import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockserver.model.HttpRequest;
+import org.mockserver.verify.VerificationTimes;
 
 public class TestSupportTags extends TestBase {
 
@@ -77,6 +98,12 @@ public class TestSupportTags extends TestBase {
   private static Fileset genericFileset;
 
   private static Topic genericTopic;
+
+  private static View genericView;
+
+  private static Function genericFunction;
+
+  private static SemanticModel genericSemanticModel;
 
   @BeforeAll
   public static void setUp() throws Exception {
@@ -171,6 +198,114 @@ public class TestSupportTags extends TestBase {
                 .build(),
             client.restClient(),
             Namespace.of(METALAKE_NAME, "catalog1", "schema1"));
+
+    genericView =
+        new GenericView(
+            ViewDTO.builder()
+                .withName("view1")
+                .withComment("comment1")
+                .withColumns(new ColumnDTO[0])
+                .withRepresentations(
+                    new SQLRepresentationDTO[] {
+                      SQLRepresentationDTO.builder()
+                          .withDialect(Dialects.TRINO)
+                          .withSql("SELECT 1")
+                          .build()
+                    })
+                .withProperties(Collections.emptyMap())
+                .withAudit(AuditDTO.builder().withCreator("test").build())
+                .build(),
+            client.restClient(),
+            Namespace.of(METALAKE_NAME, "catalog1", "schema1"));
+
+    genericFunction =
+        new GenericFunction(
+            FunctionDTO.builder()
+                .withName("function1")
+                .withFunctionType(FunctionType.SCALAR)
+                .withComment("comment1")
+                .withDeterministic(true)
+                .withDefinitions(
+                    new FunctionDefinitionDTO[] {
+                      FunctionDefinitionDTO.builder().withReturnType(Types.StringType.get()).build()
+                    })
+                .withAudit(AuditDTO.builder().withCreator("test").build())
+                .build(),
+            client.restClient(),
+            Namespace.of(METALAKE_NAME, "catalog1", "schema1"));
+
+    genericSemanticModel =
+        new GenericSemanticModel(
+            SemanticModelDTO.builder()
+                .withName("semantic_model1")
+                .withDefinition(
+                    SemanticModelDefinitionDTO.fromDefinition(
+                        SemanticModelDefinition.builder()
+                            .withDatasets(
+                                new Dataset[] {
+                                  Dataset.builder()
+                                      .withName("orders")
+                                      .withSource(
+                                          NameIdentifier.of("catalog1", "schema1", "orders"))
+                                      .build()
+                                })
+                            .build()))
+                .withAudit(AuditDTO.builder().withCreator("test").build())
+                .build(),
+            client.restClient(),
+            Namespace.of(METALAKE_NAME, "catalog1", "schema1"));
+  }
+
+  /**
+   * Verifies Semantic Model tag name listing and error mapping.
+   *
+   * @throws JsonProcessingException if a mock response cannot be serialized
+   */
+  @Test
+  public void testListTagsForSemanticModel() throws JsonProcessingException {
+    testListTags(
+        genericSemanticModel.supportsTags(),
+        MetadataObjects.of(
+            "catalog1.schema1", genericSemanticModel.name(), MetadataObject.Type.SEMANTIC_MODEL));
+  }
+
+  /**
+   * Verifies Semantic Model detailed tag listing and error mapping.
+   *
+   * @throws JsonProcessingException if a mock response cannot be serialized
+   */
+  @Test
+  public void testListTagsInfoForSemanticModel() throws JsonProcessingException {
+    testListTagsInfo(
+        genericSemanticModel.supportsTags(),
+        MetadataObjects.of(
+            "catalog1.schema1", genericSemanticModel.name(), MetadataObject.Type.SEMANTIC_MODEL));
+  }
+
+  /**
+   * Verifies fetching a Semantic Model tag and mapping missing-tag errors.
+   *
+   * @throws JsonProcessingException if a mock response cannot be serialized
+   */
+  @Test
+  public void testGetTagForSemanticModel() throws JsonProcessingException {
+    testGetTag(
+        genericSemanticModel.supportsTags(),
+        MetadataObjects.of(
+            "catalog1.schema1", genericSemanticModel.name(), MetadataObject.Type.SEMANTIC_MODEL));
+  }
+
+  /**
+   * Verifies both Semantic Model tag association overloads, including value media types.
+   *
+   * @throws JsonProcessingException if a mock response cannot be serialized
+   */
+  @Test
+  public void testAssociateTagsForSemanticModel() throws JsonProcessingException {
+    testAssociateTags(
+        genericSemanticModel.supportsTags(),
+        MetadataObjects.of(
+            "catalog1.schema1", genericSemanticModel.name(), MetadataObject.Type.SEMANTIC_MODEL));
   }
 
   @Test
@@ -225,6 +360,21 @@ public class TestSupportTags extends TestBase {
   }
 
   @Test
+  public void testListTagsForView() throws JsonProcessingException {
+    testListTags(
+        genericView.supportsTags(),
+        MetadataObjects.of("catalog1.schema1", genericView.name(), MetadataObject.Type.VIEW));
+  }
+
+  @Test
+  public void testListTagsForFunction() throws JsonProcessingException {
+    testListTags(
+        genericFunction.supportsTags(),
+        MetadataObjects.of(
+            "catalog1.schema1", genericFunction.name(), MetadataObject.Type.FUNCTION));
+  }
+
+  @Test
   public void testListTagsInfoForCatalog() throws JsonProcessingException {
     testListTagsInfo(
         relationalCatalog.supportsTags(),
@@ -273,6 +423,21 @@ public class TestSupportTags extends TestBase {
     testListTagsInfo(
         genericTopic.supportsTags(),
         MetadataObjects.of("catalog1.schema1", genericTopic.name(), MetadataObject.Type.TOPIC));
+  }
+
+  @Test
+  public void testListTagsInfoForView() throws JsonProcessingException {
+    testListTagsInfo(
+        genericView.supportsTags(),
+        MetadataObjects.of("catalog1.schema1", genericView.name(), MetadataObject.Type.VIEW));
+  }
+
+  @Test
+  public void testListTagsInfoForFunction() throws JsonProcessingException {
+    testListTagsInfo(
+        genericFunction.supportsTags(),
+        MetadataObjects.of(
+            "catalog1.schema1", genericFunction.name(), MetadataObject.Type.FUNCTION));
   }
 
   @Test
@@ -327,6 +492,21 @@ public class TestSupportTags extends TestBase {
   }
 
   @Test
+  public void testGetTagForView() throws JsonProcessingException {
+    testGetTag(
+        genericView.supportsTags(),
+        MetadataObjects.of("catalog1.schema1", genericView.name(), MetadataObject.Type.VIEW));
+  }
+
+  @Test
+  public void testGetTagForFunction() throws JsonProcessingException {
+    testGetTag(
+        genericFunction.supportsTags(),
+        MetadataObjects.of(
+            "catalog1.schema1", genericFunction.name(), MetadataObject.Type.FUNCTION));
+  }
+
+  @Test
   public void testAssociateTagsForCatalog() throws JsonProcessingException {
     testAssociateTags(
         relationalCatalog.supportsTags(),
@@ -377,6 +557,21 @@ public class TestSupportTags extends TestBase {
         MetadataObjects.of("catalog1.schema1", genericTopic.name(), MetadataObject.Type.TOPIC));
   }
 
+  @Test
+  public void testAssociateTagsForView() throws JsonProcessingException {
+    testAssociateTags(
+        genericView.supportsTags(),
+        MetadataObjects.of("catalog1.schema1", genericView.name(), MetadataObject.Type.VIEW));
+  }
+
+  @Test
+  public void testAssociateTagsForFunction() throws JsonProcessingException {
+    testAssociateTags(
+        genericFunction.supportsTags(),
+        MetadataObjects.of(
+            "catalog1.schema1", genericFunction.name(), MetadataObject.Type.FUNCTION));
+  }
+
   private void testListTags(SupportsTags supportsTags, MetadataObject metadataObject)
       throws JsonProcessingException {
     String path =
@@ -389,14 +584,15 @@ public class TestSupportTags extends TestBase {
             + "/tags";
 
     String[] tags = new String[] {"tag1", "tag2"};
-    NameListResponse resp = new NameListResponse(tags);
+    TagNameListResponse resp = new TagNameListResponse(tags, true);
     buildMockResource(Method.GET, path, null, resp, SC_OK);
 
-    String[] actualTags = supportsTags.listTags();
-    Assertions.assertArrayEquals(tags, actualTags);
+    TagList<String> tagList = supportsTags.listTagsWithVisibility();
+    Assertions.assertArrayEquals(tags, tagList.tags());
+    Assertions.assertTrue(tagList.hasInaccessibleTags());
 
     // Return empty list
-    NameListResponse resp1 = new NameListResponse(new String[0]);
+    TagNameListResponse resp1 = new TagNameListResponse(new String[0], false);
     buildMockResource(Method.GET, path, null, resp1, SC_OK);
 
     String[] actualTags1 = supportsTags.listTags();
@@ -440,16 +636,18 @@ public class TestSupportTags extends TestBase {
             .withAudit(AuditDTO.builder().withCreator("test").build())
             .build();
     TagDTO[] tags = new TagDTO[] {tag1, tag2};
-    TagListResponse resp = new TagListResponse(tags);
+    MetadataObjectTagListResponse resp = new MetadataObjectTagListResponse(tags, true);
     buildMockResource(Method.GET, path, null, resp, SC_OK);
 
-    Tag[] actualTags = supportsTags.listTagsInfo();
+    TagList<Tag> tagList = supportsTags.listTagsInfoWithVisibility();
+    Tag[] actualTags = tagList.tags();
     Assertions.assertEquals(2, actualTags.length);
     Assertions.assertEquals("tag1", actualTags[0].name());
     Assertions.assertEquals("tag2", actualTags[1].name());
+    Assertions.assertTrue(tagList.hasInaccessibleTags());
 
     // Return empty list
-    TagListResponse resp1 = new TagListResponse(new TagDTO[0]);
+    MetadataObjectTagListResponse resp1 = new MetadataObjectTagListResponse(new TagDTO[0], false);
     buildMockResource(Method.GET, path, null, resp1, SC_OK);
 
     Tag[] actualTags1 = supportsTags.listTagsInfo();
@@ -532,6 +730,23 @@ public class TestSupportTags extends TestBase {
 
     String[] actualTags = supportsTags.associateTags(tagsToAdd, tagsToRemove);
     Assertions.assertArrayEquals(tagsToAdd, actualTags);
+
+    TagValue[] tagValuesToAdd =
+        new TagValue[] {TagValue.noValue("tag1"), TagValue.of("tag2", "finance")};
+    TagValue[] tagValuesToRemove = new TagValue[] {TagValue.of("tag3", "risk")};
+    TagValuesAssociateRequest valueRequest =
+        new TagValuesAssociateRequest(tagValuesToAdd, tagValuesToRemove);
+    buildMockResource(Method.POST, path, valueRequest, resp, SC_OK);
+
+    String[] actualValueTags = supportsTags.associateTags(tagValuesToAdd, tagValuesToRemove);
+    Assertions.assertArrayEquals(tagsToAdd, actualValueTags);
+    mockServer.verify(
+        HttpRequest.request(path)
+            .withMethod(Method.POST.name())
+            .withHeader(HttpHeaders.ACCEPT, "application/vnd.gravitino.v2+json")
+            .withHeader(HttpHeaders.CONTENT_TYPE, "application/vnd.gravitino.v2+json")
+            .withBody(MAPPER.writeValueAsString(valueRequest)),
+        VerificationTimes.once());
 
     // Test throw internal error
     ErrorResponse errorResp1 = ErrorResponse.internalError("mock error");

@@ -34,6 +34,18 @@ from gravitino.api.job.job_template_change import (
 from gravitino.api.job.shell_job_template import ShellJobTemplate
 from gravitino.api.job.spark_job_template import SparkJobTemplate
 from gravitino.api.metalake_change import MetalakeChange
+from gravitino.api.policy.policy_change import PolicyChange
+from gravitino.api.policy.policy_content import (
+    AccessControlContent,
+    ColumnMaskContent,
+    IcebergDataCompactionContent,
+    IcebergOrphanFileRemovalContent,
+    IcebergRewriteManifestsContent,
+    IcebergSnapshotExpirationContent,
+    PolicyContent,
+    RowFilterContent,
+)
+from gravitino.api.policy.policy_contents import PolicyContents
 from gravitino.api.tag.tag_change import TagChange
 from gravitino.client.fileset_catalog import FilesetCatalog
 from gravitino.client.generic_model_catalog import GenericModelCatalog
@@ -47,6 +59,17 @@ from gravitino.dto.job.shell_template_update_dto import ShellTemplateUpdateDTO
 from gravitino.dto.job.spark_job_template_dto import SparkJobTemplateDTO
 from gravitino.dto.job.spark_template_update_dto import SparkTemplateUpdateDTO
 from gravitino.dto.job.template_update_dto import TemplateUpdateDTO
+from gravitino.dto.policy_dto import (
+    AccessControlContentDTO,
+    ColumnMaskContentDTO,
+    CustomContentDTO,
+    IcebergCompactionContentDTO,
+    IcebergOrphanFileRemovalContentDTO,
+    IcebergRewriteManifestsContentDTO,
+    IcebergSnapshotExpirationContentDTO,
+    PolicyContentDTO,
+    RowFilterContentDTO,
+)
 from gravitino.dto.requests.catalog_update_request import CatalogUpdateRequest
 from gravitino.dto.requests.job_template_update_request import (
     JobTemplateUpdateRequest,
@@ -55,6 +78,10 @@ from gravitino.dto.requests.job_template_update_request import (
     UpdateJobTemplateContentRequest,
 )
 from gravitino.dto.requests.metalake_update_request import MetalakeUpdateRequest
+from gravitino.dto.requests.policy_update_request import (
+    PolicyUpdateRequest,
+    PolicyUpdateRequestBase,
+)
 from gravitino.dto.requests.tag_update_request import (
     TagUpdateRequest,
     TagUpdateRequestBase,
@@ -144,6 +171,16 @@ class DTOConverters:
         if isinstance(change, CatalogChange.RemoveProperty):
             return CatalogUpdateRequest.RemoveCatalogPropertyRequest(
                 change.get_property()
+            )
+        if isinstance(change, CatalogChange.SetSecretBinding):
+            binding = change.binding()
+            return CatalogUpdateRequest.SetCatalogSecretBindingRequest(
+                change.property(), binding.provider, binding.plaintext
+            )
+        if isinstance(change, CatalogChange.SetSecretReference):
+            reference = change.reference()
+            return CatalogUpdateRequest.SetCatalogSecretReferenceRequest(
+                change.property(), reference.provider, reference.attributes
             )
 
         raise ValueError(f"Unknown change type: {type(change).__name__}")
@@ -329,6 +366,146 @@ class DTOConverters:
             return TagUpdateRequest.RemoveTagPropertyRequest(change.removed_property)
 
         raise IllegalArgumentException(f"Unknown change type: {type(change)}")
+
+    @staticmethod
+    def to_policy_update_request(
+        change: PolicyChange,
+    ) -> PolicyUpdateRequestBase:
+        """
+        Converts a PolicyChange to a PolicyUpdateRequestBase.
+
+        Args:
+            change (PolicyChange): the PolicyChange to convert.
+
+        Raises:
+            IllegalArgumentException: if the change is not a valid PolicyChange.
+
+        Returns:
+            PolicyUpdateRequestBase: the PolicyUpdateRequestBase corresponding
+                to the change.
+        """
+        if isinstance(change, PolicyChange.RenamePolicy):
+            return PolicyUpdateRequest.RenamePolicyRequest(change.new_name)
+
+        if isinstance(change, PolicyChange.UpdatePolicyComment):
+            return PolicyUpdateRequest.UpdatePolicyCommentRequest(change.new_comment)
+
+        if isinstance(change, PolicyChange.UpdateContent):
+            return PolicyUpdateRequest.UpdatePolicyContentRequest(
+                change.policy_type,
+                DTOConverters.to_policy_content_dto(change.content),
+            )
+
+        raise IllegalArgumentException(f"Unknown change type: {type(change)}")
+
+    @staticmethod
+    def to_policy_content_dto(content: PolicyContent) -> PolicyContentDTO:
+        """
+        Converts a domain PolicyContent to its PolicyContentDTO form.
+
+        Args:
+            content (PolicyContent): the policy content to convert.
+
+        Raises:
+            IllegalArgumentException: if the content type is not supported.
+
+        Returns:
+            PolicyContentDTO: the DTO corresponding to the content.
+        """
+        if isinstance(content, PolicyContents.CustomContent):
+            return CustomContentDTO(
+                _custom_rules=content.rules(),
+                _properties=content.properties(),
+                _supported_object_types=content.supported_object_types(),
+            )
+
+        if isinstance(content, IcebergDataCompactionContent):
+            spec = content.execution_spec()
+            return IcebergCompactionContentDTO(
+                _min_data_file_mse=content.min_data_file_mse(),
+                _min_delete_file_number=content.min_delete_file_number(),
+                _data_file_mse_weight=content.data_file_mse_weight(),
+                _delete_file_number_weight=content.delete_file_number_weight(),
+                _max_partition_num=content.max_partition_num(),
+                _rewrite_strategy=content.rewrite_strategy(),
+                _sort_order=content.sort_order(),
+                _rewrite_options=content.rewrite_options(),
+                _time_trigger=spec.time_trigger(),
+                _commit_trigger=spec.commit_trigger(),
+                _min_interval_ms=spec.min_interval_ms(),
+                _job_options=spec.job_options(),
+                _updater_options=spec.updater_options(),
+            )
+
+        if isinstance(content, IcebergOrphanFileRemovalContent):
+            spec = content.execution_spec()
+            return IcebergOrphanFileRemovalContentDTO(
+                _older_than_days=content.older_than_days(),
+                _location=content.location(),
+                _dry_run=content.dry_run(),
+                _time_trigger=spec.time_trigger(),
+                _commit_trigger=spec.commit_trigger(),
+                _min_interval_ms=spec.min_interval_ms(),
+                _job_options=spec.job_options(),
+                _updater_options=spec.updater_options(),
+            )
+
+        if isinstance(content, IcebergRewriteManifestsContent):
+            spec = content.execution_spec()
+            return IcebergRewriteManifestsContentDTO(
+                _manifest_count_critical=content.manifest_count_critical(),
+                _manifest_count_warning=content.manifest_count_warning(),
+                _avg_manifest_size_threshold_bytes=(
+                    content.avg_manifest_size_threshold_bytes()
+                ),
+                _spec_id=content.spec_id(),
+                _use_caching=content.use_caching(),
+                _time_trigger=spec.time_trigger(),
+                _commit_trigger=spec.commit_trigger(),
+                _min_interval_ms=spec.min_interval_ms(),
+                _job_options=spec.job_options(),
+                _updater_options=spec.updater_options(),
+            )
+
+        if isinstance(content, IcebergSnapshotExpirationContent):
+            spec = content.execution_spec()
+            return IcebergSnapshotExpirationContentDTO(
+                _older_than_days=content.older_than_days(),
+                _retain_last=content.retain_last(),
+                _stream_results=content.stream_results(),
+                _time_trigger=spec.time_trigger(),
+                _commit_trigger=spec.commit_trigger(),
+                _min_interval_ms=spec.min_interval_ms(),
+                _job_options=spec.job_options(),
+                _updater_options=spec.updater_options(),
+            )
+
+        if isinstance(content, RowFilterContent):
+            return RowFilterContentDTO(_expression=content.expression())
+
+        if isinstance(content, ColumnMaskContent):
+            return ColumnMaskContentDTO(_expression=content.expression())
+
+        if isinstance(content, AccessControlContent):
+            return AccessControlContentDTO(
+                _privileges=content.privileges(),
+                _applicable_roles=content.applicable_roles(),
+            )
+
+        raise IllegalArgumentException(f"Unknown policy content type: {type(content)}")
+
+    @staticmethod
+    def from_policy_content_dto(dto: PolicyContentDTO) -> PolicyContent:
+        """
+        Converts a PolicyContentDTO to its domain PolicyContent form.
+
+        Args:
+            dto (PolicyContentDTO): the policy content DTO to convert.
+
+        Returns:
+            PolicyContent: the domain content corresponding to the DTO.
+        """
+        return dto.to_domain_content()
 
     @staticmethod
     def to_privilege_dto(privilege: Privilege) -> PrivilegeDTO:

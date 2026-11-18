@@ -36,7 +36,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.vector.Float4Vector;
+import org.apache.arrow.vector.IntVector;
+import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -45,7 +51,11 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.spark.connector.plugin.restcatalog.GravitinoLakehouseRESTDiscoveryPlugin;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.Row;
@@ -53,30 +63,47 @@ import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.lance.Dataset;
+import org.lance.Fragment;
+import org.lance.FragmentMetadata;
+import org.lance.WriteParams;
+import org.lance.operation.Append;
 
 public class LanceSparkRESTServiceIT extends BaseIT {
 
-  private static final String LANCE_SPARK_CATALOG = "lance";
   private static final String LANCE_SPARK_CATALOG_CLASS =
       "org.lance.spark.LanceNamespaceSparkCatalog";
+  private static final String LANCE_SPARK_EXTENSIONS =
+      "org.lance.spark.extensions.LanceSparkSessionExtensions";
   private static final String LANCE_SPARK_BUNDLE_JAR_PATH_PROPERTY =
       "gravitino.lance.spark.bundle.jar";
   private static final String JAVA_MODULE_OPEN_OPTIONS =
       "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED";
   private static final String CATALOG_NAME = GravitinoITUtils.genRandomName("lance_spark_catalog");
+  private static final String HISTORY_CATALOG_NAME =
+      GravitinoITUtils.genRandomName("lance_history_catalog");
   private static final String TABLE_COLUMNS = "(id INT, score FLOAT)";
+  // lance-spark bundles that write at their own Lance's default file format version instead of
+  // the target dataset's, so they cannot write to a dataset Gravitino created. See
+  // testSparkWritesToGravitinoCreatedTable.
+  private static final Set<String> BUNDLES_IGNORING_DATASET_FORMAT_VERSION = Set.of("0.2.0");
+  private static final Pattern BUNDLE_VERSION_PATTERN =
+      Pattern.compile("lance-spark-bundle-[^/]*?-(\\d+\\.\\d+\\.\\d+(?:-[\\w.]+)?)\\.jar$");
   private static final String LANCE_CLASS_PREFIX = "org.lance.";
   private static final String LANCE_NATIVE_LOADER_CLASS_PREFIX = "io.questdb.jar.jni.";
   private static final String LANCE_NATIVE_RESOURCE_PREFIX = "nativelib/";
 
   private final Set<String> createdSchemas = new LinkedHashSet<>();
+  private final Set<String> createdHistorySchemas = new LinkedHashSet<>();
 
   private SparkSession sparkSession;
   private URLClassLoader sparkClientClassLoader;
   private GravitinoMetalake metalake;
   private Catalog catalog;
+  private Catalog historyCatalog;
   private Path tempDir;
 
   @Override
@@ -88,6 +115,7 @@ public class LanceSparkRESTServiceIT extends BaseIT {
     this.metalake = createMetalake(getLanceRESTServerMetalakeName());
     this.tempDir = Files.createTempDirectory("lance_spark_rest_service_it_");
     this.catalog = createCatalog(CATALOG_NAME);
+    this.historyCatalog = createCatalog(HISTORY_CATALOG_NAME, true);
     this.sparkSession = createSparkSession();
   }
 
@@ -140,6 +168,27 @@ public class LanceSparkRESTServiceIT extends BaseIT {
       dropSchema(schemaName);
     }
     createdSchemas.clear();
+
+    for (String schemaName : createdHistorySchemas) {
+      dropSchema(HISTORY_CATALOG_NAME, schemaName, historyCatalog);
+    }
+    createdHistorySchemas.clear();
+  }
+
+  @Test
+  public void testCatalogRegisteredByDiscoveryPlugin() {
+    SparkConf sparkConf = sparkSession.sparkContext().getConf();
+
+    Assertions.assertEquals(
+        LANCE_SPARK_CATALOG_CLASS, sparkConf.get("spark.sql.catalog." + CATALOG_NAME));
+    Assertions.assertEquals("rest", sparkConf.get("spark.sql.catalog." + CATALOG_NAME + ".impl"));
+    Assertions.assertEquals(
+        getLanceRestServiceUrl(), sparkConf.get("spark.sql.catalog." + CATALOG_NAME + ".uri"));
+    Assertions.assertEquals(
+        CATALOG_NAME, sparkConf.get("spark.sql.catalog." + CATALOG_NAME + ".parent"));
+    Assertions.assertTrue(
+        Arrays.asList(sparkConf.get("spark.sql.extensions").split(","))
+            .contains(LANCE_SPARK_EXTENSIONS));
   }
 
   @Test
@@ -210,6 +259,45 @@ public class LanceSparkRESTServiceIT extends BaseIT {
   }
 
   @Test
+  public void testReadHistoricalVersionViaSpark() {
+    String schemaName = createHistorySchema("spark_history_read");
+    String tableName = newTableName("orders");
+    String tableIdentifier = String.format("%s.%s.%s", HISTORY_CATALOG_NAME, schemaName, tableName);
+
+    sql(
+        "CREATE TABLE %s (id INT, score FLOAT) USING lance TBLPROPERTIES ('format'='lance')",
+        tableIdentifier);
+    sql(
+        "INSERT INTO %s VALUES " + "(1, CAST(1.1 AS FLOAT)), " + "(2, CAST(2.2 AS FLOAT))",
+        tableIdentifier);
+    long firstVersion = loadLanceVersion(historyCatalog, schemaName, tableName);
+
+    sql(
+        "INSERT INTO %s VALUES " + "(3, CAST(3.3 AS FLOAT)), " + "(4, CAST(4.4 AS FLOAT))",
+        tableIdentifier);
+    long latestVersion = loadLanceVersion(historyCatalog, schemaName, tableName);
+
+    Assertions.assertTrue(
+        latestVersion > firstVersion,
+        String.format(
+            "Expected the second Spark write to advance the Lance version, but got %d then %d",
+            firstVersion, latestVersion));
+
+    List<Row> latestRows = sql("SELECT id, score FROM %s ORDER BY id", tableIdentifier);
+    Assertions.assertEquals(4, latestRows.size());
+    assertRow(latestRows.get(0), 1, 1.1f);
+    assertRow(latestRows.get(1), 2, 2.2f);
+    assertRow(latestRows.get(2), 3, 3.3f);
+    assertRow(latestRows.get(3), 4, 4.4f);
+
+    List<Row> historicalRows =
+        sql("SELECT id, score FROM %s VERSION AS OF %d ORDER BY id", tableIdentifier, firstVersion);
+    Assertions.assertEquals(2, historicalRows.size());
+    assertRow(historicalRows.get(0), 1, 1.1f);
+    assertRow(historicalRows.get(1), 2, 2.2f);
+  }
+
+  @Test
   public void testSelectFromEmptyTableViaSpark() {
     String schemaName = createSchema("spark_empty_tbl");
     String tableName = newTableName("orders");
@@ -218,6 +306,71 @@ public class LanceSparkRESTServiceIT extends BaseIT {
 
     List<Row> rows = sql("SELECT id, score FROM %s.%s ORDER BY id", schemaName, tableName);
     Assertions.assertTrue(rows.isEmpty(), "Expected no rows for a newly created empty table");
+  }
+
+  @Test
+  public void testSparkReadsTableCreatedThroughGravitino() {
+    String schemaName = createSchema("spark_gravitino_created");
+    String tableName = newTableName("orders");
+    String location = createTableThroughGravitinoApi(schemaName, tableName);
+
+    // Anchor the matrix to the lance-core this build embeds: a dataset created with no blob
+    // column keeps lance-core's own default file format version, which is 2.2 as of 12.0.0 and
+    // was 2.1 on the 6.0.0 this release upgrades from. Without this assertion nothing in the
+    // test would notice a downgrade of the server's Lance.
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Assertions.assertEquals("2.2", dataset.getLanceFileFormatVersion());
+    }
+
+    // First the manifest on its own: a freshly created dataset holds no data files, so this only
+    // proves the bundle can open a manifest written by lance-core 12.0.0.
+    Assertions.assertTrue(
+        sql("SELECT id, score FROM %s.%s", schemaName, tableName).isEmpty(),
+        "Expected no rows in a freshly created Lance dataset");
+
+    // Then the data files. Gravitino's API never writes rows, so seed them here with the same
+    // lance-core the server runs - 12.0.0, at file format version 2.2 - and read them back
+    // through the bundle. Without this the SELECT above would be the only read in the test and
+    // the matrix would never decode a byte written by the new writer. Every bundle in the matrix
+    // reaches this point, including the ones that cannot write such a dataset.
+    appendRowsWithServerLance(location);
+
+    List<Row> seededRows = sql("SELECT id, score FROM %s.%s ORDER BY id", schemaName, tableName);
+    Assertions.assertEquals(2, seededRows.size());
+    assertRow(seededRows.get(0), 1, 1.5f);
+    assertRow(seededRows.get(1), 2, 2.5f);
+  }
+
+  @Test
+  public void testSparkWritesToGravitinoCreatedTable() {
+    // Writing into a Gravitino-created dataset is where the bundles differ. lance-spark 0.2.0
+    // passes no data storage version to Lance, so every write goes out at its own lance-core's
+    // default - 2.0 for lance-core 2.0.0 - whatever the dataset says, and the commit is refused:
+    // "All data files must have the same version.  Detected both 2.2 and 2.0" once the dataset
+    // holds rows, or "The operation added files with version 2.0.  However, the data storage
+    // version is 2.2." while it is still empty. This is not a change in this release: the
+    // previous lance-core 6.0.0 pinned the same datasets at 2.1 and refused the same write.
+    // lance-spark 0.4.0 reads the dataset's version first (LanceDataset#newWriteBuilder) and is
+    // unaffected, which is why only 0.2.0 is listed below.
+    Assumptions.assumeFalse(
+        BUNDLES_IGNORING_DATASET_FORMAT_VERSION.contains(lanceSparkBundleVersion()),
+        "lance-spark "
+            + lanceSparkBundleVersion()
+            + " writes at its own Lance's default file format version instead of the dataset's, "
+            + "so it cannot write to a dataset created through the Gravitino table API");
+
+    String schemaName = createSchema("spark_gravitino_created_write");
+    String tableName = newTableName("orders");
+    String location = createTableThroughGravitinoApi(schemaName, tableName);
+    appendRowsWithServerLance(location);
+
+    sql("INSERT INTO %s.%s VALUES (3, CAST(3.5 AS FLOAT))", schemaName, tableName);
+
+    List<Row> rows = sql("SELECT id, score FROM %s.%s ORDER BY id", schemaName, tableName);
+    Assertions.assertEquals(3, rows.size());
+    assertRow(rows.get(0), 1, 1.5f);
+    assertRow(rows.get(1), 2, 2.5f);
+    assertRow(rows.get(2), 3, 3.5f);
   }
 
   @Test
@@ -299,8 +452,8 @@ public class LanceSparkRESTServiceIT extends BaseIT {
     RuntimeException exception =
         Assertions.assertThrows(
             RuntimeException.class, () -> createLanceTable(nonExistentSchemaName, tableName));
-    assertFailureContainsAll(
-        exception, "NoSuchSchemaException", nonExistentSchemaName, "does not exist");
+    assertFailureContainsAll(exception, nonExistentSchemaName, "does not exist");
+    assertFailureContainsAny(exception, "NoSuchSchemaException", "Namespace not found");
     Assertions.assertFalse(catalog.asSchemas().schemaExists(nonExistentSchemaName));
   }
 
@@ -361,12 +514,21 @@ public class LanceSparkRESTServiceIT extends BaseIT {
   }
 
   private Catalog createCatalog(String catalogName) {
+    return createCatalog(catalogName, false);
+  }
+
+  private Catalog createCatalog(String catalogName, boolean versionCheck) {
+    ImmutableMap.Builder<String, String> properties =
+        ImmutableMap.<String, String>builder().put(Catalog.PROPERTY_LOCATION, tempDir.toString());
+    if (versionCheck) {
+      properties.put(LanceConstants.LANCE_SCHEMA_REFRESH_MODE, "VERSION_CHECK");
+    }
     return metalake.createCatalog(
         catalogName,
         Catalog.Type.RELATIONAL,
         "lakehouse-generic",
         "catalog for lance spark rest service tests",
-        ImmutableMap.of(Catalog.PROPERTY_LOCATION, tempDir.toString()));
+        properties.build());
   }
 
   private SparkSession createSparkSession() {
@@ -385,11 +547,9 @@ public class LanceSparkRESTServiceIT extends BaseIT {
             .set("spark.jars", bundleJarPath)
             .set("spark.driver.extraClassPath", bundleJarPath)
             .set("spark.executor.extraClassPath", bundleJarPath)
-            .set("spark.sql.catalog." + LANCE_SPARK_CATALOG, LANCE_SPARK_CATALOG_CLASS)
-            .set("spark.sql.catalog." + LANCE_SPARK_CATALOG + ".impl", "rest")
-            .set("spark.sql.catalog." + LANCE_SPARK_CATALOG + ".uri", getLanceRestServiceUrl())
-            .set("spark.sql.catalog." + LANCE_SPARK_CATALOG + ".parent", CATALOG_NAME)
-            .set("spark.sql.defaultCatalog", LANCE_SPARK_CATALOG)
+            .set("spark.plugins", GravitinoLakehouseRESTDiscoveryPlugin.class.getName())
+            .set("spark.sql.gravitino.lanceREST.uri", getLanceRestServiceUrl())
+            .set("spark.sql.defaultCatalog", CATALOG_NAME)
             .set("spark.driver.extraJavaOptions", JAVA_MODULE_OPEN_OPTIONS)
             .set("spark.executor.extraJavaOptions", JAVA_MODULE_OPEN_OPTIONS)
             .set("spark.ui.enabled", "false");
@@ -471,10 +631,53 @@ public class LanceSparkRESTServiceIT extends BaseIT {
     }
   }
 
+  /** Returns the lance-spark bundle version this run is testing against, from its jar name. */
+  private static String lanceSparkBundleVersion() {
+    String jarPath = System.getProperty(LANCE_SPARK_BUNDLE_JAR_PATH_PROPERTY, "");
+    Matcher matcher = BUNDLE_VERSION_PATTERN.matcher(jarPath);
+    return matcher.find() ? matcher.group(1) : "";
+  }
+
+  /**
+   * Creates a table through Gravitino's own table API and returns its dataset location. Of the
+   * paths that reach {@code LanceTableOperations#createDataset}, this is the only one a Spark
+   * bundle can be pointed at afterwards: Spark's own CREATE TABLE goes through `declare`, where
+   * Gravitino writes no dataset at all and the bundle creates it at its own file format version.
+   */
+  private String createTableThroughGravitinoApi(String schemaName, String tableName) {
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(schemaName, tableName),
+            new Column[] {
+              Column.of("id", Types.IntegerType.get()), Column.of("score", Types.FloatType.get())
+            },
+            "created through the Gravitino API",
+            // Deliberately no LANCE_TABLE_DECLARED: that is the `declare` path, where Gravitino
+            // writes no dataset and the point of these tests is lost.
+            ImmutableMap.of("format", "lance"),
+            Transforms.EMPTY_TRANSFORM,
+            null,
+            null);
+
+    Table createdTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+    String location = createdTable.properties().get(Table.PROPERTY_LOCATION);
+    Assertions.assertNotNull(location, "Expected Gravitino to persist a table location");
+    return location;
+  }
+
   private String createSchema(String schemaNamePrefix) {
     String schemaName = newSchemaName(schemaNamePrefix);
     sql("CREATE DATABASE %s", schemaName);
     createdSchemas.add(schemaName);
+    return schemaName;
+  }
+
+  private String createHistorySchema(String schemaNamePrefix) {
+    String schemaName = newSchemaName(schemaNamePrefix);
+    sql("CREATE DATABASE %s.%s", HISTORY_CATALOG_NAME, schemaName);
+    createdHistorySchemas.add(schemaName);
     return schemaName;
   }
 
@@ -485,26 +688,74 @@ public class LanceSparkRESTServiceIT extends BaseIT {
   }
 
   private void dropSchema(String schemaName) {
+    dropSchema(CATALOG_NAME, schemaName, catalog);
+  }
+
+  private void dropSchema(String sparkCatalogName, String schemaName, Catalog sourceCatalog) {
     if (sparkSession != null) {
       try {
-        sql("DROP DATABASE IF EXISTS %s CASCADE", schemaName);
+        sql("DROP DATABASE IF EXISTS %s.%s CASCADE", sparkCatalogName, schemaName);
         return;
       } catch (RuntimeException e) {
-        if (catalog == null) {
+        if (sourceCatalog == null) {
           throw e;
         }
       }
     }
 
-    if (catalog != null && catalog.asSchemas().schemaExists(schemaName)) {
-      catalog.asSchemas().dropSchema(schemaName, true);
+    if (sourceCatalog != null && sourceCatalog.asSchemas().schemaExists(schemaName)) {
+      sourceCatalog.asSchemas().dropSchema(schemaName, true);
     }
   }
 
   private List<String> listNamespaces() {
-    return sql("SHOW NAMESPACES IN %s", LANCE_SPARK_CATALOG).stream()
+    return sql("SHOW NAMESPACES IN %s", CATALOG_NAME).stream()
         .map(row -> row.getString(0))
         .collect(Collectors.toList());
+  }
+
+  /**
+   * Appends two rows to {@code tableLocation} with the test JVM's lance-core, which is the version
+   * the Gravitino server itself writes with. The bundle's Lance lives in a child-first class
+   * loader, so these rows are written by 12.0.0 and read back by whatever Lance the bundle ships.
+   */
+  private void appendRowsWithServerLance(String tableLocation) {
+    Assertions.assertNotNull(tableLocation, "Expected Gravitino to persist a table location");
+
+    try (RootAllocator allocator = new RootAllocator();
+        Dataset dataset = Dataset.open().uri(tableLocation).build()) {
+      List<FragmentMetadata> fragments;
+      try (VectorSchemaRoot root = VectorSchemaRoot.create(dataset.getSchema(), allocator)) {
+        root.allocateNew();
+        IntVector ids = (IntVector) root.getVector("id");
+        Float4Vector scores = (Float4Vector) root.getVector("score");
+        ids.setSafe(0, 1);
+        scores.setSafe(0, 1.5f);
+        ids.setSafe(1, 2);
+        scores.setSafe(1, 2.5f);
+        root.setRowCount(2);
+
+        // No data storage version on the write params: the point is to write exactly what
+        // lance-core 12.0.0 writes by default.
+        fragments =
+            Fragment.write()
+                .datasetUri(tableLocation)
+                .allocator(allocator)
+                .data(root)
+                .writeParams(new WriteParams.Builder().build())
+                .execute();
+      }
+
+      try (Dataset ignored =
+          dataset
+              .newTransactionBuilder()
+              .operation(Append.builder().fragments(fragments).build())
+              .transactionProperties(Map.of())
+              .build()
+              .commit()) {
+        // The dataset handle returned by the commit is closed once the rows are durable.
+      }
+    }
   }
 
   private String newSchemaName(String prefix) {
@@ -513,6 +764,17 @@ public class LanceSparkRESTServiceIT extends BaseIT {
 
   private String newTableName(String prefix) {
     return GravitinoITUtils.genRandomName(prefix);
+  }
+
+  private long loadLanceVersion(Catalog sourceCatalog, String schemaName, String tableName) {
+    Table table =
+        sourceCatalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+    String version = table.properties().get(LanceConstants.LANCE_TABLE_VERSION);
+    Assertions.assertNotNull(
+        version,
+        String.format(
+            "Expected Gravitino to refresh the Lance version for %s.%s", schemaName, tableName));
+    return Long.parseLong(version);
   }
 
   private void assertTableLocationAndFormat(Table table, String schemaName, String tableName) {

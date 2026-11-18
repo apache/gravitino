@@ -26,6 +26,7 @@ import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyEvaluation;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyHandlerContext;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
+import org.apache.gravitino.maintenance.optimizer.recommender.job.GravitinoCompactionJobAdapter;
 import org.apache.gravitino.maintenance.optimizer.recommender.strategy.GravitinoStrategy;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
@@ -89,6 +90,60 @@ class TestGravitinoPolicyCompactionStrategy {
     Assertions.assertEquals(
         Map.of("target-file-size-bytes", "1048576", "min-input-files", "4"),
         jobContext.jobOptions());
+    Assertions.assertEquals("binpack", jobContext.getRewriteStrategy());
+    Assertions.assertEquals("", jobContext.getSortOrder());
     Assertions.assertTrue(jobContext.getPartitions().isEmpty());
+  }
+
+  @Test
+  void testPolicyPropagatesSortStrategyToJobContext() {
+    PolicyContent content =
+        PolicyContents.icebergDataCompaction(
+            1000L,
+            1L,
+            2L,
+            10L,
+            20L,
+            "sort",
+            "id DESC NULLS LAST",
+            Map.of("target-file-size-bytes", "1048576"));
+    Policy policy = Mockito.mock(Policy.class);
+    Mockito.when(policy.name()).thenReturn("iceberg-compaction-sort-policy");
+    Mockito.when(policy.content()).thenReturn(content);
+
+    GravitinoStrategy strategy = new GravitinoStrategy(policy);
+    Assertions.assertEquals("sort", strategy.rules().get("rewriteStrategy"));
+    Assertions.assertEquals("id DESC NULLS LAST", strategy.rules().get("sortOrder"));
+    Assertions.assertEquals(Map.of("target-file-size-bytes", "1048576"), strategy.jobOptions());
+
+    NameIdentifier tableId = NameIdentifier.of("catalog", "db", "table");
+    Table tableMetadata = Mockito.mock(Table.class);
+    Mockito.when(tableMetadata.partitioning()).thenReturn(new Transform[0]);
+    Mockito.when(tableMetadata.columns()).thenReturn(new Column[0]);
+    List<StatisticEntry<?>> tableStatistics =
+        List.of(
+            new StatisticEntryImpl("custom-data-file-mse", StatisticValues.longValue(3000L)),
+            new StatisticEntryImpl("custom-delete-file-number", StatisticValues.longValue(5L)));
+
+    StrategyHandlerContext context =
+        StrategyHandlerContext.builder(tableId, strategy)
+            .withTableMetadata(tableMetadata)
+            .withTableStatistics(tableStatistics)
+            .build();
+
+    CompactionStrategyHandler handler = new CompactionStrategyHandler();
+    handler.initialize(context);
+
+    CompactionJobContext jobContext =
+        (CompactionJobContext) handler.evaluate().jobExecutionContext().orElseThrow();
+    Assertions.assertEquals("sort", jobContext.getRewriteStrategy());
+    Assertions.assertEquals("id DESC NULLS LAST", jobContext.getSortOrder());
+    Assertions.assertEquals(Map.of("target-file-size-bytes", "1048576"), jobContext.jobOptions());
+
+    GravitinoCompactionJobAdapter adapter = new GravitinoCompactionJobAdapter();
+    Map<String, String> jobConfig = adapter.jobConfig(jobContext);
+    Assertions.assertEquals("sort", jobConfig.get("strategy"));
+    Assertions.assertEquals("id DESC NULLS LAST", jobConfig.get("sort_order"));
+    Assertions.assertEquals("{\"target-file-size-bytes\":\"1048576\"}", jobConfig.get("options"));
   }
 }

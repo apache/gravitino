@@ -37,6 +37,7 @@ class MetadataObjects:
             MetadataObject.Type.CATALOG,
             MetadataObject.Type.ROLE,
             MetadataObject.Type.TAG,
+            MetadataObject.Type.DOMAIN,
             MetadataObject.Type.POLICY,
             MetadataObject.Type.JOB,
             MetadataObject.Type.JOB_TEMPLATE,
@@ -49,6 +50,7 @@ class MetadataObjects:
             MetadataObject.Type.MODEL,
             MetadataObject.Type.VIEW,
             MetadataObject.Type.FUNCTION,
+            MetadataObject.Type.SEMANTIC_MODEL,
         },
         4: {MetadataObject.Type.COLUMN},
     }
@@ -70,6 +72,10 @@ class MetadataObjects:
         parent: Optional[str] = None,
     ) -> MetadataObject:
         if isinstance(name_or_names, str):
+            Precondition.check_argument(
+                type_ != MetadataObject.Type.DOMAIN or parent is None,
+                "A domain metadata object must not have a parent",
+            )
             name = name_or_names
             full_name = (
                 MetadataObjects.DOT_JOINER.join([parent, name]) if parent else name
@@ -94,11 +100,11 @@ class MetadataObjects:
         )
         Precondition.check_argument(
             names_len != 3 or type_ in MetadataObjects._NAMES_LEN_CONDS[3],
-            "If the length of names is 3, it must be FILESET, TABLE, TOPIC, MODEL, VIEW or FUNCTION",
+            "If the length of names is 3, it must be FILESET, TABLE, TOPIC, MODEL, VIEW, FUNCTION or SEMANTIC_MODEL",
         )
         Precondition.check_argument(
             names_len != 4 or type_ in MetadataObjects._NAMES_LEN_CONDS[4],
-            "If the length of names is 4, it must be COLUMN",
+            "If the length of names is 4, it must be the COLUMN type",
         )
         names = name_or_names
         for name in names:
@@ -129,6 +135,7 @@ class MetadataObjects:
             MetadataObject.Type.METALAKE,
             MetadataObject.Type.CATALOG,
             MetadataObject.Type.ROLE,
+            MetadataObject.Type.DOMAIN,
         }:
             return None
 
@@ -141,6 +148,7 @@ class MetadataObjects:
             MetadataObject.Type.TOPIC,
             MetadataObject.Type.MODEL,
             MetadataObject.Type.FUNCTION,
+            MetadataObject.Type.SEMANTIC_MODEL,
             MetadataObject.Type.VIEW,
         }:
             parent_type = MetadataObject.Type.SCHEMA
@@ -191,8 +199,8 @@ class MetadataObjects:
         )
 
         parts = full_name.split(MetadataObjects.DOT_SPLITTER)
-        if type_ is MetadataObject.Type.ROLE:
-            return MetadataObjects.of([full_name], MetadataObject.Type.ROLE)
+        if type_ in {MetadataObject.Type.ROLE, MetadataObject.Type.DOMAIN}:
+            return MetadataObjects.of([full_name], type_)
 
         return MetadataObjects.of(parts, type_)
 

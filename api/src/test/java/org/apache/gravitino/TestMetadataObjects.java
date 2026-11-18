@@ -129,6 +129,32 @@ public class TestMetadataObjects {
   }
 
   @Test
+  public void testDomainObject() {
+    MetadataObject domainObject = MetadataObjects.of(null, "finance", MetadataObject.Type.DOMAIN);
+    Assertions.assertNull(domainObject.parent());
+    Assertions.assertEquals("finance", domainObject.name());
+    Assertions.assertEquals("finance", domainObject.fullName());
+    Assertions.assertEquals(MetadataObject.Type.DOMAIN, domainObject.type());
+    Assertions.assertNull(MetadataObjects.parent(domainObject));
+
+    MetadataObject domainObject2 = MetadataObjects.parse("finance", MetadataObject.Type.DOMAIN);
+    Assertions.assertEquals(domainObject, domainObject2);
+
+    MetadataObject domainObject3 =
+        MetadataObjects.of(Lists.newArrayList("finance"), MetadataObject.Type.DOMAIN);
+    Assertions.assertEquals(domainObject, domainObject3);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> MetadataObjects.of("parent", "finance", MetadataObject.Type.DOMAIN));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            MetadataObjects.of(
+                Lists.newArrayList("parent", "finance"), MetadataObject.Type.DOMAIN));
+  }
+
+  @Test
   public void testViewObject() {
     MetadataObject viewObject =
         MetadataObjects.of("catalog.schema", "view1", MetadataObject.Type.VIEW);
@@ -221,5 +247,27 @@ public class TestMetadataObjects {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> MetadataObjects.parse("catalog.schema", MetadataObject.Type.FUNCTION));
+  }
+
+  @Test
+  public void testSemanticModelObject() {
+    MetadataObject semanticModel =
+        MetadataObjects.of("catalog.schema", "sales_model", MetadataObject.Type.SEMANTIC_MODEL);
+    Assertions.assertEquals("catalog.schema", semanticModel.parent());
+    Assertions.assertEquals("sales_model", semanticModel.name());
+    Assertions.assertEquals(MetadataObject.Type.SEMANTIC_MODEL, semanticModel.type());
+    Assertions.assertEquals("catalog.schema.sales_model", semanticModel.fullName());
+
+    MetadataObject parsed =
+        MetadataObjects.parse("catalog.schema.sales_model", MetadataObject.Type.SEMANTIC_MODEL);
+    Assertions.assertEquals(semanticModel, parsed);
+
+    MetadataObject parent = MetadataObjects.parent(semanticModel);
+    Assertions.assertEquals("catalog.schema", parent.fullName());
+    Assertions.assertEquals(MetadataObject.Type.SCHEMA, parent.type());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> MetadataObjects.parse("schema.sales_model", MetadataObject.Type.SEMANTIC_MODEL));
   }
 }

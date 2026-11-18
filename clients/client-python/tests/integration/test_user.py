@@ -15,23 +15,18 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import logging
-import os
 from random import randint
 
 from gravitino import GravitinoAdminClient, GravitinoClient
 from gravitino.exceptions.base import (
-    GravitinoRuntimeException,
     NoSuchUserException,
     UserAlreadyExistsException,
 )
 
-from tests.integration.integration_test_env import IntegrationTestEnv
-
-logger = logging.getLogger(__name__)
+from tests.integration.integration_test_env import IntegrationTestEnv, MetalakeTestMixin
 
 
-class TestUser(IntegrationTestEnv):
+class TestUser(MetalakeTestMixin, IntegrationTestEnv):
     metalake_name: str = "test_user_metalake" + str(randint(1, 10000))
 
     gravitino_admin_client: GravitinoAdminClient = None
@@ -39,62 +34,11 @@ class TestUser(IntegrationTestEnv):
 
     @classmethod
     def setUpClass(cls):
-        cls._get_gravitino_home()
-        conf_path = os.path.join(cls.gravitino_home, "conf", "gravitino.conf")
-        auth_confs = {
-            "gravitino.authorization.enable": "true",
-            "gravitino.authorization.serviceAdmins": "anonymous",
-        }
-        cls._reset_conf(auth_confs, conf_path)
-        cls._append_conf(auth_confs, conf_path)
-        if (
-            os.environ.get("START_EXTERNAL_GRAVITINO") is not None
-            and os.environ.get("START_EXTERNAL_GRAVITINO").lower() == "true"
-        ):
-            cls.restart_server()
-        else:
-            super().setUpClass()
-        cls.gravitino_admin_client = GravitinoAdminClient(uri="http://localhost:8090")
+        cls.gravitino_admin_client = cls.set_up_authorization_test_env()
 
     @classmethod
     def tearDownClass(cls):
-        conf_path = os.path.join(cls.gravitino_home, "conf", "gravitino.conf")
-        reset_confs = {
-            "gravitino.authorization.enable": "false",
-            "gravitino.authorization.serviceAdmins": "anonymous",
-        }
-        cls._reset_conf(reset_confs, conf_path)
-        cls._append_conf(reset_confs, conf_path)
-        if (
-            os.environ.get("START_EXTERNAL_GRAVITINO") is not None
-            and os.environ.get("START_EXTERNAL_GRAVITINO").lower() == "true"
-        ):
-            cls.restart_server()
-        else:
-            super().tearDownClass()
-
-    def setUp(self):
-        self.init_test_env()
-
-    def tearDown(self):
-        self.clean_test_data()
-
-    def init_test_env(self):
-        self.gravitino_admin_client.create_metalake(
-            self.metalake_name, comment="", properties={}
-        )
-        self.gravitino_client = GravitinoClient(
-            uri="http://localhost:8090", metalake_name=self.metalake_name
-        )
-
-    def clean_test_data(self):
-        self.gravitino_client = GravitinoClient(
-            uri="http://localhost:8090", metalake_name=self.metalake_name
-        )
-        try:
-            self.gravitino_admin_client.drop_metalake(self.metalake_name, force=True)
-        except GravitinoRuntimeException:
-            logger.warning("Failed to drop metalake %s", self.metalake_name)
+        cls.tear_down_authorization_test_env()
 
     def test_add_user(self):
         user = self.gravitino_client.add_user("test_add_user")

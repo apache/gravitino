@@ -20,11 +20,13 @@ package org.apache.gravitino.client.integration.test.authorization;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.util.HashMap;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.client.RESTClient;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -71,6 +73,12 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
 
   protected void putServiceAdmin() {
     customConfigs.put(Configs.SERVICE_ADMINS.getKey(), USER);
+  }
+
+  protected RESTClient restClient(GravitinoAdminClient client) throws Exception {
+    Method restClientMethod = client.getClass().getSuperclass().getDeclaredMethod("restClient");
+    restClientMethod.setAccessible(true);
+    return (RESTClient) restClientMethod.invoke(client);
   }
 
   @AfterAll

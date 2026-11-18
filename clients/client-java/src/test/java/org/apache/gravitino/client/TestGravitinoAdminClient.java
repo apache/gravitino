@@ -25,11 +25,16 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
+import org.apache.gravitino.dto.authorization.OwnerDTO;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
+import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
+import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
 import org.apache.gravitino.dto.requests.MetalakeCreateRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdatesRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
@@ -57,6 +62,7 @@ public class TestGravitinoAdminClient extends TestBase {
             .withComment("comment")
             .withAudit(
                 AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .withOwner(OwnerDTO.builder().withName("alice").withType(Owner.Type.USER).build())
             .build();
     MetalakeDTO mockMetalake1 =
         MetalakeDTO.builder()
@@ -75,10 +81,13 @@ public class TestGravitinoAdminClient extends TestBase {
     Assertions.assertEquals("mock", metaLakes[0].name());
     Assertions.assertEquals("comment", metaLakes[0].comment());
     Assertions.assertEquals("creator", metaLakes[0].auditInfo().creator());
+    Assertions.assertEquals("alice", metaLakes[0].owner().name());
+    Assertions.assertEquals(Owner.Type.USER, metaLakes[0].owner().type());
 
     Assertions.assertEquals("mock1", metaLakes[1].name());
     Assertions.assertEquals("comment1", metaLakes[1].comment());
     Assertions.assertEquals("creator1", metaLakes[1].auditInfo().creator());
+    Assertions.assertNull(metaLakes[1].owner());
 
     // Test return empty metalake list
     MetalakeListResponse resp1 = new MetalakeListResponse(new MetalakeDTO[] {});
@@ -315,5 +324,51 @@ public class TestGravitinoAdminClient extends TestBase {
                 metaLake.testConnection(
                     "catalog", Catalog.Type.RELATIONAL, "hive", "comment", Collections.emptyMap()));
     Assertions.assertTrue(exception.getMessage().contains("connection failed"));
+
+    buildMockResource(
+        Method.POST,
+        "/api/metalakes/mock/catalogs/catalog/testConnection",
+        null,
+        new BaseResponse(),
+        HttpStatus.SC_OK);
+    Assertions.assertDoesNotThrow(() -> metaLake.testConnection("catalog"));
+
+    buildMockResource(
+        Method.POST,
+        "/api/metalakes/mock/catalogs/catalog/testConnection",
+        null,
+        new BaseResponse(),
+        HttpStatus.SC_OK);
+    Assertions.assertDoesNotThrow(() -> metaLake.testConnection("catalog", new CatalogChange[0]));
+
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> metaLake.testConnection("catalog", (CatalogChange[]) null));
+    Assertions.assertTrue(exception.getMessage().contains("changes must not be null"));
+
+    CatalogUpdatesRequest updatesRequest =
+        new CatalogUpdatesRequest(
+            Collections.singletonList(
+                new CatalogUpdateRequest.SetCatalogPropertyRequest("key", "value")));
+    buildMockResource(
+        Method.POST,
+        "/api/metalakes/mock/catalogs/catalog/testConnection",
+        updatesRequest,
+        new BaseResponse(),
+        HttpStatus.SC_OK);
+    Assertions.assertDoesNotThrow(
+        () -> metaLake.testConnection("catalog", CatalogChange.setProperty("key", "value")));
+
+    buildMockResource(
+        Method.POST,
+        "/api/metalakes/mock/catalogs/catalog/testConnection",
+        null,
+        ErrorResponse.unsupportedOperation("unsupported"),
+        HttpStatus.SC_OK);
+    exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class, () -> metaLake.testConnection("catalog"));
+    Assertions.assertTrue(exception.getMessage().contains("unsupported"));
   }
 }

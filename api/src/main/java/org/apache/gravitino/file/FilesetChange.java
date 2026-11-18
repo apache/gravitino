@@ -20,10 +20,13 @@ package org.apache.gravitino.file;
 
 import java.util.Objects;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 
 /**
  * A fileset change is a change to a fileset. It can be used to rename a fileset, update the comment
- * of a fileset, set a property and value pair for a fileset, or remove a property from a fileset.
+ * of a fileset, update the type of a fileset, set a property and value pair for a fileset, or
+ * remove a property from a fileset.
  */
 @Evolving
 public interface FilesetChange {
@@ -49,6 +52,22 @@ public interface FilesetChange {
   }
 
   /**
+   * Creates a new fileset change to update the fileset type.
+   *
+   * <p>Changing the type preserves the fileset's identity, storage locations, and existing files.
+   * Changing to {@link Fileset.Type#EXTERNAL} relinquishes management of the data, so dropping the
+   * fileset retains it. Changing to {@link Fileset.Type#MANAGED} accepts management of the data,
+   * including deleting it when the fileset is dropped. Setting the current type is allowed.
+   *
+   * @param newType The new type of the fileset.
+   * @return The fileset change.
+   * @throws IllegalArgumentException if the new type is null.
+   */
+  static FilesetChange updateType(Fileset.Type newType) {
+    return new UpdateFilesetType(newType);
+  }
+
+  /**
    * Creates a new fileset change to set the property and value for the fileset.
    *
    * @param property The property name to set.
@@ -67,6 +86,28 @@ public interface FilesetChange {
    */
   static FilesetChange removeProperty(String property) {
     return new RemoveProperty(property);
+  }
+
+  /**
+   * Creates a new fileset change to bind a write-through secret for a property.
+   *
+   * @param property The property name to bind.
+   * @param binding The write-through binding ({@code provider} + {@code plaintext}).
+   * @return The fileset change.
+   */
+  static FilesetChange setSecretBinding(String property, SecretBinding binding) {
+    return new SetSecretBinding(property, binding);
+  }
+
+  /**
+   * Creates a new fileset change to bind an external secret reference for a property.
+   *
+   * @param property The property name to bind.
+   * @param reference The external secret locator ({@code provider} + {@code attributes}).
+   * @return The fileset change.
+   */
+  static FilesetChange setSecretReference(String property, SecretReference reference) {
+    return new SetSecretReference(property, reference);
   }
 
   /**
@@ -191,6 +232,48 @@ public interface FilesetChange {
     }
   }
 
+  /** A fileset change to update the fileset type without changing its data or locations. */
+  final class UpdateFilesetType implements FilesetChange {
+    private final Fileset.Type newType;
+
+    private UpdateFilesetType(Fileset.Type newType) {
+      if (newType == null) {
+        throw new IllegalArgumentException("New fileset type cannot be null");
+      }
+      this.newType = newType;
+    }
+
+    /**
+     * Returns the new type of the fileset.
+     *
+     * @return The new fileset type.
+     */
+    public Fileset.Type getNewType() {
+      return newType;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      UpdateFilesetType that = (UpdateFilesetType) o;
+      return newType == that.newType;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public int hashCode() {
+      return Objects.hash(newType);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String toString() {
+      return "UPDATEFILESETTYPE " + newType;
+    }
+  }
+
   /** A fileset change to set the property and value for the fileset. */
   final class SetProperty implements FilesetChange {
     private final String property;
@@ -309,6 +392,100 @@ public interface FilesetChange {
     @Override
     public String toString() {
       return "REMOVEPROPERTY " + property;
+    }
+  }
+
+  /** A fileset change to bind a write-through secret for a property. */
+  final class SetSecretBinding implements FilesetChange {
+    private final String property;
+    private final SecretBinding binding;
+
+    private SetSecretBinding(String property, SecretBinding binding) {
+      this.property = property;
+      this.binding = binding;
+    }
+
+    /**
+     * Retrieves the property name being bound.
+     *
+     * @return The property name.
+     */
+    public String getProperty() {
+      return property;
+    }
+
+    /**
+     * Retrieves the write-through binding.
+     *
+     * @return The secret binding.
+     */
+    public SecretBinding getBinding() {
+      return binding;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      SetSecretBinding that = (SetSecretBinding) o;
+      return Objects.equals(property, that.property) && Objects.equals(binding, that.binding);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(property, binding);
+    }
+
+    @Override
+    public String toString() {
+      return "SETSECRETBINDING " + property + " " + binding;
+    }
+  }
+
+  /** A fileset change to bind an external secret reference for a property. */
+  final class SetSecretReference implements FilesetChange {
+    private final String property;
+    private final SecretReference reference;
+
+    private SetSecretReference(String property, SecretReference reference) {
+      this.property = property;
+      this.reference = reference;
+    }
+
+    /**
+     * Retrieves the property name being bound.
+     *
+     * @return The property name.
+     */
+    public String getProperty() {
+      return property;
+    }
+
+    /**
+     * Retrieves the external secret reference.
+     *
+     * @return The secret reference.
+     */
+    public SecretReference getReference() {
+      return reference;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      SetSecretReference that = (SetSecretReference) o;
+      return Objects.equals(property, that.property) && Objects.equals(reference, that.reference);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(property, reference);
+    }
+
+    @Override
+    public String toString() {
+      return "SETSECRETREFERENCE " + property + " " + reference;
     }
   }
 

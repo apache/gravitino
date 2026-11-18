@@ -19,12 +19,19 @@
 package org.apache.gravitino.catalog.kafka;
 
 import static org.apache.gravitino.Catalog.Type.MESSAGING;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_RETENTION_SECS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
@@ -44,14 +51,17 @@ import static org.apache.gravitino.catalog.kafka.KafkaCatalogOperations.CLIENT_I
 import static org.apache.gravitino.catalog.kafka.KafkaCatalogPropertiesMetadata.BOOTSTRAP_SERVERS;
 import static org.apache.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.PARTITION_COUNT;
 import static org.apache.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.REPLICATION_FACTOR;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Set;
+import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
@@ -63,27 +73,39 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.TopicDispatcher;
+import org.apache.gravitino.catalog.TopicNormalizeDispatcher;
 import org.apache.gravitino.catalog.kafka.embedded.KafkaClusterEmbedded;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.dto.requests.TopicCreateRequest;
+import org.apache.gravitino.dto.responses.ErrorConstants;
+import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.server.web.rest.TopicOperations;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
-import org.apache.gravitino.storage.relational.helper.CatalogIds;
-import org.apache.gravitino.storage.relational.service.CatalogMetaService;
-import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
+import org.apache.gravitino.utils.ThrowableFunction;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.ListTopicsResult;
+import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.config.TopicConfig;
+import org.apache.kafka.common.errors.InvalidPartitionsException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
@@ -139,7 +161,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
   private static KafkaCatalogOperations kafkaCatalogOperations;
 
   @BeforeAll
-  public static void setUp() throws IllegalAccessException {
+  public static void setUp() throws IOException, IllegalAccessException {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
@@ -154,6 +176,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("gravitino");
     when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(10);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS)).thenReturn(1000L);
 
     File f = FileUtils.getFile(STORE_PATH);
@@ -163,6 +186,12 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     when(config.get(ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
+    when(config.get(ENTITY_CHANGE_LOG_POLL_BATCH_SIZE))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
+    when(config.get(ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS);
+    when(config.get(ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES);
     when(config.get(ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     when(config.get(ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     // Fix cache config for test
@@ -174,35 +203,23 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     Mockito.when(config.get(Configs.CACHE_IMPLEMENTATION)).thenReturn("caffeine");
     Mockito.when(config.get(Configs.CACHE_LOCK_SEGMENTS)).thenReturn(16);
 
-    // Mock
-    MetalakeMetaService metalakeMetaService = MetalakeMetaService.getInstance();
-    MetalakeMetaService spyMetaservice = Mockito.spy(metalakeMetaService);
-    doReturn(1L).when(spyMetaservice).getMetalakeIdByName(Mockito.anyString());
-
-    CatalogMetaService catalogMetaService = CatalogMetaService.getInstance();
-    CatalogMetaService spyCatalogMetaService = Mockito.spy(catalogMetaService);
-    doReturn(1L)
-        .when(spyCatalogMetaService)
-        .getCatalogIdByMetalakeIdAndName(Mockito.anyLong(), Mockito.anyString());
-    doReturn(new CatalogIds(1L, 1L))
-        .when(spyCatalogMetaService)
-        .getCatalogIdByMetalakeAndCatalogName(Mockito.anyString(), Mockito.anyString());
-
-    MockedStatic<MetalakeMetaService> metalakeMetaServiceMockedStatic =
-        Mockito.mockStatic(MetalakeMetaService.class);
-    MockedStatic<CatalogMetaService> catalogMetaServiceMockedStatic =
-        Mockito.mockStatic(CatalogMetaService.class);
-
-    metalakeMetaServiceMockedStatic
-        .when(MetalakeMetaService::getInstance)
-        .thenReturn(spyMetaservice);
-    catalogMetaServiceMockedStatic
-        .when(CatalogMetaService::getInstance)
-        .thenReturn(spyCatalogMetaService);
-
     store = EntityStoreFactory.createEntityStore(config);
     store.initialize(config);
     idGenerator = new RandomIdGenerator();
+
+    BaseMetalake metalake =
+        BaseMetalake.builder()
+            .withId(1L)
+            .withName(METALAKE_NAME)
+            .withVersion(SchemaVersion.V_0_1)
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator("testKafkaUser")
+                    .withCreateTime(Instant.now())
+                    .build())
+            .build();
+    store.put(metalake, false);
+
     kafkaCatalogEntity =
         CatalogEntity.builder()
             .withId(1L)
@@ -217,6 +234,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
                     .withCreateTime(Instant.now())
                     .build())
             .build();
+    store.put(kafkaCatalogEntity, false);
 
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
 
@@ -234,11 +252,11 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
   }
 
   @Test
-  public void testKafkaCatalogConfiguration() {
+  public void testKafkaCatalogConfiguration() throws IOException {
     String catalogName = "test_kafka_catalog_configuration";
     CatalogEntity catalogEntity =
         CatalogEntity.builder()
-            .withId(2L)
+            .withId(idGenerator.nextId())
             .withName(catalogName)
             .withNamespace(Namespace.of(METALAKE_NAME))
             .withType(MESSAGING)
@@ -250,6 +268,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
                     .build())
             .withProperties(MOCK_CATALOG_PROPERTIES)
             .build();
+    store.put(catalogEntity, false);
     KafkaCatalogOperations ops = new KafkaCatalogOperations(store, idGenerator);
     Assertions.assertNull(ops.adminClientConfig);
 
@@ -270,11 +289,11 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
   }
 
   @Test
-  public void testInitialization() {
+  public void testInitialization() throws IOException {
     String catalogName = "test_kafka_catalog_initialization";
     CatalogEntity catalogEntity =
         CatalogEntity.builder()
-            .withId(2L)
+            .withId(idGenerator.nextId())
             .withName(catalogName)
             .withNamespace(Namespace.of(METALAKE_NAME))
             .withType(MESSAGING)
@@ -286,6 +305,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
                     .build())
             .withProperties(MOCK_CATALOG_PROPERTIES)
             .build();
+    store.put(catalogEntity, false);
     KafkaCatalogOperations ops = new KafkaCatalogOperations(store, idGenerator);
     ops.initialize(
         MOCK_CATALOG_PROPERTIES, catalogEntity.toCatalogInfo(), KAFKA_PROPERTIES_METADATA);
@@ -298,6 +318,115 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     Assertions.assertTrue(ops.schemaExists(ops.defaultSchemaIdent));
     Schema schema = ops.loadSchema(ops.defaultSchemaIdent);
     Assertions.assertEquals(DEFAULT_SCHEMA_NAME, schema.name());
+  }
+
+  @Test
+  public void testInitializeRejectsConfigProviders() throws IllegalAccessException {
+    CatalogEntity catalogEntity =
+        CatalogEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName("test_kafka_catalog_config_providers")
+            .withNamespace(Namespace.of(METALAKE_NAME))
+            .withType(MESSAGING)
+            .withProvider("kafka")
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator("testKafkaUser")
+                    .withCreateTime(Instant.now())
+                    .build())
+            .withProperties(MOCK_CATALOG_PROPERTIES)
+            .build();
+
+    for (String key :
+        ImmutableList.of(
+            "config.providers",
+            "config.providers.env.class",
+            "config.providers.env.param.allowlist.pattern")) {
+      Map<String, String> properties =
+          ImmutableMap.<String, String>builder()
+              .putAll(MOCK_CATALOG_PROPERTIES)
+              .put("gravitino.bypass." + key, "env")
+              .put("gravitino.bypass.request.timeout.ms", "${env:GRAVITINO_KAFKA_TEST_ENV_MARKER}")
+              .build();
+      KafkaCatalogOperations ops = new KafkaCatalogOperations(store, idGenerator);
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ops.initialize(
+                      properties, catalogEntity.toCatalogInfo(), KAFKA_PROPERTIES_METADATA));
+      Assertions.assertTrue(
+          exception.getMessage().contains("gravitino.bypass." + key), exception.getMessage());
+      // The check must run before any bypass property is applied or the AdminClient is created.
+      Assertions.assertNull(ops.adminClientConfig.get("request.timeout.ms"));
+      Assertions.assertNull(FieldUtils.readField(ops, "adminClient", true));
+    }
+  }
+
+  @Test
+  public void testValidateConfigurationRejectsConfigProviders() {
+    KafkaCatalog catalog = new KafkaCatalog();
+    for (String key :
+        ImmutableList.of(
+            "config.providers",
+            "config.providers.env.class",
+            "config.providers.env.param.allowlist.pattern")) {
+      Map<String, String> properties =
+          ImmutableMap.<String, String>builder()
+              .putAll(MOCK_CATALOG_PROPERTIES)
+              .put("gravitino.bypass." + key, "env")
+              .build();
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> catalog.validateConfiguration(properties));
+      Assertions.assertEquals(
+          "Kafka config providers are not supported, please remove the properties: "
+              + "gravitino.bypass."
+              + key,
+          exception.getMessage());
+    }
+
+    // Unprefixed keys are not forwarded to Kafka, and similar names are not provider keys.
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog.validateConfiguration(
+                ImmutableMap.<String, String>builder()
+                    .putAll(MOCK_CATALOG_PROPERTIES)
+                    .put("config.providers", "env")
+                    .put("gravitino.bypass.config.providersx", "ignored")
+                    .put("gravitino.bypass.request.timeout.ms", "30000")
+                    .build()));
+  }
+
+  @Test
+  public void testInitializeKeepsOtherBypassConfigs() throws IOException {
+    CatalogEntity catalogEntity =
+        CatalogEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName("test_kafka_catalog_bypass")
+            .withNamespace(Namespace.of(METALAKE_NAME))
+            .withType(MESSAGING)
+            .withProvider("kafka")
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator("testKafkaUser")
+                    .withCreateTime(Instant.now())
+                    .build())
+            .withProperties(MOCK_CATALOG_PROPERTIES)
+            .build();
+    store.put(catalogEntity, false);
+
+    // "config.providers" must only match whole keys and its sub-keys, not similar names.
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .putAll(MOCK_CATALOG_PROPERTIES)
+            .put("gravitino.bypass.request.timeout.ms", "30000")
+            .put("gravitino.bypass.config.providersx", "ignored")
+            .build();
+    try (KafkaCatalogOperations ops = new KafkaCatalogOperations(store, idGenerator)) {
+      ops.initialize(properties, catalogEntity.toCatalogInfo(), KAFKA_PROPERTIES_METADATA);
+      Assertions.assertEquals("30000", ops.adminClientConfig.get("request.timeout.ms"));
+    }
   }
 
   @Test
@@ -434,6 +563,117 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     Assertions.assertTrue(
         exception.getMessage().contains("Invalid replication factor for topic"),
         exception.getMessage());
+  }
+
+  @Test
+  void testCreateTopicNameCollisionReturnsBadRequest() throws IllegalAccessException {
+    NameIdentifier existingTopic =
+        NameIdentifier.of(
+            METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, "test.topic.name.collision");
+    String collidingName = "test_topic_name_collision";
+    Map<String, String> properties = ImmutableMap.of(PARTITION_COUNT, "1", REPLICATION_FACTOR, "1");
+
+    // Create the dotted name directly in Kafka, bypassing Gravitino's name validation.
+    kafkaCatalogOperations.createTopic(existingTopic, null, null, properties);
+    try {
+      CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+      BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+      when(catalog.capability()).thenReturn(new KafkaCatalogCapability());
+      Mockito.doAnswer(
+              invocation -> {
+                ThrowableFunction<BaseCatalog, Object> operation = invocation.getArgument(1);
+                return operation.apply(catalog);
+              })
+          .when(catalogManager)
+          .doWithCatalog(Mockito.any(), Mockito.any());
+      TopicDispatcher dispatcher = Mockito.mock(TopicDispatcher.class);
+      when(dispatcher.createTopic(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+          .thenAnswer(
+              invocation ->
+                  kafkaCatalogOperations.createTopic(
+                      invocation.getArgument(0),
+                      invocation.getArgument(1),
+                      invocation.getArgument(2),
+                      invocation.getArgument(3)));
+      TopicOperations operations =
+          new TopicOperations(new TopicNormalizeDispatcher(dispatcher, catalogManager));
+      FieldUtils.writeField(
+          operations, "httpRequest", Mockito.mock(HttpServletRequest.class), true);
+
+      TopicCreateRequest request = new TopicCreateRequest(collidingName, null, properties);
+      try (Response response =
+          operations.createTopic(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, request)) {
+        Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+        ErrorResponse error = (ErrorResponse) response.getEntity();
+        Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+        Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), error.getType());
+        Assertions.assertTrue(error.getMessage().contains("Invalid topic name"));
+        Assertions.assertTrue(error.getMessage().contains(collidingName));
+        Assertions.assertTrue(error.getMessage().contains("collides with existing topics"));
+        Assertions.assertTrue(error.getMessage().contains(existingTopic.name()));
+      }
+    } finally {
+      kafkaCatalogOperations.dropTopic(existingTopic);
+    }
+  }
+
+  @Test
+  void testCreateTopicWithInvalidPartitionCount() {
+    for (String partitionCount : new String[] {"0", "-2"}) {
+      NameIdentifier ident =
+          NameIdentifier.of(
+              METALAKE_NAME,
+              CATALOG_NAME,
+              DEFAULT_SCHEMA_NAME,
+              "test_create_topic_invalid_partitions_" + partitionCount);
+      Map<String, String> properties =
+          ImmutableMap.of(PARTITION_COUNT, partitionCount, REPLICATION_FACTOR, "1");
+
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> kafkaCatalogOperations.createTopic(ident, null, null, properties));
+      Assertions.assertTrue(
+          exception.getMessage().contains("Invalid partition count for topic " + ident),
+          exception.getMessage());
+      Throwable cause = exception.getCause().getCause();
+      Assertions.assertInstanceOf(InvalidPartitionsException.class, cause);
+      Assertions.assertTrue(exception.getMessage().contains(cause.getMessage()));
+    }
+  }
+
+  @Test
+  void testCreateTopicWithDefaultPartitionCount() {
+    NameIdentifier defaultIdent =
+        NameIdentifier.of(
+            METALAKE_NAME,
+            CATALOG_NAME,
+            DEFAULT_SCHEMA_NAME,
+            "test_create_topic_default_partitions");
+    Topic defaultTopic =
+        kafkaCatalogOperations.createTopic(
+            defaultIdent, null, null, ImmutableMap.of(REPLICATION_FACTOR, "1"));
+
+    NameIdentifier negativeOneIdent =
+        NameIdentifier.of(
+            METALAKE_NAME,
+            CATALOG_NAME,
+            DEFAULT_SCHEMA_NAME,
+            "test_create_topic_negative_one_partitions");
+    Topic negativeOneTopic =
+        kafkaCatalogOperations.createTopic(
+            negativeOneIdent,
+            null,
+            null,
+            ImmutableMap.of(PARTITION_COUNT, "-1", REPLICATION_FACTOR, "1"));
+
+    String defaultPartitionCount = defaultTopic.properties().get(PARTITION_COUNT);
+    Assertions.assertTrue(Integer.parseInt(defaultPartitionCount) > 0);
+    Assertions.assertEquals(
+        defaultPartitionCount, negativeOneTopic.properties().get(PARTITION_COUNT));
+    Assertions.assertEquals(
+        defaultPartitionCount,
+        kafkaCatalogOperations.loadTopic(negativeOneIdent).properties().get(PARTITION_COUNT));
   }
 
   @Test
@@ -584,5 +824,29 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
                 "kafka",
                 "comment",
                 ImmutableMap.of()));
+  }
+
+  @Test
+  public void testConnectionPreservesInterruptStatus() throws Exception {
+    AdminClient adminClient = Mockito.mock(AdminClient.class);
+    ListTopicsResult listTopicsResult = Mockito.mock(ListTopicsResult.class);
+    @SuppressWarnings("unchecked")
+    KafkaFuture<Set<String>> namesFuture = Mockito.mock(KafkaFuture.class);
+    when(adminClient.listTopics()).thenReturn(listTopicsResult);
+    when(listTopicsResult.names()).thenReturn(namesFuture);
+    when(namesFuture.get()).thenThrow(new InterruptedException("interrupted"));
+
+    KafkaCatalogOperations operations = new KafkaCatalogOperations(store, idGenerator);
+    FieldUtils.writeField(operations, "adminClient", adminClient, true);
+
+    Thread.interrupted();
+    try {
+      Assertions.assertThrows(
+          ConnectionFailedException.class,
+          () -> operations.testConnection(NameIdentifier.of("metalake", "catalog")));
+      Assertions.assertTrue(Thread.currentThread().isInterrupted());
+    } finally {
+      Thread.interrupted();
+    }
   }
 }

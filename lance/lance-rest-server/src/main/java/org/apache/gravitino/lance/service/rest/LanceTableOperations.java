@@ -22,6 +22,11 @@ import static org.apache.gravitino.lance.common.ops.NamespaceWrapper.NAMESPACE_D
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_LOCATION;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_LOCATION_HEADER;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_PROPERTIES_PREFIX_HEADER;
+import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.CREATE_TABLE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.DROP_TABLE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.MODIFY_TABLE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.PROBE_TABLE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.READ_TABLE_AUTHORIZATION_EXPRESSION;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
@@ -29,6 +34,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
@@ -49,6 +55,7 @@ import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.lance.common.utils.SerializationUtils;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.lance.namespace.errors.TableNotFoundException;
 import org.lance.namespace.model.AlterColumnsEntry;
 import org.lance.namespace.model.AlterTableAlterColumnsRequest;
@@ -84,6 +91,7 @@ public class LanceTableOperations {
   @Path("/describe")
   @Timed(name = "describe-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "describe-table", absolute = true)
+  @AuthorizationExpression(expression = READ_TABLE_AUTHORIZATION_EXPRESSION)
   public Response describeTable(
       @PathParam("id") String tableId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
@@ -117,6 +125,7 @@ public class LanceTableOperations {
   @Produces("application/json")
   @Timed(name = "create-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-table", absolute = true)
+  @AuthorizationExpression(expression = CREATE_TABLE_AUTHORIZATION_EXPRESSION)
   public Response createTable(
       @PathParam("id") String tableId,
       @QueryParam("mode") @DefaultValue("create") String mode, // create, exist_ok, overwrite
@@ -156,6 +165,7 @@ public class LanceTableOperations {
   @Produces("application/json")
   @Timed(name = "declare-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "declare-table", absolute = true)
+  @AuthorizationExpression(expression = CREATE_TABLE_AUTHORIZATION_EXPRESSION)
   public Response declareTable(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) String delimiter,
@@ -184,6 +194,7 @@ public class LanceTableOperations {
   @Path("/register")
   @Timed(name = "register-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "register-table", absolute = true)
+  @AuthorizationExpression(expression = CREATE_TABLE_AUTHORIZATION_EXPRESSION)
   public Response registerTable(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue("$") String delimiter,
@@ -213,6 +224,7 @@ public class LanceTableOperations {
   @Path("/deregister")
   @Timed(name = "deregister-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "deregister-table", absolute = true)
+  @AuthorizationExpression(expression = DROP_TABLE_AUTHORIZATION_EXPRESSION)
   public Response deregisterTable(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue("$") String delimiter,
@@ -232,6 +244,7 @@ public class LanceTableOperations {
   @Path("/exists")
   @Timed(name = "table-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "table-exists", absolute = true)
+  @AuthorizationExpression(expression = PROBE_TABLE_AUTHORIZATION_EXPRESSION)
   public Response tableExists(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue("$") String delimiter,
@@ -254,6 +267,7 @@ public class LanceTableOperations {
   @Path("/drop")
   @Timed(name = "drop-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-table", absolute = true)
+  @AuthorizationExpression(expression = DROP_TABLE_AUTHORIZATION_EXPRESSION)
   public Response dropTable(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue("$") String delimiter,
@@ -272,6 +286,7 @@ public class LanceTableOperations {
   @Path("/drop_columns")
   @Timed(name = "drop-columns." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-columns", absolute = true)
+  @AuthorizationExpression(expression = MODIFY_TABLE_AUTHORIZATION_EXPRESSION)
   public Response dropColumns(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue("$") String delimiter,
@@ -295,6 +310,7 @@ public class LanceTableOperations {
   @Path("/alter_columns")
   @Timed(name = "alter-columns." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-columns", absolute = true)
+  @AuthorizationExpression(expression = MODIFY_TABLE_AUTHORIZATION_EXPRESSION)
   public Response alterColumns(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue("$") String delimiter,
@@ -313,14 +329,13 @@ public class LanceTableOperations {
     }
   }
 
-  private void validateDeclareTableRequest(
-      @SuppressWarnings("unused") DeclareTableRequest request) {
-    // No specific fields to validate for now
+  private void validateDeclareTableRequest(DeclareTableRequest request) {
+    Preconditions.checkArgument(request != null, "Request body must not be null");
   }
 
-  private void validateRegisterTableRequest(
-      @SuppressWarnings("unused") RegisterTableRequest request) {
-    // No specific fields to validate for now
+  private void validateRegisterTableRequest(RegisterTableRequest request) {
+    Preconditions.checkArgument(request != null, "Request body must not be null");
+    Preconditions.checkArgument(request.getLocation() != null, "location must not be null");
   }
 
   private void validateDeregisterTableRequest(
@@ -329,10 +344,11 @@ public class LanceTableOperations {
     // No specific fields to validate for now
   }
 
-  private void validateDescribeTableRequest(
-      @SuppressWarnings("unused") DescribeTableRequest request) {
+  private void validateDescribeTableRequest(DescribeTableRequest request) {
     // We will ignore the id in the request body since it's already provided in the path param
-    // No specific fields to validate for now
+    if (request != null) {
+      validateVersionSelectors(request.getBranch(), request.getTag());
+    }
   }
 
   private void validateTableExists(@SuppressWarnings("unused") TableExistsRequest request) {
@@ -346,6 +362,9 @@ public class LanceTableOperations {
   }
 
   private void validateDropColumnsRequest(AlterTableDropColumnsRequest request) {
+    Preconditions.checkArgument(request != null, "Request body must not be null");
+    validateVersionSelectors(request.getBranch(), null);
+    Preconditions.checkArgument(request.getColumns() != null, "columns must not be null");
     Preconditions.checkArgument(
         !request.getColumns().isEmpty(), "Columns to drop cannot be empty.");
     Preconditions.checkArgument(
@@ -354,10 +373,15 @@ public class LanceTableOperations {
   }
 
   private void validateAlterColumnsRequest(AlterTableAlterColumnsRequest request) {
+    Preconditions.checkArgument(request != null, "Request body must not be null");
+    validateVersionSelectors(request.getBranch(), null);
+    Preconditions.checkArgument(request.getAlterations() != null, "alterations must not be null");
     Preconditions.checkArgument(
         !request.getAlterations().isEmpty(), "Columns to alter cannot be empty.");
 
-    for (AlterColumnsEntry alteration : request.getAlterations()) {
+    for (int i = 0; i < request.getAlterations().size(); i++) {
+      AlterColumnsEntry alteration = request.getAlterations().get(i);
+      Preconditions.checkArgument(alteration != null, "alterations[%s] must not be null", i);
       Preconditions.checkArgument(
           StringUtils.isNotBlank(alteration.getPath()), "Column path to alter cannot be empty.");
       Preconditions.checkArgument(
@@ -368,6 +392,28 @@ public class LanceTableOperations {
               && alteration.getVirtualColumn() == null,
           "Only RENAME alteration is supported currently.");
     }
+  }
+
+  // lance-namespace 0.11.1 added optional `branch` and `tag` selectors to the describe and
+  // alter requests. Gravitino keeps a single Lance history per table and implements neither, so a
+  // request naming one is rejected: ignoring it would silently apply a mutation meant for a branch
+  // to the table itself, and answer a tag-pinned read with the table's current state. The 0.7.5
+  // models had no such fields, so these payloads used to fail deserialization instead.
+  //
+  // The alter requests are called with a null tag because in 0.11.1 only DescribeTableRequest
+  // declares `tag`; AlterTableDropColumnsRequest and AlterTableAlterColumnsRequest carry `branch`
+  // alone. If a later spec adds `tag` to them, pass it here instead of null, or the selector goes
+  // through unchecked.
+  //
+  // A present but blank selector is accepted: it names no branch or tag, so there is nothing to
+  // refuse, and rejecting it would break clients that serialize empty strings for unset fields.
+  private static void validateVersionSelectors(@Nullable String branch, @Nullable String tag) {
+    Preconditions.checkArgument(
+        StringUtils.isBlank(branch),
+        "Lance table branches are not supported, got branch: %s",
+        branch);
+    Preconditions.checkArgument(
+        StringUtils.isBlank(tag), "Lance table tags are not supported, got tag: %s", tag);
   }
 
   private static String normalizeCreateTableMode(String mode) {

@@ -1,0 +1,300 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.catalog;
+
+import static org.apache.gravitino.semantic.OssieVersion.DEFAULT_VERSION;
+import static org.apache.gravitino.semantic.SemanticModel.PROPERTY_OSSIE_VERSION;
+import static org.apache.gravitino.semantic.SemanticModelTestUtils.sources;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
+
+import java.util.Locale;
+import java.util.Map;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.CatalogOperations;
+import org.apache.gravitino.connector.SupportsTableNameResolution;
+import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
+import org.apache.gravitino.semantic.Dataset;
+import org.apache.gravitino.semantic.OssieDocument;
+import org.apache.gravitino.semantic.OssieFormat;
+import org.apache.gravitino.semantic.SemanticModel;
+import org.apache.gravitino.semantic.SemanticModelChange;
+import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+
+public class TestSemanticModelNormalizeDispatcher {
+
+  private static final Namespace INPUT_NAMESPACE =
+      Namespace.of("metalake", "catalog", "MixedSchema");
+  private static final Namespace NORMALIZED_NAMESPACE =
+      Namespace.of("metalake", "catalog", "MIXEDSCHEMA");
+  private static final NameIdentifier INPUT_IDENT =
+      NameIdentifier.of(INPUT_NAMESPACE, "SalesModel");
+  private static final NameIdentifier NORMALIZED_IDENT =
+      NameIdentifier.of(NORMALIZED_NAMESPACE, "SalesModel");
+
+  private SemanticModelDispatcher delegate;
+  private SemanticModelNormalizeDispatcher dispatcher;
+
+  @BeforeEach
+  public void setUp() throws Exception {
+    delegate = mock(SemanticModelDispatcher.class);
+    CatalogManager catalogManager = mock(CatalogManager.class);
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    when(catalog.capability()).thenReturn(new ParentNormalizingCapability());
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
+    dispatcher = new SemanticModelNormalizeDispatcher(delegate, catalogManager);
+  }
+
+  @Test
+  public void testSourceLookupUsesTableAndViewNamingRules() {
+    NameIdentifier source = NameIdentifier.of(INPUT_NAMESPACE, "Orders");
+    NameIdentifier[] datasets = {NameIdentifier.of("metalake", "other", "schema", "Model", "a")};
+    for (Entity.EntityType type :
+        new Entity.EntityType[] {Entity.EntityType.TABLE, Entity.EntityType.VIEW}) {
+      NameIdentifier normalized =
+          NameIdentifier.of(
+              NORMALIZED_NAMESPACE, type == Entity.EntityType.TABLE ? "orders" : "ORDERS");
+      when(delegate.listSemanticModelDatasets(normalized, type)).thenReturn(datasets);
+      assertSame(datasets, dispatcher.listSemanticModelDatasets(source, type));
+      verify(delegate).listSemanticModelDatasets(normalized, type);
+    }
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> dispatcher.listSemanticModelDatasets(source, Entity.EntityType.SCHEMA));
+    verifyNoMoreInteractions(delegate);
+  }
+
+  @Test
+  public void testSourceLookupResolvesPhysicalTableName() throws Exception {
+    CatalogManager manager = mock(CatalogManager.class);
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    CatalogOperations operations =
+        mock(
+            CatalogOperations.class,
+            withSettings().extraInterfaces(SupportsTableNameResolution.class));
+    when(catalog.ops()).thenReturn(operations);
+    when(catalog.capability()).thenReturn(new ParentNormalizingCapability());
+    CatalogTestUtils.mockDoWithCatalog(manager, catalog);
+    SemanticModelNormalizeDispatcher normalizer =
+        new SemanticModelNormalizeDispatcher(delegate, manager);
+    NameIdentifier source = NameIdentifier.of(INPUT_NAMESPACE, "orders");
+    NameIdentifier normalized = NameIdentifier.of(NORMALIZED_NAMESPACE, "orders");
+    NameIdentifier physical = NameIdentifier.of(NORMALIZED_NAMESPACE, "ORDERS");
+    when(((SupportsTableNameResolution) operations).resolveTableName(normalized))
+        .thenReturn(physical);
+    NameIdentifier[] datasets = new NameIdentifier[0];
+    when(delegate.listSemanticModelDatasets(physical, Entity.EntityType.TABLE))
+        .thenReturn(datasets);
+    assertSame(datasets, normalizer.listSemanticModelDatasets(source, Entity.EntityType.TABLE));
+    verify(delegate).listSemanticModelDatasets(physical, Entity.EntityType.TABLE);
+  }
+
+  @Test
+  public void testMetricDiscoveryNormalizesOnlyParents() {
+    NameIdentifier[] names = {
+      NameIdentifier.of(Namespace.of("metalake", "catalog", "MIXEDSCHEMA", "SalesModel"), "Revenue")
+    };
+    SemanticModelMetric[] infos = {mock(SemanticModelMetric.class)};
+    when(delegate.listMetrics(NORMALIZED_NAMESPACE)).thenReturn(names);
+    when(delegate.listMetricInfos(NORMALIZED_NAMESPACE)).thenReturn(infos);
+    assertSame(names, dispatcher.listMetrics(INPUT_NAMESPACE));
+    assertSame(infos, dispatcher.listMetricInfos(INPUT_NAMESPACE));
+    verify(delegate).listMetrics(NORMALIZED_NAMESPACE);
+    verify(delegate).listMetricInfos(NORMALIZED_NAMESPACE);
+    verifyNoMoreInteractions(delegate);
+  }
+
+  @Test
+  public void testParentUsesCatalogCapabilityButModelUsesStableRules() {
+    SemanticModelDefinition definition = definition();
+    SemanticModel model = mock(SemanticModel.class);
+    when(delegate.createSemanticModel(
+            NORMALIZED_IDENT, "comment", definition, Map.of(), sources(definition)))
+        .thenReturn(model);
+    when(delegate.loadSemanticModel(NORMALIZED_IDENT)).thenReturn(model);
+    when(delegate.semanticModelExists(NORMALIZED_IDENT)).thenReturn(true);
+    when(delegate.listSemanticModels(NORMALIZED_NAMESPACE))
+        .thenReturn(new NameIdentifier[] {NORMALIZED_IDENT});
+    when(delegate.dropSemanticModel(NORMALIZED_IDENT)).thenReturn(true);
+
+    assertEquals(
+        model,
+        dispatcher.createSemanticModel(
+            INPUT_IDENT, "comment", definition, Map.of(), sources(definition)));
+    assertEquals(model, dispatcher.loadSemanticModel(INPUT_IDENT));
+    assertTrue(dispatcher.semanticModelExists(INPUT_IDENT));
+    assertEquals(NORMALIZED_IDENT, dispatcher.listSemanticModels(INPUT_NAMESPACE)[0]);
+    assertTrue(dispatcher.dropSemanticModel(INPUT_IDENT));
+
+    verify(delegate)
+        .createSemanticModel(
+            NORMALIZED_IDENT, "comment", definition, Map.of(), sources(definition));
+    verify(delegate).loadSemanticModel(NORMALIZED_IDENT);
+    verify(delegate).semanticModelExists(NORMALIZED_IDENT);
+    verify(delegate).listSemanticModels(NORMALIZED_NAMESPACE);
+    verify(delegate).dropSemanticModel(NORMALIZED_IDENT);
+  }
+
+  @Test
+  public void testRenameUsesStableSemanticModelRules() {
+    SemanticModel model = mock(SemanticModel.class);
+    SemanticModelChange rename = SemanticModelChange.rename("RevenueModel");
+    when(delegate.alterSemanticModel(
+            NORMALIZED_IDENT, SemanticModelSourceUpdate.preserve(), rename))
+        .thenReturn(model);
+
+    assertEquals(
+        model,
+        dispatcher.alterSemanticModel(INPUT_IDENT, SemanticModelSourceUpdate.preserve(), rename));
+    verify(delegate)
+        .alterSemanticModel(NORMALIZED_IDENT, SemanticModelSourceUpdate.preserve(), rename);
+
+    NameIdentifier invalidIdent = NameIdentifier.of(INPUT_NAMESPACE, "invalid model");
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            dispatcher.createSemanticModel(
+                invalidIdent, null, definition(), Map.of(), sources(definition())));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            dispatcher.alterSemanticModel(
+                INPUT_IDENT,
+                SemanticModelSourceUpdate.preserve(),
+                SemanticModelChange.rename("invalid model")));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            dispatcher.alterSemanticModel(
+                INPUT_IDENT, SemanticModelSourceUpdate.preserve(), new SemanticModelChange[0]));
+  }
+
+  @Test
+  public void testOssieImportNormalizesAndForwardsNativeValues() {
+    SemanticModel model = mock(SemanticModel.class);
+    Map<String, String> properties = Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION);
+    when(delegate.importSemanticModel(
+            eq(NORMALIZED_IDENT),
+            isNull(),
+            any(SemanticModelDefinition.class),
+            eq(properties),
+            any()))
+        .thenReturn(model);
+
+    assertEquals(
+        model,
+        dispatcher.importOssieDocument(
+            INPUT_NAMESPACE,
+            ossieDocument("SalesModel"),
+            definitionToValidate -> sources(definitionToValidate)));
+
+    ArgumentCaptor<SemanticModelDefinition> definition =
+        ArgumentCaptor.forClass(SemanticModelDefinition.class);
+    verify(delegate)
+        .importSemanticModel(
+            eq(NORMALIZED_IDENT), isNull(), definition.capture(), eq(properties), any());
+    assertEquals(definition(), definition.getValue());
+    verifyNoMoreInteractions(delegate);
+  }
+
+  @Test
+  public void testOssieImportRejectsInvalidModelName() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            dispatcher.importOssieDocument(
+                INPUT_NAMESPACE,
+                ossieDocument("invalid model"),
+                definition -> sources(definition)));
+    verifyNoInteractions(delegate);
+  }
+
+  @Test
+  public void testOssieExportNormalizesAndForwardsWithoutLoading() {
+    OssieDocument document = OssieDocument.json("{}");
+    when(delegate.exportOssieDocument(NORMALIZED_IDENT, OssieFormat.JSON)).thenReturn(document);
+
+    assertSame(document, dispatcher.exportOssieDocument(INPUT_IDENT, OssieFormat.JSON));
+
+    verify(delegate).exportOssieDocument(NORMALIZED_IDENT, OssieFormat.JSON);
+    verifyNoMoreInteractions(delegate);
+  }
+
+  private static OssieDocument ossieDocument(String name) {
+    return OssieDocument.yaml(
+        "version: 0.2.0.dev0\nname: "
+            + name
+            + "\ndatasets:\n"
+            + "  - name: orders\n    source: sales.mart.orders\n");
+  }
+
+  private static SemanticModelDefinition definition() {
+    Dataset dataset =
+        Dataset.builder()
+            .withName("orders")
+            .withSource(NameIdentifier.of("sales", "mart", "orders"))
+            .build();
+    return SemanticModelDefinition.builder().withDatasets(new Dataset[] {dataset}).build();
+  }
+
+  private static final class ParentNormalizingCapability implements Capability {
+
+    @Override
+    public CapabilityResult caseSensitiveOnName(Scope scope) {
+      return CapabilityResult.unsupported("Normalize names for this test");
+    }
+
+    @Override
+    public String normalizeName(Scope scope, String name) {
+      if (scope == Scope.SCHEMA) {
+        return name.toUpperCase(Locale.ROOT);
+      }
+      if (scope == Scope.SEMANTIC_MODEL) {
+        return name.toLowerCase(Locale.ROOT);
+      }
+      if (scope == Scope.TABLE) {
+        return name.toLowerCase(Locale.ROOT);
+      }
+      if (scope == Scope.VIEW) {
+        return name.toUpperCase(Locale.ROOT);
+      }
+      return name;
+    }
+  }
+}

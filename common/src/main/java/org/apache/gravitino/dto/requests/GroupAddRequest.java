@@ -50,7 +50,6 @@ public class GroupAddRequest implements RESTRequest {
    * @param name The name of the group.
    */
   public GroupAddRequest(String name) {
-    super();
     this.name = name;
   }
 

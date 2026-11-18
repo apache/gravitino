@@ -23,56 +23,88 @@ import static org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
+import org.apache.gravitino.storage.relational.mapper.provider.MetadataObjectSQL;
 import org.apache.gravitino.storage.relational.po.StatisticPO;
 import org.apache.ibatis.annotations.Param;
 
 public class StatisticBaseSQLProvider {
 
-  public String batchInsertStatisticPOsOnDuplicateKeyUpdate(
-      @Param("statisticPOs") List<StatisticPO> statisticPOs) {
-    return "<script>"
-        + "INSERT INTO "
+  /**
+   * Returns whether the backend's {@code statistic_meta} key ignores trailing spaces, so that
+   * "name" and "name " are the same statistic.
+   *
+   * @return {@code true} if names that differ only in trailing spaces collide
+   */
+  public boolean namesIgnoreTrailingSpaces() {
+    return false;
+  }
+
+  /** Inserts new live statistics in one statement without upsert fallback. */
+  public String batchInsertStatisticPOs(@Param("statisticPOs") List<StatisticPO> statisticPOs) {
+    return "<script>INSERT INTO "
         + STATISTIC_META_TABLE_NAME
         + " (statistic_id, statistic_name, statistic_value, metalake_id, metadata_object_id,"
-        + " metadata_object_type, audit_info, current_version, last_version, deleted_at) VALUES "
+        + " metadata_object_type, audit_info, current_version, last_version, deleted_at) VALUES"
         + "<foreach collection='statisticPOs' item='item' separator=','>"
-        + "(#{item.statisticId}, "
-        + "#{item.statisticName}, "
-        + "#{item.statisticValue}, "
-        + "#{item.metalakeId}, "
-        + "#{item.metadataObjectId}, "
-        + "#{item.metadataObjectType}, "
-        + "#{item.auditInfo}, "
-        + "#{item.currentVersion}, "
-        + "#{item.lastVersion}, "
-        + "#{item.deletedAt})"
-        + "</foreach>"
-        + " ON DUPLICATE KEY UPDATE "
-        + "  statistic_value = VALUES(statistic_value),"
-        + "  audit_info = VALUES(audit_info),"
-        + "  current_version = VALUES(current_version),"
-        + "  last_version = VALUES(last_version),"
-        + "  deleted_at = VALUES(deleted_at)"
+        + " (#{item.statisticId}, #{item.statisticName}, #{item.statisticValue},"
+        + " #{item.metalakeId}, #{item.metadataObjectId}, #{item.metadataObjectType},"
+        + " #{item.auditInfo}, #{item.currentVersion}, #{item.lastVersion}, #{item.deletedAt})"
+        + "</foreach></script>";
+  }
+
+  /**
+   * Replaces the values of the observed statistics in one statement and advances their versions.
+   * Each PO identifies an observed row by ID, target, name and current version, and carries the new
+   * value and audit info.
+   */
+  public String batchUpdateStatisticPOsWithVersion(
+      @Param("statisticPOs") List<StatisticPO> statisticPOs) {
+    return "<script>UPDATE "
+        + STATISTIC_META_TABLE_NAME
+        + " SET statistic_value = CASE statistic_id"
+        + "<foreach collection='statisticPOs' item='item'>"
+        + " WHEN #{item.statisticId} THEN #{item.statisticValue}"
+        + "</foreach> END,"
+        + " audit_info = CASE statistic_id"
+        + "<foreach collection='statisticPOs' item='item'>"
+        + " WHEN #{item.statisticId} THEN #{item.auditInfo}"
+        + "</foreach> END,"
+        + " last_version = current_version, current_version = current_version + 1"
+        + observedRowsPredicate()
         + "</script>";
   }
 
-  public String batchDeleteStatisticPOs(
-      @Param("entityId") Long entityId, @Param("statisticNames") List<String> statisticNames) {
-    return "<script>"
-        + "UPDATE "
+  /**
+   * Soft-deletes the observed statistics in one statement and advances their versions. Each PO
+   * identifies an observed row by ID, target, name and current version.
+   */
+  public String batchDeleteStatisticPOsWithVersion(
+      @Param("statisticPOs") List<StatisticPO> statisticPOs) {
+    return "<script>UPDATE "
         + STATISTIC_META_TABLE_NAME
         + softDeleteSQL()
-        + " WHERE "
-        + " statistic_name IN ("
-        + "<foreach collection='statisticNames' item='item' separator=','>"
-        + " #{item}"
-        + "</foreach>"
-        + " ) AND deleted_at = 0 AND metadata_object_id = #{entityId}"
+        + ", last_version = current_version, current_version = current_version + 1"
+        + observedRowsPredicate()
         + "</script>";
+  }
+
+  private static String observedRowsPredicate() {
+    return " WHERE deleted_at = 0 AND ("
+        + "<foreach collection='statisticPOs' item='item' separator=' OR '>"
+        + "(statistic_id = #{item.statisticId}"
+        + " AND metadata_object_id = #{item.metadataObjectId}"
+        + " AND statistic_name = #{item.statisticName}"
+        + " AND current_version = #{item.currentVersion})"
+        + "</foreach>)";
   }
 
   public String softDeleteStatisticsByEntityId(@Param("entityId") Long entityId) {
@@ -90,6 +122,20 @@ public class StatisticBaseSQLProvider {
         + " current_version as currentVersion, last_version as lastVersion, deleted_at as deletedAt FROM "
         + STATISTIC_META_TABLE_NAME
         + " WHERE metadata_object_id = #{entityId} AND deleted_at = 0 AND metalake_id = #{metalakeId}";
+  }
+
+  /** Selects full rows of only the requested live statistics of one metadata object. */
+  public String listStatisticPOsByNames(
+      @Param("metalakeId") Long metalakeId,
+      @Param("entityId") Long entityId,
+      @Param("names") List<String> names) {
+    return "<script>"
+        + listStatisticPOsByEntityId(metalakeId, entityId)
+        + " AND statistic_name IN "
+        + "<foreach collection='names' item='name' open='(' separator=',' close=')'>"
+        + "#{name}"
+        + "</foreach>"
+        + "</script>";
   }
 
   public String softDeleteStatisticsByMetalakeId(@Param("metalakeId") Long metalakeId) {
@@ -115,26 +161,61 @@ public class StatisticBaseSQLProvider {
         + SchemaMetaMapper.TABLE_NAME
         + " st WHERE st.catalog_id = #{catalogId} AND"
         + " st.schema_id = stat.metadata_object_id AND stat.metadata_object_type = 'SCHEMA'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            SchemaMetaMapper.TABLE_NAME, "schema_id", "st")
         + " UNION"
         + " SELECT tt.catalog_id FROM "
         + TopicMetaMapper.TABLE_NAME
         + " tt WHERE tt.catalog_id = #{catalogId} AND"
         + " tt.topic_id = stat.metadata_object_id AND stat.metadata_object_type = 'TOPIC'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(TopicMetaMapper.TABLE_NAME, "topic_id", "tt")
         + " UNION"
         + " SELECT tat.catalog_id FROM "
         + TableMetaMapper.TABLE_NAME
         + " tat WHERE tat.catalog_id = #{catalogId} AND"
         + " tat.table_id = stat.metadata_object_id AND stat.metadata_object_type = 'TABLE'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            TableMetaMapper.TABLE_NAME, "table_id", "tat")
         + " UNION"
         + " SELECT ft.catalog_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
         + " ft WHERE ft.catalog_id = #{catalogId} AND"
         + " ft.fileset_id = stat.metadata_object_id AND stat.metadata_object_type = 'FILESET'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            FilesetMetaMapper.META_TABLE_NAME, "fileset_id", "ft")
         + " UNION"
         + " SELECT mt.catalog_id FROM "
         + ModelMetaMapper.TABLE_NAME
         + " mt WHERE mt.catalog_id = #{catalogId} AND"
         + " mt.model_id = stat.metadata_object_id AND stat.metadata_object_type = 'MODEL'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(ModelMetaMapper.TABLE_NAME, "model_id", "mt")
+        + " UNION"
+        + " SELECT cot.catalog_id FROM "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " cot WHERE cot.catalog_id = #{catalogId} AND"
+        + " cot.column_id = stat.metadata_object_id AND stat.metadata_object_type = 'COLUMN'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            TableColumnMapper.COLUMN_TABLE_NAME, "column_id", "cot")
+        + " UNION"
+        + " SELECT smt.catalog_id FROM "
+        + SemanticModelMetaMapper.TABLE_NAME
+        + " smt WHERE smt.catalog_id = #{catalogId} AND"
+        + " smt.semantic_model_id = stat.metadata_object_id AND stat.metadata_object_type = 'SEMANTIC_MODEL'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            SemanticModelMetaMapper.TABLE_NAME, "semantic_model_id", "smt")
+        + " UNION"
+        + " SELECT vt.catalog_id FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " vt WHERE vt.catalog_id = #{catalogId} AND"
+        + " vt.view_id = stat.metadata_object_id AND stat.metadata_object_type = 'VIEW'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(ViewMetaMapper.TABLE_NAME, "view_id", "vt")
+        + " UNION"
+        + " SELECT fnt.catalog_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " fnt WHERE fnt.catalog_id = #{catalogId} AND"
+        + " fnt.function_id = stat.metadata_object_id AND stat.metadata_object_type = 'FUNCTION'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            FunctionMetaMapper.TABLE_NAME, "function_id", "fnt")
         + ")";
   }
 
@@ -160,6 +241,7 @@ public class StatisticBaseSQLProvider {
         + "#{schemaId}"
         + "</foreach>"
         + " AND tt.topic_id = stat.metadata_object_id AND stat.metadata_object_type = 'TOPIC'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(TopicMetaMapper.TABLE_NAME, "topic_id", "tt")
         + " UNION"
         + " SELECT tat.schema_id FROM "
         + TableMetaMapper.TABLE_NAME
@@ -168,6 +250,7 @@ public class StatisticBaseSQLProvider {
         + "#{schemaId}"
         + "</foreach>"
         + " AND tat.table_id = stat.metadata_object_id AND stat.metadata_object_type = 'TABLE'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(TableMetaMapper.TABLE_NAME, "table_id", "tat")
         + " UNION"
         + " SELECT ft.schema_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
@@ -176,6 +259,8 @@ public class StatisticBaseSQLProvider {
         + "#{schemaId}"
         + "</foreach>"
         + " AND ft.fileset_id = stat.metadata_object_id AND stat.metadata_object_type = 'FILESET'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(
+            FilesetMetaMapper.META_TABLE_NAME, "fileset_id", "ft")
         + " UNION"
         + " SELECT mt.schema_id FROM "
         + ModelMetaMapper.TABLE_NAME
@@ -184,6 +269,46 @@ public class StatisticBaseSQLProvider {
         + "#{schemaId}"
         + "</foreach>"
         + " AND mt.model_id = stat.metadata_object_id AND stat.metadata_object_type = 'MODEL'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(ModelMetaMapper.TABLE_NAME, "model_id", "mt")
+        + " UNION"
+        + " SELECT cot.schema_id FROM "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " cot WHERE cot.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach> AND"
+        + " cot.column_id = stat.metadata_object_id AND stat.metadata_object_type = 'COLUMN'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(
+            TableColumnMapper.COLUMN_TABLE_NAME, "column_id", "cot")
+        + " UNION"
+        + " SELECT smt.schema_id FROM "
+        + SemanticModelMetaMapper.TABLE_NAME
+        + " smt WHERE smt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach> AND"
+        + " smt.semantic_model_id = stat.metadata_object_id AND stat.metadata_object_type = 'SEMANTIC_MODEL'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(
+            SemanticModelMetaMapper.TABLE_NAME, "semantic_model_id", "smt")
+        + " UNION"
+        + " SELECT vt.schema_id FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " vt WHERE vt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach> AND"
+        + " vt.view_id = stat.metadata_object_id AND stat.metadata_object_type = 'VIEW'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(ViewMetaMapper.TABLE_NAME, "view_id", "vt")
+        + " UNION"
+        + " SELECT fnt.schema_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " fnt WHERE fnt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach> AND"
+        + " fnt.function_id = stat.metadata_object_id AND stat.metadata_object_type = 'FUNCTION'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(
+            FunctionMetaMapper.TABLE_NAME, "function_id", "fnt")
         + ")"
         + "</script>";
   }
@@ -196,7 +321,6 @@ public class StatisticBaseSQLProvider {
   }
 
   protected String softDeleteSQL() {
-    return " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000 ";
+    return " SET deleted_at = " + DatabaseTimeSQL.MYSQL + " ";
   }
 }

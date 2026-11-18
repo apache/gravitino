@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.utils;
 
+import static org.apache.gravitino.Entity.EntityType.DOMAIN;
 import static org.apache.gravitino.Entity.EntityType.GROUP;
 import static org.apache.gravitino.Entity.EntityType.JOB;
 import static org.apache.gravitino.Entity.EntityType.JOB_TEMPLATE;
@@ -57,7 +58,7 @@ public class NameIdentifierUtil {
   private NameIdentifierUtil() {}
 
   private static final Set<Entity.EntityType> SUPPORT_VIRTUAL_NAMESPACE_TYPES =
-      ImmutableSet.of(USER, GROUP, ROLE, TAG, POLICY, JOB, JOB_TEMPLATE);
+      ImmutableSet.of(USER, GROUP, ROLE, TAG, POLICY, JOB, JOB_TEMPLATE, DOMAIN);
 
   /**
    * Create the metalake {@link NameIdentifierUtil} with the given name.
@@ -118,6 +119,20 @@ public class NameIdentifierUtil {
    */
   public static NameIdentifier ofView(String metalake, String catalog, String schema, String view) {
     return NameIdentifier.of(metalake, catalog, schema, view);
+  }
+
+  /**
+   * Create the semantic model {@link NameIdentifier} with the given parent names.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @param semanticModel The semantic model name
+   * @return The created semantic model {@link NameIdentifier}
+   */
+  public static NameIdentifier ofSemanticModel(
+      String metalake, String catalog, String schema, String semanticModel) {
+    return NameIdentifier.of(metalake, catalog, schema, semanticModel);
   }
 
   /**
@@ -336,6 +351,17 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Create the domain {@link NameIdentifier} with the given metalake and domain name.
+   *
+   * @param metalake The metalake name
+   * @param domainName The domain name
+   * @return The created domain {@link NameIdentifier}
+   */
+  public static NameIdentifier ofDomain(String metalake, String domainName) {
+    return NameIdentifier.of(NamespaceUtil.ofDomain(metalake), domainName);
+  }
+
+  /**
    * Create the job {@link NameIdentifier} with the given metalake and job name.
    *
    * @param metalake The metalake name
@@ -506,6 +532,17 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Check the given {@link NameIdentifier} is a semantic model identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The semantic model {@link NameIdentifier} to check.
+   */
+  public static void checkSemanticModel(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Semantic model identifier must not be null");
+    NamespaceUtil.checkSemanticModel(ident.namespace());
+  }
+
+  /**
    * Check the given {@link NameIdentifier} is a column identifier. Throw an {@link
    * IllegalNameIdentifierException} if it's not.
    *
@@ -594,8 +631,41 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Check the given {@link NameIdentifier} is a domain identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The domain {@link NameIdentifier} to check.
+   */
+  public static void checkDomain(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Domain identifier must not be null");
+    NamespaceUtil.checkDomain(ident.namespace());
+  }
+
+  /**
+   * Check whether the metadata object name can be represented in a qualified metadata object name.
+   *
+   * @param ident The metadata object identifier to check
+   * @param entityType The metadata object entity type
+   * @throws IllegalNameIdentifierException If the name contains the qualified-name separator
+   */
+  public static void checkMetadataObjectName(NameIdentifier ident, Entity.EntityType entityType) {
+    Preconditions.checkArgument(
+        ident != null && entityType != null, "The identifier and entity type must not be null");
+
+    if (ident.name().contains(".")) {
+      throw new IllegalNameIdentifierException(
+          "The %s name '%s' is unsupported because '.' is reserved as the qualified-name "
+              + "separator.",
+          entityType, ident.name());
+    }
+  }
+
+  /**
    * Convert the given {@link NameIdentifier} and {@link Entity.EntityType} to {@link
    * MetadataObject}.
+   *
+   * <p>All object types reject dots in their names. Use {@link #toMetadataObjectForRead} when
+   * addressing an existing tag or policy with a legacy dotted name.
    *
    * @param ident The identifier
    * @param entityType The entity type
@@ -605,6 +675,7 @@ public class NameIdentifierUtil {
       NameIdentifier ident, Entity.EntityType entityType) {
     Preconditions.checkArgument(
         ident != null && entityType != null, "The identifier and entity type must not be null");
+    checkMetadataObjectName(ident, entityType);
 
     Joiner dot = Joiner.on(".");
 
@@ -631,6 +702,13 @@ public class NameIdentifierUtil {
         checkView(ident);
         String viewParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
         return MetadataObjects.of(viewParent, ident.name(), MetadataObject.Type.VIEW);
+
+      case SEMANTIC_MODEL:
+        checkSemanticModel(ident);
+        String semanticModelParent =
+            dot.join(ident.namespace().level(1), ident.namespace().level(2));
+        return MetadataObjects.of(
+            semanticModelParent, ident.name(), MetadataObject.Type.SEMANTIC_MODEL);
 
       case COLUMN:
         checkColumn(ident);
@@ -677,9 +755,41 @@ public class NameIdentifierUtil {
         checkJobTemplate(ident);
         return MetadataObjects.of(null, ident.name(), MetadataObject.Type.JOB_TEMPLATE);
 
+      case DOMAIN:
+        checkDomain(ident);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.DOMAIN);
+
       default:
         throw new IllegalArgumentException(
             "Entity type " + entityType + " is not supported to convert to MetadataObject");
+    }
+  }
+
+  /**
+   * Converts an existing identifier for reads, authorization, and cleanup.
+   *
+   * <p>Only tag and policy names accept legacy dots: these are single-level metadata objects with
+   * no parent scope. Namespace checks still apply, and all other types use strict conversion. New
+   * names and rename targets must use {@link #toMetadataObject} instead.
+   *
+   * @param ident the existing metadata object's identifier
+   * @param entityType the entity type
+   * @return the converted metadata object
+   * @throws IllegalArgumentException if the identifier or type is invalid
+   */
+  public static MetadataObject toMetadataObjectForRead(
+      NameIdentifier ident, Entity.EntityType entityType) {
+    Preconditions.checkArgument(
+        ident != null && entityType != null, "The identifier and entity type must not be null");
+    switch (entityType) {
+      case TAG:
+        checkTag(ident);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.TAG);
+      case POLICY:
+        checkPolicy(ident);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.POLICY);
+      default:
+        return toMetadataObject(ident, entityType);
     }
   }
 
@@ -897,6 +1007,7 @@ public class NameIdentifierUtil {
 
       case TABLE:
       case VIEW:
+      case SEMANTIC_MODEL:
       case FILESET:
       case MODEL:
       case TOPIC:
@@ -914,6 +1025,7 @@ public class NameIdentifierUtil {
       case POLICY:
       case JOB:
       case JOB_TEMPLATE:
+      case DOMAIN:
         return Entity.EntityType.METALAKE;
 
       case METALAKE:
@@ -960,6 +1072,8 @@ public class NameIdentifierUtil {
         return NamespaceUtil.ofJob(metalake);
       case JOB_TEMPLATE:
         return NamespaceUtil.ofJobTemplate(metalake);
+      case DOMAIN:
+        return NamespaceUtil.ofDomain(metalake);
       default:
         throw new IllegalArgumentException("Unsupported virtual namespace type: " + type);
     }

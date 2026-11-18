@@ -25,20 +25,24 @@ import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
+import org.apache.gravitino.storage.relational.mapper.provider.MetadataObjectSQL;
 import org.apache.gravitino.storage.relational.po.OwnerRelForDeletion;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.ibatis.annotations.Param;
 
 public class OwnerMetaBaseSQLProvider {
   protected String currentTimestampMillisExpression() {
-    return "(UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000";
+    return DatabaseTimeSQL.MYSQL;
   }
 
   public String selectUserOwnerMetaByMetadataObjectIdAndType(
@@ -109,6 +113,41 @@ public class OwnerMetaBaseSQLProvider {
         + " ot.metadata_object_type = #{metadataObjectType} AND"
         + " ot.owner_type = 'GROUP' AND"
         + " ot.deleted_at = 0 AND gt.deleted_at = 0";
+  }
+
+  /**
+   * Builds SQL to select group owners for the specified metadata objects.
+   *
+   * @param metadataObjectIds IDs of the metadata objects
+   * @param metadataObjectType type of the metadata objects
+   * @return SQL for selecting group owners
+   */
+  public String batchSelectGroupOwnerMetaByMetadataObjectIdAndType(
+      @Param("metadataObjectIds") List<Long> metadataObjectIds,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return "<script>"
+        + "SELECT ot.metadata_object_id as metadataObjectId,"
+        + "gt.group_id as groupId, "
+        + "gt.group_name as groupName, "
+        + "gt.metalake_id as metalakeId, "
+        + "gt.audit_info as auditInfo, "
+        + "gt.current_version as currentVersion, "
+        + "gt.last_version as lastVersion, "
+        + "gt.deleted_at as deletedAt "
+        + "FROM "
+        + OWNER_TABLE_NAME
+        + " ot LEFT JOIN "
+        + GroupMetaMapper.GROUP_TABLE_NAME
+        + " gt ON gt.group_id = ot.owner_id "
+        + "WHERE "
+        + "ot.metadata_object_type = #{metadataObjectType} "
+        + "AND ot.owner_type = 'GROUP' "
+        + "AND ot.metadata_object_id IN "
+        + "<foreach collection='metadataObjectIds' item='itemId' open='(' separator=',' close=')'>"
+        + "#{itemId}"
+        + "</foreach> "
+        + "AND ot.deleted_at = 0 AND gt.deleted_at = 0 "
+        + "</script>";
   }
 
   public String insertOwnerRel(@Param("ownerRelPO") OwnerRelPO ownerRelPO) {
@@ -216,37 +255,78 @@ public class OwnerMetaBaseSQLProvider {
         + SchemaMetaMapper.TABLE_NAME
         + " st WHERE st.catalog_id = #{catalogId} AND"
         + " st.schema_id = ot.metadata_object_id AND ot.metadata_object_type = 'SCHEMA'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            SchemaMetaMapper.TABLE_NAME, "schema_id", "st")
         + " UNION"
         + " SELECT tt.catalog_id FROM "
         + TopicMetaMapper.TABLE_NAME
         + " tt WHERE tt.catalog_id = #{catalogId} AND"
         + " tt.topic_id = ot.metadata_object_id AND ot.metadata_object_type = 'TOPIC'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(TopicMetaMapper.TABLE_NAME, "topic_id", "tt")
         + " UNION"
         + " SELECT tat.catalog_id FROM "
         + TableMetaMapper.TABLE_NAME
         + " tat WHERE tat.catalog_id = #{catalogId} AND"
         + " tat.table_id = ot.metadata_object_id AND ot.metadata_object_type = 'TABLE'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            TableMetaMapper.TABLE_NAME, "table_id", "tat")
         + " UNION"
         + " SELECT ft.catalog_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
         + " ft WHERE ft.catalog_id = #{catalogId} AND"
         + " ft.fileset_id = ot.metadata_object_id AND ot.metadata_object_type = 'FILESET'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            FilesetMetaMapper.META_TABLE_NAME, "fileset_id", "ft")
         + " UNION"
         + " SELECT mt.catalog_id FROM "
         + ModelMetaMapper.TABLE_NAME
         + " mt WHERE mt.catalog_id = #{catalogId} AND"
         + " mt.model_id = ot.metadata_object_id AND ot.metadata_object_type = 'MODEL'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(ModelMetaMapper.TABLE_NAME, "model_id", "mt")
         + " UNION"
         + " SELECT vt.catalog_id FROM "
         + ViewMetaMapper.TABLE_NAME
         + " vt WHERE vt.catalog_id = #{catalogId} AND"
         + " vt.view_id = ot.metadata_object_id AND ot.metadata_object_type = 'VIEW'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(ViewMetaMapper.TABLE_NAME, "view_id", "vt")
         + " UNION"
         + " SELECT fnt.catalog_id FROM "
         + FunctionMetaMapper.TABLE_NAME
         + " fnt WHERE fnt.catalog_id = #{catalogId} AND"
         + " fnt.function_id = ot.metadata_object_id AND ot.metadata_object_type = 'FUNCTION'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            FunctionMetaMapper.TABLE_NAME, "function_id", "fnt")
+        + " UNION"
+        + " SELECT cot.catalog_id FROM "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " cot WHERE cot.catalog_id = #{catalogId} AND"
+        + " cot.column_id = ot.metadata_object_id AND ot.metadata_object_type = 'COLUMN'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            TableColumnMapper.COLUMN_TABLE_NAME, "column_id", "cot")
+        + " UNION"
+        + " SELECT smt.catalog_id FROM "
+        + SemanticModelMetaMapper.TABLE_NAME
+        + " smt WHERE smt.catalog_id = #{catalogId} AND"
+        + " smt.semantic_model_id = ot.metadata_object_id AND ot.metadata_object_type = 'SEMANTIC_MODEL'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            SemanticModelMetaMapper.TABLE_NAME, "semantic_model_id", "smt")
         + ")";
+  }
+
+  public String softDeleteOwnerRelOfJobsByTemplateId(@Param("jobTemplateId") Long jobTemplateId) {
+    String now = currentTimestampMillisExpression();
+    // No deleted_at filter on the job rows: the template delete soft-deletes its jobs earlier in
+    // the same transaction, and filtering them out would make this a no-op.
+    return "UPDATE "
+        + OWNER_TABLE_NAME
+        + " SET deleted_at = "
+        + now
+        + ", updated_at = "
+        + now
+        + " WHERE deleted_at = 0 AND metadata_object_type = 'JOB' AND metadata_object_id IN ("
+        + " SELECT job_run_id FROM "
+        + JobMetaMapper.TABLE_NAME
+        + " WHERE job_template_id = #{jobTemplateId})";
   }
 
   public String softDeleteOwnerRelBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
@@ -274,6 +354,7 @@ public class OwnerMetaBaseSQLProvider {
         + "#{schemaId}"
         + "</foreach>"
         + " AND tt.topic_id = ot.metadata_object_id AND ot.metadata_object_type = 'TOPIC'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(TopicMetaMapper.TABLE_NAME, "topic_id", "tt")
         + " UNION"
         + " SELECT tat.schema_id FROM "
         + TableMetaMapper.TABLE_NAME
@@ -282,6 +363,7 @@ public class OwnerMetaBaseSQLProvider {
         + "#{schemaId}"
         + "</foreach>"
         + " AND tat.table_id = ot.metadata_object_id AND ot.metadata_object_type = 'TABLE'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(TableMetaMapper.TABLE_NAME, "table_id", "tat")
         + " UNION"
         + " SELECT ft.schema_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
@@ -290,6 +372,8 @@ public class OwnerMetaBaseSQLProvider {
         + "#{schemaId}"
         + "</foreach>"
         + " AND ft.fileset_id = ot.metadata_object_id AND ot.metadata_object_type = 'FILESET'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(
+            FilesetMetaMapper.META_TABLE_NAME, "fileset_id", "ft")
         + " UNION"
         + " SELECT mt.schema_id FROM "
         + ModelMetaMapper.TABLE_NAME
@@ -298,6 +382,7 @@ public class OwnerMetaBaseSQLProvider {
         + "#{schemaId}"
         + "</foreach>"
         + " AND mt.model_id = ot.metadata_object_id AND ot.metadata_object_type = 'MODEL'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(ModelMetaMapper.TABLE_NAME, "model_id", "mt")
         + " UNION"
         + " SELECT vt.schema_id FROM "
         + ViewMetaMapper.TABLE_NAME
@@ -306,6 +391,7 @@ public class OwnerMetaBaseSQLProvider {
         + "#{schemaId}"
         + "</foreach>"
         + " AND vt.view_id = ot.metadata_object_id AND ot.metadata_object_type = 'VIEW'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(ViewMetaMapper.TABLE_NAME, "view_id", "vt")
         + " UNION"
         + " SELECT fnt.schema_id FROM "
         + FunctionMetaMapper.TABLE_NAME
@@ -314,6 +400,28 @@ public class OwnerMetaBaseSQLProvider {
         + "#{schemaId}"
         + "</foreach>"
         + " AND fnt.function_id = ot.metadata_object_id AND ot.metadata_object_type = 'FUNCTION'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(
+            FunctionMetaMapper.TABLE_NAME, "function_id", "fnt")
+        + " UNION"
+        + " SELECT cot.schema_id FROM "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " cot WHERE cot.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach> AND"
+        + " cot.column_id = ot.metadata_object_id AND ot.metadata_object_type = 'COLUMN'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(
+            TableColumnMapper.COLUMN_TABLE_NAME, "column_id", "cot")
+        + " UNION"
+        + " SELECT smt.schema_id FROM "
+        + SemanticModelMetaMapper.TABLE_NAME
+        + " smt WHERE smt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach> AND"
+        + " smt.semantic_model_id = ot.metadata_object_id AND ot.metadata_object_type = 'SEMANTIC_MODEL'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(
+            SemanticModelMetaMapper.TABLE_NAME, "semantic_model_id", "smt")
         + ")"
         + "</script>";
   }

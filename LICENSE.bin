@@ -201,12 +201,16 @@
    limitations under the License.
 
    The Web UI also bundles various third-party components also under
-   different licenses, please see web/LICENSE.bin for these.
+   different licenses, please see web/LICENSE and web-v2/LICENSE for these.
 
    This product bundles various third-party components also under the
    Apache Software License 2.0 from:
 
    Apache Hive
+   Apache Paimon
+   FastDoubleParser (older Jackson copy shaded in paimon-format 1.2.0)
+   Apache DataSketches Java
+   Apache DataSketches Memory
    Apache Iceberg
    Apache Kafka
    Apache Spark
@@ -218,6 +222,7 @@
    Jackson Core
    Jackson Databind
    Jackson Data Mapper
+   Jackson Dataformat YAML
    Jackson Datatype Guava
    Jackson Datatype JDK8
    Jackson Datatype Joda
@@ -230,6 +235,13 @@
    Jackson Xml Compatibility Extensions
    Caffeine
    Dropwizard Hadoop Metrics
+   Dropwizard Metrics Annotation
+   Dropwizard Metrics Core
+   Dropwizard Metrics Healthchecks
+   Dropwizard Metrics JMX
+   Dropwizard Metrics JSON
+   Dropwizard Metrics JVM
+   Dropwizard Metrics Servlets
    GSON
    Error Prone Annotations
    Failure Access
@@ -303,6 +315,10 @@
    Apache Hadoop Yarn Client
    Apache Hive
    Apache HTrace
+   Google HTTP Client
+   Google HTTP Client GSON
+   gRPC API
+   gRPC Context
    Apache HttpCore
    Apache HttpClient
    Apache Iceberg
@@ -338,9 +354,11 @@
    JBoss Logging
    RoaringBitmap
    cglib
+   Objenesis
    jmxutils
    SQLite JDBC
    SnakeYAML
+   SnakeYAML Engine
    StAX API
    Tomcat Jasper Compiler
    Apache Xerces Java
@@ -371,6 +389,7 @@
    Jetty SSLEngine
    JJWT
    LZ4 and XxHash
+   LZ4 Java (at.yawk.lz4 fork)
    Prometheus Java Simpleclient
    Snappy Java
    XNIO API
@@ -391,6 +410,12 @@
    IPAddress
    Aliyun SDK OSS
    QLExpress
+   Fabric8 Kubernetes Client
+   Fabric8 Kubernetes Model
+   Fabric8 zjsonpatch
+   db-scheduler
+   cron-utils (shaded into db-scheduler)
+   JSpecify
 
    This product bundles various third-party components also under the
    Apache Software Foundation License 1.1
@@ -413,10 +438,15 @@
    String Template 4
    JSch
    ASM
+   OGNL (shaded in MyBatis 3.5.6)
+   bigint
    Protobuf
    ParaNamer
    RE2/J
    ZSTD JNI
+   LZ4 native library and xxHash (bundled in LZ4 Java, see licenses/lz4.txt)
+   Zstandard native library (bundled in ZSTD JNI, see licenses/zstd-native.txt)
+   Snappy native library (bundled in Snappy Java, see licenses/snappy.txt)
    fsspec
    Google auth HTTP
    Google auth Credentials
@@ -424,6 +454,10 @@
    Apache HttpComponents Core5
    Helger Profiler
    OpenAPI Tools Jackson Databind Nullable
+   dnsjava
+   PostgreSQL JDBC Driver
+   SQLLine
+   ThreeTen-Extra
 
    This product bundles various third-party components also under the
    MIT license
@@ -431,12 +465,22 @@
    SLF4J
    SLF4J-API
    Checker Framework
+   FastDoubleParser
+   fast_float
+   Schubfach
    Janino Common Compiler
    Protocol Buffers
    Treelayout
    Kyligence/kylinpy
    elarivie/pyReaderWriterLock
    tkem/cachetools
+   gethostname4j
+   Bitshuffle (bundled in Snappy Java, see licenses/bitshuffle.txt)
+
+   This product bundles various third-party components also under the
+   Boost Software License 1.0
+
+   fast_double_parser
 
    This product bundles various third-party components also under the
    Common Development and Distribution License 1.0
@@ -506,3 +550,22 @@
    XZ For Java
    HdrHistogram
    LatencyUtils
+
+
+   For the FastDoubleParser license text, see licenses/FastDoubleParser.txt.
+   Third-party license texts for code included in FastDoubleParser are in
+   licenses/FastDoubleParser-thirdparty.txt.
+   For the Schubfach license text, see licenses/Schubfach.txt.
+
+For the BSD license of OGNL shaded in MyBatis, see licenses/mybatis-ognl.txt.
+
+For the BSD licenses of the native LZ4 and xxHash code bundled in LZ4 Java, see licenses/lz4.txt.
+
+For the BSD license of the native Snappy code and the MIT license of the Bitshuffle code bundled
+   in Snappy Java, see licenses/snappy.txt and licenses/bitshuffle.txt.
+
+For the BSD license of the ZSTD JNI wrapper, see licenses/zstd.txt. For the BSD license of the
+   native Zstandard code it bundles, see licenses/zstd-native.txt.
+
+For the license texts of code included in Apache Commons Math 3.1.1,
+   see licenses/commons-math3.txt.

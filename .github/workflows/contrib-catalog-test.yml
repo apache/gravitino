@@ -1,0 +1,183 @@
+name: Contrib Catalog Test
+
+on:
+  workflow_call:
+    inputs:
+      base-ref:
+        type: string
+        required: false
+        default: ''
+      base-sha:
+        type: string
+        required: false
+        default: ''
+      head-repository:
+        type: string
+        required: false
+        default: ''
+      head-sha:
+        type: string
+        required: false
+        default: ''
+      sync:
+        type: string
+        required: false
+        default: ''
+  workflow_dispatch:
+
+concurrency:
+  group: fork-ci-contrib-catalog-${{ inputs.head-sha || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
+        id: checkout
+      - name: Disable Git automatic maintenance
+        run: git config --local maintenance.auto false
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d
+        id: filter
+        with:
+          base: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.base-sha || steps.checkout.outputs.base-ref }}
+          ref: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.head-sha || github.ref }}
+          filters: |
+            source_changes:
+              - .github/workflows/contrib-catalog-test.yml
+              - catalogs-contrib/**
+              - catalogs/catalog-common/**
+              - catalogs/catalog-jdbc-common/**
+              - dev/**
+              - gradle/**
+              - integration-test-common/**
+              - build.gradle.kts
+              - gradle.properties
+              - gradlew
+              - settings.gradle.kts
+      - name: Detect changed catalogs-contrib modules
+        id: contrib
+        run: |
+          if [ "${{ steps.checkout.outputs.synced }}" = "true" ]; then
+            BASE_SHA="${{ steps.checkout.outputs.base-sha }}"
+            HEAD_SHA="$(git rev-parse HEAD)"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+          fi
+
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            BASE_SHA="$(git rev-list --max-parents=0 "$HEAD_SHA" | tail -n 1)"
+          fi
+
+          MERGE_BASE_SHA="$(git merge-base "$BASE_SHA" "$HEAD_SHA" || true)"
+          if [ -z "$MERGE_BASE_SHA" ]; then
+            MERGE_BASE_SHA="$BASE_SHA"
+          fi
+
+          CHANGED_FILES="$(git diff --name-only "$MERGE_BASE_SHA" "$HEAD_SHA")"
+          CHANGED_MODULES="$(echo "$CHANGED_FILES" | awk -F/ '/^catalogs-contrib\/[^/]+\// {print $2}' | sort -u | xargs)"
+
+          if echo "$CHANGED_FILES" | grep -Eq '^(\.github/workflows/contrib-catalog-test.yml|catalogs-contrib/build.gradle.kts|catalogs/catalog-common/|catalogs/catalog-jdbc-common/|dev/|gradle/|integration-test-common/|build.gradle.kts|gradle.properties|gradlew|settings.gradle.kts)'; then
+            CHANGED_MODULES="__all__"
+          fi
+
+          echo "changed_catalogs_contrib_modules=$CHANGED_MODULES" >> "$GITHUB_OUTPUT"
+    outputs:
+      source_changes: ${{ steps.filter.outputs.source_changes }}
+      changed_catalogs_contrib_modules: ${{ steps.contrib.outputs.changed_catalogs_contrib_modules }}
+
+  contrib-catalog-test:
+    needs: changes
+    if: needs.changes.outputs.source_changes == 'true' && needs.changes.outputs.changed_catalogs_contrib_modules != ''
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+
+      - name: Check required command
+        run: |
+          dev/ci/check_commands.sh
+
+      - name: Free up disk space
+        run: |
+          dev/ci/util_free_space.sh
+
+      - name: Install dependencies
+        run: |
+          # libssl1.1 is not in the runner's apt sources, so the .deb is fetched directly.
+          deb=libssl1.1_1.1.1f-1ubuntu2_amd64.deb
+          for host in archive.ubuntu.com nz2.archive.ubuntu.com security.ubuntu.com; do
+            wget --tries=3 --timeout=30 -O "$deb" "https://$host/ubuntu/pool/main/o/openssl/$deb" && break
+            rm -f "$deb"
+          done
+          [ -s "$deb" ] || { echo "Could not download $deb from any mirror" >&2; exit 1; }
+          sudo dpkg -i "$deb"
+
+      - name: Run contrib catalog tests
+        id: contribCatalogTest
+        env:
+          GRAVITINO_CLICKHOUSE_TEST_IMAGE: clickhouse:25.8.14.17
+        run: |
+          CHANGED_CONTRIB_MODULES="${{ needs.changes.outputs.changed_catalogs_contrib_modules }}"
+
+          if [ "$CHANGED_CONTRIB_MODULES" = "__all__" ]; then
+            CONTRIB_MODULES="$(find catalogs-contrib -mindepth 1 -maxdepth 1 -type d -name 'catalog-*' -exec basename {} \; | sort)"
+          else
+            CONTRIB_MODULES="$CHANGED_CONTRIB_MODULES"
+          fi
+
+          gradle_args=()
+          for module in $CONTRIB_MODULES; do
+            if [ -d "catalogs-contrib/$module" ]; then
+              gradle_args+=(":catalogs-contrib:$module:test")
+            fi
+          done
+
+          if [ "${#gradle_args[@]}" -eq 0 ]; then
+            echo "No changed contrib catalog test tasks."
+            exit 0
+          fi
+
+          ./gradlew "${gradle_args[@]}" -PskipDockerTests=false -PskipWeb=true
+
+      - name: Upload contrib catalog test reports
+        uses: actions/upload-artifact@v7
+        if: ${{ (failure() && steps.contribCatalogTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
+        with:
+          name: contrib-catalog-test-reports
+          path: |
+            build/reports
+            catalogs-contrib/**/*.log
+            catalogs-contrib/**/*.tar

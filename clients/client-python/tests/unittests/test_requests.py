@@ -38,6 +38,7 @@ from gravitino.dto.requests.function_update_request import (
 from gravitino.dto.requests.function_updates_request import FunctionUpdatesRequest
 from gravitino.dto.requests.table_create_request import TableCreateRequest
 from gravitino.exceptions.base import IllegalArgumentException
+from tests.unittests.fixtures.table_fixtures import TABLE_CREATE_REQUEST_JSON_STRING
 
 
 class TestRequests(unittest.TestCase):
@@ -109,137 +110,7 @@ class TestRequests(unittest.TestCase):
                 req.validate()
 
     def test_table_create_request(self):
-        json_str = """
-            {
-                "name": "example_table",
-                "comment": "This is an example table",
-                "columns": [
-                    {
-                        "name": "id",
-                        "type": "integer",
-                        "comment": "id column comment",
-                        "nullable": false,
-                        "autoIncrement": true,
-                        "defaultValue": {
-                            "type": "literal",
-                            "dataType": "integer",
-                            "value": "-1"
-                        }
-                    },
-                    {
-                        "name": "name",
-                        "type": "varchar(500)",
-                        "comment": "name column comment",
-                        "nullable": true,
-                        "autoIncrement": false,
-                        "defaultValue": {
-                            "type": "literal",
-                            "dataType": "null",
-                            "value": "null"
-                        }
-                    },
-                    {
-                        "name": "StartingDate",
-                        "type": "timestamp",
-                        "comment": "StartingDate column comment",
-                        "nullable": false,
-                        "autoIncrement": false,
-                        "defaultValue": {
-                            "type": "function",
-                            "funcName": "current_timestamp",
-                            "funcArgs": []
-                        }
-                    },
-                    {
-                        "name": "info",
-                        "type": {
-                            "type": "struct",
-                            "fields": [
-                                {
-                                    "name": "position",
-                                    "type": "string",
-                                    "nullable": true,
-                                    "comment": "position field comment"
-                                },
-                                {
-                                    "name": "contact",
-                                    "type": {
-                                        "type": "list",
-                                        "elementType": "integer",
-                                        "containsNull": false
-                                    },
-                                    "nullable": true,
-                                    "comment": "contact field comment"
-                                },
-                                {
-                                    "name": "rating",
-                                    "type": {
-                                        "type": "map",
-                                        "keyType": "string",
-                                        "valueType": "integer",
-                                        "valueContainsNull": false
-                                    },
-                                    "nullable": true,
-                                    "comment": "rating field comment"
-                                }
-                            ]
-                        },
-                        "comment": "info column comment",
-                        "nullable": true
-                    },
-                    {
-                        "name": "dt",
-                        "type": "date",
-                        "comment": "dt column comment",
-                        "nullable": true
-                    },
-                    {
-                        "name": "age",
-                        "type": "integer",
-                        "comment": "age column comment",
-                        "nullable": true
-                    }
-                ],
-                "partitioning": [
-                    {
-                        "strategy": "identity",
-                        "fieldName": [ "dt" ]
-                    }
-                ],
-                "distribution": {
-                    "strategy": "hash",
-                    "number": 32,
-                    "funcArgs": [
-                        {
-                            "type": "field",
-                            "fieldName": [ "id" ]
-                        }
-                    ]
-                },
-                "sortOrders": [
-                    {
-                        "sortTerm": {
-                            "type": "field",
-                            "fieldName": [ "age" ]
-                        },
-                        "direction": "asc",
-                        "nullOrdering": "nulls_first"
-                    }
-                ],
-                "indexes": [
-                    {
-                        "indexType": "primary_key",
-                        "name": "PRIMARY",
-                        "fieldNames": [["id"]]
-                    }
-                ],
-                "properties": {
-                    "format": "ORC"
-                }
-            }
-        """
-
-        req = TableCreateRequest.from_json(json_str)
+        req = TableCreateRequest.from_json(TABLE_CREATE_REQUEST_JSON_STRING)
         req.validate()
 
         multiple_auto_increment_json_str = """

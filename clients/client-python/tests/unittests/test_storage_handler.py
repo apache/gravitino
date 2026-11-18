@@ -15,12 +15,24 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import re
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from fsspec.implementations.memory import MemoryFileSystem
 
-from gravitino.filesystem.gvfs_storage_handler import S3StorageHandler
+from gravitino.exceptions.base import GravitinoRuntimeException
+from gravitino.filesystem.gvfs_storage_handler import (
+    ABSStorageHandler,
+    GCSStorageHandler,
+    HDFSStorageHandler,
+    OSSStorageHandler,
+    S3StorageHandler,
+)
+
+STORAGE_IMPORT_MODULE = (
+    "gravitino.filesystem.gvfs_storage_handler.importlib.import_module"
+)
 
 
 class TestStorageHandler(unittest.TestCase):
@@ -84,3 +96,84 @@ class TestStorageHandler(unittest.TestCase):
             self.assertEqual(captured_args["key"], "access_key_from_client")
             self.assertEqual(captured_args["secret"], "secret_key_from_client")
             self.assertEqual(captured_args["endpoint_url"], "endpoint_from_catalog")
+
+    def test_missing_provider_dependency_has_install_guidance(self):
+        handlers = [
+            (HDFSStorageHandler(), "pyarrow", "hdfs"),
+            (S3StorageHandler(), "s3fs", "s3"),
+            (GCSStorageHandler(), "gcsfs", "gcs"),
+            (OSSStorageHandler(), "ossfs", "oss"),
+            (ABSStorageHandler(), "adlfs", "azure"),
+        ]
+
+        for handler, missing_module, extra_name in handlers:
+            with self.subTest(extra=extra_name):
+                with patch(
+                    STORAGE_IMPORT_MODULE,
+                    side_effect=ModuleNotFoundError(
+                        f"No module named '{missing_module}'",
+                        name=missing_module,
+                    ),
+                ):
+                    with self.assertRaisesRegex(
+                        GravitinoRuntimeException,
+                        re.escape(f"apache-gravitino[{extra_name}]"),
+                    ):
+                        handler.get_filesystem("unused://path")
+
+    def test_provider_handlers_dispatch_to_their_filesystem_class(self):
+        handlers = [
+            (HDFSStorageHandler(), "pyarrow.fs", "HadoopFileSystem"),
+            (S3StorageHandler(), "s3fs", "S3FileSystem"),
+            (GCSStorageHandler(), "gcsfs", "GCSFileSystem"),
+            (OSSStorageHandler(), "ossfs", "OSSFileSystem"),
+            (ABSStorageHandler(), "adlfs", "AzureBlobFileSystem"),
+        ]
+
+        for handler, module_name, class_name in handlers:
+            with self.subTest(provider=module_name):
+                provider_module = MagicMock()
+                filesystem_class = getattr(provider_module, class_name)
+                filesystem = MagicMock()
+
+                if module_name == "pyarrow.fs":
+                    filesystem_class.from_uri.return_value = filesystem
+                    with (
+                        patch(
+                            "gravitino.filesystem.gvfs_storage_handler.ArrowFSWrapper",
+                            return_value=filesystem,
+                        ) as arrow_wrapper,
+                        patch(
+                            STORAGE_IMPORT_MODULE, return_value=provider_module
+                        ) as import_module,
+                    ):
+                        result = handler.get_filesystem("hdfs://namenode:8020/path")
+
+                    filesystem_class.from_uri.assert_called_once_with(
+                        "hdfs://namenode:8020/path"
+                    )
+                    arrow_wrapper.assert_called_once_with(filesystem)
+                else:
+                    filesystem_class.return_value = filesystem
+                    with patch(
+                        STORAGE_IMPORT_MODULE, return_value=provider_module
+                    ) as import_module:
+                        result = handler.get_filesystem(
+                            "unused://path", test_option="value"
+                        )
+
+                    filesystem_class.assert_called_once_with(test_option="value")
+
+                import_module.assert_called_once_with(module_name)
+                self.assertIs(result, filesystem)
+
+    def test_provider_transitive_import_error_is_preserved(self):
+        handler = S3StorageHandler()
+        with patch(
+            STORAGE_IMPORT_MODULE,
+            side_effect=ModuleNotFoundError(
+                "No module named 'botocore'", name="botocore"
+            ),
+        ):
+            with self.assertRaisesRegex(ModuleNotFoundError, "botocore"):
+                handler.get_filesystem("s3a://bucket/path")

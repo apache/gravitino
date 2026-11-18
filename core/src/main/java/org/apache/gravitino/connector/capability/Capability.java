@@ -19,6 +19,7 @@
 package org.apache.gravitino.connector.capability;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.Locale;
 import java.util.Set;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.annotation.Evolving;
@@ -42,7 +43,8 @@ public interface Capability {
     TOPIC,
     PARTITION,
     MODEL,
-    FUNCTION
+    FUNCTION,
+    SEMANTIC_MODEL
   }
 
   /**
@@ -74,6 +76,25 @@ public interface Capability {
   }
 
   /**
+   * Normalizes the given name to the catalog's canonical form before it is used to call the
+   * underlying catalog operation and persisted as the Gravitino entity name. This is invoked
+   * instead of the simple lowercase folding implied by {@link #caseSensitiveOnName(Scope)} whenever
+   * a catalog needs custom folding logic (for example, a catalog whose native folding direction is
+   * uppercase, or one that supports a case-sensitive quoted form alongside a case-insensitive
+   * unquoted form).
+   *
+   * @param scope The scope of the capability.
+   * @param name The name to normalize.
+   * @return The normalized, canonical name.
+   */
+  default String normalizeName(Scope scope, String name) {
+    if (name == null) {
+      return null;
+    }
+    return caseSensitiveOnName(scope).supported() ? name : name.toLowerCase(Locale.ROOT);
+  }
+
+  /**
    * Check if the name is illegal in the scope, such as special characters, reserved words, etc.
    *
    * @param scope The scope of the capability.
@@ -85,10 +106,31 @@ public interface Capability {
   }
 
   /**
+   * Checks an existing table or schema name for deletion, or an existing column reference.
+   *
+   * <p>The default preserves the create-time restrictions. A catalog may accept additional native
+   * names only when the corresponding operations safely quote them. This does not relax creation or
+   * rename-target validation.
+   *
+   * @param scope the table, schema, or column scope
+   * @param name the existing name to check
+   * @return whether the existing name is supported
+   */
+  default CapabilityResult specificationOnExistingName(Scope scope, String name) {
+    return specificationOnName(scope, name);
+  }
+
+  /**
    * Check if the metadata entity is fully managed by Gravitino for the passed-in scope. This is
    * used to determine whether Gravitino should manage the lifecycle of the metadata and related
    * data. For example, if a catalog storage is managed, when the catalog is dropped, Gravitino will
    * also delete all underlying data associated with the catalog.
+   *
+   * <p>For managed table storage, creating a new table must persist the server-supplied {@code
+   * gravitino.identifier} as its entity ID. If creation returns an existing table, its stored ID
+   * must be retained instead. Core uses these identities to distinguish creation from reuse before
+   * assigning ownership. A connector may omit the reserved identifier from the returned table
+   * properties if it is preserved in the entity store; core reads the stored ID in that case.
    *
    * @param scope The scope of the capability.
    * @return The capability of the managed storage.
@@ -159,7 +201,7 @@ public interface Capability {
 
     @Override
     public CapabilityResult managedStorage(Scope scope) {
-      if (scope == Scope.FUNCTION) {
+      if (scope == Scope.FUNCTION || scope == Scope.SEMANTIC_MODEL) {
         return CapabilityResult.SUPPORTED;
       }
 

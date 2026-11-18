@@ -37,6 +37,7 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.credential.PathContext;
 import org.apache.gravitino.connector.credential.SupportsPathBasedCredentials;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -45,8 +46,11 @@ import org.apache.gravitino.utils.PrincipalUtils;
 public class CredentialOperationDispatcher extends OperationDispatcher {
 
   public CredentialOperationDispatcher(
-      CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
-    super(catalogManager, store, idGenerator);
+      CatalogManager catalogManager,
+      EntityStore store,
+      IdGenerator idGenerator,
+      SecretManager secretManager) {
+    super(catalogManager, store, idGenerator, secretManager);
   }
 
   public List<Credential> getCredentials(NameIdentifier identifier, CredentialPrivilege privilege) {

@@ -41,6 +41,12 @@ curl -fsSL "${JDBC_URL}" -o "${JDBC_JAR}"
 EXPECTED_SHA1="$(curl -fsSL "${JDBC_URL}.sha1")"
 echo "${EXPECTED_SHA1}  ${JDBC_JAR}" | sha1sum --check
 
+# The entity-cache consistency test uses an Iceberg JDBC catalog. Catalogs have
+# isolated class loaders, so the driver must also be present in the catalog's
+# own libs directory before the distribution is copied for instance B.
+mkdir -p distribution/package/catalogs/lakehouse-iceberg/libs
+cp "${JDBC_JAR}" distribution/package/catalogs/lakehouse-iceberg/libs/
+
 # ---------------------------------------------------------------------------
 # 2. Copy distribution to get two independent instances.
 # ---------------------------------------------------------------------------
@@ -70,7 +76,9 @@ subs = [
   (r'^gravitino\.entity\.store\.relational\.jdbcPassword\s*=.*$',
    'gravitino.entity.store.relational.jdbcPassword = gravitino'),
   (r'^gravitino\.cache\.enabled\s*=.*$',
-   'gravitino.cache.enabled = false'),
+   'gravitino.cache.enabled = true'),
+  (r'^gravitino\.entityChangeLog\.pollIntervalSecs\s*=.*$',
+   'gravitino.entityChangeLog.pollIntervalSecs = 1'),
   (r'^gravitino\.authorization\.enable\s*=.*$',
    'gravitino.authorization.enable = true'),
   (r'^gravitino\.authorization\.serviceAdmins\s*=.*$',
@@ -135,8 +143,8 @@ patch_pid_grep distribution/package-b/bin/gravitino.sh
 # ---------------------------------------------------------------------------
 # 5. Start both instances and wait until they are ready.
 # ---------------------------------------------------------------------------
-distribution/package/bin/gravitino.sh   start
-distribution/package-b/bin/gravitino.sh start
+GRAVITINO_DEBUG_OPTS= distribution/package/bin/gravitino.sh start
+GRAVITINO_DEBUG_OPTS= distribution/package-b/bin/gravitino.sh start
 
 wait_ready() {
   local url=$1

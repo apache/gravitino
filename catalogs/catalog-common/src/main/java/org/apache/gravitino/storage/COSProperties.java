@@ -1,0 +1,44 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.storage;
+
+// Properties for Tencent Cloud COS.
+public class COSProperties {
+
+  // The region of Tencent Cloud COS, e.g. "ap-guangzhou".
+  public static final String GRAVITINO_COS_REGION = "cos-region";
+  // The endpoint of Tencent Cloud COS (optional, normally derived from region).
+  public static final String GRAVITINO_COS_ENDPOINT = "cos-endpoint";
+  // The static access key ID (Tencent Cloud SecretId) used to access COS data.
+  public static final String GRAVITINO_COS_ACCESS_KEY_ID = "cos-access-key-id";
+  // The static secret access key (Tencent Cloud SecretKey) used to access COS data.
+  public static final String GRAVITINO_COS_ACCESS_KEY_SECRET = "cos-secret-access-key";
+
+  // The CAM role ARN that the server assumes when issuing temporary STS credentials.
+  // Format: qcs::cam::uin/<owner-uin>:roleName/<role-name>
+  public static final String GRAVITINO_COS_ROLE_ARN = "cos-role-arn";
+  // Optional external ID associated with the CAM role; required only when the role is configured
+  // with a third-party external ID for cross-account assume-role.
+  public static final String GRAVITINO_COS_EXTERNAL_ID = "cos-external-id";
+  // The Tencent Cloud APPID that owns the COS buckets, used to build resource ARNs in the STS
+  // session policy. Required when STS credential vending is enabled.
+  public static final String GRAVITINO_COS_APP_ID = "cos-app-id";
+
+  private COSProperties() {}
+}

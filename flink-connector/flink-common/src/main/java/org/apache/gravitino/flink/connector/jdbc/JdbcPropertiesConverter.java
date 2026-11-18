@@ -19,10 +19,13 @@
 
 package org.apache.gravitino.flink.connector.jdbc;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.util.Preconditions;
@@ -33,6 +36,17 @@ public abstract class JdbcPropertiesConverter
     implements CatalogPropertiesConverter, SchemaAndTablePropertiesConverter {
 
   private static final Pattern jdbcUrlPattern = Pattern.compile("(jdbc:\\w+://[^:/]+(?::\\d+)?)");
+
+  // Group 1 is the URL up to the authority, group 2 the optional query parameters.
+  private static final Pattern jdbcBaseUrlPattern =
+      Pattern.compile("(jdbc:\\w+://[^/?]+)(?:/[^?]*)?(\\?.*)?");
+
+  private static final Set<String> INJECTED_TABLE_OPTIONS =
+      ImmutableSet.of(
+          JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL,
+          JdbcPropertiesConstants.FLINK_JDBC_TABLE_NAME,
+          JdbcPropertiesConstants.FLINK_JDBC_USER,
+          JdbcPropertiesConstants.FLINK_JDBC_PASSWORD);
 
   @Override
   public Map<String, String> toGravitinoCatalogProperties(Configuration flinkConf) {
@@ -56,9 +70,22 @@ public abstract class JdbcPropertiesConverter
             + JdbcPropertiesConstants.GRAVITINO_JDBC_URL
             + "'.");
 
-    // The URL in FlinkJdbcCatalog does not support database and other parameters.
-    flinkCatalogProperties.put(
-        JdbcPropertiesConstants.FLINK_JDBC_URL, getBaseUrlFromJdbcUrl(gravitinoJdbcUrl));
+    // The URL in FlinkJdbcCatalog does not support database and other parameters. An explicit
+    // flink.bypass.base-url takes precedence, so Flink clients can reach the database through a
+    // different address than the Gravitino server.
+    if (!flinkCatalogProperties.containsKey(JdbcPropertiesConstants.FLINK_JDBC_URL)) {
+      flinkCatalogProperties.put(
+          JdbcPropertiesConstants.FLINK_JDBC_URL, getBaseUrlFromJdbcUrl(gravitinoJdbcUrl));
+    }
+
+    // Default the Flink catalog's 'default-database' option from the Gravitino jdbc-database
+    // property when it was not already supplied (e.g. via flink.bypass.default-database).
+    String gravitinoJdbcDatabase =
+        gravitinoProperties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DATABASE);
+    if (StringUtils.isNotBlank(gravitinoJdbcDatabase)) {
+      flinkCatalogProperties.putIfAbsent(
+          JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE, gravitinoJdbcDatabase);
+    }
     return flinkCatalogProperties;
   }
 
@@ -72,10 +99,22 @@ public abstract class JdbcPropertiesConverter
     return JdbcPropertiesConstants.gravitinoToFlinkMap.get(configKey);
   }
 
+  /**
+   * Drops the connection options that {@link #toFlinkTableProperties} injects for scans. Flink
+   * copies them into the options of {@code CREATE TABLE ... LIKE}, but they describe the catalog
+   * connection rather than the table, and must not reach the server as table properties.
+   */
+  @Override
+  public Map<String, String> toGravitinoTableProperties(Map<String, String> flinkProperties) {
+    Map<String, String> gravitinoProperties = new HashMap<>(flinkProperties);
+    gravitinoProperties.keySet().removeAll(INJECTED_TABLE_OPTIONS);
+    return gravitinoProperties;
+  }
+
   @Override
   public Map<String, String> toFlinkTableProperties(
       Map<String, String> flinkCatalogProperties,
-      Map<String, String> gravitinoProperties,
+      Map<String, String> gravitinoTableProperties,
       ObjectPath tablePath) {
     String jdbcUser = flinkCatalogProperties.get(JdbcPropertiesConstants.FLINK_JDBC_USER);
     String jdbcPassword = flinkCatalogProperties.get(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD);
@@ -89,14 +128,47 @@ public abstract class JdbcPropertiesConverter
     Map<String, String> tableOptions = new HashMap<>();
     tableOptions.put(
         JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL,
-        jdbcBaseUrl + tablePath.getDatabaseName());
-    tableOptions.put(JdbcPropertiesConstants.FLINK_JDBC_TABLE_NAME, tablePath.getObjectName());
+        buildDatabaseUrl(jdbcBaseUrl, getConnectionDatabase(flinkCatalogProperties, tablePath)));
+    tableOptions.put(JdbcPropertiesConstants.FLINK_JDBC_TABLE_NAME, getTableName(tablePath));
     tableOptions.put(JdbcPropertiesConstants.FLINK_JDBC_USER, jdbcUser);
     tableOptions.put(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD, jdbcPassword);
     return tableOptions;
   }
 
+  /**
+   * Returns the database name used to build the JDBC connection URL for a table scan. Defaults to
+   * the Flink "database", which corresponds to the Gravitino schema name.
+   *
+   * @param flinkCatalogProperties the Flink catalog properties produced by {@link
+   *     #toFlinkCatalogProperties(Map)}.
+   * @param tablePath the Flink table path being scanned.
+   * @return the database name to use when building the JDBC connection URL.
+   */
+  protected String getConnectionDatabase(
+      Map<String, String> flinkCatalogProperties, ObjectPath tablePath) {
+    return tablePath.getDatabaseName();
+  }
+
+  /** Returns the table name used in the JDBC connector's {@code table-name} option. */
+  protected String getTableName(ObjectPath tablePath) {
+    return tablePath.getObjectName();
+  }
+
   protected abstract String defaultDriverName();
+
+  /**
+   * Builds the JDBC URL of the given database from a base-url. The base-url may end with or without
+   * a slash, and Flink JDBC 4.x also accepts one that contains a database and query parameters, so
+   * any database in it is replaced and the query parameters are kept.
+   */
+  private static String buildDatabaseUrl(String baseUrl, String database) {
+    Matcher matcher = jdbcBaseUrlPattern.matcher(baseUrl.trim());
+    if (!matcher.matches()) {
+      return (baseUrl.endsWith("/") ? baseUrl : baseUrl + "/") + database;
+    }
+    String parameters = matcher.group(2) == null ? "" : matcher.group(2);
+    return matcher.group(1) + "/" + database + parameters;
+  }
 
   private static String getBaseUrlFromJdbcUrl(String jdbcUrl) {
     Matcher matcher = jdbcUrlPattern.matcher(jdbcUrl);
