@@ -43,6 +43,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -1123,8 +1124,10 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   @Test
   public void testSecrets() throws Exception {
     try (SecretManager secrets = memorySecretManager()) {
+      AtomicLong nextId = new AtomicLong(idGenerator.nextId());
       SchemaOperationDispatcher d =
-          new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secrets);
+          new SchemaOperationDispatcher(
+              catalogManager, entityStore, nextId::getAndIncrement, secrets);
       NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_secret");
       Map<String, SecretBinding> bindings = Map.of("k2", new SecretBinding("memory", "s3cr3t"));
       Schema schema =
@@ -1150,9 +1153,20 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
       Assertions.assertFalse(
           entityStore.get(ident, SCHEMA, SchemaEntity.class).properties().containsKey("k2"));
       Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+      long retryId = nextId.get();
       Assertions.assertThrows(
           SchemaAlreadyExistsException.class,
           () -> d.createSchema(ident, "comment", ImmutableMap.of("k1", "v1"), bindings, Map.of()));
+      // The schema was not created in the catalog, so the failed create deletes its version.
+      SecretUrn retryUrn =
+          SecretUrn.buildWriteThrough(
+              "memory",
+              Map.of(
+                  SecretConstants.ATTR_ENTITY_TYPE, "schema",
+                  SecretConstants.ATTR_ENTITY_ID, String.valueOf(retryId),
+                  SecretConstants.ATTR_PROPERTY_KEY, "k2"));
+      Assertions.assertNull(
+          secrets.getRegistry().getProvider("memory").currentSecretVersion(retryUrn));
       Assertions.assertTrue(d.dropSchema(ident, false));
       Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
     }

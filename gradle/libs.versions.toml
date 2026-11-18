@@ -113,6 +113,7 @@ metrics = "4.2.25"
 prometheus = "0.16.0"
 clickhouse = "0.7.1"
 lz4 = "1.8.0"
+yawk-lz4-java = "1.11.4"
 snappy-java = "1.1.10.12"
 mysql = "8.0.33"
 postgresql = "42.7.14"
@@ -121,7 +122,7 @@ selenium = "4.33.0"
 rauschig = "1.2.0"
 mybatis = "3.5.6"
 h2db = "2.2.224"
-kafka = "3.4.0"
+kafka = "3.9.2"
 curator = "2.12.0"
 awaitility = "4.2.1"
 servlet = "3.1.0"
@@ -367,6 +368,7 @@ prometheus-dropwizard = { group = "io.prometheus", name = "simpleclient_dropwiza
 prometheus-servlet = { group = "io.prometheus", name = "simpleclient_servlet", version.ref = "prometheus" }
 clickhouse-driver = { group = "com.clickhouse", name = "clickhouse-jdbc", version.ref = "clickhouse" }
 lz4-java = { group = "org.lz4", name = "lz4-java", version.ref = "lz4" }
+yawk-lz4-java = { group = "at.yawk.lz4", name = "lz4-java", version.ref = "yawk-lz4-java" }
 snappy-java = { group = "org.xerial.snappy", name = "snappy-java", version.ref = "snappy-java" }
 mysql-driver = { group = "mysql", name = "mysql-connector-java", version.ref = "mysql" }
 postgresql-driver = { group = "org.postgresql", name = "postgresql", version.ref = "postgresql" }
