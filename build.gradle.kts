@@ -395,6 +395,15 @@ val shadedAvroStrippedProjects = setOf(
   ":iceberg:iceberg-rest-server-experiment"
 )
 
+// Bundles whose shaded jars include hadoop-client-runtime.
+val shadedAvroStrippedBundles = setOf(
+  ":bundles:aliyun-bundle",
+  ":bundles:aws-bundle",
+  ":bundles:azure-bundle",
+  ":bundles:gcp-bundle",
+  ":bundles:tencent-bundle"
+)
+
 val snappyJavaVersion: String = libs.versions.snappy.java.get()
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
@@ -734,6 +743,18 @@ subprojects {
       .configureEach {
         attributes.attribute(StripShadedAvroTransform.STRIPPED, true)
       }
+  }
+  // The bundles drop the same entries from their shaded jars instead. The shadow plugin resolves
+  // the dependency files while it builds the task graph, before project jars exist, so the
+  // artifact transform above cannot run on the bundle classpaths. Remove this together with the
+  // transform.
+  if (project.path in shadedAvroStrippedBundles) {
+    plugins.withId("com.github.johnrengelman.shadow") {
+      tasks.named<ShadowJar>("shadowJar") {
+        exclude("${StripShadedAvroTransform.SHADED_AVRO_PREFIX}**")
+        exclude("${StripShadedAvroTransform.AVRO_METADATA_PREFIX}**")
+      }
+    }
   }
 
   repositories {

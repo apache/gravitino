@@ -34,6 +34,10 @@ dependencies {
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
   implementation(libs.hadoop3.gcs)
+
+  testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.slf4j.api)
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks.withType(ShadowJar::class.java) {
@@ -82,4 +86,11 @@ tasks.jar {
 
 tasks.compileJava {
   dependsOn(":catalogs:catalog-fileset:runtimeJars")
+}
+
+tasks.test {
+  val bundle = tasks.named<ShadowJar>("shadowJar")
+  dependsOn(bundle)
+  inputs.file(bundle.flatMap { it.archiveFile })
+  doFirst { systemProperty("shadowJarPath", bundle.get().archiveFile.get().asFile.absolutePath) }
 }

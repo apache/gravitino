@@ -679,17 +679,6 @@ vulnerabilities:
       - pkg:npm/source-map-js@1.2.1
     expired_at: 2027-02-07
     statement: "Pre-existing finding, tracked in apache/gravitino#14777."
-  # org.apache.avro/avro
-  - id: CVE-2023-39410
-    purls:
-      - pkg:maven/org.apache.avro/avro@1.7.7
-    expired_at: 2027-02-07
-    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
-  - id: CVE-2024-47561
-    purls:
-      - pkg:maven/org.apache.avro/avro@1.7.7
-    expired_at: 2027-02-07
-    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
   # org.apache.kerby/kerb-server
   - id: CVE-2026-57915
     purls:
