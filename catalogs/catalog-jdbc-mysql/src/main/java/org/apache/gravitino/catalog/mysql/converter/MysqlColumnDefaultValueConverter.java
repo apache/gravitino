@@ -25,6 +25,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
@@ -38,11 +39,18 @@ import org.apache.gravitino.rel.types.Types;
 
 public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConverter {
 
+  // Only quoted temporal literals may be rendered from an unparsed default.
+  private static final Pattern QUOTED_TEMPORAL_LITERAL =
+      Pattern.compile(
+          "'(?:[0-9]{4}-[0-9]{2}-[0-9]{2}(?: [0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,6})?)?"
+              + "|-?[0-9]{2,3}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,6})?)'");
+
   /**
-   * Renders Boolean literal defaults as numeric 1 or 0. Gravitino maps BOOLEAN to MySQL BIT, which
-   * rejects the quoted 'true' and 'false' strings. The check uses the literal type, so a Boolean
-   * default that is loaded from BIT(1) and then re-rendered by MODIFY COLUMN keeps working after a
-   * type change to a numeric column. Other defaults use the shared JDBC rendering.
+   * Renders preserved temporal defaults as quoted SQL literals and Boolean defaults as numeric 1 or
+   * 0. Gravitino maps BOOLEAN to MySQL BIT, which rejects the quoted 'true' and 'false' strings.
+   * The check uses the literal type, so a Boolean default that is loaded from BIT(1) and then
+   * re-rendered by MODIFY COLUMN keeps working after a type change to a numeric column. Other
+   * defaults use the shared JDBC rendering.
    *
    * @param defaultValue the Gravitino default expression
    * @return the SQL expression, or null when no default is set
@@ -51,6 +59,12 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
   @Override
   @Nullable
   public String fromGravitino(Expression defaultValue) {
+    if (defaultValue instanceof UnparsedExpression) {
+      String sql = ((UnparsedExpression) defaultValue).unparsedExpression();
+      if (QUOTED_TEMPORAL_LITERAL.matcher(sql).matches()) {
+        return sql;
+      }
+    }
     if (defaultValue instanceof Literal
         && ((Literal<?>) defaultValue).dataType() instanceof Types.BooleanType) {
       String value = String.valueOf(((Literal<?>) defaultValue).value()).trim();
@@ -126,9 +140,17 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
         return Literals.decimalLiteral(
             Decimal.of(columnDefaultValue, type.getColumnSize(), type.getScale()));
       case JdbcTypeConverter.DATE:
-        return Literals.dateLiteral(LocalDate.parse(columnDefaultValue, DATE_FORMATTER));
+        try {
+          return Literals.dateLiteral(LocalDate.parse(columnDefaultValue, DATE_FORMATTER));
+        } catch (DateTimeParseException e) {
+          return UnparsedExpression.of(quoteStringLiteral(columnDefaultValue));
+        }
       case JdbcTypeConverter.TIME:
-        return Literals.timeLiteral(LocalTime.parse(columnDefaultValue, TIME_FORMATTER));
+        try {
+          return Literals.timeLiteral(LocalTime.parse(columnDefaultValue, TIME_FORMATTER));
+        } catch (DateTimeParseException e) {
+          return UnparsedExpression.of(quoteStringLiteral(columnDefaultValue));
+        }
       case JdbcTypeConverter.TIMESTAMP:
       case MysqlTypeConverter.DATETIME:
         if (StringUtils.startsWithIgnoreCase(columnDefaultValue, CURRENT_TIMESTAMP)) {
@@ -138,8 +160,7 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
           return Literals.timestampLiteral(
               LocalDateTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
         } catch (DateTimeParseException e) {
-          throw new IllegalArgumentException(
-              String.format("Unable to parse datetime value: %s", columnDefaultValue));
+          return UnparsedExpression.of(quoteStringLiteral(columnDefaultValue));
         }
       case JdbcTypeConverter.VARCHAR:
         return Literals.of(columnDefaultValue, Types.VarCharType.of(type.getColumnSize()));

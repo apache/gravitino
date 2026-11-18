@@ -21,6 +21,7 @@ from typing import Dict, Optional
 from gravitino.api.auditable import Auditable
 from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.secret.supports_secrets import SupportsSecrets
+from gravitino.api.domain.supports_domains import SupportsDomains
 from gravitino.api.policy.supports_policies import SupportsPolicies
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.exceptions.base import UnsupportedOperationException
@@ -99,3 +100,7 @@ class Model(Auditable):
         raise UnsupportedOperationException(
             "Model does not support secret property operations."
         )
+
+    def supports_domains(self) -> SupportsDomains:
+        """Return domain lookup operations for this model."""
+        raise UnsupportedOperationException("Model does not support domain operations.")

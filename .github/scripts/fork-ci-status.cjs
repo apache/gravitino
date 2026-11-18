@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 'use strict';
-const { TRUSTED_REQUIRED } = require('./publish-ci-status.cjs');
+const { TRUSTED_REQUIRED, NEEDS_ATTENTION } = require('./publish-ci-status.cjs');
 const { readFileSync } = require('node:fs');
 const path = require('node:path');
 const UPSTREAM = { owner: 'apache', repo: 'gravitino' };
@@ -60,9 +60,25 @@ const MISSING_WORKFLOW = 'Your fork has no Fork CI workflow, so pushes to this b
   'Merge or rebase the branch onto the latest base branch, which adds .github/workflows/fork-ci.yml, ' +
   'make sure Actions are enabled in your fork, and push again.';
 const requiredAction = note => ({ status: 'completed', conclusion: 'action_required',
-  title: 'Fork CI needs attention', note });
+  title: NEEDS_ATTENTION, note });
+
+function incompleteAttempt(run, jobs) {
+  if (jobs.some(job => job.run_attempt > run.run_attempt)) {
+    return requiredAction('The jobs API reports a newer attempt than the run listing. ' +
+      'Waiting for consistent results; the publisher will automatically check again.');
+  }
+  // A completed rerun must expose at least one job from that attempt. Otherwise all
+  // retained successes (and auxiliary cancellations) could belong to the previous run.
+  if (run.status === 'completed' && run.run_attempt > 1 &&
+      !jobs.some(job => job.run_attempt === run.run_attempt)) {
+    return requiredAction('The jobs API has not reported the completed current attempt yet. ' +
+      'Waiting for consistent results; the publisher will automatically check again.');
+  }
+}
 
 function evaluateExecution(pr, run, jobs, baseSha) {
+  const incomplete = incompleteAttempt(run, jobs);
+  if (incomplete) return incomplete;
   const required = jobs.find(job => job.name === requiredName(pr, baseSha));
   if (run.status !== 'completed') {
     // A workflow can remain queued while some of its matrix jobs already have runners.
@@ -70,18 +86,73 @@ function evaluateExecution(pr, run, jobs, baseSha) {
     return { status: running ? 'in_progress' : 'queued',
       title: running ? 'Fork CI is running' : 'Fork CI is queued, waiting for a runner' };
   }
-  const failed = jobs.filter(job => job.name !== FAIL_FAST && ['failure', 'timed_out'].includes(job.conclusion))
-    .map(job => job.name);
-  // A run that failed only because of the watcher is judged by its suites below.
-  const watcherOnly = run.conclusion === 'failure' && !failed.length &&
-    jobs.some(job => job.name === FAIL_FAST && ['failure', 'timed_out'].includes(job.conclusion));
-  if (run.conclusion !== 'success' && !watcherOnly) {
-    // Fork CI cancels its own run on the first failed job, so report that job, not the cancellation.
-    if (failed.length) return { status: 'completed', conclusion: 'failure',
-      title: `Failed: ${failed[0]}${failed.length > 1 ? ` (+${failed.length - 1} more)` : ''}`.slice(0, 200) };
+  // A nonmatching summary is obsolete only when it is provably from an older attempt.
+  // A newer (possibly unexpanded) summary must not reuse an earlier exact success.
+  const otherSummary = job => job.name.startsWith('Required CI / ') && job !== required;
+  const obsoleteSummary = job => otherSummary(job) && required &&
+    Number.isInteger(job.run_attempt) && job.run_attempt > 0 &&
+    Number.isInteger(required.run_attempt) && required.run_attempt > job.run_attempt;
+  const isAuxiliary = job => job.name === FAIL_FAST || obsoleteSummary(job);
+  const currentJobs = jobs.filter(job => !isAuxiliary(job));
+  // A previous attempt's unsuccessful job may be awaiting its replacement in the jobs API.
+  // It cannot become a settled failure for this rerun. Current failures remain authoritative.
+  const fromCurrentAttempt = job => run.run_attempt === 1 || job.run_attempt === run.run_attempt;
+  const failed = currentJobs.filter(job => !otherSummary(job) && fromCurrentAttempt(job) &&
+    ['failure', 'timed_out'].includes(job.conclusion)).map(job => job.name);
+  // Partial reruns can retain a cancelled watcher or an obsolete Required CI job, keeping
+  // the whole run cancelled after its suites recover. Ignore only those auxiliary results,
+  // then verify the exact Required CI and all required suites below. Any other unfinished
+  // or unsuccessful job still blocks.
+  const auxiliaryOnly = ['failure', 'timed_out', 'cancelled'].includes(run.conclusion) &&
+    jobs.some(job => isAuxiliary(job) && ['failure', 'timed_out', 'cancelled'].includes(job.conclusion)) &&
+    currentJobs.every(job => ['success', 'skipped'].includes(job.conclusion));
+  // Run and job metadata are separate API snapshots. Even a successful aggregate must
+  // not hide a failed prerequisite or suite observed in the jobs response.
+  if (failed.length) return { status: 'completed', conclusion: 'failure',
+    title: `Failed: ${failed[0]}${failed.length > 1 ? ` (+${failed.length - 1} more)` : ''}`.slice(0, 200) };
+  if (jobs.some(job => otherSummary(job) && !obsoleteSummary(job))) {
+    return requiredAction('A Required CI record from the same, newer or unknown attempt does not match ' +
+      'this head and base. Rerun Required CI for the current context before publishing success.');
+  }
+  const stale = currentJobs.find(job => !fromCurrentAttempt(job) &&
+    !['success', 'skipped'].includes(job.conclusion));
+  if (stale) {
+    return requiredAction(`The result for ${stale.name} is not from the current attempt. ` +
+      'Waiting for consistent results; the publisher will automatically check again.');
+  }
+  // Seeing one current job does not establish that downstream results are complete.
+  // Overriding an unsuccessful aggregate requires a successful gate in THIS attempt.
+  // A watcher-only rerun with an older gate must rerun Required CI too: the API snapshot
+  // alone cannot distinguish it from a rerun whose downstream records have not arrived.
+  const gateBehind = required?.conclusion === 'success' &&
+    currentJobs.every(job => ['success', 'skipped'].includes(job.conclusion)) && currentJobs.some(job =>
+    Number.isInteger(job.run_attempt) && job.run_attempt > 0 &&
+    (!Number.isInteger(required.run_attempt) || job.run_attempt > required.run_attempt));
+  if (run.run_attempt > 1 && (gateBehind || (run.conclusion !== 'success' &&
+      required?.run_attempt !== run.run_attempt &&
+      currentJobs.every(job => ['success', 'skipped'].includes(job.conclusion))))) {
+    return requiredAction('Required CI has not confirmed the current attempt. The publisher will ' +
+      'check again automatically; if only the watcher was rerun, rerun Required CI as well.');
+  }
+  if (currentJobs.some(job => !job.conclusion)) {
+    return requiredAction('The completed run still has unfinished job results. ' +
+      'The publisher will check the results again automatically.');
+  }
+  if (run.conclusion !== 'success' && !auxiliaryOnly) {
+    // The aggregate may arrive before its unsuccessful job (including the watcher).
+    // Without that evidence a settled cancellation would suppress the next jobs read.
+    if (['failure', 'timed_out', 'cancelled'].includes(run.conclusion) &&
+        currentJobs.every(job => ['success', 'skipped'].includes(job.conclusion))) {
+      return requiredAction('The unsuccessful run has no corresponding unsuccessful job result yet. ' +
+        'Waiting for consistent results; the publisher will automatically check again.');
+    }
     return { status: 'completed',
       conclusion: ['failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion)
         ? run.conclusion : 'action_required', title: `Fork CI ${run.conclusion}` };
+  }
+  if (currentJobs.some(job => !['success', 'skipped'].includes(job.conclusion))) {
+    return requiredAction('The run reports success but a required job is cancelled or unfinished. ' +
+      'The publisher will check the results again automatically.');
   }
   if (!required || required.conclusion !== 'success') {
     return requiredAction('The run did not finish Required CI for this exact head, base branch and base SHA. ' +
@@ -156,7 +227,8 @@ function createService(github, { readWorkflow = sha => github.rest.repos.getCont
       { owner, repo, run_id: run.id, filter: 'all', per_page: 100 });
     const latest = new Map();
     for (const job of jobs) {
-      if ((job.run_attempt || 1) > run.run_attempt) continue;
+      // Keep evidence of a rerun that started after the run listing was read. Silently
+      // discarding it could turn an earlier attempt's success into the current result.
       const previous = latest.get(job.name);
       if (!previous || (job.run_attempt || 1) > (previous.run_attempt || 1) ||
           ((job.run_attempt || 1) === (previous.run_attempt || 1) && job.id > previous.id)) {
@@ -167,9 +239,16 @@ function createService(github, { readWorkflow = sha => github.rest.repos.getCont
   }
   async function acceptedBase(pr, sha) {
     if (!sha || sha === pr.base.sha || !/^[0-9a-f]{40}$/.test(sha)) return pr.base.sha;
-    const { data } = await github.rest.repos.compareCommitsWithBasehead({ ...UPSTREAM,
-      basehead: `${sha}...${pr.base.ref}`, per_page: 1 });
-    return ['ahead', 'identical'].includes(data.status) ? sha : pr.base.sha;
+    try {
+      const { data } = await github.rest.repos.compareCommitsWithBasehead({ ...UPSTREAM,
+        basehead: `${sha}...${pr.base.ref}`, per_page: 1 });
+      return ['ahead', 'identical'].includes(data.status) ? sha : pr.base.sha;
+    } catch (error) {
+      // A workflow can name a nonexistent SHA. Reject that context without hiding
+      // authoritative job failures; transient API errors must still retry the refresh.
+      if (error.status !== 404) throw error;
+      return pr.base.sha;
+    }
   }
   async function testedBase(pr, jobs) {
     // pr.base.sha is not refreshed by later pushes, so runs usually test a newer base commit.
@@ -215,14 +294,23 @@ function createService(github, { readWorkflow = sha => github.rest.repos.getCont
     const sameDefinitions = await unchanged(pr);
     let trusted = await findRun(pr, true);
     let trustedJobs;
+    let trustedExact = false;
+    let trustedCurrentExact = false;
     if (trusted) {
       trustedJobs = await jobsFor(trusted.owner, trusted.repo, trusted.run);
-      const exact = trustedJobs.some(job => job.name === requiredName(pr, trusted.run.head_sha));
-      // The display title identifies only the PR number. A previous contributor head can
-      // have a trusted result too; do not let it obscure this head's running fork jobs.
-      if (!exact && (trusted.run.status === 'completed' ||
-          trustedJobs.some(job => job.name.startsWith('Required CI / ')) ||
-          (ordinary && trusted.run.created_at < ordinary.run.created_at))) trusted = undefined;
+      trustedExact = trustedJobs.some(job => job.name === requiredName(pr, trusted.run.head_sha));
+      trustedCurrentExact = trustedJobs.some(job => job.name === requiredName(pr, trusted.run.head_sha) &&
+        (job.run_attempt || 1) === trusted.run.run_attempt);
+      // A missing or unexpanded gate is unknown context, not evidence of an older PR head.
+      // Only discard a run whose current summaries all explicitly identify another head.
+      const summaries = trustedJobs.filter(job => job.name.startsWith('Required CI / ') &&
+        (job.run_attempt || 1) === trusted.run.run_attempt);
+      const otherHead = summaries.length > 0 && summaries.every(job => {
+        const match = /^Required CI \/ (.+) \/ ([0-9a-f]{40}) \/ ([0-9a-f]{40})$/.exec(job.name);
+        return match && match[3] !== pr.head.sha;
+      });
+      // Retained gates from earlier attempts do not identify the current attempt's PR head.
+      if (otherHead && !incompleteAttempt(trusted.run, trustedJobs)) trusted = undefined;
     }
     let selected = trusted && (!ordinary || (trusted.run.updated_at || trusted.run.created_at) >= (ordinary.run.updated_at || ordinary.run.created_at) || !sameDefinitions)
       ? trusted : ordinary;
@@ -236,8 +324,25 @@ function createService(github, { readWorkflow = sha => github.rest.repos.getCont
     const { owner, repo, run } = selected;
     // A manual upstream run uses the workflow definitions at run.head_sha, not the PR definitions.
     const jobs = selected.trusted ? trustedJobs : await jobsFor(owner, repo, run);
-    const base = selected.trusted ? run.head_sha : !sameDefinitions ? pr.base.sha : await testedBase(pr, jobs);
+    const incomplete = incompleteAttempt(run, jobs);
+    if (incomplete) return { ...selected, fork: ordinary?.run, result: incomplete };
+    if (selected.trusted && !trustedExact && run.status === 'completed') {
+      return { ...selected, fork: ordinary?.run, result: requiredAction(
+        'Trusted CI has not identified this PR head and base. The publisher will check again; ' +
+        'if the gate remains missing, dispatch a new trusted run for the current PR.') };
+    }
+    // CI edits change who may attest success, not which base the run actually tested.
+    const base = selected.trusted ? run.head_sha : await testedBase(pr, jobs);
     let result = evaluateExecution(pr, run, jobs, base);
+    // A retained exact gate identifies an earlier attempt. Do not settle a newer
+    // failure/cancellation until that attempt identifies its head too: a full rerun
+    // may have resolved a different PR head whose summary has not arrived yet.
+    // Successful watcher-only reruns still reach the suite checks below.
+    if (selected.trusted && !trustedCurrentExact && result?.status === 'completed' &&
+        result.title !== NEEDS_ATTENTION) {
+      result = requiredAction('Trusted CI has not identified this attempt\'s PR head and base. ' +
+        'The publisher will check again before attributing its unsuccessful jobs to this PR.');
+    }
     const needsSuiteChecks = !result;
     if (needsSuiteChecks) {
       // Require the callers of the commit the run tested: the upstream dispatch commit for trusted
@@ -255,9 +360,9 @@ function createService(github, { readWorkflow = sha => github.rest.repos.getCont
         'After reviewing these changes, a committer must dispatch Fork CI from the current upstream default branch with this PR number.';
       // Approval of CI edits is separate from execution progress. Never turn a running fork
       // into a completed error, or hide an actual failure behind the trust requirement.
-      result = run.status === 'completed' && (run.conclusion === 'success' || needsSuiteChecks)
+      result = needsSuiteChecks
         ? { ...requiredAction(note), title: TRUSTED_REQUIRED }
-        : { ...result, note: `${result.title}. ${note}` };
+        : { ...result, note: `${result.note || result.title}. ${note}` };
     }
     return { ...selected, fork: ordinary?.run, base, result };
   }
