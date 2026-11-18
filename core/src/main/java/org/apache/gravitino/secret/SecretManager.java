@@ -657,7 +657,7 @@ public class SecretManager implements Closeable {
    *     null
    */
   public Map<String, String> toPlaintextProperties(@Nullable Map<String, String> properties) {
-    return resolvePlaintextProperties(properties, true);
+    return validateSecretsReadable(properties);
   }
 
   /**
@@ -671,7 +671,7 @@ public class SecretManager implements Closeable {
    * @return a new map with secret URNs replaced by plaintext or the masked placeholder
    */
   public Map<String, String> toPlaintextOrMasked(@Nullable Map<String, String> properties) {
-    return resolvePlaintextProperties(properties, false);
+    return validateSecretsReadable(properties, false);
   }
 
   /**
@@ -686,18 +686,10 @@ public class SecretManager implements Closeable {
    *     null
    */
   public Map<String, String> validateSecretsReadable(@Nullable Map<String, String> properties) {
-    return resolveSecretProperties(properties, true);
+    return validateSecretsReadable(properties, true);
   }
 
-  private Map<String, String> resolvePlaintextProperties(
-      @Nullable Map<String, String> properties, boolean failOnMissing) {
-    if (failOnMissing) {
-      return validateSecretsReadable(properties);
-    }
-    return resolveSecretProperties(properties, false);
-  }
-
-  private Map<String, String> resolveSecretProperties(
+  private Map<String, String> validateSecretsReadable(
       @Nullable Map<String, String> properties, boolean failOnMissing) {
     if (properties == null || properties.isEmpty()) {
       return properties == null ? Map.of() : Map.copyOf(properties);
