@@ -828,11 +828,16 @@ components:
     BackingTag:
       type: object
       required: [name]
+      additionalProperties: false
       properties:
         name:
           type: string
           minLength: 1
           description: The name of the backing tag.
+        create:
+          type: boolean
+          default: false
+          description: True creates a new valueless tag. False binds an existing tag, whatever values it allows.
 
     DomainName:
       type: string
@@ -866,14 +871,7 @@ components:
               enum: [null]
           description: Optional top-level parent. A subdomain is created atomically under it.
         backingTag:
-          allOf:
-            - $ref: "#/components/schemas/BackingTag"
-            - type: object
-              properties:
-                create:
-                  type: boolean
-                  default: false
-                  description: True creates a new valueless tag. False binds an existing tag, whatever values it allows.
+          $ref: "#/components/schemas/BackingTag"
       example:
         name: Finance
         backingTag:
@@ -908,6 +906,7 @@ components:
           type: object
           nullable: true
           required: [name]
+          additionalProperties: false
           properties:
             name:
               type: string

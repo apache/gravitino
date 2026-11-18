@@ -608,9 +608,12 @@ for creating constrained tags and assigning them to catalogs or schemas.
 
 ### Assign a Backing Tag to an Object
 
-Assign the Finance backing tag to the model using normal tag permissions. Assign it without a value;
-a value on the assignment is allowed by the tag API but ignored by Domain membership. The same API
-works for leaf, schema and catalog assignments. A tagged container and its directly tagged descendants
+Assign the Finance backing tag to the model using normal tag permissions. The assignment follows the
+tag's own constraint: the valueless examples below work for a tag without an allowed-values list, such
+as one created with the domain. A tag with an allowed-values list must be assigned one of its allowed
+values, for example `{"name":"finance","value":"risk"}` or `TagValue.of("finance", "risk")`. Domain
+membership uses only the presence of the tag and ignores the value. The same API works for leaf,
+schema and catalog assignments. A tagged container and its directly tagged descendants
 appear separately. Use `expand=true` to include recorded leaves that inherit the binding.
 Tag-value requests use `application/vnd.gravitino.v2+json`; Domain endpoints use the v1 API.
 
@@ -646,16 +649,19 @@ model.supports_tags().assign_tags(
 
 ### Remove a Backing Tag Assignment
 
-Remove the backing tag assigned directly to the model. An ancestor assignment can then become
-effective again, so this does not necessarily remove inherited Domain membership.
+Remove the backing tag assigned directly to the model. Removing the tag by name with the v1 tag API
+clears all its direct assignments on the object, with or without values. The v2 tag-value API removes
+only the given pair, so an object that keeps another value of the tag remains a member. An ancestor
+assignment can then become effective again, so this does not necessarily remove inherited Domain
+membership.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
 
 ```shell
-curl --fail-with-body -u anonymous:dummy -X POST -H 'Accept: application/vnd.gravitino.v2+json' \
-  -H 'Content-Type: application/vnd.gravitino.v2+json' \
-  -d '{"tagsToAdd":[],"tagsToRemove":[{"name":"finance"}]}' \
+curl --fail-with-body -u anonymous:dummy -X POST -H 'Accept: application/vnd.gravitino.v1+json' \
+  -H 'Content-Type: application/json' \
+  -d '{"tagsToRemove":["finance"]}' \
   "http://127.0.0.1:8090/api/metalakes/test/objects/model/models.sales.forecast/tags"
 ```
 
@@ -663,17 +669,14 @@ curl --fail-with-body -u anonymous:dummy -X POST -H 'Accept: application/vnd.gra
 <TabItem value="java" label="Java">
 
 ```java
-model.supportsTags().associateTags(
-    new TagValue[0], new TagValue[] {TagValue.noValue("finance")});
+model.supportsTags().associateTags(new String[0], new String[] {"finance"});
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-model.supports_tags().assign_tags(
-    tags_to_remove=["finance"]
-)
+model.supports_tags().associate_tags([], ["finance"])
 ```
 
 </TabItem>
