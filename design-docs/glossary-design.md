@@ -162,14 +162,15 @@ TermVersion  { termId, version, state, snapshot, audit_info }   // Step 2 only; 
   endpoints are stored in ascending ID order. The storage service rejects self-links and missing or
   cross-metalake endpoints, and makes duplicate additions and absent removals no-ops. Cycle/depth
   and overlap checks, authorization, and surviving-term revision/audit updates remain manager work
-  in T4/T5. Reads return live endpoint IDs without authorization or status filtering. Each batch of up to 500
-  frontier IDs uses one statement snapshot; wrap a whole walk in the hierarchy-lock transaction when a
-  stable graph is required. Manager reads must filter each frontier before expanding it.
+  in T4/T5. Reads return live endpoint IDs without authorization or status filtering. Each batch
+  of up to 500 frontier IDs uses one statement snapshot. A stable walk requires a hierarchy-lock
+  transaction. Manager reads must filter each frontier before expanding it.
 - **Relation cleanup**: term deletion retires touching edges under the hierarchy mutex, and metalake
   deletion retires its edges and removes its mutex row under the exclusive parent fence. Relation
   deletion timestamps advance beyond retained timestamps in that metalake, avoiding primary-key
   collisions when an edge is removed and re-added within a millisecond. The glossary garbage
-  collector drains expired relation generations as well as definitions, within its row budget.
+  collector counts expired relation generations and definitions toward the batch limit. It also
+  purges the synonyms of each collected definition in the same transaction.
 - **Normalized key**: `key(s)` trims `s`, turns each run of spaces into one space, and lower-cases
   it (`Locale.ROOT`). Names, synonyms and lookups all use `key()`, so they compare the same way.
 - **Names** are unique in a metalake by `name_key = key(name)`. So `Churn` and `churn` are the same

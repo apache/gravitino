@@ -40,6 +40,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermRelMapper;
@@ -436,6 +437,35 @@ public class TestGlossaryTermRelService extends TestJDBCBackend {
     while (GlossaryTermMetaService.getInstance().collect(Long.MAX_VALUE, 1) != 0) {}
     Assertions.assertEquals(0, scalar("SELECT COUNT(*) FROM glossary_term_rel"));
     Assertions.assertEquals(0, scalar("SELECT COUNT(*) FROM glossary_term_meta"));
+  }
+
+  /**
+   * Non-cascading metalake deletion preserves glossary state on rejection and retires it on
+   * success.
+   */
+  @TestTemplate
+  public void testNonCascadeMetalakeCleanup() throws Exception {
+    setupTerms(2);
+    NameIdentifier metalake = NameIdentifier.of("glossary");
+    NameIdentifier catalog = createAndInsertCatalog("glossary", "catalog").nameIdentifier();
+    Assertions.assertTrue(service.add(100, 101, 102, RelationType.BROADER));
+
+    Assertions.assertThrows(
+        NonEmptyEntityException.class,
+        () -> backend.delete(metalake, Entity.EntityType.METALAKE, false));
+    Assertions.assertEquals(Set.of(102L), service.listBroader(100, 101));
+    Assertions.assertEquals(
+        1, scalar("SELECT COUNT(*) FROM glossary_hierarchy_lock WHERE metalake_id=100"));
+
+    Assertions.assertTrue(backend.delete(catalog, Entity.EntityType.CATALOG, false));
+    Assertions.assertTrue(backend.delete(metalake, Entity.EntityType.METALAKE, false));
+    // Joins against the retired parent would hide a leaked live edge. Check the stored generations.
+    Assertions.assertEquals(
+        1, scalar("SELECT COUNT(*) FROM glossary_term_rel WHERE metalake_id=100 AND deleted_at>0"));
+    Assertions.assertEquals(
+        0, scalar("SELECT COUNT(*) FROM glossary_term_rel WHERE metalake_id=100 AND deleted_at=0"));
+    Assertions.assertEquals(
+        0, scalar("SELECT COUNT(*) FROM glossary_hierarchy_lock WHERE metalake_id=100"));
   }
 
   /** T3.5: the committed mutex itself excludes a writer independently of the parent fence. */
