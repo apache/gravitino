@@ -190,17 +190,26 @@ test('fork pushes resolve the PR base once', async () => {
       getBranch: async () => ({ data: { commit: { sha: B } } }) } }, paginate: async () => [pr()] } });
   assert.equal(output['base-sha'], B); assert.equal(output['base-ref'], 'main'); assert.equal(output.sync, 'true');
 });
-test('pre-PR base discovery paginates branches, including later release branches', async () => {
-  const output = {}; let paginated = false;
+async function discoverBase(main, release) {
+  const output = {};
   const listBranches = () => {};
   await resolve({ context: context('fork/repo', true), core: coreFor(output), github: {
     rest: { pulls: { list() {} }, repos: { listBranches,
       get: async args => ({ data: args.owner === 'fork' ? { fork: true, source: { full_name: 'apache/gravitino' } } : { default_branch: 'main' } }),
-      compareCommitsWithBasehead: async args => ({ data: { ahead_by: args.basehead.startsWith('branch-9.9...') ? 1 : 99 } }),
+      compareCommitsWithBasehead: async args => ({ data: args.basehead.startsWith('branch-2.0...') ? release : main }),
       getBranch: async () => ({ data: { commit: { sha: B } } }) } },
-    paginate: async endpoint => { if (endpoint === listBranches) { paginated = true; return [{ name: 'branch-9.9' }]; } return []; }
+    paginate: async endpoint => endpoint === listBranches ? [{ name: 'branch-2.0' }] : []
   } });
-  assert.equal(paginated, true); assert.equal(output['base-ref'], 'branch-9.9');
+  return output['base-ref'];
+}
+test('pre-PR base discovery prefers fewer head-only commits among paginated branches', async () => {
+  assert.equal(await discoverBase({ ahead_by: 2, behind_by: 0 }, { ahead_by: 1, behind_by: 5 }), 'branch-2.0');
+});
+test('pre-PR backports prefer the closer base when both have the same head-only commits', async () => {
+  assert.equal(await discoverBase({ ahead_by: 1, behind_by: 13 }, { ahead_by: 1, behind_by: 0 }), 'branch-2.0');
+});
+test('pre-PR base discovery keeps the default branch when both distances tie', async () => {
+  assert.equal(await discoverBase({ ahead_by: 1, behind_by: 0 }, { ahead_by: 1, behind_by: 0 }), 'main');
 });
 test('trusted dispatch rejects an arbitrary ref or a non-upstream repository', async () => {
   const ctx = context('fork/repo');ctx.eventName = 'workflow_dispatch';ctx.payload.inputs = { 'pull-request': '7' };
