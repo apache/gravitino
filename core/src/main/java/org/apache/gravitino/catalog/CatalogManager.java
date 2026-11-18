@@ -893,7 +893,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             AtomicBoolean entityStored = new AtomicBoolean(false);
             Catalog info;
             try {
-              secretManager.validateSecretsReadable(mergedConfig);
               // Reject known duplicates before contacting the backend; store.put still arbitrates
               // concurrent creates from other server instances.
               if (store.exists(ident, EntityType.CATALOG)) {
@@ -1913,7 +1912,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       CatalogEntity entity,
       @Nullable Map<String, String> propsToValidate,
       boolean validateBackend) {
-    BaseCatalog<?> catalog = createBaseCatalog(wrapper.classLoader, entity);
+    // Create/testConnection pass propsToValidate and must fail on unreadable secrets before any
+    // backend probe. Load/list pass null and stay lenient so a deleted secret does not block
+    // disable/drop/re-bind.
+    boolean failOnMissingSecrets = propsToValidate != null;
+    BaseCatalog<?> catalog = createBaseCatalog(wrapper.classLoader, entity, failOnMissingSecrets);
     wrapper.catalog = catalog;
     try {
       wrapper.classLoader.withClassLoader(
@@ -2037,7 +2040,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     Preconditions.checkState(!closed, "CatalogManager is already closed");
   }
 
-  private BaseCatalog<?> createBaseCatalog(IsolatedClassLoader classLoader, CatalogEntity entity) {
+  private BaseCatalog<?> createBaseCatalog(
+      IsolatedClassLoader classLoader, CatalogEntity entity, boolean failOnMissingSecrets) {
     BaseMetalake metalakeEntity;
     try {
       metalakeEntity =
@@ -2053,11 +2057,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     // Load Catalog class instance
     BaseCatalog<?> catalog = createCatalogInstance(classLoader, entity.getProvider());
     // Resolve secret URNs to plaintext for connector init only; entity storage keeps URNs.
-    // toPlaintextOrMasked: a deleted/rotated secret must not block disable, drop, re-bind or list.
-    catalog
-        .withCatalogConf(secretManager.toPlaintextOrMasked(entity.getProperties()))
-        .withCatalogEntity(entity)
-        .withSecretManager(secretManager);
+    Map<String, String> catalogConf =
+        failOnMissingSecrets
+            ? secretManager.toPlaintextProperties(entity.getProperties())
+            : secretManager.toPlaintextOrMasked(entity.getProperties());
+    catalog.withCatalogConf(catalogConf).withCatalogEntity(entity).withSecretManager(secretManager);
     catalog.initAuthorizationPluginInstance(classLoader, metalakeEntity.id());
     return catalog;
   }

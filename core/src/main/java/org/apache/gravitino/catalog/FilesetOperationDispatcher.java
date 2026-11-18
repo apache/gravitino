@@ -207,7 +207,6 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
     AtomicBoolean createdInCatalog = new AtomicBoolean();
     Fileset createdFileset;
     try {
-      secretManager.validateSecretsReadable(entityProperties);
       createdFileset =
           TreeLockUtils.doWithTreeLock(
               // Lock at fileset level (not schema level) to allow concurrent fileset creation.
