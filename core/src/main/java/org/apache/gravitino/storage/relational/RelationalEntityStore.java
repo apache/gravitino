@@ -271,6 +271,9 @@ public class RelationalEntityStore
 
   @Override
   public boolean exists(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
+    if (entityType == Entity.EntityType.GLOSSARY_TERM) {
+      return backend.exists(ident, entityType);
+    }
     boolean existsInCache = cache.contains(ident, entityType);
     return existsInCache || backend.exists(ident, entityType);
   }
@@ -312,6 +315,9 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> E get(
       NameIdentifier ident, Entity.EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException {
+    if (entityType == Entity.EntityType.GLOSSARY_TERM) {
+      return backend.get(ident, entityType);
+    }
     return cache.withCacheLock(
         EntityCacheKey.of(ident, entityType),
         () -> {
@@ -331,6 +337,9 @@ public class RelationalEntityStore
   @Override
   public <E extends Entity & HasIdentifier> List<E> batchGet(
       List<NameIdentifier> idents, Entity.EntityType entityType, Class<E> clazz) {
+    if (entityType == Entity.EntityType.GLOSSARY_TERM) {
+      return backend.batchGet(idents, entityType);
+    }
     List<E> allEntities = new ArrayList<>();
     List<NameIdentifier> noCacheIdents =
         idents.stream()
@@ -836,6 +845,9 @@ public class RelationalEntityStore
   }
 
   private <E extends Entity & HasIdentifier> void cacheIfEpochUnchanged(E entity, long epoch) {
+    if (entity.type() == Entity.EntityType.GLOSSARY_TERM) {
+      return;
+    }
     if (cache instanceof BaseEntityCache && !BaseEntityCache.isCacheable(entity.type())) {
       // Uncached entities still invoke the cache's related-invalidation hook. There is no stale
       // value to publish, and taking this entity's key lock can nest locks inside that hook.
@@ -849,6 +861,9 @@ public class RelationalEntityStore
 
   // The caller holds the entry's cache lock; do not acquire it again here.
   private <E extends Entity & HasIdentifier> void publishIfEpochUnchanged(E entity, long epoch) {
+    if (entity.type() == Entity.EntityType.GLOSSARY_TERM) {
+      return;
+    }
     if (cache instanceof BaseEntityCache && !BaseEntityCache.isCacheable(entity.type())) {
       cache.put(entity);
       return;

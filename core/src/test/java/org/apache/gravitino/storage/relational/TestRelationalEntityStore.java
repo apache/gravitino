@@ -46,6 +46,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
+import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
@@ -74,6 +75,31 @@ public class TestRelationalEntityStore {
 
     FieldUtils.writeField(store, "backend", backend, true);
     FieldUtils.writeField(store, "cache", Mockito.spy(new NoOpsCache(config)), true);
+  }
+
+  @Test
+  void testGlossaryDefinitionsBypassCache() throws Exception {
+    EntityCache cache = Mockito.mock(EntityCache.class);
+    FieldUtils.writeField(store, "cache", cache, true);
+    Entity.EntityType type = Entity.EntityType.GLOSSARY_TERM;
+    NameIdentifier ident =
+        NameIdentifier.of("lake", Entity.SYSTEM_CATALOG_RESERVED_NAME, "glossary_term", "term");
+    GlossaryTermEntity entity =
+        GlossaryTermEntity.builder()
+            .withId(1L)
+            .withName("term")
+            .withNamespace(ident.namespace())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    Mockito.when(backend.get(ident, type)).thenReturn(entity);
+    Mockito.when(backend.exists(ident, type)).thenReturn(true);
+    Mockito.when(backend.batchGet(List.of(ident), type)).thenReturn(List.of(entity));
+    store.put(entity, false);
+    Assertions.assertSame(entity, store.get(ident, type, GlossaryTermEntity.class));
+    Assertions.assertTrue(store.exists(ident, type));
+    Assertions.assertEquals(
+        List.of(entity), store.batchGet(List.of(ident), type, GlossaryTermEntity.class));
+    Mockito.verifyNoInteractions(cache);
   }
 
   @Test

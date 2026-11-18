@@ -1415,3 +1415,52 @@ COMMENT ON COLUMN domain_rel.audit_info IS 'domain relation audit info';
 COMMENT ON COLUMN domain_rel.current_version IS 'domain relation current version';
 COMMENT ON COLUMN domain_rel.last_version IS 'domain relation last version';
 COMMENT ON COLUMN domain_rel.deleted_at IS 'domain relation deleted at';
+
+CREATE TABLE IF NOT EXISTS glossary_term_meta (
+    term_id BIGINT NOT NULL PRIMARY KEY,
+    metalake_id BIGINT NOT NULL,
+    name VARCHAR(128) COLLATE "C" NOT NULL,
+    name_key VARCHAR(384) COLLATE "C" NOT NULL,
+    definition TEXT,
+    status VARCHAR(16) NOT NULL,
+    links TEXT NOT NULL,
+    source_ref VARCHAR(128) COLLATE "C",
+    properties TEXT NOT NULL,
+    audit_info TEXT NOT NULL,
+    current_version BIGINT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0
+);
+-- Only live rows reserve names and source references. Deletion times remain available for GC.
+CREATE UNIQUE INDEX IF NOT EXISTS uk_glossary_name ON glossary_term_meta (metalake_id, name_key) WHERE deleted_at = 0;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_glossary_source ON glossary_term_meta (metalake_id, source_ref) WHERE deleted_at = 0;
+
+CREATE TABLE IF NOT EXISTS glossary_term_synonym (
+    term_id BIGINT NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    synonym VARCHAR(128) COLLATE "C" NOT NULL,
+    synonym_key VARCHAR(384) COLLATE "C" NOT NULL,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (term_id, synonym_key, deleted_at)
+);
+CREATE INDEX IF NOT EXISTS idx_glossary_synonym ON glossary_term_synonym (metalake_id, synonym_key, deleted_at);
+
+COMMENT ON TABLE glossary_term_meta IS 'glossary term definitions';
+COMMENT ON COLUMN glossary_term_meta.term_id IS 'globally unique glossary term id';
+COMMENT ON COLUMN glossary_term_meta.metalake_id IS 'owning metalake id';
+COMMENT ON COLUMN glossary_term_meta.name IS 'glossary term display name, preserving case and internal whitespace';
+COMMENT ON COLUMN glossary_term_meta.name_key IS 'lookup and uniqueness key: trimmed, whitespace-collapsed and lowercased name, e.g. " Active   Customer " -> "active customer"';
+COMMENT ON COLUMN glossary_term_meta.definition IS 'optional glossary term definition';
+COMMENT ON COLUMN glossary_term_meta.status IS 'glossary term status: DRAFT, APPROVED or DEPRECATED';
+COMMENT ON COLUMN glossary_term_meta.links IS 'documentation links as a JSON array of label and URL pairs';
+COMMENT ON COLUMN glossary_term_meta.source_ref IS 'optional external source identifier, e.g. "crm:123", case and trailing spaces are significant';
+COMMENT ON COLUMN glossary_term_meta.properties IS 'glossary term properties as a JSON object';
+COMMENT ON COLUMN glossary_term_meta.audit_info IS 'glossary term audit info as a JSON object';
+COMMENT ON COLUMN glossary_term_meta.current_version IS 'glossary term revision, starting at 1 and incremented on update or overwrite';
+COMMENT ON COLUMN glossary_term_meta.deleted_at IS 'soft deletion time in epoch milliseconds, 0 means live';
+
+COMMENT ON TABLE glossary_term_synonym IS 'glossary term synonyms, different terms may share the same synonym';
+COMMENT ON COLUMN glossary_term_synonym.term_id IS 'globally unique glossary term id';
+COMMENT ON COLUMN glossary_term_synonym.metalake_id IS 'owning metalake id';
+COMMENT ON COLUMN glossary_term_synonym.synonym IS 'glossary term synonym display name';
+COMMENT ON COLUMN glossary_term_synonym.synonym_key IS 'synonym lookup key: trimmed, whitespace-collapsed and lowercased synonym, e.g. " ACTIVE   USER " -> "active user"';
+COMMENT ON COLUMN glossary_term_synonym.deleted_at IS 'soft deletion time in epoch milliseconds, 0 means live';

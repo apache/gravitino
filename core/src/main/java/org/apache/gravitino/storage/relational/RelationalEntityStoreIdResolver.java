@@ -31,6 +31,7 @@ import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.DomainMetaService;
 import org.apache.gravitino.storage.relational.service.FilesetMetaService;
 import org.apache.gravitino.storage.relational.service.FunctionMetaService;
+import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
 import org.apache.gravitino.storage.relational.service.JobTemplateMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
@@ -58,7 +59,8 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
           Entity.EntityType.POLICY,
           Entity.EntityType.JOB,
           Entity.EntityType.JOB_TEMPLATE,
-          Entity.EntityType.DOMAIN);
+          Entity.EntityType.DOMAIN,
+          Entity.EntityType.GLOSSARY_TERM);
 
   private static final Set<Entity.EntityType> ENTITY_TYPES_REQUIRING_CATALOG_IDS =
       ImmutableSet.of(Entity.EntityType.CATALOG);
@@ -118,6 +120,9 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
 
   private NamespacedEntityId getEntityIdsRequiringMetalakeId(
       NameIdentifier nameIdentifier, Entity.EntityType type) {
+    if (type == Entity.EntityType.GLOSSARY_TERM) {
+      return GlossaryTermMetaService.getInstance().getIds(nameIdentifier);
+    }
     long metalakeId =
         MetalakeMetaService.getInstance()
             .getMetalakeIdByName(NameIdentifierUtil.getMetalake(nameIdentifier));

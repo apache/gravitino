@@ -61,6 +61,7 @@ import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
@@ -85,6 +86,7 @@ import org.apache.gravitino.storage.relational.service.DomainMetaService;
 import org.apache.gravitino.storage.relational.service.DomainRelService;
 import org.apache.gravitino.storage.relational.service.FilesetMetaService;
 import org.apache.gravitino.storage.relational.service.FunctionMetaService;
+import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
 import org.apache.gravitino.storage.relational.service.JobMetaService;
 import org.apache.gravitino.storage.relational.service.JobTemplateMetaService;
@@ -174,6 +176,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (List<E>) FilesetMetaService.getInstance().listFilesetsByNamespace(namespace);
       case TOPIC:
         return (List<E>) TopicMetaService.getInstance().listTopicsByNamespace(namespace);
+      case GLOSSARY_TERM:
+        return (List<E>) GlossaryTermMetaService.getInstance().list(namespace);
       case TAG:
         return (List<E>) TagMetaService.getInstance().listTagsByNamespace(namespace);
       case USER:
@@ -297,6 +301,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (E) GroupMetaService.getInstance().getGroupByIdentifier(ident);
       case ROLE:
         return (E) RoleMetaService.getInstance().getRoleByIdentifier(ident);
+      case GLOSSARY_TERM:
+        return (E) GlossaryTermMetaService.getInstance().get(ident);
       case TAG:
         return (E) TagMetaService.getInstance().getTagByIdentifier(ident);
       case MODEL:
@@ -352,6 +358,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (List<E>) TopicMetaService.getInstance().batchGetTopicByIdentifier(identifiers);
       case MODEL:
         return (List<E>) ModelMetaService.getInstance().batchGetModelByIdentifier(identifiers);
+      case GLOSSARY_TERM:
+        return (List<E>) GlossaryTermMetaService.getInstance().batchGet(identifiers);
       case TAG:
         return (List<E>) TagMetaService.getInstance().batchGetTagByIdentifier(identifiers);
       case POLICY:
@@ -512,6 +520,9 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return RoleMetaService.getInstance()
             .deleteRoleMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case GLOSSARY_TERM:
+        return GlossaryTermMetaService.getInstance()
+            .collect(legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case TAG:
         return TagMetaService.getInstance()
             .deleteTagMetasByLegacyTimeline(
@@ -596,6 +607,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       case JOB:
       case VIEW:
       case DOMAIN:
+      case GLOSSARY_TERM:
         // These entity types have not implemented multi-versions, so we can skip.
         return 0;
 
@@ -1160,6 +1172,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       RoleMetaService.getInstance().insertRole((RoleEntity) e, overwritten);
     } else if (e instanceof GroupEntity) {
       GroupMetaService.getInstance().insertGroup((GroupEntity) e, overwritten);
+    } else if (e instanceof GlossaryTermEntity) {
+      GlossaryTermMetaService.getInstance().insert((GlossaryTermEntity) e, overwritten);
     } else if (e instanceof TagEntity) {
       TagMetaService.getInstance().insertTag((TagEntity) e, overwritten);
     } else if (e instanceof ModelEntity) {
@@ -1218,6 +1232,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (E) GroupMetaService.getInstance().updateGroup(ident, updater);
       case ROLE:
         return (E) RoleMetaService.getInstance().updateRole(ident, updater);
+      case GLOSSARY_TERM:
+        return (E) GlossaryTermMetaService.getInstance().update(ident, updater);
       case TAG:
         return (E) TagMetaService.getInstance().updateTag(ident, updater);
       case MODEL:
@@ -1265,6 +1281,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return GroupMetaService.getInstance().deleteGroup(ident);
       case ROLE:
         return RoleMetaService.getInstance().deleteRole(ident);
+      case GLOSSARY_TERM:
+        return GlossaryTermMetaService.getInstance().delete(ident);
       case TAG:
         return TagMetaService.getInstance().deleteTag(ident);
       case MODEL:
