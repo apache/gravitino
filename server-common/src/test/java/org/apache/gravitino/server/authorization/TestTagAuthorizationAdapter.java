@@ -25,14 +25,12 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -41,19 +39,12 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
-import org.apache.gravitino.authorization.ResolvedTagPolicy;
 import org.apache.gravitino.meta.PolicyEntity;
-import org.apache.gravitino.meta.TagEntity;
-import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.core.Appender;
-import org.apache.logging.log4j.core.LogEvent;
-import org.apache.logging.log4j.core.LoggerContext;
-import org.apache.logging.log4j.core.config.Configuration;
-import org.apache.logging.log4j.core.config.LoggerConfig;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
-/** Tests RBAC and tag-policy composition, including deny-suppression diagnostics. */
+/** Tests RBAC and tag-policy composition, including explicit deny precedence. */
 public class TestTagAuthorizationAdapter {
   private final GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
   private final TagAuthorizationAdapter adapter = new TagAuthorizationAdapter(authorizer);
@@ -76,7 +67,7 @@ public class TestTagAuthorizationAdapter {
   /** Tests that a matching tag policy can satisfy an RBAC miss. */
   @Test
   public void testRbacMissAllowsMatchingTag() {
-    doReturn(Optional.of(binding()))
+    doReturn(Optional.of(mock(PolicyEntity.class)))
         .when(authorizer)
         .matchTagPolicy(principal, "metalake", table, SELECT_TABLE, context);
     assertTrue(evaluate());
@@ -91,65 +82,15 @@ public class TestTagAuthorizationAdapter {
     assertFalse(evaluate());
   }
 
-  /** Tests deny precedence and suppression diagnostics when RBAC also allows access. */
-  @Test
-  public void testExplicitDenySuppressesAndIdentifiesTagEvenWithRbacAllow() {
+  /** An explicit deny skips policy reads regardless of whether RBAC also allows access. */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testExplicitDenySkipsTagPolicies(boolean rbacAllows) {
     when(authorizer.authorize(principal, "metalake", catalog, SELECT_TABLE, context))
-        .thenReturn(true);
-    when(authorizer.deny(principal, "metalake", catalog, SELECT_TABLE, context)).thenReturn(true);
-    doReturn(Optional.of(binding()))
-        .when(authorizer)
-        .matchTagPolicy(principal, "metalake", table, SELECT_TABLE, context);
-    LoggerContext logging = (LoggerContext) LogManager.getContext(false);
-    Configuration configuration = logging.getConfiguration();
-    String loggerName = TagAuthorizationAdapter.class.getName();
-    LoggerConfig previous = configuration.getLoggers().get(loggerName);
-    LoggerConfig capture = new LoggerConfig(loggerName, Level.INFO, false);
-    Appender appender = mock(Appender.class);
-    when(appender.getName()).thenReturn("tagAccessCapture");
-    when(appender.isStarted()).thenReturn(true);
-    List<String> messages = new ArrayList<>();
-    doAnswer(
-            invocation -> {
-              messages.add(
-                  ((LogEvent) invocation.getArgument(0)).getMessage().getFormattedMessage());
-              return null;
-            })
-        .when(appender)
-        .append(any(LogEvent.class));
-    capture.addAppender(appender, Level.INFO, null);
-    configuration.removeLogger(loggerName);
-    configuration.addLogger(loggerName, capture);
-    logging.updateLoggers();
-    try {
-      assertFalse(evaluate());
-      assertTrue(
-          messages.stream()
-              .anyMatch(
-                  message ->
-                      message.contains("Suppressed tag allow")
-                          && message.contains("tag certified (11)")
-                          && message.contains("policy read_certified (12)")
-                          && message.contains("SELECT_TABLE")
-                          && message.contains("catalog.schema.table")
-                          && message.contains("deny scope CATALOG:catalog")));
-    } finally {
-      configuration.removeLogger(loggerName);
-      if (previous != null) {
-        configuration.addLogger(loggerName, previous);
-      }
-      logging.updateLoggers();
-    }
-  }
-
-  /** Tests that an RBAC deny suppresses a tag-only grant. */
-  @Test
-  public void testExplicitDenySuppressesTagWithoutRbacAllow() {
+        .thenReturn(rbacAllows);
     when(authorizer.deny(principal, "metalake", table, SELECT_TABLE, context)).thenReturn(true);
-    doReturn(Optional.of(binding()))
-        .when(authorizer)
-        .matchTagPolicy(principal, "metalake", table, SELECT_TABLE, context);
     assertFalse(evaluate());
+    verify(authorizer, never()).matchTagPolicy(any(), any(), any(), any(), any());
   }
 
   /** Tests that a tag-policy read failure propagates instead of becoming a non-match. */
@@ -172,18 +113,5 @@ public class TestTagAuthorizationAdapter {
 
   private boolean evaluate() {
     return adapter.authorize(principal, "metalake", List.of(catalog, table), SELECT_TABLE, context);
-  }
-
-  private ResolvedTagPolicy binding() {
-    TagEntity tag = mock(TagEntity.class);
-    when(tag.name()).thenReturn("certified");
-    when(tag.id()).thenReturn(11L);
-    PolicyEntity policy = mock(PolicyEntity.class);
-    when(policy.name()).thenReturn("read_certified");
-    when(policy.id()).thenReturn(12L);
-    ResolvedTagPolicy binding = mock(ResolvedTagPolicy.class);
-    when(binding.tag()).thenReturn(tag);
-    when(binding.policy()).thenReturn(policy);
-    return binding;
   }
 }

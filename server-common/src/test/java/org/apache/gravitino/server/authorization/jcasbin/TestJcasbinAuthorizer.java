@@ -108,6 +108,7 @@ import org.apache.gravitino.catalog.SemanticModelDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.hook.SemanticModelHookDispatcher;
 import org.apache.gravitino.meta.AuditInfo;
@@ -479,6 +480,70 @@ public class TestJcasbinAuthorizer {
     }
   }
 
+  /** A missing catalog during normalization cannot grant access or turn a denial into an error. */
+  @Test
+  public void testTagAccessMissingCatalog() throws Exception {
+    try (AutoCloseable ignored = tagAccessFixture(true)) {
+      MetadataObject target =
+          MetadataObjects.parse("dropped.schema.table", MetadataObject.Type.TABLE);
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.normalizeMetadataObject(target, METALAKE))
+          .thenThrow(new NoSuchCatalogException("Catalog was dropped"));
+      try {
+        assertTrue(
+            jcasbinAuthorizer
+                .matchTagPolicy(
+                    new UserPrincipal(USERNAME),
+                    METALAKE,
+                    target,
+                    SELECT_TABLE,
+                    new AuthorizationRequestContext())
+                .isEmpty());
+        verify(entityStore)
+            .list(
+                NamespaceUtil.ofPolicy(METALAKE),
+                PolicyEntity.class,
+                Entity.EntityType.POLICY,
+                true);
+        verify(supportsRelationOperations, Mockito.never())
+            .listEntitiesByRelation(
+                eq(SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL), any(), any());
+      } finally {
+        metadataIdConverterMockedStatic
+            .when(() -> MetadataIdConverter.normalizeMetadataObject(target, METALAKE))
+            .thenCallRealMethod();
+      }
+    }
+  }
+
+  /** A native missing view can inherit probe access from its schema. */
+  @Test
+  public void testTagAccessNativeViewProbe() throws Exception {
+    try (AutoCloseable ignored = tagAccessFixture(true)) {
+      mockTagPolicy(tagTestPolicy(true, List.of(Privilege.Name.PROBE_TABLE_LIKE)), null);
+      grantTagTraversal();
+      Map<Entity.EntityType, NameIdentifier> names =
+          new HashMap<>(tableMetadataNames("catalog", "absent"));
+      NameIdentifier view = names.remove(Entity.EntityType.TABLE);
+      names.put(Entity.EntityType.VIEW, view);
+      when(supportsRelationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              view,
+              Entity.EntityType.VIEW))
+          .thenThrow(new NoSuchEntityException("Missing view"));
+      when(supportsRelationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              names.get(Entity.EntityType.SCHEMA),
+              Entity.EntityType.SCHEMA))
+          .thenReturn(List.of(tagTestTag("gold")));
+      assertTrue(
+          new AuthorizationExpressionEvaluator(
+                  AuthorizationExpressionConstants.PROBE_TABLE_LIKE_AUTHORIZATION_EXPRESSION,
+                  jcasbinAuthorizer)
+              .evaluate(names, new AuthorizationRequestContext()));
+    }
+  }
+
   /** Tests that disabled tag access avoids tag-policy reads. */
   @Test
   public void testTagAccessDisabledDoesNotReadPolicies() throws Exception {
@@ -561,11 +626,7 @@ public class TestJcasbinAuthorizer {
       AuthorizationRequestContext context = new AuthorizationRequestContext();
       context.setActiveRoles(ActiveRoles.of(Set.of("analyst")));
       assertFalse(evaluateTagExpression("ANY_SELECT_TABLE", context));
-      verify(supportsRelationOperations)
-          .batchListEntitiesByRelation(
-              eq(SupportsRelationOperations.Type.POLICY_TAG_REL),
-              anyList(),
-              eq(Entity.EntityType.TAG));
+      verifyNoTagReads();
     }
   }
 
@@ -6984,6 +7045,10 @@ public class TestJcasbinAuthorizer {
   }
 
   private static PolicyEntity tagTestPolicy(boolean enabled) {
+    return tagTestPolicy(enabled, List.of(SELECT_TABLE, Privilege.Name.MODIFY_TABLE));
+  }
+
+  private static PolicyEntity tagTestPolicy(boolean enabled, List<Privilege.Name> privileges) {
     return PolicyEntity.builder()
         .withId(802L)
         .withName("read_certified")
@@ -6991,9 +7056,7 @@ public class TestJcasbinAuthorizer {
         .withAuditInfo(AuditInfo.EMPTY)
         .withPolicyType(Policy.BuiltInType.ACCESS_CONTROL)
         .withEnabled(enabled)
-        .withContent(
-            PolicyContents.accessControl(
-                List.of(SELECT_TABLE, Privilege.Name.MODIFY_TABLE), List.of("analyst")))
+        .withContent(PolicyContents.accessControl(privileges, List.of("analyst")))
         .build();
   }
 

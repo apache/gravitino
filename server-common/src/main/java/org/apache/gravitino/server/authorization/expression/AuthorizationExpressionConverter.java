@@ -37,7 +37,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.policy.AccessControlContent;
@@ -419,15 +418,16 @@ public class AuthorizationExpressionConverter {
    */
   private static String replaceTagPrivilegeChecks(String expression) {
     for (Privilege.Name privilege : AccessControlContent.PERMITTED_PRIVILEGES) {
-      MetadataObject.Type type =
+      String target =
           switch (privilege) {
-            case SELECT_TABLE, MODIFY_TABLE, PROBE_TABLE_LIKE -> MetadataObject.Type.TABLE;
-            case SELECT_VIEW -> MetadataObject.Type.VIEW;
-            case READ_FILESET, WRITE_FILESET -> MetadataObject.Type.FILESET;
-            case CONSUME_TOPIC, PRODUCE_TOPIC -> MetadataObject.Type.TOPIC;
-            case USE_MODEL -> MetadataObject.Type.MODEL;
-            case EXECUTE_FUNCTION -> MetadataObject.Type.FUNCTION;
-            case USE_SEMANTIC_MODEL -> MetadataObject.Type.SEMANTIC_MODEL;
+            case SELECT_TABLE, MODIFY_TABLE -> "TABLE";
+            case PROBE_TABLE_LIKE -> "(TABLE != null ? TABLE : VIEW)";
+            case SELECT_VIEW -> "VIEW";
+            case READ_FILESET, WRITE_FILESET -> "FILESET";
+            case CONSUME_TOPIC, PRODUCE_TOPIC -> "TOPIC";
+            case USE_MODEL -> "MODEL";
+            case EXECUTE_FUNCTION -> "FUNCTION";
+            case USE_SEMANTIC_MODEL -> "SEMANTIC_MODEL";
             default -> throw new IllegalArgumentException(
                 "Missing tag privilege scope: " + privilege);
           };
@@ -435,7 +435,7 @@ public class AuthorizationExpressionConverter {
           expression.replace(
               "ANY_" + privilege.name(),
               "tagAuthorization.authorize(principal,METALAKE_NAME,{METALAKE,CATALOG,SCHEMA,"
-                  + type
+                  + target
                   + "},@org.apache.gravitino.authorization.Privilege$Name@"
                   + privilege.name()
                   + ",authorizationContext)");

@@ -42,6 +42,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
@@ -98,8 +99,8 @@ public class AuthorizationRequestContext {
   /** Per-request metadataId→owner cache. Deduplicates isOwner within a single request. */
   private final Map<Long, Optional<OwnerInfo>> ownerCache = new ConcurrentHashMap<>();
 
-  /** Resolved bindings and read failures are retained only for the exact target in this request. */
-  private final Map<TagPolicyKey, CachedTagData<ResolvedTagPolicy>> tagPolicyCache =
+  /** Matched policies and read failures are retained only for the exact target in this request. */
+  private final Map<TagPolicyKey, CachedTagData<PolicyEntity>> tagPolicyCache =
       new ConcurrentHashMap<>();
 
   /** Direct assignments and read failures shared by targets with common ancestors. */
@@ -357,11 +358,11 @@ public class AuthorizationRequestContext {
    * @param metalake the containing metalake
    * @param target the original canonical target, not an ancestor visited by the RBAC walk
    * @param loader the resolver, returning a complete non-null list or throwing
-   * @return the immutable resolved bindings
+   * @return the immutable matched policies
    * @throws RuntimeException if resolution fails
    */
-  public List<ResolvedTagPolicy> computeTagPoliciesIfAbsent(
-      String metalake, MetadataObject target, Supplier<List<ResolvedTagPolicy>> loader) {
+  public List<PolicyEntity> computeTagPoliciesIfAbsent(
+      String metalake, MetadataObject target, Supplier<List<PolicyEntity>> loader) {
     return tagPolicyCache
         .computeIfAbsent(new TagPolicyKey(metalake, target), ignored -> new CachedTagData<>())
         .get(loader);

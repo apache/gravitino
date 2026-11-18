@@ -27,6 +27,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
@@ -64,10 +65,10 @@ public interface GravitinoAuthorizer extends Closeable {
    * @param target the original target, not an ancestor from the RBAC walk
    * @param privilege the requested privilege
    * @param requestContext the request's shared context
-   * @return the matching binding, or empty when tag access does not apply
+   * @return the matching policy, or empty when tag access does not apply
    * @throws RuntimeException if tag-policy evaluation fails
    */
-  default Optional<ResolvedTagPolicy> matchTagPolicy(
+  default Optional<PolicyEntity> matchTagPolicy(
       Principal principal,
       String metalake,
       MetadataObject target,

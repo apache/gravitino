@@ -136,6 +136,26 @@ public class TestObjectPolicyResolver {
   }
 
   @Test
+  public void testSameTagNameFromAnotherMetalakeDoesNotMatch() throws Exception {
+    TagEntity domain = tag(1L, "domain", TagAssignment.noValue());
+    when(effectiveTagResolver.resolveWithSources(METALAKE, OBJECT))
+        .thenReturn(new ResolvedTag[] {new ResolvedTag(domain, OBJECT)});
+    when(relationOperations.batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            List.of(domain.nameIdentifier()),
+            Entity.EntityType.TAG))
+        .thenReturn(
+            List.of(
+                new RelationalEntity<>(
+                    SupportsRelationOperations.Type.POLICY_TAG_REL,
+                    NameIdentifierUtil.ofTag("other", "domain"),
+                    Entity.EntityType.TAG,
+                    policy(10L, "policy", true),
+                    null)));
+    Assertions.assertEquals(0, resolver.resolve(METALAKE, OBJECT).length);
+  }
+
+  @Test
   public void testDropNonMatchingSelector() throws Exception {
     TagEntity domain = tag(1L, "domain", TagAssignment.ofValues("engineering"));
     PolicyEntity policy = policy(10L, "policy", true);

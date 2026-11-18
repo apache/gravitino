@@ -27,7 +27,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
-import org.apache.gravitino.authorization.ResolvedTagPolicy;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,53 +68,31 @@ public final class TagAuthorizationAdapter {
         break;
       }
     }
-    MetadataObject denyScope =
-        rbacAllows ? findDeny(principal, metalake, scopes, privilege, context) : null;
-    if (rbacAllows && denyScope == null) {
+    if (findDeny(principal, metalake, scopes, privilege, context) != null) {
+      return false;
+    }
+    if (rbacAllows) {
       return true;
     }
     MetadataObject target = scopes.get(scopes.size() - 1);
     if (target == null) {
       return false;
     }
-    // Resolve the match even after an RBAC deny so suppression logs identify the tag and policy.
-    Optional<ResolvedTagPolicy> match =
+    Optional<PolicyEntity> match =
         authorizer.matchTagPolicy(principal, metalake, target, privilege, context);
     if (match.isEmpty()) {
       return false;
     }
-    if (!rbacAllows) {
-      denyScope = findDeny(principal, metalake, scopes, privilege, context);
-    }
-    ResolvedTagPolicy binding = match.get();
-    if (denyScope != null) {
-      LOG.info(
-          "Suppressed tag allow: principal {}, metalake {}, object {}:{}, privilege {}, "
-              + "tag {} ({}), policy {} ({}), deny scope {}:{}",
-          principal.getName(),
-          metalake,
-          target.type(),
-          target.fullName(),
-          privilege,
-          binding.tag().name(),
-          binding.tag().id(),
-          binding.policy().name(),
-          binding.policy().id(),
-          denyScope.type(),
-          denyScope.fullName());
-      return false;
-    }
+    PolicyEntity policy = match.get();
     LOG.debug(
-        "Tag allow: principal {}, metalake {}, object {}:{}, privilege {}, tag {} ({}), policy {} ({})",
+        "Tag allow: principal {}, metalake {}, object {}:{}, privilege {}, policy {} ({})",
         principal.getName(),
         metalake,
         target.type(),
         target.fullName(),
         privilege,
-        binding.tag().name(),
-        binding.tag().id(),
-        binding.policy().name(),
-        binding.policy().id());
+        policy.name(),
+        policy.id());
     return true;
   }
 

@@ -62,15 +62,14 @@ import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
-import org.apache.gravitino.authorization.ResolvedTagPolicy;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.TagPolicyMatcher;
-import org.apache.gravitino.authorization.TagPolicyResolver;
 import org.apache.gravitino.cache.CaffeineGravitinoCache;
 import org.apache.gravitino.cache.GravitinoCache;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
@@ -319,7 +318,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   private JcasbinChangeListener changePoller;
 
   /** Tag-policy resolver initialized at startup; null when tag authorization is disabled. */
-  @Nullable private TagPolicyResolver tagPolicyResolver;
+  @Nullable private ObjectPolicyResolver objectPolicyResolver;
 
   @Override
   public void initialize() {
@@ -366,10 +365,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     lookups = new JcasbinAuthorizationLookups(metadataIdCache, ownerRelCache);
     changePoller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, pollIntervalSecs);
     EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-    tagPolicyResolver =
+    objectPolicyResolver =
         Boolean.TRUE.equals(
                 GravitinoEnv.getInstance().config().get(Configs.ENABLE_TAG_BASED_AUTHORIZATION))
-            ? new TagPolicyResolver(new ObjectPolicyResolver(entityStore))
+            ? new ObjectPolicyResolver(entityStore)
             : null;
     if (entityStore instanceof SupportsEntityChangeLog) {
       ((SupportsEntityChangeLog) entityStore).registerEntityChangeLogListener(changePoller);
@@ -486,13 +485,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   /** {@inheritDoc} */
   @Override
-  public Optional<ResolvedTagPolicy> matchTagPolicy(
+  public Optional<PolicyEntity> matchTagPolicy(
       Principal principal,
       String metalake,
       MetadataObject target,
       Privilege.Name privilege,
       AuthorizationRequestContext requestContext) {
-    if (tagPolicyResolver == null
+    if (objectPolicyResolver == null
         || !AccessControlContent.PERMITTED_PRIVILEGES.contains(privilege)
         || requestContext.getActiveRoles().isNone()) {
       return Optional.empty();
@@ -514,14 +513,21 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       return Optional.empty();
     }
     String rawKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, target);
-    MetadataObject canonicalTarget =
-        requestContext.computeNormalizedMetadataObjectIfAbsent(
-            rawKey,
-            NameIdentifierUtil.getCatalogIdentifier(
-                MetadataObjectUtil.toEntityIdent(metalake, target)),
-            ignored -> MetadataIdConverter.normalizeMetadataObject(target, metalake));
+    MetadataObject canonicalTarget;
+    try {
+      canonicalTarget =
+          requestContext.computeNormalizedMetadataObjectIfAbsent(
+              rawKey,
+              NameIdentifierUtil.getCatalogIdentifier(
+                  MetadataObjectUtil.toEntityIdent(metalake, target)),
+              ignored -> MetadataIdConverter.normalizeMetadataObject(target, metalake));
+    } catch (NotFoundException e) {
+      return Optional.empty();
+    }
     return TagPolicyMatcher.match(
-        privilege, roleNames, tagPolicyResolver.resolve(metalake, canonicalTarget, requestContext));
+        privilege,
+        roleNames,
+        objectPolicyResolver.resolve(metalake, canonicalTarget, requestContext));
   }
 
   @Override

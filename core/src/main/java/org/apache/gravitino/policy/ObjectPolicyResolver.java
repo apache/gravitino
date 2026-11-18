@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -35,6 +36,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
@@ -95,17 +97,7 @@ public class ObjectPolicyResolver {
    */
   public Match[] resolveMatches(String metalake, MetadataObject metadataObject) {
     ResolvedTag[] effectiveTags = effectiveTagResolver.resolveWithSources(metalake, metadataObject);
-    if (effectiveTags.length == 0) {
-      return new Match[0];
-    }
-
-    List<NameIdentifier> tagIdentifiers =
-        Arrays.stream(effectiveTags)
-            .map(resolvedTag -> resolvedTag.tag().name())
-            .distinct()
-            .map(tagName -> NameIdentifierUtil.ofTag(metalake, tagName))
-            .collect(Collectors.toList());
-    return selectMatches(effectiveTags, loadRelations(tagIdentifiers, metadataObject));
+    return resolveMatches(metalake, metadataObject, effectiveTags);
   }
 
   /**
@@ -164,6 +156,49 @@ public class ObjectPolicyResolver {
     return result;
   }
 
+  /**
+   * Resolves the enabled access policies matched by a canonical target's effective tags.
+   *
+   * @param metalake the containing metalake
+   * @param target the original object whose access is being checked
+   * @param context the context shared by checks and list workers of this request
+   * @return immutable matched access policies in policy ID order
+   * @throws RuntimeException if resolution fails
+   */
+  public List<PolicyEntity> resolve(
+      String metalake, MetadataObject target, AuthorizationRequestContext context) {
+    Objects.requireNonNull(metalake, "metalake must not be null");
+    Objects.requireNonNull(target, "target must not be null");
+    Objects.requireNonNull(context, "context must not be null");
+    return context.computeTagPoliciesIfAbsent(
+        metalake,
+        target,
+        () -> {
+          ResolvedTag[] effectiveTags =
+              effectiveTagResolver.resolveWithSources(metalake, target, context);
+          return Arrays.stream(resolveMatches(metalake, target, effectiveTags))
+              .map(Match::policy)
+              .filter(policy -> policy.policyType() == Policy.BuiltInType.ACCESS_CONTROL)
+              .sorted(Comparator.comparingLong(PolicyEntity::id))
+              .collect(Collectors.toList());
+        });
+  }
+
+  private Match[] resolveMatches(
+      String metalake, MetadataObject metadataObject, ResolvedTag[] effectiveTags) {
+    if (effectiveTags.length == 0) {
+      return new Match[0];
+    }
+
+    List<NameIdentifier> tagIdentifiers =
+        Arrays.stream(effectiveTags)
+            .map(resolvedTag -> resolvedTag.tag().name())
+            .distinct()
+            .map(tagName -> NameIdentifierUtil.ofTag(metalake, tagName))
+            .collect(Collectors.toList());
+    return selectMatches(effectiveTags, loadRelations(tagIdentifiers, metadataObject));
+  }
+
   private List<RelationalEntity<?>> loadRelations(
       List<NameIdentifier> tagIdentifiers, Object request) {
 
@@ -189,18 +224,18 @@ public class ObjectPolicyResolver {
 
   private static Match[] selectMatches(
       ResolvedTag[] effectiveTags, List<RelationalEntity<?>> relations) {
-    Map<String, ResolvedTag> tagsByName =
+    Map<NameIdentifier, ResolvedTag> tagsByIdentifier =
         Arrays.stream(effectiveTags)
             .collect(
                 Collectors.toMap(
-                    resolvedTag -> resolvedTag.tag().name(),
+                    resolvedTag -> resolvedTag.tag().nameIdentifier(),
                     resolvedTag -> resolvedTag,
                     (left, right) -> left,
                     LinkedHashMap::new));
 
     Map<Long, MatchState> matchStates = new LinkedHashMap<>();
     for (RelationalEntity<?> relation : relations) {
-      ResolvedTag resolvedTag = tagsByName.get(relation.source().name());
+      ResolvedTag resolvedTag = tagsByIdentifier.get(relation.source());
       if (resolvedTag == null) {
         continue;
       }
