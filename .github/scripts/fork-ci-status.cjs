@@ -359,7 +359,7 @@ function createService(github, { readWorkflow = sha => github.rest.repos.getCont
     }
     if (!selected.trusted && !sameDefinitions) {
       const note = 'CI workflow/action/script definitions or branch protection differ from the base. ' +
-        'After reviewing these changes, a committer must dispatch Fork CI from the current upstream default branch with this PR number.';
+        'After reviewing these changes, a committer must dispatch Fork CI from the current upstream PR base branch with this PR number.';
       // Approval of CI edits is separate from execution progress. Never turn a running fork
       // into a completed error, or hide an actual failure behind the trust requirement.
       result = needsSuiteChecks

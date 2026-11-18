@@ -2277,3 +2277,12 @@ test('trusted release verification binds the dispatch to the current supported r
     await assert.rejects(resolve({context:ctx,core:coreFor({}),github}), /current PR base branch/);
   }
 });
+
+test('release CI-definition diagnostics point to the supported trusted base-branch dispatch', async () => {
+  const pull = pr(); pull.base.ref = 'branch-2.0';
+  const github = serviceMock({changed:true, forkJobs:jobs(pull)});
+  const {result} = await createService(github).mirror(pull);
+  assert.equal(result.conclusion, 'action_required');
+  assert.match(result.note, /current upstream PR base branch/);
+  assert.doesNotMatch(result.note, /default branch/);
+});
