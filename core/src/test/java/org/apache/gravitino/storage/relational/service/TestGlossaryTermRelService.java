@@ -25,6 +25,7 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -42,6 +43,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermRelMapper;
+import org.apache.gravitino.storage.relational.po.GlossaryTermRelPO;
 import org.apache.gravitino.storage.relational.service.GlossaryTermRelService.RelationType;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
@@ -123,7 +125,12 @@ public class TestGlossaryTermRelService extends TestJDBCBackend {
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> service.listBroaderEdges(100, invalid));
     Assertions.assertThrows(
-        IllegalStateException.class, () -> service.lockTerms(100, Set.of(101L)));
+        NoSuchEntityException.class,
+        () ->
+            service.withHierarchyLock(
+                100,
+                Set.of(101L, 201L),
+                () -> Assertions.fail("Missing endpoint must prevent callback")));
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> service.collect(Long.MAX_VALUE, -1));
     Assertions.assertEquals(0, scalar("SELECT COUNT(*) FROM glossary_term_rel"));
@@ -178,6 +185,26 @@ public class TestGlossaryTermRelService extends TestJDBCBackend {
       Assertions.assertEquals(
           Set.of(101L, 102L, 103L, 104L, 105L, 106L, 107L), service.descendants(100, 108));
       Assertions.assertEquals(5, queries.get());
+      Set<Long> wide = new LinkedHashSet<>();
+      wide.add(107L);
+      for (long id = 1000; id < 1499; id++) {
+        wide.add(id);
+      }
+      wide.add(101L);
+      queries.set(0);
+      Assertions.assertEquals(
+          List.of(101L, 101L, 107L),
+          service.listBroaderEdges(100, wide).stream()
+              .map(GlossaryTermRelPO::getFromTermId)
+              .toList());
+      Assertions.assertEquals(2, queries.get());
+      queries.set(0);
+      Assertions.assertEquals(
+          List.of(105L),
+          service.listNarrowerEdges(100, wide).stream()
+              .map(GlossaryTermRelPO::getFromTermId)
+              .toList());
+      Assertions.assertEquals(2, queries.get());
       queries.set(0);
       Assertions.assertTrue(service.listBroaderEdges(100, Set.of()).isEmpty());
       Assertions.assertTrue(service.listNarrowerEdges(100, Set.of()).isEmpty());
@@ -248,6 +275,39 @@ public class TestGlossaryTermRelService extends TestJDBCBackend {
             Assertions.assertTrue(writer.awaitTermination(10, TimeUnit.SECONDS));
           }
         });
+  }
+
+  /** A pre-mutex read sees later commits when checking duplicate edges and retiring a term. */
+  @TestTemplate
+  public void testPeerReplacementBeforeHierarchyLock() throws Exception {
+    setupTerms(2);
+    long future = 4102444800000L;
+    execute("INSERT INTO glossary_term_rel VALUES (100,101,102,'BROADER'," + future + ")");
+    ExecutorService writer = Executors.newSingleThreadExecutor();
+    try {
+      SessionUtils.beginTransaction();
+      try {
+        Assertions.assertTrue(service.listBroader(100, 101).isEmpty());
+        writer
+            .submit(
+                () -> {
+                  Assertions.assertTrue(service.add(100, 101, 102, RelationType.BROADER));
+                  Assertions.assertTrue(service.remove(100, 101, 102, RelationType.BROADER));
+                  Assertions.assertTrue(service.add(100, 101, 102, RelationType.BROADER));
+                })
+            .get(10, TimeUnit.SECONDS);
+        Assertions.assertFalse(service.add(100, 101, 102, RelationType.BROADER));
+        Assertions.assertTrue(
+            GlossaryTermMetaService.getInstance().delete(NameIdentifier.of(NS, "Term102")));
+        SessionUtils.commitTransaction();
+      } finally {
+        if (SessionUtils.isInTransaction()) SessionUtils.rollbackTransaction();
+      }
+      Assertions.assertEquals(future + 2, scalar("SELECT MAX(deleted_at) FROM glossary_term_rel"));
+    } finally {
+      writer.shutdownNow();
+      Assertions.assertTrue(writer.awaitTermination(10, TimeUnit.SECONDS));
+    }
   }
 
   /** T3.5: two independent transactions concurrently initialize the same mutex, 20 rounds. */

@@ -20,7 +20,10 @@
 package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -43,12 +46,13 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
  *
  * <p>Use withHierarchyLock around the complete read/validate/write operation, before locking any
  * terms. Multiple changes must plan and lock all their term IDs in order before making changes.
- * Plain reads take no locks and return only live endpoints. Each frontier has a statement snapshot;
- * a multi-level walk needs an enclosing hierarchy lock for a stable graph. These ID-only reads do
- * not apply authorization/status filters: the manager must filter each frontier before expanding
- * it.
+ * Plain reads take no locks and return only live endpoints. Each query has a READ_COMMITTED
+ * statement snapshot; a multi-level walk needs an enclosing hierarchy lock for a stable graph.
+ * These ID-only reads do not apply authorization/status filters: the manager must filter each
+ * frontier before expanding it.
  */
 public final class GlossaryTermRelService {
+  private static final int FRONTIER_BATCH_SIZE = 500;
   private static final GlossaryTermRelService INSTANCE = new GlossaryTermRelService();
 
   /** The two persisted edge kinds. BROADER points from child to parent. */
@@ -97,6 +101,30 @@ public final class GlossaryTermRelService {
   }
 
   /**
+   * Runs work after acquiring the metalake fence, hierarchy mutex and all planned live endpoints in
+   * ascending term ID order. A missing endpoint prevents the callback from running.
+   */
+  public <T> T withHierarchyLock(long metalakeId, Set<Long> termIds, Supplier<T> work) {
+    checkIds(termIds);
+    Preconditions.checkArgument(work != null, "work cannot be null");
+    return withHierarchyLock(
+        metalakeId,
+        () -> {
+          SessionUtils.doWithoutCommit(
+              GlossaryTermRelMapper.class,
+              mapper -> {
+                for (Long id : termIds.stream().sorted().toList()) {
+                  if (mapper.lockTerm(metalakeId, id) == null) {
+                    throw new NoSuchEntityException(
+                        "Glossary term %s does not exist in metalake %s", id, metalakeId);
+                  }
+                }
+              });
+          return work.get();
+        });
+  }
+
+  /**
    * Adds an edge if absent, verifying both live endpoints in this metalake. Graph semantic checks
    * and revision changes are the caller's responsibility under withHierarchyLock.
    */
@@ -106,18 +134,17 @@ public final class GlossaryTermRelService {
     long to = type == RelationType.RELATED ? Math.max(fromId, toId) : toId;
     return withHierarchyLock(
         metalakeId,
-        () -> {
-          lockTerms(metalakeId, Set.of(from, to));
-          return SessionUtils.getWithoutCommit(
-              GlossaryTermRelMapper.class,
-              mapper -> {
-                if (mapper.exists(metalakeId, from, to, type.name()) != 0) {
-                  return false;
-                }
-                mapper.insert(metalakeId, from, to, type.name());
-                return true;
-              });
-        });
+        Set.of(from, to),
+        () ->
+            SessionUtils.getWithoutCommit(
+                GlossaryTermRelMapper.class,
+                mapper -> {
+                  if (mapper.exists(metalakeId, from, to, type.name()) != 0) {
+                    return false;
+                  }
+                  mapper.insert(metalakeId, from, to, type.name());
+                  return true;
+                }));
   }
 
   /** Removes a live edge if present. Both endpoints must still exist in this metalake. */
@@ -127,37 +154,14 @@ public final class GlossaryTermRelService {
     long to = type == RelationType.RELATED ? Math.max(fromId, toId) : toId;
     return withHierarchyLock(
         metalakeId,
-        () -> {
-          lockTerms(metalakeId, Set.of(from, to));
-          return SessionUtils.getWithoutCommit(
-              GlossaryTermRelMapper.class,
-              mapper ->
-                  mapper.remove(
-                          metalakeId, from, to, type.name(), nextDeletedAt(mapper, metalakeId))
-                      == 1);
-        });
-  }
-
-  /**
-   * Locks a planned set of live endpoints in ascending ID order in an existing hierarchy-locked
-   * transaction. Call before writes when an operation changes several edges; it must include all
-   * endpoints. A missing endpoint fails the transaction rather than silently dropping an edge.
-   */
-  public void lockTerms(long metalakeId, Set<Long> termIds) {
-    checkIds(termIds);
-    Preconditions.checkState(
-        SessionUtils.isInTransaction(), "Term locks require a hierarchy-locked transaction");
-    SessionUtils.getWithoutCommit(
-        GlossaryTermRelMapper.class,
-        mapper -> {
-          for (Long id : termIds.stream().sorted().toList()) {
-            if (mapper.lockTerm(metalakeId, id) == null) {
-              throw new NoSuchEntityException(
-                  "Glossary term %s does not exist in metalake %s", id, metalakeId);
-            }
-          }
-          return null;
-        });
+        Set.of(from, to),
+        () ->
+            SessionUtils.getWithoutCommit(
+                GlossaryTermRelMapper.class,
+                mapper ->
+                    mapper.remove(
+                            metalakeId, from, to, type.name(), nextDeletedAt(mapper, metalakeId))
+                        == 1));
   }
 
   /** Returns the live direct broader IDs, or an empty set when none exist. */
@@ -176,19 +180,25 @@ public final class GlossaryTermRelService {
         readEdges(metalakeId, Set.of(termId), RelationType.RELATED, false), termId, false, true);
   }
 
-  /** Reads all outgoing BROADER edges of a frontier in one query; an empty frontier runs no SQL. */
+  /**
+   * Reads all outgoing BROADER edges of a frontier in bounded batches; an empty frontier runs no
+   * SQL.
+   */
   public List<GlossaryTermRelPO> listBroaderEdges(long metalakeId, Set<Long> termIds) {
     return readEdges(metalakeId, termIds, RelationType.BROADER, false);
   }
 
-  /** Reads all incoming BROADER edges of a frontier in one query; an empty frontier runs no SQL. */
+  /**
+   * Reads all incoming BROADER edges of a frontier in bounded batches; an empty frontier runs no
+   * SQL.
+   */
   public List<GlossaryTermRelPO> listNarrowerEdges(long metalakeId, Set<Long> termIds) {
     return readEdges(metalakeId, termIds, RelationType.BROADER, true);
   }
 
   /**
-   * Walks all live ancestors with one query per nonempty frontier, including the terminal frontier.
-   * IDs are visited once, even for diamonds or malformed cycles; the root is excluded.
+   * Walks all live ancestors in bounded batches at each level, including the terminal frontier. IDs
+   * are visited once, even for diamonds or malformed cycles; the root is excluded.
    */
   public Set<Long> ancestors(long metalakeId, long termId) {
     return walk(metalakeId, termId, false);
@@ -258,7 +268,19 @@ public final class GlossaryTermRelService {
     }
     return SessionUtils.getWithoutCommit(
         GlossaryTermRelMapper.class,
-        mapper -> mapper.listEdges(metalakeId, ids, type.name(), reverse));
+        mapper -> {
+          if (ids.size() <= FRONTIER_BATCH_SIZE) {
+            return mapper.listEdges(metalakeId, ids, type.name(), reverse);
+          }
+          List<GlossaryTermRelPO> edges = new ArrayList<>();
+          for (List<Long> batch : Lists.partition(List.copyOf(ids), FRONTIER_BATCH_SIZE)) {
+            edges.addAll(mapper.listEdges(metalakeId, batch, type.name(), reverse));
+          }
+          edges.sort(
+              Comparator.comparing(GlossaryTermRelPO::getFromTermId)
+                  .thenComparing(GlossaryTermRelPO::getToTermId));
+          return edges;
+        });
   }
 
   private Set<Long> walk(long metalakeId, long root, boolean reverse) {

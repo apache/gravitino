@@ -162,8 +162,8 @@ TermVersion  { termId, version, state, snapshot, audit_info }   // Step 2 only; 
   endpoints are stored in ascending ID order. The storage service rejects self-links and missing or
   cross-metalake endpoints, and makes duplicate additions and absent removals no-ops. Cycle/depth
   and overlap checks, authorization, and surviving-term revision/audit updates remain manager work
-  in T4/T5. Reads return live endpoint IDs without authorization or status filtering. Each batched
-  frontier is one statement snapshot; wrap a whole walk in the hierarchy-lock transaction when a
+  in T4/T5. Reads return live endpoint IDs without authorization or status filtering. Each batch of up to 500
+  frontier IDs uses one statement snapshot; wrap a whole walk in the hierarchy-lock transaction when a
   stable graph is required. Manager reads must filter each frontier before expanding it.
 - **Relation cleanup**: term deletion retires touching edges under the hierarchy mutex, and metalake
   deletion retires its edges and removes its mutex row under the exclusive parent fence. Relation
@@ -234,7 +234,7 @@ TermVersion  { termId, version, state, snapshot, audit_info }   // Step 2 only; 
   X → A, B → Y and X `RELATED` Y make A → B invalid. Walking only upward from B misses X.
   Both walks and the pair check run under the hierarchy lock, with visited IDs deduplicated
   across each walk. An alter validates its complete proposed relation graph before committing.
-- **No recursive SQL**: the walk runs in code, with one batched query per level. The backend still
+- **No recursive SQL**: the walk runs in code, with queries of up to 500 frontier IDs per level. The backend still
   supports MySQL 5.7, which has no `WITH RECURSIVE`.
 - A hierarchy read returns all ancestors or all descendants of a term. There are no cycles, so the
   walk always ends.
@@ -1331,7 +1331,7 @@ also need `-PskipDockerTests=false` and a running Docker.
 - T3.2 `RELATED` from A to B and from B to A is one row, with `from_term_id < to_term_id`. Adding
   the second one is a duplicate.
 - T3.3 Diamond: A → B, A → C, B → D, C → D. Walking up from A returns B, C and D, each once.
-- T3.4 The walk sends one query per level. For a chain of 5 levels, it sends 5 queries. (Count the
+- T3.4 The walk sends one query per batch of up to 500 IDs per level. For a chain of 5 levels, it sends 5 queries. (Count the
   calls on the mapper.) **(guard: a version with one query per term fails this test.)**
 - T3.5 The first use of the hierarchy lock inserts its row. A second use does not insert another
   row. Two threads using it for the first time at the same time both succeed.

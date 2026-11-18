@@ -19,8 +19,8 @@
 
 package org.apache.gravitino.storage.relational.mapper;
 
+import java.util.Collection;
 import java.util.List;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.mapper.provider.base.GlossaryTermRelSQLProvider;
 import org.apache.gravitino.storage.relational.po.GlossaryTermRelPO;
@@ -96,12 +96,12 @@ public interface GlossaryTermRelMapper {
   @DeleteProvider(type = GlossaryTermRelSQLProvider.class, method = "dropLock")
   void dropLock(@Param("metalakeId") long metalakeId);
 
-  /** Reads one nonempty frontier with live endpoints in a single statement. */
+  /** Reads one nonempty frontier batch with live endpoints in a single statement. */
   @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
   @SelectProvider(type = GlossaryTermRelSQLProvider.class, method = "listEdges")
   List<GlossaryTermRelPO> listEdges(
       @Param("metalakeId") long metalakeId,
-      @Param("ids") Set<Long> ids,
+      @Param("ids") Collection<Long> ids,
       @Param("type") String type,
       @Param("reverse") boolean reverse);
 

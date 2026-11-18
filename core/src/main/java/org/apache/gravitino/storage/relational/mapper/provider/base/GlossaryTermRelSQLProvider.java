@@ -101,7 +101,7 @@ public final class GlossaryTermRelSQLProvider {
     return "DELETE FROM glossary_hierarchy_lock WHERE metalake_id=#{metalakeId}";
   }
 
-  /** Reads one complete frontier, excluding deleted endpoints, without recursive SQL or locks. */
+  /** Reads one frontier batch, excluding deleted endpoints, without recursive SQL or locks. */
   public static String listEdges() {
     return "<script>SELECT "
         + COLUMNS
