@@ -20,7 +20,7 @@ const { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } = require(
 const { tmpdir } = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { resolve, mergedChangeBase, verifyBot, buildCommit, prepare, openPullRequest, dispatch, ROUTING_MARKER } = require('../backport-to-fork.cjs');
+const { resolve, loadTask, mergedChangeBase, verifyBot, buildCommit, prepare, openPullRequest, dispatch, ROUTING_MARKER } = require('../backport-to-fork.cjs');
 const { resolve: resolveCI } = require('../resolve-fork-ci.cjs');
 const A = 'a'.repeat(40), B = 'b'.repeat(40);
 const task = { owner: 'alice', repo: 'gravitino', repositoryId: 42, number: 7, sha: A, sourceBaseSha: B, title: 'Fix $(untrusted) `title`' };
@@ -45,7 +45,7 @@ test('resolve uses configured bot fork and exact labels, independent of merger',
     const h = harness();
     if (manual) h.github.rest.pulls.get = async () => ({data:{...source(),merged_by:{login:'someone-else',type:'Bot'}}});
     await resolve(h);
-    assert.deepEqual(JSON.parse(h.outputs.task), task);
+    assert.deepEqual(JSON.parse(h.outputs.task), {destination:'fork',repo:task.repo,repositoryId:42,number:task.number,sha:A,sourceBaseSha:B});
     assert.deepEqual(JSON.parse(h.outputs.targets), ['branch-2.0']);
   }
   const h = harness();
@@ -92,7 +92,7 @@ test('workflow_run discovers only a merged main PR matching the signal head', as
   const merged = {...source(),merged_at:'2026-11-18',head:{sha:A}};
   h.github.paginate = async (_, args) => args.commit_sha === A ? [merged] : [];
   await resolve(h);
-  assert.deepEqual(JSON.parse(h.outputs.task), task);
+  assert.deepEqual(JSON.parse(h.outputs.task), {destination:'fork',repo:task.repo,repositoryId:42,number:task.number,sha:A,sourceBaseSha:B});
   for (const candidate of [{...merged,merged_at:null},{...merged,head:{sha:B}},
     {...merged,base:{...merged.base,ref:'branch-2.0'}}]) {
     h.github.paginate = async () => [candidate];
@@ -370,7 +370,7 @@ test('production coordinator wiring keeps credentials out of PR code and uses th
   assert.match(auto, /workflow_run:/);
   assert.doesNotMatch(auto, /pull_request_target:/);
   assert.match(workflow('fork-ci-status.yml'), /types: \[opened, synchronize, reopened, edited, closed\]/);
-  assert.match(auto, /vars.BACKPORT_BOT_OWNER/);
+  assert.match(auto, /secrets.BACKPORT_BOT_OWNER/);
   assert.match(auto, /pull-requests: write/);
   assert.match(auto, /issues: write/);
   assert.match(backport, /verifyBot/);
@@ -384,8 +384,8 @@ test('absent and empty bot owner preserve upstream backports without querying a 
     const h = harness();
     h.github.rest.repos.get = async () => {throw new Error('must not require a fork');};
     await resolve({...h,botOwner});
-    assert.deepEqual(JSON.parse(h.outputs.task), {owner:'apache',repo:'gravitino',number:7,
-      sha:A,sourceBaseSha:B,title:task.title});
+    assert.deepEqual(JSON.parse(h.outputs.task), {destination:'upstream',repo:'gravitino',number:7,
+      sha:A,sourceBaseSha:B});
     assert.deepEqual(JSON.parse(h.outputs.targets), ['branch-2.0']);
   }
   const h = harness();
@@ -463,12 +463,12 @@ test('workflow fallback is selectable without a bot secret and isolates upstream
   const fork = call.slice(call.indexOf('  backport:'),call.indexOf('  backport-upstream:'));
   const upstream = call.slice(call.indexOf('  backport-upstream:'));
   assert.match(fork,/contents: read/);assert.doesNotMatch(fork,/contents: write|actions: write/);
-  assert.match(fork,/owner != 'apache'/);assert.match(upstream,/owner == 'apache'/);
+  assert.match(fork,/destination == 'fork'/);assert.match(upstream,/destination == 'upstream'/);
   assert.match(upstream,/contents: write/);assert.match(upstream,/actions: write/);
   assert.match(impl,/BACKPORT_BOT_TOKEN:\n\s+required: false/);
   assert.match(impl,/CHERRY_PICK_TOKEN:\n\s+required: false/);
   assert.match(impl,/secrets.CHERRY_PICK_TOKEN \|\| github.token/);
-  assert.match(impl,/Verify the dedicated bot credential\n\s+if: fromJSON\(inputs.task\).owner != 'apache'/);
+  assert.match(impl,/Verify the dedicated bot credential\n\s+if: fromJSON\(inputs.task\).destination == 'fork'/);
 });
 
 test('conflict PR recovery instructions work for both bot and Apache destinations', async () => {
@@ -480,4 +480,25 @@ test('conflict PR recovery instructions work for both bot and Apache destination
     assert.doesNotMatch(h.calls[0].body,/in the fork|run Fork CI on this branch/);
     assert.equal(h.outputs.ready,'false');
   }
+});
+
+test('secret owner and title stay out of cross-job outputs and are restored only inside the destination job', async () => {
+  const h = harness();
+  h.github.rest.pulls.get = async () => ({data:{...source(),title:'Fix by alice'}});
+  await resolve(h);
+  assert.ok(!h.outputs.task.includes('alice'));
+  assert.equal(JSON.parse(h.outputs.task).owner,undefined);
+  const exported = {};
+  const core = {...h.core,exportVariable:(key,value) => exported[key] = JSON.parse(value)};
+  await loadTask({...h,core,task:JSON.parse(h.outputs.task)});
+  assert.equal(exported.BACKPORT_TASK.owner,'alice');
+  assert.equal(exported.BACKPORT_TASK.title,'Fix by alice');
+  for (const botOwner of [undefined,'','apache','bad/owner']) {
+    await assert.rejects(loadTask({...h,core,task:JSON.parse(h.outputs.task),botOwner}),/Configure/);
+  }
+  await loadTask({...h,core,task:{...JSON.parse(h.outputs.task),destination:'upstream'},botOwner:undefined});
+  assert.equal(exported.BACKPORT_TASK.owner,'apache');
+  await assert.rejects(loadTask({...h,core,task:{...JSON.parse(h.outputs.task),destination:'invalid'}}),/Invalid/);
+  h.github.rest.pulls.get = async () => ({data:{...source(),merge_commit_sha:B}});
+  await assert.rejects(loadTask({...h,core,task:JSON.parse(h.outputs.task)}),/no longer matches/);
 });

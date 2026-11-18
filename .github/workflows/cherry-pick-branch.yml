@@ -30,6 +30,8 @@ on:
         required: true
         type: string
     secrets:
+      BACKPORT_BOT_OWNER:
+        required: false
       BACKPORT_BOT_TOKEN:
         required: false
       CHERRY_PICK_TOKEN:
@@ -45,7 +47,7 @@ jobs:
       cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    name: Cherry-pick to ${{ inputs.target-branch }} in ${{ fromJSON(inputs.task).owner }}/gravitino
+    name: Cherry-pick to ${{ inputs.target-branch }} (${{ fromJSON(inputs.task).destination }})
     env:
       BACKPORT_TASK: ${{ inputs.task }}
       BACKPORT_TARGET: ${{ inputs.target-branch }}
@@ -54,8 +56,16 @@ jobs:
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
+      - name: Load destination credentials within this job
+        uses: actions/github-script@v7
+        env:
+          BACKPORT_BOT_OWNER: ${{ secrets.BACKPORT_BOT_OWNER }}
+        with:
+          script: |
+            await require('./.github/scripts/backport-to-fork.cjs').loadTask({
+              github, core, task: JSON.parse(process.env.BACKPORT_TASK), botOwner: process.env.BACKPORT_BOT_OWNER });
       - name: Verify the dedicated bot credential
-        if: fromJSON(inputs.task).owner != 'apache'
+        if: fromJSON(inputs.task).destination == 'fork'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.BACKPORT_BOT_TOKEN }}
@@ -66,9 +76,9 @@ jobs:
         id: prepare
         uses: actions/github-script@v7
         env:
-          FORK_TOKEN: ${{ fromJSON(inputs.task).owner == 'apache' && (secrets.CHERRY_PICK_TOKEN || github.token) || secrets.BACKPORT_BOT_TOKEN }}
+          FORK_TOKEN: ${{ fromJSON(inputs.task).destination == 'upstream' && (secrets.CHERRY_PICK_TOKEN || github.token) || secrets.BACKPORT_BOT_TOKEN }}
         with:
-          github-token: ${{ fromJSON(inputs.task).owner == 'apache' && (secrets.CHERRY_PICK_TOKEN || github.token) || secrets.BACKPORT_BOT_TOKEN }}
+          github-token: ${{ fromJSON(inputs.task).destination == 'upstream' && (secrets.CHERRY_PICK_TOKEN || github.token) || secrets.BACKPORT_BOT_TOKEN }}
           script: |
             await require('./.github/scripts/backport-to-fork.cjs').prepare({ github, core,
               task: JSON.parse(process.env.BACKPORT_TASK), target: process.env.BACKPORT_TARGET,
@@ -82,7 +92,7 @@ jobs:
           BACKPORT_MARKERS: ${{ steps.prepare.outputs.markers }}
           BACKPORT_CONFLICT: ${{ steps.prepare.outputs.conflict }}
         with:
-          github-token: ${{ fromJSON(inputs.task).owner == 'apache' && (secrets.CHERRY_PICK_TOKEN || github.token) || secrets.BACKPORT_BOT_TOKEN }}
+          github-token: ${{ fromJSON(inputs.task).destination == 'upstream' && (secrets.CHERRY_PICK_TOKEN || github.token) || secrets.BACKPORT_BOT_TOKEN }}
           script: |
             await require('./.github/scripts/backport-to-fork.cjs').openPullRequest({ github, upstream: new github.constructor({ auth: process.env.UPSTREAM_TOKEN }), core,
               task: JSON.parse(process.env.BACKPORT_TASK), target: process.env.BACKPORT_TARGET,
@@ -96,7 +106,7 @@ jobs:
           BACKPORT_SHA: ${{ steps.prepare.outputs.sha }}
           BACKPORT_NUMBER: ${{ steps.pr.outputs.number }}
         with:
-          github-token: ${{ fromJSON(inputs.task).owner == 'apache' && (secrets.CHERRY_PICK_TOKEN || github.token) || secrets.BACKPORT_BOT_TOKEN }}
+          github-token: ${{ fromJSON(inputs.task).destination == 'upstream' && (secrets.CHERRY_PICK_TOKEN || github.token) || secrets.BACKPORT_BOT_TOKEN }}
           script: |
             await require('./.github/scripts/backport-to-fork.cjs').dispatch({ github, core,
               task: JSON.parse(process.env.BACKPORT_TASK), target: process.env.BACKPORT_TARGET,

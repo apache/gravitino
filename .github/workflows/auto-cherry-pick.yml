@@ -57,7 +57,7 @@ jobs:
       - id: resolve
         uses: actions/github-script@v7
         env:
-          BACKPORT_BOT_OWNER: ${{ vars.BACKPORT_BOT_OWNER }}
+          BACKPORT_BOT_OWNER: ${{ secrets.BACKPORT_BOT_OWNER }}
         with:
           script: |
             await require('./.github/scripts/backport-to-fork.cjs').resolve({ github, context, core, botOwner: process.env.BACKPORT_BOT_OWNER });
@@ -68,7 +68,7 @@ jobs:
       pull-requests: write
       issues: write
     needs: resolve
-    if: needs.resolve.outputs.targets != '[]' && fromJSON(needs.resolve.outputs.task).owner != 'apache'
+    if: needs.resolve.outputs.targets != '[]' && fromJSON(needs.resolve.outputs.task).destination == 'fork'
     strategy:
       fail-fast: false
       matrix:
@@ -86,7 +86,7 @@ jobs:
       pull-requests: write
       issues: write
     needs: resolve
-    if: needs.resolve.outputs.targets != '[]' && fromJSON(needs.resolve.outputs.task).owner == 'apache'
+    if: needs.resolve.outputs.targets != '[]' && fromJSON(needs.resolve.outputs.task).destination == 'upstream'
     strategy:
       fail-fast: false
       matrix:

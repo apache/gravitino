@@ -68,8 +68,8 @@ async function resolve({ github, context, core, botOwner }) {
   if (!targets.length) return;
   const owner = botOwner || UPSTREAM.owner;
   if (!botOwner) {
-    core.setOutput('task', JSON.stringify({ ...UPSTREAM, number: pr.number,
-      sha: pr.merge_commit_sha, sourceBaseSha: await mergedChangeBase(github, pr), title: pr.title }));
+    core.setOutput('task', JSON.stringify({ destination: 'upstream', repo: UPSTREAM.repo, number: pr.number,
+      sha: pr.merge_commit_sha, sourceBaseSha: await mergedChangeBase(github, pr) }));
     core.notice('BACKPORT_BOT_OWNER is unset; backport branches and CI remain in apache/gravitino.');
     return;
   }
@@ -84,9 +84,22 @@ async function resolve({ github, context, core, botOwner }) {
   }
   if (!fork.fork || fork.source?.full_name !== 'apache/gravitino' || fork.private || fork.archived ||
       fork.owner.login.toLowerCase() !== owner.toLowerCase()) throw new Error(`${owner}/gravitino must be an active public fork of apache/gravitino.`);
-  const task = { owner, repo: 'gravitino', repositoryId: fork.id, number: pr.number,
-    sha: pr.merge_commit_sha, sourceBaseSha: await mergedChangeBase(github, pr), title: pr.title };
+  // Secret owner names (including names in PR titles) must not enter job outputs.
+  const task = { destination: 'fork', repo: 'gravitino', repositoryId: fork.id, number: pr.number,
+    sha: pr.merge_commit_sha, sourceBaseSha: await mergedChangeBase(github, pr) };
   core.setOutput('task', JSON.stringify(task));
+}
+
+async function loadTask({ github, core, task, botOwner }) {
+  if (!['fork', 'upstream'].includes(task.destination)) throw new Error('Invalid backport destination.');
+  const owner = task.destination === 'upstream' ? UPSTREAM.owner : botOwner;
+  if (task.destination === 'fork' && (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(owner || '') || owner.toLowerCase() === 'apache')) {
+    throw new Error('Configure BACKPORT_BOT_OWNER before retrying bot routing.');
+  }
+  const { data: pr } = await github.rest.pulls.get({ ...UPSTREAM, pull_number: task.number });
+  if (!pr.merged || pr.merge_commit_sha !== task.sha) throw new Error('Source PR no longer matches the resolved backport.');
+  // Same-job environment preserves masking without exposing the owner in job outputs.
+  core.exportVariable('BACKPORT_TASK', JSON.stringify({ ...task, owner, title: pr.title }));
 }
 
 async function verifyBot({ github, task }) {
@@ -242,4 +255,4 @@ async function dispatch({ github, core, task, target, branch, sha, number }) {
     ...(upstreamMode ? { inputs: { 'pull-request': String(number) } } : {}) });
   core.notice(`Started Fork CI in ${task.owner}/${task.repo} for #${number}.`);
 }
-module.exports = { resolve, mergedChangeBase, verifyBot, buildCommit, prepare, openPullRequest, dispatch, ROUTING_MARKER };
+module.exports = { resolve, loadTask, mergedChangeBase, verifyBot, buildCommit, prepare, openPullRequest, dispatch, ROUTING_MARKER };

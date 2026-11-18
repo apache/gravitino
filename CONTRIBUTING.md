@@ -170,7 +170,7 @@ heavy CI on Apache.
 
 A nonempty but invalid owner, missing/invalid bot token, unavailable fork, or
 missing fork routing support fails visibly; none silently switches to Apache.
-Removing the owner variable restores upstream mode for subsequent runs. Existing
+Removing the owner secret restores upstream mode for subsequent runs. Existing
 fork PRs are not migrated, so finish or close them before retrying the same source
 in upstream mode to avoid creating a second backport PR.
 
@@ -180,7 +180,7 @@ Repository administrators must complete these steps before opting into bot mode:
    manually prepared PR. The coordinator checks the routing markers before
    pushing; it cannot install its own prerequisites. Sync the bot fork's default
    branch with the routing support and enable Actions and the **Fork CI** workflow.
-2. Set the Apache Actions variable `BACKPORT_BOT_OWNER` to the dedicated account's
+2. Set the Apache Actions secret `BACKPORT_BOT_OWNER` to the dedicated account's
    login (for example, `yuqi-datastrato`). Its public `gravitino` fork must belong
    to Apache's fork network. The bot needs no Apache write access.
 3. Store that account's classic PAT as the Apache Actions secret
