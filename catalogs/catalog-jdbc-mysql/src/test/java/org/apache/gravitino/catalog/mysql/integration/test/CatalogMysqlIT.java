@@ -87,6 +87,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.api.condition.EnabledIf;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
@@ -182,6 +184,10 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   private Catalog createCatalog(String catalogName) throws SQLException {
+    return createCatalog(catalogName, "");
+  }
+
+  private Catalog createCatalog(String catalogName, String jdbcOptions) throws SQLException {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
     catalogProperties.put(
@@ -190,7 +196,8 @@ public class CatalogMysqlIT extends BaseIT {
                 MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME),
                 0,
                 MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/"))
-            + "?useSSL=false&allowPublicKeyRetrieval=true");
+            + "?useSSL=false&allowPublicKeyRetrieval=true"
+            + jdbcOptions);
     catalogProperties.put(
         JdbcConfig.JDBC_DRIVER.getKey(), MYSQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
     catalogProperties.put(JdbcConfig.USERNAME.getKey(), MYSQL_CONTAINER.getUsername());
@@ -595,6 +602,54 @@ public class CatalogMysqlIT extends BaseIT {
     Assertions.assertEquals("flag", commented.columns()[0].comment());
     Assertions.assertEquals(Literals.booleanLiteral(false), commented.columns()[0].defaultValue());
     assertBooleanDefaultInsert(ident, false, true);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testZeroDateDefaultsSurviveLoadAndAlter(boolean useInformationSchema) throws SQLException {
+    String legacyCatalogName = GravitinoITUtils.genRandomName("mysql_zero_date_catalog");
+    Catalog legacyCatalog =
+        createCatalog(
+            legacyCatalogName,
+            "&useInformationSchema=" + useInformationSchema + "&sessionVariables=sql_mode=%27%27");
+    TableCatalog tables = legacyCatalog.asTableCatalog();
+    NameIdentifier ident = NameIdentifier.of(schemaName, tableName);
+    try {
+      try (Connection connection =
+              DriverManager.getConnection(
+                  MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME),
+                  MYSQL_CONTAINER.getUsername(),
+                  MYSQL_CONTAINER.getPassword());
+          Statement statement = connection.createStatement()) {
+        statement.execute("SET SESSION sql_mode = ''");
+        statement.execute(
+            "CREATE TABLE "
+                + schemaName
+                + "."
+                + tableName
+                + " (d DATE DEFAULT '0000-00-00', "
+                + "dt DATETIME(6) DEFAULT '0000-00-00 12:34:56.123456', "
+                + "ts TIMESTAMP NULL DEFAULT '0000-00-00 00:00:00')");
+      }
+
+      Table loaded = tables.loadTable(ident);
+      Assertions.assertEquals(
+          UnparsedExpression.of("'0000-00-00'"), loaded.columns()[0].defaultValue());
+      Assertions.assertEquals(
+          UnparsedExpression.of("'0000-00-00 12:34:56.123456'"),
+          loaded.columns()[1].defaultValue());
+      Assertions.assertEquals(
+          UnparsedExpression.of("'0000-00-00 00:00:00'"), loaded.columns()[2].defaultValue());
+
+      tables.alterTable(ident, TableChange.updateColumnComment(new String[] {"d"}, "legacy"));
+      Table altered = tables.loadTable(ident);
+      Assertions.assertEquals("legacy", altered.columns()[0].comment());
+      Assertions.assertEquals(
+          loaded.columns()[0].defaultValue(), altered.columns()[0].defaultValue());
+    } finally {
+      metalake.disableCatalog(legacyCatalogName);
+      metalake.dropCatalog(legacyCatalogName, true);
+    }
   }
 
   @Test

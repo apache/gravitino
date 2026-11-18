@@ -81,6 +81,7 @@ public class TestIcebergUpdateStatsJob {
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.type"));
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.uri"));
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.warehouse"));
+    assertEquals("{{catalog_name}}", configs.get("spark.sql.defaultCatalog"));
     assertEquals(
         "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
         configs.get("spark.sql.extensions"));

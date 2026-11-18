@@ -25,8 +25,8 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
- * An immutable relationship between two datasets in the same semantic model. The endpoint column
- * arrays describe the corresponding join columns on the source and target datasets.
+ * An immutable relationship between two datasets in the same semantic model. The endpoint arrays
+ * name fields declared by the source and target datasets that form the join.
  */
 @Evolving
 public final class Relationship {
@@ -87,18 +87,22 @@ public final class Relationship {
   }
 
   /**
-   * Returns a copy of the source dataset columns.
+   * Returns a copy of the source dataset field names.
    *
-   * @return The source columns.
+   * <p>The names refer to fields declared by the source dataset, not columns of its source.
+   *
+   * @return The source field names.
    */
   public String[] fromColumns() {
     return Arrays.copyOf(fromColumns, fromColumns.length);
   }
 
   /**
-   * Returns a copy of the target dataset columns.
+   * Returns a copy of the target dataset field names.
    *
-   * @return The target columns.
+   * <p>The names refer to fields declared by the target dataset, not columns of its source.
+   *
+   * @return The target field names.
    */
   public String[] toColumns() {
     return Arrays.copyOf(toColumns, toColumns.length);
@@ -241,9 +245,11 @@ public final class Relationship {
     }
 
     /**
-     * Sets the source dataset columns.
+     * Sets the source dataset join field names.
      *
-     * @param fromColumns The non-empty source column array.
+     * <p>The names must refer to fields declared by the source dataset, not columns of its source.
+     *
+     * @param fromColumns The non-empty source field name array.
      * @return This builder.
      */
     public Builder withFromColumns(String[] fromColumns) {
@@ -252,9 +258,11 @@ public final class Relationship {
     }
 
     /**
-     * Sets the target dataset columns.
+     * Sets the target dataset join field names.
      *
-     * @param toColumns The non-empty target column array.
+     * <p>The names must refer to fields declared by the target dataset, not columns of its source.
+     *
+     * @param toColumns The non-empty target field name array.
      * @return This builder.
      */
     public Builder withToColumns(String[] toColumns) {
@@ -288,8 +296,8 @@ public final class Relationship {
      * Builds an immutable {@link Relationship}.
      *
      * @return The new relationship.
-     * @throws IllegalArgumentException If a required name is null or empty, a required column array
-     *     is null or empty, a column name or custom extension is null, or the endpoint column
+     * @throws IllegalArgumentException If a required name is null or empty, a required endpoint
+     *     array is null or empty, an endpoint name or custom extension is null, or the endpoint
      *     arrays have different lengths.
      */
     public Relationship build() {

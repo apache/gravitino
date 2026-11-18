@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.OptionalLong;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
@@ -44,6 +45,7 @@ import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogTestUtils;
+import org.apache.gravitino.catalog.EntityCombinedTable;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TableNormalizeDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
@@ -52,6 +54,7 @@ import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.hook.TableHookDispatcher;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -185,8 +188,11 @@ class TestNormalizedOwnerOperations extends TestJDBCBackend {
   void testQuotedCreateHookDoesNotNormalizeStoredNameAgain() throws Exception {
     NameIdentifier stored = putQuotedTable();
     TableDispatcher source = mock(TableDispatcher.class);
+    EntityCombinedTable created = mock(EntityCombinedTable.class);
+    long createdId = store.get(stored, Entity.EntityType.TABLE, TableEntity.class).id();
+    when(created.createdTableId()).thenReturn(OptionalLong.of(createdId));
     when(source.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
-        .thenReturn(mock(Table.class));
+        .thenReturn(created);
     TableDispatcher tables =
         new TableNormalizeDispatcher(new TableHookDispatcher(source, () -> manager), catalogs);
     tables.createTable(

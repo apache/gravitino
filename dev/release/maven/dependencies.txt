@@ -57,5 +57,7 @@ com.fasterxml.jackson.core:jackson-core:2.9.2=
 com.fasterxml.jackson.core:jackson-core:2.13.5=
 com.fasterxml.jackson.core:jackson-core:2.15.2=LICENSE.fastdoubleparser-0.9.0,LICENSE.schubfach | Jackson Core (Apache-2.0), including FastDoubleParser 0.9.0 and Schubfach (MIT), bigint (BSD-2-Clause)
 com.fasterxml.jackson.core:jackson-core:2.18.3=LICENSE.fastdoubleparser-1.0.90,LICENSE.schubfach,LICENSE.fastdoubleparser-boost | Jackson Core (Apache-2.0), including FastDoubleParser 1.0.90 and Schubfach (MIT), fast_double_parser (BSL-1.0), fast_float (MIT), bigint (BSD-2-Clause)
-# This version already includes the complete parser license texts.
+# These versions already include the complete parser license texts.
+com.fasterxml.jackson.core:jackson-core:2.18.12=
 com.fasterxml.jackson.core:jackson-core:2.21.3=
+com.fasterxml.jackson.core:jackson-core:2.21.8=
