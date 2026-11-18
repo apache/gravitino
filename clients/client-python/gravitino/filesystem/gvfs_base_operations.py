@@ -14,6 +14,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+# pylint: disable=too-many-lines
 import logging
 import os
 import sys
@@ -21,7 +22,7 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from pathlib import PurePosixPath
-from typing import Dict, Tuple, Optional, List
+from typing import Any, Dict, Tuple, Optional, List
 from urllib.error import URLError
 from urllib.parse import urlparse
 
@@ -74,6 +75,27 @@ _CREDENTIAL_INFO_TO_GVFS_KEYS = {
     "azure-storage-account-name": GVFSConfig.GVFS_FILESYSTEM_AZURE_ACCOUNT_NAME,
     "azure-storage-account-key": GVFSConfig.GVFS_FILESYSTEM_AZURE_ACCOUNT_KEY,
 }
+
+
+class _OperationScope:  # pylint: disable=too-few-public-methods
+    """Shares catalogs and filesets loaded during a single GVFS operation."""
+
+    def __init__(self, scope_local: threading.local):
+        self._scope_local = scope_local
+        self._outermost = getattr(scope_local, "scope", None) is None
+        self.catalogs: Dict[NameIdentifier, Any] = {}
+        # Keyed by fileset_catalog identity so a fileset loaded through an
+        # overriding _get_fileset_catalog is not reused for another catalog.
+        self.filesets: Dict[int, Tuple[object, Dict[NameIdentifier, Fileset]]] = {}
+
+    def __enter__(self):
+        if self._outermost:
+            self._scope_local.scope = self
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self._outermost:
+            delattr(self._scope_local, "scope")
 
 
 class FileSystemCacheKey:
@@ -263,6 +285,7 @@ class BaseGVFSOperations(ABC):
             )
         )
         self._current_location_name = self._init_current_location_name()
+        self._scope_local = threading.local()
         self._kwargs = kwargs
 
     def _get_gravitino_client(self):
@@ -543,11 +566,9 @@ class BaseGVFSOperations(ABC):
             )
             fileset = self._get_fileset(fileset_ident)
         else:
-            catalog = self._get_gravitino_client().load_catalog(catalog_name)
+            catalog = self._load_catalog(NameIdentifier.of(metalake_name, catalog_name))
             schema = catalog.as_schemas().load_schema(schema_name)
-            fileset = catalog.as_fileset_catalog().load_fileset(
-                NameIdentifier.of(schema_name, fileset_ident.name())
-            )
+            fileset = self._load_fileset(fileset_ident, catalog.as_fileset_catalog())
         # Masked placeholders are skipped, as the Java client does: a cached entry can still
         # hold one for a secret removed since, which would overwrite a value merged before it.
         fileset_props = self._omit_masked_properties(catalog.properties())
@@ -648,53 +669,56 @@ class BaseGVFSOperations(ABC):
         :param location_name: The location name, None means the default location
         :return: The actual filesystem
         """
-        fileset = self._get_fileset(fileset_ident)
+        with self._open_operation_scope():
+            fileset = self._get_fileset(fileset_ident)
 
-        # Determine target location name
-        target_location_name = (
-            location_name
-            or fileset.properties().get(fileset.PROPERTY_DEFAULT_LOCATION_NAME)
-            or fileset.LOCATION_NAME_UNKNOWN
-        )
-
-        # Get the actual storage location
-        actual_location = fileset.storage_locations().get(target_location_name)
-        if actual_location is None:
-            raise NoSuchLocationNameException(
-                f"Cannot find the location: {target_location_name} in fileset: {fileset_ident}"
+            # Determine target location name
+            target_location_name = (
+                location_name
+                or fileset.properties().get(fileset.PROPERTY_DEFAULT_LOCATION_NAME)
+                or fileset.LOCATION_NAME_UNKNOWN
             )
 
-        fileset_props = self._merge_fileset_properties(fileset_ident, actual_location)
+            # Get the actual storage location
+            actual_location = fileset.storage_locations().get(target_location_name)
+            if actual_location is None:
+                raise NoSuchLocationNameException(
+                    f"Cannot find the location: {target_location_name} in fileset: {fileset_ident}"
+                )
 
-        # Set caller context for credential vending
-        if location_name:
-            context = {
-                Credential.HTTP_HEADER_CURRENT_LOCATION_NAME: location_name,
-            }
-            caller_context: CallerContext = CallerContext(context)
-            CallerContextHolder.set(caller_context)
-
-        try:
-            # Get credentials with client-side caching to avoid redundant REST calls
-            credentials = self._get_credentials_with_cache(
-                fileset_ident, fileset, target_location_name
+            fileset_props = self._merge_fileset_properties(
+                fileset_ident, actual_location
             )
 
-            # Get the filesystem using the new path-based caching approach
-            # This matches how Java GVFS caches by (scheme, authority, config)
-            actual_fs = self._get_filesystem(
-                credentials,
-                fileset_props,
-                actual_location,
-                **self._kwargs,
-            )
+            # Set caller context for credential vending
+            if location_name:
+                context = {
+                    Credential.HTTP_HEADER_CURRENT_LOCATION_NAME: location_name,
+                }
+                caller_context: CallerContext = CallerContext(context)
+                CallerContextHolder.set(caller_context)
 
-            self._create_fileset_location_if_needed(
-                fileset_props, actual_fs, actual_location
-            )
-            return actual_fs
-        finally:
-            CallerContextHolder.remove()
+            try:
+                # Get credentials with client-side caching to avoid redundant REST calls
+                credentials = self._get_credentials_with_cache(
+                    fileset_ident, fileset, target_location_name
+                )
+
+                # Get the filesystem using the new path-based caching approach
+                # This matches how Java GVFS caches by (scheme, authority, config)
+                actual_fs = self._get_filesystem(
+                    credentials,
+                    fileset_props,
+                    actual_location,
+                    **self._kwargs,
+                )
+
+                self._create_fileset_location_if_needed(
+                    fileset_props, actual_fs, actual_location
+                )
+                return actual_fs
+            finally:
+                CallerContextHolder.remove()
 
     def _create_fileset_location_if_needed(
         self,
@@ -918,9 +942,41 @@ class BaseGVFSOperations(ABC):
         finally:
             write_lock.release()
 
+    def _open_operation_scope(self):
+        return _OperationScope(self._scope_local)
+
+    def _load_catalog(self, catalog_ident: NameIdentifier):
+        scope = getattr(self._scope_local, "scope", None)
+        if scope is None:
+            return self._get_gravitino_client().load_catalog(catalog_ident.name())
+        catalog = scope.catalogs.get(catalog_ident)
+        if catalog is None:
+            catalog = self._get_gravitino_client().load_catalog(catalog_ident.name())
+            scope.catalogs[catalog_ident] = catalog
+        return catalog
+
+    def _load_fileset(self, fileset_ident: NameIdentifier, fileset_catalog):
+        ident = NameIdentifier.of(
+            fileset_ident.namespace().level(2), fileset_ident.name()
+        )
+        scope = getattr(self._scope_local, "scope", None)
+        if scope is None:
+            return fileset_catalog.load_fileset(ident)
+        entry = scope.filesets.get(id(fileset_catalog))
+        if entry is None:
+            catalog_filesets: Dict[NameIdentifier, Fileset] = {}
+            scope.filesets[id(fileset_catalog)] = (fileset_catalog, catalog_filesets)
+        else:
+            catalog_filesets = entry[1]
+        fileset = catalog_filesets.get(fileset_ident)
+        if fileset is None:
+            fileset = fileset_catalog.load_fileset(ident)
+            catalog_filesets[fileset_ident] = fileset
+        return fileset
+
     def _get_fileset_catalog(self, catalog_ident: NameIdentifier):
         if not self._enable_fileset_metadata_cache:
-            return self._get_gravitino_client().load_catalog(catalog_ident.name())
+            return self._load_catalog(catalog_ident)
 
         read_lock = self._catalog_cache_lock.gen_rlock()
         try:
@@ -949,11 +1005,7 @@ class BaseGVFSOperations(ABC):
                 fileset_ident.namespace().level(0), fileset_ident.namespace().level(1)
             )
             catalog: FilesetCatalog = self._get_fileset_catalog(catalog_ident)
-            return catalog.as_fileset_catalog().load_fileset(
-                NameIdentifier.of(
-                    fileset_ident.namespace().level(2), fileset_ident.name()
-                )
-            )
+            return self._load_fileset(fileset_ident, catalog.as_fileset_catalog())
 
         read_lock = self._fileset_cache_lock.gen_rlock()
         try:
