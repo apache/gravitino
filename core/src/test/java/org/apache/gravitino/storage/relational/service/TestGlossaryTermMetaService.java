@@ -209,6 +209,17 @@ public class TestGlossaryTermMetaService extends TestJDBCBackend {
         () -> service.update(ident("One"), old -> term(999, "One").build()));
   }
 
+  /** The backend distinguishes a missing parent from an absent child of a live metalake. */
+  @TestTemplate
+  public void testDeleteDistinguishesMissingMetalakeFromMissingTerm() throws Exception {
+    NoSuchEntityException missingParent =
+        Assertions.assertThrows(
+            NoSuchEntityException.class, () -> backend.delete(ident("Churn"), TYPE, false));
+    Assertions.assertEquals("No such metalake entity: glossary", missingParent.getMessage());
+    setupMetalake();
+    Assertions.assertFalse(backend.delete(ident("Churn"), TYPE, false));
+  }
+
   @TestTemplate
   public void testDeleteRecreateAndGc() throws Exception {
     setupMetalake();

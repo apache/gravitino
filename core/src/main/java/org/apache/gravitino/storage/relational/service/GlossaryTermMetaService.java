@@ -197,24 +197,27 @@ public final class GlossaryTermMetaService {
     }
   }
 
-  /** Soft-deletes a definition and all its synonyms; a missing definition returns false. */
+  /**
+   * Soft-deletes the definition, synonyms and incident edges. Returns false if the term is absent
+   * in a live metalake.
+   *
+   * @throws NoSuchEntityException if the parent metalake is absent or disappears before locking
+   */
   public boolean delete(NameIdentifier ident) {
-    try {
-      return transaction(
-          ident.namespace(),
-          true,
-          (mapper, metalakeId) -> {
-            GlossaryTermPO row = require(mapper, ident, metalakeId);
-            long deletedAt = Math.max(1, System.currentTimeMillis());
-            requireUpdated(
-                mapper.delete(row.getTermId(), row.getCurrentVersion(), deletedAt), ident);
-            mapper.deleteSynonyms(row.getTermId(), deletedAt);
-            GlossaryTermRelService.getInstance().removeTerm(metalakeId, row.getTermId());
-            return true;
-          });
-    } catch (NoSuchEntityException e) {
-      return false;
-    }
+    return transaction(
+        ident.namespace(),
+        true,
+        (mapper, metalakeId) -> {
+          GlossaryTermPO row = mapper.getForUpdate(metalakeId, GlossaryTermNames.key(ident.name()));
+          if (row == null) {
+            return false;
+          }
+          long deletedAt = Math.max(1, System.currentTimeMillis());
+          requireUpdated(mapper.delete(row.getTermId(), row.getCurrentVersion(), deletedAt), ident);
+          mapper.deleteSynonyms(row.getTermId(), deletedAt);
+          GlossaryTermRelService.getInstance().removeTerm(metalakeId, row.getTermId());
+          return true;
+        });
   }
 
   /** Soft-deletes definitions and synonyms inside the metalake deletion transaction. */
