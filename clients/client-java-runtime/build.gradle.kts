@@ -93,10 +93,10 @@ val stageRuntimePublication by tasks.registering(Sync::class) {
       it.dir("${project.group.toString().replace('.', '/')}/$consumerArtifactName/${project.version}")
     }
   )
-  from(layout.buildDirectory.file("publications/mavenJava/pom-default.xml")) {
+  from(layout.buildDirectory.file("publications/MavenJava/pom-default.xml")) {
     rename { "$consumerArtifactName-${project.version}.pom" }
   }
-  from(layout.buildDirectory.file("publications/mavenJava/module.json")) {
+  from(layout.buildDirectory.file("publications/MavenJava/module.json")) {
     rename { "$consumerArtifactName-${project.version}.module" }
   }
   from(tasks.named<ShadowJar>("shadowJar").flatMap { it.archiveFile })
