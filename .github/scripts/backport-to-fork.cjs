@@ -226,12 +226,16 @@ async function dispatch({ github, core, task, target, branch, sha, number }) {
       return;
     }
   }
-  const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
-    owner: task.owner, repo: task.repo, workflow_id: 'fork-ci.yml', ...(upstreamMode ? { branch: target } : { head_sha: sha }), event: 'workflow_dispatch', per_page: 100 });
-  if (runs.some(run => run.head_branch === (upstreamMode ? target : branch) &&
-      (!upstreamMode || run.display_title === `Trusted Fork CI #${number}`) && run.status !== 'completed')) {
-    core.notice('Fork CI is already queued or running for this backport.');
-    return;
+  // A trusted upstream run's head_sha identifies the release workflow, not the
+  // tested PR head. Redispatch upstream retries so an older PR-head run cannot
+  // suppress current tests; trusted CI concurrency supersedes the previous run.
+  if (!upstreamMode) {
+    const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+      owner: task.owner, repo: task.repo, workflow_id: 'fork-ci.yml', head_sha: sha, event: 'workflow_dispatch', per_page: 100 });
+    if (runs.some(run => run.head_branch === branch && run.status !== 'completed')) {
+      core.notice('Fork CI is already queued or running for this backport.');
+      return;
+    }
   }
   await github.rest.actions.createWorkflowDispatch({ owner: task.owner, repo: task.repo,
     workflow_id: 'fork-ci.yml', ref: upstreamMode ? target : branch,

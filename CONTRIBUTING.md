@@ -158,10 +158,15 @@ continue in `apache/gravitino` using the existing `CHERRY_PICK_TOKEN` (or
 `GITHUB_TOKEN`) and `cherry-pick-<short SHA>-to-<target>` branch names. This mode
 needs no bot token, bot fork, or release routing markers. Existing release PR
 workflows run on Apache; `CHERRY_PICK_TOKEN` is required for automatic PR-event
-CI because GitHub suppresses events created with `GITHUB_TOKEN`. For releases
+CI; PR workflows created with `GITHUB_TOKEN` can require committer approval.
+Using `GITHUB_TOKEN` also requires repository policy allowing Actions to create
+PRs. For releases
 already using Fork CI routing, the coordinator explicitly dispatches trusted CI
 on the upstream release branch after creating the PR, including when it uses
-`GITHUB_TOKEN`. Upstream mode keeps all heavy CI on Apache.
+`GITHUB_TOKEN`. Upstream retries redispatch trusted CI, whose per-PR concurrency
+supersedes the previous run: an upstream run SHA identifies the release workflow,
+so it cannot prove which PR head a queued run will test. Upstream mode keeps all
+heavy CI on Apache.
 
 A nonempty but invalid owner, missing/invalid bot token, unavailable fork, or
 missing fork routing support fails visibly; none silently switches to Apache.
