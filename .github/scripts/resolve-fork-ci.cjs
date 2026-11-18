@@ -42,13 +42,13 @@ async function resolve({ github, context, core }) {
     const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: Number(number) });
     if (pr.state !== 'open' || !pr.head.repo) throw new Error('The pull request must be open with an existing head repository.');
     baseRef = pr.base.ref;
-    if (baseRef !== context.payload.repository.default_branch || context.ref !== `refs/heads/${baseRef}`) {
-      throw new Error('Dispatch the trusted workflow from the current default branch; release branches use their own CI.');
+    if (![context.payload.repository.default_branch, 'branch-1.3', 'branch-2.0'].includes(baseRef) || context.ref !== `refs/heads/${baseRef}`) {
+      throw new Error('Dispatch the trusted workflow from the current PR base branch (main or a supported release branch).');
     }
     // Pull requests retain an older base.sha after the base branch advances.
     const { data: base } = await github.rest.repos.getBranch({ ...context.repo, branch: baseRef });
     if (context.sha !== base.commit.sha) {
-      throw new Error('Dispatch the trusted workflow from the current default branch; release branches use their own CI.');
+      throw new Error('Dispatch the trusted workflow from the current PR base branch (main or a supported release branch).');
     }
     headSha = pr.head.sha;
     headRepository = pr.head.repo.full_name;

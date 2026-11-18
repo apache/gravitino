@@ -355,7 +355,7 @@ function createService(github, { readWorkflow = sha => github.rest.repos.getCont
         : evaluateSuites(jobs, await suitesAt(base), selected.trusted);
     }
     if (selected.trusted && result.conclusion === 'success' && await acceptedBase(pr, base) !== base) {
-      result = requiredAction('Trusted CI tested a commit outside the current base branch. Dispatch trusted Fork CI again from the current default branch.');
+      result = requiredAction('Trusted CI tested a commit outside the current base branch. Dispatch trusted Fork CI again from the current PR base branch.');
     }
     if (!selected.trusted && !sameDefinitions) {
       const note = 'CI workflow/action/script definitions or branch protection differ from the base. ' +

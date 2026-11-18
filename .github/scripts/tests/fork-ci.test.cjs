@@ -206,7 +206,7 @@ test('trusted dispatch rejects an arbitrary ref or a non-upstream repository', a
   const ctx = context('fork/repo');ctx.eventName = 'workflow_dispatch';ctx.payload.inputs = { 'pull-request': '7' };
   await assert.rejects(resolve({ context: ctx, core: coreFor({}), github: {} }), /apache/);
   const upstream = context('apache/gravitino');upstream.eventName = 'workflow_dispatch';upstream.payload.inputs = { 'pull-request': '7' };
-  await assert.rejects(resolve({ context: upstream, core: coreFor({}), github: { rest: { pulls: { get: async () => ({ data: pr() }) } } } }), /current default branch/);
+  await assert.rejects(resolve({ context: upstream, core: coreFor({}), github: { rest: { pulls: { get: async () => ({ data: pr() }) } } } }), /current PR base branch/);
 });
 
 test('trusted dispatch resolves the current default branch after the PR base snapshot ages', async () => {
@@ -219,7 +219,7 @@ test('trusted dispatch resolves the current default branch after the PR base sna
   assert.equal(output['base-sha'], C);
   assert.equal(output['head-sha'], A);
   ctx.sha = B;
-  await assert.rejects(resolve({ context: ctx, core: coreFor({}), github }), /current default branch/);
+  await assert.rejects(resolve({ context: ctx, core: coreFor({}), github }), /current PR base branch/);
 });
 
 test('trusted runs on an advanced base are found by branch and verified against their actual tested SHA', async () => {
@@ -2252,5 +2252,28 @@ test('trusted rerun failures stay retryable until the current summary identifies
         }
       }
     }
+  }
+});
+
+test('trusted release verification binds the dispatch to the current supported release tip', async () => {
+  for (const branch of ['branch-1.3', 'branch-2.0']) {
+    const ctx = context('apache/gravitino');
+    ctx.eventName = 'workflow_dispatch'; ctx.ref = 'refs/heads/' + branch;
+    ctx.sha = C; ctx.payload.inputs = {'pull-request':'7'};
+    const pull = pr(); pull.base.ref = branch;
+    const output = {};
+    const github = {rest:{pulls:{get:async () => ({data:pull})},repos:{
+      getBranch:async args => {assert.equal(args.branch, branch);return {data:{commit:{sha:C}}};}
+    }}};
+    await resolve({context:ctx,core:coreFor(output),github});
+    assert.equal(output['base-ref'], branch);
+    assert.equal(output['base-sha'], C);
+    assert.equal(output['head-sha'], A);
+    ctx.sha = B;
+    await assert.rejects(resolve({context:ctx,core:coreFor({}),github}), /current PR base branch/);
+    ctx.sha = C; ctx.ref = 'refs/heads/main';
+    await assert.rejects(resolve({context:ctx,core:coreFor({}),github}), /current PR base branch/);
+    ctx.ref = 'refs/heads/unreviewed';pull.base.ref = 'unreviewed';
+    await assert.rejects(resolve({context:ctx,core:coreFor({}),github}), /current PR base branch/);
   }
 });

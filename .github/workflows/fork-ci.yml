@@ -25,7 +25,7 @@ on:
   workflow_dispatch:
     inputs:
       pull-request:
-        description: 'In apache/gravitino: PR to test using the reviewed default-branch workflows (committers only). In a fork: leave empty to test the selected branch.'
+        description: 'In apache/gravitino: PR to test using the reviewed PR base-branch workflows (select main or the target release branch; committers only). In a fork: leave empty to test the selected branch.'
         required: false
         type: string
 

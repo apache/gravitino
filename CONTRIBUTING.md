@@ -137,7 +137,7 @@ Known limitations of Fork CI:
 * A pull request last pushed before this migration needs an update and another push. Old runs without the tested-context metadata cannot satisfy the new check.
 * Coverage comments remain available for release branches. For PRs to `main`, inspect the fork run's `build / coverage` log and `coverage-report` artifact.
 * Release branches (`branch-*`) keep their own upstream CI until this change is backported.
-* CI workflow, action, helper-script or `.asf.yaml` changes cannot approve themselves. After reviewing those changes, a committer runs **Fork CI** in `apache/gravitino`, from the current default branch, and supplies the PR number. This explicit exception uses upstream runner resources, reviewed default-branch workflow definitions, a read-only token and no repository secrets; it tests the exact contributor head against the current base. The run resolves the branch's current SHA even when the PR retains an older base snapshot. A later contributor push requires a new run; an existing trusted success remains valid while its tested base stays on the same base branch, with branch protection controlling freshness.
+* CI workflow, action, helper-script or `.asf.yaml` changes cannot approve themselves. After reviewing those changes, a committer runs **Fork CI** in `apache/gravitino`, from the current PR base branch (`main`, `branch-1.3`, or `branch-2.0`), and supplies the PR number. This explicit exception uses upstream runner resources, reviewed base-branch workflow definitions, a read-only token and no repository secrets; it tests the exact contributor head against the current base. The run resolves the branch's current SHA even when the PR retains an older base snapshot. A later contributor push requires a new run; an existing trusted success remains valid while its tested base stays on the same base branch, with branch protection controlling freshness.
 * The independent allowlist scanner downloads bounded YAML data outside its trusted checkout and never executes PR code. It reports the **ASF Allowlist Check** on every PR, including PRs that do not change `.github/`. A committer can re-run **Trusted ASF Allowlist** with the PR number.
 
 **Fork CI** and **ASF Allowlist Check** are not required status checks, so a trusted run stuck in the shared runner queue does not block an urgent merge. Branch protection still requires an up-to-date branch and an approving review. Release-branch protection is unchanged.
@@ -172,7 +172,9 @@ Repository administrators must complete these steps before enabling backports:
 4. Keep the existing Fork CI status publisher and trusted CI allowlist checks
    enabled. External-contributor workflow approvals may still be required for
    the bot's PRs; do not disable ASF's approval policy. CI-definition changes
-   require the existing trusted verification even when the bot's CI passes.
+   require a committer to dispatch trusted Fork CI from the target release
+   branch even when the bot's CI passes. This exceptional trusted run uses
+   Apache runners; ordinary code backports use only the bot fork for heavy CI.
 
 The unprivileged **Fork CI PR Signal** includes closed PR events. Its completion
 wakes a `workflow_run` coordinator on the default branch. GitHub's authenticated
