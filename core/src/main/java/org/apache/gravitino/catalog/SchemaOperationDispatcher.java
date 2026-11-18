@@ -204,6 +204,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     AtomicBoolean createdInCatalog = new AtomicBoolean();
     Schema createdSchema;
     try {
+      secretManager.toPlaintextProperties(entityProperties);
       createdSchema =
           TreeLockUtils.doWithTreeLock(
               catalogIdent,

@@ -893,6 +893,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             AtomicBoolean entityStored = new AtomicBoolean(false);
             Catalog info;
             try {
+              // Strict resolve before the backend probe: createBaseCatalog uses a lenient mask for
+              // load/disable, which would turn missing refs into ConnectionFailedException here.
+              secretManager.toPlaintextProperties(mergedConfig);
               // Reject known duplicates before contacting the backend; store.put still arbitrates
               // concurrent creates from other server instances.
               if (store.exists(ident, EntityType.CATALOG)) {
