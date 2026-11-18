@@ -116,6 +116,7 @@ public class TestIcebergExpireSnapshotsJob {
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.type"));
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.uri"));
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.warehouse"));
+    assertEquals("{{catalog_name}}", configs.get("spark.sql.defaultCatalog"));
 
     // Verify Iceberg extensions
     assertTrue(configs.containsKey("spark.sql.extensions"));
@@ -324,6 +325,19 @@ public class TestIcebergExpireSnapshotsJob {
     // Test null and empty
     assertEquals(null, IcebergJobUtils.escapeSqlString(null));
     assertEquals("", IcebergJobUtils.escapeSqlString(""));
+  }
+
+  @Test
+  public void testEscapeSparkCallStringArg() {
+    // Doubles backslashes first, then encodes ' as \' (Spark CALL where => '...').
+    assertEquals(
+        "region = \\'a\"b\\\\\\\\c\\'",
+        IcebergJobUtils.escapeSparkCallStringArg("region = 'a\"b\\\\c'"));
+    assertEquals(
+        "(region = \\'O\\\\\\'Brien\\')",
+        IcebergJobUtils.escapeSparkCallStringArg("(region = 'O\\'Brien')"));
+    assertEquals(null, IcebergJobUtils.escapeSparkCallStringArg(null));
+    assertEquals("", IcebergJobUtils.escapeSparkCallStringArg(""));
   }
 
   @Test
