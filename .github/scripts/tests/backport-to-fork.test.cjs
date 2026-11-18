@@ -450,8 +450,9 @@ test('upstream dispatch preserves legacy PR workflows and explicitly runs migrat
   h.github.rest.repos.getContent = async () => ({data:{encoding:'base64',content:Buffer.from(ROUTING_MARKER).toString('base64')}});
   await dispatch(args);
   assert.deepEqual(h.calls,[{owner:'apache',repo:'gravitino',workflow_id:'fork-ci.yml',ref:'branch-2.0',inputs:{'pull-request':'99'}}]);
-  h.github.paginate = async () => {throw new Error('release workflow SHA cannot identify the PR head');};
-  await dispatch(args);assert.equal(h.calls.length,2,'upstream retries must dispatch the current PR head');
+  // This run may already have resolved an older PR head. Its SHA is only the release tip.
+  h.github.paginate = async () => [{head_branch:'branch-2.0',display_title:'Trusted Fork CI #99',head_sha:B,status:'in_progress'}];
+  await dispatch(args);assert.equal(h.calls.length,2,'an active old PR-head run must not suppress current-head tests');
   h.github.rest.repos.getContent = async () => {throw new Error('API unavailable');};
   await assert.rejects(dispatch(args),/API unavailable/);assert.equal(h.calls.length,2);
 });
