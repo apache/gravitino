@@ -18,7 +18,12 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { genUpdates, normalizeColumnDefaultValue, isAutoIncrementColumnTypeSupported } from './index'
+import {
+  genUpdates,
+  normalizeColumnDefaultValue,
+  isAutoIncrementColumnTypeSupported,
+  hasMySQLAutoIncrementRenameConflict
+} from './index'
 
 const createTableData = (autoIncrement, defaultValue) => ({
   name: 'users',
@@ -34,7 +39,6 @@ const createTableData = (autoIncrement, defaultValue) => ({
     }
   ]
 })
-
 describe('genUpdates', () => {
   it.each([
     [false, true],
@@ -117,6 +121,48 @@ describe('genUpdates', () => {
     expect(normalizeColumnDefaultValue(expression)).toEqual(expression)
   })
 
+  it('preserves an unparsed default loaded into the edit form unchanged', () => {
+    const defaultValue = {
+      type: 'unparsed',
+      unparsedExpression: 'CURRENT_TIMESTAMP'
+    }
+
+    const formValue = {
+      ...defaultValue,
+      value: defaultValue.unparsedExpression
+    }
+
+    const normalized = normalizeColumnDefaultValue(formValue)
+
+    expect(normalized).toEqual(defaultValue)
+    expect(genUpdates(createTableData(false, defaultValue), createTableData(false, normalized))).toEqual([])
+  })
+
+  it('generates an update when an unparsed default is edited', () => {
+    const originalDefault = {
+      type: 'unparsed',
+      unparsedExpression: 'CURRENT_TIMESTAMP'
+    }
+
+    const formValue = {
+      ...originalDefault,
+      value: 'CURRENT_DATE'
+    }
+
+    const newDefault = normalizeColumnDefaultValue(formValue)
+
+    expect(newDefault).toEqual({
+      type: 'unparsed',
+      unparsedExpression: 'CURRENT_DATE'
+    })
+
+    expect(genUpdates(createTableData(false, originalDefault), createTableData(false, newDefault))).toContainEqual({
+      '@type': 'updateColumnDefaultValue',
+      fieldName: ['id'],
+      newDefaultValue: newDefault
+    })
+  })
+
   it.each([true, false])('includes autoIncrement when adding a new column: %s', autoIncrement => {
     const originalData = {
       name: 'users',
@@ -169,5 +215,43 @@ describe('genUpdates', () => {
       fieldName: ['id'],
       newDefaultValue: newDefault
     })
+  })
+  it('does not disable AutoIncrement when the field is omitted during an unrelated edit', () => {
+    const originalData = createTableData(true)
+    const newData = createTableData(false)
+
+    delete newData.columns[0].autoIncrement
+
+    originalData.comment = 'Old comment'
+    newData.comment = 'Updated comment'
+
+    expect(genUpdates(originalData, newData)).toEqual([
+      {
+        '@type': 'updateComment',
+        newComment: 'Updated comment'
+      }
+    ])
+  })
+})
+describe('hasMySQLAutoIncrementRenameConflict', () => {
+  it('detects renaming and disabling AutoIncrement together', () => {
+    const originalColumns = [{ uniqueId: 'id', name: 'id', autoIncrement: true }]
+    const newColumns = [{ uniqueId: 'id', name: 'user_id', autoIncrement: false }]
+
+    expect(hasMySQLAutoIncrementRenameConflict(originalColumns, newColumns)).toBe(true)
+  })
+
+  it('allows renaming while keeping AutoIncrement enabled', () => {
+    const originalColumns = [{ uniqueId: 'id', name: 'id', autoIncrement: true }]
+    const newColumns = [{ uniqueId: 'id', name: 'user_id', autoIncrement: true }]
+
+    expect(hasMySQLAutoIncrementRenameConflict(originalColumns, newColumns)).toBe(false)
+  })
+
+  it('allows disabling AutoIncrement without renaming', () => {
+    const originalColumns = [{ uniqueId: 'id', name: 'id', autoIncrement: true }]
+    const newColumns = [{ uniqueId: 'id', name: 'id', autoIncrement: false }]
+
+    expect(hasMySQLAutoIncrementRenameConflict(originalColumns, newColumns)).toBe(false)
   })
 })

@@ -39,6 +39,21 @@ export const isAutoIncrementColumnTypeSupported = type => {
   return ColumnTypeSupportAutoIncrement.includes(type.trim().toLowerCase())
 }
 
+export const hasMySQLAutoIncrementRenameConflict = (originalColumns, newColumns) => {
+  const originalColumnsMap = _.keyBy(originalColumns || [], 'uniqueId')
+
+  return (newColumns || []).some(newColumn => {
+    const originalColumn = originalColumnsMap[newColumn.uniqueId]
+
+    return (
+      originalColumn &&
+      Boolean(originalColumn.autoIncrement) &&
+      originalColumn.name !== newColumn.name &&
+      newColumn.autoIncrement === false
+    )
+  })
+}
+
 export const isDevEnv = process.env.NODE_ENV === 'development'
 
 export const isProdEnv = process.env.NODE_ENV === 'production'
@@ -101,7 +116,7 @@ export const normalizeColumnDefaultValue = expression => {
     case 'unparsed':
       return {
         type: 'unparsed',
-        unparsedExpression: expression.unparsedExpression
+        unparsedExpression: expression.value !== undefined ? expression.value : expression.unparsedExpression
       }
 
     default:
@@ -237,7 +252,12 @@ export const genUpdates = (originalData, newData, disableUpdate = false) => {
           nullable: newColumnsMap[key].nullable
         })
       }
-      if (Boolean(originalColumnsMap[key].autoIncrement) !== Boolean(newColumnsMap[key].autoIncrement)) {
+      const newAutoIncrement = newColumnsMap[key].autoIncrement
+      if (
+        newAutoIncrement !== undefined &&
+        newAutoIncrement !== null &&
+        Boolean(originalColumnsMap[key].autoIncrement) !== Boolean(newAutoIncrement)
+      ) {
         updates.push({
           '@type': 'updateColumnAutoIncrement',
           fieldName: [newColumnsMap[key].name],

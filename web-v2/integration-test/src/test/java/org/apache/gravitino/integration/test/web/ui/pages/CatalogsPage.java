@@ -515,12 +515,13 @@ public class CatalogsPage extends BaseWebIT {
       String columnName = "//div[@data-refer='column-name-" + index + "']//input";
       WebElement keyInput = driver.findElement(By.xpath(columnName));
       keyInput.sendKeys(name);
-      // Set the indexed column type - Ant Design Select structure
+
+      // Set the indexed column type
       String columnType = "//div[@data-refer='column-type-" + index + "']";
       WebElement typeSelect = driver.findElement(By.xpath(columnType));
       clickAndWait(typeSelect);
+
       // Wait for dropdown to appear and click the option
-      // Ant Design Select dropdown - try multiple selectors for compatibility
       Thread.sleep(500);
       WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       String optionXpath =
@@ -530,6 +531,7 @@ public class CatalogsPage extends BaseWebIT {
               + "' or .//div[text()='"
               + capitalizeFirstLetter(type)
               + "'])]";
+
       WebElement typeItem =
           wait.until(ExpectedConditions.elementToBeClickable(By.xpath(optionXpath)));
       clickAndWait(typeItem);
@@ -1237,7 +1239,7 @@ public class CatalogsPage extends BaseWebIT {
   }
 
   /**
-   * Click the table overview link to open the popover.
+   * Click the table overview link to open the popover. 0
    *
    * @param linkType The type of link to click (properties, partitions, sortorders, distribution,
    *     indexes).
@@ -1392,7 +1394,16 @@ public class CatalogsPage extends BaseWebIT {
 
   public boolean verifyTableColumns() {
     try {
-      List<String> columns = Arrays.asList("Column Name", "Data Type", "Tags");
+      List<String> columns =
+          Arrays.asList(
+              "Column Name",
+              "Data Type",
+              "Tags",
+              "Policies",
+              "Nullable",
+              "AutoIncrement",
+              "Default Value",
+              "Comment");
 
       // Ant Design Table structure: thead > tr > th
       List<WebElement> columnHeadersRows =
@@ -1442,6 +1453,58 @@ public class CatalogsPage extends BaseWebIT {
       return true;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
+      return false;
+    }
+  }
+
+  public void clickColumnSettings() {
+    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+
+    WebElement settingsButton =
+        wait.until(
+            ExpectedConditions.elementToBeClickable(
+                By.xpath("//button[@aria-label='Column settings']")));
+
+    try {
+      clickAndWait(settingsButton);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Interrupted while opening column settings", e);
+    }
+  }
+
+  public void toggleMetadataColumn(String columnName) {
+    String xpath =
+        "//div[contains(@class, 'ant-popover') and not(contains(@class, 'ant-popover-hidden'))]"
+            + "//label[contains(@class, 'ant-checkbox-wrapper') and normalize-space(.)='"
+            + columnName
+            + "']";
+
+    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+
+    WebElement checkbox = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
+
+    checkbox.click();
+  }
+
+  public boolean verifyTableColumnVisibility(String columnName, boolean expectedVisible) {
+    try {
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+
+      return wait.until(
+          currentDriver -> {
+            List<WebElement> headers =
+                currentDriver.findElements(
+                    By.xpath(
+                        "//div[@data-refer='table-grid']//thead//th[contains(@class, 'ant-table-cell')]"));
+
+            boolean visible =
+                headers.stream().anyMatch(header -> columnName.equals(header.getText().trim()));
+
+            return visible == expectedVisible;
+          });
+    } catch (Exception e) {
+      LOG.error("Failed to verify column visibility: {}", columnName, e);
       return false;
     }
   }

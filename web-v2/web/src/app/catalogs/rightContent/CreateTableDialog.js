@@ -71,7 +71,8 @@ import {
   capitalizeFirstLetter,
   genUpdates,
   normalizeColumnDefaultValue,
-  isAutoIncrementColumnTypeSupported
+  isAutoIncrementColumnTypeSupported,
+  hasMySQLAutoIncrementRenameConflict
 } from '@/lib/utils'
 import { cn } from '@/lib/utils/tailwind'
 import { createTable, updateTable, getTableDetails } from '@/lib/store/metalakes'
@@ -424,8 +425,15 @@ export default function CreateTableDialog({ ...props }) {
                     )
                 }
               }
-              if (table.columns[key].defaultValue) {
-                form.setFieldValue(['columns', key, 'defaultValue'], table.columns[key].defaultValue)
+              const defaultValue = table.columns[key].defaultValue
+
+              if (defaultValue) {
+                form.setFieldValue(
+                  ['columns', key, 'defaultValue'],
+                  defaultValue.type === 'unparsed'
+                    ? { ...defaultValue, value: defaultValue.unparsedExpression }
+                    : defaultValue
+                )
               }
             }
             if (table.distribution) {
@@ -601,6 +609,16 @@ export default function CreateTableDialog({ ...props }) {
     form
       .validateFields()
       .then(async () => {
+        if (provider === 'jdbc-mysql' && hasMySQLAutoIncrementRenameConflict(cacheData?.columns, values?.columns)) {
+          Modal.warning({
+            title: 'Save these changes separately',
+            content:
+              'For MySQL, rename an AutoIncrement column first. Then reopen the table and disable AutoIncrement in a separate save.'
+          })
+
+          return
+        }
+
         setConfirmLoading(true)
 
         let submitted = false

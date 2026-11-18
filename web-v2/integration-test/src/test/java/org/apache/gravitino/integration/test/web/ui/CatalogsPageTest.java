@@ -444,6 +444,22 @@ public class CatalogsPageTest extends BaseWebIT {
         TABLE_NAME);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(TABLE_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyTableColumns());
+    List<String> metadataColumns =
+        Arrays.asList("Nullable", "AutoIncrement", "Default Value", "Comment");
+
+    catalogsPage.clickColumnSettings();
+
+    for (String column : metadataColumns) {
+      catalogsPage.toggleMetadataColumn(column);
+      Assertions.assertTrue(
+          catalogsPage.verifyTableColumnVisibility(column, false), column + " should be hidden");
+    }
+
+    for (String column : metadataColumns) {
+      catalogsPage.toggleMetadataColumn(column);
+      Assertions.assertTrue(
+          catalogsPage.verifyTableColumnVisibility(column, true), column + " should be visible");
+    }
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME, true));
     Assertions.assertTrue(catalogsPage.verifySelectedNode(TABLE_NAME));
   }

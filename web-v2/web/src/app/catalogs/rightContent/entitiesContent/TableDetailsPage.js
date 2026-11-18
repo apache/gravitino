@@ -465,7 +465,36 @@ export default function TableDetailsPage({ ...props }) {
               metadataObjectFullName={`${catalog}.${schema}.${table}.${record.name}`}
             />
           ) : null
-      }
+      },
+            {
+        title: 'Nullable',
+        dataIndex: 'nullable',
+        key: 'nullable',
+        metadataKey: 'nullable',
+        render: value => (value ? 'Yes' : 'No')
+      },
+      {
+        title: 'AutoIncrement',
+        dataIndex: 'autoIncrement',
+        key: 'autoIncrement',
+        metadataKey: 'autoIncrement',
+        render: value => (value ? 'Yes' : 'No')
+      },
+      {
+        title: 'Default Value',
+        dataIndex: 'defaultValue',
+        key: 'defaultValue',
+        metadataKey: 'defaultValue',
+        render: formatColumnDefaultValue
+      },
+      {
+        title: 'Comment',
+        dataIndex: 'comment',
+        key: 'comment',
+        metadataKey: 'comment',
+        ellipsis: true,
+        render: value => value || '-'
+      },
     ].filter(column => !column.metadataKey || visibleMetadataColumns.includes(column.metadataKey)),
     [store.activatedDetails, visibleMetadataColumns]
   )
