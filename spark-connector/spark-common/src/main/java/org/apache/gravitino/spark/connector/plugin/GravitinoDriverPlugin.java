@@ -133,9 +133,15 @@ public class GravitinoDriverPlugin implements DriverPlugin {
             identity ->
                 createGravitinoClient(
                     gravitinoUri, metalake, conf, sc.sparkUser(), gravitinoClientConfig));
-    catalogManager.loadRelationalCatalogs();
-    registerGravitinoCatalogs(conf, catalogManager.getCatalogs());
-    registerSqlExtensions(conf);
+    try {
+      catalogManager.loadRelationalCatalogs();
+      registerGravitinoCatalogs(conf, catalogManager.getCatalogs());
+      registerSqlExtensions(conf);
+    } catch (RuntimeException e) {
+      catalogManager.close();
+      catalogManager = null;
+      throw e;
+    }
     return Collections.emptyMap();
   }
 
@@ -159,10 +165,31 @@ public class GravitinoDriverPlugin implements DriverPlugin {
                 LOG.warn("Skip registering {} because catalog provider is empty.", catalogName);
                 return;
               }
+              String sparkCatalogConfigName = "spark.sql.catalog." + catalogName;
+              if (sparkConf.contains(sparkCatalogConfigName)) {
+                LOG.info(
+                    "Skip registering catalog {} because it is already configured in Spark.",
+                    catalogName);
+                return;
+              }
+              String extensionCatalogClassName = bindings.extensionCatalogClassName(provider);
+              if (extensionCatalogClassName != null) {
+                try {
+                  registerCatalogClass(sparkConf, catalogName, extensionCatalogClassName);
+                } catch (RuntimeException e) {
+                  LOG.warn("Register catalog {} failed.", catalogName, e);
+                }
+                return;
+              }
               // The provider is read once, here, and every decision below is made from the kind, so
               // no two places can disagree about what this catalog is.
               SparkCatalogKind kind = SparkCatalogKind.fromProvider(provider);
               if (kind == null) {
+                Preconditions.checkArgument(
+                    !StringUtils.startsWithIgnoreCase(provider, "jdbc-"),
+                    "Catalog %s has unsupported JDBC provider %s. It may be served by a separate extension jar.",
+                    catalogName,
+                    provider);
                 LOG.warn(
                     "Skip registering {} because {} is not supported yet.", catalogName, provider);
                 return;
@@ -171,13 +198,6 @@ public class GravitinoDriverPlugin implements DriverPlugin {
                 return;
               }
               if (SparkCatalogKind.LAKEHOUSE_PAIMON.equals(kind) && !enablePaimonSupport) {
-                return;
-              }
-              String sparkCatalogConfigName = "spark.sql.catalog." + catalogName;
-              if (sparkConf.contains(sparkCatalogConfigName)) {
-                LOG.info(
-                    "Skip registering catalog {} because it is already configured in Spark.",
-                    catalogName);
                 return;
               }
               try {
@@ -206,12 +226,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
       return;
     }
 
-    String sparkCatalogConfigName = "spark.sql.catalog." + catalogName;
-    Preconditions.checkArgument(
-        !sparkConf.contains(sparkCatalogConfigName),
-        catalogName + " is already registered to SparkCatalogManager");
-    sparkConf.set(sparkCatalogConfigName, catalogClassName);
-    LOG.info("Register {} catalog to Spark catalog manager.", catalogName);
+    registerCatalogClass(sparkConf, catalogName, catalogClassName);
   }
 
   /**
@@ -344,6 +359,16 @@ public class GravitinoDriverPlugin implements DriverPlugin {
       throw new UnsupportedOperationException("Unsupported auth type: " + authType);
     }
     return builder.build();
+  }
+
+  private void registerCatalogClass(
+      SparkConf sparkConf, String catalogName, String catalogClassName) {
+    String sparkCatalogConfigName = "spark.sql.catalog." + catalogName;
+    Preconditions.checkArgument(
+        !sparkConf.contains(sparkCatalogConfigName),
+        catalogName + " is already registered to SparkCatalogManager");
+    sparkConf.set(sparkCatalogConfigName, catalogClassName);
+    LOG.info("Register {} catalog to Spark catalog manager.", catalogName);
   }
 
   private static String getRequiredConfig(SparkConf sparkConf, String configKey) {

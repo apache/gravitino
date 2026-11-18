@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
@@ -36,15 +37,19 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.auth.AuthProperties;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
+import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import org.apache.gravitino.spark.connector.catalog.SparkCatalogKind;
 import org.apache.gravitino.spark.connector.iceberg.extensions.GravitinoIcebergSparkSessionExtensions;
 import org.apache.gravitino.spark.connector.plugin.GravitinoDriverPlugin.DynamicBearerTokenProvider;
 import org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions;
 import org.apache.spark.SparkConf;
+import org.apache.spark.SparkContext;
+import org.apache.spark.api.plugin.PluginContext;
 import org.apache.spark.sql.internal.StaticSQLConf;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 /**
@@ -233,14 +238,12 @@ public class TestGravitinoDriverPlugin {
                 .put("my_hive", catalogWithProvider("hive"))
                 .put("my_mysql", catalogWithProvider("jdbc-mysql"))
                 .put("my_postgresql", catalogWithProvider("jdbc-postgresql"))
-                // Four shapes that must all be skipped. null and "" stop at the blank-provider
+                // Three shapes that must all be skipped. null and "" stop at the blank-provider
                 // guard, null being the one that pins it since fromProvider rejects null; kafka is
-                // a non-blank provider this connector maps to no kind, and jdbc-clickhouse is an
-                // unsupported jdbc provider with no extension.
+                // a non-blank provider this connector maps to no kind.
                 .put("no_provider", catalogWithProvider(null))
                 .put("blank_provider", catalogWithProvider(""))
                 .put("my_kafka", catalogWithProvider("kafka"))
-                .put("my_clickhouse", catalogWithProvider("jdbc-clickhouse"))
                 .build());
         plugin.registerSqlExtensions(sparkConf);
 
@@ -263,7 +266,6 @@ public class TestGravitinoDriverPlugin {
         assertFalse(sparkConf.contains("spark.sql.catalog.no_provider"), flags);
         assertFalse(sparkConf.contains("spark.sql.catalog.blank_provider"), flags);
         assertFalse(sparkConf.contains("spark.sql.catalog.my_kafka"), flags);
-        assertFalse(sparkConf.contains("spark.sql.catalog.my_clickhouse"), flags);
 
         String extensions = sparkConf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key());
         assertEquals(
@@ -279,6 +281,83 @@ public class TestGravitinoDriverPlugin {
             extensions.contains(GravitinoDriverPlugin.PAIMON_SPARK_EXTENSIONS),
             flags + " -> " + extensions);
       }
+    }
+  }
+
+  @Test
+  void testUnknownJdbcProviderFailsRegistration() {
+    SparkConf sparkConf = new SparkConf(false);
+    GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withoutPaimon());
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                plugin.registerGravitinoCatalogs(
+                    sparkConf,
+                    ImmutableMap.of("my_clickhouse", catalogWithProvider("jdbc-clickhouse"))));
+
+    assertEquals(
+        "Catalog my_clickhouse has unsupported JDBC provider jdbc-clickhouse. "
+            + "It may be served by a separate extension jar.",
+        exception.getMessage());
+    assertFalse(sparkConf.contains("spark.sql.catalog.my_clickhouse"));
+  }
+
+  @Test
+  void testExtensionCatalogIsRegisteredForUnknownJdbcProvider() {
+    SparkConf sparkConf = new SparkConf(false);
+    SparkBindings bindings =
+        requiredCatalogs()
+            .extensionCatalog("JDBC-CLICKHOUSE", "org.example.ClickHouseCatalog")
+            .build();
+    GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(bindings);
+
+    plugin.registerGravitinoCatalogs(
+        sparkConf, ImmutableMap.of("my_clickhouse", catalogWithProvider("jdbc-clickhouse")));
+
+    assertEquals("org.example.ClickHouseCatalog", sparkConf.get("spark.sql.catalog.my_clickhouse"));
+  }
+
+  @Test
+  void testExistingSparkCatalogIsPreservedForUnknownJdbcProvider() {
+    SparkConf sparkConf = new SparkConf(false);
+    sparkConf.set("spark.sql.catalog.my_clickhouse", "org.example.ExistingCatalog");
+    GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withoutPaimon());
+
+    plugin.registerGravitinoCatalogs(
+        sparkConf, ImmutableMap.of("my_clickhouse", catalogWithProvider("jdbc-clickhouse")));
+
+    assertEquals("org.example.ExistingCatalog", sparkConf.get("spark.sql.catalog.my_clickhouse"));
+  }
+
+  @Test
+  void testInitClosesCatalogManagerWhenRegistrationFails() {
+    SparkConf sparkConf =
+        new SparkConf(false)
+            .set(GravitinoSparkConfig.GRAVITINO_URI, "http://127.0.0.1:8090")
+            .set(GravitinoSparkConfig.GRAVITINO_METALAKE, "metalake");
+    SparkContext sparkContext = mock(SparkContext.class);
+    when(sparkContext.conf()).thenReturn(sparkConf);
+    when(sparkContext.sparkUser()).thenReturn("user");
+    GravitinoCatalogManager catalogManager = mock(GravitinoCatalogManager.class);
+    Catalog clickhouse = catalogWithProvider("jdbc-clickhouse");
+    when(catalogManager.getCatalogs()).thenReturn(ImmutableMap.of("my_clickhouse", clickhouse));
+    GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withoutPaimon());
+
+    try (MockedStatic<GravitinoCatalogManager> global = mockStatic(GravitinoCatalogManager.class)) {
+      global
+          .when(
+              () ->
+                  GravitinoCatalogManager.create(Mockito.any(), Mockito.anyString(), Mockito.any()))
+          .thenReturn(catalogManager);
+
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> plugin.init(sparkContext, mock(PluginContext.class)));
+      plugin.shutdown();
+
+      Mockito.verify(catalogManager, Mockito.times(1)).close();
     }
   }
 
