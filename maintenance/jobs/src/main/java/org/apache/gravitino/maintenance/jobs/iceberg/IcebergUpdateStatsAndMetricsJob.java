@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
@@ -44,8 +43,9 @@ import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
-import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
+import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoClientUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
 import org.apache.gravitino.stats.StatisticValues;
 import org.apache.spark.sql.Row;
@@ -62,7 +62,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-update-stats";
-  private static final String VERSION = "v3";
+  private static final String VERSION = "v5";
   private static final String DEFAULT_STATISTICS_UPDATER = "gravitino-statistics-updater";
   private static final String DEFAULT_METRICS_UPDATER = "gravitino-metrics-updater";
   private static final long DEFAULT_TARGET_FILE_SIZE_BYTES = 128L * 1024 * 1024;
@@ -117,7 +117,12 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     StatisticsUpdater statisticsUpdater = null;
     MetricsUpdater metricsUpdater = null;
     try {
-      Map<String, String> optimizerProperties = buildOptimizerProperties(updaterOptions);
+      Map<String, String> optimizerProperties =
+          GravitinoClientUtils.normalizeUpdaterConnectionOptions(updaterOptions);
+      GravitinoClientUtils.requireGravitinoUri(optimizerProperties);
+      String schemaSeparator =
+          GravitinoClientUtils.fetchSchemaSeparator(
+              optimizerProperties.get(OptimizerConfig.GRAVITINO_URI));
       if (updateMode.updateStats) {
         String statisticsUpdaterName =
             updaterOptions.getOrDefault("statistics_updater", DEFAULT_STATISTICS_UPDATER).trim();
@@ -132,7 +137,13 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
       }
 
       updateStatistics(
-          spark, statisticsUpdater, metricsUpdater, updateMode, catalogName, tableIdentifier);
+          spark,
+          statisticsUpdater,
+          metricsUpdater,
+          updateMode,
+          catalogName,
+          tableIdentifier,
+          schemaSeparator);
     } catch (Exception e) {
       LOG.error("Failed to update Iceberg statistics/metrics", e);
       System.exit(1);
@@ -159,31 +170,11 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
   static void updateStatistics(
       SparkSession spark,
       StatisticsUpdater statisticsUpdater,
-      String catalogName,
-      String tableIdentifier) {
-    updateStatistics(
-        spark, statisticsUpdater, null, UpdateMode.STATS, catalogName, tableIdentifier);
-  }
-
-  @VisibleForTesting
-  static void updateStatistics(
-      SparkSession spark,
-      StatisticsUpdater statisticsUpdater,
-      MetricsUpdater metricsUpdater,
-      String catalogName,
-      String tableIdentifier) {
-    updateStatistics(
-        spark, statisticsUpdater, metricsUpdater, UpdateMode.ALL, catalogName, tableIdentifier);
-  }
-
-  @VisibleForTesting
-  static void updateStatistics(
-      SparkSession spark,
-      StatisticsUpdater statisticsUpdater,
       MetricsUpdater metricsUpdater,
       UpdateMode updateMode,
       String catalogName,
-      String tableIdentifier) {
+      String tableIdentifier,
+      String schemaSeparator) {
     Objects.requireNonNull(updateMode, "updateMode must not be null");
 
     if (updateMode.updateStats && statisticsUpdater == null) {
@@ -197,7 +188,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     }
 
     NameIdentifier gravitinoTableIdentifier =
-        toGravitinoTableIdentifier(catalogName, tableIdentifier);
+        IdentifierUtils.fromSparkTableIdentifier(catalogName, tableIdentifier, schemaSeparator);
     long metricTimestamp = System.currentTimeMillis() / 1000L;
     boolean partitioned = isPartitionedTable(spark, catalogName, tableIdentifier);
     if (partitioned) {
@@ -424,33 +415,9 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
   }
 
   @VisibleForTesting
-  static Map<String, String> buildOptimizerProperties(Map<String, String> updaterOptions) {
-    Map<String, String> optimizerProperties = new HashMap<>(updaterOptions);
-
-    Optional<String> gravitinoUri =
-        firstNonEmpty(
-            updaterOptions.get("gravitino_uri"),
-            updaterOptions.get("gravitino-uri"),
-            updaterOptions.get(OptimizerConfig.GRAVITINO_URI));
-    Optional<String> metalake =
-        firstNonEmpty(
-            updaterOptions.get("metalake"), updaterOptions.get(OptimizerConfig.GRAVITINO_METALAKE));
-
-    gravitinoUri.ifPresent(uri -> optimizerProperties.put(OptimizerConfig.GRAVITINO_URI, uri));
-    metalake.ifPresent(value -> optimizerProperties.put(OptimizerConfig.GRAVITINO_METALAKE, value));
-    GravitinoAuthSettings.copyAliases(optimizerProperties);
-    return optimizerProperties;
-  }
-
-  @VisibleForTesting
   static Map<String, String> requireGravitinoConfig(Map<String, String> optimizerProperties) {
-    String gravitinoUri = optimizerProperties.get(OptimizerConfig.GRAVITINO_URI);
+    GravitinoClientUtils.requireGravitinoUri(optimizerProperties);
     String metalake = optimizerProperties.get(OptimizerConfig.GRAVITINO_METALAKE);
-
-    if (gravitinoUri == null || gravitinoUri.trim().isEmpty()) {
-      throw new IllegalArgumentException(
-          "updater_options must contain 'gravitino_uri' when update_mode is stats or all");
-    }
 
     if (metalake == null || metalake.trim().isEmpty()) {
       throw new IllegalArgumentException(
@@ -506,11 +473,6 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     return requests;
   }
 
-  private static NameIdentifier toGravitinoTableIdentifier(
-      String catalogName, String tableIdentifier) {
-    return IcebergJobUtils.toGravitinoTableIdentifier(catalogName, tableIdentifier);
-  }
-
   private static String buildFilesTableIdentifier(String catalogName, String tableIdentifier) {
     return IcebergJobUtils.qualifyCatalogMetadataTableSql(catalogName, tableIdentifier, "files");
   }
@@ -523,15 +485,6 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
   private static double toDoubleValue(Row row, String fieldName) {
     Number number = row.getAs(fieldName);
     return number == null ? 0D : number.doubleValue();
-  }
-
-  private static Optional<String> firstNonEmpty(String... candidates) {
-    for (String candidate : candidates) {
-      if (candidate != null && !candidate.trim().isEmpty()) {
-        return Optional.of(candidate.trim());
-      }
-    }
-    return Optional.empty();
   }
 
   private static List<String> buildArguments() {
@@ -557,7 +510,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
         IcebergUpdateStatsAndMetricsJob.class.getSimpleName(),
         ImmutableList.of(
             "  --catalog <name>          Iceberg catalog name registered in Spark",
-            "  --table <identifier>      Table name in schema.table format"),
+            "  --table <identifier>      Spark table id (schema…table, dotted)"),
         IcebergJobUtils.withSparkConfUsage(
             "  --update-mode <mode>      stats | metrics | all (default: all)",
             "                              data-file-mse target size is fixed at 134217728 (128MB)",

@@ -33,8 +33,9 @@ public class IdentifierUtils {
       "Identifier must be catalog.schema.table";
 
   /**
-   * Default external hierarchical-schema separator ({@code gravitino.schema.separator}). Used when
-   * server config is unavailable (for example optimizer/job adapters outside {@code GravitinoEnv}).
+   * Server default for {@code gravitino.schema.separator}. Production TMS paths must load the live
+   * value from {@code GET /configs}; this constant is only for tests that pass an explicit
+   * separator.
    */
   public static final String DEFAULT_SCHEMA_SEPARATOR = ":";
 
@@ -86,15 +87,8 @@ public class IdentifierUtils {
    * hierarchical Gravitino schema (e.g. {@code a:b:c}) into dotted namespace levels ({@code
    * a.b.c.events}).
    *
-   * @param tableIdentifier catalog.schema.table identifier
-   * @return Spark table identifier (schema levels joined by {@code .}, then table)
-   */
-  public static String toSparkTableIdentifier(NameIdentifier tableIdentifier) {
-    return toSparkTableIdentifier(tableIdentifier, DEFAULT_SCHEMA_SEPARATOR);
-  }
-
-  /**
-   * Builds a Spark/Iceberg table identifier from {@code catalog.schema.table}.
+   * <p>Callers must pass the server's configured separator (from {@code GET /configs}); do not
+   * invent a default.
    *
    * @param tableIdentifier catalog.schema.table identifier
    * @param schemaSeparator external hierarchical schema separator (must not contain {@code .})

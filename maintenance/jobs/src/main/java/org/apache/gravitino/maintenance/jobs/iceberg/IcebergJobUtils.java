@@ -31,7 +31,6 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.iceberg.Snapshot;
@@ -267,20 +266,6 @@ public final class IcebergJobUtils {
     return qualifyCatalogTableSql(catalogName, sparkTableIdentifier)
         + "."
         + escapeSqlIdentifier(metadataTable.trim());
-  }
-
-  /**
-   * Converts a Spark table identifier back to Gravitino {@code catalog.schema.table}, joining
-   * multi-level namespaces with the default external schema separator.
-   *
-   * @param catalogName catalog name
-   * @param sparkTableIdentifier Spark table id
-   * @return Gravitino catalog.schema.table identifier
-   */
-  public static NameIdentifier toGravitinoTableIdentifier(
-      String catalogName, String sparkTableIdentifier) {
-    return IdentifierUtils.fromSparkTableIdentifier(
-        catalogName, sparkTableIdentifier, IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
   }
 
   /**

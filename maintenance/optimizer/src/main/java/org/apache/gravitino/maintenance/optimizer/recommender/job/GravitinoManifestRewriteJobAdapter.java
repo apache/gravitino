@@ -23,25 +23,24 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionContext;
 import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
-import org.apache.gravitino.maintenance.optimizer.common.util.SparkTableIdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.ManifestRewriteJobContext;
 
 /** Maps a manifest rewrite decision to the built-in Spark job's arguments. */
 public final class GravitinoManifestRewriteJobAdapter implements GravitinoJobAdapter {
   @Override
-  public Map<String, String> jobConfig(JobExecutionContext context) {
+  public Map<String, String> jobConfig(
+      JobExecutionContext context, Map<String, String> submitterConfigs, String schemaSeparator) {
     Preconditions.checkArgument(
         context instanceof ManifestRewriteJobContext,
         "jobExecutionContext must be ManifestRewriteJobContext");
     ManifestRewriteJobContext rewrite = (ManifestRewriteJobContext) context;
-    IdentifierUtils.requireTableIdentifierNormalized(rewrite.nameIdentifier());
     Map<String, String> config = new LinkedHashMap<>(rewrite.jobOptions());
     config.put(
         "catalog_name",
         IdentifierUtils.getCatalogNameFromTableIdentifier(rewrite.nameIdentifier()));
     config.put(
         "table_identifier",
-        SparkTableIdentifierUtils.toSparkTableIdentifier(rewrite.nameIdentifier()));
+        IdentifierUtils.toSparkTableIdentifier(rewrite.nameIdentifier(), schemaSeparator));
     return Map.copyOf(config);
   }
 }

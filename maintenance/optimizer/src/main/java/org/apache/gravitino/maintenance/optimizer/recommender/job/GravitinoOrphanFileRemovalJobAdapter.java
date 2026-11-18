@@ -26,8 +26,8 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionContext;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.OrphanFileLocationUtils;
-import org.apache.gravitino.maintenance.optimizer.common.util.SparkTableIdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.orphan.OrphanFileRemovalJobContext;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 
@@ -51,7 +51,8 @@ public class GravitinoOrphanFileRemovalJobAdapter implements GravitinoJobAdapter
   }
 
   @Override
-  public Map<String, String> jobConfig(JobExecutionContext context) {
+  public Map<String, String> jobConfig(
+      JobExecutionContext context, Map<String, String> submitterConfigs, String schemaSeparator) {
     Preconditions.checkArgument(
         context instanceof OrphanFileRemovalJobContext,
         "jobExecutionContext must be OrphanFileRemovalJobContext");
@@ -84,7 +85,7 @@ public class GravitinoOrphanFileRemovalJobAdapter implements GravitinoJobAdapter
     }
     return Map.of(
         TABLE_IDENTIFIER_KEY,
-        SparkTableIdentifierUtils.toSparkTableIdentifier(orphan.nameIdentifier()),
+        IdentifierUtils.toSparkTableIdentifier(orphan.nameIdentifier(), schemaSeparator),
         OLDER_THAN_KEY,
         cutoff(days),
         LOCATION_KEY,

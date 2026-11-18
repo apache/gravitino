@@ -38,6 +38,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionJobContext;
 import org.apache.gravitino.maintenance.optimizer.recommender.job.GravitinoCompactionJobAdapter;
 import org.apache.gravitino.maintenance.optimizer.recommender.job.PartitionUtils;
@@ -975,7 +976,8 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
                       "",
                       new Column[0],
                       new Transform[0],
-                      List.of()));
+                      List.of()),
+                  IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
       assertEquals(sparkTableId, conf.get("table_identifier"));
 
       String sql =

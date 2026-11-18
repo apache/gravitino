@@ -47,8 +47,9 @@ import org.apache.gravitino.maintenance.optimizer.common.IcebergManifestStatisti
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
-import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
+import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoClientUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
@@ -87,7 +88,7 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
                 "--spark-conf",
                 "{{spark_conf:-}}"))
         .withConfigs(IcebergSparkConfigUtils.buildTemplateSparkConfigs())
-        .withCustomFields(Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, "v2"))
+        .withCustomFields(Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, "v4"))
         .build();
   }
 
@@ -120,6 +121,8 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
         IcebergSparkConfigUtils.parseFlatJsonMap(
             arguments.get("updater-options"), "updater-options");
     Map<String, String> properties = buildOptimizerProperties(options);
+    String schemaSeparator =
+        GravitinoClientUtils.fetchSchemaSeparator(properties.get(OptimizerConfig.GRAVITINO_URI));
     Map<String, String> sparkConfigs =
         IcebergJobUtils.parseCustomSparkConfigs(arguments.get("spark-conf"));
     try (StatisticsUpdater updater =
@@ -138,7 +141,8 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
             catalog,
             table,
             properties.get(OptimizerConfig.GRAVITINO_METALAKE),
-            coordinationPath);
+            coordinationPath,
+            schemaSeparator);
       } finally {
         spark.stop();
       }
@@ -206,10 +210,11 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
       String catalogName,
       String tableIdentifier,
       String metalake,
-      @Nullable Path coordinationDirectory)
+      @Nullable Path coordinationDirectory,
+      String schemaSeparator)
       throws IOException {
     NameIdentifier identifier =
-        IcebergJobUtils.toGravitinoTableIdentifier(catalogName, tableIdentifier);
+        IdentifierUtils.fromSparkTableIdentifier(catalogName, tableIdentifier, schemaSeparator);
     if (coordinationDirectory == null) {
       updater.updateTableStatistics(
           identifier, collectManifestStatistics(spark, catalogName, tableIdentifier));
@@ -263,26 +268,23 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
     }
   }
 
+  /**
+   * Normalizes updater aliases, requires uri+metalake, and disables client retries for safe
+   * coordination recovery.
+   */
   @VisibleForTesting
   static Map<String, String> buildOptimizerProperties(Map<String, String> options) {
-    Map<String, String> properties = new HashMap<>(options);
-    if (options.containsKey("gravitino_uri")) {
-      properties.put(OptimizerConfig.GRAVITINO_URI, options.get("gravitino_uri"));
+    Map<String, String> properties =
+        GravitinoClientUtils.normalizeUpdaterConnectionOptions(options);
+    GravitinoClientUtils.requireGravitinoUri(properties);
+    String metalake = properties.get(OptimizerConfig.GRAVITINO_METALAKE);
+    if (metalake == null || metalake.trim().isEmpty()) {
+      throw new IllegalArgumentException(
+          "updater_options must configure " + OptimizerConfig.GRAVITINO_METALAKE);
     }
-    if (options.containsKey("metalake")) {
-      properties.put(OptimizerConfig.GRAVITINO_METALAKE, options.get("metalake"));
-    }
-    for (String key :
-        Arrays.asList(OptimizerConfig.GRAVITINO_URI, OptimizerConfig.GRAVITINO_METALAKE)) {
-      String value = properties.get(key);
-      if (value == null || value.trim().isEmpty()) {
-        throw new IllegalArgumentException("updater_options must configure " + key);
-      }
-      properties.put(key, value.trim());
-    }
+    properties.put(OptimizerConfig.GRAVITINO_METALAKE, metalake.trim());
     // A retried PUT can hide an older request that is still executing after a connection failure.
     properties.put(GravitinoClientConfiguration.CLIENT_RETRY_TIMES, "0");
-    GravitinoAuthSettings.copyAliases(properties);
     return properties;
   }
 
