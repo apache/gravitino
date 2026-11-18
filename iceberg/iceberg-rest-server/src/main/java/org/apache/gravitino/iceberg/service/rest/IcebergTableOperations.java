@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.iceberg.service.rest;
 
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.CREATE_TABLE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.DROP_TABLE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION;
@@ -167,16 +168,14 @@ public class IcebergTableOperations {
   @Timed(name = "create-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-table", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TABLE",
+      expression = CREATE_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createTable(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
-      CreateTableRequest createTableRequest,
+      @IcebergAuthorizationMetadata(type = IcebergAuthorizationMetadata.RequestType.CREATE_TABLE)
+          CreateTableRequest createTableRequest,
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
     IcebergRESTUtils.validateRequest(createTableRequest, "CreateTableRequest");
     boolean isCredentialVending = isCredentialVending(accessDelegation);
@@ -220,7 +219,8 @@ public class IcebergTableOperations {
           String namespace,
       @AuthorizationMetadata(type = Entity.EntityType.TABLE) @Encoded() @PathParam("table")
           String table,
-      UpdateTableRequest updateTableRequest) {
+      @IcebergAuthorizationMetadata(type = IcebergAuthorizationMetadata.RequestType.UPDATE_TABLE)
+          UpdateTableRequest updateTableRequest) {
     IcebergRESTUtils.validateRequest(updateTableRequest, "UpdateTableRequest");
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =

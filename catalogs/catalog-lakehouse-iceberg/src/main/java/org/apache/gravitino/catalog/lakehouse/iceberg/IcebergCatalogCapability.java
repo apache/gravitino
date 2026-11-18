@@ -70,6 +70,29 @@ public class IcebergCatalogCapability implements Capability {
     return Capability.super.specificationOnName(scope, name);
   }
 
+  /**
+   * Accepts existing Iceberg namespace names independently of the rules for creating new names.
+   * Iceberg namespaces may have been created directly by engines and are passed as API values,
+   * rather than interpolated into SQL identifiers.
+   *
+   * @param scope the scope of the existing name
+   * @param name the existing name
+   * @return whether the existing name can be addressed
+   */
+  @Override
+  public CapabilityResult specificationOnExistingName(Scope scope, String name) {
+    if (scope != Scope.SCHEMA) {
+      return Capability.super.specificationOnExistingName(scope, name);
+    }
+    for (String segment : HierarchicalSchemaUtil.splitSchemaName(name, schemaSeparator)) {
+      if (segment.isEmpty()) {
+        return CapabilityResult.unsupported(
+            "An existing Iceberg namespace cannot have empty segments");
+      }
+    }
+    return CapabilityResult.SUPPORTED;
+  }
+
   private CapabilityResult validateSegments(String name, String separator) {
     String[] segments = HierarchicalSchemaUtil.splitSchemaName(name, separator);
     for (String segment : segments) {

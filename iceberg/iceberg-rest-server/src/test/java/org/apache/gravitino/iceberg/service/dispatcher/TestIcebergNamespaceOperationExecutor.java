@@ -20,6 +20,8 @@
 package org.apache.gravitino.iceberg.service.dispatcher;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -37,6 +39,7 @@ import java.util.Optional;
 import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.ops.RegisterTableRequestWithMetadata;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
@@ -252,7 +255,15 @@ public class TestIcebergNamespaceOperationExecutor {
     executor.registerTable(mockContext, namespace, request);
 
     verify(mockCatalogWrapper).loadTableMetadataFromLocation(metadataLocation);
-    verify(mockCatalogWrapper).registerTable(namespace, request, false);
+    verify(mockCatalogWrapper)
+        .registerTable(
+            eq(namespace),
+            argThat(
+                loaded ->
+                    loaded instanceof RegisterTableRequestWithMetadata
+                        && ((RegisterTableRequestWithMetadata) loaded).tableMetadata() == metadata
+                        && loaded.name().equals(request.name())),
+            eq(false));
   }
 
   @Test
@@ -466,5 +477,24 @@ public class TestIcebergNamespaceOperationExecutor {
     } finally {
       IcebergRESTServerContext.create(provider, false, false, false, null);
     }
+  }
+
+  @Test
+  void testAuthorizedSnapshotIsNotReadAgain() {
+    Schema schema = new Schema(NestedField.required(1, "id", StringType.get()));
+    TableMetadata metadata =
+        TableMetadata.newTableMetadata(
+            schema, PartitionSpec.unpartitioned(), "file:/tmp/table", Collections.emptyMap());
+    RegisterTableRequestWithMetadata request =
+        new RegisterTableRequestWithMetadata(
+            ImmutableRegisterTableRequest.builder()
+                .name("table")
+                .metadataLocation("file:/tmp/v1.metadata.json")
+                .build(),
+            metadata);
+    Namespace namespace = Namespace.of("ns");
+    executor.registerTable(mockContext, namespace, request);
+    verify(mockCatalogWrapper, never()).loadTableMetadataFromLocation(any());
+    verify(mockCatalogWrapper).registerTable(namespace, request, false);
   }
 }
