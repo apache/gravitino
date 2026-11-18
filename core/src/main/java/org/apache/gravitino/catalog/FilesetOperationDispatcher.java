@@ -202,12 +202,12 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
     // Write secrets before create: paths that resolve URNs (e.g. mergeUpLevelConfigurations for FS
     // mkdir, catalog createBaseCatalog) require secrets to exist first. Roll back only if the
     // catalog create fails; once it returns, the fileset references these secrets.
+    secretManager.validateSecretsBeforeStage(entityProperties, secretPlaintexts);
     SecretVersionChanges stagedSecrets =
         secretManager.stageSecrets(null, entityProperties, "fileset", uid, secretPlaintexts);
     AtomicBoolean createdInCatalog = new AtomicBoolean();
     Fileset createdFileset;
     try {
-      secretManager.validateSecretsReadable(entityProperties);
       createdFileset =
           TreeLockUtils.doWithTreeLock(
               // Lock at fileset level (not schema level) to allow concurrent fileset creation.

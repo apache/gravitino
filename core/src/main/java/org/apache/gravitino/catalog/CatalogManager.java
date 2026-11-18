@@ -888,12 +888,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             checkOpen();
             checkMetalake(metalakeIdent, store);
             // Initialization resolves secret URNs, but must not publish the entity yet.
+            secretManager.validateSecretsBeforeStage(mergedConfig, secretPlaintexts);
             SecretVersionChanges stagedSecrets =
                 secretManager.stageSecrets(null, mergedConfig, "catalog", uid, secretPlaintexts);
             AtomicBoolean entityStored = new AtomicBoolean(false);
             Catalog info;
             try {
-              secretManager.validateSecretsReadable(mergedConfig);
               // Reject known duplicates before contacting the backend; store.put still arbitrates
               // concurrent creates from other server instances.
               if (store.exists(ident, EntityType.CATALOG)) {

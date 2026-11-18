@@ -199,12 +199,12 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     // mergeUpLevelConfigurations, catalog createBaseCatalog) require secrets to exist first.
     // Roll back secrets only if the catalog has not created the schema; once it has, the schema may
     // reference them even if a later step fails.
+    secretManager.validateSecretsBeforeStage(entityProperties, secretPlaintexts);
     SecretVersionChanges stagedSecrets =
         secretManager.stageSecrets(null, entityProperties, "schema", uid, secretPlaintexts);
     AtomicBoolean createdInCatalog = new AtomicBoolean();
     Schema createdSchema;
     try {
-      secretManager.validateSecretsReadable(entityProperties);
       createdSchema =
           TreeLockUtils.doWithTreeLock(
               catalogIdent,

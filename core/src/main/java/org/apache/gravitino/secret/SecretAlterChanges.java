@@ -98,11 +98,15 @@ public final class SecretAlterChanges {
       }
     }
     // Without an id the checks above let no change write or release a write-through secret.
-    SecretVersionChanges staged =
-        entityId == null
-            ? SecretVersionChanges.EMPTY
-            : secretManager.stageSecrets(
-                currentProperties, properties, "catalog", entityId, plaintexts);
+    SecretVersionChanges staged;
+    if (entityId == null) {
+      staged = SecretVersionChanges.EMPTY;
+    } else {
+      secretManager.validateSecretsBeforeStage(properties, plaintexts);
+      staged =
+          secretManager.stageSecrets(
+              currentProperties, properties, "catalog", entityId, plaintexts);
+    }
     return Pair.of(out.toArray(new CatalogChange[0]), staged);
   }
 
@@ -213,11 +217,14 @@ public final class SecretAlterChanges {
       }
     }
     // Without an id the checks above let no change write or release a write-through secret.
-    SecretVersionChanges staged =
-        entityId == null
-            ? SecretVersionChanges.EMPTY
-            : secretManager.stageSecrets(
-                currentProperties, properties, "schema", entityId, plaintexts);
+    SecretVersionChanges staged;
+    if (entityId == null) {
+      staged = SecretVersionChanges.EMPTY;
+    } else {
+      secretManager.validateSecretsBeforeStage(properties, plaintexts);
+      staged =
+          secretManager.stageSecrets(currentProperties, properties, "schema", entityId, plaintexts);
+    }
     return Pair.of(out.toArray(new SchemaChange[0]), staged);
   }
 
@@ -277,11 +284,15 @@ public final class SecretAlterChanges {
       }
     }
     // Without an id the checks above let no change write or release a write-through secret.
-    SecretVersionChanges staged =
-        entityId == null
-            ? SecretVersionChanges.EMPTY
-            : secretManager.stageSecrets(
-                currentProperties, properties, "fileset", entityId, plaintexts);
+    SecretVersionChanges staged;
+    if (entityId == null) {
+      staged = SecretVersionChanges.EMPTY;
+    } else {
+      secretManager.validateSecretsBeforeStage(properties, plaintexts);
+      staged =
+          secretManager.stageSecrets(
+              currentProperties, properties, "fileset", entityId, plaintexts);
+    }
     return Pair.of(out.toArray(new FilesetChange[0]), staged);
   }
 }
