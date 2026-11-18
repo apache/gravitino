@@ -38,8 +38,9 @@ can search for an article, read it, and follow its bindings under their existing
 
 1. **Article object**: add `KnowledgeBaseArticle` as metalake-scoped metadata with an immutable
    name and stable numeric ID. A title can change without breaking references to the article.
-2. **Content and history**: store Markdown or HTML. Keep a snapshot of the title, body, Domains
-   and bindings for each effective content change, and expose readable version history.
+2. **Content and version storage**: store Markdown or HTML. Keep an internal snapshot of the
+   title, body, Domains and bindings for each effective content change, and expose the current
+   content only. Historical version reads are deferred.
 3. **Bindings**: link an article to terms and metadata objects. Support reverse lookup from
    either target. A binding never grants access to data.
 4. **Domains**: organize and filter articles by zero or more Domains. Membership does not change
@@ -64,17 +65,16 @@ can search for an article, read it, and follow its bindings under their existing
    outside this contribution.
 4. **File ingestion, attachments and image upload**: the body is text. It may contain ordinary
    external links, but Gravitino does not host files, extract text or fetch linked content.
-5. **Tags and policies on articles**: this proposal adds neither tag association nor policies
-   for articles. An article binding does not change a target's policies.
-6. **Ranked, fuzzy or semantic search and RAG**: substring search is sufficient for this scope.
+5. **Ranked, fuzzy or semantic search and RAG**: substring search is sufficient for this scope.
    There is no embedding index or answer-generation service.
-7. **Inferred or transitive bindings**: words and links in the body do not create bindings.
+6. **Inferred or transitive bindings**: words and links in the body do not create bindings.
    Binding an article to a term does not bind it to that term's assets; binding a table does not
    bind its columns.
-8. **Metric bindings and version pinning**: bind a Semantic Model as an object, not an individual
+7. **Metric bindings and version pinning**: bind a Semantic Model as an object, not an individual
    metric. A binding points to the target's identity and resolves its current state.
-9. **Article hierarchy, comparison and rollback**: articles form a flat list. History reads
-   snapshots; it does not compare them or restore them as new content.
+8. **Historical version reads, article hierarchy, comparison and rollback**: this delivery has
+   no history-list or individual-version read API, including in Java and Python clients.
+   Articles form a flat list; comparison and rollback are also outside this delivery.
 
 ---
 
@@ -101,9 +101,16 @@ deletion hooks described in the Glossary design; that document is not evidence t
 interfaces have shipped. Article storage, ordinary asset bindings and other independent work
 can proceed before the Term integration is ready.
 
-Article history is included from the start. This differs from Glossary Step 1, which has a
-revision number and audit but no content snapshots. The two objects share definition privileges
-and Domain conventions, not an identical storage or delivery plan.
+Keep the four-table layout, internal snapshots and `live_version` from the start, but defer
+public history reads. This differs from Glossary Step 1's storage, which has a revision and
+audit but no snapshots; both initial public APIs expose current content only. Retaining
+snapshots still requires version-write, transaction and retention logic in this delivery.
+
+Historical version lists and individual-version reads, their authorization, public DTOs and
+Java/Python client methods are separate follow-up work. They can read the retained snapshots
+without changing these four tables or migrating current content. No follow-up issue is created
+by this document. Future history reads must apply the article's current read check and resolve
+deleted target IDs without attaching them to same-name replacements.
 
 ---
 
@@ -118,7 +125,8 @@ and Domain conventions, not an identical storage or delivery plan.
 3. The reader searches for a word from the body and loads the article. Its bindings lead to
    the current term and table; each target still requires its own read privilege.
 4. The analyst loads the article and saves a new body and another binding with its `ETag`.
-   One new version becomes effective atomically. The history shows both snapshots.
+   One new version becomes effective atomically. The response shows the current version;
+   the previous snapshot remains in storage without a public history-read API.
 5. An agent acting as the reader calls `search_kb_articles`, then `get_kb_article`. It receives
    the stored body with its format and only the bound objects it can read.
 6. To prepare content privately, the analyst can create or set the article to `DRAFT`. Only its
@@ -143,10 +151,13 @@ KnowledgeBaseArticle {
   status: DRAFT | APPROVED | DEPRECATED, domains[], comment?, synonyms[],
   sourceReference?, properties, version, audit_info
 }
-ArticleVersion { articleId, version, title, body, domainIds[], bindings[], status, audit_info }
+ArticleSnapshot { articleId, version, title, body, domainIds[], bindings[], audit_info }
 ArticleBinding { articleId, targetType, targetId, audit_info }
 ArticleDomain  { articleId, domainId, audit_info }
 ```
+
+`ArticleSnapshot` describes internal storage, not a public historical-version DTO. The Article's
+`version` identifies its current content snapshot; its ETag separately guards the store revision.
 
 - **Identity**: `metalake.articleName`. The name is immutable and unique in the metalake; the
   internal numeric article ID is stable. Add `KNOWLEDGE_BASE_ARTICLE` to `MetadataObject.Type`
@@ -162,7 +173,12 @@ ArticleDomain  { articleId, domainId, audit_info }
   `DEPRECATED` checks it again. A conflict is `409`. Different titles can generate the same
   name, which is why generated names also need collision suffixes.
 - **Owner**: the creator becomes the owner through the existing Owner APIs. Owners may be users
-  or groups; no owner column is added to the article table.
+  or groups. Persist the relation in the existing `owner_meta` table: `metadata_object_id` is
+  the stable article ID, `metadata_object_type` is `KNOWLEDGE_BASE_ARTICLE`, and `metalake_id`
+  identifies its metalake. `owner_id` references the user or group ID and `owner_type` is `USER`
+  or `GROUP`; owner names are resolved from `user_meta` or `group_meta`. Integrate the Article
+  type with `OwnerMetaService` and the existing Owner APIs. No owner column is added to the
+  article tables, and ownership is not part of a content snapshot.
 - **Other fields**: `comment` is at most 256 characters. `synonyms` are trimmed, at most 128
   characters each and at most 20 per article; remove duplicates ignoring case. They need not be
   unique across articles. `sourceReference` is optional free text of at most 1024 characters,
@@ -234,8 +250,8 @@ may be edited or deleted in any status with the normal privileges.
 
 The title, body, Domains and bindings are versioned together, following Semantic Model storage.
 Owner, article status, comment, synonyms, source reference and properties change directly and
-are audited, without a content snapshot. Properties must not be used to hide content that is
-expected to appear in history.
+are audited, without a content snapshot. Properties must not be used to hide content that
+belongs in the versioned fields.
 
 - Create writes version 1 with its initial Domains and bindings.
 - An effective change to one or more versioned fields writes exactly one new snapshot, using
@@ -244,10 +260,9 @@ expected to appear in history.
 - Copy the complete stored snapshot before applying changes, including relations the editor
   cannot see. Filter only response data. A body-only edit must not remove hidden bindings or
   Domain memberships.
-- History lists versions newest first, with version, title, version status and audit information,
-  without bodies. Reading one version returns its body, Domains and bindings. Resolve stored
-  IDs to current names; mark deleted targets or Domains as deleted rather than resolving a
-  same-name replacement. Apply the article's current read check to all history reads.
+- Public loads, summaries and bindings read the current effective version only. Older snapshots
+  remain internal; this delivery adds no history service operation, REST route or client method.
+  Stored target and Domain IDs remain unchanged after deletion for later historical resolution.
 - Keep every version until article deletion. `JDBCBackend.deleteOldVersionData` returns `0` for
   this entity type, so the normal old-version sweep does not remove history. Article deletion
   soft-deletes all its versions atomically; normal deletion garbage collection still applies.
@@ -324,7 +339,7 @@ required capability. Every operation requires effective VIEW; ownership never by
 
 | Operation                         | Required definition privilege                                  |
 | --------------------------------- | -------------------------------------------------------------- |
-| List, load and version history    | VIEW; drafts also require current owner with CREATE, or MANAGE |
+| List and load                     | VIEW; drafts also require current owner with CREATE, or MANAGE |
 | Create                            | CREATE                                                         |
 | Edit, set status, change bindings | Current owner with CREATE, or MANAGE                           |
 | Change Domain membership          | Current owner with CREATE, or MANAGE; Domain checks also apply |
@@ -332,7 +347,7 @@ required capability. Every operation requires effective VIEW; ownership never by
 | Reverse lookup                    | VIEW on the article and read access to the lookup root         |
 
 CREATE alone cannot read another owner's draft, and ownership alone cannot replace CREATE.
-Use the same rules on direct reads, lists, history, nested results, reverse lookups and MCP.
+Use the same rules on direct reads, lists, nested results, reverse lookups and MCP.
 Definition grants on a single article are rejected. Reader roles need only VIEW; until the
 platform provides an all-users role, admins grant it explicitly rather than assuming `PUBLIC`.
 
@@ -382,12 +397,12 @@ The token is opaque and unambiguously includes stable metalake ID, article ID an
 It covers all article writes, not just content versions. Names and content-version numbers do
 not distinguish a deleted article from a same-name replacement with the same numeric revision.
 
-| Request                            | Concurrency headers                    |
-| ---------------------------------- | -------------------------------------- |
-| Create or load an article          | Response `ETag`                        |
-| Alter or change bindings           | Request `If-Match`; response `ETag`    |
-| Delete                             | Request `If-Match`; no response `ETag` |
-| Lists, history and reverse lookups | No `ETag`; load before editing         |
+| Request                   | Concurrency headers                    |
+| ------------------------- | -------------------------------------- |
+| Create or load an article | Response `ETag`                        |
+| Alter or change bindings  | Request `If-Match`; response `ETag`    |
+| Delete                    | Request `If-Match`; no response `ETag` |
+| Lists and reverse lookups | No `ETag`; load before editing         |
 
 Under the article lock, resolve and authorize the current identity before comparing the token,
 and compare before writes or no-op detection. Missing or hidden roots return `404` first; a
@@ -406,21 +421,19 @@ segment. Successful calls use HTTP `200` and the normal Gravitino response envel
 `code: 0`, as the Tag APIs do. The table names the other response fields; errors use the usual
 error envelope. Article and binding writes also carry the concurrency headers above.
 
-| Method and path                                 | Request                                        | Response fields         | Behavior                                          |
-| ----------------------------------------------- | ---------------------------------------------- | ----------------------- | ------------------------------------------------- |
-| `POST /kb-articles`                             | Create fields below                            | `article`               | Create identity, owner, version 1 and relations   |
-| `GET /kb-articles`                              | List filters below                             | `articles`, `total`     | Read visible summaries only                       |
-| `GET /kb-articles/{article}`                    | No body                                        | `article`               | Read full current article                         |
-| `PUT /kb-articles/{article}`                    | `updates` array                                | `article`               | Apply all changes atomically                      |
-| `DELETE /kb-articles/{article}`                 | No body                                        | Existing `DropResponse` | Soft-delete article and related rows atomically   |
-| `GET /kb-articles/{article}/versions`           | No body                                        | `versions`              | Read version summaries, newest first              |
-| `GET /kb-articles/{article}/versions/{version}` | Positive version number                        | `version`               | Read one snapshot; missing version is `404`       |
-| `GET /kb-articles/{article}/terms`              | No body                                        | `terms`                 | Read visible current Term bindings                |
-| `POST /kb-articles/{article}/terms`             | `termsToAdd`, `termsToRemove`: name arrays     | `terms`                 | Change Term bindings atomically                   |
-| `GET /kb-articles/{article}/objects`            | No body                                        | `objects`               | Read visible current asset bindings               |
-| `POST /kb-articles/{article}/objects`           | `objectsToAdd`, `objectsToRemove`: identifiers | `objects`               | Change asset bindings atomically                  |
-| `GET /glossary/terms/{term}/kb-articles`        | `includeDeprecated`, default `false`           | `articles`              | Authorize Term root, then read article summaries  |
-| `GET /objects/{type}/kb-articles`               | `namespace`, `name`, `includeDeprecated`       | `articles`              | Authorize asset root, then read article summaries |
+| Method and path                          | Request                                        | Response fields         | Behavior                                          |
+| ---------------------------------------- | ---------------------------------------------- | ----------------------- | ------------------------------------------------- |
+| `POST /kb-articles`                      | Create fields below                            | `article`               | Create identity, owner, version 1 and relations   |
+| `GET /kb-articles`                       | List filters below                             | `articles`, `total`     | Read visible summaries only                       |
+| `GET /kb-articles/{article}`             | No body                                        | `article`               | Read full current article                         |
+| `PUT /kb-articles/{article}`             | `updates` array                                | `article`               | Apply all changes atomically                      |
+| `DELETE /kb-articles/{article}`          | No body                                        | Existing `DropResponse` | Soft-delete article and related rows atomically   |
+| `GET /kb-articles/{article}/terms`       | No body                                        | `terms`                 | Read visible current Term bindings                |
+| `POST /kb-articles/{article}/terms`      | `termsToAdd`, `termsToRemove`: name arrays     | `terms`                 | Change Term bindings atomically                   |
+| `GET /kb-articles/{article}/objects`     | No body                                        | `objects`               | Read visible current asset bindings               |
+| `POST /kb-articles/{article}/objects`    | `objectsToAdd`, `objectsToRemove`: identifiers | `objects`               | Change asset bindings atomically                  |
+| `GET /glossary/terms/{term}/kb-articles` | `includeDeprecated`, default `false`           | `articles`              | Authorize Term root, then read article summaries  |
+| `GET /objects/{type}/kb-articles`        | `namespace`, `name`, `includeDeprecated`       | `articles`              | Authorize asset root, then read article summaries |
 
 The two reverse lookups return only `APPROVED` articles unless `includeDeprecated=true`, which
 also includes `DEPRECATED`. They never return drafts. Each returned article, Term, asset and
@@ -464,8 +477,7 @@ Create, load and alter return `{ "code": 0, "article": ... }`, where `article` h
 fields in [Data model](#data-model), plus readable bound Terms and objects. Bound Term details
 include current status; object details use `ArticleObjectIdentifier`. Owner information is
 resolved through the existing Owner model, not stored in the version snapshot. `audit_info`
-follows the standard AuditInfo DTO. A version read returns the versioned fields and its audit
-information, rather than presenting unversioned fields as historical values.
+follows the standard AuditInfo DTO. These responses expose current content only.
 
 Alter follows the existing `updates` convention. Supported changes are `updateTitle`,
 `updateBody`, `updateDomains`, `updateStatus`, `updateComment`, `updateSynonyms`,
@@ -547,7 +559,7 @@ View columns and individual metrics are outside the supported set.
 | --------- | ---------------------------------------------------------------------------------------------- |
 | `400`     | Invalid fields, type, format, size, status, identifier components or malformed condition token |
 | `403`     | Visible object, but insufficient privilege for the operation                                   |
-| `404`     | Missing or hidden article, version, Term, asset or Domain                                      |
+| `404`     | Missing or hidden article, Term, asset or Domain                                               |
 | `409`     | Name/title conflict, CAS conflict, nonapproved new Term binding, or nonempty Domain drop       |
 | `412`     | Stale article identity or store revision in `If-Match`                                         |
 | `502`     | Backend failure, following the existing REST error conventions                                 |
@@ -570,8 +582,6 @@ KnowledgeBaseArticleOperations
                 sourceReference?, properties?, terms?, objects?): KnowledgeBaseArticle
   alterArticle(name, changes...): KnowledgeBaseArticle
   deleteArticle(name): boolean
-  listVersions(name): ArticleVersionSummary[]
-  getVersion(name, version): ArticleVersion
   listTermBindings(name): GlossaryTerm[]
   alterTermBindings(name, termsToAdd, termsToRemove): GlossaryTerm[]
   listAssetBindings(name): ArticleObjectIdentifier[]
@@ -585,6 +595,9 @@ or write in their Article handle, send it for conditional mutations and retain t
 after binding writes as well as alter. Convenience calls without a loaded token may omit the
 header; they retain server CAS behavior. A `412` surfaces as a concurrent-modification error
 requiring reload. Neither client retries a mutation unconditionally after a conflict.
+
+Both clients expose the current Article version but no historical-version listing or loading
+method in this delivery. Those methods are added with the deferred history-read APIs.
 
 ### Agent integration
 
@@ -637,8 +650,8 @@ content, status, Domain and binding changes, ownership, cleanup losses and delet
 writes emit no content-change success event. There is no new delivery or ordering guarantee.
 
 This adds an object type, APIs and storage; existing resources keep their request contracts.
-Owner and audit dispatchers must recognize the new type. Generic tag and role routes must reject
-unsupported Article tagging and article-scoped grants rather than implying those capabilities.
+Owner and audit dispatchers must recognize the new type. Role routes reject article-scoped
+definition grants.
 No required configuration is added. The body limit has a default; its concrete configuration
 key and documentation are delivered with T3/T14 using the ordinary OSS configuration namespace.
 
@@ -656,16 +669,17 @@ key and documentation are delivered with T3/T14 using the ordinary OSS configura
 | Split targets from dotted full names      | Shorter URL and one string per target | A literal dot in a column or namespace component is ambiguous. Use structured components throughout the new Article APIs.                                          |
 
 The selected model adds storage and atomic projection updates, but gives each article its own
-identity and readable history. It also keeps bindings independent of access policies and lets
-ordinary Domain backing-tag behavior remain unchanged.
+identity and retained snapshots for future history reads. It also keeps bindings independent of
+access policies and lets ordinary Domain backing-tag behavior remain unchanged.
 
 ---
 
 ## Open Questions and Decisions
 
-1. **History included (decided)**: store content snapshots in the first implementation. A store
-   revision and audit alone are insufficient for long explanations. This deliberately differs
-   from the initial Glossary delivery scope.
+1. **Version storage now, history reads later (decided)**: keep the four-table layout,
+   `live_version`, snapshot writes and retention in the first implementation. Public reads and
+   clients expose current content only; add historical reads separately without changing this
+   schema. Unlike Glossary Step 1, internal content snapshots are retained from the start.
 2. **Immediate status and deletion (decided)**: default to `APPROVED`, allow direct status changes
    and edits, and allow owner-with-CREATE or MANAGE deletion in every status. These are Article
    rules; do not copy the Glossary's MANAGE-only deletion rule.
@@ -709,8 +723,8 @@ Every storage mutation test checks these invariants for its metalake:
    once without a content version. Failed writes and no-ops advance neither.
 5. An unrelated edit preserves the complete stored relation sets, including unreadable targets.
    Authorization filtering changes only the response, never the stored snapshot.
-6. History survives old-version garbage collection and is deleted with its article. It resolves
-   old target IDs as deleted rather than attaching history to same-name replacement objects.
+6. Retained snapshots survive old-version garbage collection and are deleted with their article.
+   They preserve old target IDs rather than substituting same-name replacement objects.
 
 ### Cases per task
 
@@ -726,7 +740,7 @@ Every storage mutation test checks these invariants for its metalake:
 
 - **T2.1**: CRUD and unique live keys in all four tables on every backend.
 - **T2.2**: soft deletion, name reuse, target lookup indexes and complete deletion cleanup.
-- **T2.3**: old-version GC returns zero for retained Article history; deletion GC still removes
+- **T2.3**: old-version GC returns zero for retained Article snapshots; deletion GC still removes
   deleted data.
 - **T2.4**: older snapshot defaults, unknown-field preservation and rejection of unsupported
   structures without writes.
@@ -752,7 +766,7 @@ Every storage mutation test checks these invariants for its metalake:
 - **T4.3**: committed ownership transfer on server 1 revokes the previous owner on new server-2
   reads, edits and Owner-transfer calls before cache refresh.
 - **T4.4**: user removal keeps articles; MANAGE reassigns ownership.
-- **T4.5**: article-scoped grants and unsupported generic Tag operations are rejected.
+- **T4.5**: article-scoped definition grants are rejected.
 
 #### T5: Domain integration
 
@@ -771,7 +785,7 @@ Every storage mutation test checks these invariants for its metalake:
 - **T6.3**: Term deprecation or return to DRAFT keeps existing bindings and exposes current status
   only when readable.
 - **T6.4**: rename, target deletion, column reconciliation, dotted column names and same-name target
-  replacement preserve identity/history rules.
+  replacement preserve identity and retained-snapshot rules.
 - **T6.5**: cleanup racing ordinary edits or new bindings leaves no dangling rows or lost revision
   increment; several losses increment each article once.
 - **T6.6**: external DDL succeeds but local cleanup fails; assert actual DDL outcome, local rollback
@@ -779,7 +793,8 @@ Every storage mutation test checks these invariants for its metalake:
 
 #### T7: REST and conditional editing
 
-- **T7.1**: each route's request, success envelope, validation and error mapping.
+- **T7.1**: each route's request, success envelope, validation and error mapping; no historical
+  version-list or individual-version read route is registered.
 - **T7.2**: stale/malformed ETag, another metalake's token and same-name replacement with an equal
   revision; hidden roots return 404 first.
 - **T7.3**: stale no-op returns 412; valid no-op preserves ETag; successful writes return the next
@@ -806,8 +821,8 @@ Every storage mutation test checks these invariants for its metalake:
 
 #### T10: Java client
 
-- **T10.1**: Java CRUD, versions, bindings, reverse reads, filters and full error mapping against
-  REST.
+- **T10.1**: Java CRUD, current content version, bindings, reverse reads, filters and full error
+  mapping against REST; no public history-read operation.
 - **T10.2**: ETag round trips across alter/binding writes, stale-token errors without retry, and
   structured dotted-column identifiers.
 
@@ -834,8 +849,8 @@ Every storage mutation test checks these invariants for its metalake:
 #### T14: User documentation
 
 - **T14.1**: executable documentation examples agree with REST and clients; OpenAPI validates.
-- **T14.2**: user docs cover direct publication, draft visibility, history, conditional edits,
-  configuration, pagination and external cleanup limits.
+- **T14.2**: user docs cover direct publication, draft visibility, current versions, conditional
+  edits, configuration, pagination and external cleanup limits; historical reads are deferred.
 
 ### Critical user journeys
 
@@ -853,10 +868,11 @@ on the metalake. Grant Domain/target access separately.
 | `outsider`     | No definition grant                                  |
 | `domain_admin` | Domain administration, but no Article edit grant     |
 
-1. **Create, edit and read history**: `author_a` creates the revenue guide with its Domain and
+1. **Create, edit and read current content**: `author_a` creates the revenue guide with its Domain and
    initial bindings. The default is APPROVED and version 1. Search and both reverse paths find
    it as `reader`, but not `outsider`. Change title, body and Domains in one alter: version 2 and
-   effective relations appear together. Load versions 1 and 2 and verify their full snapshots.
+   effective relations appear together. Reload the article and verify version 2 and its complete
+   effective content. Storage tests verify retention of both snapshots; no history API is used.
 2. **Draft, deprecate and delete**: create a draft and prove `reader` and another CREATE user
    cannot read it. Its owner sets APPROVED directly. Deprecate it, create a replacement using
    its old title, and get 409 when restoring the original until it has a different title. The
@@ -867,13 +883,14 @@ on the metalake. Grant Domain/target access separately.
    when the replacement has the same numeric revision. Repeat with stale no-op requests.
 4. **Term and asset lifecycle**: reject new bindings to `churn` and `gmv`. Deprecate an already
    bound Term, then return another to DRAFT: old bindings remain, new unapproved bindings fail.
-   Delete a Term and a bound table; effective bindings disappear, history marks them deleted.
+   Delete a Term and a bound table; effective bindings disappear, while stored snapshots retain
+   their former IDs.
    Bind and reverse-query `total.amount` without splitting the literal name. Exercise column
    rename separately from the inherited concurrent external-rename limitation.
 5. **Domain lifecycle**: parent filtering finds subdomain articles. Rename Finance and verify
    current names without changing IDs. Drop Audit while it has members and get 409; a Domain
    admin cannot silently detach them. Remove memberships through authorized object APIs and
-   drop the empty Domain. History still marks its former ID as deleted. Race add against drop
+   drop the empty Domain. Stored snapshots retain its former ID. Race add against drop
    on two servers and verify either legal commit order.
 6. **Ownership and Deny**: transfer to `author_b`; the former owner cannot edit. Without CREATE,
    the new owner cannot edit either. Grant CREATE, then transfer draft ownership across servers
@@ -921,26 +938,27 @@ OpenAPI and run `./gradlew :docs:build`. No task in this section is delivered by
 ### Group A: API and persistence
 
 - [ ] **T1. Add Article APIs** (`api/`, DTO contracts in `common/`). Define Article, body, status,
-      version and summary types, structured object identifiers, operations, changes and errors;
+      current-version and summary contracts, structured object identifiers, operations, changes
+      and errors;
       add the metadata/entity type integration and metalake access point. Define the three
       metalake definition privileges with the Glossary work if they are not already present.
       Depends on: none. Cases: T1.1–T1.3.
 - [ ] **T2. Add Article storage** (`core/`, `scripts/`). Implement entities, POs, mappers and
       services for all four tables and dialect upgrade scripts, atomic snapshots/projections,
-      soft deletion, snapshot compatibility, retained-history GC and parent cleanup.
+      soft deletion, snapshot compatibility, retained-snapshot GC and parent cleanup.
       Depends on: T1. Cases: T2.1–T2.4.
 
 ### Group B: Core behavior
 
 - [ ] **T3. Add the Article manager and policy boundary** (`core/`). Implement CRUD, generated
       names, title claims and lock planning, sanitization and body-limit configuration, status,
-      atomic version creation, history and no-op/revision rules. Route explicit drop and all
-      version-producing writes through the common policy boundaries with immediate defaults.
+      atomic version creation, retained snapshots and no-op/revision rules. Route explicit drop
+      and all version-producing writes through the common policy boundaries with immediate defaults.
       Depends on: T2. Cases: T3.1–T3.6.
 - [ ] **T4. Add Article authorization and ownership** (`core/`, `server/`). Implement definition
       privilege implications and Deny, current-store owner checks, group ownership, draft
-      visibility and filtering across all reads; integrate Owner transfer and reject unsupported
-      tag/grant routes. Depends on: T3. Cases: T4.1–T4.5.
+      visibility and filtering across all reads; integrate Owner transfer and reject article-scoped
+      definition grants. Depends on: T3. Cases: T4.1–T4.5.
 - [ ] **T5. Add Domain integration** (`core/`). Implement explicit membership writes, parent
       filters, current-name resolution, Domain visibility and nonempty-drop checks shared with
       Term membership where applicable. Fence membership changes and verify cross-object lock
@@ -954,7 +972,7 @@ OpenAPI and run `./gradlew :docs:build`. No task in this section is delivered by
 ### Group C: REST and events
 
 - [ ] **T7. Add Article REST and OpenAPI** (`common/`, `server/`, `docs/open-api/`). Implement all
-      resource and history routes, binding and reverse routes, envelopes, structured identifiers,
+      current-resource routes, binding and reverse routes, envelopes, structured identifiers,
       error mapping, optional identity/revision ETag handling and conditional mutations.
       Depends on: T5, T6. Cases: T7.1–T7.5.
 - [ ] **T8. Add filtered lists and search** (`core/`, `server/`). Implement escaped case-insensitive
@@ -966,8 +984,8 @@ OpenAPI and run `./gradlew :docs:build`. No task in this section is delivered by
 
 ### Group D: Clients and agents
 
-- [ ] **T10. Add Java client operations** (`clients/client-java/`). Expose CRUD, history, bindings,
-      reverse lookups and filters, including ETag retention and conditional mutation errors.
+- [ ] **T10. Add Java client operations** (`clients/client-java/`). Expose CRUD, current versions,
+      bindings, reverse lookups and filters, including ETag retention and conditional mutation errors.
       Depends on: T8. Cases: T10.1–T10.2.
 - [ ] **T11. Add Python client operations** (`clients/client-python/`). Match the Java/REST
       contracts, identifier components and conditional-edit behavior.
@@ -983,6 +1001,7 @@ OpenAPI and run `./gradlew :docs:build`. No task in this section is delivered by
       results and resolve any search implementation change before release.
       Depends on: T9, T10, T12. Cases: T13.1–T13.3.
 - [ ] **T14. Add user documentation** (`docs/`). Document Article lifecycle, metalake grants,
-      Domain membership, content history, search, clients, MCP, conditional edits, body-limit
-      configuration and external cleanup/recovery limits. Validate examples against the APIs.
+      Domain membership, current versions, deferred history reads, search, clients, MCP,
+      conditional edits, body-limit configuration and external cleanup/recovery limits.
+      Validate examples against the APIs.
       Depends on: T10, T12, T13. Cases: T14.1–T14.2.
