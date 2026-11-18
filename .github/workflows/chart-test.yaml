@@ -190,7 +190,7 @@ jobs:
         if: steps.list-changed.outputs.changed == 'true'
         run: ct install --charts=dev/charts/gravitino --helm-extra-set-args "--values dev/charts/gravitino/resources/scenarios/pg-values.yaml --set image.registry="" --set image.repository=${KIND_REGISTRY}/gravitino" --target-branch ${{ github.event.pull_request.base.ref }}
 
-      - name: Schema migrate fresh install and first upgrade (mysql)
+      - name: Schema migrate fresh install and same-revision upgrade (mysql)
         if: steps.list-changed.outputs.changed == 'true'
         run: |
           set -euo pipefail
@@ -213,6 +213,16 @@ jobs:
             --set image.tag="${tag}" \
             --set "podAnnotations.schema-migrate-upgrade=$(date +%s)"
           bash dev/ci/check-schema-migrate.sh "$NS" "$RELEASE" mysql
+
+      - name: Schema migrate cross-version upgrade from 1.2.0 (mysql)
+        if: steps.list-changed.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          chmod +x dev/ci/chart-schema-migrate-cross-version.sh
+          FROM_VERSION=1.2.0 \
+            NAMESPACE=schema-migrate-cross \
+            RELEASE_NAME=gravitino-sm-cross \
+            bash dev/ci/chart-schema-migrate-cross-version.sh
 
       - name: Schema migrate fresh install (postgresql)
         if: steps.list-changed.outputs.changed == 'true'
