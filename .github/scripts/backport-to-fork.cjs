@@ -193,7 +193,7 @@ async function openPullRequest({ github, upstream = github, core, task, target, 
     pr = (await github.rest.pulls.create({ ...UPSTREAM, base: target, head: `${task.owner}:${branch}`,
       title: `${conflict ? '[DO NOT MERGE] ' : ''}[Cherry-pick to ${target}] ${task.title}`.slice(0, 256),
       draft: conflict, ...(task.owner === UPSTREAM.owner ? {} : { maintainer_can_modify: true }),
-      body: `Backport of #${task.number}.\n\n- Original commit: ${task.sha}\n- Target branch: ${target}\n- Backport fork owner: @${task.owner}\n\n${conflict ? 'Resolve conflicts in the fork, remove the cherry-pick-conflict label, mark ready for review, and run Fork CI on this branch.' : task.owner === UPSTREAM.owner ? 'CI runs in apache/gravitino.' : 'CI runs in the dedicated bot fork.'}` })).data;
+      body: `Backport of #${task.number}.\n\n- Original commit: ${task.sha}\n- Target branch: ${target}\n- Backport fork owner: @${task.owner}\n\n${conflict ? 'Resolve conflicts on this backport branch, remove the cherry-pick-conflict label, mark ready for review, and rerun the backport coordinator for the original PR.' : task.owner === UPSTREAM.owner ? 'CI runs in apache/gravitino.' : 'CI runs in the dedicated bot fork.'}` })).data;
   }
   const labels = ['cherry-pick', ...(blocked ? ['cherry-pick-conflict'] : [])];
   for (const name of labels) {

@@ -474,3 +474,14 @@ test('workflow fallback is selectable without a bot secret and isolates upstream
   assert.match(impl,/secrets.CHERRY_PICK_TOKEN \|\| github.token/);
   assert.match(impl,/Verify the dedicated bot credential\n\s+if: fromJSON\(inputs.task\).owner != 'apache'/);
 });
+
+test('conflict PR recovery instructions work for both bot and Apache destinations', async () => {
+  for (const owner of ['alice','apache']) {
+    const h = prHarness();
+    await openPullRequest({...h,task:{...task,owner},target:'branch-2.0',branch:'backport-branch',conflict:true});
+    assert.equal(h.calls[0].draft,true);
+    assert.match(h.calls[0].body,/rerun the backport coordinator for the original PR/);
+    assert.doesNotMatch(h.calls[0].body,/in the fork|run Fork CI on this branch/);
+    assert.equal(h.outputs.ready,'false');
+  }
+});
