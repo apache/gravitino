@@ -44,37 +44,42 @@ public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform>
 
   @Override
   public Transform identity(String sourceName, int sourceId) {
-    return Transforms.identity(idToName.get(sourceId));
+    return Transforms.identity(fieldName(sourceId));
   }
 
   @Override
   public Transform bucket(String sourceName, int sourceId, int numBuckets) {
-    return Transforms.bucket(numBuckets, new String[] {idToName.get(sourceId)});
+    // String[]...: wrap as one nested path, not multiple top-level fields.
+    return Transforms.bucket(numBuckets, new String[][] {fieldName(sourceId)});
   }
 
   @Override
   public Transform truncate(String sourceName, int sourceId, int width) {
-    return Transforms.truncate(width, idToName.get(sourceId));
+    return Transforms.truncate(width, fieldName(sourceId));
   }
 
   @Override
   public Transform year(String sourceName, int sourceId) {
-    return Transforms.year(idToName.get(sourceId));
+    return Transforms.year(fieldName(sourceId));
   }
 
   @Override
   public Transform month(String sourceName, int sourceId) {
-    return Transforms.month(idToName.get(sourceId));
+    return Transforms.month(fieldName(sourceId));
   }
 
   @Override
   public Transform day(String sourceName, int sourceId) {
-    return Transforms.day(idToName.get(sourceId));
+    return Transforms.day(fieldName(sourceId));
   }
 
   @Override
   public Transform hour(String sourceName, int sourceId) {
-    return Transforms.hour(idToName.get(sourceId));
+    return Transforms.hour(fieldName(sourceId));
+  }
+
+  private String[] fieldName(int sourceId) {
+    return ConvertUtil.splitIcebergNameToFieldPath(idToName.get(sourceId));
   }
 
   @Override

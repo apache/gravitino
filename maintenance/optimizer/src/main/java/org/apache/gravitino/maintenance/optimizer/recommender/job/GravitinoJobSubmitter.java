@@ -128,7 +128,7 @@ public class GravitinoJobSubmitter implements JobSubmitter {
     Map<String, String> submitterConfigs =
         optimizerConfig == null ? Map.of() : optimizerConfig.jobSubmitterConfigs();
     Map<String, String> adapterConfigs =
-        jobAdapter == null ? Map.of() : jobAdapter.jobConfig(jobExecutionContext);
+        jobAdapter == null ? Map.of() : jobAdapter.jobConfig(jobExecutionContext, submitterConfigs);
 
     Map<String, String> mergedConfigs = new LinkedHashMap<>();
     mergedConfigs.putAll(submitterConfigs);

@@ -26,8 +26,8 @@ import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionCo
  * Translates optimizer job execution context into Gravitino job submission inputs.
  *
  * <p>Usage: {@link GravitinoJobSubmitter} looks up an adapter for the requested job template,
- * creates a new instance, and calls {@link #jobConfig(JobExecutionContext)} when submitting the job
- * to Gravitino.
+ * creates a new instance, and calls {@link #jobConfig(JobExecutionContext, Map)} when submitting
+ * the job to Gravitino.
  */
 public interface GravitinoJobAdapter {
 
@@ -40,4 +40,20 @@ public interface GravitinoJobAdapter {
    * @return job configuration map
    */
   Map<String, String> jobConfig(JobExecutionContext jobExecutionContext);
+
+  /**
+   * Same as {@link #jobConfig(JobExecutionContext)}, with access to optimizer job-submitter
+   * defaults (for example Spark {@code catalog_name}) before they are merged over.
+   *
+   * <p>Default delegates to {@link #jobConfig(JobExecutionContext)}. Compaction overrides this so
+   * partition {@code where_clause} functions use the same Spark catalog alias as the CALL.
+   *
+   * @param jobExecutionContext job execution context
+   * @param submitterConfigs {@code gravitino.optimizer.jobSubmitterConfig.*} values (may be empty)
+   * @return job configuration map
+   */
+  default Map<String, String> jobConfig(
+      JobExecutionContext jobExecutionContext, Map<String, String> submitterConfigs) {
+    return jobConfig(jobExecutionContext);
+  }
 }
