@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionContext;
 import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.ManifestRewriteJobContext;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 /** Maps a manifest rewrite decision to the built-in Spark job's arguments. */
 public final class GravitinoManifestRewriteJobAdapter implements GravitinoJobAdapter {
@@ -40,7 +41,8 @@ public final class GravitinoManifestRewriteJobAdapter implements GravitinoJobAda
         IdentifierUtils.getCatalogNameFromTableIdentifier(rewrite.nameIdentifier()));
     config.put(
         "table_identifier",
-        IdentifierUtils.removeCatalogFromIdentifier(rewrite.nameIdentifier()).toString());
+        IdentifierUtils.toSparkTableIdentifier(
+            rewrite.nameIdentifier(), HierarchicalSchemaUtil.schemaSeparator()));
     return Map.copyOf(config);
   }
 }

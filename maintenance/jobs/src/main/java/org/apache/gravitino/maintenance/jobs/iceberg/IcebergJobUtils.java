@@ -32,6 +32,7 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.spark.Spark3Util;
@@ -230,6 +231,22 @@ public final class IcebergJobUtils {
     }
     String escaped = identifier.replace("`", "``");
     return "`" + escaped + "`";
+  }
+
+  /**
+   * Builds a backtick-quoted {@code catalog.ns…table} SQL reference from a Spark table identifier
+   * that may include hierarchical Iceberg namespace levels (e.g. {@code a.b.c.events}).
+   *
+   * @param catalogName Spark catalog name
+   * @param sparkTableIdentifier dotted schema…table identifier
+   * @return qualified SQL identifier
+   */
+  public static String qualifyCatalogTableSql(String catalogName, String sparkTableIdentifier) {
+    StringBuilder sql = new StringBuilder(escapeSqlIdentifier(catalogName));
+    for (String level : IdentifierUtils.sparkTableIdentifierLevels(sparkTableIdentifier)) {
+      sql.append('.').append(escapeSqlIdentifier(level));
+    }
+    return sql.toString();
   }
 
   /**

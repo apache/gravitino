@@ -49,6 +49,7 @@ import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
@@ -112,7 +113,10 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
             : Paths.get(coordinationDirectory);
     String catalog = arguments.get("catalog");
     String table = arguments.get("table");
-    tableIdentifier(catalog, table);
+    if (catalog == null || catalog.trim().isEmpty() || table == null) {
+      throw new IllegalArgumentException("--catalog and --table are required");
+    }
+    IdentifierUtils.sparkTableIdentifierLevels(table);
     Map<String, String> options =
         IcebergSparkConfigUtils.parseFlatJsonMap(
             arguments.get("updater-options"), "updater-options");
@@ -205,7 +209,9 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
       String metalake,
       @Nullable Path coordinationDirectory)
       throws IOException {
-    NameIdentifier identifier = tableIdentifier(catalogName, tableIdentifier);
+    NameIdentifier identifier =
+        IdentifierUtils.fromSparkTableIdentifier(
+            catalogName, tableIdentifier, IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
     if (coordinationDirectory == null) {
       updater.updateTableStatistics(
           identifier, collectManifestStatistics(spark, catalogName, tableIdentifier));
@@ -284,23 +290,9 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
 
   @VisibleForTesting
   static String buildTableIdentifier(String catalogName, String tableName) {
-    NameIdentifier identifier = tableIdentifier(catalogName, tableName);
-    return IcebergJobUtils.escapeSqlIdentifier(identifier.namespace().level(0))
-        + "."
-        + IcebergJobUtils.escapeSqlIdentifier(identifier.namespace().level(1))
-        + "."
-        + IcebergJobUtils.escapeSqlIdentifier(identifier.name());
-  }
-
-  private static NameIdentifier tableIdentifier(
-      @Nullable String catalogName, @Nullable String tableName) {
     if (catalogName == null || catalogName.trim().isEmpty() || tableName == null) {
       throw new IllegalArgumentException("--catalog and --table are required");
     }
-    String[] levels = tableName.split("\\.", -1);
-    if (levels.length != 2 || levels[0].trim().isEmpty() || levels[1].trim().isEmpty()) {
-      throw new IllegalArgumentException("--table must use schema.table format: " + tableName);
-    }
-    return NameIdentifier.of(catalogName, levels[0], levels[1]);
+    return IcebergJobUtils.qualifyCatalogTableSql(catalogName, tableName);
   }
 }

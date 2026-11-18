@@ -32,7 +32,6 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 public class TestGravitinoCompactionJobAdapter {
@@ -165,11 +164,7 @@ public class TestGravitinoCompactionJobAdapter {
     Assertions.assertEquals("(`event`.`meta`.`user-id` = 7)", conf.get("where_clause"));
   }
 
-  /**
-   * Tracks #15048: hierarchical Gravitino schemas must become Spark-physical table identifiers
-   * before CALL. Today the adapter forwards {@code a:b:c.events} unchanged.
-   */
-  @Disabled("TODO(#15048): translate hierarchical schema table_identifier for Spark CALL")
+  /** #15048: hierarchical Gravitino schemas become Spark-physical table identifiers for CALL. */
   @Test
   public void testHierarchicalSchemaTableIdentifierIsSparkPhysical() {
     Map<String, String> conf =

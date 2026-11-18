@@ -46,6 +46,7 @@ import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
 import org.apache.gravitino.stats.StatisticValues;
 import org.apache.spark.sql.Row;
@@ -508,31 +509,12 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
   private static NameIdentifier toGravitinoTableIdentifier(
       String catalogName, String tableIdentifier) {
-    String[] levels = tableIdentifier.split("\\.");
-    if (levels.length != 2) {
-      throw new IllegalArgumentException(
-          "--table must use schema.table format, but got: " + tableIdentifier);
-    }
-    return NameIdentifier.of(catalogName, levels[0], levels[1]);
+    return IdentifierUtils.fromSparkTableIdentifier(
+        catalogName, tableIdentifier, IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
   }
 
   private static String buildFilesTableIdentifier(String catalogName, String tableIdentifier) {
-    String[] levels = tableIdentifier.split("\\.");
-    if (levels.length != 2) {
-      throw new IllegalArgumentException(
-          "--table must use schema.table format, but got: " + tableIdentifier);
-    }
-    return escapeSqlIdentifier(catalogName)
-        + "."
-        + escapeSqlIdentifier(levels[0])
-        + "."
-        + escapeSqlIdentifier(levels[1])
-        + ".`files`";
-  }
-
-  private static String escapeSqlIdentifier(String identifier) {
-    String escaped = identifier.replace("`", "``");
-    return "`" + escaped + "`";
+    return IcebergJobUtils.qualifyCatalogTableSql(catalogName, tableIdentifier) + ".`files`";
   }
 
   private static long toLongValue(Row row, String fieldName) {

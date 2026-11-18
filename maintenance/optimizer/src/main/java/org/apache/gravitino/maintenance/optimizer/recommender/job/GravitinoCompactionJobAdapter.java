@@ -31,6 +31,7 @@ import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionCo
 import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionJobContext;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 public class GravitinoCompactionJobAdapter implements GravitinoJobAdapter {
 
@@ -71,9 +72,8 @@ public class GravitinoCompactionJobAdapter implements GravitinoJobAdapter {
   }
 
   private String getTableName(CompactionJobContext jobContext) {
-    // TODO(#15048): translate hierarchical Gravitino schema identifiers (e.g. a:b:c.events)
-    // to Spark physical namespace components before emitting table_identifier for CALL.
-    return IdentifierUtils.removeCatalogFromIdentifier(jobContext.nameIdentifier()).toString();
+    return IdentifierUtils.toSparkTableIdentifier(
+        jobContext.nameIdentifier(), HierarchicalSchemaUtil.schemaSeparator());
   }
 
   private String getWhereClause(

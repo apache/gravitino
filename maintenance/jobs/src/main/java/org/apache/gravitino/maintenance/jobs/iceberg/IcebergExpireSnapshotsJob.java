@@ -494,17 +494,8 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenance
    */
   @VisibleForTesting
   static String buildReachableContentFilesSql(String catalogName, String tableIdentifier) {
-    String[] levels = tableIdentifier.split("\\.");
-    if (levels.length != 2) {
-      throw new IllegalArgumentException(
-          "table_identifier must use schema.table format, but got: " + tableIdentifier);
-    }
     String metadataTable =
-        IcebergJobUtils.escapeSqlIdentifier(catalogName)
-            + "."
-            + IcebergJobUtils.escapeSqlIdentifier(levels[0])
-            + "."
-            + IcebergJobUtils.escapeSqlIdentifier(levels[1])
+        IcebergJobUtils.qualifyCatalogTableSql(catalogName, tableIdentifier)
             + "."
             + IcebergJobUtils.escapeSqlIdentifier("all_files");
     return "SELECT file_path AS `file-path`, MAX(file_size_in_bytes) AS `file-size` FROM "
