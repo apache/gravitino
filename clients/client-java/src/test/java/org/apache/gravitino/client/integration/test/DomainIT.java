@@ -370,7 +370,9 @@ public class DomainIT extends BaseIT {
     fileset
         .supportsTags()
         .associateTags(new TagValue[] {TagValue.of("department", "finance")}, new TagValue[0]);
-    model.supportsTags().associateTags(new String[] {"department"}, new String[0]);
+    model
+        .supportsTags()
+        .associateTags(new TagValue[] {TagValue.of("department", "risk")}, new TagValue[0]);
 
     // An object can be inherited from Finance and reached through Trading at the same time.
     Map<String, DomainMember> members =

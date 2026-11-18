@@ -313,7 +313,7 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
         fileset.supports_tags().assign_tags(
             [{"name": "department", "value": "finance"}]
         )
-        model.supports_tags().assign_tags(["department"])
+        model.supports_tags().assign_tags([{"name": "department", "value": "risk"}])
 
         # The same table has both inherited and subdomain relations, with no precedence.
         members = {
