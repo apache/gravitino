@@ -69,9 +69,9 @@ instead of plaintext for marked keys, expose a clear **REST create/alter contrac
    for **catalog, schema, and fileset** (see §5.9). **Persistence** stays an all-string JSON map on
    each entity's properties column. Secret property values are stored as **URN strings**. A property
    is treated as a secret when its value matches the **URN recognition rule** (§5.1): starts with
-   `urn:gravitino-secret` and ends with that property's key. Whether to `deleteSecret` on entity drop
-   or alter `removeProperty` is decided from the **URN shape** (write-through embeds
-   `entityType`/`entityId`/`propertyKey` — §5.5.2 C).
+   `urn:gravitino-secret` and ends with that property's key. Whether drop calls `deleteSecret`, or
+   an alter release deletes the current version, is decided from the **URN shape** (write-through
+   embeds `entityType`/`entityId`/`propertyKey` — §5.5.2 C).
 
 4. **Backward compatible reads**: existing all-string entity properties continue to
    work as plaintext with no migration required.
@@ -361,7 +361,9 @@ public interface GravitinoSecretProvider {
   String type();
 
   /**
-   * Write-through: store plaintext in this backend and return a durable reference URN.
+   * Store plaintext in this backend and return a durable reference URN.
+   * Core calls it only for setProperty on a secret URN the entity does not own (§5.5.3);
+   * create and alter of the entity's own write-through secrets use the version methods.
    * Read-only / external-ref-only implementations throw UnsupportedOperationException.
    * Core may wrap a provider-returned type-specific identifier into the full URN using the
    * factory-bound provider name — or the impl returns the full URN.
@@ -372,16 +374,16 @@ public interface GravitinoSecretProvider {
   String readSecret(String urn);
 
   /**
-   * Best-effort delete of every version. Used on entity drop and create rollback for
-   * <b>Gravitino-managed</b> (write-through) secrets only — see §5.5.2 C. Alter uses the
-   * version methods instead (§5.5.3).
+   * Best-effort delete of every version. Used on entity drop for <b>Gravitino-managed</b>
+   * (write-through) secrets only — see §5.5.2 C. Create and alter use the version methods
+   * instead (§5.5.3).
    */
   void deleteSecret(String urn);
 }
 
 /**
  * Context for write-through path generation / GC metadata (Polaris forEntity analogue).
- * External-ref path never calls writeSecret — this type is unused there.
+ * Creating or setting a secret reference never calls writeSecret — this type is unused there.
  *
  * <p>Do <b>not</b> put renameable names (metalake / catalog / schema / fileset <b>names</b>) into
  * generated URNs. Prefer stable ids so renames do not orphan or collide paths.
@@ -396,10 +398,11 @@ public final class SecretWriteContext {
 **Mapping to entity property JSON** after write-through:
 
 ```text
-writeSecret → urn string
-  (URN envelope provider_name from factory binding; identifier includes entityType + entityId + propertyKey)
+Core builds urn
+  (URN envelope provider_name from the binding; identifier is entityType + entityId + propertyKey)
+writeSecretVersion(urn, plaintext) → first version of urn (§5.5.3)
 Core persists:
-  "jdbc-password": "<returned-urn>"
+  "jdbc-password": "<urn>"
 ```
 
 URN / write-through paths must use **stable entity ids** + **entity type** + **property key**, not
@@ -414,8 +417,8 @@ Create request shapes: §5.9.2 / §5.9.5. Below is the provider / URN outcome on
 **A. Write-through (in-memory)**
 
 Client create uses typed `secretBindings` (`jdbc-password` → `{ "provider": "memory",
-"plaintext": "…" }`). Core calls `writeSecret(plaintext, SecretWriteContext("catalog", entityId,
-"jdbc-password"))`, persists e.g.:
+"plaintext": "…" }`). Core builds the URN from `("catalog", entityId, "jdbc-password")`, writes
+the plaintext as its first version (§5.5.3), and persists e.g.:
 
 ```text
 jdbc-password = urn:gravitino-secret:memory:catalog:10042:jdbc-password
@@ -454,7 +457,7 @@ full check.
 Rationale: write-through secrets are **Gravitino-managed**; once the property (or entity) is gone,
 leaving material in the provider would orphan it. External refs are owned outside Gravitino.
 
-#### 5.5.3 Alter: versioned write-through secrets
+#### 5.5.3 Create and alter: versioned write-through secrets
 
 Secret material and the entity live in different stores, so an alter that fails after touching the
 provider must not leave the entity referencing a deleted or changed write-through secret of its own.
@@ -465,7 +468,7 @@ A `setCurrentSecretVersion` call that throws must not take effect afterwards, an
 `currentSecretVersion` must already report whether it did: a provider settles an unknown outcome
 before throwing, for example with a conditional update, and reads with read-after-write
 consistency.
-If a provider of a written or released URN does not implement them, the alter fails with
+If a provider of a written or released URN does not implement them, the create or alter fails with
 `UnsupportedOperationException`. Released URNs are checked before any version is written; versions
 already written for other keys in the batch are deleted best-effort.
 
@@ -484,6 +487,13 @@ already written for other keys in the batch are deleted best-effort.
    change again writes another version and makes it current.
 3. Rollback (`rollbackSecrets`, entity update failed): delete the new versions. The entity keeps
    reading the versions that were current before the alter.
+
+Create runs the same steps with no start properties, so it releases nothing. Its URNs carry the new
+entity id and have no current version, so each new version is current once written and commit has
+nothing to switch. If the create fails, rollback deletes those versions. A schema already created in
+the external catalog, or a fileset the catalog already created, keeps them even if a later step
+fails. A stored catalog whose create then fails keeps them if its entity cannot be removed, and the
+create fails with an error that asks to drop the catalog with force.
 
 An alter releases a write-through URN of the entity when the final properties no longer hold it,
 for example after `removeProperty`, `setSecretReference`, or a binding to another provider. Working
@@ -529,7 +539,7 @@ map[URN] = { versions: version id → Base64(plaintext), current: version id }
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `writeSecret`          | Base64-encode plaintext. Allocate URN `urn:gravitino-secret:<provider_name>:<entityType>:<entityId>:<propertyKey>` from `SecretWriteContext`. Store Base64 as the only version of that URN and make it current. Return the URN. |
 | `readSecret`           | Look up map by URN; Base64-decode the current version; return plaintext. Missing URN or no current version → `IllegalArgumentException`.                                                                                       |
-| `deleteSecret`         | `map.remove(urn)`, all versions — best-effort; used by create rollback and entity drop for **managed** (write-through) secrets (§5.5.2 C).                                                                                       |
+| `deleteSecret`         | `map.remove(urn)`, all versions — best-effort; used by entity drop for **managed** (write-through) secrets (§5.5.2 C).                                                                                                           |
 | `writeSecretVersion`   | Add a version under an id that increases per provider instance; make it current only when the URN has no current version.                                                                                                                      |
 | `setCurrentSecretVersion` | Make an existing version current; unknown version → `IllegalArgumentException` without changing state (synchronous, so a call that throws never takes effect).                                                                                                                                                  |
 | `deleteSecretVersion`  | Remove one version; deleting the current one leaves no readable value; unknown version → no-op.                                                                                                                                   |
@@ -649,7 +659,7 @@ urn:gravitino-secret:<provider>:<type-specific-identifier>
 | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Key **not** in either secret map                                                 | Persist `properties` value as plain **string** (legacy / non-secret).                                                                                            |
 | Key in **`secretReferences`**                                                    | Validate locator; **build URN** (must end with the property key); persist **URN string**; key **must not** be in `properties`; **do not** `readSecret` on write. |
-| Key in **`secretBindings`**                                                      | Validate binding; `plaintext` (not `******`) → `writeSecret` via named provider; persist **returned URN string**; key **must not** be in `properties`.          |
+| Key in **`secretBindings`**                                                      | Validate binding; `plaintext` (not `******`) → first version of the URN on the named provider (§5.5.3); persist **URN string**; key **must not** be in `properties`. |
 | Key in **both** `secretReferences` and `secretBindings`                          | **Reject**.                                                                                                                                                      |
 | Key in `secretReferences` **or** `secretBindings` **and** also present in `properties` | **Reject** (no overlap with `properties`).                                                                                                                 |
 | `secretBindings` missing `provider` / `plaintext`, or `plaintext` is `******`    | **Reject**.                                                                                                                                                      |
@@ -714,8 +724,8 @@ sibling maps). Existing **`setProperty`** stays a **string** `value` (plaintext 
 
 | `@type`              | Fields (flat; not nested under `value`)                                                  | Behavior                                                                                                                                                  |
 | -------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `setProperty`        | `value` (**string** plaintext)                                                           | Today’s plaintext set. If the **current** value matches the URN recognition rule, in-place `writeSecret` via provider in the current URN; persist new URN |
-| `setSecretBinding`   | `provider` (instance name) + `plaintext` (plaintext string)                              | Write-through bind/re-bind (`writeSecret`); persist returned URN                                                                                          |
+| `setProperty`        | `value` (**string** plaintext)                                                           | Today’s plaintext set. If the **current** value is a write-through URN of this entity, write `value` as a new version of it (§5.5.3); if it is another secret URN, rewrite it in place with `writeSecret` via its provider and persist the returned URN |
+| `setSecretBinding`   | `provider` (instance name) + `plaintext` (plaintext string)                              | Write-through bind/re-bind: build the URN and write `plaintext` as a new version of it (§5.5.3); persist the URN |
 | `setSecretReference` | `provider` (instance name) + `attributes` (`map<string,string>`; same locator as §5.9.2) | External ref; server builds URN from locator (must end with the property key). Required `attributes` keys are provider-defined.                           |
 
 | Rule                                                                               | Behavior                                                                                                                                                                                                                                           |
@@ -769,7 +779,7 @@ Request:
 }
 ```
 
-DB `properties` (illustrative returned URN):
+DB `properties` (illustrative URN):
 
 ```json
 {
