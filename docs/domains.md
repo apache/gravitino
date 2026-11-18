@@ -51,7 +51,7 @@ lookup to resolve them.
 A leaf is a member when it carries the backing tag directly or inherits it from its schema or
 catalog. Membership uses only the presence of the tag, and any value on an assignment is ignored.
 The assignment itself follows the tag's constraint: a tag with an allowed-values list must be assigned
-one of its allowed values. To remove a backing tag from an object, remove it by name with the v1 tag
+one of its allowed values with the v2 tag-value API. To remove a backing tag from an object, remove it by name with the v1 tag
 API, which clears all its direct assignments on the object whatever their values.
 Different tags resolve independently, allowing membership in multiple domains.
 
