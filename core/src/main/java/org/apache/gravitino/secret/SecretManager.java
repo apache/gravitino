@@ -126,7 +126,7 @@ public class SecretManager implements Closeable {
    * Checks secret keys and puts reference / write-through URN strings into {@code
    * targetProperties}.
    *
-   * <p>Callers typically invoke {@link #validateSecretsBeforeStage} on {@code targetProperties} and
+   * <p>Callers typically invoke {@link #validateProposedSecrets} on {@code targetProperties} and
    * the returned plaintexts, then {@link #stageSecrets}, and call {@link #commitSecrets} after the
    * entity is created or {@link #rollbackSecrets(SecretVersionChanges)} on failure. {@code
    * properties} is used only for key uniqueness checks (e.g. the original request map); {@code
@@ -361,21 +361,21 @@ public class SecretManager implements Closeable {
   }
 
   /**
-   * Validates secrets for a create or alter batch before {@link #stageSecrets}.
+   * Validates the proposed secret property view for a create or alter batch.
    *
    * <p>Checks each write-through plaintext (non-blank, not the masked placeholder), then overlays
    * {@code plaintexts} onto a copy of {@code finalProperties} and resolves that view with {@link
    * #toPlaintextProperties(Map)}. New bindings are therefore checked as plaintext (same idea as
    * {@link SecretAlterChanges#prepareCatalogChangesForTest}) while references and any other secret
-   * URNs are read through their providers. Call this before staging so a blank binding or missing
-   * reference fails without writing secret versions.
+   * URNs are read through their providers. Callers should invoke this before {@link #stageSecrets}
+   * so a blank binding or missing reference fails without writing secret versions.
    *
    * @param finalProperties entity properties after the create or alter (URNs for secrets; may be
    *     null when there are no secrets)
    * @param plaintexts property key → plaintext that {@link #stageSecrets} will write
    * @throws IllegalArgumentException if a plaintext is blank or masked, or a secret cannot be read
    */
-  public void validateSecretsBeforeStage(
+  public void validateProposedSecrets(
       @Nullable Map<String, String> finalProperties, Map<String, String> plaintexts) {
     Preconditions.checkArgument(plaintexts != null, "plaintexts must not be null");
     if ((finalProperties == null || finalProperties.isEmpty()) && plaintexts.isEmpty()) {
@@ -399,7 +399,7 @@ public class SecretManager implements Closeable {
    * several times is treated by its net effect. A URN that has a current version keeps it readable
    * until {@link #commitSecrets}. If a write fails, the versions already written are deleted.
    *
-   * <p>Callers must invoke {@link #validateSecretsBeforeStage} first. This method only writes and
+   * <p>Callers must invoke {@link #validateProposedSecrets} first. This method only writes and
    * records versions.
    *
    * @param startProperties entity properties before the alter, or {@code null} for a create

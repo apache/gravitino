@@ -102,7 +102,7 @@ public final class SecretAlterChanges {
     if (entityId == null) {
       staged = SecretVersionChanges.EMPTY;
     } else {
-      secretManager.validateSecretsBeforeStage(properties, plaintexts);
+      secretManager.validateProposedSecrets(properties, plaintexts);
       staged =
           secretManager.stageSecrets(
               currentProperties, properties, "catalog", entityId, plaintexts);
@@ -221,7 +221,7 @@ public final class SecretAlterChanges {
     if (entityId == null) {
       staged = SecretVersionChanges.EMPTY;
     } else {
-      secretManager.validateSecretsBeforeStage(properties, plaintexts);
+      secretManager.validateProposedSecrets(properties, plaintexts);
       staged =
           secretManager.stageSecrets(currentProperties, properties, "schema", entityId, plaintexts);
     }
@@ -288,7 +288,7 @@ public final class SecretAlterChanges {
     if (entityId == null) {
       staged = SecretVersionChanges.EMPTY;
     } else {
-      secretManager.validateSecretsBeforeStage(properties, plaintexts);
+      secretManager.validateProposedSecrets(properties, plaintexts);
       staged =
           secretManager.stageSecrets(
               currentProperties, properties, "fileset", entityId, plaintexts);

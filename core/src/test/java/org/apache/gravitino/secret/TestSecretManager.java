@@ -98,7 +98,7 @@ public class TestSecretManager {
   }
 
   @Test
-  void testValidateSecretsBeforeStageRejectsBlankPlaintext() {
+  void testValidateProposedSecretsRejectsBlankPlaintext() {
     try (SecretManager sm = memorySecretManager()) {
       Map<String, String> props = new HashMap<>();
       List<SecretUrn> urns = sm.buildSecretBindingUrns("catalog", 42L, BINDINGS);
@@ -106,14 +106,14 @@ public class TestSecretManager {
       IllegalArgumentException ex =
           Assertions.assertThrows(
               IllegalArgumentException.class,
-              () -> sm.validateSecretsBeforeStage(props, Map.of("jdbc-password", "")));
+              () -> sm.validateProposedSecrets(props, Map.of("jdbc-password", "")));
       Assertions.assertTrue(ex.getMessage().contains("plaintext must not be blank"));
       Assertions.assertThrows(IllegalArgumentException.class, () -> sm.readSecret(urns.get(0)));
     }
   }
 
   @Test
-  void testValidateSecretsBeforeStageRejectsMissingReference() {
+  void testValidateProposedSecretsRejectsMissingReference() {
     try (SecretManager sm = memorySecretManager()) {
       // memory provider cannot build reference URNs; use a write-through URN that was never
       // written.
@@ -122,7 +122,7 @@ public class TestSecretManager {
       SecretPropertyUtils.putSecretUrns(props, urns);
       IllegalArgumentException ex =
           Assertions.assertThrows(
-              IllegalArgumentException.class, () -> sm.validateSecretsBeforeStage(props, Map.of()));
+              IllegalArgumentException.class, () -> sm.validateProposedSecrets(props, Map.of()));
       Assertions.assertTrue(
           ex.getMessage().contains("Secret not found") || ex.getMessage().contains("not found"),
           ex.getMessage());
@@ -130,12 +130,12 @@ public class TestSecretManager {
   }
 
   @Test
-  void testValidateSecretsBeforeStageAcceptsBindingOverlay() {
+  void testValidateProposedSecretsAcceptsBindingOverlay() {
     try (SecretManager sm = memorySecretManager()) {
       Map<String, String> props = new HashMap<>();
       Map<String, String> plaintexts =
           sm.assembleSecretPlaintexts(Map.of(), props, "catalog", 42L, BINDINGS, Map.of());
-      Assertions.assertDoesNotThrow(() -> sm.validateSecretsBeforeStage(props, plaintexts));
+      Assertions.assertDoesNotThrow(() -> sm.validateProposedSecrets(props, plaintexts));
       Assertions.assertThrows(
           IllegalArgumentException.class,
           () -> sm.readSecret(SecretUrn.parse(props.get("jdbc-password"))));
