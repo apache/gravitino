@@ -15,4 +15,4 @@
 # specific language governing permissions and limitations
 # under the License.
 
-pyarrow==23.0.1
+pyarrow==25.0.1
