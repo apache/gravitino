@@ -193,7 +193,7 @@ public class FactoryUtils {
   public static FactoryUtil.CatalogFactoryHelper createCatalogFactoryHelper(
       CatalogFactory factory, CatalogFactory.Context context) {
     GravitinoSessionCatalogStore.checkGravitinoManagedCatalogNotShadowing(
-        context.getName(), factory.factoryIdentifier());
+        context.getName(), factory.factoryIdentifier(), context.getConfiguration());
     checkCatalogNameNotExcluded(factory, context);
     return new FactoryUtils.GravitinoCatalogFactoryHelper(factory, context);
   }

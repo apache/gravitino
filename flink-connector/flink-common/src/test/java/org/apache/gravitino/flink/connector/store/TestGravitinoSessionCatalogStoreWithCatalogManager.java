@@ -46,6 +46,7 @@ import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.flink.table.factories.Factory;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
+import org.apache.gravitino.flink.connector.utils.FakeExternalCatalogFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
@@ -63,6 +64,10 @@ public class TestGravitinoSessionCatalogStoreWithCatalogManager {
   private static final String GRAVITINO_ONLY_CATALOG = "gravitino_only_catalog";
   private static final String GRAVITINO_PAIMON = "gravitino-paimon";
   private static final String SHADOWED_CATALOG = "shadowed_catalog";
+  private static final String SESSION_CATALOG_SUPPORT_KEY =
+      "table.catalog-store.gravitino.gravitino.enableSessionCatalogSupport";
+  private static final String SESSION_CATALOG_SHADOWING_KEY =
+      "table.catalog-store.gravitino.gravitino.enableSessionCatalogShadowing";
   private static final String CREATE_SHADOWING_CATALOG =
       "CREATE CATALOG " + SHADOWED_CATALOG + " WITH ('type'='generic_in_memory')";
   private static final String CREATE_EXCLUDED_CATALOG =
@@ -438,6 +443,62 @@ public class TestGravitinoSessionCatalogStoreWithCatalogManager {
     verifyGravitinoCatalogNeverLoadedOrModified(SHADOWED_CATALOG);
   }
 
+  /**
+   * Operations that check the catalog store without instantiating a catalog afterwards leave the
+   * shadowed name on the thread. Another session on the same thread that does not enable shadowing
+   * must still be able to create a Gravitino-managed catalog with that name.
+   */
+  @Test
+  void testShadowing_leftOverCheck_doesNotAffectAnotherSessionOnTheSameThread() {
+    String createGravitinoManagedCatalog =
+        "CREATE CATALOG "
+            + SHADOWED_CATALOG
+            + " WITH ('type'='"
+            + FakeExternalCatalogFactory.IDENTIFIER
+            + "')";
+    TableEnvironment shadowingEnv = shadowingTableEnv();
+    String[] operationsWithoutInstantiation = {
+      "DROP CATALOG IF EXISTS " + SHADOWED_CATALOG,
+      "CREATE CATALOG " + SHADOWED_CATALOG + " WITH ('type'='no_such_catalog_type')",
+      createGravitinoManagedCatalog
+    };
+
+    for (String operation : operationsWithoutInstantiation) {
+      TableEnvironment otherEnv = defaultCatalogStoreTableEnv();
+      try {
+        execute(shadowingEnv, operation);
+      } catch (RuntimeException e) {
+        // Only the state left on the thread matters here.
+      }
+      execute(otherEnv, createGravitinoManagedCatalog);
+      Assertions.assertInstanceOf(
+          GenericInMemoryCatalog.class, otherEnv.getCatalog(SHADOWED_CATALOG).get(), operation);
+    }
+
+    // The shadowing session itself keeps rejecting the Gravitino-managed catalog type.
+    execute(shadowingEnv, "DROP CATALOG IF EXISTS " + SHADOWED_CATALOG);
+    Throwable exception =
+        Assertions.assertThrows(
+            Exception.class, () -> execute(shadowingEnv, createGravitinoManagedCatalog));
+    Assertions.assertTrue(
+        allMessages(exception).contains("already exists in Gravitino"), allMessages(exception));
+    verify(gravitinoCatalogStore, never()).storeCatalog(any(), any());
+    verify(gravitinoCatalogStore, never()).removeCatalog(any(), anyBoolean());
+  }
+
+  /** The same holds for another session that uses this store without enabling shadowing. */
+  @Test
+  void testShadowing_leftOverCheck_doesNotAffectNonShadowingGravitinoSession() {
+    TableEnvironment shadowingEnv = shadowingTableEnv();
+    TableEnvironment nonShadowingEnv = tableEnv(ImmutableSet.of());
+    execute(shadowingEnv, "DROP CATALOG IF EXISTS " + SHADOWED_CATALOG);
+
+    // Without shadowing, the Gravitino catalog with the name is visible and usable as before.
+    execute(nonShadowingEnv, "USE CATALOG " + SHADOWED_CATALOG);
+    execute(nonShadowingEnv, "USE CATALOG default_catalog");
+    verify(gravitinoCatalogStore).getCatalog(SHADOWED_CATALOG);
+  }
+
   /** Shadowing a catalog does not change how other Gravitino catalogs behave in the session. */
   @Test
   void testShadowing_otherGravitinoCatalogsKeepExistingBehavior() {
@@ -466,8 +527,21 @@ public class TestGravitinoSessionCatalogStoreWithCatalogManager {
     return tableEnv(excludedCatalogs, false, sessionConfiguration);
   }
 
+  /**
+   * Creates a session that enables shadowing. The options are also set in the session
+   * configuration, as {@link GravitinoCatalogStoreFactory} requires, because Gravitino catalog
+   * factories read them from there.
+   */
   private TableEnvironment shadowingTableEnv() {
-    return tableEnv(ImmutableSet.of(), true, new Configuration());
+    Configuration sessionConfiguration = new Configuration();
+    sessionConfiguration.setString(SESSION_CATALOG_SUPPORT_KEY, "true");
+    sessionConfiguration.setString(SESSION_CATALOG_SHADOWING_KEY, "true");
+    return tableEnv(ImmutableSet.of(), true, sessionConfiguration);
+  }
+
+  /** Creates a session that uses Flink's default in-memory catalog store. */
+  private static TableEnvironment defaultCatalogStoreTableEnv() {
+    return TableEnvironment.create(EnvironmentSettings.newInstance().inBatchMode().build());
   }
 
   private TableEnvironment tableEnv(

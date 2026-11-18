@@ -23,11 +23,16 @@ import static org.apache.gravitino.flink.connector.utils.FactoryUtils.isGravitin
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
+import java.lang.ref.WeakReference;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nullable;
+import org.apache.flink.configuration.ConfigOption;
+import org.apache.flink.configuration.ConfigOptions;
+import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.catalog.AbstractCatalogStore;
 import org.apache.flink.table.catalog.CatalogDescriptor;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
@@ -80,15 +85,45 @@ public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoSessionCatalogStore.class);
 
   /**
-   * The name of a Gravitino catalog that {@link #contains(String)} has just found shadowed: either
-   * reported as absent so that a session catalog can take its name, or already shadowed by a
-   * session catalog. Flink calls {@link #contains(String)} and then, on the same thread,
-   * instantiates the catalog for CREATE CATALOG or ALTER CATALOG without calling this store in
-   * between. The instantiation step reads the name to reject Gravitino-managed catalog types, and
-   * {@link #storeCatalog(String, CatalogDescriptor)} reads it to log the shadowing. Every other
-   * method of this store clears it, so it never outlives the operation that follows the check.
+   * {@link GravitinoCatalogStoreFactoryOptions#GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT} as seen in
+   * the session configuration, where catalog store options carry the {@code
+   * table.catalog-store.gravitino.} prefix.
    */
-  private static final ThreadLocal<String> SHADOWED_GRAVITINO_CATALOG = new ThreadLocal<>();
+  private static final ConfigOption<Boolean> SESSION_ENABLE_SESSION_CATALOG_SUPPORT =
+      ConfigOptions.key(
+              sessionConfigurationKey(
+                  GravitinoCatalogStoreFactoryOptions.GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT))
+          .booleanType()
+          .defaultValue(false);
+
+  /**
+   * {@link GravitinoCatalogStoreFactoryOptions#GRAVITINO_ENABLE_SESSION_CATALOG_SHADOWING} as seen
+   * in the session configuration.
+   */
+  private static final ConfigOption<Boolean> SESSION_ENABLE_SESSION_CATALOG_SHADOWING =
+      ConfigOptions.key(
+              sessionConfigurationKey(
+                  GravitinoCatalogStoreFactoryOptions.GRAVITINO_ENABLE_SESSION_CATALOG_SHADOWING))
+          .booleanType()
+          .defaultValue(false);
+
+  /**
+   * The Gravitino catalog that {@link #contains(String)} has just found shadowed: either reported
+   * as absent so that a session catalog can take its name, or already shadowed by a session
+   * catalog. Flink calls {@link #contains(String)} and then, on the same thread, instantiates the
+   * catalog for CREATE CATALOG or ALTER CATALOG without calling the catalog store in between. The
+   * instantiation step reads it to reject Gravitino-managed catalog types, and {@link
+   * #storeCatalog(String, CatalogDescriptor)} reads it to log the shadowing.
+   *
+   * <p>Every method of this store and every check by a Gravitino catalog factory clears it. Flink
+   * calls the catalog store of a session before it instantiates a catalog in that session, so a
+   * session that uses this store never sees a value left by another session. A value can still be
+   * left behind when no catalog is instantiated after the check, for example after {@code DROP
+   * CATALOG IF EXISTS}. Such a value is only honored by a factory whose session enables shadowing,
+   * and only by the store that recorded it.
+   */
+  private static final ThreadLocal<ShadowedCatalog> SHADOWED_GRAVITINO_CATALOG =
+      new ThreadLocal<>();
 
   private final GenericInMemoryCatalogStore memoryCatalogStore;
   private final GravitinoCatalogStore gravitinoCatalogStore;
@@ -123,7 +158,9 @@ public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
   }
 
   /**
-   * Creates a session catalog store.
+   * Creates a session catalog store. Package-private because session catalog shadowing relies on
+   * {@link GravitinoCatalogStoreFactoryOptions#GRAVITINO_ENABLE_SESSION_CATALOG_SHADOWING} being
+   * set in the session configuration, which {@link GravitinoCatalogStoreFactory} guarantees.
    *
    * @param gravitinoCatalogStore the Gravitino-backed catalog store
    * @param memoryCatalogStore the session-scoped in-memory catalog store
@@ -132,7 +169,7 @@ public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
    * @param sessionCatalogShadowing whether a session catalog can shadow a Gravitino catalog with
    *     the same name that this session has not accessed yet
    */
-  public GravitinoSessionCatalogStore(
+  GravitinoSessionCatalogStore(
       GravitinoCatalogStore gravitinoCatalogStore,
       GenericInMemoryCatalogStore memoryCatalogStore,
       Set<String> excludedCatalogs,
@@ -154,18 +191,29 @@ public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
    * an existing Gravitino catalog is not affected, because Flink always resolves it through {@link
    * #getCatalog(String)} first.
    *
-   * <p>This method is intended for Gravitino catalog factories only.
+   * <p>The check only applies when the session configuration of the factory enables session catalog
+   * shadowing, so a value left behind by another session cannot reject catalogs in a session that
+   * does not use this store. A session that uses this store resets the value before every catalog
+   * instantiation. This method is intended for Gravitino catalog factories only.
    *
    * @param catalogName the name of the catalog to create
    * @param catalogType the Gravitino-managed catalog type
+   * @param sessionConfiguration the session configuration of the catalog factory context
    * @throws CatalogException if a Gravitino catalog with the same name exists and is shadowed in
    *     the current session
    */
   public static void checkGravitinoManagedCatalogNotShadowing(
-      String catalogName, String catalogType) throws CatalogException {
-    String shadowedCatalog = SHADOWED_GRAVITINO_CATALOG.get();
+      String catalogName, String catalogType, @Nullable ReadableConfig sessionConfiguration)
+      throws CatalogException {
+    ShadowedCatalog shadowedCatalog = SHADOWED_GRAVITINO_CATALOG.get();
     SHADOWED_GRAVITINO_CATALOG.remove();
-    if (shadowedCatalog != null && shadowedCatalog.equals(catalogName)) {
+    if (shadowedCatalog == null
+        || !shadowedCatalog.catalogName.equals(catalogName)
+        || !isSessionCatalogShadowingEnabled(sessionConfiguration)) {
+      return;
+    }
+    // A store that has been garbage collected belongs to a session that no longer exists.
+    if (shadowedCatalog.owner.get() != null) {
       throw gravitinoManagedCatalogAlreadyExists(catalogName, catalogType);
     }
   }
@@ -307,7 +355,7 @@ public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
       if (sessionCatalogShadowing
           && !isExcluded(catalogName)
           && gravitinoCatalogStore.contains(catalogName)) {
-        SHADOWED_GRAVITINO_CATALOG.set(catalogName);
+        SHADOWED_GRAVITINO_CATALOG.set(new ShadowedCatalog(this, catalogName));
       }
       return true;
     }
@@ -318,7 +366,7 @@ public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
       return gravitinoCatalogStore.contains(catalogName);
     }
     if (gravitinoCatalogStore.contains(catalogName)) {
-      SHADOWED_GRAVITINO_CATALOG.set(catalogName);
+      SHADOWED_GRAVITINO_CATALOG.set(new ShadowedCatalog(this, catalogName));
     }
     return false;
   }
@@ -327,8 +375,49 @@ public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
     return excludedCatalogs.contains(catalogName);
   }
 
+  /** Whether this store has just found the Gravitino catalog with the given name shadowed. */
   private boolean isShadowedGravitinoCatalog(String catalogName) {
-    return sessionCatalogShadowing && catalogName.equals(SHADOWED_GRAVITINO_CATALOG.get());
+    ShadowedCatalog shadowedCatalog = SHADOWED_GRAVITINO_CATALOG.get();
+    return sessionCatalogShadowing
+        && shadowedCatalog != null
+        && shadowedCatalog.owner.get() == this
+        && shadowedCatalog.catalogName.equals(catalogName);
+  }
+
+  private static boolean isSessionCatalogShadowingEnabled(
+      @Nullable ReadableConfig sessionConfiguration) {
+    if (sessionConfiguration == null) {
+      return false;
+    }
+    try {
+      return sessionConfiguration.get(SESSION_ENABLE_SESSION_CATALOG_SUPPORT)
+          && sessionConfiguration.get(SESSION_ENABLE_SESSION_CATALOG_SHADOWING);
+    } catch (IllegalArgumentException e) {
+      // GravitinoCatalogStoreFactory rejects invalid values, so a session with an invalid value
+      // does not use session catalog shadowing.
+      return false;
+    }
+  }
+
+  private static String sessionConfigurationKey(ConfigOption<?> catalogStoreOption) {
+    return CommonCatalogOptions.TABLE_CATALOG_STORE_OPTION_PREFIX
+        + GravitinoCatalogStoreFactoryOptions.GRAVITINO
+        + "."
+        + catalogStoreOption.key();
+  }
+
+  /**
+   * A Gravitino catalog found shadowed by a store. The store is weakly referenced, so that a value
+   * left on a pooled thread does not keep a closed session's store reachable.
+   */
+  private static final class ShadowedCatalog {
+    private final WeakReference<GravitinoSessionCatalogStore> owner;
+    private final String catalogName;
+
+    private ShadowedCatalog(GravitinoSessionCatalogStore owner, String catalogName) {
+      this.owner = new WeakReference<>(owner);
+      this.catalogName = catalogName;
+    }
   }
 
   private static CatalogException gravitinoManagedCatalogAlreadyExists(
