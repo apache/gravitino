@@ -694,7 +694,6 @@ vulnerabilities:
   - id: CVE-2026-57915
     purls:
       - pkg:maven/org.apache.kerby/kerb-server@1.0.1
-      - pkg:maven/org.apache.kerby/kerb-server@2.0.3
     expired_at: 2027-02-07
     statement: "Pre-existing finding, tracked in apache/gravitino#14777."
   # org.apache.thrift/libthrift
@@ -754,17 +753,6 @@ vulnerabilities:
   - id: CVE-2026-56741
     purls:
       - pkg:maven/org.jline/jline-remote-telnet@3.9.0
-    expired_at: 2027-02-07
-    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
-  # org.json/json
-  - id: CVE-2022-45688
-    purls:
-      - pkg:maven/org.json/json@20180130
-    expired_at: 2027-02-07
-    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
-  - id: CVE-2023-5072
-    purls:
-      - pkg:maven/org.json/json@20180130
     expired_at: 2027-02-07
     statement: "Pre-existing finding, tracked in apache/gravitino#14777."
   # org.lz4/lz4-java
