@@ -28,15 +28,31 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.fs.UnsupportedFileSystemException;
 
-/** Validates scan paths on Hadoop filesystems that can resolve symbolic links. */
+/**
+ * Validates scan paths on Hadoop filesystems that can resolve symbolic links.
+ *
+ * <p>Object-store schemes often have no Hadoop {@link FileSystem} on the job classpath (Iceberg
+ * {@code FileIO} is used instead). When {@link Path#getFileSystem(Configuration)} fails with {@link
+ * UnsupportedFileSystemException}, this validator keeps the lexical URI containment check and skips
+ * symlink inspection.
+ */
 final class RemoteLocationValidator {
   private RemoteLocationValidator() {}
 
   static void validate(Configuration conf, String tableLocation, String location)
       throws IOException {
     Path scan = new Path(location);
-    FileSystem fs = scan.getFileSystem(conf);
+    FileSystem fs;
+    try {
+      fs = scan.getFileSystem(conf);
+    } catch (UnsupportedFileSystemException e) {
+      // No Hadoop FS for this scheme (for example s3:// / gs:// when only Iceberg FileIO is wired).
+      // Symlink walking cannot run; URI containment is sufficient for object stores.
+      OrphanFileLocationUtils.validateLocation(tableLocation, location);
+      return;
+    }
     validate(fs, new Path(tableLocation), scan);
   }
 
