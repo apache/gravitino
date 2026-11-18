@@ -263,8 +263,70 @@ schema_tables_exist() {
   [ "$found" = "1" ]
 }
 
+column_exists() {
+  local table="$1"
+  local column="$2"
+  local count
+  if [ "$DB_ENGINE" = mysql ]; then
+    count=$(mysql_query "SELECT COUNT(*) FROM information_schema.columns
+      WHERE table_schema='${GRAVITINO_DB}' AND table_name='${table}' AND column_name='${column}'")
+    [ "$count" = "1" ]
+  else
+    count=$(psql_query "SELECT COUNT(*) FROM information_schema.columns
+      WHERE table_schema=current_schema() AND table_name='${table}' AND column_name='${column}'" | tr -d '[:space:]')
+    [ "$count" = "1" ]
+  fi
+}
+
+# Emit table<TAB>column for each ADD COLUMN in an upgrade script.
+# Tracks the latest ALTER TABLE target so multi-line MySQL upgrades work.
+extract_upgrade_add_columns() {
+  local file="$1"
+  local table="" line col
+  while IFS= read -r line || [ -n "$line" ]; do
+    if printf '%s\n' "$line" | grep -qiE 'alter[[:space:]]+table'; then
+      table=$(printf '%s\n' "$line" | sed -E \
+        's/.*[Aa][Ll][Tt][Ee][Rr][[:space:]]+[Tt][Aa][Bb][Ll][Ee][[:space:]]+([Ii][Ff][[:space:]]+[Ee][Xx][Ii][Ss][Tt][Ss][[:space:]]+)?[`"]?([A-Za-z0-9_]+).*/\2/')
+      if [ "$table" = "$line" ]; then
+        table=""
+      fi
+    fi
+    if [ -n "$table" ] && printf '%s\n' "$line" | grep -qiE 'add[[:space:]]+column'; then
+      col=$(printf '%s\n' "$line" | sed -E \
+        's/.*[Aa][Dd][Dd][[:space:]]+[Cc][Oo][Ll][Uu][Mm][Nn][[:space:]]+([Ii][Ff][[:space:]]+[Nn][Oo][Tt][[:space:]]+[Ee][Xx][Ii][Ss][Tt][Ss][[:space:]]+)?[`"]?([A-Za-z0-9_]+).*/\2/')
+      if [ -n "$col" ] && [ "$col" != "$line" ]; then
+        printf '%s\t%s\n' "$table" "$col"
+      fi
+    fi
+  done <"$file"
+}
+
+# Snapshots such as 1.3.0 and 2.0.0 share the same CREATE TABLE set; require
+# columns introduced by upgrade-*-to-<ver> before claiming that version.
+schema_version_markers_present() {
+  local ver="$1"
+  local f table column
+  shopt -s nullglob
+  local files=("${SCRIPT_DB_DIR}"/upgrade-*-to-"${ver}"-"${DB_ENGINE}".sql)
+  shopt -u nullglob
+  if [ ${#files[@]} -eq 0 ]; then
+    return 0
+  fi
+  for f in "${files[@]}"; do
+    while IFS=$'\t' read -r table column; do
+      if [ -z "$table" ] || [ -z "$column" ]; then
+        continue
+      fi
+      column_exists "$table" "$column" || return 1
+    done < <(extract_upgrade_add_columns "$f")
+  done
+  # Upgrade exists but only creates tables/indexes: table match is enough.
+  return 0
+}
+
 infer_schema_version() {
   local best="" f ver
+  local matched_without_markers=""
   shopt -s nullglob
   local files=("${SCRIPT_DB_DIR}"/schema-*-"${DB_ENGINE}".sql)
   shopt -u nullglob
@@ -274,9 +336,25 @@ infer_schema_version() {
   while IFS= read -r f; do
     ver=$(basename "$f" | sed "s/schema-\\(.*\\)-${DB_ENGINE}\\.sql/\\1/")
     if version_le "$ver" "$VERSION" && schema_tables_exist "$f"; then
-      best="$ver"
+      if schema_version_markers_present "$ver"; then
+        best="$ver"
+        matched_without_markers=""
+      else
+        # Tables match a newer snapshot whose upgrade columns are missing
+        # (e.g. 1.3.0 DB vs schema-2.0.0.sql). Keep the prior best.
+        matched_without_markers="$ver"
+      fi
     fi
   done < <(printf '%s\n' "${files[@]}" | sort -V)
+  if [ -n "$matched_without_markers" ] && [ -z "$best" ]; then
+    echo "ERROR: Existing tables match schema-${matched_without_markers} but upgrade columns for that version are missing." >&2
+    echo "Cannot safely infer the starting schema version." >&2
+    echo "Set schema.baselineVersion to the Gravitino version that created this database." >&2
+    exit 1
+  fi
+  if [ -n "$matched_without_markers" ] && [ -n "$best" ] && version_lt "$best" "$matched_without_markers"; then
+    echo "INFO: Tables also match schema-${matched_without_markers}, but upgrade columns are absent; inferring ${best}."
+  fi
   printf '%s' "$best"
 }
 
@@ -433,6 +511,7 @@ if ! metalake_exists; then
   echo "Fresh install detected, skipping upgrade script."
   apply_sql_file "$schema_file"
   write_recorded_version "$VERSION"
+  echo "Schema migration completed successfully"
   exit 0
 fi
 

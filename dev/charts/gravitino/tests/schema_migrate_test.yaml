@@ -45,6 +45,12 @@ tests:
           pattern: "ensure_column_name_capacity"
       - matchRegex:
           path: data["schema-migrate.sh"]
+          pattern: "schema_version_markers_present"
+      - matchRegex:
+          path: data["schema-migrate.sh"]
+          pattern: "Schema migration completed successfully"
+      - matchRegex:
+          path: data["schema-migrate.sh"]
           pattern: "schema.baselineVersion"
       - notMatchRegex:
           path: data["schema-migrate.sh"]
@@ -120,6 +126,9 @@ tests:
       - matchRegex:
           path: spec.template.spec.initContainers[1].command[2]
           pattern: "gravitino_schema_migration"
+      - matchRegex:
+          path: spec.template.spec.initContainers[1].command[2]
+          pattern: 'psql -h .* -U "\$POSTGRES_USER" -d "\$GRAVITINO_DB" -c "SELECT 1"'
       - notMatchRegex:
           path: spec.template.spec.initContainers[1].command[2]
           pattern: "upgrade-.*-to-.*-postgresql"
@@ -180,6 +189,12 @@ tests:
               secretKeyRef:
                 name: gravitino-pg-secret
                 key: password
+      - template: schema-migrate-job.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PGOPTIONS
+            value: "-c search_path=gravitino"
       - template: deployment.yaml
         equal:
           path: spec.template.spec.initContainers[1].name
@@ -188,6 +203,16 @@ tests:
         matchRegex:
           path: spec.template.spec.initContainers[1].command[2]
           pattern: "Waiting for schema version"
+      - template: deployment.yaml
+        matchRegex:
+          path: spec.template.spec.initContainers[1].command[2]
+          pattern: 'psql -h "\$DB_HOST" -p "\$DB_PORT" -U "\$POSTGRES_USER" -d "\$GRAVITINO_DB" -c "SELECT 1"'
+      - template: deployment.yaml
+        contains:
+          path: spec.template.spec.initContainers[1].env
+          content:
+            name: PGOPTIONS
+            value: "-c search_path=gravitino"
 
   - it: fails when schema migrate enabled without relational target
     template: schema-migrate-job.yaml

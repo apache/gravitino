@@ -183,38 +183,52 @@ case "$FROM_VERSION" in
     ;;
 esac
 
-echo "==> Helm upgrade with schema.baselineVersion=${FROM_VERSION} (${ENGINE})"
-helm upgrade "$RELEASE_NAME" "$CHART_DIR" -n "$NAMESPACE" --wait --timeout 10m \
-  --values "$VALUES_FILE" \
-  --set image.registry="" \
-  --set image.repository="${KIND_REGISTRY}/gravitino" \
-  --set image.tag="${tag}" \
-  --set "schema.baselineVersion=${FROM_VERSION}" \
-  --set "podAnnotations.schema-migrate-cross=$(date +%s)"
+# 1.3.0 shares table names with 2.0.0; exercise automatic inference (no baseline)
+# so upgrade columns such as user_meta.enabled are still applied.
+if [ "$FROM_VERSION" = "1.3.0" ]; then
+  echo "==> Helm upgrade without schema.baselineVersion (${ENGINE}, infer from columns)"
+  helm upgrade "$RELEASE_NAME" "$CHART_DIR" -n "$NAMESPACE" --wait --timeout 10m \
+    --values "$VALUES_FILE" \
+    --set image.registry="" \
+    --set image.repository="${KIND_REGISTRY}/gravitino" \
+    --set image.tag="${tag}" \
+    --set "podAnnotations.schema-migrate-cross=$(date +%s)"
 
-bash "$CHECK_SCRIPT" "$NAMESPACE" "$RELEASE_NAME" "$ENGINE"
+  bash "$CHECK_SCRIPT" "$NAMESPACE" "$RELEASE_NAME" "$ENGINE"
 
-JOB=$(kubectl get jobs -n "$NAMESPACE" -l app.kubernetes.io/component=schema-migrate \
-  --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].metadata.name}')
-LOG="/tmp/${JOB}-cross.log"
-kubectl logs -n "$NAMESPACE" "job/${JOB}" --all-containers=true | tee "$LOG"
-grep -q "schema.baselineVersion=${FROM_VERSION}" "$LOG"
-grep -q "upgrade-1.3.0-to-2.0.0-${ENGINE}" "$LOG"
+  JOB=$(kubectl get jobs -n "$NAMESPACE" -l app.kubernetes.io/component=schema-migrate \
+    --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].metadata.name}')
+  LOG="/tmp/${JOB}-cross-infer.log"
+  kubectl logs -n "$NAMESPACE" "job/${JOB}" --all-containers=true | tee "$LOG"
+  grep -q "inferred 1.3.0 from existing tables" "$LOG"
+  grep -q "upgrade-1.3.0-to-2.0.0-${ENGINE}" "$LOG"
+  if grep -q "upgrade-1.2.0-to-1.3.0-${ENGINE}" "$LOG"; then
+    echo "ERROR: unexpected upgrade-1.2.0-to-1.3.0 when inferred baseline is 1.3.0" >&2
+    exit 1
+  fi
+  assert_column view_meta audit_info 1
+  assert_column user_meta enabled 1
+else
+  echo "==> Helm upgrade with schema.baselineVersion=${FROM_VERSION} (${ENGINE})"
+  helm upgrade "$RELEASE_NAME" "$CHART_DIR" -n "$NAMESPACE" --wait --timeout 10m \
+    --values "$VALUES_FILE" \
+    --set image.registry="" \
+    --set image.repository="${KIND_REGISTRY}/gravitino" \
+    --set image.tag="${tag}" \
+    --set "schema.baselineVersion=${FROM_VERSION}" \
+    --set "podAnnotations.schema-migrate-cross=$(date +%s)"
 
-case "$FROM_VERSION" in
-  1.2.0)
-    grep -q "upgrade-1.2.0-to-1.3.0-${ENGINE}" "$LOG"
-    assert_column view_meta audit_info 1
-    assert_column user_meta enabled 1
-    ;;
-  1.3.0)
-    if grep -q "upgrade-1.2.0-to-1.3.0-${ENGINE}" "$LOG"; then
-      echo "ERROR: unexpected upgrade-1.2.0-to-1.3.0 when baseline is 1.3.0" >&2
-      exit 1
-    fi
-    assert_column view_meta audit_info 1
-    assert_column user_meta enabled 1
-    ;;
-esac
+  bash "$CHECK_SCRIPT" "$NAMESPACE" "$RELEASE_NAME" "$ENGINE"
+
+  JOB=$(kubectl get jobs -n "$NAMESPACE" -l app.kubernetes.io/component=schema-migrate \
+    --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].metadata.name}')
+  LOG="/tmp/${JOB}-cross.log"
+  kubectl logs -n "$NAMESPACE" "job/${JOB}" --all-containers=true | tee "$LOG"
+  grep -q "schema.baselineVersion=${FROM_VERSION}" "$LOG"
+  grep -q "upgrade-1.2.0-to-1.3.0-${ENGINE}" "$LOG"
+  grep -q "upgrade-1.3.0-to-2.0.0-${ENGINE}" "$LOG"
+  assert_column view_meta audit_info 1
+  assert_column user_meta enabled 1
+fi
 
 echo "Cross-version schema migrate (${ENGINE} ${FROM_VERSION} -> image) passed"
