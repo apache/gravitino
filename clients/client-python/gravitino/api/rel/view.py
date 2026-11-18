@@ -23,6 +23,7 @@ from gravitino.api.rel.column import Column
 from gravitino.api.rel.representation import Representation
 from gravitino.api.rel.sql_representation import SQLRepresentation
 from gravitino.api.secret.supports_secrets import SupportsSecrets
+from gravitino.api.domain.supports_domains import SupportsDomains
 from gravitino.api.semantic.supports_semantic_models import SupportsSemanticModels
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.exceptions.base import UnsupportedOperationException
@@ -99,3 +100,7 @@ class View(Auditable):
         raise UnsupportedOperationException(
             "View does not support secret property operations."
         )
+
+    def supports_domains(self) -> SupportsDomains:
+        """Return domain lookup operations for this view."""
+        raise UnsupportedOperationException("View does not support domain operations.")

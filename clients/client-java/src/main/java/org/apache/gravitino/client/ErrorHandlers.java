@@ -26,11 +26,13 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.OAuth2ErrorResponse;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
+import org.apache.gravitino.exceptions.BackingTagAlreadyBoundException;
 import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.DomainAlreadyExistsException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.FunctionAlreadyExistsException;
@@ -49,6 +51,7 @@ import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchFunctionException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -71,6 +74,7 @@ import org.apache.gravitino.exceptions.NoSuchTopicException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
+import org.apache.gravitino.exceptions.NonEmptyDomainException;
 import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
@@ -232,6 +236,15 @@ public class ErrorHandlers {
    */
   public static Consumer<ErrorResponse> tagErrorHandler() {
     return TagErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Returns the error handler for domain operations.
+   *
+   * @return The domain error handler.
+   */
+  public static Consumer<ErrorResponse> domainErrorHandler() {
+    return DomainErrorHandler.INSTANCE;
   }
 
   /**
@@ -813,6 +826,9 @@ public class ErrorHandlers {
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new TopicAlreadyExistsException(errorMessage);
 
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
+
         case ErrorConstants.FORBIDDEN_CODE:
           throw new ForbiddenException(errorMessage);
 
@@ -1092,6 +1108,38 @@ public class ErrorHandlers {
         default:
           super.accept(errorResponse);
       }
+    }
+  }
+
+  /** Error handler specific to domain operations. */
+  private static class DomainErrorHandler extends TagErrorHandler {
+    private static final DomainErrorHandler INSTANCE = new DomainErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse response) {
+      String message = formatErrorMessage(response);
+      if (response.getCode() == ErrorConstants.NOT_FOUND_CODE) {
+        if (response.getType().equals(NoSuchDomainException.class.getSimpleName())) {
+          throw new NoSuchDomainException("%s", message);
+        }
+        if (response.getType().equals(NoSuchMetadataObjectException.class.getSimpleName())) {
+          throw new NoSuchMetadataObjectException("%s", message);
+        }
+      }
+      if (response.getCode() == ErrorConstants.ALREADY_EXISTS_CODE) {
+        if (response.getType().equals(DomainAlreadyExistsException.class.getSimpleName())) {
+          throw new DomainAlreadyExistsException("%s", message);
+        }
+        if (response.getType().equals(BackingTagAlreadyBoundException.class.getSimpleName())) {
+          throw new BackingTagAlreadyBoundException("%s", message);
+        }
+      }
+      if ((response.getCode() == ErrorConstants.UNSUPPORTED_OPERATION_CODE
+              || response.getCode() == ErrorConstants.NON_EMPTY_CODE)
+          && response.getType().equals(NonEmptyDomainException.class.getSimpleName())) {
+        throw new NonEmptyDomainException("%s", message);
+      }
+      super.accept(response);
     }
   }
 

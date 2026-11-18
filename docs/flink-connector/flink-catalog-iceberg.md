@@ -31,6 +31,7 @@ To enable the Flink connector, you must download the Iceberg Flink runtime JAR a
 - `UPDATE` clause
 - `DELETE` clause
 - `CREATE TABLE LIKE` clause
+- Computed columns, metadata columns and watermarks
 
 ## Getting Started
 
@@ -131,4 +132,10 @@ For temporary credentials vended per table and refreshed automatically, use a `R
 
 ### OSS
 
-Additionally, you need download the [Aliyun OSS SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip), and copy `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` to the Flink classpath.
+Additionally, download the Aliyun OSS SDK version that matches the Iceberg runtime from the table above
+([3.18.5](https://repo1.maven.org/maven2/com/aliyun/oss/aliyun-sdk-oss/3.18.5/aliyun-sdk-oss-3.18.5.jar)
+for Iceberg 1.11.0 and 1.12.0, [3.10.2](https://repo1.maven.org/maven2/com/aliyun/oss/aliyun-sdk-oss/3.10.2/aliyun-sdk-oss-3.10.2.jar)
+for Iceberg 1.10.2) together with its [jdom2](https://repo1.maven.org/maven2/org/jdom/jdom2/2.0.6.1/jdom2-2.0.6.1.jar)
+dependency, and put `aliyun-sdk-oss-<version>.jar` and `jdom2-2.0.6.1.jar` in the Flink `lib` directory.
+Iceberg 1.11.0 and later expect `OSS#deleteObject(String, String)` to return `VoidResult`, which is only
+true from SDK 3.12.0 onward; older SDKs fail with `NoSuchMethodError` on OSS deletes.

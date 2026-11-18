@@ -65,13 +65,21 @@ async function resolve({ github, context, core }) {
         const releases = branches.map(b => b.name).filter(n => /^branch-\d+\.\d+$/.test(n))
           .sort((a, b) => a.localeCompare(b, 'en', { numeric: true })).slice(-3);
         const candidates = [...new Set([upstream.default_branch, ...releases])];
-        let fewest = Infinity;
+        let fewestAhead = Infinity;
+        let fewestBehind = Infinity;
         for (const candidate of candidates) {
           const { data: comparison } = await github.rest.repos.compareCommitsWithBasehead({
             owner: 'apache', repo: 'gravitino',
             basehead: `${candidate}...${context.repo.owner}:${headSha}`, per_page: 1
           });
-          if (comparison.ahead_by < fewest) { fewest = comparison.ahead_by; baseRef = candidate; }
+          // Branches sharing a fork point can have the same head-only commits.
+          // Prefer the candidate with fewer commits since that fork point.
+          if (comparison.ahead_by < fewestAhead ||
+              (comparison.ahead_by === fewestAhead && comparison.behind_by < fewestBehind)) {
+            fewestAhead = comparison.ahead_by;
+            fewestBehind = comparison.behind_by;
+            baseRef = candidate;
+          }
         }
         core.notice(`No open PR: testing against ${baseRef}; results require a matching PR base.`);
       }

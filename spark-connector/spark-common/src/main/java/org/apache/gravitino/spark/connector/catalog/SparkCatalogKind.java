@@ -46,6 +46,8 @@ public enum SparkCatalogKind {
    * jdbc-starrocks}, and {@code jdbc-oceanbase}.
    */
   JDBC,
+  /** Apache Doris catalogs, when the specialized read path is explicitly enabled. */
+  DORIS,
   /** PostgreSQL catalogs, provider {@code jdbc-postgresql}. */
   JDBC_POSTGRESQL;
 

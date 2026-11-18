@@ -193,6 +193,140 @@ public class CatalogKafkaIT extends BaseIT {
   }
 
   @Test
+  public void testConnectionRejectsConfigProviders() {
+    // A caller-selected Kafka config provider must not be able to read server environment values.
+    String marker = "GRAVITINO_KAFKA_IT_ENV_MARKER";
+    ImmutableMap<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put(BOOTSTRAP_SERVERS, kafkaBootstrapServers)
+            .put("gravitino.bypass.config.providers", "env")
+            .put(
+                "gravitino.bypass.config.providers.env.class",
+                "org.apache.kafka.common.config.provider.EnvVarConfigProvider")
+            .put("gravitino.bypass.request.timeout.ms", "${env:" + marker + "}")
+            .build();
+
+    Exception exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                metalake.testConnection(
+                    GravitinoITUtils.genRandomName("test_catalog"),
+                    Catalog.Type.MESSAGING,
+                    PROVIDER,
+                    "comment",
+                    properties));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Kafka config providers are not supported"),
+        exception.getMessage());
+    Assertions.assertTrue(
+        exception.getMessage().contains("gravitino.bypass.config.providers"),
+        exception.getMessage());
+  }
+
+  @Test
+  public void testCreateAndAlterCatalogRejectConfigProviders() {
+    String catalogName = GravitinoITUtils.genRandomName("test_catalog");
+    String providersKey = "gravitino.bypass.config.providers";
+    Map<String, String> properties =
+        ImmutableMap.of(BOOTSTRAP_SERVERS, kafkaBootstrapServers, providersKey, "env");
+
+    Exception exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> createCatalog(catalogName, "comment", properties));
+    Assertions.assertTrue(exception.getMessage().contains(providersKey), exception.getMessage());
+    Assertions.assertFalse(metalake.catalogExists(catalogName));
+
+    Catalog catalog =
+        createCatalog(
+            catalogName, "comment", ImmutableMap.of(BOOTSTRAP_SERVERS, kafkaBootstrapServers));
+    try {
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  metalake.alterCatalog(
+                      catalogName, CatalogChange.setProperty(providersKey + ".env.class", "x")));
+      Assertions.assertTrue(
+          exception.getMessage().contains(providersKey + ".env.class"), exception.getMessage());
+      Assertions.assertFalse(
+          metalake.loadCatalog(catalogName).properties().containsKey(providersKey + ".env.class"));
+      Assertions.assertDoesNotThrow(() -> metalake.testConnection(catalog.name()));
+    } finally {
+      metalake.dropCatalog(catalogName, true);
+    }
+  }
+
+  @Test
+  public void testCatalogReregistrationLoadsExistingTopic()
+      throws ExecutionException, InterruptedException {
+    String catalogName = GravitinoITUtils.genRandomName("test_catalog_reregistration");
+    String topicName = GravitinoITUtils.genRandomName("test_topic_reregistration");
+    NameIdentifier topicIdent = NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName);
+    Map<String, String> properties = ImmutableMap.of(BOOTSTRAP_SERVERS, kafkaBootstrapServers);
+
+    adminClient.createTopics(ImmutableList.of(new NewTopic(topicName, 1, (short) 1))).all().get();
+
+    Catalog originalCatalog = createCatalog(catalogName, "original catalog", properties);
+    Assertions.assertEquals(
+        topicName, originalCatalog.asTopicCatalog().loadTopic(topicIdent).name());
+
+    Assertions.assertTrue(metalake.dropCatalog(catalogName, true));
+    Assertions.assertTrue(topicExistsInKafka(topicName));
+
+    Catalog reregisteredCatalog = createCatalog(catalogName, "re-registered catalog", properties);
+    Topic restoredTopic =
+        Assertions.assertDoesNotThrow(
+            () -> reregisteredCatalog.asTopicCatalog().loadTopic(topicIdent));
+    Assertions.assertEquals(topicName, restoredTopic.name());
+    checkTopicReadWrite(topicName);
+
+    Assertions.assertTrue(reregisteredCatalog.asTopicCatalog().dropTopic(topicIdent));
+    awaitTopicDeletedInKafka(topicName);
+    Assertions.assertTrue(metalake.dropCatalog(catalogName, true));
+  }
+
+  @Test
+  public void testActiveTopicRegistrationCannotBeRebound()
+      throws ExecutionException, InterruptedException {
+    String originalCatalogName =
+        GravitinoITUtils.genRandomName("test_active_topic_original_catalog");
+    String conflictingCatalogName =
+        GravitinoITUtils.genRandomName("test_active_topic_conflicting_catalog");
+    String topicName = GravitinoITUtils.genRandomName("test_active_topic_registration");
+    NameIdentifier topicIdent = NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName);
+    Map<String, String> properties = ImmutableMap.of(BOOTSTRAP_SERVERS, kafkaBootstrapServers);
+
+    adminClient.createTopics(ImmutableList.of(new NewTopic(topicName, 1, (short) 1))).all().get();
+
+    Catalog originalCatalog = createCatalog(originalCatalogName, "original catalog", properties);
+    Assertions.assertEquals(
+        topicName, originalCatalog.asTopicCatalog().loadTopic(topicIdent).name());
+
+    Catalog conflictingCatalog =
+        createCatalog(conflictingCatalogName, "conflicting catalog", properties);
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () -> conflictingCatalog.asTopicCatalog().loadTopic(topicIdent));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("metadata-only unregister of an individual external topic"));
+    Assertions.assertTrue(exception.getMessage().contains("catalog-specific recovery guidance"));
+
+    // The rejected import must not move the active entity away from its original path.
+    Assertions.assertEquals(
+        topicName, originalCatalog.asTopicCatalog().loadTopic(topicIdent).name());
+
+    Assertions.assertTrue(metalake.dropCatalog(conflictingCatalogName, true));
+    Assertions.assertTrue(originalCatalog.asTopicCatalog().dropTopic(topicIdent));
+    awaitTopicDeletedInKafka(topicName);
+    Assertions.assertTrue(metalake.dropCatalog(originalCatalogName, true));
+  }
+
+  @Test
   public void testCatalogException() {
     String catalogName1 = GravitinoITUtils.genRandomName("test_catalog");
     Catalog catalog1 =
