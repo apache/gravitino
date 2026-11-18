@@ -20,9 +20,22 @@
 package org.apache.iceberg.jdbc;
 
 import com.google.common.base.Preconditions;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
+import org.apache.gravitino.iceberg.common.utils.IcebergTableLocationUtils;
+import org.apache.iceberg.MetastoreRegisterTableUtils;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.jdbc.JdbcUtil.SchemaVersion;
 
@@ -57,6 +70,84 @@ public class JdbcCatalogWithMetadataLocationSupport extends JdbcCatalog
     return table.get(METADATA_LOCATION_PROP);
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public Optional<Map<TableIdentifier, String>> metadataLocationCandidates(String location) {
+    return metadataLocationCandidates(location, null);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Optional<Map<TableIdentifier, String>> metadataLocationCandidates(
+      String location, @Nullable String metadataLocation) {
+    List<String> patterns = IcebergTableLocationUtils.metadataLocationPatterns(location);
+    Set<String> exactPointers = new LinkedHashSet<>();
+    if (metadataLocation != null) {
+      exactPointers.add(metadataLocation);
+      String normalized = IcebergTableLocationUtils.normalize(metadataLocation);
+      exactPointers.add(normalized);
+      if (normalized.startsWith("s3://")) {
+        exactPointers.add("s3a://" + normalized.substring(5));
+        exactPointers.add("s3n://" + normalized.substring(5));
+      }
+    }
+    String predicate =
+        String.join(
+            " OR ",
+            Collections.nCopies(patterns.size(), METADATA_LOCATION_PROP + " LIKE ? ESCAPE '!'"));
+    String query =
+        "SELECT table_namespace, table_name, metadata_location FROM iceberg_tables"
+            + " WHERE catalog_name = ?"
+            + (jdbcSchemaVersion == SchemaVersion.V0
+                ? ""
+                : " AND (iceberg_type = 'TABLE' OR iceberg_type IS NULL)")
+            + " AND ("
+            + predicate
+            // Filesystem pointers can contain equivalent dot segments and repeated separators.
+            // Return those strings for lexical comparison without opening their metadata files.
+            + " OR LOWER(metadata_location) LIKE 'file:%'"
+            + " OR LOWER(metadata_location) LIKE 'hdfs:%'"
+            + " OR LOWER(metadata_location) LIKE 'viewfs:%'"
+            + " OR metadata_location NOT LIKE '%://%'"
+            + (exactPointers.isEmpty()
+                ? ""
+                : " OR metadata_location IN ("
+                    + String.join(",", Collections.nCopies(exactPointers.size(), "?"))
+                    + ")")
+            + ")";
+    try {
+      return Optional.of(
+          jdbcConnections.run(
+              connection -> {
+                Map<TableIdentifier, String> rows = new LinkedHashMap<>();
+                try (PreparedStatement statement = connection.prepareStatement(query)) {
+                  statement.setString(1, jdbcCatalogName);
+                  for (int i = 0; i < patterns.size(); i++) {
+                    statement.setString(i + 2, patterns.get(i));
+                  }
+                  int parameter = patterns.size() + 2;
+                  for (String pointer : exactPointers) {
+                    statement.setString(parameter++, pointer);
+                  }
+                  try (ResultSet result = statement.executeQuery()) {
+                    while (result.next()) {
+                      rows.put(
+                          TableIdentifier.of(
+                              JdbcUtil.stringToNamespace(result.getString(1)), result.getString(2)),
+                          result.getString(3));
+                    }
+                  }
+                }
+                return rows;
+              }));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new UncheckedInterruptedException(e, "Interrupted during metadata pointer lookup");
+    } catch (SQLException e) {
+      throw new UncheckedSQLException(e, "Failed to look up metadata pointers");
+    }
+  }
+
   /**
    * Check if the JDBC catalog schema version supports view operations. View operations are
    * supported from V1 schema version onwards.
@@ -66,6 +157,18 @@ public class JdbcCatalogWithMetadataLocationSupport extends JdbcCatalog
   public boolean supportsViewsWithSchemaVersion() {
     // V0 doesn't support views, only V1 and later versions do
     return jdbcSchemaVersion != null && jdbcSchemaVersion != SchemaVersion.V0;
+  }
+
+  /**
+   * Registers an already read metadata snapshot without opening the input file again.
+   *
+   * @param identifier destination table
+   * @param metadata metadata snapshot read and authorized for this request
+   * @param overwrite whether replacement was requested; unsupported on this branch
+   */
+  public void registerTableWithMetadata(
+      TableIdentifier identifier, TableMetadata metadata, boolean overwrite) {
+    MetastoreRegisterTableUtils.registerTableWithMetadata(this, identifier, metadata, overwrite);
   }
 
   private void loadFields() {

@@ -41,31 +41,40 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.iceberg.common.ops.RegisterTableRequestWithMetadata;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.rest.IcebergNamespaceOperations;
+import org.apache.gravitino.iceberg.service.rest.IcebergTableOperations;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.BaseEvent;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.ImmutableRegisterTableRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 
@@ -239,7 +248,7 @@ class TestRegisterTableAuthzHandler {
   }
 
   @Test
-  void testUnreadableSourceMetadataBlocksRegister() throws Throwable {
+  void testUnreadableProtectedSourceStillRequiresLoadAccess() throws Throwable {
     TableIdentifier source = TableIdentifier.of("other", "secret");
     stubCatalogWithSource(source);
     when(catalogWrapper.getTableMetadataLocation(source))
@@ -249,6 +258,36 @@ class TestRegisterTableAuthzHandler {
 
     MethodInvocation invocation = registerInvocation(false, "copy", META_LOC);
     interceptor.invoke(invocation);
+    verify(invocation, never()).proceed();
+    verify(catalogWrapper, never()).loadTableMetadata(source);
+  }
+
+  @Test
+  void testUnreadableSourceWithoutPointerNeverReachesOperation() throws Throwable {
+    TableIdentifier source = TableIdentifier.of("other", "secret");
+    stubCatalogWithSource(source);
+    when(catalogWrapper.getTableMetadataLocation(source)).thenReturn(Optional.empty());
+    when(catalogWrapper.loadTableMetadata(source))
+        .thenThrow(new RuntimeException("storage unavailable"));
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.CREATE_TABLE);
+    MethodInvocation invocation = registerInvocation(false, "copy", META_LOC);
+    Response response = assertInstanceOf(Response.class, interceptor.invoke(invocation));
+    assertEquals(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
+    verify(invocation, never()).proceed();
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "file:/warehouse/other/./secret",
+        "file:/warehouse//other/secret",
+        "file:/warehouse/public/../other/secret"
+      })
+  void testFilesystemAliasesCannotBypassCreateAuthorization(String location) throws Throwable {
+    stubCatalogWithSource(TableIdentifier.of("other", "secret"));
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.CREATE_TABLE);
+    MethodInvocation invocation = createInvocation(false, location);
+    assertForbidden(interceptor.invoke(invocation));
     verify(invocation, never()).proceed();
   }
 
@@ -290,6 +329,114 @@ class TestRegisterTableAuthzHandler {
     Object result = interceptor.invoke(invocation);
     assertBadRequest(result);
     verify(invocation, never()).proceed();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testCreateAndStageRequireLoadAccessToOverlappingSource(boolean staged) throws Throwable {
+    stubCatalogWithSource(TableIdentifier.of("other", "secret"));
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.CREATE_TABLE);
+    MethodInvocation invocation = createInvocation(staged, TABLE_LOC + "/data");
+    Response response = (Response) interceptor.invoke(invocation);
+    assertForbidden(response);
+    Assertions.assertFalse(((ErrorResponse) response.getEntity()).message().contains("secret"));
+    verify(invocation, never()).proceed();
+    allow(
+        Privilege.Name.USE_CATALOG,
+        Privilege.Name.USE_SCHEMA,
+        Privilege.Name.CREATE_TABLE,
+        Privilege.Name.SELECT_TABLE);
+    assertEquals(PROCEEDED, interceptor.invoke(createInvocation(staged, TABLE_LOC + "/data")));
+  }
+
+  @Test
+  void testDefaultCreateDoesNotScanAndDeniedCreateDoesNotResolveStorage() throws Throwable {
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA);
+    assertForbidden(interceptor.invoke(createInvocation(false, TABLE_LOC)));
+    verify(catalogWrapper, never()).getTableMetadataLocationCandidates(any());
+    verify(catalogWrapper, never()).listNamespace(any());
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.CREATE_TABLE);
+    assertEquals(PROCEEDED, interceptor.invoke(createInvocation(false, null)));
+    verify(catalogWrapper, never()).getTableMetadataLocationCandidates(any());
+    verify(catalogWrapper, never()).listNamespace(any());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testSetLocationChecksSourceForOrdinaryAndStagedCommits(boolean staged) throws Throwable {
+    stubCatalogWithSource(TableIdentifier.of("other", "secret"));
+    doAnswer(
+            call -> {
+              Privilege.Name privilege = call.getArgument(3);
+              if (privilege == Privilege.Name.MODIFY_TABLE) {
+                MetadataObject object = call.getArgument(2);
+                return object != null
+                    && object.type() == MetadataObject.Type.TABLE
+                    && object.name().equals("copy");
+              }
+              return Set.of(
+                      Privilege.Name.USE_CATALOG,
+                      Privilege.Name.USE_SCHEMA,
+                      Privilege.Name.CREATE_TABLE)
+                  .contains(privilege);
+            })
+        .when(authorizer)
+        .authorize(any(), any(), any(), any(), any());
+    MethodInvocation invocation = locationUpdateInvocation(staged);
+    assertForbidden(interceptor.invoke(invocation));
+    verify(invocation, never()).proceed();
+    allow(
+        Privilege.Name.USE_CATALOG,
+        Privilege.Name.USE_SCHEMA,
+        Privilege.Name.MODIFY_TABLE,
+        Privilege.Name.CREATE_TABLE,
+        Privilege.Name.SELECT_TABLE);
+    assertEquals(PROCEEDED, interceptor.invoke(locationUpdateInvocation(staged)));
+  }
+
+  @Test
+  void testRegisterRetainsAuthorizedSnapshotForExecution() throws Throwable {
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.CREATE_TABLE);
+    MethodInvocation invocation = registerInvocation(false, "copy", META_LOC);
+    assertEquals(PROCEEDED, interceptor.invoke(invocation));
+    RegisterTableRequestWithMetadata request =
+        assertInstanceOf(RegisterTableRequestWithMetadata.class, invocation.getArguments()[2]);
+    assertEquals("copy", request.name());
+    assertEquals(META_LOC, request.metadataLocation());
+    assertEquals(TABLE_LOC, request.tableMetadata().location());
+    verify(catalogWrapper).loadTableMetadataFromLocation(META_LOC);
+  }
+
+  private MethodInvocation createInvocation(boolean staged, String location) throws Throwable {
+    CreateTableRequest.Builder builder =
+        CreateTableRequest.builder().withName("copy").withSchema(tableMetadata().schema());
+    if (location != null) builder.withLocation(location);
+    if (staged) builder.stageCreate();
+    Method method =
+        IcebergTableOperations.class.getMethod(
+            "createTable", String.class, String.class, CreateTableRequest.class, String.class);
+    MethodInvocation invocation = mock(MethodInvocation.class);
+    when(invocation.getMethod()).thenReturn(method);
+    when(invocation.getArguments())
+        .thenReturn(new Object[] {CATALOG + "/", SCHEMA, builder.build(), null});
+    when(invocation.proceed()).thenReturn(PROCEEDED);
+    return invocation;
+  }
+
+  private MethodInvocation locationUpdateInvocation(boolean staged) throws Throwable {
+    UpdateTableRequest request =
+        new UpdateTableRequest(
+            staged ? List.of(new UpdateRequirement.AssertTableDoesNotExist()) : List.of(),
+            List.of(new MetadataUpdate.SetLocation(TABLE_LOC + "/data")));
+    Method method =
+        IcebergTableOperations.class.getMethod(
+            "updateTable", String.class, String.class, String.class, UpdateTableRequest.class);
+    MethodInvocation invocation = mock(MethodInvocation.class);
+    when(invocation.getMethod()).thenReturn(method);
+    when(invocation.getArguments())
+        .thenReturn(new Object[] {CATALOG + "/", SCHEMA, "copy", request});
+    when(invocation.proceed()).thenReturn(PROCEEDED);
+    return invocation;
   }
 
   private MethodInvocation registerInvocation(

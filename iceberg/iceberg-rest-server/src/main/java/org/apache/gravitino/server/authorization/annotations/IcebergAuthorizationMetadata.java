@@ -34,6 +34,10 @@ public @interface IcebergAuthorizationMetadata {
     RENAME_TABLE,
     RENAME_VIEW,
     CREATE_NAMESPACE,
+    /** A table create, including staged creation, with an optional explicit location. */
+    CREATE_TABLE,
+    /** A table commit, which may finish a staged create. */
+    UPDATE_TABLE,
     REGISTER_TABLE,
   }
   /**
