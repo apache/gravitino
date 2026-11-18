@@ -204,7 +204,11 @@ jobs:
             CONTEXT_DIR="${{ github.workspace }}/dev/docker/${FOLDER_NAME}/"
             . ${CONTEXT_DIR}/${FOLDER_NAME}-dependency.sh
             docker build -t ${KIND_REGISTRY}/${REPO_NAME}:${tag} "${CONTEXT_DIR}"
-            docker push ${KIND_REGISTRY}/${REPO_NAME}:${tag}
+            # With the containerd image store (ubuntu-26.04), Docker pushes to ${KIND_REGISTRY} over HTTPS
+            # and fails, but uses plain HTTP for localhost. Both names reach the registry the cluster pulls from.
+            PUSH_IMAGE="localhost:${KIND_REGISTRY##*:}/${REPO_NAME}:${tag}"
+            docker tag ${KIND_REGISTRY}/${REPO_NAME}:${tag} "${PUSH_IMAGE}"
+            docker push "${PUSH_IMAGE}"
             )
           done
 

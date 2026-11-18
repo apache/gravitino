@@ -38,11 +38,11 @@ public final class SecretBinding {
    * Creates a write-through binding.
    *
    * @param provider registered provider instance name
-   * @param plaintext plaintext secret to write through
+   * @param plaintext non-blank plaintext secret to write through
    */
   public SecretBinding(String provider, String plaintext) {
     Preconditions.checkArgument(StringUtils.isNotBlank(provider), "provider must not be blank");
-    Preconditions.checkArgument(plaintext != null, "plaintext must not be null");
+    Preconditions.checkArgument(StringUtils.isNotBlank(plaintext), "plaintext must not be blank");
     this.provider = provider;
     this.plaintext = plaintext;
   }
