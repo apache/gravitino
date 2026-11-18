@@ -690,12 +690,6 @@ vulnerabilities:
       - pkg:maven/org.apache.avro/avro@1.7.7
     expired_at: 2027-02-07
     statement: "Pre-existing finding, tracked in apache/gravitino#14777."
-  # org.apache.kafka/kafka-clients
-  - id: CVE-2026-35554
-    purls:
-      - pkg:maven/org.apache.kafka/kafka-clients@3.4.0
-    expired_at: 2027-02-07
-    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
   # org.apache.kerby/kerb-server
   - id: CVE-2026-57915
     purls:
@@ -724,27 +718,6 @@ vulnerabilities:
     purls:
       - pkg:maven/org.apache.thrift/libthrift@0.12.0
       - pkg:maven/org.apache.thrift/libthrift@0.14.1
-    expired_at: 2027-02-07
-    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
-  # org.codehaus.jettison/jettison
-  - id: CVE-2022-40150
-    purls:
-      - pkg:maven/org.codehaus.jettison/jettison@1.1
-    expired_at: 2027-02-07
-    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
-  - id: CVE-2022-45685
-    purls:
-      - pkg:maven/org.codehaus.jettison/jettison@1.1
-    expired_at: 2027-02-07
-    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
-  - id: CVE-2022-45693
-    purls:
-      - pkg:maven/org.codehaus.jettison/jettison@1.1
-    expired_at: 2027-02-07
-    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
-  - id: CVE-2023-1436
-    purls:
-      - pkg:maven/org.codehaus.jettison/jettison@1.1
     expired_at: 2027-02-07
     statement: "Pre-existing finding, tracked in apache/gravitino#14777."
   # org.eclipse.jetty/jetty-http
