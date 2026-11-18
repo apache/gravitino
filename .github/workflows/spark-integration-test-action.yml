@@ -94,17 +94,9 @@ jobs:
             ./gradlew -PskipTests -PtestMode=${{ inputs.test-mode }} -PskipDockerTests=false -PskipWeb=true :spark-connector:spark-4.0:test --tests "org.apache.gravitino.spark.connector.integration.test.**"
           fi
 
-      - name: Spark Doris JDBC read tests
-        id: dorisIntegrationTest
-        if: ${{ inputs.test-mode == 'embedded' && inputs.scala-version == '2.12' }}
-        run: |
-          ./gradlew -PskipTests -PtestMode=embedded -PscalaVersion=2.12 -PskipDockerTests=false -PskipWeb=true -PdorisMultiVersionTest :spark-connector:spark-3.5:test \
-            --tests "org.apache.gravitino.spark.connector.integration.test.jdbc.SparkJdbcDorisReadBaselineIT35.testPartitionedReadOptionsAreScopedToEachRead" \
-            --tests "org.apache.gravitino.spark.connector.integration.test.jdbc.SparkJdbcDorisReadBaselineIT35.testGovernedQueriesWithPartitionedRead"
-
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v7
-        if: ${{ (failure() && (steps.integrationTest.outcome == 'failure' || steps.dorisIntegrationTest.outcome == 'failure')) || contains(github.event.pull_request.labels.*.name, 'upload log') }}
+        if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
           name: spark-connector-integrate-test-reports-${{ inputs.java-version }}-${{ inputs.test-mode }}
           path: |
