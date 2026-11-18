@@ -165,7 +165,10 @@ public class GravitinoDriverPlugin implements DriverPlugin {
               SparkCatalogKind kind = SparkCatalogKind.fromProvider(provider);
               if (kind == null) {
                 LOG.warn(
-                    "Skip registering {} because {} is not supported yet.", catalogName, provider);
+                    "Skip registering {} because {} is not supported yet. "
+                        + "It may be served by a separate extension jar.",
+                    catalogName,
+                    provider);
                 return;
               }
               if (SparkCatalogKind.LAKEHOUSE_ICEBERG.equals(kind) && !enableIcebergSupport) {

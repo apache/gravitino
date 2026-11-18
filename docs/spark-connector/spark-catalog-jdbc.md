@@ -15,7 +15,11 @@ The Apache Gravitino Spark connector offers the capability to read JDBC tables, 
 
 ## Capabilities
 
-Supports MySQL and PostgreSQL. OceanBase, which is MySQL-compatible, can use the MySQL driver as a workaround. Apache Doris supports an opt-in, read-only governed path described below; when that path is disabled, `jdbc-doris` keeps the generic JDBC behavior.
+The generic JDBC catalog supports the `jdbc-mysql`, `jdbc-doris`, `jdbc-starrocks`, and
+`jdbc-oceanbase` providers. PostgreSQL uses a dedicated catalog path. OceanBase, which is
+MySQL-compatible, can use the MySQL driver as a workaround. Apache Doris supports an opt-in,
+read-only governed path described below; when that path is disabled, `jdbc-doris` keeps the
+generic JDBC behavior. Other JDBC providers require a separate Spark connector extension.
 
 ### Governed Apache Doris batch reads
 
@@ -50,7 +54,8 @@ Spark and driver diagnostic logs and executor failures are controlled by the app
 - `SELECT`
 - `INSERT`
 
-For the specialized Doris path, only `SELECT` batch reads are supported. Spark writes and catalog DDL are rejected. The generic MySQL and PostgreSQL JDBC paths retain their existing behavior.
+For the specialized Doris path, only `SELECT` batch reads are supported. Spark writes and catalog
+DDL are rejected. The generic JDBC paths retain their existing behavior.
 
   :::info
   JDBCTable does not support distributed transaction. When writing data to RDBMS, each task is an independent transaction. If some tasks of spark succeed and some tasks fail, dirty data is generated.
