@@ -214,15 +214,19 @@ jobs:
             --set "podAnnotations.schema-migrate-upgrade=$(date +%s)"
           bash dev/ci/check-schema-migrate.sh "$NS" "$RELEASE" mysql
 
-      - name: Schema migrate cross-version upgrade from 1.2.0 (mysql)
+      - name: Schema migrate cross-version upgrade matrix (mysql/postgresql × 1.2.0/1.3.0)
         if: steps.list-changed.outputs.changed == 'true'
         run: |
           set -euo pipefail
           chmod +x dev/ci/chart-schema-migrate-cross-version.sh
-          FROM_VERSION=1.2.0 \
-            NAMESPACE=schema-migrate-cross \
-            RELEASE_NAME=gravitino-sm-cross \
-            bash dev/ci/chart-schema-migrate-cross-version.sh
+          for ENGINE in mysql postgresql; do
+            for FROM_VERSION in 1.2.0 1.3.0; do
+              echo "::group::cross-version ${ENGINE} from ${FROM_VERSION}"
+              ENGINE="${ENGINE}" FROM_VERSION="${FROM_VERSION}" \
+                bash dev/ci/chart-schema-migrate-cross-version.sh
+              echo "::endgroup::"
+            done
+          done
 
       - name: Schema migrate fresh install (postgresql)
         if: steps.list-changed.outputs.changed == 'true'
