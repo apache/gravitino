@@ -71,6 +71,8 @@ public class GravitinoCompactionJobAdapter implements GravitinoJobAdapter {
   }
 
   private String getTableName(CompactionJobContext jobContext) {
+    // TODO(#15048): translate hierarchical Gravitino schema identifiers (e.g. a:b:c.events)
+    // to Spark physical namespace components before emitting table_identifier for CALL.
     return IdentifierUtils.removeCatalogFromIdentifier(jobContext.nameIdentifier()).toString();
   }
 

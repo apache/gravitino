@@ -32,6 +32,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 public class TestGravitinoCompactionJobAdapter {
@@ -162,6 +163,29 @@ public class TestGravitinoCompactionJobAdapter {
                     partitions));
 
     Assertions.assertEquals("(`event`.`meta`.`user-id` = 7)", conf.get("where_clause"));
+  }
+
+  /**
+   * Tracks #15048: hierarchical Gravitino schemas must become Spark-physical table identifiers
+   * before CALL. Today the adapter forwards {@code a:b:c.events} unchanged.
+   */
+  @Disabled("TODO(#15048): translate hierarchical schema table_identifier for Spark CALL")
+  @Test
+  public void testHierarchicalSchemaTableIdentifierIsSparkPhysical() {
+    Map<String, String> conf =
+        new GravitinoCompactionJobAdapter()
+            .jobConfig(
+                new CompactionJobContext(
+                    NameIdentifier.of("catalog", "a:b:c", "events"),
+                    Map.of("target_file_size_bytes", "1073741824"),
+                    "compaction-job-template",
+                    "binpack",
+                    "",
+                    new Column[0],
+                    new Transform[0],
+                    List.of()));
+
+    Assertions.assertEquals("a.b.c.events", conf.get("table_identifier"));
   }
 
   private CompactionJobContext mockCompactionJobContext(String rewriteStrategy, String sortOrder) {
