@@ -684,7 +684,7 @@ public class SecretManager implements Closeable {
    * @param properties entity properties that may contain secret URNs (may be null)
    */
   public void validateSecretsReadable(@Nullable Map<String, String> properties) {
-    toPlaintextProperties(properties);
+    resolvePlaintextProperties(properties, true);
   }
 
   private Map<String, String> resolvePlaintextProperties(
