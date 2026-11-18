@@ -66,7 +66,13 @@ async function resolve({ github, context, core, botOwner }) {
   const targets = TARGETS.filter(target => pr.labels.some(label => label.name === target));
   core.setOutput('targets', JSON.stringify(targets));
   if (!targets.length) return;
-  const owner = botOwner;
+  const owner = botOwner || UPSTREAM.owner;
+  if (!botOwner) {
+    core.setOutput('task', JSON.stringify({ ...UPSTREAM, number: pr.number,
+      sha: pr.merge_commit_sha, sourceBaseSha: await mergedChangeBase(github, pr), title: pr.title }));
+    core.notice('BACKPORT_BOT_OWNER is unset; backport branches and CI remain in apache/gravitino.');
+    return;
+  }
   if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(owner || '') || owner.toLowerCase() === 'apache') {
     throw new Error('Configure BACKPORT_BOT_OWNER with the dedicated fork account.');
   }
@@ -120,10 +126,11 @@ function buildCommit({ directory, upstream, baseSha, sourceSha, sourceBaseSha })
 
 async function prepare({ github, core, task, target, token }) {
   if (!TARGETS.includes(target) || !/^[0-9a-f]{40}$/.test(task.sha) || !/^[0-9a-f]{40}$/.test(task.sourceBaseSha)) throw new Error('Invalid backport target or source SHA.');
-  const branch = `backport/pr-${task.number}/${target}`;
+  const upstreamMode = task.owner === UPSTREAM.owner;
+  const branch = upstreamMode ? `cherry-pick-${task.sha.slice(0, 8)}-to-${target}` : `backport/pr-${task.number}/${target}`;
   const { data: base } = await github.rest.repos.getBranch({ ...UPSTREAM, branch: target });
   // Roll out routing to the release branch before enabling automated fork pushes.
-  for (const file of ['.github/scripts/resolve-fork-ci.cjs', '.github/workflows/fork-ci.yml']) {
+  for (const file of upstreamMode ? [] : ['.github/scripts/resolve-fork-ci.cjs', '.github/workflows/fork-ci.yml']) {
     let contents;
     try { contents = (await github.rest.repos.getContent({ ...UPSTREAM, ref: base.commit.sha, path: file })).data; }
     catch (error) {
@@ -135,13 +142,15 @@ async function prepare({ github, core, task, target, token }) {
     }
   }
   const fork = { owner: task.owner, repo: task.repo };
-  let workflow;
-  try { workflow = (await github.rest.actions.getWorkflow({ ...fork, workflow_id: 'fork-ci.yml' })).data; }
-  catch (error) {
-    if (error.status !== 404) throw error;
-    throw new Error(`Sync the fork's default branch and enable Fork CI in ${task.owner}/${task.repo}, then retry.`, { cause: error });
+  if (!upstreamMode) {
+    let workflow;
+    try { workflow = (await github.rest.actions.getWorkflow({ ...fork, workflow_id: 'fork-ci.yml' })).data; }
+    catch (error) {
+      if (error.status !== 404) throw error;
+      throw new Error(`Sync the fork's default branch and enable Fork CI in ${task.owner}/${task.repo}, then retry.`, { cause: error });
+    }
+    if (workflow.state !== 'active') throw new Error(`Enable Fork CI in ${task.owner}/${task.repo} before retrying.`);
   }
-  if (workflow.state !== 'active') throw new Error(`Enable Fork CI in ${task.owner}/${task.repo} before retrying.`);
   let existing;
   try { existing = (await github.rest.git.getRef({ ...fork, ref: `heads/${branch}` })).data; }
   catch (error) { if (error.status !== 404) throw error; }
@@ -183,8 +192,8 @@ async function openPullRequest({ github, upstream = github, core, task, target, 
   if (!pr) {
     pr = (await github.rest.pulls.create({ ...UPSTREAM, base: target, head: `${task.owner}:${branch}`,
       title: `${conflict ? '[DO NOT MERGE] ' : ''}[Cherry-pick to ${target}] ${task.title}`.slice(0, 256),
-      draft: conflict, maintainer_can_modify: true,
-      body: `Backport of #${task.number}.\n\n- Original commit: ${task.sha}\n- Target branch: ${target}\n- Backport fork owner: @${task.owner}\n\n${conflict ? 'Resolve conflicts in the fork, remove the cherry-pick-conflict label, mark ready for review, and run Fork CI on this branch.' : 'CI runs in the dedicated bot fork.'}` })).data;
+      draft: conflict, ...(task.owner === UPSTREAM.owner ? {} : { maintainer_can_modify: true }),
+      body: `Backport of #${task.number}.\n\n- Original commit: ${task.sha}\n- Target branch: ${target}\n- Backport fork owner: @${task.owner}\n\n${conflict ? 'Resolve conflicts in the fork, remove the cherry-pick-conflict label, mark ready for review, and run Fork CI on this branch.' : task.owner === UPSTREAM.owner ? 'CI runs in apache/gravitino.' : 'CI runs in the dedicated bot fork.'}` })).data;
   }
   const labels = ['cherry-pick', ...(blocked ? ['cherry-pick-conflict'] : [])];
   for (const name of labels) {
@@ -207,14 +216,26 @@ async function dispatch({ github, core, task, target, branch, sha, number }) {
   if (pr.state !== 'open' || pr.draft || pr.base.ref !== target || pr.head.sha !== sha ||
       pr.head.repo?.full_name.toLowerCase() !== `${task.owner}/${task.repo}`.toLowerCase() ||
       pr.labels.some(label => label.name === 'cherry-pick-conflict')) throw new Error('The backport changed or is not ready; retry after resolving it.');
+  const upstreamMode = task.owner === UPSTREAM.owner;
+  if (upstreamMode) {
+    let file;
+    try { file = (await github.rest.repos.getContent({ ...UPSTREAM, path: '.github/scripts/resolve-fork-ci.cjs', ref: target })).data; }
+    catch (error) { if (error.status !== 404) throw error; }
+    if (!file || file.encoding !== 'base64' || !Buffer.from(file.content, 'base64').toString().includes(ROUTING_MARKER)) {
+      core.notice('The release branch uses its existing Apache PR workflows; CHERRY_PICK_TOKEN is needed to trigger them automatically.');
+      return;
+    }
+  }
   const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
-    owner: task.owner, repo: task.repo, workflow_id: 'fork-ci.yml', head_sha: sha, event: 'workflow_dispatch', per_page: 100 });
-  if (runs.some(run => run.head_branch === branch && run.status !== 'completed')) {
+    owner: task.owner, repo: task.repo, workflow_id: 'fork-ci.yml', ...(upstreamMode ? { branch: target } : { head_sha: sha }), event: 'workflow_dispatch', per_page: 100 });
+  if (runs.some(run => run.head_branch === (upstreamMode ? target : branch) &&
+      (!upstreamMode || run.display_title === `Trusted Fork CI #${number}`) && run.status !== 'completed')) {
     core.notice('Fork CI is already queued or running for this backport.');
     return;
   }
   await github.rest.actions.createWorkflowDispatch({ owner: task.owner, repo: task.repo,
-    workflow_id: 'fork-ci.yml', ref: branch });
+    workflow_id: 'fork-ci.yml', ref: upstreamMode ? target : branch,
+    ...(upstreamMode ? { inputs: { 'pull-request': String(number) } } : {}) });
   core.notice(`Started Fork CI in ${task.owner}/${task.repo} for #${number}.`);
 }
 module.exports = { resolve, mergedChangeBase, verifyBot, buildCommit, prepare, openPullRequest, dispatch, ROUTING_MARKER };

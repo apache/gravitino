@@ -153,7 +153,23 @@ branch. No per-committer credentials or App installation is needed. Heavy CI run
 in the bot fork; Apache runs the coordinator and existing status publishers.
 Post-merge CI on Apache `main` and release branches is unchanged.
 
-Repository administrators must complete these steps before enabling backports:
+`BACKPORT_BOT_OWNER` is an opt-in switch. If it is absent or empty, backports
+continue in `apache/gravitino` using the existing `CHERRY_PICK_TOKEN` (or
+`GITHUB_TOKEN`) and `cherry-pick-<short SHA>-to-<target>` branch names. This mode
+needs no bot token, bot fork, or release routing markers. Existing release PR
+workflows run on Apache; `CHERRY_PICK_TOKEN` is required for automatic PR-event
+CI because GitHub suppresses events created with `GITHUB_TOKEN`. For releases
+already using Fork CI routing, the coordinator explicitly dispatches trusted CI
+on the upstream release branch after creating the PR, including when it uses
+`GITHUB_TOKEN`. Upstream mode keeps all heavy CI on Apache.
+
+A nonempty but invalid owner, missing/invalid bot token, unavailable fork, or
+missing fork routing support fails visibly; none silently switches to Apache.
+Removing the owner variable restores upstream mode for subsequent runs. Existing
+fork PRs are not migrated, so finish or close them before retrying the same source
+in upstream mode to avoid creating a second backport PR.
+
+Repository administrators must complete these steps before opting into bot mode:
 
 1. Backport the Fork CI routing support to each supported release branch using a
    manually prepared PR. The coordinator checks the routing markers before
@@ -203,8 +219,8 @@ used. Matching branches and open PRs are reused without overwriting human fixes;
 closed PRs are not reopened, and active CI for the same head is not duplicated.
 For rebase merges, commit attribution identifies the complete contiguous change,
 up to 250 commits; missing attribution or API failures require retry. Larger
-changes require a manual backport. Missing configuration or fork support fails
-visibly, with no fallback to heavy Apache CI. Existing Apache-hosted backport PRs
+changes require a manual backport. Invalid configured bot credentials or missing fork support fail
+visibly, with no error-triggered fallback to heavy Apache CI. Existing Apache-hosted backport PRs
 must be replaced deliberately; this change does not migrate them automatically.
 
 ## 🆘 Need Help?

@@ -17,7 +17,7 @@
 # under the License.
 #
 
-name: Cherry-pick to fork
+name: Cherry-pick to configured repository
 
 on:
   workflow_call:
@@ -26,17 +26,17 @@ on:
         required: true
         type: string
       task:
-        description: 'Verified source PR, bot fork and immutable source commit'
+        description: 'Verified source PR, destination and immutable source commit'
         required: true
         type: string
     secrets:
       BACKPORT_BOT_TOKEN:
-        required: true
+        required: false
+      CHERRY_PICK_TOKEN:
+        required: false
 
-permissions:
-  contents: read
-  pull-requests: write
-  issues: write
+# Inherit read-only Contents in bot mode, write Contents/Actions in upstream mode.
+# The caller grants only the permissions needed for the selected destination.
 
 jobs:
   cherry-pick:
@@ -45,7 +45,7 @@ jobs:
       cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    name: Cherry-pick to ${{ inputs.target-branch }} in bot fork
+    name: Cherry-pick to ${{ inputs.target-branch }} in ${{ fromJSON(inputs.task).owner }}/gravitino
     env:
       BACKPORT_TASK: ${{ inputs.task }}
       BACKPORT_TARGET: ${{ inputs.target-branch }}
@@ -55,6 +55,7 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
       - name: Verify the dedicated bot credential
+        if: fromJSON(inputs.task).owner != 'apache'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.BACKPORT_BOT_TOKEN }}
@@ -65,9 +66,9 @@ jobs:
         id: prepare
         uses: actions/github-script@v7
         env:
-          FORK_TOKEN: ${{ secrets.BACKPORT_BOT_TOKEN }}
+          FORK_TOKEN: ${{ fromJSON(inputs.task).owner == 'apache' && (secrets.CHERRY_PICK_TOKEN || github.token) || secrets.BACKPORT_BOT_TOKEN }}
         with:
-          github-token: ${{ secrets.BACKPORT_BOT_TOKEN }}
+          github-token: ${{ fromJSON(inputs.task).owner == 'apache' && (secrets.CHERRY_PICK_TOKEN || github.token) || secrets.BACKPORT_BOT_TOKEN }}
           script: |
             await require('./.github/scripts/backport-to-fork.cjs').prepare({ github, core,
               task: JSON.parse(process.env.BACKPORT_TASK), target: process.env.BACKPORT_TARGET,
@@ -81,13 +82,13 @@ jobs:
           BACKPORT_MARKERS: ${{ steps.prepare.outputs.markers }}
           BACKPORT_CONFLICT: ${{ steps.prepare.outputs.conflict }}
         with:
-          github-token: ${{ secrets.BACKPORT_BOT_TOKEN }}
+          github-token: ${{ fromJSON(inputs.task).owner == 'apache' && (secrets.CHERRY_PICK_TOKEN || github.token) || secrets.BACKPORT_BOT_TOKEN }}
           script: |
             await require('./.github/scripts/backport-to-fork.cjs').openPullRequest({ github, upstream: new github.constructor({ auth: process.env.UPSTREAM_TOKEN }), core,
               task: JSON.parse(process.env.BACKPORT_TASK), target: process.env.BACKPORT_TARGET,
               branch: process.env.BACKPORT_BRANCH, conflict: process.env.BACKPORT_CONFLICT === 'true',
               markers: process.env.BACKPORT_MARKERS === 'true' });
-      - name: Start CI in the fork after the PR exists
+      - name: Start CI after the PR exists
         if: steps.pr.outputs.ready == 'true'
         uses: actions/github-script@v7
         env:
@@ -95,7 +96,7 @@ jobs:
           BACKPORT_SHA: ${{ steps.prepare.outputs.sha }}
           BACKPORT_NUMBER: ${{ steps.pr.outputs.number }}
         with:
-          github-token: ${{ secrets.BACKPORT_BOT_TOKEN }}
+          github-token: ${{ fromJSON(inputs.task).owner == 'apache' && (secrets.CHERRY_PICK_TOKEN || github.token) || secrets.BACKPORT_BOT_TOKEN }}
           script: |
             await require('./.github/scripts/backport-to-fork.cjs').dispatch({ github, core,
               task: JSON.parse(process.env.BACKPORT_TASK), target: process.env.BACKPORT_TARGET,

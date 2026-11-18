@@ -68,7 +68,25 @@ jobs:
       pull-requests: write
       issues: write
     needs: resolve
-    if: needs.resolve.outputs.targets != '[]'
+    if: needs.resolve.outputs.targets != '[]' && fromJSON(needs.resolve.outputs.task).owner != 'apache'
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.resolve.outputs.targets) }}
+    uses: ./.github/workflows/cherry-pick-branch.yml
+    with:
+      target-branch: ${{ matrix.target }}
+      task: ${{ needs.resolve.outputs.task }}
+    secrets: inherit
+
+  backport-upstream:
+    permissions:
+      contents: write
+      actions: write
+      pull-requests: write
+      issues: write
+    needs: resolve
+    if: needs.resolve.outputs.targets != '[]' && fromJSON(needs.resolve.outputs.task).owner == 'apache'
     strategy:
       fail-fast: false
       matrix:

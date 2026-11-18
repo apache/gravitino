@@ -82,7 +82,7 @@ test('bot credential must match configured identity and push the verified fork',
     h.github.rest.repos.get = async () => ({data});
     await assert.rejects(verifyBot({...h,task}), /cannot push/);
   }
-  for (const botOwner of ['', 'apache', 'bad/owner']) await assert.rejects(resolve({...h,botOwner}), /Configure/);
+  for (const botOwner of [' ', 'apache', 'bad/owner']) await assert.rejects(resolve({...h,botOwner}), /Configure/);
 });
 
 test('workflow_run discovers only a merged main PR matching the signal head', async () => {
@@ -185,7 +185,7 @@ function prHarness() {
   h.github.paginate = async () => existing;
   h.github.rest.pulls.list = () => {};
   h.github.rest.pulls.create = async args => { h.calls.push(args); created = { number: 99, html_url: 'https://example.test/99', state: 'open', labels: [], ...args,
-    head: { repo: { full_name: 'alice/gravitino' } } }; return { data: created }; };
+    head: { repo: { full_name: `${args.head.split(':')[0]}/gravitino` } } }; return { data: created }; };
   h.github.rest.issues = { getLabel: async () => ({}), addLabels: async args => h.calls.push(args) };
   return { ...h, existing: value => existing = value, created: () => created };
 }
@@ -371,10 +371,106 @@ test('production coordinator wiring keeps credentials out of PR code and uses th
   assert.doesNotMatch(auto, /pull_request_target:/);
   assert.match(workflow('fork-ci-status.yml'), /types: \[opened, synchronize, reopened, edited, closed\]/);
   assert.match(auto, /vars.BACKPORT_BOT_OWNER/);
-  assert.match(backport, /pull-requests: write/);
-  assert.match(backport, /issues: write/);
+  assert.match(auto, /pull-requests: write/);
+  assert.match(auto, /issues: write/);
   assert.match(backport, /verifyBot/);
   assert.match(backport, /upstream: new github.constructor/);
   assert.match(backport, /ref: \$\{\{ github.event.repository.default_branch \}\}/);
-  assert.doesNotMatch(backport, /BACKPORT_APP|CHERRY_PICK_TOKEN|installationToken/);
+  assert.doesNotMatch(backport, /BACKPORT_APP|installationToken/);
+});
+
+test('absent and empty bot owner preserve upstream backports without querying a bot fork', async () => {
+  for (const botOwner of [undefined, '']) {
+    const h = harness();
+    h.github.rest.repos.get = async () => {throw new Error('must not require a fork');};
+    await resolve({...h,botOwner});
+    assert.deepEqual(JSON.parse(h.outputs.task), {owner:'apache',repo:'gravitino',number:7,
+      sha:A,sourceBaseSha:B,title:task.title});
+    assert.deepEqual(JSON.parse(h.outputs.targets), ['branch-2.0']);
+  }
+  const h = harness();
+  h.github.rest.repos.get = async () => {throw new Error('configured fork unavailable');};
+  await assert.rejects(resolve(h), /configured fork unavailable/);
+  assert.equal(h.outputs.task, undefined, 'configured bot errors must not select upstream');
+});
+
+test('upstream preparation pushes and reuses a real branch without fork routing prerequisites', async t => {
+  const f = fixture(t), config = path.join(f.root,'config');
+  writeFileSync(config, `[url "${f.upstream}"]\n insteadOf = https://github.com/apache/gravitino.git\n`);
+  const old = [process.env.GIT_CONFIG_GLOBAL,process.env.GIT_ALLOW_PROTOCOL];
+  process.env.GIT_CONFIG_GLOBAL = config;process.env.GIT_ALLOW_PROTOCOL = 'file';
+  t.after(() => {
+    for (const [i,key] of ['GIT_CONFIG_GLOBAL','GIT_ALLOW_PROTOCOL'].entries()) {
+      if (old[i] === undefined) delete process.env[key];else process.env[key] = old[i];
+    }
+  });
+  const h = harness();let existing;
+  h.github.rest.repos.getBranch = async () => ({data:{commit:{sha:f.baseSha}}});
+  h.github.rest.repos.getContent = async () => {throw new Error('must not require routing files');};
+  h.github.rest.actions = {getWorkflow:async () => {throw new Error('must not require Fork CI');}};
+  h.github.rest.git = {getRef:async args => {
+    assert.equal(args.owner,'apache');
+    if (!existing) throw Object.assign(new Error(),{status:404});
+    return {data:{object:{sha:existing}}};
+  }};
+  const args = {...h,task:{...task,owner:'apache',sha:f.sourceSha,sourceBaseSha:f.baseSha},
+    target:'branch-2.0',token:'test-only-token'};
+  await prepare(args);
+  const branch = `cherry-pick-${f.sourceSha.slice(0,8)}-to-branch-2.0`;
+  existing = git(f.upstream,'rev-parse',branch);
+  assert.equal(h.outputs.branch,branch);assert.equal(h.outputs.sha,existing);
+  assert.equal(h.outputs.conflict,'false');
+  await prepare(args);assert.equal(h.outputs.sha,existing);
+  assert.equal(git(f.upstream,'show',`${branch}:data.txt`),'source');
+});
+
+test('upstream mode creates an Apache PR and describes the Apache CI destination', async () => {
+  const h = prHarness();
+  await openPullRequest({...h,task:{...task,owner:'apache'},target:'branch-2.0',
+    branch:'cherry-pick-aaaaaaaa-to-branch-2.0',conflict:false});
+  assert.equal(h.created().head.repo.full_name,'apache/gravitino');
+  assert.equal(h.calls[0].head,'apache:cherry-pick-aaaaaaaa-to-branch-2.0');
+  assert.match(h.calls[0].body,/CI runs in apache\/gravitino/);
+  assert.equal(h.calls[0].maintainer_can_modify,undefined);
+  assert.equal(h.outputs.ready,'true');
+});
+
+test('upstream dispatch preserves legacy PR workflows and explicitly runs migrated release CI', async () => {
+  const h = harness();
+  h.github.rest.pulls.get = async () => ({data:{state:'open',base:{ref:'branch-2.0'},
+    head:{sha:A,repo:{full_name:'apache/gravitino'}},labels:[]}});
+  h.github.rest.repos.getContent = async () => {throw Object.assign(new Error(),{status:404});};
+  h.github.rest.actions = {listWorkflowRuns(){},createWorkflowDispatch:async args => h.calls.push(args)};
+  h.github.paginate = async () => [];
+  const args = {...h,task:{...task,owner:'apache'},target:'branch-2.0',
+    branch:'cherry-pick-aaaaaaaa-to-branch-2.0',sha:A,number:99};
+  await dispatch(args);assert.deepEqual(h.calls,[]);
+  h.github.rest.repos.getContent = async () => ({data:{encoding:'base64',content:Buffer.from('old resolver').toString('base64')}});
+  await dispatch(args);assert.deepEqual(h.calls,[]);
+  h.github.rest.repos.getContent = async () => ({data:{encoding:'base64',content:Buffer.from(ROUTING_MARKER).toString('base64')}});
+  await dispatch(args);
+  assert.deepEqual(h.calls,[{owner:'apache',repo:'gravitino',workflow_id:'fork-ci.yml',ref:'branch-2.0',inputs:{'pull-request':'99'}}]);
+  h.github.paginate = async (_, params) => {
+    assert.equal(params.branch,'branch-2.0');assert.equal(params.head_sha,undefined);
+    return [{head_branch:'branch-2.0',display_title:'Trusted Fork CI #99',status:'in_progress'}];
+  };
+  await dispatch(args);assert.equal(h.calls.length,1);
+  h.github.paginate = async () => [{head_branch:'branch-2.0',display_title:'Trusted Fork CI #100',status:'in_progress'}];
+  await dispatch(args);assert.equal(h.calls.length,2,'another release PR must not block this one');
+  h.github.rest.repos.getContent = async () => {throw new Error('API unavailable');};
+  await assert.rejects(dispatch(args),/API unavailable/);assert.equal(h.calls.length,2);
+});
+
+test('workflow fallback is selectable without a bot secret and isolates upstream write permissions', () => {
+  const workflow = name => readFileSync(path.join(__dirname,'../../workflows/',name),'utf8');
+  const call = workflow('auto-cherry-pick.yml'), impl = workflow('cherry-pick-branch.yml');
+  const fork = call.slice(call.indexOf('  backport:'),call.indexOf('  backport-upstream:'));
+  const upstream = call.slice(call.indexOf('  backport-upstream:'));
+  assert.match(fork,/contents: read/);assert.doesNotMatch(fork,/contents: write|actions: write/);
+  assert.match(fork,/owner != 'apache'/);assert.match(upstream,/owner == 'apache'/);
+  assert.match(upstream,/contents: write/);assert.match(upstream,/actions: write/);
+  assert.match(impl,/BACKPORT_BOT_TOKEN:\n\s+required: false/);
+  assert.match(impl,/CHERRY_PICK_TOKEN:\n\s+required: false/);
+  assert.match(impl,/secrets.CHERRY_PICK_TOKEN \|\| github.token/);
+  assert.match(impl,/Verify the dedicated bot credential\n\s+if: fromJSON\(inputs.task\).owner != 'apache'/);
 });
