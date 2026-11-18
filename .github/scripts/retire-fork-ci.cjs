@@ -32,7 +32,7 @@ async function retireCancelled({ github, repo, pr }) {
     throw error;
   }
   for (const run of data.workflow_runs) {
-    if (isBackportPreparation(run.event, `refs/heads/${run.head_branch}`, run.actor?.type) ||
+    if (isBackportPreparation(run.event, `refs/heads/${run.head_branch}`) ||
         run.head_sha === pr.head.sha || run.head_branch !== pr.head.ref ||
         run.path !== '.github/workflows/fork-ci.yml' || !FORK_EVENTS.includes(run.event) ||
         run.status !== 'completed' || run.conclusion !== 'cancelled') continue;

@@ -34,11 +34,11 @@ permissions:
   actions: read
   pull-requests: read
 
-# A human push and Run workflow share a group. App preparation pushes use a separate
+# Ordinary pushes and Run workflow share a group. Backport preparation uses a separate
 # group: a delayed push event must not cancel the explicitly dispatched tests.
 # Backport fork routing v1
 concurrency:
-  group: fork-ci-${{ inputs.pull-request && format('trusted-{0}', inputs.pull-request) || github.ref }}${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/backport/') && github.event.sender.type == 'Bot' && '-prepare' || '' }}
+  group: fork-ci-${{ inputs.pull-request && format('trusted-{0}', inputs.pull-request) || github.ref }}${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/backport/') && '-prepare' || '' }}
   cancel-in-progress: true
 
 jobs:

@@ -20,9 +20,9 @@
 name: Automatically cherry-pick merged PR to different branches
 
 on:
-  pull_request_target:
-    branches: [main]
-    types: [closed]
+  workflow_run:
+    workflows: [Fork CI PR Signal]
+    types: [completed]
   workflow_dispatch:
     inputs:
       pull-request:
@@ -30,20 +30,20 @@ on:
         required: true
         type: string
 
-permissions:
-  contents: read
-  pull-requests: write
-  issues: write
+permissions: {}
 
 concurrency:
-  group: backport-${{ github.event.pull_request.number || inputs.pull-request }}
+  group: backport-${{ github.event.workflow_run.head_sha || inputs.pull-request }}
   cancel-in-progress: false
 
 jobs:
   resolve:
+    permissions:
+      contents: read
+      pull-requests: read
     if: >-
       github.repository == 'apache/gravitino' &&
-      (github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true)
+      (github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'))
     runs-on: ubuntu-slim
     outputs:
       targets: ${{ steps.resolve.outputs.targets }}
@@ -56,11 +56,17 @@ jobs:
           persist-credentials: false
       - id: resolve
         uses: actions/github-script@v7
+        env:
+          BACKPORT_BOT_OWNER: ${{ vars.BACKPORT_BOT_OWNER }}
         with:
           script: |
-            await require('./.github/scripts/backport-to-fork.cjs').resolve({ github, context, core });
+            await require('./.github/scripts/backport-to-fork.cjs').resolve({ github, context, core, botOwner: process.env.BACKPORT_BOT_OWNER });
 
   backport:
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
     needs: resolve
     if: needs.resolve.outputs.targets != '[]'
     strategy:

@@ -19,7 +19,7 @@
 name: Fork CI PR Signal
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened, edited, closed]
 permissions: {}
 jobs:
   signal:

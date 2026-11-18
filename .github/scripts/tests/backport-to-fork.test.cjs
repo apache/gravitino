@@ -16,12 +16,11 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { generateKeyPairSync, verify } = require('node:crypto');
 const { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { resolve, mergedChangeBase, installationToken, buildCommit, prepare, openPullRequest, dispatch, ROUTING_MARKER } = require('../backport-to-fork.cjs');
+const { resolve, mergedChangeBase, verifyBot, buildCommit, prepare, openPullRequest, dispatch, ROUTING_MARKER } = require('../backport-to-fork.cjs');
 const { resolve: resolveCI } = require('../resolve-fork-ci.cjs');
 const A = 'a'.repeat(40), B = 'b'.repeat(40);
 const task = { owner: 'alice', repo: 'gravitino', repositoryId: 42, number: 7, sha: A, sourceBaseSha: B, title: 'Fix $(untrusted) `title`' };
@@ -33,18 +32,18 @@ function harness() {
   const core = { setOutput: (key, value) => outputs[key] = value, setSecret: value => secrets.push(value), notice() {}, warning() {},
     summary: { addLink() { return this; }, async write() {} } };
   const context = { repo: { owner: 'apache', repo: 'gravitino' }, ref: 'refs/heads/main',
-    payload: { repository: { default_branch: 'main' }, pull_request: { number: 7 } } };
+    eventName: 'workflow_dispatch', payload: { repository: { default_branch: 'main' }, inputs: { 'pull-request': '7' } } };
   const github = { rest: { pulls: { get: async () => ({ data: source() }) }, repos: { get: async () => ({ data: fork() }) } } };
   github.rest.repos.getCommit = async () => ({ data: { parents: [{ sha: B }] } });
   github.rest.repos.listPullRequestsAssociatedWithCommit = () => {};
   github.paginate = async (_, args) => args.commit_sha === A ? [{ number: 7, merged_at: '2026-11-17', base: { ref: 'main' } }] : [];
-  return { outputs, secrets, calls, core, context, github };
+  return { outputs, secrets, calls, core, context, github, botOwner: 'alice' };
 }
 
-test('resolve uses authoritative original merger and exact labels, including manual retry', async () => {
+test('resolve uses configured bot fork and exact labels, independent of merger', async () => {
   for (const manual of [false, true]) {
     const h = harness();
-    if (manual) h.context.payload = { repository: { default_branch: 'main' }, inputs: { 'pull-request': '7' } };
+    if (manual) h.github.rest.pulls.get = async () => ({data:{...source(),merged_by:{login:'someone-else',type:'Bot'}}});
     await resolve(h);
     assert.deepEqual(JSON.parse(h.outputs.task), task);
     assert.deepEqual(JSON.parse(h.outputs.targets), ['branch-2.0']);
@@ -55,9 +54,9 @@ test('resolve uses authoritative original merger and exact labels, including man
   await resolve(h); assert.equal(h.outputs.targets, '[]');
 });
 
-test('reject unmerged PRs, bot mergers, unrelated or missing forks, and arbitrary coordinator refs', async () => {
+test('reject unmerged PRs, unrelated or missing forks, and arbitrary coordinator refs', async () => {
   for (const change of [pr => pr.merged = false, pr => pr.base.ref = 'branch-2.0',
-    pr => pr.base.repo.full_name = 'other/repo', pr => pr.merged_by.type = 'Bot', pr => pr.merge_commit_sha = 'bad']) {
+    pr => pr.base.repo.full_name = 'other/repo', pr => pr.merge_commit_sha = 'bad']) {
     const h = harness(), pr = source(); change(pr); h.github.rest.pulls.get = async () => ({ data: pr });
     await assert.rejects(resolve(h)); assert.equal(h.outputs.task, undefined);
   }
@@ -71,23 +70,42 @@ test('reject unmerged PRs, bot mergers, unrelated or missing forks, and arbitrar
   h.context.ref = 'refs/heads/unreviewed'; await assert.rejects(resolve(h), /default branch/);
 });
 
-test('App JWT is signed, time-bounded, and installation token is restricted to one fork', async () => {
-  const h = harness(); const keys = generateKeyPairSync('rsa', { modulusLength: 2048 });
-  const privateKey = keys.privateKey.export({ type: 'pkcs8', format: 'pem' });
-  const appRequest = async (route, args) => {
-    h.calls.push({ route, args });
-    return { data: route.startsWith('GET') ? { id: 123 } : { token: 'fork-secret' } };
-  };
-  await installationToken({ ...h, appRequest, task, appId: '1234', privateKey, now: 1000000 });
-  const jwt = h.calls[0].args.headers.authorization.slice(7), parts = jwt.split('.');
-  assert.equal(verify('RSA-SHA256', Buffer.from(parts.slice(0, 2).join('.')), keys.publicKey, Buffer.from(parts[2], 'base64url')), true);
-  assert.deepEqual(JSON.parse(Buffer.from(parts[1], 'base64url')), { iat: 940, exp: 1540, iss: '1234' });
-  assert.deepEqual(h.calls[1].args.repository_ids, [42]);
-  assert.deepEqual(h.calls[1].args.permissions, { contents: 'write', actions: 'write', workflows: 'write' });
-  assert.equal(h.outputs.token, 'fork-secret'); assert.ok(h.secrets.includes('fork-secret'));
-  await assert.rejects(installationToken({ ...h, appRequest, task, appId: '', privateKey }), /Configure/);
-  await assert.rejects(installationToken({ ...h, appRequest: async () => { throw Object.assign(new Error(), { status: 404 }); },
-    task, appId: '1234', privateKey }), /Install the Backport App/);
+test('bot credential must match configured identity and push the verified fork', async () => {
+  const h = harness();
+  h.github.rest.users = {getAuthenticated: async () => ({data:{login:'alice'}})};
+  h.github.rest.repos.get = async () => ({data:{id:42,permissions:{push:true}}});
+  await verifyBot({...h,task});
+  h.github.rest.users.getAuthenticated = async () => ({data:{login:'merger'}});
+  await assert.rejects(verifyBot({...h,task}), /must belong/);
+  h.github.rest.users.getAuthenticated = async () => ({data:{login:'alice'}});
+  for (const data of [{id:42,permissions:{push:false}},{id:43,permissions:{push:true}}]) {
+    h.github.rest.repos.get = async () => ({data});
+    await assert.rejects(verifyBot({...h,task}), /cannot push/);
+  }
+  for (const botOwner of ['', 'apache', 'bad/owner']) await assert.rejects(resolve({...h,botOwner}), /Configure/);
+});
+
+test('workflow_run discovers only a merged main PR matching the signal head', async () => {
+  const h = harness();
+  h.context.eventName = 'workflow_run';
+  h.context.payload = {repository:{default_branch:'main'},workflow_run:{event:'pull_request',conclusion:'success',head_sha:A}};
+  const merged = {...source(),merged_at:'2026-11-18',head:{sha:A}};
+  h.github.paginate = async (_, args) => args.commit_sha === A ? [merged] : [];
+  await resolve(h);
+  assert.deepEqual(JSON.parse(h.outputs.task), task);
+  for (const candidate of [{...merged,merged_at:null},{...merged,head:{sha:B}},
+    {...merged,base:{...merged.base,ref:'branch-2.0'}}]) {
+    h.github.paginate = async () => [candidate];
+    await resolve(h); assert.equal(h.outputs.targets, '[]');
+  }
+  h.github.paginate = async () => [merged, {...merged,number:8}];
+  await assert.rejects(resolve(h), /Ambiguous/);
+  for (const run of [{event:'push',conclusion:'success',head_sha:A},
+    {event:'pull_request',conclusion:'failure',head_sha:A},
+    {event:'pull_request',conclusion:'success',head_sha:'invalid'}]) {
+    h.context.payload.workflow_run = run;
+    await assert.rejects(resolve(h), /Invalid PR signal/);
+  }
 });
 
 function git(cwd, ...args) { return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim(); }
@@ -196,9 +214,9 @@ test('dispatch checks the current PR and never dispatches duplicate active CI', 
   pr.labels = [{ name: 'cherry-pick-conflict' }]; await assert.rejects(dispatch(args), /not ready/);
 });
 
-test('App backport pushes are lightweight; explicit dispatch remains eligible after opening PR', async () => {
+test('Machine-user backport pushes are lightweight; explicit dispatch remains eligible after opening PR', async () => {
   const h = harness(); const context = { repo: { owner: 'alice', repo: 'gravitino' }, sha: A, ref: 'refs/heads/backport/pr-7/branch-2.0',
-    eventName: 'push', payload: { sender: { type: 'Bot' } } };
+    eventName: 'push', payload: { sender: { type: 'User' } } };
   await resolveCI({ ...h, context }); assert.equal(h.outputs.valid, 'false');
   h.github.rest.repos.get = async () => ({ data: fork() });
   h.github.paginate = async () => [{ head: { sha: A, repo: { full_name: 'alice/gravitino' } }, base: { ref: 'branch-2.0' }, labels: [] }];
@@ -223,7 +241,7 @@ test('PR summary is best effort, while creation and label errors remain visible'
 });
 
 
-test('status discovery ignores a later preparation run but retains human pushes and dispatches', async () => {
+test('status discovery ignores preparation pushes by Apps and machine users but retains dispatches', async () => {
   const { createService } = require('../fork-ci-status.cjs');
   const branch = 'backport/pr-7/branch-2.0', pr = { number: 99, base: { ref: 'branch-2.0' },
     head: { sha: A, repo: { owner: { login: 'alice' }, name: 'gravitino' } } };
@@ -235,7 +253,7 @@ test('status discovery ignores a later preparation run but retains human pushes 
   github.paginate = async () => [preparation];
   assert.equal(await createService(github).findRun(pr, false), undefined);
   github.paginate = async () => [{ ...preparation, actor: { type: 'User' } }];
-  assert.equal((await createService(github).findRun(pr, false)).run.id, 2);
+  assert.equal(await createService(github).findRun(pr, false), undefined);
 });
 
 test('cancelled preparation runs never retire a previous head status', async () => {
@@ -336,4 +354,27 @@ test('retry respects explicit human conflict resolution but still blocks current
   await openPullRequest({ ...args, markers: true });
   assert.equal(h.outputs.ready, 'false');
   assert.deepEqual(h.calls.at(-1).labels, ['cherry-pick', 'cherry-pick-conflict']);
+});
+
+test('PR labels use upstream credentials while public PR creation uses the bot', async () => {
+  const h = prHarness();
+  const upstream = {rest:{issues:h.github.rest.issues}};
+  h.github.rest.issues = new Proxy({}, {get(){throw new Error('must not label with bot credential');}});
+  await openPullRequest({...h,upstream,task,target:'branch-2.0',branch:'backport/pr-7/branch-2.0',conflict:false});
+  assert.equal(h.outputs.ready, 'true');
+});
+
+test('production coordinator wiring keeps credentials out of PR code and uses the bot', () => {
+  const workflow = name => readFileSync(path.join(__dirname, '../../workflows/', name), 'utf8');
+  const auto = workflow('auto-cherry-pick.yml'), backport = workflow('cherry-pick-branch.yml');
+  assert.match(auto, /workflow_run:/);
+  assert.doesNotMatch(auto, /pull_request_target:/);
+  assert.match(workflow('fork-ci-status.yml'), /types: \[opened, synchronize, reopened, edited, closed\]/);
+  assert.match(auto, /vars.BACKPORT_BOT_OWNER/);
+  assert.match(backport, /pull-requests: write/);
+  assert.match(backport, /issues: write/);
+  assert.match(backport, /verifyBot/);
+  assert.match(backport, /upstream: new github.constructor/);
+  assert.match(backport, /ref: \$\{\{ github.event.repository.default_branch \}\}/);
+  assert.doesNotMatch(backport, /BACKPORT_APP|CHERRY_PICK_TOKEN|installationToken/);
 });

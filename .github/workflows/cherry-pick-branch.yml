@@ -26,13 +26,11 @@ on:
         required: true
         type: string
       task:
-        description: 'Verified source PR, merger, fork and immutable source commit'
+        description: 'Verified source PR, bot fork and immutable source commit'
         required: true
         type: string
     secrets:
-      CHERRY_PICK_TOKEN:
-        required: false
-      BACKPORT_APP_PRIVATE_KEY:
+      BACKPORT_BOT_TOKEN:
         required: true
 
 permissions:
@@ -42,9 +40,12 @@ permissions:
 
 jobs:
   cherry-pick:
+    concurrency:
+      group: backport-pr-${{ fromJSON(inputs.task).number }}-${{ inputs.target-branch }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    name: Cherry-pick to ${{ inputs.target-branch }} in merger fork
+    name: Cherry-pick to ${{ inputs.target-branch }} in bot fork
     env:
       BACKPORT_TASK: ${{ inputs.task }}
       BACKPORT_TARGET: ${{ inputs.target-branch }}
@@ -53,24 +54,20 @@ jobs:
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
-      - name: Authorize only the merger's fork
-        id: token
+      - name: Verify the dedicated bot credential
         uses: actions/github-script@v7
-        env:
-          APP_ID: ${{ vars.BACKPORT_APP_ID }}
-          APP_PRIVATE_KEY: ${{ secrets.BACKPORT_APP_PRIVATE_KEY }}
         with:
+          github-token: ${{ secrets.BACKPORT_BOT_TOKEN }}
           script: |
-            await require('./.github/scripts/backport-to-fork.cjs').installationToken({
-              appRequest: new github.constructor().request, core, task: JSON.parse(process.env.BACKPORT_TASK),
-              appId: process.env.APP_ID, privateKey: process.env.APP_PRIVATE_KEY });
+            await require('./.github/scripts/backport-to-fork.cjs').verifyBot({
+              github, task: JSON.parse(process.env.BACKPORT_TASK) });
       - name: Prepare or reuse the backport branch
         id: prepare
         uses: actions/github-script@v7
         env:
-          FORK_TOKEN: ${{ steps.token.outputs.token }}
+          FORK_TOKEN: ${{ secrets.BACKPORT_BOT_TOKEN }}
         with:
-          github-token: ${{ steps.token.outputs.token }}
+          github-token: ${{ secrets.BACKPORT_BOT_TOKEN }}
           script: |
             await require('./.github/scripts/backport-to-fork.cjs').prepare({ github, core,
               task: JSON.parse(process.env.BACKPORT_TASK), target: process.env.BACKPORT_TARGET,
@@ -79,13 +76,14 @@ jobs:
         id: pr
         uses: actions/github-script@v7
         env:
+          UPSTREAM_TOKEN: ${{ github.token }}
           BACKPORT_BRANCH: ${{ steps.prepare.outputs.branch }}
           BACKPORT_MARKERS: ${{ steps.prepare.outputs.markers }}
           BACKPORT_CONFLICT: ${{ steps.prepare.outputs.conflict }}
         with:
-          github-token: ${{ secrets.CHERRY_PICK_TOKEN || secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.BACKPORT_BOT_TOKEN }}
           script: |
-            await require('./.github/scripts/backport-to-fork.cjs').openPullRequest({ github, core,
+            await require('./.github/scripts/backport-to-fork.cjs').openPullRequest({ github, upstream: new github.constructor({ auth: process.env.UPSTREAM_TOKEN }), core,
               task: JSON.parse(process.env.BACKPORT_TASK), target: process.env.BACKPORT_TARGET,
               branch: process.env.BACKPORT_BRANCH, conflict: process.env.BACKPORT_CONFLICT === 'true',
               markers: process.env.BACKPORT_MARKERS === 'true' });
@@ -97,16 +95,9 @@ jobs:
           BACKPORT_SHA: ${{ steps.prepare.outputs.sha }}
           BACKPORT_NUMBER: ${{ steps.pr.outputs.number }}
         with:
-          github-token: ${{ steps.token.outputs.token }}
+          github-token: ${{ secrets.BACKPORT_BOT_TOKEN }}
           script: |
             await require('./.github/scripts/backport-to-fork.cjs').dispatch({ github, core,
               task: JSON.parse(process.env.BACKPORT_TASK), target: process.env.BACKPORT_TARGET,
               branch: process.env.BACKPORT_BRANCH, sha: process.env.BACKPORT_SHA,
               number: process.env.BACKPORT_NUMBER });
-      - name: Revoke fork credentials
-        if: always() && steps.token.outputs.token != ''
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ steps.token.outputs.token }}
-          script: |
-            await github.request('DELETE /installation/token');

@@ -981,10 +981,10 @@ test('Run workflow in a fork tests the selected branch like a push', async () =>
   await assert.rejects(resolve({ context: upstream, core: coreFor({}), github: {} }), /pull request number is required/);
 });
 
-test('human pushes and Run workflow share a group while App backport preparation is isolated', async () => {
+test('ordinary pushes and Run workflow share a group while all backport preparation is isolated', async () => {
   const workflow = await readFile(path.join(__dirname, '../../workflows/fork-ci.yml'), 'utf8');
   assert.match(workflow, /pull-request:\n\s+description: .*\n\s+required: false\n/);
-  assert.match(workflow, /group: fork-ci-\$\{\{ inputs\.pull-request && format\('trusted-\{0\}', inputs\.pull-request\) \|\| github\.ref \}\}\$\{\{ github\.event_name == 'push' && startsWith\(github\.ref, 'refs\/heads\/backport\/'\) && github\.event\.sender\.type == 'Bot' && '-prepare' \|\| '' \}\}\n\s+cancel-in-progress: true/);
+  assert.match(workflow, /group: fork-ci-\$\{\{ inputs\.pull-request && format\('trusted-\{0\}', inputs\.pull-request\) \|\| github\.ref \}\}\$\{\{ github\.event_name == 'push' && startsWith\(github\.ref, 'refs\/heads\/backport\/'\) && '-prepare' \|\| '' \}\}\n\s+cancel-in-progress: true/);
   assert.match(workflow, /github\.event_name == 'workflow_dispatch' && inputs\.pull-request != '' && format\('Trusted Fork CI #\{0\}'/);
 });
 

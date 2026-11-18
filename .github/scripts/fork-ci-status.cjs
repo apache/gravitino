@@ -276,7 +276,7 @@ function createService(github, { readWorkflow = sha => github.rest.repos.getCont
     const all = trusted ? await trustedListings.get(pr.base.ref) : await list();
     const runs = all.filter(run => run.path === '.github/workflows/fork-ci.yml' &&
       (trusted || FORK_EVENTS.includes(run.event)) &&
-      !isBackportPreparation(run.event, `refs/heads/${run.head_branch}`, run.actor?.type) &&
+      !isBackportPreparation(run.event, `refs/heads/${run.head_branch}`) &&
       (trusted ? run.head_branch === pr.base.ref : run.head_sha === pr.head.sha) &&
       (!trusted || run.display_title === `Trusted Fork CI #${pr.number}`)).sort((a, b) => b.id - a.id);
     return runs[0] && { ...target, run: runs[0], trusted };

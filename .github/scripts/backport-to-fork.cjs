@@ -13,7 +13,6 @@
  * limitations under the License.
  */
 'use strict';
-const { createPrivateKey, sign } = require('node:crypto');
 const { mkdtempSync, rmSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const path = require('node:path');
@@ -43,11 +42,23 @@ async function mergedChangeBase(github, pr) {
   throw new Error('Merged change exceeds 250 commits; prepare this backport manually.');
 }
 
-async function resolve({ github, context, core }) {
+async function resolve({ github, context, core, botOwner }) {
   if (`${context.repo.owner}/${context.repo.repo}` !== 'apache/gravitino') throw new Error('Run backports in apache/gravitino.');
   const defaultBranch = context.payload.repository.default_branch;
   if (context.ref !== `refs/heads/${defaultBranch}`) throw new Error('Run the coordinator from the default branch.');
-  const number = context.payload.inputs?.['pull-request'] || context.payload.pull_request?.number;
+  let number = context.payload.inputs?.['pull-request'];
+  if (context.eventName === 'workflow_run') {
+    const run = context.payload.workflow_run;
+    if (run.event !== 'pull_request' || run.conclusion !== 'success' ||
+        !/^[0-9a-f]{40}$/.test(run.head_sha || '')) throw new Error('Invalid PR signal.');
+    const candidates = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit,
+      { ...UPSTREAM, commit_sha: run.head_sha, per_page: 100 });
+    const merged = candidates.filter(pr => pr.merged_at && pr.base.ref === 'main' &&
+      pr.base.repo.full_name === 'apache/gravitino' && pr.head.sha === run.head_sha);
+    if (!merged.length) { core.setOutput('targets', '[]'); return; }
+    if (merged.length !== 1) throw new Error('Ambiguous PR signal; retry with an explicit source PR number.');
+    number = merged[0].number;
+  }
   if (!/^[1-9][0-9]*$/.test(String(number))) throw new Error('A source PR number is required.');
   const { data: pr } = await github.rest.pulls.get({ ...UPSTREAM, pull_number: Number(number) });
   if (!pr.merged || pr.base.ref !== 'main' || pr.base.repo.full_name !== 'apache/gravitino' ||
@@ -55,8 +66,10 @@ async function resolve({ github, context, core }) {
   const targets = TARGETS.filter(target => pr.labels.some(label => label.name === target));
   core.setOutput('targets', JSON.stringify(targets));
   if (!targets.length) return;
-  const owner = pr.merged_by?.login;
-  if (pr.merged_by?.type !== 'User' || !/^[A-Za-z0-9-]+$/.test(owner || '')) throw new Error('The original merger must be a human account.');
+  const owner = botOwner;
+  if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(owner || '') || owner.toLowerCase() === 'apache') {
+    throw new Error('Configure BACKPORT_BOT_OWNER with the dedicated fork account.');
+  }
   let fork;
   try { fork = (await github.rest.repos.get({ owner, repo: 'gravitino' })).data; }
   catch (error) {
@@ -70,26 +83,11 @@ async function resolve({ github, context, core }) {
   core.setOutput('task', JSON.stringify(task));
 }
 
-async function installationToken({ appRequest, core, task, appId, privateKey, now = Date.now() }) {
-  if (!/^[0-9]+$/.test(appId || '') || !privateKey) throw new Error('Configure BACKPORT_APP_ID and BACKPORT_APP_PRIVATE_KEY, and install the App on the merger’s fork.');
-  const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
-  const data = `${encode({ alg: 'RS256', typ: 'JWT' })}.${encode({ iat: Math.floor(now / 1000) - 60,
-    exp: Math.floor(now / 1000) + 540, iss: appId })}`;
-  const jwt = `${data}.${sign('RSA-SHA256', Buffer.from(data), createPrivateKey(privateKey)).toString('base64url')}`;
-  core.setSecret(jwt);
-  const headers = { authorization: `Bearer ${jwt}` };
-  let installation;
-  try { installation = (await appRequest('GET /repos/{owner}/{repo}/installation', { owner: task.owner, repo: task.repo, headers })).data; }
-  catch (error) {
-    if (error.status !== 404) throw error;
-    throw new Error(`Install the Backport App on ${task.owner}/${task.repo}, then retry.`);
-  }
-  const { data: token } = await appRequest('POST /app/installations/{installation_id}/access_tokens', {
-    installation_id: installation.id, repository_ids: [task.repositoryId],
-    permissions: { contents: 'write', actions: 'write', workflows: 'write' }, headers
-  });
-  core.setSecret(token.token);
-  core.setOutput('token', token.token);
+async function verifyBot({ github, task }) {
+  const { data: user } = await github.rest.users.getAuthenticated();
+  if (user.login.toLowerCase() !== task.owner.toLowerCase()) throw new Error('BACKPORT_BOT_TOKEN must belong to BACKPORT_BOT_OWNER.');
+  const { data: fork } = await github.rest.repos.get({ owner: task.owner, repo: task.repo });
+  if (fork.id !== task.repositoryId || !fork.permissions?.push) throw new Error('BACKPORT_BOT_TOKEN cannot push the verified fork.');
 }
 
 function git(directory, args, env = {}, allowFailure = false) {
@@ -175,7 +173,7 @@ async function prepare({ github, core, task, target, token }) {
   } finally { rmSync(directory, { recursive: true, force: true }); }
 }
 
-async function openPullRequest({ github, core, task, target, branch, conflict, markers = false }) {
+async function openPullRequest({ github, upstream = github, core, task, target, branch, conflict, markers = false }) {
   const prs = await github.paginate(github.rest.pulls.list, { ...UPSTREAM, state: 'all',
     head: `${task.owner}:${branch}`, base: target, per_page: 100 });
   let pr = prs.find(pr => pr.head.repo?.full_name.toLowerCase() === `${task.owner}/${task.repo}`.toLowerCase());
@@ -186,17 +184,17 @@ async function openPullRequest({ github, core, task, target, branch, conflict, m
     pr = (await github.rest.pulls.create({ ...UPSTREAM, base: target, head: `${task.owner}:${branch}`,
       title: `${conflict ? '[DO NOT MERGE] ' : ''}[Cherry-pick to ${target}] ${task.title}`.slice(0, 256),
       draft: conflict, maintainer_can_modify: true,
-      body: `Backport of #${task.number}.\n\n- Original commit: ${task.sha}\n- Target branch: ${target}\n- Original merger: @${task.owner}\n\n${conflict ? 'Resolve conflicts in the fork, remove the cherry-pick-conflict label, mark ready for review, and run Fork CI on this branch.' : 'CI runs in the original merger’s fork.'}` })).data;
+      body: `Backport of #${task.number}.\n\n- Original commit: ${task.sha}\n- Target branch: ${target}\n- Backport fork owner: @${task.owner}\n\n${conflict ? 'Resolve conflicts in the fork, remove the cherry-pick-conflict label, mark ready for review, and run Fork CI on this branch.' : 'CI runs in the dedicated bot fork.'}` })).data;
   }
   const labels = ['cherry-pick', ...(blocked ? ['cherry-pick-conflict'] : [])];
   for (const name of labels) {
-    try { await github.rest.issues.getLabel({ ...UPSTREAM, name }); }
+    try { await upstream.rest.issues.getLabel({ ...UPSTREAM, name }); }
     catch (error) {
       if (error.status !== 404) throw error;
-      await github.rest.issues.createLabel({ ...UPSTREAM, name, color: name === 'cherry-pick' ? '1D76DB' : 'B60205' });
+      await upstream.rest.issues.createLabel({ ...UPSTREAM, name, color: name === 'cherry-pick' ? '1D76DB' : 'B60205' });
     }
   }
-  await github.rest.issues.addLabels({ ...UPSTREAM, issue_number: pr.number, labels });
+  await upstream.rest.issues.addLabels({ ...UPSTREAM, issue_number: pr.number, labels });
   const ready = !blocked && !pr.draft && !pr.labels?.some(label => label.name === 'cherry-pick-conflict');
   core.setOutput('ready', String(ready));
   core.setOutput('number', String(pr.number));
@@ -219,4 +217,4 @@ async function dispatch({ github, core, task, target, branch, sha, number }) {
     workflow_id: 'fork-ci.yml', ref: branch });
   core.notice(`Started Fork CI in ${task.owner}/${task.repo} for #${number}.`);
 }
-module.exports = { resolve, mergedChangeBase, installationToken, buildCommit, prepare, openPullRequest, dispatch, ROUTING_MARKER };
+module.exports = { resolve, mergedChangeBase, verifyBot, buildCommit, prepare, openPullRequest, dispatch, ROUTING_MARKER };

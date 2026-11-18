@@ -15,15 +15,15 @@
 'use strict';
 const UPSTREAM = 'apache/gravitino';
 
-function isBackportPreparation(event, ref, actorType) {
-  return event === 'push' && ref?.startsWith('refs/heads/backport/') && actorType === 'Bot';
+function isBackportPreparation(event, ref) {
+  return event === 'push' && ref?.startsWith('refs/heads/backport/');
 }
 
 async function resolve({ github, context, core }) {
   const repository = `${context.repo.owner}/${context.repo.repo}`;
   // Backport fork routing v1: the coordinator dispatches only after opening the PR.
-  // App pushes must not race that dispatch or run suites for unresolved conflicts.
-  if (isBackportPreparation(context.eventName, context.ref, context.payload.sender?.type)) {
+  // Preparation pushes must not race that dispatch or run suites for unresolved conflicts.
+  if (isBackportPreparation(context.eventName, context.ref)) {
     core.setOutput('valid', 'false');
     return;
   }
