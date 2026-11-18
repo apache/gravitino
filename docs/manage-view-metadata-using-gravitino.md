@@ -10,21 +10,26 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-This page covers the Gravitino API for views. For what a view is, which catalogs support them, and
-how they relate to tables, see [Tables and Views](./tables-and-views.md). For creating the catalog
-and schema a view lives in, see [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md).
+This page covers the Gravitino API for views. For how views relate to tables, see
+[Tables and Views](./tables-and-views.md). The [Hive](./apache-hive-catalog.md#view-capabilities),
+[Iceberg](./lakehouse-iceberg-catalog.md#view-capabilities), and
+[Paimon](./lakehouse-paimon-catalog.md#view-capabilities) catalog guides describe which SQL dialects
+and defaults each catalog supports.
 
-Views are supported by the Hive, Iceberg, and Paimon catalogs.
+To follow the examples, register the [`iceberg_rest` catalog](./lakehouse-iceberg-catalog.md#rest-catalog-backend)
+in the metalake named `metalake` using an Iceberg REST backend that supports views. Then
+[create a schema](./manage-catalogs-and-schemas.md#create-a-schema) named `db` in that catalog.
 
 ## View Operations
 
-For client setup and configuration, see [Client Setup](./how-to-use-gravitino-client.md) and [Python Client](./how-to-use-python-client.md).
+For the client examples, connect the [Java client](./how-to-use-gravitino-client.md) or
+[Python client](./how-to-use-python-client.md) to the same metalake.
 
 ### Create a View
 
-A view carries its columns and one or more representations, each holding a query and the dialect it
-is written in. SQL is the only representation type today. A default catalog and schema can be set so
-unqualified names in the query resolve.
+A view declares its output columns and one or more SQL representations, each with its own dialect.
+The `customer_ids` view below supplies the query for both Spark and Trino. Its default catalog and
+schema tell each engine where to resolve the unqualified table name `customers`.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -32,82 +37,61 @@ unqualified names in the query resolve.
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" -d '{
-  "name": "active_customers",
-  "comment": "Customers with orders in the last year",
-  "columns": [
-    {"name": "id", "type": "integer", "nullable": false},
-    {"name": "name", "type": "varchar(500)", "nullable": true}
-  ],
+  "name": "customer_ids",
+  "comment": "Customer identifiers",
+  "columns": [{"name": "id", "type": "integer", "nullable": true}],
   "representations": [
-    {
-      "type": "sql",
-      "sql": "SELECT * FROM customers WHERE last_order_at > current_date - interval 365 day",
-      "dialect": "spark"
-    }
+    {"type": "sql", "dialect": "spark", "sql": "SELECT id FROM customers"},
+    {"type": "sql", "dialect": "trino", "sql": "SELECT id FROM customers"}
   ],
-  "properties": {
-    "spark.sql.create.version": "3.5.0"
-  }
-}' http://localhost:8090/api/metalakes/example/catalogs/sales/schemas/public/views
+  "defaultCatalog": "iceberg_rest",
+  "defaultSchema": "db"
+}' http://localhost:8090/api/metalakes/metalake/catalogs/iceberg_rest/schemas/db/views
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-Catalog catalog = client.loadCatalog("sales");
+Catalog catalog = client.loadCatalog("iceberg_rest");
 ViewCatalog views = catalog.asViewCatalog();
-
-Column[] columns = new Column[] {
-    Column.of("id", Types.IntegerType.get(), null, false, false, null),
-    Column.of("name", Types.VarCharType.of(500))
-};
-
-Representation[] representations = new Representation[] {
-    SQLRepresentation.builder()
-        .withDialect("spark")
-        .withSql("SELECT * FROM customers "
-            + "WHERE last_order_at > current_date - interval 365 day")
-        .build()
+NameIdentifier viewId = NameIdentifier.of("db", "customer_ids");
+Column[] columns = {Column.of("id", Types.IntegerType.get())};
+String sql = "SELECT id FROM customers";
+Representation[] representations = {
+    SQLRepresentation.builder().withDialect(Dialects.SPARK).withSql(sql).build(),
+    SQLRepresentation.builder().withDialect(Dialects.TRINO).withSql(sql).build()
 };
 
 View view = views.createView(
-    NameIdentifier.of("public", "active_customers"),
-    "Customers with orders in the last year",
+    viewId,
+    "Customer identifiers",
     columns,
     representations,
-    "sales",
-    "public",
-    ImmutableMap.of("spark.sql.create.version", "3.5.0"));
+    "iceberg_rest",
+    "db",
+    Collections.emptyMap());
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-catalog = client.load_catalog("sales")
+catalog = client.load_catalog("iceberg_rest")
 views = catalog.as_view_catalog()
-
-columns = [
-    Column.of("id", Types.IntegerType.get(), nullable=False),
-    Column.of("name", Types.VarCharType.of(500)),
-]
-
-representations = [
-    SQLRepresentation(
-        Dialects.SPARK,
-        "SELECT * FROM customers WHERE last_order_at > current_date - interval 365 day",
-    )
-]
+view_id = NameIdentifier.of("db", "customer_ids")
+sql = "SELECT id FROM customers"
 
 view = views.create_view(
-    NameIdentifier.of("public", "active_customers"),
-    columns=columns,
-    representations=representations,
-    comment="Customers with orders in the last year",
-    default_catalog="sales",
-    default_schema="public",
-    properties={"spark.sql.create.version": "3.5.0"},
+    view_id,
+    columns=[Column.of("id", Types.IntegerType.get())],
+    representations=[
+        SQLRepresentation(Dialects.SPARK, sql),
+        SQLRepresentation(Dialects.TRINO, sql),
+    ],
+    comment="Customer identifiers",
+    default_catalog="iceberg_rest",
+    default_schema="db",
 )
 ```
 
@@ -124,21 +108,21 @@ for the engine reading the view.
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-  http://localhost:8090/api/metalakes/example/catalogs/sales/schemas/public/views/active_customers
+  http://localhost:8090/api/metalakes/metalake/catalogs/iceberg_rest/schemas/db/views/customer_ids
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-View view = views.loadView(NameIdentifier.of("public", "active_customers"));
+View current = views.loadView(viewId);
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-view = views.load_view(NameIdentifier.of("public", "active_customers"))
+current = views.load_view(view_id)
 ```
 
 </TabItem>
@@ -153,6 +137,9 @@ view = views.load_view(NameIdentifier.of("public", "active_customers"))
 | Remove a property  | `{"@type":"removeProperty","property":"key1"}`               | `ViewChange.removeProperty("key1")`        | `ViewChange.remove_property("key1")`       |
 | Replace a view     | `{"@type":"replaceView",...}`                                | `ViewChange.replaceView(...)`              | `ViewChange.replace_view(...)`             |
 
+`replaceView` replaces the columns, SQL representations, default catalog, default schema, and
+comment together. To change just the comment, pass the other values from the view you loaded.
+
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
 
@@ -160,27 +147,48 @@ view = views.load_view(NameIdentifier.of("public", "active_customers"))
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" -d '{
   "updates": [
-    {"@type": "setProperty", "property": "key1", "value": "value1"}
+    {
+      "@type": "replaceView",
+      "columns": [{"name": "id", "type": "integer", "nullable": true}],
+      "representations": [
+        {"type": "sql", "dialect": "spark", "sql": "SELECT id FROM customers"},
+        {"type": "sql", "dialect": "trino", "sql": "SELECT id FROM customers"}
+      ],
+      "defaultCatalog": "iceberg_rest",
+      "defaultSchema": "db",
+      "comment": "Customer IDs for reporting"
+    }
   ]
-}' http://localhost:8090/api/metalakes/example/catalogs/sales/schemas/public/views/active_customers
+}' http://localhost:8090/api/metalakes/metalake/catalogs/iceberg_rest/schemas/db/views/customer_ids
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-View view = views.alterView(
-    NameIdentifier.of("public", "active_customers"),
-    ViewChange.setProperty("key1", "value1"));
+View updated = views.alterView(
+    viewId,
+    ViewChange.replaceView(
+        current.columns(),
+        current.representations(),
+        current.defaultCatalog(),
+        current.defaultSchema(),
+        "Customer IDs for reporting"));
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-view = views.alter_view(
-    NameIdentifier.of("public", "active_customers"),
-    ViewChange.set_property("key1", "value1"),
+updated = views.alter_view(
+    view_id,
+    ViewChange.replace_view(
+        columns=current.columns(),
+        representations=current.representations(),
+        default_catalog=current.default_catalog(),
+        default_schema=current.default_schema(),
+        comment="Customer IDs for reporting",
+    ),
 )
 ```
 
@@ -196,21 +204,21 @@ Dropping a view removes the definition. The tables it reads are untouched.
 
 ```shell
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
-  http://localhost:8090/api/metalakes/example/catalogs/sales/schemas/public/views/active_customers
+  http://localhost:8090/api/metalakes/metalake/catalogs/iceberg_rest/schemas/db/views/customer_ids
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-boolean dropped = views.dropView(NameIdentifier.of("public", "active_customers"));
+boolean dropped = views.dropView(viewId);
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-dropped = views.drop_view(NameIdentifier.of("public", "active_customers"))
+dropped = views.drop_view(view_id)
 ```
 
 </TabItem>
@@ -223,21 +231,21 @@ dropped = views.drop_view(NameIdentifier.of("public", "active_customers"))
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-  http://localhost:8090/api/metalakes/example/catalogs/sales/schemas/public/views
+  http://localhost:8090/api/metalakes/metalake/catalogs/iceberg_rest/schemas/db/views
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-NameIdentifier[] identifiers = views.listViews(Namespace.of("public"));
+NameIdentifier[] identifiers = views.listViews(Namespace.of("db"));
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-identifiers = views.list_views(Namespace.of("public"))
+identifiers = views.list_views(Namespace.of("db"))
 ```
 
 </TabItem>

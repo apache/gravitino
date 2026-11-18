@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
@@ -40,6 +41,7 @@ import org.apache.gravitino.rel.partitions.IdentityPartition;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -209,7 +211,7 @@ public class TestCapabilityHelpers {
   }
 
   @Test
-  void testGetCapabilityPropagatesNoSuchCatalogException() {
+  void testWithCapabilityPropagatesNoSuchCatalogException() {
     NameIdentifier tableIdent =
         NameIdentifier.of(Namespace.of("metalake", "catalog", "schema"), "table");
     CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
@@ -220,11 +222,11 @@ public class TestCapabilityHelpers {
     // instead of being wrapped into a plain RuntimeException (a 500).
     Assertions.assertThrows(
         NoSuchCatalogException.class,
-        () -> CapabilityHelpers.getCapability(tableIdent, catalogManager));
+        () -> CapabilityHelpers.withCapability(tableIdent, catalogManager, capability -> true));
   }
 
   @Test
-  void testGetCapabilityWrapsCapabilityFailure() throws Exception {
+  void testWithCapabilityWrapsCapabilityFailure() throws Exception {
     NameIdentifier tableIdent =
         NameIdentifier.of(Namespace.of("metalake", "catalog", "schema"), "table");
     CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
@@ -235,9 +237,72 @@ public class TestCapabilityHelpers {
     RuntimeException e =
         Assertions.assertThrows(
             RuntimeException.class,
-            () -> CapabilityHelpers.getCapability(tableIdent, catalogManager));
+            () -> CapabilityHelpers.withCapability(tableIdent, catalogManager, capability -> true));
 
     Assertions.assertInstanceOf(IllegalStateException.class, e.getCause());
+  }
+
+  @Test
+  void testWithCapabilityKeepsCallbackException() throws Exception {
+    NameIdentifier tableIdent =
+        NameIdentifier.of(Namespace.of("metalake", "catalog", "schema"), "table");
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
+    Mockito.when(catalog.capability()).thenReturn(Capability.DEFAULT);
+    IllegalArgumentException invalidName = new IllegalArgumentException("Illegal name");
+
+    // A callback failure, such as an invalid name, must reach the caller unchanged (a 400), not
+    // wrapped like a failure to load the capability (a 500).
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                CapabilityHelpers.withCapability(
+                    tableIdent,
+                    catalogManager,
+                    capability -> {
+                      throw invalidName;
+                    }));
+
+    Assertions.assertSame(invalidName, e);
+  }
+
+  @Test
+  void testWithCapabilityRunsCallbackInsideCatalogCall() throws Exception {
+    NameIdentifier tableIdent =
+        NameIdentifier.of(Namespace.of("metalake", "catalog", "schema"), "table");
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability()).thenReturn(Capability.DEFAULT);
+    AtomicBoolean insideCatalogCall = new AtomicBoolean();
+    Mockito.when(
+            catalogManager.doWithCatalog(
+                Mockito.eq(NameIdentifier.of("metalake", "catalog")), Mockito.any()))
+        .thenAnswer(
+            invocation -> {
+              insideCatalogCall.set(true);
+              try {
+                ThrowableFunction<BaseCatalog, Object> operation = invocation.getArgument(1);
+                return operation.apply(catalog);
+              } finally {
+                insideCatalogCall.set(false);
+              }
+            });
+
+    // The capability may load classes from the catalog ClassLoader, so it must be used while the
+    // catalog call holds the lease, never after the call has returned.
+    boolean usedInside =
+        CapabilityHelpers.withCapability(
+            tableIdent,
+            catalogManager,
+            capability -> {
+              capability.caseSensitiveOnName(Capability.Scope.TABLE);
+              return insideCatalogCall.get();
+            });
+
+    Assertions.assertTrue(usedInside);
+    Mockito.verify(catalog).capability();
   }
 
   @Test

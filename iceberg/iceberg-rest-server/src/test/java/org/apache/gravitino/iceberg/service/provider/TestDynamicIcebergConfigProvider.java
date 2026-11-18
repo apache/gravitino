@@ -48,7 +48,6 @@ import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerConte
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
-import org.apache.gravitino.secret.SecretMaterial;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.secret.SupportsSecrets;
@@ -702,15 +701,15 @@ public class TestDynamicIcebergConfigProvider {
     try (SecretManager sm = memorySecretManager()) {
       Map<String, String> entityProps = new HashMap<>();
       entityProps.put("custom-token", "placeholder");
-      List<SecretMaterial> writes =
-          sm.assembleSecretMaterials(
+      Map<String, String> plaintexts =
+          sm.assembleSecretPlaintexts(
               Map.of(),
               entityProps,
               "catalog",
               3L,
               Map.of("custom-token", new SecretBinding("memory", "mem-custom-tok")),
               Map.of());
-      sm.writeSecrets(writes);
+      sm.stageSecrets(null, entityProps, "catalog", 3L, plaintexts);
       Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
 
       String metalakeName = "test_metalake";
@@ -765,8 +764,8 @@ public class TestDynamicIcebergConfigProvider {
       entityProps.put(IcebergConstants.CATALOG_BACKEND, "jdbc");
       entityProps.put(IcebergConstants.CATALOG_BACKEND_NAME, catalogName);
       entityProps.put(IcebergConstants.GRAVITINO_JDBC_USER, "root");
-      List<SecretMaterial> writes =
-          sm.assembleSecretMaterials(
+      Map<String, String> plaintexts =
+          sm.assembleSecretPlaintexts(
               Map.of(IcebergConstants.GRAVITINO_JDBC_USER, "root"),
               entityProps,
               "catalog",
@@ -775,7 +774,7 @@ public class TestDynamicIcebergConfigProvider {
                   IcebergConstants.GRAVITINO_JDBC_PASSWORD,
                   new SecretBinding("memory", "aux-mem-pwd")),
               Map.of());
-      sm.writeSecrets(writes);
+      sm.stageSecrets(null, entityProps, "catalog", 9L, plaintexts);
 
       @SuppressWarnings("unchecked")
       BaseCatalog<?> baseCatalog = Mockito.mock(BaseCatalog.class);
