@@ -675,19 +675,29 @@ public class SecretManager implements Closeable {
   }
 
   /**
-   * Fails if any secret URN in {@code properties} cannot be read.
+   * Resolves secret URNs in {@code properties} and fails if any cannot be read.
    *
    * <p>Call on entity create after secrets are staged and before backend connectivity checks.
    * Create init otherwise resolves secrets leniently ({@link #toPlaintextOrMasked}), which can hide
    * a missing reference behind a later connection error.
    *
    * @param properties entity properties that may contain secret URNs (may be null)
+   * @return a new map with secret URNs replaced by plaintext; empty map when {@code properties} is
+   *     null
    */
-  public void validateSecretsReadable(@Nullable Map<String, String> properties) {
-    resolvePlaintextProperties(properties, true);
+  public Map<String, String> validateSecretsReadable(@Nullable Map<String, String> properties) {
+    return resolveSecretProperties(properties, true);
   }
 
   private Map<String, String> resolvePlaintextProperties(
+      @Nullable Map<String, String> properties, boolean failOnMissing) {
+    if (failOnMissing) {
+      return validateSecretsReadable(properties);
+    }
+    return resolveSecretProperties(properties, false);
+  }
+
+  private Map<String, String> resolveSecretProperties(
       @Nullable Map<String, String> properties, boolean failOnMissing) {
     if (properties == null || properties.isEmpty()) {
       return properties == null ? Map.of() : Map.copyOf(properties);
