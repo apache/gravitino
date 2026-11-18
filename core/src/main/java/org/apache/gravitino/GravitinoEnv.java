@@ -66,6 +66,7 @@ import org.apache.gravitino.domain.DomainDispatcher;
 import org.apache.gravitino.domain.DomainManager;
 import org.apache.gravitino.domain.DomainNormalizeDispatcher;
 import org.apache.gravitino.encryption.kms.KmsClientRegistry;
+import org.apache.gravitino.glossary.GlossaryManager;
 import org.apache.gravitino.hook.AccessControlHookDispatcher;
 import org.apache.gravitino.hook.CatalogHookDispatcher;
 import org.apache.gravitino.hook.DomainHookDispatcher;
@@ -147,6 +148,7 @@ public class GravitinoEnv {
   private MetalakeManager metalakeManager;
 
   private DomainManager domainManager;
+  private GlossaryManager glossaryManager;
 
   private SchemaDispatcher schemaDispatcher;
   private SchemaDispatcher internalSchemaDispatcher;
@@ -610,6 +612,11 @@ public class GravitinoEnv {
     return idGenerator;
   }
 
+  /** Returns the core glossary definition manager. */
+  public GlossaryManager glossaryManager() {
+    return glossaryManager;
+  }
+
   /**
    * Get the CatalogManager associated with the Gravitino environment.
    *
@@ -966,6 +973,8 @@ public class GravitinoEnv {
 
     this.internalTagDispatcher = new TagManager(idGenerator, entityStore);
     this.internalPolicyDispatcher = new PolicyManager(idGenerator, entityStore);
+    this.glossaryManager =
+        new GlossaryManager(idGenerator, config.get(Configs.ENABLE_AUTHORIZATION));
     this.domainManager = new DomainManager(idGenerator, entityStore);
     this.internalDomainDispatcher = new DomainNormalizeDispatcher(domainManager);
 

@@ -29,8 +29,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
@@ -46,6 +48,7 @@ import org.apache.gravitino.meta.GlossaryTermNames;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.GlossaryTermPO;
 import org.apache.gravitino.storage.relational.po.GlossaryTermSnapshotPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
@@ -215,6 +218,11 @@ public final class GlossaryTermMetaService {
           long deletedAt = Math.max(1, System.currentTimeMillis());
           requireUpdated(mapper.delete(row.getTermId(), row.getCurrentVersion(), deletedAt), ident);
           mapper.deleteSynonyms(row.getTermId(), deletedAt);
+          SessionUtils.doWithoutCommit(
+              OwnerMetaMapper.class,
+              owners ->
+                  owners.softDeleteOwnerRelByMetadataObjectIdAndType(
+                      row.getTermId(), Entity.EntityType.GLOSSARY_TERM.name()));
           GlossaryTermRelService.getInstance().removeTerm(metalakeId, row.getTermId());
           return true;
         });
@@ -248,6 +256,49 @@ public final class GlossaryTermMetaService {
             count += mapper.purge(id);
           }
           return count;
+        });
+  }
+
+  /** Runs a create request with the live parent and hierarchy locked through commit. */
+  public <T> T withHierarchyLock(Namespace namespace, Supplier<T> work) {
+    return transaction(namespace, true, (mapper, metalakeId) -> work.get());
+  }
+
+  /** Locks the parent, optional hierarchy mutex, and current term before invoking the operation. */
+  public <T> T withLockedTerm(
+      NameIdentifier ident,
+      boolean hierarchyLock,
+      Function<Optional<GlossaryTermEntity>, T> operation) {
+    return transaction(
+        ident.namespace(),
+        hierarchyLock,
+        (mapper, metalakeId) -> {
+          GlossaryTermPO row = mapper.getForUpdate(metalakeId, GlossaryTermNames.key(ident.name()));
+          return operation.apply(
+              Optional.ofNullable(row).map(term -> fromPO(term, mapper, ident.namespace())));
+        });
+  }
+
+  /** Checks indexed name/synonym conflicts inside the caller's hierarchy transaction. */
+  public void checkTermNames(GlossaryTermEntity term) {
+    String name = GlossaryTermNames.key(term.name());
+    long metalakeId = metalake(term.namespace()).getMetalakeId();
+    SessionUtils.doWithoutCommit(
+        GlossaryTermMetaMapper.class,
+        mapper -> {
+          Preconditions.checkArgument(
+              mapper.conflictingSynonym(metalakeId, term.id(), name) == null,
+              "Term name conflicts with a synonym");
+          List<String> keys = new ArrayList<>();
+          for (String synonym : term.synonyms()) {
+            String key = GlossaryTermNames.key(synonym);
+            Preconditions.checkArgument(
+                !name.equals(key), "Term name conflicts with its own synonym");
+            keys.add(key);
+          }
+          Preconditions.checkArgument(
+              keys.isEmpty() || mapper.conflictingName(metalakeId, term.id(), keys) == null,
+              "Synonym conflicts with a term name");
         });
   }
 

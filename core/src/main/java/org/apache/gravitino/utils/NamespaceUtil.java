@@ -30,6 +30,11 @@ public class NamespaceUtil {
 
   private NamespaceUtil() {}
 
+  /** Returns the internal namespace for a metalake's glossary terms. */
+  public static Namespace ofGlossaryTerm(String metalake) {
+    return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, "glossary_term");
+  }
+
   /**
    * Create a namespace for metalake.
    *
