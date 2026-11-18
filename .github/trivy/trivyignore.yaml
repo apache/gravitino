@@ -756,17 +756,6 @@ vulnerabilities:
       - pkg:maven/org.jline/jline-remote-telnet@3.9.0
     expired_at: 2027-02-07
     statement: "Pre-existing finding, tracked in apache/gravitino#14777."
-  # org.json/json
-  - id: CVE-2022-45688
-    purls:
-      - pkg:maven/org.json/json@20180130
-    expired_at: 2027-02-07
-    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
-  - id: CVE-2023-5072
-    purls:
-      - pkg:maven/org.json/json@20180130
-    expired_at: 2027-02-07
-    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
   # org.lz4/lz4-java
   - id: CVE-2025-12183
     purls:
