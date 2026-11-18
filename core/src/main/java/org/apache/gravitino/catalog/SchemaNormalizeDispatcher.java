@@ -20,7 +20,7 @@ package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
-import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
+import static org.apache.gravitino.catalog.CapabilityHelpers.withCapability;
 
 import java.util.Collections;
 import java.util.Map;
@@ -36,6 +36,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretReference;
 
@@ -50,6 +51,13 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
   public SchemaNormalizeDispatcher(SchemaDispatcher dispatcher, CatalogManager catalogManager) {
     this.dispatcher = dispatcher;
     this.catalogManager = catalogManager;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Schema importSchema(NameIdentifier ident, AuditInfo auditInfo)
+      throws NoSuchSchemaException {
+    return dispatcher.importSchema(normalizeCaseSensitive(ident), auditInfo);
   }
 
   @Override
@@ -118,8 +126,10 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
   }
 
   private boolean supportsHierarchicalSchema(Namespace namespace) {
-    Capability capabilities = getCapability(NameIdentifier.of(namespace.levels()), catalogManager);
-    return capabilities.supportsHierarchicalSchema().supported();
+    return withCapability(
+        NameIdentifier.of(namespace.levels()),
+        catalogManager,
+        capabilities -> capabilities.supportsHierarchicalSchema().supported());
   }
 
   private static void checkCommentLength(@Nullable String comment) {
@@ -128,12 +138,16 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier schemaIdent) {
-    Capability capabilities = getCapability(schemaIdent, catalogManager);
-    return applyCapabilities(schemaIdent, Capability.Scope.SCHEMA, capabilities);
+    return withCapability(
+        schemaIdent,
+        catalogManager,
+        capabilities -> applyCapabilities(schemaIdent, Capability.Scope.SCHEMA, capabilities));
   }
 
   private NameIdentifier normalizeCaseSensitive(NameIdentifier schemaIdent) {
-    Capability capabilities = getCapability(schemaIdent, catalogManager);
-    return applyCaseSensitive(schemaIdent, Capability.Scope.SCHEMA, capabilities);
+    return withCapability(
+        schemaIdent,
+        catalogManager,
+        capabilities -> applyCaseSensitive(schemaIdent, Capability.Scope.SCHEMA, capabilities));
   }
 }

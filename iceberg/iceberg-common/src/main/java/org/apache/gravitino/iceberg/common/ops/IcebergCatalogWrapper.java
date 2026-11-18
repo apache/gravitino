@@ -25,6 +25,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.Setter;
@@ -477,10 +478,47 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     return loadTableResponse;
   }
 
+  /**
+   * Commits an already built table change and reloads the table metadata.
+   *
+   * <p>This method does not establish an impersonation context for the earlier table load or
+   * transaction construction. Callers that require Kerberos impersonation must build changes inside
+   * {@link #buildAndUpdateTable(Function)} on the proxied wrapper instead of building them with
+   * {@link #getCatalog()} before calling this method.
+   *
+   * @param icebergTableChange the table change to commit
+   * @return the response after committing the table change
+   */
   public LoadTableResponse updateTable(IcebergTableChange icebergTableChange) {
     Transaction transaction = icebergTableChange.getTransaction();
-    transaction.commitTransaction();
+    try {
+      transaction.commitTransaction();
+    } finally {
+      // A load during the commit can cache old metadata, even if the commit ultimately fails.
+      getMetadataCache().invalidate(icebergTableChange.getTableIdentifier());
+    }
     return loadTable(icebergTableChange.getTableIdentifier());
+  }
+
+  /**
+   * Builds an {@link IcebergTableChange} and commits it within a single proxied call. When this
+   * wrapper is behind the {@link KerberosAwareIcebergCatalogProxy}, the entire operation, including
+   * the metadata.json read triggered by {@code loadTable()} inside the builder, runs under the
+   * impersonated user's UGI context.
+   *
+   * <p>The catalog passed to the builder is the same underlying instance returned by {@link
+   * #getCatalog()}; it is not itself proxied. The builder must execute inside this wrapper method
+   * so that table loading and transaction construction remain within the proxy's Kerberos boundary.
+   * Moving the builder call outside this method would bypass impersonation even when using the same
+   * catalog.
+   *
+   * @param builder a function that uses the underlying catalog to build an {@link
+   *     IcebergTableChange}
+   * @return the response after committing the table change
+   */
+  public LoadTableResponse buildAndUpdateTable(Function<Catalog, IcebergTableChange> builder) {
+    IcebergTableChange change = builder.apply(getCatalog());
+    return updateTable(change);
   }
 
   public LoadViewResponse createView(Namespace namespace, CreateViewRequest request) {

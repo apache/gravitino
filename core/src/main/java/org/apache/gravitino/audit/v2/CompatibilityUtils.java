@@ -29,6 +29,23 @@ public class CompatibilityUtils {
 
   private static final ImmutableMap<OperationType, Operation> OPERATION_TYPE_MAP =
       ImmutableMap.<OperationType, Operation>builder()
+          .put(OperationType.LIST_DOMAIN, Operation.LIST_DOMAIN)
+          .put(OperationType.LIST_DOMAINS_INFO, Operation.LIST_DOMAINS_INFO)
+          .put(OperationType.GET_DOMAIN, Operation.GET_DOMAIN)
+          .put(OperationType.CREATE_DOMAIN, Operation.CREATE_DOMAIN)
+          .put(OperationType.ALTER_DOMAIN, Operation.ALTER_DOMAIN)
+          .put(OperationType.DELETE_DOMAIN, Operation.DELETE_DOMAIN)
+          .put(OperationType.PUBLISH_DOMAIN, Operation.PUBLISH_DOMAIN)
+          .put(OperationType.UNPUBLISH_DOMAIN, Operation.UNPUBLISH_DOMAIN)
+          .put(OperationType.UPDATE_DOMAIN_BACKING_TAG, Operation.UPDATE_DOMAIN_BACKING_TAG)
+          .put(OperationType.ATTACH_DOMAIN, Operation.ATTACH_DOMAIN)
+          .put(OperationType.DETACH_DOMAIN, Operation.DETACH_DOMAIN)
+          .put(OperationType.LIST_SUBDOMAINS, Operation.LIST_SUBDOMAINS)
+          .put(OperationType.LIST_SUBDOMAINS_INFO, Operation.LIST_SUBDOMAINS_INFO)
+          .put(OperationType.LIST_DOMAIN_MEMBERS, Operation.LIST_DOMAIN_MEMBERS)
+          .put(
+              OperationType.LIST_DOMAINS_FOR_METADATA_OBJECT,
+              Operation.LIST_DOMAINS_FOR_METADATA_OBJECT)
           .put(OperationType.CREATE_METALAKE, Operation.CREATE_METALAKE)
           .put(OperationType.ALTER_METALAKE, Operation.ALTER_METALAKE)
           .put(OperationType.DROP_METALAKE, Operation.DROP_METALAKE)

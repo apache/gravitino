@@ -34,6 +34,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
@@ -343,10 +344,11 @@ public class LanceTableOperations {
     // No specific fields to validate for now
   }
 
-  private void validateDescribeTableRequest(
-      @SuppressWarnings("unused") DescribeTableRequest request) {
+  private void validateDescribeTableRequest(DescribeTableRequest request) {
     // We will ignore the id in the request body since it's already provided in the path param
-    // No specific fields to validate for now
+    if (request != null) {
+      validateVersionSelectors(request.getBranch(), request.getTag());
+    }
   }
 
   private void validateTableExists(@SuppressWarnings("unused") TableExistsRequest request) {
@@ -361,6 +363,7 @@ public class LanceTableOperations {
 
   private void validateDropColumnsRequest(AlterTableDropColumnsRequest request) {
     Preconditions.checkArgument(request != null, "Request body must not be null");
+    validateVersionSelectors(request.getBranch(), null);
     Preconditions.checkArgument(request.getColumns() != null, "columns must not be null");
     Preconditions.checkArgument(
         !request.getColumns().isEmpty(), "Columns to drop cannot be empty.");
@@ -371,6 +374,7 @@ public class LanceTableOperations {
 
   private void validateAlterColumnsRequest(AlterTableAlterColumnsRequest request) {
     Preconditions.checkArgument(request != null, "Request body must not be null");
+    validateVersionSelectors(request.getBranch(), null);
     Preconditions.checkArgument(request.getAlterations() != null, "alterations must not be null");
     Preconditions.checkArgument(
         !request.getAlterations().isEmpty(), "Columns to alter cannot be empty.");
@@ -388,6 +392,28 @@ public class LanceTableOperations {
               && alteration.getVirtualColumn() == null,
           "Only RENAME alteration is supported currently.");
     }
+  }
+
+  // lance-namespace 0.11.1 added optional `branch` and `tag` selectors to the describe and
+  // alter requests. Gravitino keeps a single Lance history per table and implements neither, so a
+  // request naming one is rejected: ignoring it would silently apply a mutation meant for a branch
+  // to the table itself, and answer a tag-pinned read with the table's current state. The 0.7.5
+  // models had no such fields, so these payloads used to fail deserialization instead.
+  //
+  // The alter requests are called with a null tag because in 0.11.1 only DescribeTableRequest
+  // declares `tag`; AlterTableDropColumnsRequest and AlterTableAlterColumnsRequest carry `branch`
+  // alone. If a later spec adds `tag` to them, pass it here instead of null, or the selector goes
+  // through unchecked.
+  //
+  // A present but blank selector is accepted: it names no branch or tag, so there is nothing to
+  // refuse, and rejecting it would break clients that serialize empty strings for unset fields.
+  private static void validateVersionSelectors(@Nullable String branch, @Nullable String tag) {
+    Preconditions.checkArgument(
+        StringUtils.isBlank(branch),
+        "Lance table branches are not supported, got branch: %s",
+        branch);
+    Preconditions.checkArgument(
+        StringUtils.isBlank(tag), "Lance table tags are not supported, got tag: %s", tag);
   }
 
   private static String normalizeCreateTableMode(String mode) {

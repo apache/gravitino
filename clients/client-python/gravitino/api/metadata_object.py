@@ -75,6 +75,9 @@ class MetadataObject(ABC):
         MODEL = "model"
         """A model is mapped to the model artifact in ML."""
 
+        DOMAIN = "domain"
+        """A business grouping of leaf metadata objects."""
+
         TAG = "tag"
         """A tag is used to help manage other metadata object."""
 

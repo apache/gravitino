@@ -105,6 +105,8 @@ Metalake (top level)
 │       ├── Model
 │       ├── Function
 │       └── Semantic Model
+├── Domain
+│   └── Subdomain
 ├── Tag
 ├── Policy
 ├── Job Template
@@ -142,7 +144,7 @@ catalog, or schema, never to a table. Whoever creates a role owns it, and can al
 
 Ownership can be held by a group as well as a user, in which case every member of that group holds
 it, and it can be transferred at any time. It applies to metalakes, catalogs, schemas, tables, views,
-topics, filesets, models, semantic models, functions, roles, tags, policies, job templates, and jobs.
+topics, filesets, models, semantic models, functions, domains, roles, tags, policies, job templates, and jobs.
 
 ### Resolution
 
@@ -853,3 +855,60 @@ client.setOwner(schema, "analyst", Owner.Type.USER);
   data source or to an external system such as Apache Ranger
 - [How to Authenticate](how-to-authenticate.md), for establishing who the caller is
 - [Local users and groups](local-users-and-groups.md)
+
+
+## Domain permissions
+
+Domains have two privileges, bindable to a metalake or a domain:
+
+| Privilege | Operations |
+| --- | --- |
+| `USE_DOMAIN` | Read published domains, list their visible subdomains and accessible members, and discover them from accessible leaf metadata. |
+| `MANAGE_DOMAIN` | Create, alter, delete, publish/unpublish, change parent and change backing tag; also use domains and see drafts. |
+
+A top-level domain is created with `MANAGE_DOMAIN` on the metalake. Creating a subdomain requires
+management on both the metalake and parent. Attaching/moving requires management on the child
+(using its current scopes) and the new parent. Other mutations require management on the domain.
+Privileges are evaluated over the metalake, current parent (if any), and domain. An allow on any
+scope suffices only when no scope denies that privilege. An explicit `USE_DOMAIN` deny prevents
+use even with an allowed `MANAGE_DOMAIN`. Owners of the domain, current parent or metalake bypass
+these privilege denies. Service administrators retain administrative access.
+
+A draft is omitted from lists for callers who cannot manage it; direct access returns
+`NoSuchDomainException` (404). A published domain without use permission is omitted from lists,
+but direct access returns `ForbiddenException` (403). A child snapshot can still name a hidden
+draft parent; this does not authorize loading the parent. Moving/detaching changes the inherited
+scopes immediately, without rewriting grants: former parent permissions stop applying.
+
+Domain visibility and data visibility are separate. Member lists filter out leaf objects the caller
+cannot access under ordinary metadata authorization. Reverse lookup of an inaccessible object
+returns 403. `USE_DOMAIN` and `MANAGE_DOMAIN` do not grant catalog/schema use, table selection,
+fileset access, model access or any backend data permission. A hidden child contributes no
+`VIA_SUBDOMAIN` relation, in either query direction. Relations with no visible membership path
+are removed. An `INHERITED` relation for an accessible leaf retains the complete source catalog or
+schema name; the source is explanatory metadata and is not separately authorized by this query.
+
+Tag privileges are also separate. Creating a new backing tag requires `CREATE_TAG` on the metalake
+in addition to Domain management. Binding an existing tag requires ownership of that tag or the
+metalake; Domain ownership alone does not confer tag ownership. Removing a binding requires no tag
+privilege. Assigning/removing tags on member metadata uses the existing tag authorization rules;
+Domain management does not confer assignment rights. Reading Domain membership does not require
+`VIEW_TAG`, `APPLY_TAG` or tag ownership.
+
+For example, after creating user `domain_reader`, grant a role over a published Finance domain:
+
+```shell
+curl --fail-with-body -u anonymous:dummy -H 'Content-Type: application/json' \
+  -d '{"name":"finance_reader","properties":{},"securableObjects":[{"fullName":"Finance","type":"domain","privileges":[{"name":"USE_DOMAIN","condition":"ALLOW"}]}]}' \
+  http://127.0.0.1:8090/api/metalakes/test/roles
+curl --fail-with-body -u anonymous:dummy -X PUT -H 'Content-Type: application/json' \
+  -d '{"roleNames":["finance_reader"]}' \
+  http://127.0.0.1:8090/api/metalakes/test/permissions/users/domain_reader/grant
+```
+
+Use the role/user APIs from the walkthrough above to create the user first. This role permits
+published Finance discovery and inherited use of its published children, but a member list can
+still be empty until the user has ordinary access to member objects. Replacing `USE_DOMAIN` with
+`MANAGE_DOMAIN` grants management and draft visibility. A child `USE_DOMAIN` deny can exclude that
+child from the reader's inherited access. See the [Domain guide](../manage-domains-in-gravitino.md)
+for executable SDK examples, lifecycle constraints, tag rules and REST errors.
