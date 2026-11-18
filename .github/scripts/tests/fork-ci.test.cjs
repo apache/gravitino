@@ -215,7 +215,7 @@ test('trusted dispatch rejects an arbitrary ref or a non-upstream repository', a
   const ctx = context('fork/repo');ctx.eventName = 'workflow_dispatch';ctx.payload.inputs = { 'pull-request': '7' };
   await assert.rejects(resolve({ context: ctx, core: coreFor({}), github: {} }), /apache/);
   const upstream = context('apache/gravitino');upstream.eventName = 'workflow_dispatch';upstream.payload.inputs = { 'pull-request': '7' };
-  await assert.rejects(resolve({ context: upstream, core: coreFor({}), github: { rest: { pulls: { get: async () => ({ data: pr() }) } } } }), /current default branch/);
+  await assert.rejects(resolve({ context: upstream, core: coreFor({}), github: { rest: { pulls: { get: async () => ({ data: pr() }) } } } }), /current upstream PR target branch/);
 });
 
 test('trusted dispatch resolves the current default branch after the PR base snapshot ages', async () => {
@@ -228,7 +228,60 @@ test('trusted dispatch resolves the current default branch after the PR base sna
   assert.equal(output['base-sha'], C);
   assert.equal(output['head-sha'], A);
   ctx.sha = B;
-  await assert.rejects(resolve({ context: ctx, core: coreFor({}), github }), /current default branch/);
+  await assert.rejects(resolve({ context: ctx, core: coreFor({}), github }), /current upstream PR target branch/);
+});
+
+test('trusted release dispatch freezes the current target tip and can satisfy the publisher', async () => {
+  for (const branch of ['branch-1.3', 'branch-2.0']) {
+    const p = pr(); p.base.ref = branch;
+    const ctx = context('apache/gravitino'); ctx.eventName = 'workflow_dispatch';
+    ctx.ref = `refs/heads/${branch}`; ctx.sha = C; ctx.payload.inputs = { 'pull-request': '7' };
+    const output = {};
+    await resolve({ context: ctx, core: coreFor(output), github: { rest: {
+      pulls: { get: async () => ({ data: p }) },
+      repos: { getBranch: async args => {
+        assert.equal(args.branch, branch); return { data: { commit: { sha: C } } };
+      } }
+    } } });
+    assert.deepEqual(output, { 'base-ref': branch, 'base-sha': C, 'head-sha': A,
+      'head-repository': 'fork/repo', sync: 'true', valid: 'true' });
+    const tested = { ...p, base: { ref: output['base-ref'], sha: output['base-sha'] } };
+    const github = serviceMock({ changed: true, trusted: true, trustedSha: C,
+      forkJobs: jobs(p), trustedJobs: jobs(tested) });
+    github.rest.repos.compareCommitsWithBasehead = async args => {
+      assert.equal(args.basehead, `${C}...${branch}`); return { data: { status: 'ahead' } };
+    };
+    const list = github.rest.actions.listWorkflowRuns;
+    github.rest.actions.listWorkflowRuns = async args => {
+      const response = await list(args);
+      if (args.event === 'workflow_dispatch') {
+        assert.equal(args.branch, branch);
+        response.data.workflow_runs[0].head_branch = branch;
+      }
+      return response;
+    };
+    const mirrored = await createService(github).mirror(p);
+    assert.equal(mirrored.trusted, true);
+    assert.equal(mirrored.result.conclusion, 'success');
+    assert.equal(mirrored.base, C);
+  }
+});
+
+test('trusted release dispatch rejects mismatched refs, stale tips and arbitrary targets before output', async () => {
+  for (const scenario of ['main-ref', 'other-release', 'tag', 'stale-tip', 'feature-target']) {
+    const p = pr(); p.base.ref = scenario === 'feature-target' ? 'topic' : 'branch-2.0';
+    const ctx = context('apache/gravitino'); ctx.eventName = 'workflow_dispatch';
+    ctx.payload.inputs = { 'pull-request': '7' }; ctx.sha = scenario === 'stale-tip' ? B : C;
+    ctx.ref = scenario === 'main-ref' ? 'refs/heads/main'
+      : scenario === 'other-release' ? 'refs/heads/branch-1.3'
+      : scenario === 'tag' ? 'refs/tags/branch-2.0' : `refs/heads/${p.base.ref}`;
+    const output = {};
+    await assert.rejects(resolve({ context: ctx, core: coreFor(output), github: { rest: {
+      pulls: { get: async () => ({ data: p }) },
+      repos: { getBranch: async () => ({ data: { commit: { sha: C } } }) }
+    } } }), /Dispatch/);
+    assert.deepEqual(output, {}, scenario);
+  }
 });
 
 test('trusted runs on an advanced base are found by branch and verified against their actual tested SHA', async () => {
