@@ -25,6 +25,9 @@ plugins {
 }
 
 dependencies {
+  // aliyun-sdk-oss 3.10.2 pulls in jettison 1.1. Declare it directly so that both the shaded jar
+  // and the published POM resolve the version in the catalog.
+  implementation(libs.jettison)
   implementation(libs.aliyun.credentials.sdk)
   implementation(libs.aliyun.sdk.oss)
   // Aliyun oss SDK depends on this package, and JDK >= 9 requires manual add

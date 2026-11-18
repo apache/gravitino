@@ -19,6 +19,7 @@
 package org.apache.gravitino.secret;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -35,20 +36,64 @@ public class TestSecretManager {
       Map.of("jdbc-password", new SecretReference("memory", Map.of("path", "secret/data/x")));
 
   @Test
-  void testWriteSecrets() {
+  void testStageSecretsForCreate() {
     try (SecretManager sm = memorySecretManager()) {
       Map<String, String> props = new HashMap<>(Map.of("jdbc-user", "root"));
-      List<SecretUrn> urns = sm.buildSecretBindingUrns("catalog", 42L, BINDINGS);
-      sm.writeSecrets(List.of(new SecretMaterial(urns.get(0), "s3cr3t")));
-      SecretPropertyUtils.putSecretUrns(props, urns);
-
-      String urn = props.get("jdbc-password");
-      Assertions.assertTrue(SecretPropertyUtils.isSecretProperty("jdbc-password", urn));
+      Map<String, String> plaintexts =
+          sm.assembleSecretPlaintexts(
+              Map.of("jdbc-user", "root"), props, "catalog", 42L, BINDINGS, Map.of());
+      Assertions.assertEquals(Map.of("jdbc-password", "s3cr3t"), plaintexts);
       Assertions.assertEquals("root", props.get("jdbc-user"));
-      Assertions.assertEquals(1, urns.size());
-      Assertions.assertEquals(
-          "s3cr3t", sm.getRegistry().getProvider("memory").readSecret(urns.get(0)));
-      Assertions.assertEquals("s3cr3t", sm.readSecret(urns.get(0)));
+      SecretUrn urn = SecretUrn.parse(props.get("jdbc-password"));
+      Assertions.assertTrue(
+          SecretPropertyUtils.isWriteThroughForEntity(
+              "jdbc-password", urn.toString(), "catalog", 42L));
+
+      SecretVersionChanges staged = sm.stageSecrets(null, props, "catalog", 42L, plaintexts);
+      // A create releases nothing and its URN has no previous version, so commit switches nothing.
+      Assertions.assertEquals(1, staged.written().size());
+      Assertions.assertNull(staged.written().get(0).previousId());
+      Assertions.assertTrue(staged.released().isEmpty());
+      Assertions.assertEquals("s3cr3t", sm.readSecret(urn));
+      sm.commitSecrets(staged);
+      Assertions.assertEquals("s3cr3t", sm.readSecret(urn));
+    }
+  }
+
+  @Test
+  void testRollbackSecretsAfterFailedCreate() {
+    try (SecretManager sm = memorySecretManager()) {
+      Map<String, String> props = new HashMap<>();
+      Map<String, String> plaintexts =
+          sm.assembleSecretPlaintexts(Map.of(), props, "catalog", 42L, BINDINGS, Map.of());
+      SecretVersionChanges staged = sm.stageSecrets(null, props, "catalog", 42L, plaintexts);
+      SecretUrn urn = SecretUrn.parse(props.get("jdbc-password"));
+      Assertions.assertEquals("s3cr3t", sm.readSecret(urn));
+
+      sm.rollbackSecrets(staged);
+      Assertions.assertThrows(IllegalArgumentException.class, () -> sm.readSecret(urn));
+      Assertions.assertNull(sm.getRegistry().getProvider("memory").currentSecretVersion(urn));
+    }
+  }
+
+  @Test
+  void testCreateWithUnversionedProviderDeletesVersionsWrittenBefore() {
+    try (SecretManager sm = memorySecretManager()) {
+      Map<String, SecretBinding> bindings = new LinkedHashMap<>();
+      bindings.put("jdbc-password", new SecretBinding("memory", "s3cr3t"));
+      bindings.put("token", new SecretBinding("unversioned", "t0ken"));
+      Map<String, String> props = new HashMap<>();
+      Map<String, String> plaintexts =
+          sm.assembleSecretPlaintexts(Map.of(), props, "catalog", 42L, bindings, Map.of());
+
+      UnsupportedOperationException error =
+          Assertions.assertThrows(
+              UnsupportedOperationException.class,
+              () -> sm.stageSecrets(null, props, "catalog", 42L, plaintexts));
+      Assertions.assertTrue(error.getMessage().contains("\"unversioned\""), error.getMessage());
+      Assertions.assertTrue(error.getMessage().contains("\"token\""), error.getMessage());
+      SecretUrn urn = SecretUrn.parse(props.get("jdbc-password"));
+      Assertions.assertNull(sm.getRegistry().getProvider("memory").currentSecretVersion(urn));
     }
   }
 
@@ -61,7 +106,7 @@ public class TestSecretManager {
       Map<String, String> props = new HashMap<>(Map.of("jdbc-user", "root"));
       List<SecretUrn> urns = sm.buildSecretBindingUrns("catalog", 42L, BINDINGS);
       SecretPropertyUtils.putSecretUrns(props, urns);
-      sm.writeSecrets(List.of(new SecretMaterial(urns.get(0), "s3cr3t")));
+      sm.stageSecrets(null, props, "catalog", 42L, Map.of("jdbc-password", "s3cr3t"));
 
       String urn = props.get("jdbc-password");
       Map<String, String> plaintext = sm.toPlaintextProperties(props);
@@ -99,7 +144,7 @@ public class TestSecretManager {
           Assertions.assertThrows(
               IllegalArgumentException.class,
               () ->
-                  sm.assembleSecretMaterials(
+                  sm.assembleSecretPlaintexts(
                       Map.of(), entityProps, "catalog", 42L, bindings, Map.of()));
       Assertions.assertTrue(ex.getMessage().contains("masked placeholder"));
       Assertions.assertTrue(ex.getMessage().contains("jdbc-password"));
@@ -143,24 +188,12 @@ public class TestSecretManager {
   }
 
   @Test
-  void testSecretMaterialRedacts() {
-    try (SecretManager sm = memorySecretManager()) {
-      List<SecretUrn> urns = sm.buildSecretBindingUrns("catalog", 42L, BINDINGS);
-      SecretMaterial material = new SecretMaterial(urns.get(0), "s3cr3t");
-      Assertions.assertEquals(urns.get(0), material.urn());
-      Assertions.assertEquals("s3cr3t", material.plaintext());
-      Assertions.assertFalse(material.toString().contains("s3cr3t"));
-      Assertions.assertTrue(material.toString().contains("***"));
-    }
-  }
-
-  @Test
   void testDeleteBindingsFromProperties() {
     try (SecretManager sm = memorySecretManager()) {
       List<SecretUrn> urns = sm.buildSecretBindingUrns("catalog", 99L, BINDINGS);
-      sm.writeSecrets(List.of(new SecretMaterial(urns.get(0), "s3cr3t")));
       Map<String, String> props = new HashMap<>();
       SecretPropertyUtils.putSecretUrns(props, urns);
+      sm.stageSecrets(null, props, "catalog", 99L, Map.of("jdbc-password", "s3cr3t"));
       sm.deleteSecretsFromProperties(props);
       Assertions.assertThrows(IllegalArgumentException.class, () -> sm.readSecret(urns.get(0)));
     }
@@ -169,12 +202,17 @@ public class TestSecretManager {
   private static SecretManager memorySecretManager() {
     Config config = new Config(false) {};
     Properties properties = new Properties();
-    properties.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory");
+    properties.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory,unversioned");
     properties.setProperty(
         SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
             + "memory."
             + SecretProviderRegistry.CLASS_NAME,
         InMemorySecretsProvider.class.getName());
+    properties.setProperty(
+        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
+            + "unversioned."
+            + SecretProviderRegistry.CLASS_NAME,
+        TestSecretManagerAlter.UnversionedSecretsProvider.class.getName());
     config.loadFromProperties(properties);
     return new SecretManager(config);
   }

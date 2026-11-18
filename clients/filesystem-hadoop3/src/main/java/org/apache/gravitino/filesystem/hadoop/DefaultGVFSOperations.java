@@ -61,18 +61,22 @@ public class DefaultGVFSOperations extends BaseGVFSOperations {
 
   @Override
   public FSDataInputStream open(Path gvfsPath, int bufferSize) throws IOException {
-    FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
-    Path actualFilePath =
-        getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.OPEN);
-    return actualFs.open(actualFilePath, bufferSize);
+    try (OperationScope ignored = openOperationScope()) {
+      FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
+      Path actualFilePath =
+          getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.OPEN);
+      return actualFs.open(actualFilePath, bufferSize);
+    }
   }
 
   @Override
   public synchronized void setWorkingDirectory(Path gvfsDir) throws FileNotFoundException {
-    FileSystem actualFs = getActualFileSystem(gvfsDir, currentLocationName());
-    Path actualFilePath =
-        getActualFilePath(gvfsDir, currentLocationName(), FilesetDataOperation.SET_WORKING_DIR);
-    actualFs.setWorkingDirectory(actualFilePath);
+    try (OperationScope ignored = openOperationScope()) {
+      FileSystem actualFs = getActualFileSystem(gvfsDir, currentLocationName());
+      Path actualFilePath =
+          getActualFilePath(gvfsDir, currentLocationName(), FilesetDataOperation.SET_WORKING_DIR);
+      actualFs.setWorkingDirectory(actualFilePath);
+    }
   }
 
   @Override
@@ -85,146 +89,164 @@ public class DefaultGVFSOperations extends BaseGVFSOperations {
       long blockSize,
       Progressable progress)
       throws IOException {
-    try {
-      FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
-      Path actualFilePath =
-          getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.CREATE);
-      return actualFs.create(
-          actualFilePath, permission, overwrite, bufferSize, replication, blockSize, progress);
-    } catch (FileNotFoundException e) {
-      String message =
-          "Fileset is not found for path: "
-              + gvfsPath
-              + " for operation CREATE. "
-              + "This may be caused by fileset related metadata not found or not in use in "
-              + "Gravitino, please check the fileset metadata in Gravitino.";
-      throw new IOException(message, e);
+    try (OperationScope ignored = openOperationScope()) {
+      try {
+        FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
+        Path actualFilePath =
+            getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.CREATE);
+        return actualFs.create(
+            actualFilePath, permission, overwrite, bufferSize, replication, blockSize, progress);
+      } catch (FileNotFoundException e) {
+        String message =
+            "Fileset is not found for path: "
+                + gvfsPath
+                + " for operation CREATE. "
+                + "This may be caused by fileset related metadata not found or not in use in "
+                + "Gravitino, please check the fileset metadata in Gravitino.";
+        throw new IOException(message, e);
+      }
     }
   }
 
   @Override
   public FSDataOutputStream append(Path gvfsPath, int bufferSize, Progressable progress)
       throws IOException {
-    FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
-    Path actualFilePath =
-        getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.APPEND);
-    return actualFs.append(actualFilePath, bufferSize, progress);
+    try (OperationScope ignored = openOperationScope()) {
+      FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
+      Path actualFilePath =
+          getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.APPEND);
+      return actualFs.append(actualFilePath, bufferSize, progress);
+    }
   }
 
   @Override
   public boolean rename(Path srcGvfsPath, Path dstGvfsPath) throws IOException {
-    // Fileset identifier is not allowed to be renamed, only its subdirectories can be renamed
-    // which not in the storage location of the fileset;
-    NameIdentifier srcIdentifier = extractIdentifier(metalakeName(), srcGvfsPath.toString());
-    NameIdentifier dstIdentifier = extractIdentifier(metalakeName(), dstGvfsPath.toString());
-    Preconditions.checkArgument(
-        srcIdentifier.equals(dstIdentifier),
-        "Destination path fileset identifier: %s should be same with src path "
-            + "fileset identifier: %s.",
-        srcIdentifier,
-        dstIdentifier);
+    try (OperationScope ignored = openOperationScope()) {
+      // Fileset identifier is not allowed to be renamed, only its subdirectories can be renamed
+      // which not in the storage location of the fileset;
+      NameIdentifier srcIdentifier = extractIdentifier(metalakeName(), srcGvfsPath.toString());
+      NameIdentifier dstIdentifier = extractIdentifier(metalakeName(), dstGvfsPath.toString());
+      Preconditions.checkArgument(
+          srcIdentifier.equals(dstIdentifier),
+          "Destination path fileset identifier: %s should be same with src path "
+              + "fileset identifier: %s.",
+          srcIdentifier,
+          dstIdentifier);
 
-    Path srcActualPath =
-        getActualFilePath(srcGvfsPath, currentLocationName(), FilesetDataOperation.RENAME);
-    Path dstActualPath =
-        getActualFilePath(dstGvfsPath, currentLocationName(), FilesetDataOperation.RENAME);
-    FileSystem actualFs = getActualFileSystem(srcGvfsPath, currentLocationName());
-    return actualFs.rename(srcActualPath, dstActualPath);
+      Path srcActualPath =
+          getActualFilePath(srcGvfsPath, currentLocationName(), FilesetDataOperation.RENAME);
+      Path dstActualPath =
+          getActualFilePath(dstGvfsPath, currentLocationName(), FilesetDataOperation.RENAME);
+      FileSystem actualFs = getActualFileSystem(srcGvfsPath, currentLocationName());
+      return actualFs.rename(srcActualPath, dstActualPath);
+    }
   }
 
   @Override
   public boolean delete(Path gvfsPath, boolean recursive) throws IOException {
-    try {
-      FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
-      Path actualFilePath =
-          getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.DELETE);
-      return actualFs.delete(actualFilePath, recursive);
-    } catch (FileNotFoundException e) {
-      return false;
+    try (OperationScope ignored = openOperationScope()) {
+      try {
+        FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
+        Path actualFilePath =
+            getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.DELETE);
+        return actualFs.delete(actualFilePath, recursive);
+      } catch (FileNotFoundException e) {
+        return false;
+      }
     }
   }
 
   @Override
   public FileStatus getFileStatus(Path gvfsPath) throws IOException {
-    FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
-    Path actualFilePath =
-        getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.GET_FILE_STATUS);
-    FileStatus fileStatus = actualFs.getFileStatus(actualFilePath);
+    try (OperationScope ignored = openOperationScope()) {
+      FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
+      Path actualFilePath =
+          getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.GET_FILE_STATUS);
+      FileStatus fileStatus = actualFs.getFileStatus(actualFilePath);
 
-    NameIdentifier identifier = extractIdentifier(metalakeName(), gvfsPath.toString());
-    String subPath = getSubPathFromGvfsPath(identifier, gvfsPath.toString());
-    String filesetLocation =
-        actualFilePath
-            .toString()
-            .substring(0, actualFilePath.toString().length() - subPath.length());
+      NameIdentifier identifier = extractIdentifier(metalakeName(), gvfsPath.toString());
+      String subPath = getSubPathFromGvfsPath(identifier, gvfsPath.toString());
+      String filesetLocation =
+          actualFilePath
+              .toString()
+              .substring(0, actualFilePath.toString().length() - subPath.length());
 
-    return convertFileStatusPathPrefix(
-        fileStatus, filesetLocation, getVirtualLocation(identifier, true));
+      return convertFileStatusPathPrefix(
+          fileStatus, filesetLocation, getVirtualLocation(identifier, true));
+    }
   }
 
   @Override
   public FileStatus[] listStatus(Path gvfsPath) throws IOException {
-    FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
-    Path actualFilePath =
-        getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.LIST_STATUS);
-    FileStatus[] fileStatusResults = actualFs.listStatus(actualFilePath);
+    try (OperationScope ignored = openOperationScope()) {
+      FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
+      Path actualFilePath =
+          getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.LIST_STATUS);
+      FileStatus[] fileStatusResults = actualFs.listStatus(actualFilePath);
 
-    NameIdentifier identifier = extractIdentifier(metalakeName(), gvfsPath.toString());
-    String subPath = getSubPathFromGvfsPath(identifier, gvfsPath.toString());
-    String filesetLocation =
-        actualFilePath
-            .toString()
-            .substring(0, actualFilePath.toString().length() - subPath.length());
+      NameIdentifier identifier = extractIdentifier(metalakeName(), gvfsPath.toString());
+      String subPath = getSubPathFromGvfsPath(identifier, gvfsPath.toString());
+      String filesetLocation =
+          actualFilePath
+              .toString()
+              .substring(0, actualFilePath.toString().length() - subPath.length());
 
-    return Arrays.stream(fileStatusResults)
-        .map(
-            fileStatus ->
-                convertFileStatusPathPrefix(
-                    fileStatus, filesetLocation, getVirtualLocation(identifier, true)))
-        .toArray(FileStatus[]::new);
+      return Arrays.stream(fileStatusResults)
+          .map(
+              fileStatus ->
+                  convertFileStatusPathPrefix(
+                      fileStatus, filesetLocation, getVirtualLocation(identifier, true)))
+          .toArray(FileStatus[]::new);
+    }
   }
 
   @Override
   public boolean mkdirs(Path gvfsPath, FsPermission permission) throws IOException {
-    try {
-      FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
-      Path actualFilePath =
-          getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.MKDIRS);
-      return actualFs.mkdirs(actualFilePath, permission);
-    } catch (FileNotFoundException e) {
-      String message =
-          "Fileset is not found for path: "
-              + gvfsPath
-              + " for operation MKDIRS. "
-              + "This may be caused by fileset related metadata not found or not in use in "
-              + "Gravitino, please check the fileset metadata in Gravitino.";
-      throw new IOException(message, e);
+    try (OperationScope ignored = openOperationScope()) {
+      try {
+        FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
+        Path actualFilePath =
+            getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.MKDIRS);
+        return actualFs.mkdirs(actualFilePath, permission);
+      } catch (FileNotFoundException e) {
+        String message =
+            "Fileset is not found for path: "
+                + gvfsPath
+                + " for operation MKDIRS. "
+                + "This may be caused by fileset related metadata not found or not in use in "
+                + "Gravitino, please check the fileset metadata in Gravitino.";
+        throw new IOException(message, e);
+      }
     }
   }
 
   @Override
   public short getDefaultReplication(Path gvfsPath) {
-    try {
-      FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
-      Path actualFilePath =
-          getActualFilePath(
-              gvfsPath, currentLocationName(), FilesetDataOperation.GET_DEFAULT_REPLICATION);
-      return actualFs.getDefaultReplication(actualFilePath);
-    } catch (FileNotFoundException e) {
-      return 1;
+    try (OperationScope ignored = openOperationScope()) {
+      try {
+        FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
+        Path actualFilePath =
+            getActualFilePath(
+                gvfsPath, currentLocationName(), FilesetDataOperation.GET_DEFAULT_REPLICATION);
+        return actualFs.getDefaultReplication(actualFilePath);
+      } catch (FileNotFoundException e) {
+        return 1;
+      }
     }
   }
 
   @Override
   public long getDefaultBlockSize(Path gvfsPath) {
-    try {
-      FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
-      Path actualFilePath =
-          getActualFilePath(
-              gvfsPath, currentLocationName(), FilesetDataOperation.GET_DEFAULT_BLOCK_SIZE);
-      return actualFs.getDefaultBlockSize(actualFilePath);
-    } catch (FileNotFoundException e) {
-      return defaultBlockSize();
+    try (OperationScope ignored = openOperationScope()) {
+      try {
+        FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
+        Path actualFilePath =
+            getActualFilePath(
+                gvfsPath, currentLocationName(), FilesetDataOperation.GET_DEFAULT_BLOCK_SIZE);
+        return actualFs.getDefaultBlockSize(actualFilePath);
+      } catch (FileNotFoundException e) {
+        return defaultBlockSize();
+      }
     }
   }
 
