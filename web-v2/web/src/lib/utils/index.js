@@ -117,7 +117,11 @@ export const genUpdates = (originalData, newData, disableUpdate = false) => {
   const newContent = newData.content || {}
 
   if (JSON.stringify(originalContent) !== JSON.stringify(newContent)) {
-    updates.push({ '@type': 'updateContent', policyType: 'custom', newContent: newContent })
+    updates.push({
+      '@type': 'updateContent',
+      policyType: newData.policyType || originalData.policyType || 'custom',
+      newContent: newContent
+    })
   }
 
   const originalProperties = originalData.properties || {}
