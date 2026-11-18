@@ -121,8 +121,6 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
         IcebergSparkConfigUtils.parseFlatJsonMap(
             arguments.get("updater-options"), "updater-options");
     Map<String, String> properties = buildOptimizerProperties(options);
-    String schemaSeparator =
-        GravitinoClientUtils.fetchSchemaSeparator(properties.get(OptimizerConfig.GRAVITINO_URI));
     Map<String, String> sparkConfigs =
         IcebergJobUtils.parseCustomSparkConfigs(arguments.get("spark-conf"));
     try (StatisticsUpdater updater =
@@ -134,7 +132,11 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
       sparkConfigs.forEach(builder::config);
       SparkSession spark = builder.getOrCreate();
       try {
+        // Fail fast on a missing Iceberg runtime before contacting Gravitino for the separator.
         IcebergJobUtils.requireIcebergSparkRuntime();
+        String schemaSeparator =
+            GravitinoClientUtils.fetchSchemaSeparator(
+                properties.get(OptimizerConfig.GRAVITINO_URI));
         updateStatistics(
             spark,
             updater,
