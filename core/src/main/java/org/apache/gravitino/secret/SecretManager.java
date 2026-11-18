@@ -657,7 +657,7 @@ public class SecretManager implements Closeable {
    *     null
    */
   public Map<String, String> toPlaintextProperties(@Nullable Map<String, String> properties) {
-    return validateSecretsReadable(properties);
+    return resolvePlaintextProperties(properties, true);
   }
 
   /**
@@ -671,25 +671,27 @@ public class SecretManager implements Closeable {
    * @return a new map with secret URNs replaced by plaintext or the masked placeholder
    */
   public Map<String, String> toPlaintextOrMasked(@Nullable Map<String, String> properties) {
-    return validateSecretsReadable(properties, false);
+    return resolvePlaintextProperties(properties, false);
   }
 
   /**
-   * Resolves secret URNs in {@code properties} and fails if any cannot be read.
+   * Fails if any secret URN in {@code properties} cannot be read.
    *
    * <p>Call on entity create after secrets are staged and before backend connectivity checks.
    * Create init otherwise resolves secrets leniently ({@link #toPlaintextOrMasked}), which can hide
    * a missing reference behind a later connection error.
    *
    * @param properties entity properties that may contain secret URNs (may be null)
-   * @return a new map with secret URNs replaced by plaintext; empty map when {@code properties} is
-   *     null
    */
-  public Map<String, String> validateSecretsReadable(@Nullable Map<String, String> properties) {
-    return validateSecretsReadable(properties, true);
+  public void validateSecretsReadable(@Nullable Map<String, String> properties) {
+    resolvePlaintextProperties(properties, true);
   }
 
-  private Map<String, String> validateSecretsReadable(
+  /**
+   * Replaces secret URN values with plaintext, or with {@link HiddenPropertyMaskUtils#MASKED_VALUE}
+   * when {@code failOnMissing} is false and a secret cannot be read.
+   */
+  private Map<String, String> resolvePlaintextProperties(
       @Nullable Map<String, String> properties, boolean failOnMissing) {
     if (properties == null || properties.isEmpty()) {
       return properties == null ? Map.of() : Map.copyOf(properties);
