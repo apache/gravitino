@@ -56,6 +56,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -101,7 +102,6 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretConstants;
 import org.apache.gravitino.secret.SecretManager;
-import org.apache.gravitino.secret.SecretMaterial;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretProvider;
 import org.apache.gravitino.secret.SecretProviderRegistry;
@@ -2642,7 +2642,7 @@ public class TestCatalogManager {
       NameIdentifier ident = NameIdentifier.of("metalake", "legacy_secret_providers");
       long id = new RandomIdGenerator().nextId();
       SecretUrn urn = writeThroughUrn("catalog", id, CredentialConstants.CREDENTIAL_PROVIDERS);
-      secrets.writeSecrets(List.of(new SecretMaterial(urn, "gcs-token")));
+      secrets.getRegistry().getProvider(urn.providerName()).writeSecretVersion(urn, "gcs-token");
       Map<String, String> props = new HashMap<>(catalogProps());
       props.put(CredentialConstants.CREDENTIAL_PROVIDERS, urn.toString());
       entityStore.put(
@@ -2800,6 +2800,76 @@ public class TestCatalogManager {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testFailureAfterCatalogIsStoredKeepsSecretsUntilEntityIsRemoved(boolean deleteFails)
+      throws Exception {
+    InMemoryEntityStore store = Mockito.spy(new InMemoryEntityStore());
+    store.initialize(config);
+    store.put(metalakeEntity, true);
+    IOException deleteFailure = new IOException("catalog delete failed");
+    if (deleteFails) {
+      Mockito.doThrow(deleteFailure).when(store).delete(any(), eq(EntityType.CATALOG), eq(true));
+    }
+    IllegalStateException failure = new IllegalStateException("injected lease release failure");
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            Mockito.spy(
+                new CatalogManager(
+                    config, store, new AtomicLong(4545L)::getAndIncrement, secrets))) {
+      // The lease is released after store.put stored the catalog, and a failure there still runs
+      // the create rollback.
+      Mockito.doAnswer(
+              invocation -> {
+                CatalogManager.CatalogWrapper wrapper =
+                    Mockito.spy((CatalogManager.CatalogWrapper) invocation.callRealMethod());
+                Mockito.doAnswer(
+                        release -> {
+                          release.callRealMethod();
+                          throw failure;
+                        })
+                    .when(wrapper)
+                    .release();
+                return wrapper;
+              })
+          .when(manager)
+          .createCatalogWrapper(any(CatalogEntity.class), Mockito.anyMap());
+      NameIdentifier ident = NameIdentifier.of(metalake, "failed_after_store");
+      SecretUrn urn = writeThroughUrn("catalog", 4545L, PROPERTY_KEY4);
+
+      RuntimeException error =
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () ->
+                  manager.createCatalog(
+                      ident,
+                      Catalog.Type.RELATIONAL,
+                      provider,
+                      "comment",
+                      catalogProps(),
+                      Map.of(PROPERTY_KEY4, new SecretBinding("memory", "x")),
+                      Map.of()));
+      if (deleteFails) {
+        // The catalog row is still there, so it keeps the secret it references, and the error
+        // says the catalog was left behind.
+        Assertions.assertInstanceOf(GravitinoRuntimeException.class, error);
+        Assertions.assertTrue(
+            error.getMessage().contains("failed to remove the catalog entity"), error.getMessage());
+        Assertions.assertSame(failure, error.getCause());
+        Assertions.assertArrayEquals(new Throwable[] {deleteFailure}, error.getSuppressed());
+        Assertions.assertTrue(store.exists(ident, EntityType.CATALOG));
+        Assertions.assertEquals("x", secrets.readSecret(urn));
+      } else {
+        Assertions.assertSame(failure, error);
+        Assertions.assertEquals(0, error.getSuppressed().length);
+        Assertions.assertFalse(store.exists(ident, EntityType.CATALOG));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+      }
+    } finally {
+      store.close();
+    }
+  }
+
   @Test
   void testSecretNoMetalake() throws Exception {
     try (SecretManager secrets = memorySecretManager();
@@ -2896,6 +2966,73 @@ public class TestCatalogManager {
       Assertions.assertDoesNotThrow(() -> manager.disableCatalog(broken));
       Assertions.assertTrue(manager.dropCatalog(broken, true));
       Assertions.assertTrue(manager.dropCatalog(healthy, true));
+    }
+  }
+
+  @Test
+  void testFailedCatalogStoreUpdateKeepsSecretValue() throws Exception {
+    InMemoryEntityStore store = Mockito.spy(new InMemoryEntityStore());
+    store.initialize(config);
+    store.put(metalakeEntity, true);
+    NameIdentifier ident = NameIdentifier.of(metalake, "secret_store_failure");
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            new CatalogManager(config, store, new RandomIdGenerator(), secrets)) {
+      manager.createCatalog(
+          ident,
+          Catalog.Type.RELATIONAL,
+          provider,
+          "comment",
+          catalogProps(),
+          Map.of(PROPERTY_KEY4, new SecretBinding("memory", "old")),
+          Map.of());
+      SecretUrn urn =
+          SecretUrn.parse(
+              store
+                  .get(ident, EntityType.CATALOG, CatalogEntity.class)
+                  .getProperties()
+                  .get(PROPERTY_KEY4));
+
+      // The updater stages the secrets, then the store fails to write the entity.
+      IOException failure = new IOException("catalog update failed");
+      Mockito.doAnswer(
+              invocation -> {
+                Function<CatalogEntity, CatalogEntity> updater = invocation.getArgument(3);
+                updater.apply(store.get(ident, EntityType.CATALOG, CatalogEntity.class));
+                throw failure;
+              })
+          .when(store)
+          .update(eq(ident), eq(CatalogEntity.class), eq(EntityType.CATALOG), any());
+      CatalogChange rebind =
+          CatalogChange.setSecretBinding(PROPERTY_KEY4, new SecretBinding("memory", "new"));
+      CatalogChange[][] batches = {
+        {rebind},
+        {CatalogChange.setProperty(PROPERTY_KEY4, "new")},
+        {CatalogChange.removeProperty(PROPERTY_KEY4)},
+        {CatalogChange.removeProperty(PROPERTY_KEY4), rebind},
+      };
+      for (CatalogChange[] batch : batches) {
+        RuntimeException error =
+            Assertions.assertThrows(
+                RuntimeException.class, () -> manager.alterCatalog(ident, batch));
+        Assertions.assertSame(failure, error.getCause());
+        Assertions.assertEquals("old", secrets.readSecret(urn));
+      }
+
+      // Without material the written version is current at once, so only rollback removes it.
+      secrets.getRegistry().getProvider("memory").deleteSecret(urn);
+      RuntimeException error =
+          Assertions.assertThrows(
+              RuntimeException.class, () -> manager.alterCatalog(ident, rebind));
+      Assertions.assertSame(failure, error.getCause());
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+
+      Mockito.reset(store);
+      manager.alterCatalog(ident, rebind);
+      Assertions.assertEquals("new", secrets.readSecret(urn));
+      Assertions.assertTrue(manager.dropCatalog(ident, true));
+    } finally {
+      store.close();
     }
   }
 

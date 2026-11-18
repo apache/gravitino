@@ -88,6 +88,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -147,9 +148,9 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretConstants;
 import org.apache.gravitino.secret.SecretManager;
-import org.apache.gravitino.secret.SecretMaterial;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
@@ -897,7 +898,7 @@ public class TestFilesetCatalogOperations {
     Path schemaPath = new Path(catalogPath, schemaName);
     long schemaId = generateTestId();
     SecretUrn urn = writeThroughUrn("schema", schemaId, "schema-sk");
-    secretManager.writeSecrets(List.of(new SecretMaterial(urn, "schema-secret")));
+    seedSecret(urn, "schema-secret");
 
     FileSystem realFileSystem = schemaPath.getFileSystem(new Configuration());
     FileSystem failingFileSystem = Mockito.mock(FileSystem.class);
@@ -1061,7 +1062,7 @@ public class TestFilesetCatalogOperations {
                   SecretConstants.ATTR_ENTITY_TYPE, "fileset",
                   SecretConstants.ATTR_ENTITY_ID, String.valueOf(generateTestId()),
                   SecretConstants.ATTR_PROPERTY_KEY, "test-secret"));
-      secretManager.writeSecrets(List.of(new SecretMaterial(urn, "test-value")));
+      seedSecret(urn, "test-value");
       secrets.add(urn);
       createFileset(
           name,
@@ -1145,7 +1146,7 @@ public class TestFilesetCatalogOperations {
     NameIdentifier schemaIdent = NameIdentifier.of("m1", "c1", schemaName);
     NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, "fileset");
     SecretUrn urn = writeThroughUrn("fileset", generateTestId(), "test-secret");
-    secretManager.writeSecrets(List.of(new SecretMaterial(urn, "test-value")));
+    seedSecret(urn, "test-value");
     Map<String, String> catalogProperties = ImmutableMap.of(LOCATION, catalogPath);
     Fileset fileset =
         createMultiLocationFileset(
@@ -1242,7 +1243,7 @@ public class TestFilesetCatalogOperations {
                 SecretConstants.ATTR_ENTITY_TYPE, "fileset",
                 SecretConstants.ATTR_ENTITY_ID, String.valueOf(remainingId),
                 SecretConstants.ATTR_PROPERTY_KEY, "test-secret"));
-    secretManager.writeSecrets(List.of(new SecretMaterial(urn, "test-value")));
+    seedSecret(urn, "test-value");
     Map<String, String> remainingProperties =
         StringIdentifier.newPropertiesWithId(
             StringIdentifier.fromId(remainingId), Map.of("test-secret", urn.toString()));
@@ -1309,7 +1310,7 @@ public class TestFilesetCatalogOperations {
                 SecretConstants.ATTR_ENTITY_TYPE, "fileset",
                 SecretConstants.ATTR_ENTITY_ID, String.valueOf(generateTestId()),
                 SecretConstants.ATTR_PROPERTY_KEY, "test-secret"));
-    secretManager.writeSecrets(List.of(new SecretMaterial(urn, "test-value")));
+    seedSecret(urn, "test-value");
     Fileset fileset =
         createFileset(
             filesetIdent.name(),
@@ -2226,6 +2227,64 @@ public class TestFilesetCatalogOperations {
       Map<String, String> props2 = fileset2.properties();
       Assertions.assertFalse(props2.containsKey("k1"));
     }
+  }
+
+  @Test
+  void testAlterFilesetSecretSwitchesOnlyAfterCommit() throws IOException {
+    String schemaName = "schema_secret_alter_" + generateTestId();
+    createSchema(schemaName, "comment", null, TEST_ROOT_PATH + "/" + schemaName);
+    createFileset("fileset", schemaName, "comment", Fileset.Type.MANAGED, null, null);
+    NameIdentifier ident = NameIdentifier.of("m1", "c1", schemaName, "fileset");
+    long filesetId = store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class).id();
+    SecretUrn urn = writeThroughUrn("fileset", filesetId, "k");
+    EntityStore failingStore = Mockito.spy(store);
+
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(failingStore, secretManager)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
+      ops.alterFileset(ident, bindSecret("k", "old"));
+      Assertions.assertEquals(
+          urn.toString(),
+          store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class).properties().get("k"));
+
+      ops.alterFileset(ident, bindSecret("k", "new"));
+      Assertions.assertEquals("new", secretManager.readSecret(urn));
+
+      // The updater stages the secrets, then the store fails to write the entity.
+      IOException failure = new IOException("fileset update failed");
+      Mockito.doAnswer(
+              invocation -> {
+                Function<FilesetEntity, FilesetEntity> updater = invocation.getArgument(3);
+                updater.apply(store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class));
+                throw failure;
+              })
+          .when(failingStore)
+          .update(
+              Mockito.eq(ident),
+              Mockito.eq(FilesetEntity.class),
+              Mockito.eq(Entity.EntityType.FILESET),
+              any());
+      FilesetChange[] failingChanges = {
+        bindSecret("k", "newer"), FilesetChange.removeProperty("k"), bindSecret("k_new", "x")
+      };
+      for (FilesetChange change : failingChanges) {
+        RuntimeException error =
+            Assertions.assertThrows(RuntimeException.class, () -> ops.alterFileset(ident, change));
+        Assertions.assertSame(failure, error.getCause());
+      }
+      Assertions.assertEquals("new", secretManager.readSecret(urn));
+      // A first binding is readable as soon as it is written, so only rollback removes it.
+      SecretUrn newUrn = writeThroughUrn("fileset", filesetId, "k_new");
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> secretManager.readSecret(newUrn));
+
+      Mockito.reset(failingStore);
+      ops.alterFileset(ident, FilesetChange.removeProperty("k"));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secretManager.readSecret(urn));
+    }
+  }
+
+  private static FilesetChange bindSecret(String key, String plaintext) {
+    return FilesetChange.setSecretBinding(key, new SecretBinding("memory", plaintext));
   }
 
   @ParameterizedTest
@@ -5488,7 +5547,7 @@ public class TestFilesetCatalogOperations {
                 SecretConstants.ATTR_ENTITY_TYPE, "schema",
                 SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
                 SecretConstants.ATTR_PROPERTY_KEY, "aws-sk"));
-    secretManager.writeSecrets(List.of(new SecretMaterial(urn, "super-secret")));
+    seedSecret(urn, "super-secret");
 
     String schemaName = "schema_secret_" + generateTestId();
     String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
@@ -5520,10 +5579,8 @@ public class TestFilesetCatalogOperations {
     long filesetId = idGenerator.nextId();
     SecretUrn schemaUrn = writeThroughUrn("schema", schemaId, "schema-sk");
     SecretUrn filesetUrn = writeThroughUrn("fileset", filesetId, "fileset-sk");
-    secretManager.writeSecrets(
-        List.of(
-            new SecretMaterial(schemaUrn, "schema-secret"),
-            new SecretMaterial(filesetUrn, "fileset-secret")));
+    seedSecret(schemaUrn, "schema-secret");
+    seedSecret(filesetUrn, "fileset-secret");
 
     String schemaName = "schema_cascade_" + generateTestId();
     String catalogPath = TEST_ROOT_PATH + "/catalog_cascade_" + generateTestId();
@@ -5627,6 +5684,10 @@ public class TestFilesetCatalogOperations {
         Arguments.of(
             new IOException("Cannot initialize filesystem", new TimeoutException()), "timeout"),
         Arguments.of(new IOException("Cannot initialize filesystem"), "probe failed"));
+  }
+
+  private static void seedSecret(SecretUrn urn, String plaintext) {
+    secretManager.getRegistry().getProvider(urn.providerName()).writeSecretVersion(urn, plaintext);
   }
 
   private static SecretUrn writeThroughUrn(String entityType, long entityId, String key) {

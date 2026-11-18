@@ -123,6 +123,21 @@ them: 2.2 for `lance.blob` and 2.1 for `lance.blob.legacy`. A table cannot have 
 column to an existing dataset fails with a clear error if the dataset's file format version does not
 support it.
 
+A table created without blob columns uses Lance's own default file format version, 2.2 as of
+`lance-core` 12.0.0, and there is no property to override it. Such a table accepts a later
+`lance.blob` column but rejects `lance.blob.legacy`; tables created by earlier releases, whose
+Lance default was below 2.2, behave the other way round and keep their stored version.
+
+Any Lance client can **read** such a table. **Writing** to it needs a client that writes at the
+dataset's own file format version rather than at its own default. `lance-spark` 0.2.0 does not: it
+passes no data storage version to Lance, so every write goes out at `lance-core` 2.0.0's default of
+2.0 and the commit is refused with `All data files must have the same version.  Detected both 2.2
+and 2.0` — or, while the dataset is still empty, `The operation added files with version 2.0.
+However, the data storage version is 2.2.` This is not specific to version 2.2: earlier Gravitino
+releases pinned the same tables at 2.1 and refused the same write. `lance-spark` 0.4.0 and later
+read the dataset's version before writing and are unaffected, as are tables created *through* a
+connector — that path uses `DeclareTable`, and the connector writes the dataset at its own version.
+
 Only the blob marker is recognized. Other blob metadata, such as
 `lance-encoding:blob-dedicated-size-threshold`, is not shown in the Gravitino type, and columns created
 through Gravitino use Lance's defaults. A blob field in any other layout, for example a blob v2 struct

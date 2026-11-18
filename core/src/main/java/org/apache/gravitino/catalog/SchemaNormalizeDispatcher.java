@@ -20,7 +20,7 @@ package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
-import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
+import static org.apache.gravitino.catalog.CapabilityHelpers.withCapability;
 
 import java.util.Collections;
 import java.util.Map;
@@ -126,8 +126,10 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
   }
 
   private boolean supportsHierarchicalSchema(Namespace namespace) {
-    Capability capabilities = getCapability(NameIdentifier.of(namespace.levels()), catalogManager);
-    return capabilities.supportsHierarchicalSchema().supported();
+    return withCapability(
+        NameIdentifier.of(namespace.levels()),
+        catalogManager,
+        capabilities -> capabilities.supportsHierarchicalSchema().supported());
   }
 
   private static void checkCommentLength(@Nullable String comment) {
@@ -136,12 +138,16 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier schemaIdent) {
-    Capability capabilities = getCapability(schemaIdent, catalogManager);
-    return applyCapabilities(schemaIdent, Capability.Scope.SCHEMA, capabilities);
+    return withCapability(
+        schemaIdent,
+        catalogManager,
+        capabilities -> applyCapabilities(schemaIdent, Capability.Scope.SCHEMA, capabilities));
   }
 
   private NameIdentifier normalizeCaseSensitive(NameIdentifier schemaIdent) {
-    Capability capabilities = getCapability(schemaIdent, catalogManager);
-    return applyCaseSensitive(schemaIdent, Capability.Scope.SCHEMA, capabilities);
+    return withCapability(
+        schemaIdent,
+        catalogManager,
+        capabilities -> applyCaseSensitive(schemaIdent, Capability.Scope.SCHEMA, capabilities));
   }
 }

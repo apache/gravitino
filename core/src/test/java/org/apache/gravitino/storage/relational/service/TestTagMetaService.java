@@ -145,6 +145,24 @@ public class TestTagMetaService extends TestJDBCBackend {
     List<GenericEntity> objects =
         backend.listEntitiesByRelation(RelationQuery.forTagId(METALAKE_NAME, tag.id(), null));
     assertEquals(catalog.id(), objects.get(0).id());
+    // Put the live ID in the second batch alongside IDs that no longer resolve.
+    List<Long> ids = new ArrayList<>();
+    for (long missing = -500; missing < 0; missing++) {
+      ids.add(missing);
+    }
+    ids.add(catalog.id());
+    List<TagEntity> directTags =
+        backend
+            .listDirectTagsByObjectIds(METALAKE_NAME, MetadataObject.Type.CATALOG, ids)
+            .get(catalog.id());
+    assertEquals(1, directTags.size());
+    assertEquals(tag.id(), directTags.get(0).id());
+    assertEquals(
+        Set.of("Finance", "finance"), Set.of(directTags.get(0).assignment().get().values()));
+    assertTrue(
+        backend.listDirectTagsByObjectIds("other", MetadataObject.Type.CATALOG, ids).isEmpty());
+    assertTrue(
+        backend.listDirectTagsByObjectIds(METALAKE_NAME, MetadataObject.Type.TABLE, ids).isEmpty());
     backend.delete(tag.nameIdentifier(), Entity.EntityType.TAG, false);
     TagEntity recreated =
         TagEntity.builder()

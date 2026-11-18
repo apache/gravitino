@@ -16,27 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.secret;
+package org.apache.gravitino.storage.relational.po;
 
-import java.util.List;
+import lombok.Getter;
 
-/**
- * Mutable holder so {@code store.update} lambdas can record written secrets for rollback.
- *
- * <p>Used by catalog, schema, and fileset alter paths that prepare secrets inside {@code
- * store.update} and roll back on failure.
- */
-public final class SecretMaterialsHolder {
-
-  private List<SecretMaterial> materials = List.of();
-
-  /** Returns written secret materials. */
-  public List<SecretMaterial> get() {
-    return materials;
-  }
-
-  /** Records written secret materials. */
-  public void set(List<SecretMaterial> materials) {
-    this.materials = materials;
-  }
+/** A tag assignment matched to a domain in a batched member lookup. */
+@Getter
+public class DomainAssignmentPO extends TagMetadataObjectRelPO {
+  private Long domainId;
 }

@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.job.JobRuntimeTemplateMaskUtils;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -152,9 +153,10 @@ public class SparkProcessBuilder extends LocalProcessBuilder {
     builder.redirectOutput(outputFile);
     builder.redirectError(errorFile);
 
+    // Mask JSON bags and sensitive --conf for the log only; ProcessBuilder keeps plaintext.
     LOG.info(
         "Starting local Spark job with command: {}, environment variable names: {}",
-        Joiner.on(" ").join(commandList),
+        Joiner.on(" ").join(JobRuntimeTemplateMaskUtils.maskSensitiveArguments(commandList)),
         Joiner.on(", ").join(sparkJobTemplate.environments().keySet()));
 
     try {
