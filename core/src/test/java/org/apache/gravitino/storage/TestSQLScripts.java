@@ -194,9 +194,10 @@ public class TestSQLScripts extends TestJDBCBackend {
                 + backendType.toLowerCase()
                 + "\\.sql");
     Pattern icebergJdbcPattern =
-        Pattern.compile("iceberg-jdbc-schema-([\\d.]+)-" + backendType.toLowerCase() + "\\.sql");
+        Pattern.compile("iceberg-jdbc-schema-" + backendType.toLowerCase() + "\\.sql");
 
     Map<String, List<File>> versionScrips = new HashMap<>();
+    List<File> icebergJdbcScripts = new ArrayList<>();
     for (File scriptFile : scriptFiles) {
       Matcher schemaMatcher = schemaPattern.matcher(scriptFile.getName());
       Matcher upgradeMatcher = upgradePattern.matcher(scriptFile.getName());
@@ -217,8 +218,7 @@ public class TestSQLScripts extends TestJDBCBackend {
         versionScrips.computeIfAbsent(version, k -> new ArrayList<>()).add(scriptFile);
 
       } else if (icebergJdbcMatcher.matches()) {
-        String version = icebergJdbcMatcher.group(1);
-        versionScrips.computeIfAbsent(version, k -> new ArrayList<>()).add(scriptFile);
+        icebergJdbcScripts.add(scriptFile);
 
       } else {
         Assertions.fail("Unrecognized script file name: " + scriptFile.getName());
@@ -234,6 +234,14 @@ public class TestSQLScripts extends TestJDBCBackend {
         assertCleanupIndexes("schema " + versionScripts.getKey());
         assertNameColumnWidths("schema " + versionScripts.getKey());
       }
+    }
+
+    Assertions.assertFalse(
+        icebergJdbcScripts.isEmpty(),
+        "No standalone Iceberg JDBC schema script found for " + backendType);
+    for (File scriptFile : icebergJdbcScripts) {
+      dropAllTables();
+      executeScript(scriptFile);
     }
   }
 
