@@ -155,6 +155,12 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
         return Types.BinaryType.get();
       case UUID:
         return Types.UUIDType.get();
+      case SMALLSERIAL:
+        return Types.ShortType.get();
+      case SERIAL:
+        return Types.IntegerType.get();
+      case BIGSERIAL:
+        return Types.LongType.get();
       default:
         return Types.ExternalType.of(typeBean.getTypeName());
     }
