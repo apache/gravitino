@@ -96,7 +96,7 @@ public class CronJobPlanner {
     if (policy == null || candidates == null || candidates.isEmpty()) {
       return 0;
     }
-    if (MaintenanceJobTemplates.templateName(policy.policyType()).isEmpty()) {
+    if (!MaintenanceJobTemplates.isIcebergMaintenance(policy.policyType())) {
       LOG.warn(
           "Skipping cron-job schedule for policy {} with unsupported type {}",
           policy.id(),
@@ -569,7 +569,7 @@ public class CronJobPlanner {
         client.getScheduledExecutionsForTask(
             MaintenanceSchedulerPools.CRON_JOB, MaintenanceJobSpec.class)) {
       MaintenanceJobSpec data = execution.getData();
-      if (data == null || !data.isValid() || !isExpireSnapshots(data)) {
+      if (data == null || !data.isValid() || !data.isSnapshotExpiration()) {
         continue;
       }
       String instanceId = execution.getTaskInstance().getId();
@@ -605,13 +605,6 @@ public class CronJobPlanner {
       }
     }
     return open;
-  }
-
-  private static boolean isExpireSnapshots(MaintenanceJobSpec spec) {
-    String expireType =
-        MaintenanceJobTemplates.maintenanceType(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION)
-            .orElseThrow();
-    return spec.getTasks().stream().anyMatch(t -> expireType.equals(t.getMaintenanceType()));
   }
 
   /**
@@ -650,7 +643,7 @@ public class CronJobPlanner {
       MaintenanceJobSpec data = execution.getData();
       if (data != null
           && data.isValid()
-          && !isExpireSnapshots(data)
+          && !data.isSnapshotExpiration()
           && data.tableIds().contains(tableId)) {
         return true;
       }

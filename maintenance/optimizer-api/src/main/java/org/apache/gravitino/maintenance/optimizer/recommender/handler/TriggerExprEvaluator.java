@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.maintenance.optimizer.recommender.util.ExpressionEvaluator;
 import org.apache.gravitino.maintenance.optimizer.recommender.util.QLExpressionEvaluator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Shared QL evaluation of policy {@code trigger-expr} against sampled metrics.
@@ -32,6 +34,8 @@ import org.apache.gravitino.maintenance.optimizer.recommender.util.QLExpressionE
  * while sharing one expression stack.
  */
 public final class TriggerExprEvaluator {
+
+  private static final Logger LOG = LoggerFactory.getLogger(TriggerExprEvaluator.class);
 
   /**
    * Rule key for the boolean trigger expression (same as policy content {@code TRIGGER_EXPR_KEY}).
@@ -76,6 +80,16 @@ public final class TriggerExprEvaluator {
         trigger == null || trigger.toString().trim().isEmpty()
             ? "false"
             : trigger.toString().trim();
-    return EVALUATOR.evaluateBool(expression, context);
+    try {
+      return EVALUATOR.evaluateBool(expression, context);
+    } catch (RuntimeException e) {
+      // Mirror BaseExpressionStrategyHandler: bad/partial context must skip, not fail the job.
+      LOG.warn(
+          "Failed to evaluate trigger-expr '{}' with context {}: {}",
+          expression,
+          context,
+          e.toString());
+      return false;
+    }
   }
 }

@@ -41,16 +41,18 @@ import org.apache.gravitino.policy.PolicyExecutionSpec;
  * Fail-closed checks that merged maintenance work agrees on effective Gravitino / IRC auth after
  * cluster overlay.
  *
- * <p>Used by commit-chain schedule (one Spark job, many policies) and snapshot-expiry merge (shared
- * {@code updater_options} / {@code spark_conf} on the survivor row). Cluster-static {@code
- * gravitinoAuth} / {@code ircAuth} normally make every policy identical; when overlays are empty,
- * disagreeing policy auth must not be merged silently.
+ * <p>Commit-chain schedule uses {@link #requireSameAuth}; snapshot-expiry merge uses {@link
+ * #hasSameAuth}. Both project gravitino/IRC auth maps through the same helpers then compare.
+ * Cluster-static {@code gravitinoAuth} / {@code ircAuth} normally make every policy identical; when
+ * overlays are empty, disagreeing policy auth must not be merged silently.
  */
 public final class MaintenanceAuthConsistency {
 
   private MaintenanceAuthConsistency() {}
 
   /**
+   * Fail-closed check for commit-chain (or other) policy members.
+   *
    * @param policies commit-chain (or other) policy members
    * @param gravitinoConfig server config used for auth overlay
    * @throws IllegalArgumentException when effective auth options disagree
@@ -63,44 +65,28 @@ public final class MaintenanceAuthConsistency {
     }
 
     Set<String> clusterIrcKeys = MaintenanceAuthConfigs.loadIrcAuth(gravitinoConfig).keySet();
-    Map<String, String> expectedGravitino = null;
-    Map<String, String> expectedIrc = null;
-    long expectedId = -1L;
-
-    for (PolicyEntity policy : policies) {
-      PolicyContent content = policy.content();
-      PolicyExecutionSpec spec =
-          content instanceof ExecutablePolicyContent
-              ? ((ExecutablePolicyContent) content).executionSpec()
-              : PolicyExecutionSpec.empty();
-      Map<String, String> gravitinoAuth =
-          gravitinoAuthKeys(
-              MaintenanceAuthConfigs.overlayUpdaterOptions(gravitinoConfig, spec.updaterOptions()));
-      Map<String, String> ircAuth =
-          ircAuthKeys(
-              MaintenanceAuthConfigs.overlayJobOptions(gravitinoConfig, spec.jobOptions()),
-              clusterIrcKeys);
-
-      if (expectedGravitino == null) {
-        expectedGravitino = gravitinoAuth;
-        expectedIrc = ircAuth;
-        expectedId = policy.id();
-        continue;
-      }
-      if (!expectedGravitino.equals(gravitinoAuth)) {
+    PolicyEntity first = policies.get(0);
+    Map<String, String> expectedGravitino = gravitinoAuthFromPolicy(first, gravitinoConfig);
+    Map<String, String> expectedIrc = ircAuthFromPolicy(first, gravitinoConfig, clusterIrcKeys);
+    for (int i = 1; i < policies.size(); i++) {
+      PolicyEntity policy = policies.get(i);
+      Map<String, String> gravitino = gravitinoAuthFromPolicy(policy, gravitinoConfig);
+      Map<String, String> irc = ircAuthFromPolicy(policy, gravitinoConfig, clusterIrcKeys);
+      if (!expectedGravitino.equals(gravitino)) {
         throw new IllegalArgumentException(
             differingKeysMessage(
-                "gravitinoAuth", expectedId, policy.id(), expectedGravitino, gravitinoAuth));
+                "gravitinoAuth", first.id(), policy.id(), expectedGravitino, gravitino));
       }
-      if (!Objects.equals(expectedIrc, ircAuth)) {
+      if (!expectedIrc.equals(irc)) {
         throw new IllegalArgumentException(
-            differingKeysMessage("ircAuth", expectedId, policy.id(), expectedIrc, ircAuth));
+            differingKeysMessage("ircAuth", first.id(), policy.id(), expectedIrc, irc));
       }
     }
   }
 
   /**
-   * Compares schedule snapshots. Spec maps are already cluster-overlaid at build time.
+   * Compares two schedule snapshots after projecting gravitino/IRC auth the same way as {@link
+   * #requireSameAuth}.
    *
    * @param gravitinoConfig server config (for cluster IRC key set)
    * @param left schedule snapshot
@@ -113,18 +99,43 @@ public final class MaintenanceAuthConsistency {
     Preconditions.checkNotNull(left, "left");
     Preconditions.checkNotNull(right, "right");
     Set<String> clusterIrcKeys = MaintenanceAuthConfigs.loadIrcAuth(gravitinoConfig).keySet();
-    Map<String, String> leftUpdater =
+    return gravitinoAuthFromSpec(left).equals(gravitinoAuthFromSpec(right))
+        && ircAuthFromSpec(left, clusterIrcKeys).equals(ircAuthFromSpec(right, clusterIrcKeys));
+  }
+
+  private static Map<String, String> gravitinoAuthFromPolicy(
+      PolicyEntity policy, Config gravitinoConfig) {
+    return gravitinoAuthKeys(
+        MaintenanceAuthConfigs.overlayUpdaterOptions(
+            gravitinoConfig, executionSpec(policy).updaterOptions()));
+  }
+
+  private static Map<String, String> ircAuthFromPolicy(
+      PolicyEntity policy, Config gravitinoConfig, Set<String> clusterIrcKeys) {
+    return ircAuthKeys(
+        MaintenanceAuthConfigs.overlayJobOptions(
+            gravitinoConfig, executionSpec(policy).jobOptions()),
+        clusterIrcKeys);
+  }
+
+  private static Map<String, String> gravitinoAuthFromSpec(MaintenanceJobSpec spec) {
+    return gravitinoAuthKeys(
         IcebergSparkConfigUtils.parseFlatJsonMap(
-            left.getUpdaterOptions(), MaintenanceJobTemplates.UPDATER_OPTIONS_JOB_CONF_KEY);
-    Map<String, String> rightUpdater =
-        IcebergSparkConfigUtils.parseFlatJsonMap(
-            right.getUpdaterOptions(), MaintenanceJobTemplates.UPDATER_OPTIONS_JOB_CONF_KEY);
-    Map<String, String> leftSpark =
-        IcebergSparkConfigUtils.parseFlatJsonMap(left.getSparkConf(), "spark_conf");
-    Map<String, String> rightSpark =
-        IcebergSparkConfigUtils.parseFlatJsonMap(right.getSparkConf(), "spark_conf");
-    return gravitinoAuthKeys(leftUpdater).equals(gravitinoAuthKeys(rightUpdater))
-        && ircAuthKeys(leftSpark, clusterIrcKeys).equals(ircAuthKeys(rightSpark, clusterIrcKeys));
+            spec.getUpdaterOptions(), MaintenanceJobTemplates.UPDATER_OPTIONS_JOB_CONF_KEY));
+  }
+
+  private static Map<String, String> ircAuthFromSpec(
+      MaintenanceJobSpec spec, Set<String> clusterIrcKeys) {
+    return ircAuthKeys(
+        IcebergSparkConfigUtils.parseFlatJsonMap(spec.getSparkConf(), "spark_conf"),
+        clusterIrcKeys);
+  }
+
+  private static PolicyExecutionSpec executionSpec(PolicyEntity policy) {
+    PolicyContent content = policy.content();
+    return content instanceof ExecutablePolicyContent
+        ? ((ExecutablePolicyContent) content).executionSpec()
+        : PolicyExecutionSpec.empty();
   }
 
   /**

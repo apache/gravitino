@@ -129,7 +129,7 @@ public class TestBuiltInJobTemplateProvider {
         "builtin-iceberg-maintenance-task",
         ImmutableSet.<String>builder()
             .add("catalog_name", "catalog_type", "catalog_uri", "warehouse_location")
-            .add("maintenance_types", "policy_ids", "action_ids", "tables")
+            .add("tasks")
             .build());
 
     for (JobTemplate template : new BuiltInJobTemplateProvider().jobTemplates()) {

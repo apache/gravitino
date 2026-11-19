@@ -150,7 +150,7 @@ public class CommitJobPlanner {
         if (!Boolean.TRUE.equals(commitTrigger)) {
           continue;
         }
-        if (MaintenanceJobTemplates.maintenanceType(policy.policyType()).isEmpty()) {
+        if (!MaintenanceJobTemplates.isIcebergMaintenance(policy.policyType())) {
           continue;
         }
         chain.add(policy);
