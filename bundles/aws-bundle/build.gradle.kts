@@ -18,6 +18,9 @@
  * under the License.
  */
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
 
 plugins {
   `maven-publish`
@@ -25,7 +28,96 @@ plugins {
   alias(libs.plugins.shadow)
 }
 
+/**
+ * Removes the unrelocated Netty copy that aws-java-sdk-bundle (AWS SDK for Java v1, pulled in by
+ * hadoop-aws) embeds under io/netty.
+ *
+ * A dependency constraint cannot replace classes that live inside another jar. Left in place, those
+ * classes are merged with the standalone Netty jars used by the AWS SDK v2, and the bundle ends up
+ * with classes and metadata of two different Netty releases. The standalone Netty jars provide every
+ * module embedded in aws-java-sdk-bundle, and the embedded classes are binary compatible with them
+ * within the 4.1 line, so removing the embedded copy leaves a single Netty release in the bundle.
+ * Other jars pass through unchanged.
+ */
+@CacheableTransform
+abstract class StripEmbeddedNettyTransform : TransformAction<TransformParameters.None> {
+  companion object {
+    val STRIPPED: Attribute<Boolean> =
+      Attribute.of("org.apache.gravitino.embedded-netty-stripped", Boolean::class.javaObjectType)
+    const val EMBEDDING_JAR_PREFIX = "aws-java-sdk-bundle-"
+    private val NETTY_ENTRY_PREFIXES = listOf(
+      "io/netty/",
+      "META-INF/maven/io.netty/",
+      "META-INF/native-image/io.netty/"
+    )
+    private val NETTY_ENTRIES = setOf(
+      "META-INF/io.netty.versions.properties",
+      // Only lists Netty's BlockHound integration, which the standalone netty-common also provides.
+      "META-INF/services/reactor.blockhound.integration.BlockHoundIntegration"
+    )
+
+    /** Returns true if the jar entry [name] belongs to the embedded Netty copy. */
+    fun isNettyEntry(name: String): Boolean =
+      name in NETTY_ENTRIES || NETTY_ENTRY_PREFIXES.any { name.startsWith(it) }
+  }
+
+  @get:InputArtifact
+  @get:PathSensitive(PathSensitivity.NAME_ONLY)
+  abstract val inputArtifact: Provider<FileSystemLocation>
+
+  override fun transform(outputs: TransformOutputs) {
+    val input = inputArtifact.get().asFile
+    if (!input.isFile || !input.name.startsWith(EMBEDDING_JAR_PREFIX) || !input.name.endsWith(".jar")) {
+      outputs.file(inputArtifact)
+      return
+    }
+    val hasEmbeddedNetty = ZipFile(input).use { jar -> jar.entries().asSequence().any { isNettyEntry(it.name) } }
+    if (!hasEmbeddedNetty) {
+      outputs.file(inputArtifact)
+      return
+    }
+    // Keep the original file name so that the bundled legal files are still resolved by it.
+    val output = outputs.file(input.name)
+    ZipFile(input).use { jar ->
+      ZipOutputStream(output.outputStream().buffered()).use { out ->
+        jar.entries().asSequence().filterNot { isNettyEntry(it.name) }.forEach { source ->
+          val entry = ZipEntry(source.name)
+          entry.time = source.time
+          out.putNextEntry(entry)
+          if (!source.isDirectory) {
+            jar.getInputStream(source).use { it.copyTo(out) }
+          }
+          out.closeEntry()
+        }
+      }
+    }
+  }
+}
+
+// Moves every Netty artifact brought in by the AWS SDK to the single version of the catalog. The
+// BOM sits in a dedicated configuration so that it only applies to this module.
+val nettyBom: Configuration by configurations.creating {
+  isCanBeConsumed = false
+  isCanBeResolved = false
+}
+
+configurations.named("runtimeClasspath") {
+  extendsFrom(nettyBom)
+  attributes.attribute(StripEmbeddedNettyTransform.STRIPPED, true)
+}
+
 dependencies {
+  attributesSchema {
+    attribute(StripEmbeddedNettyTransform.STRIPPED)
+  }
+  artifactTypes.getByName(ArtifactTypeDefinition.JAR_TYPE) {
+    attributes.attribute(StripEmbeddedNettyTransform.STRIPPED, false)
+  }
+  registerTransform(StripEmbeddedNettyTransform::class) {
+    from.attribute(StripEmbeddedNettyTransform.STRIPPED, false)
+    to.attribute(StripEmbeddedNettyTransform.STRIPPED, true)
+  }
+  nettyBom(platform(libs.netty.bom))
   implementation(project(":bundles:aws"))
   implementation(libs.hadoop3.aws)
   implementation(libs.aws.iam)
@@ -87,4 +179,5 @@ tasks.test {
   dependsOn(bundle)
   inputs.file(bundle.flatMap { it.archiveFile })
   doFirst { systemProperty("shadowJarPath", bundle.get().archiveFile.get().asFile.absolutePath) }
+  systemProperty("nettyVersion", libs.versions.netty.get())
 }
