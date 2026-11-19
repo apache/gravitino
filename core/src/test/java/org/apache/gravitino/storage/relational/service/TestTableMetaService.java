@@ -213,6 +213,29 @@ public class TestTableMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testResolveTableIdWithoutColumnSnapshot() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertSchema(metalakeName, catalogName, schemaName);
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, schemaName),
+            "id_lookup",
+            AUDIT_INFO);
+    backend.insert(table, false);
+    TableMetaService tables = TableMetaService.getInstance();
+    Assertions.assertEquals(table.id(), tables.getTableIdByIdentifier(table.nameIdentifier()));
+    // A full read still returns its columns after an ID-only lookup.
+    Assertions.assertEquals(
+        table.columns().size(),
+        tables.getTableByIdentifier(table.nameIdentifier()).columns().size());
+    backend.delete(table.nameIdentifier(), Entity.EntityType.TABLE, false);
+    assertThrows(
+        NoSuchEntityException.class, () -> tables.getTableIdByIdentifier(table.nameIdentifier()));
+  }
+
+  @TestTemplate
   public void testInsertAlreadyExistsException() throws IOException {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);

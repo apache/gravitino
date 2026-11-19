@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -47,13 +48,16 @@ import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestRelationalEntityStore {
@@ -91,6 +95,62 @@ public class TestRelationalEntityStore {
         .insert(entity, false);
     store.put(entity, false);
     Mockito.verify(cache).put(entity);
+  }
+
+  @Test
+  void testColdTableIdLookupDoesNotLoadOrCacheFullEntity() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    TableMetaService tables = Mockito.mock(TableMetaService.class);
+    Mockito.when(tables.getTableIdByIdentifier(ident)).thenReturn(42L);
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    try (MockedStatic<TableMetaService> mocked = Mockito.mockStatic(TableMetaService.class)) {
+      mocked.when(TableMetaService::getInstance).thenReturn(tables);
+      Assertions.assertEquals(42L, store.getEntityId(ident, Entity.EntityType.TABLE));
+      Mockito.verify(tables).getTableIdByIdentifier(ident);
+      Mockito.verifyNoMoreInteractions(tables);
+      Mockito.verifyNoInteractions(backend);
+      Mockito.verify(cache, Mockito.never()).put(any());
+    }
+  }
+
+  @Test
+  void testWarmTableIdLookupUsesExistingEntityCache() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    TableEntity table = Mockito.mock(TableEntity.class);
+    Mockito.when(table.id()).thenReturn(42L);
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    Mockito.doReturn(Optional.of(table)).when(cache).getIfPresent(ident, Entity.EntityType.TABLE);
+    try (MockedStatic<TableMetaService> mocked = Mockito.mockStatic(TableMetaService.class)) {
+      Assertions.assertEquals(42L, store.getEntityId(ident, Entity.EntityType.TABLE));
+      mocked.verifyNoInteractions();
+      Mockito.verifyNoInteractions(backend);
+    }
+  }
+
+  @Test
+  void testTableIdLookupPropagatesMissingTable() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "missing");
+    TableMetaService tables = Mockito.mock(TableMetaService.class);
+    Mockito.when(tables.getTableIdByIdentifier(ident))
+        .thenThrow(new NoSuchEntityException("Missing table"));
+    try (MockedStatic<TableMetaService> mocked = Mockito.mockStatic(TableMetaService.class)) {
+      mocked.when(TableMetaService::getInstance).thenReturn(tables);
+      Assertions.assertThrows(
+          NoSuchEntityException.class, () -> store.getEntityId(ident, Entity.EntityType.TABLE));
+      Mockito.verifyNoInteractions(backend);
+    }
+  }
+
+  @Test
+  void testOtherEntityIdLookupRetainsFullRead() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "topic");
+    TopicEntity topic = Mockito.mock(TopicEntity.class);
+    Mockito.when(topic.id()).thenReturn(43L);
+    Mockito.when(topic.type()).thenReturn(Entity.EntityType.TOPIC);
+    Mockito.when(topic.nameIdentifier()).thenReturn(ident);
+    Mockito.when(backend.get(ident, Entity.EntityType.TOPIC)).thenReturn(topic);
+    Assertions.assertEquals(43L, store.getEntityId(ident, Entity.EntityType.TOPIC));
+    Mockito.verify(backend).get(ident, Entity.EntityType.TOPIC);
   }
 
   @Test
