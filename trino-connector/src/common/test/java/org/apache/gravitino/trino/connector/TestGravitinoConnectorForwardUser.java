@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -62,6 +63,7 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdap
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.apache.gravitino.trino.connector.security.GravitinoAuthProvider;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 
 /** Tests for forwardUser startup validation in {@link GravitinoConnector}. */
 class TestGravitinoConnectorForwardUser {
@@ -452,6 +454,21 @@ class TestGravitinoConnectorForwardUser {
   }
 
   @Test
+  void testRollbackDropsCreatedTablesBeforeClosingEvictedClient() {
+    Map<String, GravitinoAdminClient> clients = new ConcurrentHashMap<>();
+    Runnable dropCreatedTables = mock(Runnable.class);
+    GravitinoConnector connector = newConnectorWithCacheSizeOne(clients, dropCreatedTables);
+    ConnectorTransactionHandle aliceTransaction = begin(connector);
+    connector.getMetadata(mockSession("alice", null), aliceTransaction);
+    connector.getMetadata(mockSession("bob", null), begin(connector));
+
+    connector.rollback(aliceTransaction);
+    InOrder order = inOrder(dropCreatedTables, clients.get("alice"));
+    order.verify(dropCreatedTables).run();
+    order.verify(clients.get("alice")).close();
+  }
+
+  @Test
   void testLeasesAreReleasedWhenInternalRollbackFails() {
     Map<String, GravitinoAdminClient> clients = new ConcurrentHashMap<>();
     GravitinoConnector connector = newConnectorWithCacheSizeOne(clients);
@@ -500,6 +517,12 @@ class TestGravitinoConnectorForwardUser {
 
   private static GravitinoConnector newConnectorWithCacheSizeOne(
       Map<String, GravitinoAdminClient> clients) {
+    return newConnectorWithCacheSizeOne(clients, () -> {});
+  }
+
+  /** The connector's metadata runs {@code onDropCreatedTables} when it drops created tables. */
+  private static GravitinoConnector newConnectorWithCacheSizeOne(
+      Map<String, GravitinoAdminClient> clients, Runnable onDropCreatedTables) {
     CatalogConnectorContext ctx =
         mockContextWithConfig(
             ImmutableMap.of(
@@ -526,7 +549,13 @@ class TestGravitinoConnectorForwardUser {
           CatalogConnectorMetadata metadata,
           CatalogConnectorMetadataAdapter adapter,
           ConnectorMetadata delegate) {
-        return new GravitinoMetadata(metadata, adapter, delegate) {};
+        return new GravitinoMetadata(metadata, adapter, delegate) {
+          @Override
+          void dropCreatedTables() {
+            onDropCreatedTables.run();
+            super.dropCreatedTables();
+          }
+        };
       }
     };
   }
