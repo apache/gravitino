@@ -38,7 +38,7 @@ public final class GlossaryTermRelSQLProvider {
     switch (JDBCBackendType.fromString(context.getDatabaseId())) {
       case MYSQL:
         return "INSERT INTO glossary_hierarchy_lock (metalake_id) VALUES (#{metalakeId}) "
-            + "ON DUPLICATE KEY UPDATE metalake_id=VALUES(metalake_id)";
+            + "ON DUPLICATE KEY UPDATE metalake_id=metalake_id";
       case POSTGRESQL:
         return "INSERT INTO glossary_hierarchy_lock (metalake_id) VALUES (#{metalakeId}) "
             + "ON CONFLICT (metalake_id) DO NOTHING";

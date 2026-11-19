@@ -39,6 +39,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.glossary.GlossaryTerm.Status;
 import org.apache.gravitino.glossary.TermLink;
 import org.apache.gravitino.json.JsonUtils;
@@ -261,7 +262,14 @@ public final class GlossaryTermMetaService {
 
   /** Runs a create request with the live parent and hierarchy locked through commit. */
   public <T> T withHierarchyLock(Namespace namespace, Supplier<T> work) {
-    return transaction(namespace, true, (mapper, metalakeId) -> work.get());
+    return transaction(
+        namespace,
+        true,
+        missing -> {
+          throw new NoSuchMetalakeException(
+              missing, "Metalake %s does not exist", namespace.level(0));
+        },
+        (mapper, metalakeId) -> work.get());
   }
 
   /**

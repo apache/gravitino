@@ -86,7 +86,8 @@ public final class GlossaryManager {
    * Creates a live definition. When authorization is enabled the creator must be a registered user
    * in the metalake. The definition and creator ownership commit or roll back together.
    *
-   * @throws NoSuchEntityException if the metalake or required creator is missing
+   * @throws NoSuchMetalakeException if the metalake does not exist
+   * @throws NoSuchEntityException if the required creator is missing
    */
   public GlossaryTermEntity createTerm(String metalake, TermSpec spec) {
     Namespace ns = NamespaceUtil.ofGlossaryTerm(metalake);

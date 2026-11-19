@@ -84,6 +84,16 @@ class TestGlossaryManager extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testCreateRequiresExistingMetalake() {
+    NoSuchMetalakeException missing =
+        Assertions.assertThrows(
+            NoSuchMetalakeException.class,
+            () -> manager.createTerm(LAKE, TermSpec.builder("term").build()));
+    Assertions.assertTrue(missing.getMessage().contains(LAKE));
+    Assertions.assertInstanceOf(NoSuchEntityException.class, missing.getCause());
+  }
+
+  @TestTemplate
   void testCreateOwnerAndDropInEveryStatus() throws IOException {
     long lakeId = createAndInsertMakeLake(LAKE).id();
     String user = PrincipalUtils.getCurrentUserName();
