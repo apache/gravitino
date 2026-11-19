@@ -36,8 +36,10 @@ import java.util.function.Function;
 import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity.EntityType;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
@@ -52,14 +54,31 @@ import org.apache.gravitino.storage.relational.service.GlossaryTermRelService.Re
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
+import org.mockito.Mockito;
 
 /** Exercises manager transactions through the same entry points used by other core components. */
 class TestGlossaryManager extends TestJDBCBackend {
   private static final String LAKE = "glossary";
   private final AtomicLong ids = new AtomicLong(100);
   private final GlossaryManager manager = new GlossaryManager(ids::incrementAndGet, false);
+
+  private final GravitinoAuthorizer previous = GravitinoEnv.getInstance().gravitinoAuthorizer();
+
+  @AfterEach
+  void restoreAuthorizer() {
+    GravitinoEnv.getInstance().setGravitinoAuthorizer(previous);
+  }
+
+  private GlossaryManager managerForMetalakeOwner() {
+    GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
+    Mockito.when(authorizer.isOwner(Mockito.any(), Mockito.eq(LAKE), Mockito.any(), Mockito.any()))
+        .thenReturn(true);
+    GravitinoEnv.getInstance().setGravitinoAuthorizer(authorizer);
+    return new GlossaryManager(ids::incrementAndGet, true);
+  }
 
   @TestTemplate
   void testMissingParentMakesTermAbsent() {
@@ -103,7 +122,7 @@ class TestGlossaryManager extends TestJDBCBackend {
     String user = PrincipalUtils.getCurrentUserName();
     backend.insert(
         createUserEntity(90L, AuthorizationUtils.ofUserNamespace(LAKE), user, AUDIT_INFO), false);
-    GlossaryManager owned = new GlossaryManager(ids::incrementAndGet, true);
+    GlossaryManager owned = managerForMetalakeOwner();
     GlossaryTermEntity neighbor = manager.createTerm(LAKE, TermSpec.builder("neighbor").build());
     for (GlossaryTerm.Status status : GlossaryTerm.Status.values()) {
       GlossaryTermEntity term =
@@ -140,7 +159,7 @@ class TestGlossaryManager extends TestJDBCBackend {
   @TestTemplate
   void testCreatorOwnershipRollsBackAndFollowsNewIdentity() throws Exception {
     createAndInsertMakeLake(LAKE);
-    GlossaryManager owned = new GlossaryManager(ids::incrementAndGet, true);
+    GlossaryManager owned = managerForMetalakeOwner();
     TermSpec spec =
         TermSpec.builder("Account").withSynonyms("client").withSourceRef("import:1").build();
     Assertions.assertThrows(
@@ -179,7 +198,7 @@ class TestGlossaryManager extends TestJDBCBackend {
     backend.insert(
         createUserEntity(90L, AuthorizationUtils.ofUserNamespace(LAKE), user, AUDIT_INFO), false);
     for (boolean authorization : List.of(false, true)) {
-      GlossaryManager scoped = new GlossaryManager(ids::incrementAndGet, authorization);
+      GlossaryManager scoped = authorization ? managerForMetalakeOwner() : manager;
       String name = authorization ? "owned" : "unowned";
       Assertions.assertThrows(
           IllegalArgumentException.class,

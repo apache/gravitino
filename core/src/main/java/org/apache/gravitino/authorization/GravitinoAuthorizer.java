@@ -26,6 +26,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.glossary.GlossaryAccess;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
@@ -39,7 +40,9 @@ public interface GravitinoAuthorizer extends Closeable {
   void initialize();
 
   /**
-   * Perform authorization and return the authorization result.
+   * Perform authorization and return the authorization result. For metalake glossary privileges,
+   * expand allowed MANAGE_DEFINITIONS into CREATE_DEFINITION and VIEW_DEFINITION, and allowed
+   * CREATE_DEFINITION into VIEW_DEFINITION, before applying explicit denies to each capability.
    *
    * @param principal the user principal
    * @param metalake the metalake
@@ -73,6 +76,15 @@ public interface GravitinoAuthorizer extends Closeable {
     return false;
   }
 
+  /** Returns whether the caller may read this glossary term through a generic metadata endpoint. */
+  default boolean canAccessGlossaryTerm(
+      Principal principal,
+      String metalake,
+      MetadataObject object,
+      AuthorizationRequestContext context) {
+    return GlossaryAccess.canRead(this, principal, metalake, object, context);
+  }
+
   boolean deny(
       Principal principal,
       String metalake,
@@ -94,6 +106,16 @@ public interface GravitinoAuthorizer extends Closeable {
       String metalake,
       MetadataObject metadataObject,
       AuthorizationRequestContext requestContext);
+
+  /**
+   * Checks ownership of the observed live glossary term identity, including group owners. The
+   * default grants no owner access. Implementations must read current ownership without shared
+   * owner caches.
+   */
+  default boolean isGlossaryTermOwner(
+      Principal principal, String metalake, long termId, AuthorizationRequestContext context) {
+    return false;
+  }
 
   /**
    * Determine whether the user is the service admin.

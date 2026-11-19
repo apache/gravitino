@@ -39,12 +39,14 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
 
 public class MetadataObjectUtil {
 
@@ -68,6 +70,7 @@ public class MetadataObjectUtil {
           .put(MetadataObject.Type.VIEW, Entity.EntityType.VIEW)
           .put(MetadataObject.Type.SEMANTIC_MODEL, Entity.EntityType.SEMANTIC_MODEL)
           .put(MetadataObject.Type.FUNCTION, Entity.EntityType.FUNCTION)
+          .put(MetadataObject.Type.GLOSSARY_TERM, Entity.EntityType.GLOSSARY_TERM)
           .put(MetadataObject.Type.DOMAIN, Entity.EntityType.DOMAIN)
           .build();
 
@@ -140,6 +143,8 @@ public class MetadataObjectUtil {
         return NameIdentifierUtil.ofJob(metalakeName, metadataObject.name());
       case JOB_TEMPLATE:
         return NameIdentifierUtil.ofJobTemplate(metalakeName, metadataObject.name());
+      case GLOSSARY_TERM:
+        return NameIdentifier.of(NamespaceUtil.ofGlossaryTerm(metalakeName), metadataObject.name());
       case DOMAIN:
         String domainName = metadataObject.fullName();
         NameValidationUtils.validateName("domain", domainName);
@@ -350,6 +355,14 @@ public class MetadataObjectUtil {
         try {
           env.internalJobOperationDispatcher().getJobTemplate(metalake, object.fullName());
         } catch (NoSuchJobTemplateException e) {
+          throw exceptionToThrowSupplier.get();
+        }
+        break;
+
+      case GLOSSARY_TERM:
+        try {
+          GlossaryTermMetaService.getInstance().getIds(identifier);
+        } catch (NoSuchEntityException missing) {
           throw exceptionToThrowSupplier.get();
         }
         break;

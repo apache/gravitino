@@ -231,6 +231,15 @@ class Privilege(ABC):
         USE_DOMAIN = (0, 1 << 43)
         """The privilege to discover published domains and their accessible members."""
 
+        VIEW_DEFINITION = (0, 1 << 44)
+        """The privilege to read published glossary definitions."""
+
+        CREATE_DEFINITION = (0, 1 << 45)
+        """The privilege to create glossary definitions and maintain owned definitions."""
+
+        MANAGE_DEFINITIONS = (0, 1 << 46)
+        """The privilege to manage all glossary definitions."""
+
         def __init__(self, high_bits: int, low_bits: int) -> None:
             """
             Initialize the Name with the high and low bits.
@@ -1945,6 +1954,90 @@ class UseDomain(GenericPrivilege):
         return obj_type in Privileges.DOMAIN_SUPPORTED_TYPES
 
 
+class ViewDefinition(GenericPrivilege):
+    """The privilege to read published glossary definitions."""
+
+    _ALLOW_INSTANCE: Optional[ViewDefinition] = None
+    _DENY_INSTANCE: Optional[ViewDefinition] = None
+
+    @staticmethod
+    def allow() -> ViewDefinition:
+        """Return the privilege with the allow condition."""
+        if ViewDefinition._ALLOW_INSTANCE is None:
+            ViewDefinition._ALLOW_INSTANCE = ViewDefinition(
+                Privilege.Condition.ALLOW, Privilege.Name.VIEW_DEFINITION
+            )
+        return ViewDefinition._ALLOW_INSTANCE
+
+    @staticmethod
+    def deny() -> ViewDefinition:
+        """Return the privilege with the deny condition."""
+        if ViewDefinition._DENY_INSTANCE is None:
+            ViewDefinition._DENY_INSTANCE = ViewDefinition(
+                Privilege.Condition.DENY, Privilege.Name.VIEW_DEFINITION
+            )
+        return ViewDefinition._DENY_INSTANCE
+
+    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
+        return obj_type == MetadataObject.Type.METALAKE
+
+
+class CreateDefinition(GenericPrivilege):
+    """The privilege to create glossary definitions and maintain owned definitions."""
+
+    _ALLOW_INSTANCE: Optional[CreateDefinition] = None
+    _DENY_INSTANCE: Optional[CreateDefinition] = None
+
+    @staticmethod
+    def allow() -> CreateDefinition:
+        """Return the privilege with the allow condition."""
+        if CreateDefinition._ALLOW_INSTANCE is None:
+            CreateDefinition._ALLOW_INSTANCE = CreateDefinition(
+                Privilege.Condition.ALLOW, Privilege.Name.CREATE_DEFINITION
+            )
+        return CreateDefinition._ALLOW_INSTANCE
+
+    @staticmethod
+    def deny() -> CreateDefinition:
+        """Return the privilege with the deny condition."""
+        if CreateDefinition._DENY_INSTANCE is None:
+            CreateDefinition._DENY_INSTANCE = CreateDefinition(
+                Privilege.Condition.DENY, Privilege.Name.CREATE_DEFINITION
+            )
+        return CreateDefinition._DENY_INSTANCE
+
+    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
+        return obj_type == MetadataObject.Type.METALAKE
+
+
+class ManageDefinitions(GenericPrivilege):
+    """The privilege to manage all glossary definitions."""
+
+    _ALLOW_INSTANCE: Optional[ManageDefinitions] = None
+    _DENY_INSTANCE: Optional[ManageDefinitions] = None
+
+    @staticmethod
+    def allow() -> ManageDefinitions:
+        """Return the privilege with the allow condition."""
+        if ManageDefinitions._ALLOW_INSTANCE is None:
+            ManageDefinitions._ALLOW_INSTANCE = ManageDefinitions(
+                Privilege.Condition.ALLOW, Privilege.Name.MANAGE_DEFINITIONS
+            )
+        return ManageDefinitions._ALLOW_INSTANCE
+
+    @staticmethod
+    def deny() -> ManageDefinitions:
+        """Return the privilege with the deny condition."""
+        if ManageDefinitions._DENY_INSTANCE is None:
+            ManageDefinitions._DENY_INSTANCE = ManageDefinitions(
+                Privilege.Condition.DENY, Privilege.Name.MANAGE_DEFINITIONS
+            )
+        return ManageDefinitions._DENY_INSTANCE
+
+    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
+        return obj_type == MetadataObject.Type.METALAKE
+
+
 class Privileges:
     _PRIVILEGE_TYPES = {
         Privilege.Name.CREATE_CATALOG: CreateCatalog,
@@ -1988,6 +2081,9 @@ class Privileges:
         Privilege.Name.MODIFY_SEMANTIC_MODEL: ModifySemanticModel,
         Privilege.Name.MANAGE_DOMAIN: ManageDomain,
         Privilege.Name.USE_DOMAIN: UseDomain,
+        Privilege.Name.VIEW_DEFINITION: ViewDefinition,
+        Privilege.Name.CREATE_DEFINITION: CreateDefinition,
+        Privilege.Name.MANAGE_DEFINITIONS: ManageDefinitions,
         Privilege.Name.USE_SECRETS: UseSecrets,
         Privilege.Name.INCLUDE_CREDENTIAL_SECRETS: IncludeCredentialSecrets,
     }

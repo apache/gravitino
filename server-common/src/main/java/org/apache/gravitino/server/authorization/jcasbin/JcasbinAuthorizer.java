@@ -68,11 +68,13 @@ import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.DomainEntity;
+import org.apache.gravitino.meta.GlossaryTermNames;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.server.authorization.DomainAuthzHelper;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.po.RolePO;
@@ -482,6 +484,17 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       return false;
     }
 
+    if (metadataObject.type() == MetadataObject.Type.GLOSSARY_TERM) {
+      OwnerInfo owner =
+          SessionUtils.getWithoutCommitFresh(
+              OwnerMetaMapper.class,
+              mapper ->
+                  mapper.selectGlossaryTermOwner(
+                      metalake, GlossaryTermNames.key(metadataObject.name())));
+      return ownerMatchesUserOrGroups(
+          Optional.ofNullable(owner), principal, metalake, requestContext);
+    }
+
     if (metadataObject.type() == MetadataObject.Type.SCHEMA) {
       // We support hierarchical schema, so a schema may have ancestor schemas. The principal is
       // treated as the owner if it owns the schema itself or any of its ancestor schemas, hence we
@@ -524,6 +537,18 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     Optional<OwnerInfo> owner =
         lookups.resolveOwnerId(metadataId.get(), metadataObject.type(), requestContext);
     return ownerMatchesUserOrGroups(owner, principal, metalake, requestContext);
+  }
+
+  @Override
+  public boolean isGlossaryTermOwner(
+      Principal principal, String metalake, long termId, AuthorizationRequestContext context) {
+    OwnerInfo owner =
+        SessionUtils.getWithoutCommitFresh(
+            OwnerMetaMapper.class,
+            mapper ->
+                mapper.selectOwnerByMetadataObjectIdAndType(
+                    termId, Entity.EntityType.GLOSSARY_TERM.name()));
+    return ownerMatchesUserOrGroups(Optional.ofNullable(owner), principal, metalake, context);
   }
 
   @Override
@@ -2243,6 +2268,32 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             new String[] {
               roleId, type.name(), String.valueOf(metadataId), action, AuthConstants.ALLOW
             });
+      }
+      // Expand only allowed glossary grants, before Casbin combines policies from all roles.
+      // A deny on MANAGE must not discard the same grant's independent CREATE and VIEW allows.
+      if (type == MetadataObject.Type.METALAKE
+          && privilege.condition() == Privilege.Condition.ALLOW) {
+        if (privilege.name() == Privilege.Name.MANAGE_DEFINITIONS) {
+          allowRows.add(
+              new String[] {
+                roleId,
+                type.name(),
+                String.valueOf(metadataId),
+                Privilege.Name.CREATE_DEFINITION.name(),
+                AuthConstants.ALLOW
+              });
+        }
+        if (privilege.name() == Privilege.Name.MANAGE_DEFINITIONS
+            || privilege.name() == Privilege.Name.CREATE_DEFINITION) {
+          allowRows.add(
+              new String[] {
+                roleId,
+                type.name(),
+                String.valueOf(metadataId),
+                Privilege.Name.VIEW_DEFINITION.name(),
+                AuthConstants.ALLOW
+              });
+        }
       }
       allowRows.add(
           new String[] {
