@@ -181,6 +181,7 @@ class DomainApiEdgesMixin:
         )
         self.assertEqual(creation_parent.name(), subdomain.parent())
         self.assertEqual(created.name(), manager.get_domain(created.name()).name())
+        self.assertEqual(Domain.Status.DRAFT, managed.unpublish().status())
         self.assertTrue(manager.delete_domain(child.name()))
         with self.assertRaises(NoSuchDomainException):
             self.lake.get_domain(child.name())

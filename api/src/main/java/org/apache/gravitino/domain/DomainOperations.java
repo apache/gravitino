@@ -119,11 +119,14 @@ public interface DomainOperations {
       throws NoSuchDomainException, DomainAlreadyExistsException, IllegalArgumentException;
 
   /**
-   * Deletes a domain. The backing tag and the tags on the member objects are kept.
+   * Deletes a draft domain. The backing tag and the tags on the member objects are kept. A
+   * published domain must be unpublished first. The status is checked before the sub-domains, so
+   * deleting a published domain with sub-domains throws {@link IllegalArgumentException}.
    *
    * @param name The name of the domain.
    * @return True if the domain is deleted, false if it does not exist.
-   * @throws NonEmptyDomainException If the domain has sub-domains.
+   * @throws IllegalArgumentException If the domain is published.
+   * @throws NonEmptyDomainException If the domain is a draft with sub-domains.
    */
-  boolean deleteDomain(String name) throws NonEmptyDomainException;
+  boolean deleteDomain(String name) throws IllegalArgumentException, NonEmptyDomainException;
 }

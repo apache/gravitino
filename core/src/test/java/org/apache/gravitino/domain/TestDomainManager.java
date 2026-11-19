@@ -164,7 +164,14 @@ public class TestDomainManager {
   @AfterEach
   public void cleanUp() throws IOException {
     DomainEntity[] domains = domainManager.listDomainInfos(METALAKE);
-    // Sub-domains first, since a domain with sub-domains cannot be deleted.
+    // Only drafts can be deleted. Sub-domains first, since a domain with published sub-domains
+    // cannot be unpublished and a domain with sub-domains cannot be deleted.
+    Arrays.stream(domains)
+        .filter(domain -> domain.parent().isPresent())
+        .forEach(domain -> domainManager.unpublishDomain(METALAKE, domain.name()));
+    Arrays.stream(domains)
+        .filter(domain -> !domain.parent().isPresent())
+        .forEach(domain -> domainManager.unpublishDomain(METALAKE, domain.name()));
     Arrays.stream(domains)
         .filter(domain -> domain.parent().isPresent())
         .forEach(domain -> domainManager.deleteDomain(METALAKE, domain.name()));
@@ -660,6 +667,31 @@ public class TestDomainManager {
     Assertions.assertTrue(domainManager.deleteDomain(METALAKE, "Finance"));
     Assertions.assertFalse(domainManager.deleteDomain(METALAKE, "Finance"));
     Assertions.assertEquals(0, domainManager.listDomains(METALAKE).length);
+  }
+
+  @Test
+  public void testDeleteChecksStatus() {
+    domainManager.createDomain(METALAKE, "Finance", null, null, TagValue.noValue("Finance"), true);
+    domainManager.publishDomain(METALAKE, "Finance");
+
+    // A published domain must be unpublished before it is deleted.
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> domainManager.deleteDomain(METALAKE, "Finance"));
+    Assertions.assertTrue(e.getMessage().contains("unpublish it first"), e.getMessage());
+    Assertions.assertEquals(
+        Domain.Status.PUBLISHED, domainManager.getDomain(METALAKE, "Finance").status());
+
+    // The status is checked before the sub-domains.
+    domainManager.createSubdomain(
+        METALAKE, "Finance", "Trading", null, null, TagValue.noValue("Trading"), true);
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> domainManager.deleteDomain(METALAKE, "Finance"));
+    Assertions.assertTrue(domainManager.deleteDomain(METALAKE, "Trading"));
+
+    domainManager.unpublishDomain(METALAKE, "Finance");
+    Assertions.assertTrue(domainManager.deleteDomain(METALAKE, "Finance"));
+    Assertions.assertFalse(domainManager.deleteDomain(METALAKE, "Finance"));
   }
 
   @Test
