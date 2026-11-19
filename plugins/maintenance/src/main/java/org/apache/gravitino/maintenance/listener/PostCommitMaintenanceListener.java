@@ -71,7 +71,8 @@ public class PostCommitMaintenanceListener implements EventListenerPlugin {
             MaintenanceActionManager.getInstance(),
             TableMetaService.getInstance(),
             PolicyMetaService.getInstance(),
-            env.entityStore());
+            env.entityStore(),
+            env.internalTableDispatcher());
     this.commitJobClient = new CommitJobClient(AutocommitDataSources.entityStore(), planner);
     LOG.info("PostCommitMaintenanceListener started");
   }

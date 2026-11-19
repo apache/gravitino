@@ -259,9 +259,19 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
 
   @Override
   public TableSnapshotMetrics collectBeforeMetrics(
-      SparkSession spark, String catalogName, String tableIdentifier) {
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      Map<String, String> argsByName) {
     long snapshotId = IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier);
-    Map<String, Object> metrics = collectManifestBeforeMetrics(spark, catalogName, tableIdentifier);
+    String specId =
+        pinSpecIdIfAbsent(
+            spark,
+            catalogName,
+            tableIdentifier,
+            IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("spec-id")));
+    Map<String, Object> metrics =
+        collectManifestBeforeMetrics(spark, catalogName, tableIdentifier, specId);
     return TableSnapshotMetrics.of(snapshotId, metrics);
   }
 
@@ -277,13 +287,19 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
       String tableIdentifier,
       Map<String, String> argsByName,
       @Nullable TableSnapshotMetrics before) {
+    String specId =
+        pinSpecIdIfAbsent(
+            spark,
+            catalogName,
+            tableIdentifier,
+            IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("spec-id")));
     List<Row> results =
         execute(
             spark,
             catalogName,
             tableIdentifier,
             IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("use-caching")),
-            IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("spec-id")));
+            specId);
     long rewritten = 0L;
     if (!results.isEmpty()) {
       Row result = results.get(0);
@@ -337,18 +353,34 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
   // -------------------------------------------------------------------------
 
   /**
-   * Collects manifest inventory for TMS S0. Reads the current snapshot's manifests via Iceberg API.
-   * CLI entry points never call this.
+   * Collects manifest inventory for TMS S0 for one resolved partition spec. Matches optimizer
+   * {@code custom-manifest-number-by-spec} semantics: only manifests whose {@code partitionSpecId}
+   * equals the resolved spec are counted. When {@code specId} is null/blank, uses the table's
+   * current default spec. CLI entry points never call this.
+   *
+   * @param spark active Spark session
+   * @param catalogName Iceberg catalog name
+   * @param tableIdentifier fully qualified table name
+   * @param specId optional non-negative partition spec id; null/blank → table default spec
+   * @return S0 metrics map ({@code custom-manifest-number}, {@code custom-avg-manifest-size})
    */
   @VisibleForTesting
   static Map<String, Object> collectManifestBeforeMetrics(
-      SparkSession spark, String catalogName, String tableIdentifier) {
+      SparkSession spark, String catalogName, String tableIdentifier, @Nullable String specId) {
+    validateSpecId(specId);
     Table table = IcebergJobUtils.loadIcebergTable(spark, catalogName, tableIdentifier);
+    int resolvedSpec =
+        specId == null || specId.trim().isEmpty()
+            ? table.spec().specId()
+            : Integer.parseInt(specId.trim());
     Snapshot snapshot = table.currentSnapshot();
     long count = 0L;
     long totalSize = 0L;
     if (snapshot != null) {
       for (ManifestFile manifest : snapshot.allManifests(table.io())) {
+        if (manifest.partitionSpecId() != resolvedSpec) {
+          continue;
+        }
         count++;
         totalSize += manifest.length();
       }
@@ -359,5 +391,21 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
         IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC,
         count == 0L ? 0D : (double) totalSize / count);
     return metrics;
+  }
+
+  /**
+   * Retains an explicit {@code spec-id}; otherwise pins the table's current default so S0 and the
+   * procedure target the same spec within one job run when schedule-time pin was unavailable.
+   */
+  @VisibleForTesting
+  static String pinSpecIdIfAbsent(
+      SparkSession spark, String catalogName, String tableIdentifier, @Nullable String specId) {
+    if (specId != null && !specId.trim().isEmpty()) {
+      validateSpecId(specId);
+      return specId.trim();
+    }
+    int resolved =
+        IcebergJobUtils.loadIcebergTable(spark, catalogName, tableIdentifier).spec().specId();
+    return Integer.toString(resolved);
   }
 }

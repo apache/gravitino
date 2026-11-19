@@ -537,24 +537,12 @@ components:
       additionalProperties: false
       properties:
         <<: *policy-execution-peer-properties
-        manifest_count_critical:
-          type: integer
-          format: int64
-          minimum: 1
-          default: 500
-          description: Inclusive count trigger, regardless of size. Must be at least manifest_count_warning.
-        manifest_count_warning:
+        manifest_count_threshold:
           type: integer
           format: int64
           minimum: 1
           default: 100
-          description: Inclusive minimum count for the average-size trigger.
-        avg_manifest_size_threshold_bytes:
-          type: integer
-          format: int64
-          minimum: 1
-          default: 8388608
-          description: Exclusive average manifest size threshold in bytes.
+          description: Inclusive manifest count trigger. Aligns with Iceberg commit.manifest.min-count-to-merge.
         spec_id:
           type: integer
           format: int32

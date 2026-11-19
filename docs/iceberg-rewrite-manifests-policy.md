@@ -15,19 +15,17 @@ The strategy type is `iceberg-rewrite-manifests`; its handler and job adapter ar
 
 | Content field | Default | Meaning |
 | --- | --- | --- |
-| `manifest_count_critical` | `500` | Trigger when count is at least this value, regardless of size. |
-| `manifest_count_warning` | `100` | Minimum count for the small-average-size trigger. Must be positive. |
-| `avg_manifest_size_threshold_bytes` | `8388608` | Trigger when average size is strictly below this value and the warning count is reached. Must be positive. |
+| `manifest_count_threshold` | `100` | Trigger when manifest count is at least this value. Aligns with Iceberg `commit.manifest.min-count-to-merge`. Must be positive. |
 | `spec_id` | Iceberg's current default | Existing partition spec to evaluate. Omission resolves the current default from Iceberg metadata. |
 | `use_caching` | Omitted | Optional boolean forwarded to Iceberg; omission preserves the runtime default. |
 
-The critical count must be at least the warning count. Spec IDs must be non-negative
-32-bit integers. Thresholds use integer counts and bytes. Recommendations are ranked by
-the selected spec's manifest count. The policy API accepts only JSON booleans for
-`use_caching`; numbers and strings are rejected.
+Spec IDs must be non-negative 32-bit integers. Recommendations are ranked by the selected
+spec's manifest count. Average manifest size is still collected for observability but does
+not affect the trigger. The policy API accepts only JSON booleans for `use_caching`; numbers
+and strings are rejected.
 
-At the defaults, 99 manifests never trigger; 100 manifests averaging 8 MiB do not trigger;
-100 averaging less than 8 MiB trigger; and 500 trigger regardless of size.
+At the default threshold, 99 manifests never trigger and 100 or more trigger regardless of
+average manifest size.
 
 ## Collect, evaluate, and submit
 
@@ -82,10 +80,11 @@ Recollect statistics after a successful rewrite before evaluating again.
 
 ## Selecting a partition spec
 
-When `spec_id` is omitted, the recommender resolves Iceberg's current `default-spec-id`
-from the table metadata supplied by the metadata provider. Empty policy content therefore
-evaluates the current default spec with the default thresholds. Set `spec_id` explicitly to
-target another existing spec, such as an older spec after partition evolution.
+When `spec_id` is omitted, the recommender and TMS schedule paths resolve Iceberg's current
+`default-spec-id` from table metadata and retain that value through job submission. Empty
+policy content therefore evaluates the current default spec with the default thresholds. Set
+`spec_id` explicitly to target another existing spec, such as an older spec after partition
+evolution.
 
 The Iceberg catalog projects `TableMetadata.defaultSpecId()` as the reserved, read-only table
 property `default-spec-id`. This is metadata, not an operator setting; it cannot be set or

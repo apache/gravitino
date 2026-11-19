@@ -43,6 +43,8 @@ import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobConfBuilder;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
+import org.apache.gravitino.policy.Policy;
 
 /**
  * Builds schedule-time {@link MaintenanceJobSpec} values for the cron and commit paths, and helpers
@@ -150,11 +152,33 @@ public final class MaintenanceJobSpecFactory {
         Map<String, String> parameters = new LinkedHashMap<>(parts.parameters);
         parameters.put("catalog_name", table.catalogName());
         parameters.put("table_identifier", table.tableIdentifier());
+        pinRewriteManifestSpecId(parameters, policy, table.defaultPartitionSpecId());
         tasks.add(new Task(table.tableId(), policy.id(), wire.get(), null, parameters));
       }
     }
     String sparkConfJson = sparkConf.isEmpty() ? null : writeJson(sparkConf, "spark_conf");
     return new MaintenanceJobSpec(tasks, updaterOptions, sparkConfJson);
+  }
+
+  /**
+   * Pins schedule-time {@code spec_id} for rewrite-manifests when the policy omitted it and the
+   * table's {@code default-spec-id} was known at schedule time (optimizer-style retention).
+   */
+  private static void pinRewriteManifestSpecId(
+      Map<String, String> parameters,
+      PolicyEntity policy,
+      @Nullable Integer defaultPartitionSpecId) {
+    if (policy.policyType() != Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS) {
+      return;
+    }
+    String existing = parameters.get(IcebergRewriteManifestsContent.SPEC_ID);
+    if (existing != null && !existing.isBlank()) {
+      return;
+    }
+    if (defaultPartitionSpecId != null) {
+      parameters.put(
+          IcebergRewriteManifestsContent.SPEC_ID, Integer.toString(defaultPartitionSpecId));
+    }
   }
 
   /**

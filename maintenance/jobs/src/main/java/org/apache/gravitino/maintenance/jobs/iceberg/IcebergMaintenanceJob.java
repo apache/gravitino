@@ -266,7 +266,8 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     IcebergMaintenanceAction action = type.action();
     TableSnapshotMetrics before = null;
     if (action.hasBeforeMetrics()) {
-      before = action.collectBeforeMetrics(spark, table.catalogName, table.tableIdentifier);
+      before =
+          action.collectBeforeMetrics(spark, table.catalogName, table.tableIdentifier, argsByName);
       if (!reportBeforeMetricsOrStop(client, actionId, table.tableId, policyId, before)) {
         LOG.info(
             "TMS type {} stopped for action_id {} table {} policy {}: before-metrics failed"

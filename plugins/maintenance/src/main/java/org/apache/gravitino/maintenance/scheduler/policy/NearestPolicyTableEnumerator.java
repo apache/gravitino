@@ -52,7 +52,9 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.storage.relational.service.PolicyTagRelService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
@@ -262,7 +264,11 @@ public final class NearestPolicyTableEnumerator {
     switch (objectType) {
       case TABLE:
         if (taggedObject.id() != null) {
-          tryScheduleTable(taggedObject.id(), metadataObject, scan);
+          tryScheduleTable(
+              taggedObject.id(),
+              metadataObject,
+              scan,
+              tableNameIdentifier(scan.metalake, metadataObject));
         }
         break;
       case SCHEMA:
@@ -396,7 +402,8 @@ public final class NearestPolicyTableEnumerator {
           tryScheduleTable(
               storedTables.get(tableIdent.name()).id(),
               NameIdentifierUtil.toMetadataObject(tableIdent, Entity.EntityType.TABLE),
-              scan);
+              scan,
+              tableIdent);
         }
         return;
       } catch (NoSuchSchemaException e) {
@@ -423,7 +430,8 @@ public final class NearestPolicyTableEnumerator {
       tryScheduleTable(
           table.id(),
           NameIdentifierUtil.toMetadataObject(table.nameIdentifier(), Entity.EntityType.TABLE),
-          scan);
+          scan,
+          table.nameIdentifier());
     }
   }
 
@@ -529,7 +537,11 @@ public final class NearestPolicyTableEnumerator {
    * Accepts {@code tableId} into the batch when this policy is the nearest winner and occupancy
    * allows schedule.
    */
-  private static void tryScheduleTable(long tableId, MetadataObject tableObject, ScanState scan) {
+  private void tryScheduleTable(
+      long tableId,
+      MetadataObject tableObject,
+      ScanState scan,
+      @Nullable NameIdentifier tableIdent) {
     if (tableId <= 0 || !scan.visitedTableIds.add(tableId)) {
       return;
     }
@@ -563,13 +575,60 @@ public final class NearestPolicyTableEnumerator {
       LOG.warn("Skip table {} with unusable name {}", tableId, fullName);
       return;
     }
+    Integer defaultPartitionSpecId =
+        needsDefaultPartitionSpecPin(scan.policy) ? loadDefaultPartitionSpecId(tableIdent) : null;
     scan.acceptedByTableId.put(
         tableId,
         new TableCandidate(
             tableId,
             fullName.substring(0, dot),
             fullName.substring(dot + 1),
-            List.of(scan.policy)));
+            List.of(scan.policy),
+            defaultPartitionSpecId));
+  }
+
+  private static boolean needsDefaultPartitionSpecPin(PolicyEntity policy) {
+    if (policy.policyType() != Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS) {
+      return false;
+    }
+    PolicyContent content = policy.content();
+    return content instanceof IcebergRewriteManifestsContent
+        && ((IcebergRewriteManifestsContent) content).specId() == null;
+  }
+
+  @Nullable
+  private Integer loadDefaultPartitionSpecId(@Nullable NameIdentifier tableIdent) {
+    if (tableIdent == null || tableDispatcher == null) {
+      return null;
+    }
+    try {
+      Table table = tableDispatcher.loadTable(tableIdent);
+      return IcebergRewriteManifestsContent.parseDefaultSpecId(table.properties());
+    } catch (RuntimeException e) {
+      LOG.debug(
+          "Could not resolve {} for {}: {}",
+          IcebergRewriteManifestsContent.DEFAULT_SPEC_ID_PROPERTY,
+          tableIdent,
+          e.toString());
+      return null;
+    }
+  }
+
+  @Nullable
+  private static NameIdentifier tableNameIdentifier(String metalake, MetadataObject tableObject) {
+    if (tableObject == null || tableObject.type() != MetadataObject.Type.TABLE) {
+      return null;
+    }
+    String fullName = tableObject.fullName();
+    int firstDot = fullName.indexOf('.');
+    int lastDot = fullName.lastIndexOf('.');
+    if (firstDot <= 0 || lastDot <= firstDot || lastDot >= fullName.length() - 1) {
+      return null;
+    }
+    String catalog = fullName.substring(0, firstDot);
+    String schema = fullName.substring(firstDot + 1, lastDot);
+    String table = fullName.substring(lastDot + 1);
+    return NameIdentifier.of(NamespaceUtil.ofTable(metalake, catalog, schema), table);
   }
 
   /** Mutable progress for one {@link #listTableIds} call. */

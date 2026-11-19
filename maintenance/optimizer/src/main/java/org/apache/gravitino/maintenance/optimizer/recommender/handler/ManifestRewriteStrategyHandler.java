@@ -19,10 +19,10 @@
 package org.apache.gravitino.maintenance.optimizer.recommender.handler;
 
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants.CURRENT_SNAPSHOT_ID;
-import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants.DEFAULT_SPEC_ID;
 
 import com.google.common.base.Preconditions;
 import java.math.BigInteger;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -34,6 +34,7 @@ import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyEvalua
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyHandler;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyHandlerContext;
 import org.apache.gravitino.maintenance.optimizer.common.IcebergManifestStatistics;
+import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionTriggerEvaluator;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.stats.StatisticValue;
@@ -71,20 +72,20 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
         "Unexpected manifest rewrite job template");
     Map<String, Object> rules = context.strategy().rules();
     Integer requestedSpec = requestedSpec(rules);
-    Integer resolvedSpec = requestedSpec == null ? defaultSpec(context) : requestedSpec;
+    Integer resolvedSpec =
+        IcebergRewriteManifestsContent.resolveSpecId(
+            requestedSpec, context.tableMetadata().map(table -> table.properties()).orElse(null));
     if (resolvedSpec == null) {
       LOG.warn(
           "Skipping manifest rewrite policy {} for {}: cannot resolve Iceberg {} from table metadata",
           context.strategy().name(),
           context.nameIdentifier(),
-          DEFAULT_SPEC_ID);
+          IcebergRewriteManifestsContent.DEFAULT_SPEC_ID_PROPERTY);
       return;
     }
     IcebergRewriteManifestsContent content =
         PolicyContents.icebergRewriteManifests(
-            longRule(rules, IcebergRewriteManifestsContent.MANIFEST_COUNT_CRITICAL),
-            longRule(rules, IcebergRewriteManifestsContent.MANIFEST_COUNT_WARNING),
-            longRule(rules, IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_THRESHOLD_BYTES),
+            longRule(rules, IcebergRewriteManifestsContent.MANIFEST_COUNT_THRESHOLD),
             requestedSpec,
             booleanRule(rules, IcebergRewriteManifestsContent.USE_CACHING));
     content.validate();
@@ -111,9 +112,14 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
       return;
     }
     IcebergManifestStatistics values = measurement.get();
-    if (values.count() >= content.manifestCountCritical()
-        || (values.count() >= content.manifestCountWarning()
-            && values.averageSize() < content.avgManifestSizeThresholdBytes())) {
+    // Default rules from typed content, then overlay strategy rules so a custom trigger-expr
+    // matches the TMS in-Spark gate (CompactionTriggerEvaluator / MaintenanceTriggerGate).
+    Map<String, Object> evalRules = new LinkedHashMap<>(content.rules());
+    evalRules.putAll(rules);
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC, values.count());
+    metrics.put(IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC, values.averageSize());
+    if (CompactionTriggerEvaluator.shouldMaintain(evalRules, metrics)) {
       evaluation =
           new StrategyEvaluationImpl(
               values.count(),
@@ -146,20 +152,6 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
     return collectedSnapshot == -1L
         ? "none".equals(currentSnapshot)
         : collectedSnapshot >= 0 && Long.toString(collectedSnapshot).equals(currentSnapshot);
-  }
-
-  @Nullable
-  private static Integer defaultSpec(StrategyHandlerContext context) {
-    String value =
-        context.tableMetadata().map(table -> table.properties().get(DEFAULT_SPEC_ID)).orElse(null);
-    if (value == null || !value.matches("[0-9]+")) {
-      return null;
-    }
-    try {
-      return Integer.valueOf(value);
-    } catch (NumberFormatException e) {
-      return null;
-    }
   }
 
   @Nullable

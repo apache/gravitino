@@ -919,21 +919,19 @@ class IcebergRewriteManifestsContent(AbstractExecutablePolicyContent):
     STRATEGY_TYPE_KEY: ClassVar[str] = "strategy.type"
     JOB_TEMPLATE_NAME_KEY: ClassVar[str] = "job.template-name"
     TRIGGER_EXPR_KEY: ClassVar[str] = "trigger-expr"
-    SCORE_EXPR_KEY: ClassVar[str] = "score-expr"
-    MANIFEST_COUNT_CRITICAL: ClassVar[str] = "manifest_count_critical"
-    MANIFEST_COUNT_WARNING: ClassVar[str] = "manifest_count_warning"
-    AVG_MANIFEST_SIZE_THRESHOLD_BYTES: ClassVar[str] = (
-        "avg_manifest_size_threshold_bytes"
-    )
+    MANIFEST_COUNT_THRESHOLD: ClassVar[str] = "manifest_count_threshold"
     SPEC_ID: ClassVar[str] = "spec_id"
     USE_CACHING: ClassVar[str] = "use_caching"
+    MANIFEST_NUMBER_METRIC: ClassVar[str] = "custom-manifest-number"
+    AVG_MANIFEST_SIZE_METRIC: ClassVar[str] = "custom-avg-manifest-size"
 
-    DEFAULT_MANIFEST_COUNT_CRITICAL: ClassVar[int] = 500
-    DEFAULT_MANIFEST_COUNT_WARNING: ClassVar[int] = 100
-    DEFAULT_AVG_MANIFEST_SIZE_THRESHOLD_BYTES: ClassVar[int] = 8388608
+    DEFAULT_MANIFEST_COUNT_THRESHOLD: ClassVar[int] = 100
 
     STRATEGY_TYPE_VALUE: ClassVar[str] = "iceberg-rewrite-manifests"
     JOB_TEMPLATE_NAME_VALUE: ClassVar[str] = "builtin-iceberg-rewrite-manifests"
+    TRIGGER_EXPR: ClassVar[str] = (
+        f"{MANIFEST_NUMBER_METRIC} >= {MANIFEST_COUNT_THRESHOLD}"
+    )
 
     _SUPPORTED_OBJECT_TYPES: ClassVar[set] = {
         MetadataObject.Type.CATALOG,
@@ -943,40 +941,22 @@ class IcebergRewriteManifestsContent(AbstractExecutablePolicyContent):
 
     def __init__(
         self,
-        manifest_count_critical: int | None = None,
-        manifest_count_warning: int | None = None,
-        avg_manifest_size_threshold_bytes: int | None = None,
+        manifest_count_threshold: int | None = None,
         spec_id: int | None = None,
         use_caching: bool | None = None,
         execution_spec: PolicyExecutionSpec | None = None,
     ):
         super().__init__(execution_spec)
-        self._manifest_count_critical = (
-            manifest_count_critical
-            if manifest_count_critical is not None
-            else self.DEFAULT_MANIFEST_COUNT_CRITICAL
-        )
-        self._manifest_count_warning = (
-            manifest_count_warning
-            if manifest_count_warning is not None
-            else self.DEFAULT_MANIFEST_COUNT_WARNING
-        )
-        self._avg_manifest_size_threshold_bytes = (
-            avg_manifest_size_threshold_bytes
-            if avg_manifest_size_threshold_bytes is not None
-            else self.DEFAULT_AVG_MANIFEST_SIZE_THRESHOLD_BYTES
+        self._manifest_count_threshold = (
+            manifest_count_threshold
+            if manifest_count_threshold is not None
+            else self.DEFAULT_MANIFEST_COUNT_THRESHOLD
         )
         self._spec_id = spec_id
         self._use_caching = use_caching
 
-    def manifest_count_critical(self) -> int:
-        return self._manifest_count_critical
-
-    def manifest_count_warning(self) -> int:
-        return self._manifest_count_warning
-
-    def avg_manifest_size_threshold_bytes(self) -> int:
-        return self._avg_manifest_size_threshold_bytes
+    def manifest_count_threshold(self) -> int:
+        return self._manifest_count_threshold
 
     def spec_id(self) -> int | None:
         return self._spec_id
@@ -995,11 +975,8 @@ class IcebergRewriteManifestsContent(AbstractExecutablePolicyContent):
 
     def rules(self) -> dict[str, object]:
         rules: dict[str, object] = {
-            self.MANIFEST_COUNT_CRITICAL: self._manifest_count_critical,
-            self.MANIFEST_COUNT_WARNING: self._manifest_count_warning,
-            self.AVG_MANIFEST_SIZE_THRESHOLD_BYTES: (
-                self._avg_manifest_size_threshold_bytes
-            ),
+            self.MANIFEST_COUNT_THRESHOLD: self._manifest_count_threshold,
+            self.TRIGGER_EXPR_KEY: self.TRIGGER_EXPR,
         }
         if self._spec_id is not None:
             rules[self.SPEC_ID] = self._spec_id
@@ -1009,16 +986,8 @@ class IcebergRewriteManifestsContent(AbstractExecutablePolicyContent):
 
     def validate(self) -> None:
         super().validate()
-        if self._manifest_count_warning <= 0:
-            raise IllegalArgumentException("manifest_count_warning must be > 0")
-        if self._manifest_count_critical < self._manifest_count_warning:
-            raise IllegalArgumentException(
-                "manifest_count_critical must be >= manifest_count_warning"
-            )
-        if self._avg_manifest_size_threshold_bytes <= 0:
-            raise IllegalArgumentException(
-                "avg_manifest_size_threshold_bytes must be > 0"
-            )
+        if self._manifest_count_threshold <= 0:
+            raise IllegalArgumentException("manifest_count_threshold must be > 0")
         if self._spec_id is not None and self._spec_id < 0:
             raise IllegalArgumentException("spec_id must be >= 0")
 
@@ -1027,10 +996,7 @@ class IcebergRewriteManifestsContent(AbstractExecutablePolicyContent):
             return False
         return (
             self._execution_fields_equal(other)
-            and self._manifest_count_critical == other._manifest_count_critical
-            and self._manifest_count_warning == other._manifest_count_warning
-            and self._avg_manifest_size_threshold_bytes
-            == other._avg_manifest_size_threshold_bytes
+            and self._manifest_count_threshold == other._manifest_count_threshold
             and self._spec_id == other._spec_id
             and self._use_caching == other._use_caching
         )
@@ -1039,9 +1005,7 @@ class IcebergRewriteManifestsContent(AbstractExecutablePolicyContent):
         return hash(
             (
                 self._execution_fields_hash_code(),
-                self._manifest_count_critical,
-                self._manifest_count_warning,
-                self._avg_manifest_size_threshold_bytes,
+                self._manifest_count_threshold,
                 self._spec_id,
                 self._use_caching,
             )
