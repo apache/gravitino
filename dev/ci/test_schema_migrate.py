@@ -275,6 +275,195 @@ class TestSchemaMigrate(unittest.TestCase):
         self.assert_view_meta_has_audit_info()
         self.assert_version(TARGET)
 
+    def test_infer_1_3_0_keeps_version_capture_clean(self):
+        """Ambiguous 1.3.0/2.0.0 tables: infer stdout must be only the version.
+
+        The INFO diagnostic must go to stderr so inferred=$(infer_schema_version)
+        cannot exceed gravitino_schema_migration.schema_version VARCHAR(64).
+        """
+        self.seed_schema_file("1.3.0")
+        result = self.migrate(baseline="")
+        self.assertIn("inferred 1.3.0 from existing tables", result.stdout)
+        self.assertIn("upgrade-1.3.0-to-2.0.0", result.stdout)
+        self.assertNotIn("INFO: Tables also match schema-2.0.0", result.stdout)
+        self.assertIn("INFO: Tables also match schema-2.0.0", result.stderr)
+        self.assertRegex(
+            result.stdout,
+            r"No recorded schema version; inferred 1\.3\.0 from existing tables\.",
+        )
+        # Recorded versions during the chain must be clean X.Y.Z tokens only.
+        recorded = self.sql(
+            self.database,
+            "SELECT schema_version FROM gravitino_schema_migration WHERE id=1",
+        ).stdout.strip()
+        self.assertRegex(recorded, r"^[0-9]+\.[0-9]+\.[0-9]+$")
+        self.assert_version(TARGET)
+        self.assertEqual(
+            self.sql(
+                self.database,
+                "SELECT COUNT(*) FROM information_schema.columns "
+                f"WHERE table_schema=DATABASE() AND table_name='idp_user_meta' "
+                "AND column_name='enabled'",
+            ).stdout.strip(),
+            "1",
+        )
+
+
+class TestSchemaMigratePostgresCurrentSchema(unittest.TestCase):
+    """Fresh target schema must not skip init when public already has metalake_meta."""
+
+    @classmethod
+    def setUpClass(cls):
+        if not SCRIPT.is_file():
+            raise unittest.SkipTest(f"missing {SCRIPT}")
+        sql_dir = SQL_ROOT / "postgresql"
+        if not sql_dir.is_dir():
+            raise unittest.SkipTest(f"missing {sql_dir}")
+
+        workspace = Path(os.environ.get("GITHUB_WORKSPACE") or ROOT.parent).resolve()
+        cls.work = workspace / f".schema-migrate-pg-test-{uuid.uuid4().hex[:12]}"
+        cls.work.mkdir(parents=True)
+        shutil.copyfile(SCRIPT, cls.work / "schema-migrate.sh")
+        shutil.copytree(sql_dir, cls.work / "postgresql")
+        cls.container = "schema-migrate-pg-" + uuid.uuid4().hex[:12]
+        cls.addClassCleanup(shutil.rmtree, cls.work, True)
+        cls.addClassCleanup(docker, "rm", "-f", "-v", cls.container, check=False)
+
+        docker(
+            "run",
+            "-d",
+            "--network",
+            "none",
+            "--tmpfs",
+            "/var/lib/postgresql/data:rw,size=256m",
+            "--name",
+            cls.container,
+            "-e",
+            "POSTGRES_HOST_AUTH_METHOD=trust",
+            "-e",
+            "POSTGRES_INITDB_ARGS=--no-sync",
+            "-v",
+            f"{cls.work}:/test:ro",
+            "postgres:13",
+        )
+        deadline = time.monotonic() + 90
+        while time.monotonic() < deadline:
+            if (
+                docker(
+                    "exec",
+                    cls.container,
+                    "psql",
+                    "-U",
+                    "postgres",
+                    "-d",
+                    "postgres",
+                    "-c",
+                    "SELECT 1",
+                    check=False,
+                ).returncode
+                == 0
+            ):
+                return
+            time.sleep(1)
+        raise RuntimeError(docker("logs", cls.container).stdout)
+
+    def test_fresh_target_schema_ignores_public_metalake(self):
+        db = "migrate_pg_" + uuid.uuid4().hex[:8]
+        target = "gravitino_app"
+        docker(
+            "exec",
+            self.container,
+            "psql",
+            "-U",
+            "postgres",
+            "-d",
+            "postgres",
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-c",
+            f"CREATE DATABASE {db}",
+        )
+        # public already has a catalog; target schema is empty.
+        docker(
+            "exec",
+            self.container,
+            "psql",
+            "-U",
+            "postgres",
+            "-d",
+            db,
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-c",
+            "CREATE TABLE public.metalake_meta (id int); "
+            f"CREATE SCHEMA {target};",
+        )
+
+        scripts = self.work / db
+        scripts.mkdir(parents=True)
+        shutil.copytree(self.work / "postgresql", scripts / "postgresql")
+        (scripts / "version.txt").write_text(TARGET + "\n")
+        docker(
+            "exec",
+            self.container,
+            "bash",
+            "-c",
+            f"rm -rf /tmp/{db} && cp -a /test/{db} /tmp/{db}",
+        )
+
+        result = docker(
+            "exec",
+            "-e",
+            "DB_ENGINE=postgresql",
+            "-e",
+            "DB_HOST=127.0.0.1",
+            "-e",
+            f"GRAVITINO_DB={db}",
+            "-e",
+            f"SCRIPTS_DIR=/tmp/{db}",
+            "-e",
+            "POSTGRES_USER=postgres",
+            "-e",
+            "POSTGRES_PASSWORD=runtime-test-password",
+            "-e",
+            f"PG_CURRENT_SCHEMA={target}",
+            "-e",
+            f"PGOPTIONS=-c search_path={target}",
+            self.container,
+            "bash",
+            "/test/schema-migrate.sh",
+        )
+        self.assertIn("Fresh install detected", result.stdout)
+        self.assertIn("Schema migration completed successfully", result.stdout)
+
+        # Target schema got the snapshot; public still only has the stub table.
+        target_tables = docker(
+            "exec",
+            self.container,
+            "psql",
+            "-U",
+            "postgres",
+            "-d",
+            db,
+            "-Atc",
+            "SELECT COUNT(*) FROM information_schema.tables "
+            f"WHERE table_schema='{target}' AND table_name='metalake_meta'",
+        ).stdout.strip()
+        self.assertEqual(target_tables, "1")
+        recorded = docker(
+            "exec",
+            self.container,
+            "psql",
+            "-U",
+            "postgres",
+            "-d",
+            db,
+            "-Atc",
+            f"SET search_path TO {target}; "
+            "SELECT schema_version FROM gravitino_schema_migration WHERE id=1",
+        ).stdout.strip()
+        self.assertEqual(recorded, TARGET)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)

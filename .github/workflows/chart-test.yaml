@@ -246,7 +246,15 @@ jobs:
           RELEASE=gravitino-sm-mysql
           helm dependency update dev/charts/gravitino
           kubectl create namespace "$NS"
-          trap 'helm uninstall "$RELEASE" -n "$NS" --wait || true; kubectl delete namespace "$NS" --wait=false || true' EXIT
+          dump_schema_migrate() {
+            echo "::group::schema-migrate diagnostics (${NS})"
+            kubectl get pods,jobs -n "$NS" -o wide || true
+            kubectl describe pods -n "$NS" || true
+            kubectl logs -n "$NS" -l app.kubernetes.io/component=schema-migrate --all-containers --tail=200 || true
+            kubectl logs -n "$NS" -l "release=${RELEASE}" --all-containers --tail=200 || true
+            echo "::endgroup::"
+          }
+          trap 'dump_schema_migrate; helm uninstall "$RELEASE" -n "$NS" --wait || true; kubectl delete namespace "$NS" --wait=false || true' EXIT
           helm upgrade --install "$RELEASE" ./dev/charts/gravitino -n "$NS" --wait --timeout 10m \
             --values dev/charts/gravitino/resources/scenarios/schema-migrate-mysql.yaml \
             --set image.registry="" \
@@ -284,7 +292,15 @@ jobs:
           RELEASE=gravitino-sm-pg
           helm dependency update dev/charts/gravitino
           kubectl create namespace "$NS"
-          trap 'helm uninstall "$RELEASE" -n "$NS" --wait || true; kubectl delete namespace "$NS" --wait=false || true' EXIT
+          dump_schema_migrate() {
+            echo "::group::schema-migrate diagnostics (${NS})"
+            kubectl get pods,jobs -n "$NS" -o wide || true
+            kubectl describe pods -n "$NS" || true
+            kubectl logs -n "$NS" -l app.kubernetes.io/component=schema-migrate --all-containers --tail=200 || true
+            kubectl logs -n "$NS" -l "release=${RELEASE}" --all-containers --tail=200 || true
+            echo "::endgroup::"
+          }
+          trap 'dump_schema_migrate; helm uninstall "$RELEASE" -n "$NS" --wait || true; kubectl delete namespace "$NS" --wait=false || true' EXIT
           helm upgrade --install "$RELEASE" ./dev/charts/gravitino -n "$NS" --wait --timeout 10m \
             --values dev/charts/gravitino/resources/scenarios/schema-migrate-postgresql.yaml \
             --set image.registry="" \

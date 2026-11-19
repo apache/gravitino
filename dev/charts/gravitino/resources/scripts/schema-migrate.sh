@@ -232,8 +232,10 @@ metalake_exists() {
     [ "$count" = "1" ]
   else
     local exists
-    exists=$(psql_client -d "$GRAVITINO_DB" -tAc \
-      "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'metalake_meta');" 2>/dev/null || echo f)
+    # Limit to current_schema() so a populated public catalog cannot skip
+    # initialization of an empty operator-selected schema (PGOPTIONS search_path).
+    exists=$(psql_query \
+      "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = 'metalake_meta');" 2>/dev/null || echo f)
     [ "$exists" = "t" ]
   fi
 }
@@ -256,7 +258,7 @@ schema_tables_exist() {
       exists=$(mysql_query "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='${GRAVITINO_DB}' AND table_name='${tbl}';")
       [ "$exists" = "1" ] || return 1
     else
-      exists=$(psql_query "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = '${tbl}');")
+      exists=$(psql_query "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = '${tbl}');")
       [ "$exists" = "t" ] || return 1
     fi
   done < <(extract_table_names "$schema_sql")
@@ -353,7 +355,9 @@ infer_schema_version() {
     exit 1
   fi
   if [ -n "$matched_without_markers" ] && [ -n "$best" ] && version_lt "$best" "$matched_without_markers"; then
-    echo "INFO: Tables also match schema-${matched_without_markers}, but upgrade columns are absent; inferring ${best}."
+    # Keep diagnostics on stderr: callers capture stdout as the version only
+    # (gravitino_schema_migration.schema_version is VARCHAR(64)).
+    echo "INFO: Tables also match schema-${matched_without_markers}, but upgrade columns are absent; inferring ${best}." >&2
   fi
   printf '%s' "$best"
 }

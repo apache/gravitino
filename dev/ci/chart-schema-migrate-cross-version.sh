@@ -83,6 +83,12 @@ chmod +x "$CHECK_SCRIPT"
 helm dependency update "$CHART_DIR"
 
 cleanup() {
+  echo "::group::schema-migrate cross-version diagnostics (${NAMESPACE})"
+  kubectl get pods,jobs -n "$NAMESPACE" -o wide || true
+  kubectl describe pods -n "$NAMESPACE" || true
+  kubectl logs -n "$NAMESPACE" -l app.kubernetes.io/component=schema-migrate --all-containers --tail=200 || true
+  kubectl logs -n "$NAMESPACE" -l "release=${RELEASE_NAME}" --all-containers --tail=200 || true
+  echo "::endgroup::"
   helm uninstall "$RELEASE_NAME" -n "$NAMESPACE" --wait || true
   kubectl delete namespace "$NAMESPACE" --wait=false || true
 }
@@ -173,18 +179,18 @@ fi
 case "$FROM_VERSION" in
   1.2.0)
     assert_column view_meta audit_info 0
-    assert_column user_meta enabled 0
-    echo "Seeded ${FROM_VERSION}: view_meta.audit_info and user_meta.enabled absent"
+    assert_column idp_user_meta enabled 0
+    echo "Seeded ${FROM_VERSION}: view_meta.audit_info and idp_user_meta.enabled absent"
     ;;
   1.3.0)
     assert_column view_meta audit_info 1
-    assert_column user_meta enabled 0
-    echo "Seeded ${FROM_VERSION}: view_meta.audit_info present, user_meta.enabled absent"
+    assert_column idp_user_meta enabled 0
+    echo "Seeded ${FROM_VERSION}: view_meta.audit_info present, idp_user_meta.enabled absent"
     ;;
 esac
 
 # 1.3.0 shares table names with 2.0.0; exercise automatic inference (no baseline)
-# so upgrade columns such as user_meta.enabled are still applied.
+# so upgrade columns such as idp_user_meta.enabled are still applied.
 if [ "$FROM_VERSION" = "1.3.0" ]; then
   echo "==> Helm upgrade without schema.baselineVersion (${ENGINE}, infer from columns)"
   helm upgrade "$RELEASE_NAME" "$CHART_DIR" -n "$NAMESPACE" --wait --timeout 10m \
@@ -207,7 +213,7 @@ if [ "$FROM_VERSION" = "1.3.0" ]; then
     exit 1
   fi
   assert_column view_meta audit_info 1
-  assert_column user_meta enabled 1
+  assert_column idp_user_meta enabled 1
 else
   echo "==> Helm upgrade with schema.baselineVersion=${FROM_VERSION} (${ENGINE})"
   helm upgrade "$RELEASE_NAME" "$CHART_DIR" -n "$NAMESPACE" --wait --timeout 10m \
@@ -228,7 +234,7 @@ else
   grep -q "upgrade-1.2.0-to-1.3.0-${ENGINE}" "$LOG"
   grep -q "upgrade-1.3.0-to-2.0.0-${ENGINE}" "$LOG"
   assert_column view_meta audit_info 1
-  assert_column user_meta enabled 1
+  assert_column idp_user_meta enabled 1
 fi
 
 echo "Cross-version schema migrate (${ENGINE} ${FROM_VERSION} -> image) passed"

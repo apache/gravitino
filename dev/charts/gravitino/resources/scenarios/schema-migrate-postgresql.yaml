@@ -32,6 +32,12 @@ initScript: |
   echo "Start the Gravitino Server"
   /bin/bash ${GRAVITINO_HOME}/docker/docker-entrypoint.sh
 
+# Fit the 512Mi limit: chart default GRAVITINO_MEM is -Xms1024m (entrypoint also
+# disables UseContainerSupport), which OOMs under this CI resource budget.
+env:
+  - name: GRAVITINO_MEM
+    value: "-Xms256m -Xmx256m -XX:MaxMetaspaceSize=128m"
+
 resources:
   limits:
     cpu: 500m
