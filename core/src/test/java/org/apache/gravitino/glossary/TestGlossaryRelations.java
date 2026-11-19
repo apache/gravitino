@@ -47,7 +47,9 @@ import org.apache.gravitino.exceptions.TermAlreadyExistsException;
 import org.apache.gravitino.exceptions.TermVersionConflictException;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.service.GlossaryInvariants;
 import org.apache.gravitino.storage.relational.service.GlossaryTermRelService.RelationType;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.TestTemplate;
 
 class TestGlossaryRelations extends TestJDBCBackend {
@@ -55,6 +57,13 @@ class TestGlossaryRelations extends TestJDBCBackend {
   private final AtomicLong ids = new AtomicLong(1000);
   private final GlossaryManager manager = new GlossaryManager(ids::incrementAndGet, false);
 
+  @AfterEach
+  void verifyStorageInvariants() throws Exception {
+    GlossaryInvariants.assertDefinitions();
+    GlossaryInvariants.assertRelations();
+  }
+
+  /** Covers T5.1, T5.2 and T5.3. */
   @TestTemplate
   void testFinalGraphAndRevisions() throws Exception {
     createAndInsertMakeLake(LAKE);
@@ -93,6 +102,24 @@ class TestGlossaryRelations extends TestJDBCBackend {
     assertEquals(2, get("B").version());
   }
 
+  /** Covers T5.6 and T5.7, including a change that removes an existing conflict. */
+  @TestTemplate
+  void testRelatedAndAncestorConflictAtRoot() throws Exception {
+    createAndInsertMakeLake(LAKE);
+    create("A", "B", "C");
+    edit("B", TermChange.addBroader("C"));
+    edit("A", TermChange.addRelated("C"));
+    String token = get("A").revisionToken();
+    assertThrows(IllegalArgumentException.class, () -> edit("A", TermChange.addBroader("B")));
+    assertEquals(token, get("A").revisionToken());
+    assertEquals(List.of("C"), names(manager.listRelations(LAKE, "A", RELATED, false, null)));
+    edit("A", TermChange.addBroader("B"), TermChange.removeRelated("C"));
+    assertThrows(IllegalArgumentException.class, () -> edit("C", TermChange.addRelated("A")));
+    assertThrows(IllegalArgumentException.class, () -> edit("A", TermChange.addRelated("C")));
+    assertEquals(List.of("B", "C"), names(manager.listRelations(LAKE, "A", BROADER, true, null)));
+  }
+
+  /** Covers T5.15. */
   @TestTemplate
   void testCrossingRelatedBothIdOrders() throws Exception {
     createAndInsertMakeLake(LAKE);
@@ -111,6 +138,7 @@ class TestGlossaryRelations extends TestJDBCBackend {
     }
   }
 
+  /** Covers T5.4 and T5.5. */
   @TestTemplate
   void testDepthAcrossBothSides() throws Exception {
     createAndInsertMakeLake(LAKE);
@@ -144,6 +172,7 @@ class TestGlossaryRelations extends TestJDBCBackend {
     }
   }
 
+  /** Covers T5.11, T5.12 and the visibility predicate in T5.13. */
   @TestTemplate
   void testVisibilityAtEveryFrontier() throws Exception {
     createAndInsertMakeLake(LAKE);
@@ -175,6 +204,7 @@ class TestGlossaryRelations extends TestJDBCBackend {
         () -> manager.listRelations(LAKE, "left", BROADER, true, GlossaryTerm.Status.APPROVED));
   }
 
+  /** Covers T5.10 and T5.17. */
   @TestTemplate
   void testCleanupRevisionsAndRollback() throws Exception {
     createAndInsertMakeLake(LAKE);
@@ -220,6 +250,7 @@ class TestGlossaryRelations extends TestJDBCBackend {
     assertEquals(1, get("C").version());
   }
 
+  /** Covers T5.8. */
   @TestTemplate
   void testConcurrentCycleAndStaleNoOp() throws Exception {
     createAndInsertMakeLake(LAKE);
@@ -230,22 +261,33 @@ class TestGlossaryRelations extends TestJDBCBackend {
     CyclicBarrier start = new CyclicBarrier(2);
     ExecutorService workers = Executors.newFixedThreadPool(2);
     try {
-      List<Future<Boolean>> results = new ArrayList<>();
-      for (String[] pair : List.of(new String[] {"B", "C"}, new String[] {"D", "A"})) {
-        results.add(
-            workers.submit(
-                () -> {
-                  start.await(10, TimeUnit.SECONDS);
-                  try {
-                    edit(pair[0], TermChange.addBroader(pair[1]));
-                    return true;
-                  } catch (IllegalArgumentException cycle) {
-                    return false;
-                  }
-                }));
+      for (int round = 0; round < 20; round++) {
+        List<Future<Boolean>> results = new ArrayList<>();
+        for (String[] pair : List.of(new String[] {"B", "C"}, new String[] {"D", "A"})) {
+          results.add(
+              workers.submit(
+                  () -> {
+                    start.await(10, TimeUnit.SECONDS);
+                    try {
+                      edit(pair[0], TermChange.addBroader(pair[1]));
+                      return true;
+                    } catch (IllegalArgumentException cycle) {
+                      return false;
+                    }
+                  }));
+        }
+        assertNotEquals(
+            results.get(0).get(30, TimeUnit.SECONDS), results.get(1).get(30, TimeUnit.SECONDS));
+        String source = results.get(0).get() ? "B" : "D";
+        String target = source.equals("B") ? "C" : "A";
+        assertEquals(
+            List.of(target), names(manager.listRelations(LAKE, source, BROADER, false, null)));
+        assertTrue(
+            manager
+                .listRelations(LAKE, source.equals("B") ? "D" : "B", BROADER, false, null)
+                .isEmpty());
+        edit(source, TermChange.removeBroader(target));
       }
-      assertNotEquals(
-          results.get(0).get(30, TimeUnit.SECONDS), results.get(1).get(30, TimeUnit.SECONDS));
     } finally {
       workers.shutdownNow();
     }
@@ -297,6 +339,7 @@ class TestGlossaryRelations extends TestJDBCBackend {
     }
   }
 
+  /** Covers T5.9 and T5.16. */
   @TestTemplate
   void testDeleteRacesMixedAlterAndCreateInBothOrders() throws Exception {
     createAndInsertMakeLake(LAKE);
@@ -367,6 +410,7 @@ class TestGlossaryRelations extends TestJDBCBackend {
     }
   }
 
+  /** Covers T5.14. */
   @TestTemplate
   void testMixedRelationLoad() throws Exception {
     createAndInsertMakeLake(LAKE);
