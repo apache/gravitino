@@ -263,49 +263,63 @@ public class IcebergMaintenanceJob implements BuiltInJob {
       long actionId,
       Map<String, String> argsByName)
       throws Exception {
-    IcebergMaintenanceAction action = type.action();
-    TableSnapshotMetrics before = null;
-    if (action.hasBeforeMetrics()) {
-      before = action.collectBeforeMetrics(spark, table.catalogName, table.tableIdentifier);
-      if (!reportBeforeMetricsOrStop(client, actionId, table.tableId, policyId, before)) {
-        LOG.info(
-            "TMS type {} stopped for action_id {} table {} policy {}: before-metrics failed"
-                + " (abandoned or unbound)",
-            type.wireName,
-            actionId,
-            table.tableId,
-            policyId);
-        return;
+    // Rewrite-manifests may temporarily pin spec-id after S0; restore so the next table/type
+    // does not inherit that resolution.
+    String priorSpecId = argsByName.get("spec-id");
+    try {
+      IcebergMaintenanceAction action = type.action();
+      TableSnapshotMetrics before = null;
+      if (action.hasBeforeMetrics()) {
+        before =
+            action.collectBeforeMetrics(
+                spark, table.catalogName, table.tableIdentifier, argsByName);
+        if (!reportBeforeMetricsOrStop(client, actionId, table.tableId, policyId, before)) {
+          LOG.info(
+              "TMS type {} stopped for action_id {} table {} policy {}: before-metrics failed"
+                  + " (abandoned or unbound)",
+              type.wireName,
+              actionId,
+              table.tableId,
+              policyId);
+          return;
+        }
+        long headSnapshotId =
+            IcebergJobUtils.requireCurrentSnapshotId(
+                spark, table.catalogName, table.tableIdentifier);
+        if (action.shouldCheckSnapshotDrift() && before.snapshotId() != headSnapshotId) {
+          LOG.info(
+              "TMS type {} skipped for action_id {} table {} policy {}: snapshot drifted"
+                  + " (sampled={} head={})",
+              type.wireName,
+              actionId,
+              table.tableId,
+              policyId,
+              before.snapshotId(),
+              headSnapshotId);
+          return;
+        }
+        if (!MaintenanceTriggerGate.shouldMaintain(type, argsByName, before.metricsJson())) {
+          LOG.info(
+              "TMS type {} skipped for action_id {} table {} policy {}: trigger-expr skip",
+              type.wireName,
+              actionId,
+              table.tableId,
+              policyId);
+          return;
+        }
       }
-      long headSnapshotId =
-          IcebergJobUtils.requireCurrentSnapshotId(spark, table.catalogName, table.tableIdentifier);
-      if (action.shouldCheckSnapshotDrift() && before.snapshotId() != headSnapshotId) {
-        LOG.info(
-            "TMS type {} skipped for action_id {} table {} policy {}: snapshot drifted"
-                + " (sampled={} head={})",
-            type.wireName,
-            actionId,
-            table.tableId,
-            policyId,
-            before.snapshotId(),
-            headSnapshotId);
-        return;
-      }
-      if (!MaintenanceTriggerGate.shouldMaintain(type, argsByName, before.metricsJson())) {
-        LOG.info(
-            "TMS type {} skipped for action_id {} table {} policy {}: trigger-expr skip",
-            type.wireName,
-            actionId,
-            table.tableId,
-            policyId);
-        return;
+
+      TableSnapshotMetrics after =
+          action.executeAndCollectAfter(
+              spark, table.catalogName, table.tableIdentifier, argsByName, before);
+      reportAfterMetrics(client, actionId, table.tableId, policyId, after);
+    } finally {
+      if (priorSpecId == null) {
+        argsByName.remove("spec-id");
+      } else {
+        argsByName.put("spec-id", priorSpecId);
       }
     }
-
-    TableSnapshotMetrics after =
-        action.executeAndCollectAfter(
-            spark, table.catalogName, table.tableIdentifier, argsByName, before);
-    reportAfterMetrics(client, actionId, table.tableId, policyId, after);
   }
 
   /**

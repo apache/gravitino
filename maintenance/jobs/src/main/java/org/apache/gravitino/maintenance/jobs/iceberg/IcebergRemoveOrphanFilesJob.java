@@ -244,7 +244,10 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
 
   @Override
   public TableSnapshotMetrics collectBeforeMetrics(
-      SparkSession spark, String catalogName, String tableIdentifier) {
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      Map<String, String> argsByName) {
     throw new IllegalStateException("Orphan cleanup must not sample before-metrics");
   }
 
@@ -283,11 +286,8 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
       @Nullable String location,
       boolean dryRun) {
     // Render string literals using Spark so quotes and backslashes round-trip correctly.
-    StringBuilder sql =
-        new StringBuilder("CALL ")
-            .append(IcebergJobUtils.escapeSqlIdentifier(catalog))
-            .append(".system.remove_orphan_files(table => ")
-            .append(lit(table).expr().sql());
+    StringBuilder sql = IcebergJobUtils.beginSystemProcedureCall(catalog, "remove_orphan_files");
+    sql.append("table => ").append(lit(table).expr().sql());
     if (olderThan != null && !olderThan.isEmpty()) {
       sql.append(", older_than => TIMESTAMP ").append(lit(olderThan).expr().sql());
     }

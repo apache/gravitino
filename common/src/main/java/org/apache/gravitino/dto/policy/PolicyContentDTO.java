@@ -707,17 +707,9 @@ public interface PolicyContentDTO extends PolicyContent {
   @Builder(setterPrefix = "with")
   @AllArgsConstructor(access = AccessLevel.PRIVATE)
   class IcebergRewriteManifestsContentDTO implements PolicyContentDTO, ExecutionPeersDTO {
-    @JsonProperty("manifest_count_critical")
+    @JsonProperty("manifest_count_threshold")
     @JsonDeserialize(using = StrictLongDeserializer.class)
-    private Long manifestCountCritical;
-
-    @JsonProperty("manifest_count_warning")
-    @JsonDeserialize(using = StrictLongDeserializer.class)
-    private Long manifestCountWarning;
-
-    @JsonProperty("avg_manifest_size_threshold_bytes")
-    @JsonDeserialize(using = StrictLongDeserializer.class)
-    private Long avgManifestSizeThresholdBytes;
+    private Long manifestCountThreshold;
 
     @JsonProperty("spec_id")
     @JsonDeserialize(using = StrictIntegerDeserializer.class)
@@ -772,36 +764,14 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     /**
-     * Returns manifest_count_critical.
+     * Returns manifest_count_threshold.
      *
-     * @return manifest_count_critical
+     * @return manifest_count_threshold
      */
-    public Long manifestCountCritical() {
-      return manifestCountCritical == null
-          ? IcebergRewriteManifestsContent.DEFAULT_MANIFEST_COUNT_CRITICAL
-          : manifestCountCritical;
-    }
-
-    /**
-     * Returns manifest_count_warning.
-     *
-     * @return manifest_count_warning
-     */
-    public Long manifestCountWarning() {
-      return manifestCountWarning == null
-          ? IcebergRewriteManifestsContent.DEFAULT_MANIFEST_COUNT_WARNING
-          : manifestCountWarning;
-    }
-
-    /**
-     * Returns avg_manifest_size_threshold_bytes.
-     *
-     * @return avg_manifest_size_threshold_bytes
-     */
-    public Long avgManifestSizeThresholdBytes() {
-      return avgManifestSizeThresholdBytes == null
-          ? IcebergRewriteManifestsContent.DEFAULT_AVG_MANIFEST_SIZE_THRESHOLD_BYTES
-          : avgManifestSizeThresholdBytes;
+    public Long manifestCountThreshold() {
+      return manifestCountThreshold == null
+          ? IcebergRewriteManifestsContent.DEFAULT_MANIFEST_COUNT_THRESHOLD
+          : manifestCountThreshold;
     }
 
     /**
@@ -885,9 +855,7 @@ public interface PolicyContentDTO extends PolicyContent {
     public PolicyContent toDomainContent() {
       PolicyExecutionSpec spec = executionSpec();
       return PolicyContents.icebergRewriteManifests(
-          manifestCountCritical(),
-          manifestCountWarning(),
-          avgManifestSizeThresholdBytes(),
+          manifestCountThreshold(),
           specId(),
           useCaching(),
           spec.timeTrigger(),

@@ -63,8 +63,9 @@ public class TestIcebergUpdateManifestStatsJob {
     assertFalse(template.arguments().contains("--spec-id"));
     assertTrue(template.arguments().contains("{{spark_conf:-}}"));
     assertTrue(template.arguments().contains("{{coordination_directory:-}}"));
+    assertFalse(template.arguments().contains("--schema-separator"));
     assertFalse(template.arguments().contains("--update-mode"));
-    assertEquals("v2", template.customFields().get("version"));
+    assertEquals("v4", template.customFields().get("version"));
     assertTrue(template.configs().containsKey("spark.sql.extensions"));
     SparkJobTemplate existing = (SparkJobTemplate) templates.get("builtin-iceberg-update-stats");
     assertNotNull(existing);
@@ -80,7 +81,10 @@ public class TestIcebergUpdateManifestStatsJob {
     assertEquals(
         "`cat``alog`.`db`.`tbl``name`",
         IcebergUpdateManifestStatsJob.buildTableIdentifier("cat`alog", "db.tbl`name"));
-    for (String invalid : Arrays.asList("table", "db.", ".table", "db.table.extra", " ")) {
+    assertEquals(
+        "`catalog`.`a`.`b`.`c`.`events`",
+        IcebergUpdateManifestStatsJob.buildTableIdentifier("catalog", "a.b.c.events"));
+    for (String invalid : Arrays.asList("table", "db.", ".table", " ")) {
       assertThrows(
           IllegalArgumentException.class,
           () -> IcebergUpdateManifestStatsJob.buildTableIdentifier("catalog", invalid));

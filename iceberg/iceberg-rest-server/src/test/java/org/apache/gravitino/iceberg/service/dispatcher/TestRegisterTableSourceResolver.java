@@ -18,12 +18,17 @@
  */
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
@@ -31,6 +36,7 @@ import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
+import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.types.Types;
@@ -86,7 +92,7 @@ class TestRegisterTableSourceResolver {
   }
 
   @Test
-  void testUnreadableSourceMetadataPropagates() {
+  void testStandardPointerDoesNotReadUnreadableMetadata() {
     IcebergCatalogWrapper catalog = mock(IcebergCatalogWrapper.class);
     TableIdentifier source = TableIdentifier.of("other", "secret");
     stubCatalogWithSource(catalog, source);
@@ -96,11 +102,98 @@ class TestRegisterTableSourceResolver {
         .thenReturn(Optional.of("file:/warehouse/other/secret/metadata/v2.metadata.json"));
     when(catalog.loadTableMetadata(source)).thenThrow(new RuntimeException("corrupt metadata"));
 
-    Assertions.assertThrows(
-        RuntimeException.class,
-        () ->
-            RegisterTableSourceResolver.findSourceTables(
-                catalog, TableIdentifier.of("mine", "copy"), META_LOC, tableMetadata()));
+    Assertions.assertEquals(
+        List.of(source),
+        RegisterTableSourceResolver.findSourceTables(
+            catalog, TableIdentifier.of("mine", "copy"), META_LOC, tableMetadata()));
+    verify(catalog, never()).loadTableMetadata(any());
+  }
+
+  @Test
+  void testBulkPointerLookupAvoidsCatalogWalkAndStorageReads() {
+    IcebergCatalogWrapper catalog = mock(IcebergCatalogWrapper.class);
+    TableIdentifier target = TableIdentifier.of("mine", "copy");
+    TableIdentifier parent = TableIdentifier.of("other", "parent");
+    TableIdentifier child = TableIdentifier.of("other", "child");
+    TableIdentifier sibling = TableIdentifier.of("other", "sibling");
+    when(catalog.getTableMetadataLocationCandidates("s3://b/a"))
+        .thenReturn(
+            Optional.of(
+                Map.of(
+                    parent,
+                    "s3://b/metadata/v1.json",
+                    child,
+                    "s3a://b/a/data/metadata/v1.json",
+                    sibling,
+                    "s3://b/ab/metadata/v1.json",
+                    target,
+                    "s3://b/a/metadata/v1.json")));
+    var found = RegisterTableSourceResolver.findOverlappingTables(catalog, target, "s3://b/a");
+    Assertions.assertEquals(Set.of(parent, child), Set.copyOf(found));
+    verify(catalog, never()).listNamespace(any());
+    verify(catalog, never()).listTable(any());
+    verify(catalog, never()).loadTableMetadata(any());
+    verify(catalog, never()).loadTableMetadataFromLocation(any());
+  }
+
+  @Test
+  void testUnreadableFallbackFailsClosed() {
+    IcebergCatalogWrapper catalog = mock(IcebergCatalogWrapper.class);
+    TableIdentifier source = TableIdentifier.of("other", "secret");
+    stubCatalogWithSource(catalog, source);
+    when(catalog.getTableMetadataLocation(source)).thenReturn(Optional.empty());
+    RuntimeException failure = new RuntimeException("unreadable");
+    when(catalog.loadTableMetadata(source)).thenThrow(failure);
+    Assertions.assertSame(
+        failure,
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                RegisterTableSourceResolver.findOverlappingTables(
+                    catalog, TableIdentifier.of("mine", "copy"), TABLE_LOC)));
+  }
+
+  @Test
+  void testDisappearedFallbackSourceIsSkipped() {
+    IcebergCatalogWrapper catalog = mock(IcebergCatalogWrapper.class);
+    TableIdentifier source = TableIdentifier.of("other", "secret");
+    stubCatalogWithSource(catalog, source);
+    when(catalog.loadTableMetadata(source)).thenThrow(new NoSuchTableException("gone"));
+    Assertions.assertTrue(
+        RegisterTableSourceResolver.findOverlappingTables(
+                catalog, TableIdentifier.of("mine", "copy"), TABLE_LOC)
+            .isEmpty());
+  }
+
+  @Test
+  void testExactCustomPointerStillRequiresSourceAuthorization() {
+    IcebergCatalogWrapper catalog = mock(IcebergCatalogWrapper.class);
+    TableIdentifier source = TableIdentifier.of("other", "secret");
+    String pointer = "s3://b/shared/custom.metadata.json";
+    when(catalog.getTableMetadataLocationCandidates(TABLE_LOC, pointer))
+        .thenReturn(Optional.of(Map.of(source, pointer)));
+    Assertions.assertEquals(
+        List.of(source),
+        RegisterTableSourceResolver.findSourceTables(
+            catalog, TableIdentifier.of("mine", "copy"), pointer, tableMetadata()));
+    verify(catalog, never()).listNamespace(any());
+    verify(catalog, never()).loadTableMetadata(any());
+  }
+
+  @Test
+  void testSourceIdentityUsesLocationRatherThanUuid() {
+    IcebergCatalogWrapper catalog = mock(IcebergCatalogWrapper.class);
+    TableIdentifier source = TableIdentifier.of("other", "secret");
+    stubCatalogWithSource(catalog, source);
+    TableMetadata existing = tableMetadata();
+    when(catalog.getTableMetadataLocation(source)).thenReturn(Optional.empty());
+    when(catalog.loadTableMetadata(source)).thenReturn(existing);
+    TableMetadata differentLocation =
+        TableMetadata.buildFrom(existing).setLocation("file:/warehouse/unrelated").build();
+    Assertions.assertTrue(
+        RegisterTableSourceResolver.findSourceTables(
+                catalog, TableIdentifier.of("mine", "copy"), META_LOC, differentLocation)
+            .isEmpty());
   }
 
   @Test

@@ -53,7 +53,6 @@ import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NonEmptyDomainException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.rest.RESTUtils;
-import org.apache.gravitino.tag.TagValue;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -81,7 +80,7 @@ public class TestDomainOperations extends TestBase {
   @Test
   public void testMetalakeOperations() throws Exception {
     GravitinoMetalake metalake = metalake();
-    DomainDTO dto = dto(NAME, Domain.Status.DRAFT, null, TagValue.of("dept", "finance"));
+    DomainDTO dto = dto(NAME, Domain.Status.DRAFT, null, "dept");
     buildMockResource(
         Method.POST,
         ROOT,
@@ -90,12 +89,10 @@ public class TestDomainOperations extends TestBase {
             "comment",
             Collections.emptyMap(),
             null,
-            new DomainCreateRequest.BackingTag("dept", "finance", false)),
+            new DomainCreateRequest.BackingTag("dept", false)),
         new DomainResponse(dto),
         200);
-    Domain created =
-        metalake.createDomain(
-            NAME, "comment", Collections.emptyMap(), TagValue.of("dept", "finance"), false);
+    Domain created = metalake.createDomain(NAME, "comment", Collections.emptyMap(), "dept", false);
     assertSnapshot(created, dto);
     buildMockResource(Method.GET, ROOT, null, new NameListResponse(new String[] {NAME}), 200);
     Assertions.assertArrayEquals(new String[] {NAME}, metalake.listDomains());
@@ -117,9 +114,7 @@ public class TestDomainOperations extends TestBase {
     Assertions.assertNotEquals(
         loaded,
         new GenericDomain(
-            dto(NAME, Domain.Status.PUBLISHED, null, TagValue.of("dept", "finance")),
-            client.restClient(),
-            "metalake"));
+            dto(NAME, Domain.Status.PUBLISHED, null, "dept"), client.restClient(), "metalake"));
     DomainUpdatesRequest request =
         new DomainUpdatesRequest(
             Arrays.asList(
@@ -154,7 +149,7 @@ public class TestDomainOperations extends TestBase {
   @Test
   public void testSnapshotMutations() throws Exception {
     Domain original = domain();
-    DomainDTO published = dto(NAME, Domain.Status.PUBLISHED, null, TagValue.noValue("dept"));
+    DomainDTO published = dto(NAME, Domain.Status.PUBLISHED, null, "dept");
     buildMockResource(
         Method.PATCH,
         PATH,
@@ -191,12 +186,10 @@ public class TestDomainOperations extends TestBase {
     buildMockResource(
         Method.PUT,
         PATH + "/backingTag",
-        new DomainBackingTagSetRequest(new DomainBackingTagDTO("new/tag", "value")),
-        new DomainResponse(dto(NAME, Domain.Status.DRAFT, null, TagValue.of("new/tag", "value"))),
+        new DomainBackingTagSetRequest(new DomainBackingTagDTO("new/tag")),
+        new DomainResponse(dto(NAME, Domain.Status.DRAFT, null, "new/tag")),
         200);
-    Assertions.assertEquals(
-        TagValue.of("new/tag", "value"),
-        original.updateBackingTag(TagValue.of("new/tag", "value")).backingTag().get());
+    Assertions.assertEquals("new/tag", original.updateBackingTag("new/tag").backingTag().get());
     buildMockResource(
         Method.PUT,
         PATH + "/backingTag",
@@ -204,7 +197,11 @@ public class TestDomainOperations extends TestBase {
         new DomainResponse(dto(NAME, Domain.Status.DRAFT, null, null)),
         200);
     Assertions.assertFalse(original.updateBackingTag(null).backingTag().isPresent());
-    Assertions.assertEquals(TagValue.noValue("dept"), original.backingTag().get());
+    Assertions.assertEquals("dept", original.backingTag().get());
+    Domain blankBackingTag =
+        new GenericDomain(
+            dto(NAME, Domain.Status.DRAFT, null, " "), client.restClient(), "metalake");
+    Assertions.assertThrows(IllegalArgumentException.class, blankBackingTag::backingTag);
     Assertions.assertThrows(
         UnsupportedOperationException.class, () -> original.properties().put("x", "y"));
   }
@@ -217,16 +214,15 @@ public class TestDomainOperations extends TestBase {
   @Test
   public void testSubdomains() throws Exception {
     Domain domain = domain();
-    DomainDTO child = dto("Tax/Asia", Domain.Status.DRAFT, NAME, TagValue.noValue("tax"));
+    DomainDTO child = dto("Tax/Asia", Domain.Status.DRAFT, NAME, "tax");
     buildMockResource(
         Method.POST,
         ROOT,
         new DomainCreateRequest(
-            "Tax/Asia", null, null, NAME, new DomainCreateRequest.BackingTag("tax", null, true)),
+            "Tax/Asia", null, null, NAME, new DomainCreateRequest.BackingTag("tax", true)),
         new DomainResponse(child),
         200);
-    assertSnapshot(
-        domain.createSubdomain("Tax/Asia", null, null, TagValue.noValue("tax"), true), child);
+    assertSnapshot(domain.createSubdomain("Tax/Asia", null, null, "tax", true), child);
     buildMockResource(
         Method.GET,
         PATH + "/subdomains",
@@ -429,7 +425,7 @@ public class TestDomainOperations extends TestBase {
           409);
       Assertions.assertThrows(
           type.asSubclass(RuntimeException.class),
-          () -> metalake.createDomain(NAME, null, null, TagValue.noValue("dept"), true));
+          () -> metalake.createDomain(NAME, null, null, "dept", true));
     }
     buildMockResource(
         Method.PUT,
@@ -437,8 +433,7 @@ public class TestDomainOperations extends TestBase {
         null,
         ErrorResponse.notFound("NoSuchTagException", "missing"),
         404);
-    Assertions.assertThrows(
-        NoSuchTagException.class, () -> domain().updateBackingTag(TagValue.noValue("missing")));
+    Assertions.assertThrows(NoSuchTagException.class, () -> domain().updateBackingTag("missing"));
     buildMockResource(
         Method.PUT, PATH + "/parent", null, ErrorResponse.illegalArguments("invalid parent"), 400);
     Assertions.assertThrows(
@@ -482,8 +477,7 @@ public class TestDomainOperations extends TestBase {
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> metalake.createDomain(NAME, null, null, null, false));
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> metalake.createDomain(NAME, null, null, TagValue.of("tag", "value"), true));
+        IllegalArgumentException.class, () -> metalake.createDomain(NAME, null, null, " ", true));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> domain().createSubdomain("child", null, null, null, true));
@@ -497,13 +491,11 @@ public class TestDomainOperations extends TestBase {
 
   private static Domain domain() {
     return new GenericDomain(
-        dto(NAME, Domain.Status.DRAFT, null, TagValue.noValue("dept")),
-        client.restClient(),
-        "metalake");
+        dto(NAME, Domain.Status.DRAFT, null, "dept"), client.restClient(), "metalake");
   }
 
   private static DomainDTO dto(
-      String name, Domain.Status status, String parent, TagValue backingTag) {
+      String name, Domain.Status status, String parent, String backingTag) {
     return new DomainDTO(
         name,
         "comment",
@@ -522,7 +514,7 @@ public class TestDomainOperations extends TestBase {
     Assertions.assertEquals(expected.getStatus(), actual.status());
     Assertions.assertEquals(expected.getParent(), actual.parent().orElse(null));
     Assertions.assertEquals(
-        expected.getBackingTag() == null ? null : expected.getBackingTag().tagValue(),
+        expected.getBackingTag() == null ? null : expected.getBackingTag().getName(),
         actual.backingTag().orElse(null));
     Assertions.assertEquals(expected.getAudit(), actual.auditInfo());
     Assertions.assertEquals(0, actual.relations().length);

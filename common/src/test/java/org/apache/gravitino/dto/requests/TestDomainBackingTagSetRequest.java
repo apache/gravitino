@@ -20,10 +20,10 @@ package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import java.io.IOException;
 import org.apache.gravitino.dto.domain.DomainBackingTagDTO;
 import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.tag.TagValue;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -66,15 +66,26 @@ public class TestDomainBackingTagSetRequest {
   public void testSetBinding() throws IOException {
     DomainBackingTagSetRequest request =
         JsonUtils.objectMapper()
-            .readValue(
-                "{\"backingTag\":{\"name\":\"department\",\"value\":\"finance\"}}",
-                DomainBackingTagSetRequest.class);
+            .readValue("{\"backingTag\":{\"name\":\"finance\"}}", DomainBackingTagSetRequest.class);
     request.validate();
-    Assertions.assertEquals(
-        TagValue.of("department", "finance"), request.getBackingTag().tagValue());
+    Assertions.assertEquals("finance", request.getBackingTag().getName());
     DomainBackingTagSetRequest direct =
-        new DomainBackingTagSetRequest(new DomainBackingTagDTO("department", null));
+        new DomainBackingTagSetRequest(new DomainBackingTagDTO("finance"));
     direct.validate();
-    Assertions.assertEquals(TagValue.noValue("department"), direct.getBackingTag().tagValue());
+    Assertions.assertEquals("finance", direct.getBackingTag().getName());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> new DomainBackingTagSetRequest(new DomainBackingTagDTO(" ")).validate());
+  }
+
+  @Test
+  public void testValueIsRejected() {
+    Assertions.assertThrows(
+        UnrecognizedPropertyException.class,
+        () ->
+            JsonUtils.objectMapper()
+                .readValue(
+                    "{\"backingTag\":{\"name\":\"department\",\"value\":\"finance\"}}",
+                    DomainBackingTagSetRequest.class));
   }
 }

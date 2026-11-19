@@ -82,7 +82,7 @@ public class GravitinoConnector implements Connector {
   private final Cache<String, UserSession> perUserSessionCache;
   // Keyed by handle identity: GravitinoTransactionHandle has no equals, and each beginTransaction
   // creates a new handle.
-  private final Map<GravitinoTransactionHandle, Queue<UserSession>> transactionLeases =
+  private final Map<GravitinoTransactionHandle, TransactionState> transactions =
       new ConcurrentHashMap<>();
 
   /**
@@ -116,9 +116,7 @@ public class GravitinoConnector implements Connector {
 
     GravitinoTransactionHandle transactionHandle =
         new GravitinoTransactionHandle(internalTransactionHandler);
-    if (forwardUser) {
-      transactionLeases.put(transactionHandle, new ConcurrentLinkedQueue<>());
-    }
+    transactions.put(transactionHandle, new TransactionState());
     return transactionHandle;
   }
 
@@ -134,8 +132,22 @@ public class GravitinoConnector implements Connector {
 
     CatalogConnectorMetadata metadata =
         forwardUser ? leaseSessionMetadata(session, gravitinoTransactionHandle) : connectorMetadata;
-    return createGravitinoMetadata(
-        metadata, catalogConnectorContext.getMetadataAdapter(), internalMetadata);
+    GravitinoMetadata gravitinoMetadata =
+        createGravitinoMetadata(
+            metadata, catalogConnectorContext.getMetadataAdapter(), internalMetadata);
+    TransactionState state =
+        transactions.computeIfPresent(
+            gravitinoTransactionHandle,
+            (handle, current) -> {
+              current.metadata.add(gravitinoMetadata);
+              return current;
+            });
+    if (state == null) {
+      // The transaction has already ended, or did not come from beginTransaction. Mark the metadata
+      // ended so that its beginCreateTable creates no table.
+      gravitinoMetadata.dropCreatedTables();
+    }
+    return gravitinoMetadata;
   }
 
   /**
@@ -241,11 +253,14 @@ public class GravitinoConnector implements Connector {
   public void commit(ConnectorTransactionHandle transactionHandle) {
     GravitinoTransactionHandle gravitinoTransactionHandle =
         (GravitinoTransactionHandle) transactionHandle;
+    boolean committed = false;
     try {
       Connector internalConnector = catalogConnectorContext.getInternalConnector();
       internalConnector.commit(gravitinoTransactionHandle.getInternalHandle());
+      committed = true;
     } finally {
-      releaseLeases(gravitinoTransactionHandle);
+      // Trino does not roll back a transaction whose commit failed.
+      endTransaction(gravitinoTransactionHandle, !committed);
     }
   }
 
@@ -257,7 +272,7 @@ public class GravitinoConnector implements Connector {
       Connector internalConnector = catalogConnectorContext.getInternalConnector();
       internalConnector.rollback(gravitinoTransactionHandle.getInternalHandle());
     } finally {
-      releaseLeases(gravitinoTransactionHandle);
+      endTransaction(gravitinoTransactionHandle, true);
     }
   }
 
@@ -283,8 +298,9 @@ public class GravitinoConnector implements Connector {
   public void shutdown() {
     if (forwardUser) {
       perUserSessionCache.invalidateAll();
-      transactionLeases.keySet().forEach(this::releaseLeases);
     }
+    // Keep the tables of transactions still open: one of them may be committing.
+    transactions.keySet().forEach(handle -> endTransaction(handle, false));
     Connector internalConnector = catalogConnectorContext.getInternalConnector();
     internalConnector.shutdown();
     catalogConnectorContext.close();
@@ -326,12 +342,12 @@ public class GravitinoConnector implements Connector {
       // A session retired after the lookup is no longer in the cache, so the next lookup returns
       // a different session.
       if (userSession.tryLease()) {
-        Queue<UserSession> leased =
-            transactionLeases.computeIfPresent(
+        TransactionState leased =
+            transactions.computeIfPresent(
                 transactionHandle,
-                (handle, sessions) -> {
-                  sessions.add(userSession);
-                  return sessions;
+                (handle, state) -> {
+                  state.leases.add(userSession);
+                  return state;
                 });
         if (leased == null) {
           // The transaction has already ended, or did not come from beginTransaction.
@@ -342,10 +358,17 @@ public class GravitinoConnector implements Connector {
     }
   }
 
-  private void releaseLeases(GravitinoTransactionHandle transactionHandle) {
-    Queue<UserSession> sessions = transactionLeases.remove(transactionHandle);
-    if (sessions != null) {
-      sessions.forEach(UserSession::release);
+  private void endTransaction(GravitinoTransactionHandle transactionHandle, boolean failed) {
+    TransactionState state = transactions.remove(transactionHandle);
+    if (state == null) {
+      return;
+    }
+    try {
+      if (failed) {
+        state.metadata.forEach(GravitinoMetadata::dropCreatedTables);
+      }
+    } finally {
+      state.leases.forEach(UserSession::release);
     }
   }
 
@@ -506,5 +529,11 @@ public class GravitinoConnector implements Connector {
         LOG.warn(e, "Failed to close GravitinoAdminClient");
       }
     }
+  }
+
+  /** The per-user sessions a transaction leases and the metadata it uses. */
+  private static final class TransactionState {
+    final Queue<UserSession> leases = new ConcurrentLinkedQueue<>();
+    final Queue<GravitinoMetadata> metadata = new ConcurrentLinkedQueue<>();
   }
 }

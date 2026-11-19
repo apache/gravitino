@@ -606,6 +606,23 @@ class TestDomainMembershipResolver {
   }
 
   @Test
+  void testBindingWithoutValueIgnoresAssignmentValues() {
+    DomainEntity dept = domain(1, "Dept", null, 10L, null);
+    DomainEntity[] domains = {dept};
+    candidate(10, TABLE);
+    assign(SCHEMA, tag(10, "dept", "finance"));
+    assertEquals(1, resolver.listMembers(METALAKE, dept, domains, all()).length);
+    assertEquals("Dept", listDomains(METALAKE, TABLE, domains)[0].name());
+    // A nearer assignment with another value of the same tag keeps the object a member.
+    assign(TABLE, tag(10, "dept", "hr"));
+    assertEquals(1, resolver.listMembers(METALAKE, dept, domains, all()).length);
+    assertEquals(1, listDomains(METALAKE, TABLE, domains).length);
+    assign(TABLE, tag(10, "dept"));
+    assertEquals(1, resolver.listMembers(METALAKE, dept, domains, all()).length);
+    assertEquals(1, listDomains(METALAKE, TABLE, domains).length);
+  }
+
+  @Test
   void testIdNotNameAndMissingBinding() {
     DomainEntity domain = domain(1, "Finance", null, 10L, null);
     candidate(10, TABLE);

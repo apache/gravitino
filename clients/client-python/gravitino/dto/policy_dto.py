@@ -440,15 +440,8 @@ class IcebergRewriteManifestsContentDTO(
     policy. Note that the threshold fields use snake_case wire names, unlike
     the camelCase execution peer fields."""
 
-    _manifest_count_critical: int | None = field(
-        default=None, metadata=config(field_name="manifest_count_critical")
-    )
-    _manifest_count_warning: int | None = field(
-        default=None, metadata=config(field_name="manifest_count_warning")
-    )
-    _avg_manifest_size_threshold_bytes: int | None = field(
-        default=None,
-        metadata=config(field_name="avg_manifest_size_threshold_bytes"),
+    _manifest_count_threshold: int | None = field(
+        default=None, metadata=config(field_name="manifest_count_threshold")
     )
     _spec_id: int | None = field(default=None, metadata=config(field_name="spec_id"))
     _use_caching: bool | None = field(
@@ -470,27 +463,11 @@ class IcebergRewriteManifestsContentDTO(
         default=None, metadata=config(field_name="updaterOptions")
     )
 
-    def manifest_count_critical(self) -> int:
+    def manifest_count_threshold(self) -> int:
         return (
-            self._manifest_count_critical
-            if self._manifest_count_critical is not None
-            else IcebergRewriteManifestsContent.DEFAULT_MANIFEST_COUNT_CRITICAL
-        )
-
-    def manifest_count_warning(self) -> int:
-        return (
-            self._manifest_count_warning
-            if self._manifest_count_warning is not None
-            else IcebergRewriteManifestsContent.DEFAULT_MANIFEST_COUNT_WARNING
-        )
-
-    def avg_manifest_size_threshold_bytes(self) -> int:
-        return (
-            self._avg_manifest_size_threshold_bytes
-            if self._avg_manifest_size_threshold_bytes is not None
-            else (
-                IcebergRewriteManifestsContent.DEFAULT_AVG_MANIFEST_SIZE_THRESHOLD_BYTES
-            )
+            self._manifest_count_threshold
+            if self._manifest_count_threshold is not None
+            else IcebergRewriteManifestsContent.DEFAULT_MANIFEST_COUNT_THRESHOLD
         )
 
     def spec_id(self) -> int | None:
@@ -524,9 +501,7 @@ class IcebergRewriteManifestsContentDTO(
 
     def to_domain_content(self) -> IcebergRewriteManifestsContent:
         return IcebergRewriteManifestsContent(
-            self.manifest_count_critical(),
-            self.manifest_count_warning(),
-            self.avg_manifest_size_threshold_bytes(),
+            self.manifest_count_threshold(),
             self.spec_id(),
             self.use_caching(),
             self.execution_spec(),
