@@ -65,7 +65,7 @@ public class LanceRESTCatalogProvider implements LakehouseRESTCatalogProvider {
     Map<String, String> headers = new LinkedHashMap<>();
     properties.forEach(
         (key, value) -> {
-          if (StringUtils.startsWithIgnoreCase(key, HEADER_PREFIX)) {
+          if (isHeaderProperty(key)) {
             String headerName = key.substring(HEADER_PREFIX.length());
             Preconditions.checkArgument(
                 headerName.matches("[!#$%&'*+.^_`|~0-9A-Za-z-]+"),
@@ -81,7 +81,7 @@ public class LanceRESTCatalogProvider implements LakehouseRESTCatalogProvider {
                 canonicalKey);
           }
         });
-    properties.keySet().removeIf(key -> StringUtils.startsWithIgnoreCase(key, HEADER_PREFIX));
+    properties.keySet().removeIf(LanceRESTCatalogProvider::isHeaderProperty);
     properties.putAll(headers);
   }
 
@@ -172,6 +172,10 @@ public class LanceRESTCatalogProvider implements LakehouseRESTCatalogProvider {
    * error responses, so fall back to the reason phrase and finally to an explicit placeholder
    * instead of reporting a bare {@code ApiException}.
    */
+  private static boolean isHeaderProperty(@Nullable String key) {
+    return key != null && key.regionMatches(true, 0, HEADER_PREFIX, 0, HEADER_PREFIX.length());
+  }
+
   private static String describeResponse(ApiException e) {
     if (StringUtils.isNotBlank(e.getResponseBody())) {
       return e.getResponseBody();

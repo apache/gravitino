@@ -108,6 +108,21 @@ public class TestLanceRESTCatalogProvider {
   }
 
   @Test
+  void testNormalizesOnlyHeaderProperties() {
+    Map<String, String> properties = new LinkedHashMap<>();
+    properties.put(null, "untouched");
+    properties.put("headers", "ordinary property");
+    properties.put("HEADERS.X-Test", "value");
+
+    new LanceRESTCatalogProvider().normalizeCatalogProperties(properties);
+
+    assertEquals("untouched", properties.get(null));
+    assertEquals("ordinary property", properties.get("headers"));
+    assertEquals("value", properties.get("headers.x-test"));
+    assertFalse(properties.containsKey("HEADERS.X-Test"));
+  }
+
+  @Test
   void testDiscoverySendsOneAuthorizationValuePerPageForIdenticalHeaders() {
     List<String> authorizationHeaders = new CopyOnWriteArrayList<>();
     List<String> customHeaders = new CopyOnWriteArrayList<>();
