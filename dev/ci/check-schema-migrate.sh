@@ -65,13 +65,29 @@ if echo "$CMD" | grep -Eq "upgrade-.*-to-.*-${ENGINE}"; then
   exit 1
 fi
 
+# Resolve auth Secret from the wait-init container (matches Bitnami fullname
+# collapse and mysql.auth.existingSecret / postgresql.auth.existingSecret).
+init_secret_name() {
+  local init_name="$1"
+  local env_name="$2"
+  local secret
+  secret=$(kubectl get deploy -n "$NS" "$DEPLOY" \
+    -o jsonpath="{.spec.template.spec.initContainers[?(@.name==\"${init_name}\")].env[?(@.name==\"${env_name}\")].valueFrom.secretKeyRef.name}")
+  if [ -z "$secret" ]; then
+    echo "ERROR: could not resolve Secret from ${DEPLOY}/${init_name}/${env_name}" >&2
+    return 1
+  fi
+  printf '%s\n' "$secret"
+}
+
 DB_POD=$(kubectl get pods -n "$NS" -l "app.kubernetes.io/name=${ENGINE}" \
   -o jsonpath='{.items[0].metadata.name}')
 case "$ENGINE" in
   mysql)
     DB_NAME=$(kubectl get deploy -n "$NS" "$DEPLOY" \
       -o jsonpath='{.spec.template.spec.initContainers[?(@.name=="init-mysql")].env[?(@.name=="GRAVITINO_DB")].value}')
-    ROOT_PW=$(kubectl get secret -n "$NS" "${RELEASE}-mysql" -o jsonpath='{.data.mysql-root-password}' | base64 -d)
+    ROOT_SECRET=$(init_secret_name init-mysql MYSQL_PWD)
+    ROOT_PW=$(kubectl get secret -n "$NS" "$ROOT_SECRET" -o jsonpath='{.data.mysql-root-password}' | base64 -d)
     RECORDED=$(kubectl exec -n "$NS" "$DB_POD" -- \
       mysql -uroot -p"${ROOT_PW}" -D "${DB_NAME}" -sNe "SELECT schema_version FROM gravitino_schema_migration WHERE id=1")
     HAS_AUDIT=$(kubectl exec -n "$NS" "$DB_POD" -- \
@@ -82,7 +98,8 @@ case "$ENGINE" in
       -o jsonpath='{.spec.template.spec.initContainers[?(@.name=="init-postgresql")].env[?(@.name=="GRAVITINO_DB")].value}')
     PGUSER=$(kubectl get deploy -n "$NS" "$DEPLOY" \
       -o jsonpath='{.spec.template.spec.initContainers[?(@.name=="init-postgresql")].env[?(@.name=="POSTGRES_USER")].value}')
-    PG_PW=$(kubectl get secret -n "$NS" "${RELEASE}-postgresql" -o jsonpath='{.data.password}' | base64 -d)
+    PG_SECRET=$(init_secret_name init-postgresql POSTGRES_PASSWORD)
+    PG_PW=$(kubectl get secret -n "$NS" "$PG_SECRET" -o jsonpath='{.data.password}' | base64 -d)
     RECORDED=$(kubectl exec -n "$NS" "$DB_POD" -- \
       env PGPASSWORD="${PG_PW}" psql -U "${PGUSER}" -d "${DB_NAME}" -tAc "SELECT schema_version FROM gravitino_schema_migration WHERE id=1")
     HAS_AUDIT=$(kubectl exec -n "$NS" "$DB_POD" -- \

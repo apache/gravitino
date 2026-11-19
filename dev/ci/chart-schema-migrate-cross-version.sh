@@ -110,22 +110,38 @@ DB_POD=$(kubectl get pods -n "$NAMESPACE" -l "app.kubernetes.io/name=${DB_LABEL}
 DB_NAME=$(kubectl get deploy -n "$NAMESPACE" "$DEPLOY" \
   -o jsonpath="{.spec.template.spec.initContainers[?(@.name==\"${WAIT_INIT}\")].env[?(@.name==\"GRAVITINO_DB\")].value}")
 
+# Match Bitnami fullname collapse / existingSecret via the wait-init secretKeyRef.
+init_secret_name() {
+  local init_name="$1"
+  local env_name="$2"
+  local secret
+  secret=$(kubectl get deploy -n "$NAMESPACE" "$DEPLOY" \
+    -o jsonpath="{.spec.template.spec.initContainers[?(@.name==\"${init_name}\")].env[?(@.name==\"${env_name}\")].valueFrom.secretKeyRef.name}")
+  if [ -z "$secret" ]; then
+    echo "ERROR: could not resolve Secret from ${DEPLOY}/${init_name}/${env_name}" >&2
+    return 1
+  fi
+  printf '%s\n' "$secret"
+}
+
 column_count() {
   local table="$1"
   local column="$2"
   if [ "$ENGINE" = mysql ]; then
-    local root_pw
-    root_pw=$(kubectl get secret -n "$NAMESPACE" "${RELEASE_NAME}-mysql" \
+    local root_secret root_pw
+    root_secret=$(init_secret_name init-mysql MYSQL_PWD)
+    root_pw=$(kubectl get secret -n "$NAMESPACE" "$root_secret" \
       -o jsonpath='{.data.mysql-root-password}' | base64 -d)
     kubectl exec -n "$NAMESPACE" "$DB_POD" -- \
       mysql -uroot -p"${root_pw}" -D "${DB_NAME}" -sNe \
       "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='${table}' AND column_name='${column}'" \
       | tr -d '[:space:]'
   else
-    local pg_user pg_pw
+    local pg_user pg_secret pg_pw
     pg_user=$(kubectl get deploy -n "$NAMESPACE" "$DEPLOY" \
       -o jsonpath='{.spec.template.spec.initContainers[?(@.name=="init-postgresql")].env[?(@.name=="POSTGRES_USER")].value}')
-    pg_pw=$(kubectl get secret -n "$NAMESPACE" "${RELEASE_NAME}-postgresql" \
+    pg_secret=$(init_secret_name init-postgresql POSTGRES_PASSWORD)
+    pg_pw=$(kubectl get secret -n "$NAMESPACE" "$pg_secret" \
       -o jsonpath='{.data.password}' | base64 -d)
     kubectl exec -n "$NAMESPACE" "$DB_POD" -- \
       env PGPASSWORD="${pg_pw}" psql -U "${pg_user}" -d "${DB_NAME}" -tAc \
@@ -154,7 +170,8 @@ echo "==> Reset database to schema-${FROM_VERSION}-${ENGINE}.sql"
 REMOTE_SQL="/tmp/schema-${FROM_VERSION}-${ENGINE}.sql"
 kubectl cp "$SCHEMA_SQL" "${NAMESPACE}/${DB_POD}:${REMOTE_SQL}"
 if [ "$ENGINE" = mysql ]; then
-  ROOT_PW=$(kubectl get secret -n "$NAMESPACE" "${RELEASE_NAME}-mysql" \
+  ROOT_SECRET=$(init_secret_name init-mysql MYSQL_PWD)
+  ROOT_PW=$(kubectl get secret -n "$NAMESPACE" "$ROOT_SECRET" \
     -o jsonpath='{.data.mysql-root-password}' | base64 -d)
   kubectl exec -n "$NAMESPACE" "$DB_POD" -- \
     mysql -uroot -p"${ROOT_PW}" -e "DROP DATABASE IF EXISTS \`${DB_NAME}\`; CREATE DATABASE \`${DB_NAME}\`;"
@@ -163,7 +180,8 @@ if [ "$ENGINE" = mysql ]; then
 else
   PG_USER=$(kubectl get deploy -n "$NAMESPACE" "$DEPLOY" \
     -o jsonpath='{.spec.template.spec.initContainers[?(@.name=="init-postgresql")].env[?(@.name=="POSTGRES_USER")].value}')
-  PG_PW=$(kubectl get secret -n "$NAMESPACE" "${RELEASE_NAME}-postgresql" \
+  PG_SECRET=$(init_secret_name init-postgresql POSTGRES_PASSWORD)
+  PG_PW=$(kubectl get secret -n "$NAMESPACE" "$PG_SECRET" \
     -o jsonpath='{.data.password}' | base64 -d)
   # Drop schema objects so leftover gravitino_schema_migration cannot leak.
   # Prefer DROP SCHEMA over DROP DATABASE: the chart app user may not be a superuser.
