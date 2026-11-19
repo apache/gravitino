@@ -166,4 +166,45 @@ class TestIdentifierUtils {
     NameIdentifier result = IdentifierUtils.parseJobIdentifier("a.b.c.d.e").orElseThrow();
     Assertions.assertEquals("a.b.c.d.e", result.toString());
   }
+
+  @Test
+  void testToSparkTableIdentifierSplitsHierarchicalSchema() {
+    Assertions.assertEquals(
+        "a.b.c.events",
+        IdentifierUtils.toSparkTableIdentifier(
+            NameIdentifier.of("catalog", "a:b:c", "events"),
+            IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR));
+    Assertions.assertEquals(
+        "a.b.events",
+        IdentifierUtils.toSparkTableIdentifier(NameIdentifier.of("catalog", "a|b", "events"), "|"));
+    Assertions.assertEquals(
+        "db.table",
+        IdentifierUtils.toSparkTableIdentifier(
+            NameIdentifier.of("catalog", "db", "table"), IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR));
+  }
+
+  @Test
+  void testToSparkTableIdentifierRejectsEmptySchemaSegment() {
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () ->
+            IdentifierUtils.toSparkTableIdentifier(
+                NameIdentifier.of("catalog", "a::c", "t"),
+                IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR));
+  }
+
+  @Test
+  void testFromSparkTableIdentifierJoinsHierarchicalSchema() {
+    Assertions.assertEquals(
+        NameIdentifier.of("catalog", "a:b:c", "events"),
+        IdentifierUtils.fromSparkTableIdentifier(
+            "catalog", "a.b.c.events", IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR));
+    Assertions.assertEquals(
+        NameIdentifier.of("catalog", "a|b", "events"),
+        IdentifierUtils.fromSparkTableIdentifier("catalog", "a.b.events", "|"));
+    Assertions.assertEquals(
+        NameIdentifier.of("catalog", "db", "table"),
+        IdentifierUtils.fromSparkTableIdentifier(
+            "catalog", "db.table", IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR));
+  }
 }

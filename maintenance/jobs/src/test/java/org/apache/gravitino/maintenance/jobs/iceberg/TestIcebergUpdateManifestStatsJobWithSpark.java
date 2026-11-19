@@ -23,10 +23,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.sun.net.httpserver.HttpServer;
 import java.io.File;
 import java.lang.reflect.Proxy;
+import java.net.InetSocketAddress;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -45,6 +48,8 @@ import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.maintenance.optimizer.api.updater.StatisticsUpdater;
 import org.apache.gravitino.maintenance.optimizer.common.IcebergManifestStatistics;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
+import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoClientUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
@@ -132,7 +137,13 @@ public class TestIcebergUpdateManifestStatsJobWithSpark {
       assertEquals(1, manifestReads.get());
       RecordingStatisticsUpdater updater = new RecordingStatisticsUpdater();
       IcebergUpdateManifestStatsJob.updateStatistics(
-          spark, updater, CATALOG_NAME, "db.manifest_evolution", "test", tempDir.toPath());
+          spark,
+          updater,
+          CATALOG_NAME,
+          "db.manifest_evolution",
+          "test",
+          tempDir.toPath(),
+          IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
       assertEquals(1, updater.updateCalls);
       assertEquals(3, updater.manifestStatistics.size());
       Map<String, StatisticValue<?>> values = new HashMap<>();
@@ -164,6 +175,43 @@ public class TestIcebergUpdateManifestStatsJobWithSpark {
     }
   }
 
+  /**
+   * Production path: {@code GET /configs} → {@link
+   * GravitinoClientUtils#fetchSchemaSeparator(String)} → {@code updateStatistics} → updater.
+   * Asserts {@code a.b.events} + separator {@code |} yields {@code a|b.events}.
+   */
+  @Test
+  public void testUpdaterReceivesConfiguredHierarchicalSchemaSeparator() throws Exception {
+    spark.sql("CREATE NAMESPACE IF NOT EXISTS " + CATALOG_NAME + ".a");
+    spark.sql("CREATE NAMESPACE IF NOT EXISTS " + CATALOG_NAME + ".a.b");
+    String name = CATALOG_NAME + ".a.b.events";
+    spark.sql("CREATE TABLE " + name + " (id INT) USING iceberg");
+    HttpServer configs = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    configs.createContext(
+        "/configs",
+        exchange -> {
+          byte[] body = "{\"gravitino.schema.separator\":\"|\"}".getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          exchange.getResponseBody().write(body);
+          exchange.close();
+        });
+    configs.start();
+    try {
+      String gravitinoUri = "http://127.0.0.1:" + configs.getAddress().getPort();
+      String schemaSeparator = GravitinoClientUtils.fetchSchemaSeparator(gravitinoUri);
+      RecordingStatisticsUpdater updater = new RecordingStatisticsUpdater();
+      IcebergUpdateManifestStatsJob.updateStatistics(
+          spark, updater, CATALOG_NAME, "a.b.events", "test", null, schemaSeparator);
+      assertEquals("|", schemaSeparator);
+      assertEquals(NameIdentifier.of(CATALOG_NAME, "a|b", "events"), updater.identifier);
+      assertEquals(1, updater.updateCalls);
+    } finally {
+      configs.stop(0);
+      spark.sql("DROP TABLE IF EXISTS " + name);
+    }
+  }
+
   /** Verifies an empty table publishes a complete zero-valued measurement. */
   @Test
   public void testPublishesEmptyUnpartitionedTable() throws Exception {
@@ -172,7 +220,13 @@ public class TestIcebergUpdateManifestStatsJobWithSpark {
     try {
       RecordingStatisticsUpdater updater = new RecordingStatisticsUpdater();
       IcebergUpdateManifestStatsJob.updateStatistics(
-          spark, updater, CATALOG_NAME, "db.empty", "test", tempDir.toPath());
+          spark,
+          updater,
+          CATALOG_NAME,
+          "db.empty",
+          "test",
+          tempDir.toPath(),
+          IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
       assertEquals(NameIdentifier.of(CATALOG_NAME, "db", "empty"), updater.identifier);
       assertEquals(1, updater.updateCalls);
       Map<String, StatisticValue<?>> values = new HashMap<>();
@@ -194,7 +248,13 @@ public class TestIcebergUpdateManifestStatsJobWithSpark {
     RecordingStatisticsUpdater updater = new RecordingStatisticsUpdater();
     try {
       IcebergUpdateManifestStatsJob.updateStatistics(
-          spark, updater, CATALOG_NAME, "db.uncoordinated", "test", null);
+          spark,
+          updater,
+          CATALOG_NAME,
+          "db.uncoordinated",
+          "test",
+          null,
+          IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
       assertEquals(1, updater.updateCalls);
       assertEquals(3, updater.manifestStatistics.size());
       spark.sql("INSERT INTO " + name + " VALUES (1)");
@@ -203,10 +263,22 @@ public class TestIcebergUpdateManifestStatsJobWithSpark {
           IllegalStateException.class,
           () ->
               IcebergUpdateManifestStatsJob.updateStatistics(
-                  spark, updater, CATALOG_NAME, "db.uncoordinated", "test", null));
+                  spark,
+                  updater,
+                  CATALOG_NAME,
+                  "db.uncoordinated",
+                  "test",
+                  null,
+                  IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR));
       updater.fail = false;
       IcebergUpdateManifestStatsJob.updateStatistics(
-          spark, updater, CATALOG_NAME, "db.uncoordinated", "test", null);
+          spark,
+          updater,
+          CATALOG_NAME,
+          "db.uncoordinated",
+          "test",
+          null,
+          IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
       assertEquals(3, updater.updateCalls);
       Map<String, StatisticValue<?>> values = new HashMap<>();
       updater.manifestStatistics.forEach(stat -> values.put(stat.name(), stat.value()));
@@ -229,12 +301,24 @@ public class TestIcebergUpdateManifestStatsJobWithSpark {
         IllegalArgumentException.class,
         () ->
             IcebergUpdateManifestStatsJob.updateStatistics(
-                spark, updater, CATALOG_NAME, "db.retry_collection", "test", directory));
+                spark,
+                updater,
+                CATALOG_NAME,
+                "db.retry_collection",
+                "test",
+                directory,
+                IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR));
     assertEquals(0, updater.updateCalls);
     spark.sql("CREATE TABLE " + CATALOG_NAME + ".db.retry_collection (id INT) USING iceberg");
     try {
       IcebergUpdateManifestStatsJob.updateStatistics(
-          spark, updater, CATALOG_NAME, "db.retry_collection", "test", directory);
+          spark,
+          updater,
+          CATALOG_NAME,
+          "db.retry_collection",
+          "test",
+          directory,
+          IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
       assertEquals(1, updater.updateCalls);
     } finally {
       spark.sql("DROP TABLE " + CATALOG_NAME + ".db.retry_collection");
@@ -253,7 +337,13 @@ public class TestIcebergUpdateManifestStatsJobWithSpark {
           IllegalArgumentException.class,
           () ->
               IcebergUpdateManifestStatsJob.updateStatistics(
-                  spark, updater, CATALOG_NAME, "db.coordinated", "test", Paths.get("relative")));
+                  spark,
+                  updater,
+                  CATALOG_NAME,
+                  "db.coordinated",
+                  "test",
+                  Paths.get("relative"),
+                  IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR));
       assertThrows(
           IllegalArgumentException.class,
           () ->
@@ -263,10 +353,17 @@ public class TestIcebergUpdateManifestStatsJobWithSpark {
                   CATALOG_NAME,
                   "db.coordinated",
                   "test",
-                  directory.resolve("missing")));
+                  directory.resolve("missing"),
+                  IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR));
       assertEquals(0, updater.updateCalls);
       IcebergUpdateManifestStatsJob.updateStatistics(
-          spark, updater, CATALOG_NAME, "db.coordinated", "test", directory);
+          spark,
+          updater,
+          CATALOG_NAME,
+          "db.coordinated",
+          "test",
+          directory,
+          IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
       Path lockPath;
       try (Stream<Path> files = Files.list(directory)) {
         lockPath = files.findFirst().get();
@@ -286,12 +383,24 @@ public class TestIcebergUpdateManifestStatsJobWithSpark {
             IllegalStateException.class,
             () ->
                 IcebergUpdateManifestStatsJob.updateStatistics(
-                    spark, updater, CATALOG_NAME, "db.coordinated", "test", directory));
+                    spark,
+                    updater,
+                    CATALOG_NAME,
+                    "db.coordinated",
+                    "test",
+                    directory,
+                    IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR));
         assertEquals(1, updater.updateCalls);
         // Independent table targets do not share a coordination lock.
         spark.sql("CREATE TABLE " + CATALOG_NAME + ".db.independent (id INT) USING iceberg");
         IcebergUpdateManifestStatsJob.updateStatistics(
-            spark, updater, CATALOG_NAME, "db.independent", "test", directory);
+            spark,
+            updater,
+            CATALOG_NAME,
+            "db.independent",
+            "test",
+            directory,
+            IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
         assertEquals(2, updater.updateCalls);
       } finally {
         otherHost.destroyForcibly();
@@ -302,7 +411,13 @@ public class TestIcebergUpdateManifestStatsJobWithSpark {
           IllegalStateException.class,
           () ->
               IcebergUpdateManifestStatsJob.updateStatistics(
-                  spark, updater, CATALOG_NAME, "db.coordinated", "test", directory));
+                  spark,
+                  updater,
+                  CATALOG_NAME,
+                  "db.coordinated",
+                  "test",
+                  directory,
+                  IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR));
       assertEquals(3, updater.updateCalls);
       updater.fail = false;
       IllegalStateException unfinished =
@@ -310,7 +425,13 @@ public class TestIcebergUpdateManifestStatsJobWithSpark {
               IllegalStateException.class,
               () ->
                   IcebergUpdateManifestStatsJob.updateStatistics(
-                      spark, updater, CATALOG_NAME, "db.coordinated", "test", directory));
+                      spark,
+                      updater,
+                      CATALOG_NAME,
+                      "db.coordinated",
+                      "test",
+                      directory,
+                      IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR));
       assertTrue(unfinished.getMessage().contains("requires recovery"));
       assertEquals(3, updater.updateCalls);
       // Recovery is explicit and preserves the shared inode, after the prior write has ended.
@@ -320,7 +441,13 @@ public class TestIcebergUpdateManifestStatsJobWithSpark {
         channel.force(true);
       }
       IcebergUpdateManifestStatsJob.updateStatistics(
-          spark, updater, CATALOG_NAME, "db.coordinated", "test", directory);
+          spark,
+          updater,
+          CATALOG_NAME,
+          "db.coordinated",
+          "test",
+          directory,
+          IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
       assertEquals(4, updater.updateCalls);
       assertEquals(0, Files.size(lockPath));
     } finally {
