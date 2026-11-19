@@ -847,3 +847,19 @@ CREATE TABLE IF NOT EXISTS glossary_term_synonym (
     PRIMARY KEY (term_id, synonym_key, deleted_at),
     KEY idx_glossary_synonym (metalake_id, synonym_key, deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'glossary term synonyms, different terms may share the same synonym';
+
+CREATE TABLE IF NOT EXISTS glossary_term_rel (
+    metalake_id BIGINT NOT NULL COMMENT 'owning metalake id',
+    from_term_id BIGINT NOT NULL COMMENT 'child id for BROADER, smaller endpoint id for RELATED',
+    to_term_id BIGINT NOT NULL COMMENT 'parent id for BROADER, larger endpoint id for RELATED',
+    rel_type VARCHAR(16) NOT NULL COMMENT 'BROADER or RELATED, e.g. A BROADER B means A is a kind of B',
+    deleted_at BIGINT NOT NULL DEFAULT 0 COMMENT 'retirement time in epoch milliseconds, advanced past retained generations to avoid collisions, 0 means live',
+    PRIMARY KEY (from_term_id, to_term_id, rel_type, deleted_at),
+    KEY idx_glossary_rel_to (to_term_id, rel_type, deleted_at),
+    KEY idx_glossary_rel_metalake (metalake_id, deleted_at),
+    KEY idx_glossary_rel_deleted (deleted_at, from_term_id, to_term_id, rel_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'glossary directed broader and canonical related edges';
+
+CREATE TABLE IF NOT EXISTS glossary_hierarchy_lock (
+    metalake_id BIGINT NOT NULL PRIMARY KEY COMMENT 'owning metalake id, one database mutex row per metalake'
+) ENGINE=InnoDB COMMENT 'serializes glossary hierarchy and name checks within a metalake';

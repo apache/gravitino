@@ -209,6 +209,17 @@ public class TestGlossaryTermMetaService extends TestJDBCBackend {
         () -> service.update(ident("One"), old -> term(999, "One").build()));
   }
 
+  /** The backend distinguishes a missing parent from an absent child of a live metalake. */
+  @TestTemplate
+  public void testDeleteDistinguishesMissingMetalakeFromMissingTerm() throws Exception {
+    NoSuchEntityException missingParent =
+        Assertions.assertThrows(
+            NoSuchEntityException.class, () -> backend.delete(ident("Churn"), TYPE, false));
+    Assertions.assertEquals("No such metalake entity: glossary", missingParent.getMessage());
+    setupMetalake();
+    Assertions.assertFalse(backend.delete(ident("Churn"), TYPE, false));
+  }
+
   @TestTemplate
   public void testDeleteRecreateAndGc() throws Exception {
     setupMetalake();
@@ -424,7 +435,7 @@ public class TestGlossaryTermMetaService extends TestJDBCBackend {
 
   @TestTemplate
   public void testGetDoesNotFollowRenamedMetalake() throws Exception {
-    assertReadAfterMetalakeRename(
+    assertOperationAfterMetalakeRename(
         () ->
             Assertions.assertThrows(
                 NoSuchEntityException.class, () -> backend.get(ident("New term"), TYPE)));
@@ -432,26 +443,39 @@ public class TestGlossaryTermMetaService extends TestJDBCBackend {
 
   @TestTemplate
   public void testListDoesNotFollowRenamedMetalake() throws Exception {
-    assertReadAfterMetalakeRename(
+    assertOperationAfterMetalakeRename(
         () -> Assertions.assertTrue(backend.list(NS, TYPE, true).isEmpty()));
   }
 
   @TestTemplate
   public void testBatchGetDoesNotFollowRenamedMetalake() throws Exception {
-    assertReadAfterMetalakeRename(
+    assertOperationAfterMetalakeRename(
         () -> Assertions.assertTrue(backend.batchGet(List.of(ident("New term")), TYPE).isEmpty()));
   }
 
   @TestTemplate
   public void testIdsDoNotFollowRenamedMetalake() throws Exception {
-    assertReadAfterMetalakeRename(
+    assertOperationAfterMetalakeRename(
         () ->
             Assertions.assertThrows(
                 NoSuchEntityException.class,
                 () -> new RelationalEntityStoreIdResolver().getEntityIds(ident("New term"), TYPE)));
   }
 
-  private void assertReadAfterMetalakeRename(Executable read) throws Exception {
+  /** A delete that resolved the old parent name must leave the renamed metalake's term intact. */
+  @TestTemplate
+  public void testDeleteDoesNotFollowRenamedMetalake() throws Exception {
+    assertOperationAfterMetalakeRename(
+        () -> {
+          NoSuchEntityException missingParent =
+              Assertions.assertThrows(
+                  NoSuchEntityException.class,
+                  () -> backend.delete(ident("New term"), TYPE, false));
+          Assertions.assertEquals("Metalake glossary no longer exists", missingParent.getMessage());
+        });
+  }
+
+  private void assertOperationAfterMetalakeRename(Executable operation) throws Exception {
     setupMetalake();
     Namespace renamed =
         Namespace.of("renamed", Entity.SYSTEM_CATALOG_RESERVED_NAME, "glossary_term");
@@ -460,7 +484,8 @@ public class TestGlossaryTermMetaService extends TestJDBCBackend {
     Mockito.doAnswer(
             invocation -> {
               MetalakePO observed = (MetalakePO) invocation.callRealMethod();
-              // Commit on an independent session after name resolution but before the term SELECT.
+              // Commit on an independent session after name resolution and before the caller
+              // continues.
               // This term has never existed under the old namespace, so returning it cannot
               // represent
               // an earlier valid snapshot. The spy changes timing only; all reads and writes hit
@@ -488,7 +513,7 @@ public class TestGlossaryTermMetaService extends TestJDBCBackend {
     try (MockedStatic<MetalakeMetaService> services =
         Mockito.mockStatic(MetalakeMetaService.class, Mockito.CALLS_REAL_METHODS)) {
       services.when(MetalakeMetaService::getInstance).thenReturn(metalakes);
-      Assertions.assertDoesNotThrow(read);
+      Assertions.assertDoesNotThrow(operation);
       Mockito.verify(metalakes).requireMetalakeByName("glossary");
     } finally {
       writer.shutdownNow();

@@ -58,4 +58,37 @@ public final class GlossaryInvariants {
       }
     }
   }
+
+  /** Checks canonical relation keys, live endpoints and the unique mutex rows. */
+  public static void assertRelations() throws Exception {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession();
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement()) {
+      Set<String> keys = new HashSet<>();
+      try (ResultSet rows =
+          statement.executeQuery(
+              "SELECT r.from_term_id, r.to_term_id, r.rel_type, f.term_id, t.term_id, m.metalake_id FROM glossary_term_rel r "
+                  + "LEFT JOIN glossary_term_meta f ON f.term_id=r.from_term_id AND f.metalake_id=r.metalake_id AND f.deleted_at=0 "
+                  + "LEFT JOIN glossary_term_meta t ON t.term_id=r.to_term_id AND t.metalake_id=r.metalake_id AND t.deleted_at=0 "
+                  + "LEFT JOIN metalake_meta m ON m.metalake_id=r.metalake_id AND m.deleted_at=0 WHERE r.deleted_at=0")) {
+        while (rows.next()) {
+          Assertions.assertNotEquals(rows.getLong(1), rows.getLong(2));
+          Assertions.assertTrue(
+              keys.add(rows.getLong(1) + ":" + rows.getLong(2) + ":" + rows.getString(3)));
+          Assertions.assertTrue(Set.of("BROADER", "RELATED").contains(rows.getString(3)));
+          if ("RELATED".equals(rows.getString(3)))
+            Assertions.assertTrue(rows.getLong(1) < rows.getLong(2));
+          for (int i = 4; i <= 6; i++)
+            Assertions.assertNotNull(
+                rows.getObject(i), "Live relation requires live endpoints and metalake");
+        }
+      }
+      Set<Long> metalakes = new HashSet<>();
+      try (ResultSet rows =
+          statement.executeQuery("SELECT metalake_id FROM glossary_hierarchy_lock")) {
+        while (rows.next()) Assertions.assertTrue(metalakes.add(rows.getLong(1)));
+      }
+    }
+  }
 }
