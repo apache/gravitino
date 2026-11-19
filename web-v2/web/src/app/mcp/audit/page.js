@@ -193,8 +193,8 @@ function AuditLog() {
       <Title level={2}>Audit Log</Title>
       <Paragraph type='secondary'>
         {me.is_admin
-          ? 'Every tool call made through the MCP gateway, by people and service accounts.'
-          : 'The tool calls you made through the MCP gateway.'}
+          ? "Calls through the MCP gateway by people and service accounts, including the ones it refused, and admins' changes."
+          : 'Your calls through the MCP gateway, including the ones it refused.'}
       </Paragraph>
       <Flex gap='middle' wrap className='mb-4'>
         <Card size='small'>

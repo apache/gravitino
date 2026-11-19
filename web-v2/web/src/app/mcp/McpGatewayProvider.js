@@ -21,7 +21,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Result, Spin } from 'antd'
+import { Button, Result, Spin } from 'antd'
 import SectionContainer from '@/components/SectionContainer'
 import { MCP_GATEWAY_URI_KEY, createMcpGatewayApi, gatewayErrorMessage, isSignedOut } from '@/lib/api/mcpGateway'
 import { useAppSelector } from '@/lib/hooks/useStore'
@@ -53,16 +53,29 @@ export default function McpGatewayProvider({ children }) {
   }, [gatewayUri])
   const [me, setMe] = useState()
   const [error, setError] = useState()
+  const [attempt, setAttempt] = useState(0)
   const value = useMemo(() => ({ api, me }), [api, me])
 
   useEffect(() => {
-    if (api && authType === 'oauth') {
-      api
-        .getMe()
-        .then(setMe)
-        .catch(err => (isSignedOut(err) ? router.push('/login') : setError(gatewayErrorMessage(err))))
+    if (!api || authType !== 'oauth') {
+      return
     }
-  }, [api, authType, router])
+
+    // Ignore an answer that comes after the gateway or the sign-in changed.
+    let current = true
+    api
+      .getMe()
+      .then(user => current && setMe(user))
+      .catch(err => {
+        if (current) {
+          isSignedOut(err) ? router.push('/login') : setError(gatewayErrorMessage(err))
+        }
+      })
+
+    return () => {
+      current = false
+    }
+  }, [api, authType, router, attempt])
 
   let unavailable = null
   if (systemConfig && !gatewayUri) {
@@ -84,7 +97,23 @@ export default function McpGatewayProvider({ children }) {
       />
     )
   } else if (error) {
-    unavailable = <Result status='error' title='The MCP gateway is unavailable' subTitle={error} />
+    unavailable = (
+      <Result
+        status='error'
+        title='The MCP gateway is unavailable'
+        subTitle={error}
+        extra={
+          <Button
+            onClick={() => {
+              setError(undefined)
+              setAttempt(n => n + 1)
+            }}
+          >
+            Retry
+          </Button>
+        }
+      />
+    )
   } else if (!me) {
     unavailable = <Spin className='mt-20 w-full' />
   }

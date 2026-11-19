@@ -24,7 +24,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const store = { auth: {} }
 const getMe = vi.fn()
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+// Next.js returns the same router on every render.
+const router = vi.hoisted(() => ({ push: vi.fn() }))
+vi.mock('next/navigation', () => ({ useRouter: () => router }))
 vi.mock('@/lib/hooks/useStore', () => ({ useAppSelector: select => select(store) }))
 vi.mock('@/components/SectionContainer', () => ({ default: ({ children }) => children }))
 vi.mock('@/lib/api/mcpGateway', async importOriginal => ({
@@ -97,5 +99,16 @@ describe('McpGatewayProvider', () => {
     await show(page)
 
     expect(container.textContent).toContain('The MCP gateway is unavailable')
+  })
+
+  it('tries the gateway again on Retry', async () => {
+    getMe.mockRejectedValueOnce(new Error('Network Error')).mockResolvedValue({ is_admin: true })
+    await show(page)
+
+    const retry = [...container.querySelectorAll('button')].find(b => b.textContent === 'Retry')
+    await act(async () => retry.click())
+
+    expect(getMe).toHaveBeenCalledTimes(2)
+    expect(container.textContent).toBe('admin page')
   })
 })
