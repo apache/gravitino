@@ -227,13 +227,8 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
       String whereClause,
       String optionsJson) {
 
-    StringBuilder sql = new StringBuilder();
-    sql.append("CALL ")
-        .append(IcebergJobUtils.escapeSqlIdentifier(catalogName))
-        .append(".system.rewrite_data_files(");
-    sql.append("table => '")
-        .append(IcebergJobUtils.escapeSparkCallStringArg(tableIdentifier))
-        .append("'");
+    StringBuilder sql = IcebergJobUtils.beginSystemProcedureCall(catalogName, "rewrite_data_files");
+    IcebergJobUtils.appendSparkCallStringTableArg(sql, tableIdentifier);
 
     if (strategy != null && !strategy.isEmpty()) {
       sql.append(", strategy => '")
@@ -401,7 +396,10 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
 
   @Override
   public TableSnapshotMetrics collectBeforeMetrics(
-      SparkSession spark, String catalogName, String tableIdentifier) {
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      Map<String, String> argsByName) {
     long snapshotId = IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier);
     Map<String, Object> metrics = collectCompactionMetrics(spark, catalogName, tableIdentifier);
     return TableSnapshotMetrics.of(snapshotId, metrics);

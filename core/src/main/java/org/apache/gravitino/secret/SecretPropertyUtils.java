@@ -294,7 +294,7 @@ public final class SecretPropertyUtils {
    * @param plaintext the plaintext from the binding
    */
   public static void validateAlterSecretBindingPlaintext(String plaintext) {
-    Preconditions.checkArgument(plaintext != null, "plaintext must not be null");
+    Preconditions.checkArgument(StringUtils.isNotBlank(plaintext), "plaintext must not be blank");
     Preconditions.checkArgument(
         !"******".equals(plaintext),
         "setSecretBinding plaintext must not be the masked placeholder ******");

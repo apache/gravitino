@@ -34,6 +34,7 @@ import org.apache.gravitino.maintenance.optimizer.common.IcebergManifestStatisti
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.job.GravitinoManifestRewriteJobAdapter;
 import org.apache.gravitino.maintenance.optimizer.recommender.strategy.GravitinoStrategy;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
@@ -59,7 +60,7 @@ class TestManifestRewriteRecommendation {
     Policy policy = Mockito.mock(Policy.class);
     Mockito.when(policy.name()).thenReturn("rewrite");
     Mockito.when(policy.content())
-        .thenReturn(PolicyContents.icebergRewriteManifests(null, null, null, 7, false));
+        .thenReturn(PolicyContents.icebergRewriteManifests(null, 7, false));
     GravitinoStrategy strategy = new GravitinoStrategy(policy);
     StrategyProvider strategies = Mockito.mock(StrategyProvider.class);
     Mockito.when(strategies.strategies(identifier)).thenReturn(List.of(strategy));
@@ -98,7 +99,7 @@ class TestManifestRewriteRecommendation {
         Mockito.when(policy.content())
             .thenReturn(
                 PolicyContents.custom(
-                    Map.of("spec_id", 7, "manifest_count_critical", invalid),
+                    Map.of("spec_id", 7, "manifest_count_threshold", invalid),
                     validContent.supportedObjectTypes(),
                     validContent.properties()));
         Assertions.assertTrue(
@@ -124,7 +125,8 @@ class TestManifestRewriteRecommendation {
               "7",
               "use_caching",
               "false"),
-          new GravitinoManifestRewriteJobAdapter().jobConfig(captured.getValue()));
+          new GravitinoManifestRewriteJobAdapter()
+              .jobConfig(captured.getValue(), IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR));
       Mockito.verify(metadata, Mockito.atLeastOnce()).tableMetadata(identifier);
       Mockito.when(table.properties()).thenReturn(Map.of("current-snapshot-id", "2"));
       Assertions.assertTrue(
@@ -307,8 +309,7 @@ class TestManifestRewriteRecommendation {
   }
 
   private static StrategyProvider manifestStrategies(NameIdentifier... identifiers) {
-    return manifestStrategies(
-        PolicyContents.icebergRewriteManifests(null, null, null, 7, null), identifiers);
+    return manifestStrategies(PolicyContents.icebergRewriteManifests(null, 7, null), identifiers);
   }
 
   private static StrategyProvider manifestStrategies(

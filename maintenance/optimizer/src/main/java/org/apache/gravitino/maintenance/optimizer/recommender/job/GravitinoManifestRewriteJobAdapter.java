@@ -28,19 +28,19 @@ import org.apache.gravitino.maintenance.optimizer.recommender.handler.ManifestRe
 /** Maps a manifest rewrite decision to the built-in Spark job's arguments. */
 public final class GravitinoManifestRewriteJobAdapter implements GravitinoJobAdapter {
   @Override
-  public Map<String, String> jobConfig(JobExecutionContext context) {
+  public Map<String, String> jobConfig(
+      JobExecutionContext context, Map<String, String> submitterConfigs, String schemaSeparator) {
     Preconditions.checkArgument(
         context instanceof ManifestRewriteJobContext,
         "jobExecutionContext must be ManifestRewriteJobContext");
     ManifestRewriteJobContext rewrite = (ManifestRewriteJobContext) context;
-    IdentifierUtils.requireTableIdentifierNormalized(rewrite.nameIdentifier());
     Map<String, String> config = new LinkedHashMap<>(rewrite.jobOptions());
     config.put(
         "catalog_name",
         IdentifierUtils.getCatalogNameFromTableIdentifier(rewrite.nameIdentifier()));
     config.put(
         "table_identifier",
-        IdentifierUtils.removeCatalogFromIdentifier(rewrite.nameIdentifier()).toString());
+        IdentifierUtils.toSparkTableIdentifier(rewrite.nameIdentifier(), schemaSeparator));
     return Map.copyOf(config);
   }
 }
