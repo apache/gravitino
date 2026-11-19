@@ -47,8 +47,9 @@ import org.apache.gravitino.maintenance.optimizer.common.IcebergManifestStatisti
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
-import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
+import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoClientUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
@@ -87,7 +88,7 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
                 "--spark-conf",
                 "{{spark_conf:-}}"))
         .withConfigs(IcebergSparkConfigUtils.buildTemplateSparkConfigs())
-        .withCustomFields(Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, "v2"))
+        .withCustomFields(Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, "v4"))
         .build();
   }
 
@@ -112,7 +113,10 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
             : Paths.get(coordinationDirectory);
     String catalog = arguments.get("catalog");
     String table = arguments.get("table");
-    tableIdentifier(catalog, table);
+    if (catalog == null || catalog.trim().isEmpty() || table == null) {
+      throw new IllegalArgumentException("--catalog and --table are required");
+    }
+    IcebergJobUtils.requireSparkTableIdentifier(table);
     Map<String, String> options =
         IcebergSparkConfigUtils.parseFlatJsonMap(
             arguments.get("updater-options"), "updater-options");
@@ -128,14 +132,19 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
       sparkConfigs.forEach(builder::config);
       SparkSession spark = builder.getOrCreate();
       try {
+        // Fail fast on a missing Iceberg runtime before contacting Gravitino for the separator.
         IcebergJobUtils.requireIcebergSparkRuntime();
+        String schemaSeparator =
+            GravitinoClientUtils.fetchSchemaSeparator(
+                properties.get(OptimizerConfig.GRAVITINO_URI));
         updateStatistics(
             spark,
             updater,
             catalog,
             table,
             properties.get(OptimizerConfig.GRAVITINO_METALAKE),
-            coordinationPath);
+            coordinationPath,
+            schemaSeparator);
       } finally {
         spark.stop();
       }
@@ -203,9 +212,11 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
       String catalogName,
       String tableIdentifier,
       String metalake,
-      @Nullable Path coordinationDirectory)
+      @Nullable Path coordinationDirectory,
+      String schemaSeparator)
       throws IOException {
-    NameIdentifier identifier = tableIdentifier(catalogName, tableIdentifier);
+    NameIdentifier identifier =
+        IdentifierUtils.fromSparkTableIdentifier(catalogName, tableIdentifier, schemaSeparator);
     if (coordinationDirectory == null) {
       updater.updateTableStatistics(
           identifier, collectManifestStatistics(spark, catalogName, tableIdentifier));
@@ -259,48 +270,31 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
     }
   }
 
+  /**
+   * Normalizes updater aliases, requires uri+metalake, and disables client retries for safe
+   * coordination recovery.
+   */
   @VisibleForTesting
   static Map<String, String> buildOptimizerProperties(Map<String, String> options) {
-    Map<String, String> properties = new HashMap<>(options);
-    if (options.containsKey("gravitino_uri")) {
-      properties.put(OptimizerConfig.GRAVITINO_URI, options.get("gravitino_uri"));
+    Map<String, String> properties =
+        GravitinoClientUtils.normalizeUpdaterConnectionOptions(options);
+    GravitinoClientUtils.requireGravitinoUri(properties);
+    String metalake = properties.get(OptimizerConfig.GRAVITINO_METALAKE);
+    if (metalake == null || metalake.trim().isEmpty()) {
+      throw new IllegalArgumentException(
+          "updater_options must configure " + OptimizerConfig.GRAVITINO_METALAKE);
     }
-    if (options.containsKey("metalake")) {
-      properties.put(OptimizerConfig.GRAVITINO_METALAKE, options.get("metalake"));
-    }
-    for (String key :
-        Arrays.asList(OptimizerConfig.GRAVITINO_URI, OptimizerConfig.GRAVITINO_METALAKE)) {
-      String value = properties.get(key);
-      if (value == null || value.trim().isEmpty()) {
-        throw new IllegalArgumentException("updater_options must configure " + key);
-      }
-      properties.put(key, value.trim());
-    }
+    properties.put(OptimizerConfig.GRAVITINO_METALAKE, metalake.trim());
     // A retried PUT can hide an older request that is still executing after a connection failure.
     properties.put(GravitinoClientConfiguration.CLIENT_RETRY_TIMES, "0");
-    GravitinoAuthSettings.copyAliases(properties);
     return properties;
   }
 
   @VisibleForTesting
   static String buildTableIdentifier(String catalogName, String tableName) {
-    NameIdentifier identifier = tableIdentifier(catalogName, tableName);
-    return IcebergJobUtils.escapeSqlIdentifier(identifier.namespace().level(0))
-        + "."
-        + IcebergJobUtils.escapeSqlIdentifier(identifier.namespace().level(1))
-        + "."
-        + IcebergJobUtils.escapeSqlIdentifier(identifier.name());
-  }
-
-  private static NameIdentifier tableIdentifier(
-      @Nullable String catalogName, @Nullable String tableName) {
     if (catalogName == null || catalogName.trim().isEmpty() || tableName == null) {
       throw new IllegalArgumentException("--catalog and --table are required");
     }
-    String[] levels = tableName.split("\\.", -1);
-    if (levels.length != 2 || levels[0].trim().isEmpty() || levels[1].trim().isEmpty()) {
-      throw new IllegalArgumentException("--table must use schema.table format: " + tableName);
-    }
-    return NameIdentifier.of(catalogName, levels[0], levels[1]);
+    return IcebergJobUtils.qualifyCatalogTableSql(catalogName, tableName);
   }
 }

@@ -34,6 +34,7 @@ import org.apache.gravitino.maintenance.optimizer.common.IcebergManifestStatisti
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.job.GravitinoManifestRewriteJobAdapter;
 import org.apache.gravitino.maintenance.optimizer.recommender.strategy.GravitinoStrategy;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
@@ -124,7 +125,8 @@ class TestManifestRewriteRecommendation {
               "7",
               "use_caching",
               "false"),
-          new GravitinoManifestRewriteJobAdapter().jobConfig(captured.getValue()));
+          new GravitinoManifestRewriteJobAdapter()
+              .jobConfig(captured.getValue(), IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR));
       Mockito.verify(metadata, Mockito.atLeastOnce()).tableMetadata(identifier);
       Mockito.when(table.properties()).thenReturn(Map.of("current-snapshot-id", "2"));
       Assertions.assertTrue(

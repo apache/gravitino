@@ -51,7 +51,8 @@ public class GravitinoOrphanFileRemovalJobAdapter implements GravitinoJobAdapter
   }
 
   @Override
-  public Map<String, String> jobConfig(JobExecutionContext context) {
+  public Map<String, String> jobConfig(
+      JobExecutionContext context, Map<String, String> submitterConfigs, String schemaSeparator) {
     Preconditions.checkArgument(
         context instanceof OrphanFileRemovalJobContext,
         "jobExecutionContext must be OrphanFileRemovalJobContext");
@@ -84,7 +85,7 @@ public class GravitinoOrphanFileRemovalJobAdapter implements GravitinoJobAdapter
     }
     return Map.of(
         TABLE_IDENTIFIER_KEY,
-        IdentifierUtils.removeCatalogFromIdentifier(orphan.nameIdentifier()).toString(),
+        IdentifierUtils.toSparkTableIdentifier(orphan.nameIdentifier(), schemaSeparator),
         OLDER_THAN_KEY,
         cutoff(days),
         LOCATION_KEY,
