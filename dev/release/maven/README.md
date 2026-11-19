@@ -104,8 +104,11 @@ inventory. A dependency's POM license declaration may omit embedded third-party 
   SLF4J/Harmony/JCTools in common, Webbit and Hoehrmann UTF-8 validation in HTTP,
   Bzip2/FastLZ/libdivsufsort/Protobuf in codec, HPACK implementations in HTTP/2,
   and Apple's dnsinfo header in the macOS native resolver.
-  Netty tcnative classes 2.0.65.Final use the Java artifact's Netty and Tomcat Native
-  attributions from its [NOTICE](https://github.com/netty/netty-tcnative/blob/netty-tcnative-parent-2.0.65.Final/NOTICE.txt).
+  The dnsinfo header is identical in 4.1.109 and 4.1.140, so the source link refers to 4.1.140.
+  Netty tcnative classes 2.0.65.Final and 2.0.85.Final use the Java artifact's Netty and Tomcat Native
+  attributions from its [NOTICE](https://github.com/netty/netty-tcnative/blob/netty-tcnative-parent-2.0.85.Final/NOTICE.txt).
+  The Java attributions are identical in both versions; the AIX and BoringSSL entries of the
+  2.0.65.Final NOTICE only cover native libraries, which are not part of the classes artifact.
   The macOS supplement includes the full APSL-2.0 text and a source-availability link.
   The macOS-only dnsinfo inclusion follows [ASF LEGAL-613](https://issues.apache.org/jira/browse/LEGAL-613).
 

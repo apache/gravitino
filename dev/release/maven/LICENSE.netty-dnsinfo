@@ -22,7 +22,7 @@
  */
 
 Source code for the Apple dnsinfo component is available under APSL-2.0 at
-https://github.com/netty/netty/blob/netty-4.1.109.Final/resolver-dns-native-macos/src/main/c/dnsinfo.h.
+https://github.com/netty/netty/blob/netty-4.1.140.Final/resolver-dns-native-macos/src/main/c/dnsinfo.h.
 
 APPLE PUBLIC SOURCE LICENSE
 Version 2.0 -  August 6, 2003

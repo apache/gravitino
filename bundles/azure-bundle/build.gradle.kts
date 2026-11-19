@@ -24,7 +24,17 @@ plugins {
   alias(libs.plugins.shadow)
 }
 
+// Moves every Netty artifact brought in by the Azure SDK to the single version of the catalog. The
+// BOM sits in a dedicated configuration so that it only applies to this module.
+val nettyBom: Configuration by configurations.creating {
+  isCanBeConsumed = false
+  isCanBeResolved = false
+}
+
+configurations.named("runtimeClasspath") { extendsFrom(nettyBom) }
+
 dependencies {
+  nettyBom(platform(libs.netty.bom))
   implementation(project(":bundles:azure")) {
     // There is already a dependency on commons-logging v1.2 in hadoop-azure, so exclude the one
     // from the bundle.
@@ -99,4 +109,5 @@ tasks.test {
   dependsOn(bundle)
   inputs.file(bundle.flatMap { it.archiveFile })
   doFirst { systemProperty("shadowJarPath", bundle.get().archiveFile.get().asFile.absolutePath) }
+  systemProperty("nettyVersion", libs.versions.netty.get())
 }
