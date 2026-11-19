@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FilterFileSystem;
 import org.apache.hadoop.fs.Path;
@@ -45,6 +46,24 @@ public class TestRemoteLocationValidator {
     fs.symlinksSupported = false;
     RemoteLocationValidator.validate(fs, root, scan);
     assertEquals(0, fs.resolveCalls);
+  }
+
+  /**
+   * When Hadoop has no FileSystem for the scheme, validation keeps lexical containment and does not
+   * fail the job before Iceberg FileIO can run.
+   */
+  @Test
+  public void testMissingHadoopFileSystemKeepsLexicalCheck() throws Exception {
+    Configuration conf = new Configuration(false);
+    for (String scheme : new String[] {"s3", "gs", "abfs", "oss"}) {
+      String table = scheme + "://bucket/db/table";
+      RemoteLocationValidator.validate(conf, table, table + "/data");
+      IllegalArgumentException ex =
+          assertThrows(
+              IllegalArgumentException.class,
+              () -> RemoteLocationValidator.validate(conf, table, scheme + "://other/path"));
+      assertTrue(ex.getMessage().contains("must be within the table's storage location"), scheme);
+    }
   }
 
   /** Verifies resolved path outside table is rejected. */

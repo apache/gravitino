@@ -35,6 +35,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
@@ -44,6 +45,7 @@ import org.apache.gravitino.maintenance.jobs.BuiltInJob;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.OrphanFileLocationUtils;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.Table;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -332,17 +334,38 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
       location = table.location();
     }
     OrphanFileLocationUtils.validateLocation(table.location(), location);
-    validateLocalLocation(table.location(), location);
-    validateRemoteLocation(spark, table.location(), location);
+    validateSymlinkSafeLocation(
+        spark.sparkContext().hadoopConfiguration(), table.location(), location);
     return normalizeLocation(location).toString();
   }
 
-  private static void validateLocalLocation(String tableLocation, String location)
-      throws IOException {
-    URI requested = normalizeLocation(location);
-    if (!"file".equals(requested.getScheme())) {
+  /**
+   * Symlink / realpath checks for schemes that expose them. Lexical containment is already enforced
+   * by {@link OrphanFileLocationUtils}. Object-store schemes have no POSIX symlink model here, so
+   * they are skipped after the lexical check.
+   */
+  private static void validateSymlinkSafeLocation(
+      Configuration conf, String tableLocation, String location) throws IOException {
+    String scheme = normalizeLocation(location).getScheme();
+    if (scheme == null) {
       return;
     }
+    switch (scheme.toLowerCase(Locale.ROOT)) {
+      case "file":
+        validateLocalSymlinks(tableLocation, location);
+        return;
+      case "hdfs":
+        RemoteLocationValidator.validate(conf, tableLocation, location);
+        return;
+      default:
+        // s3 / gs / abfs / oss / ... : lexical containment only
+        return;
+    }
+  }
+
+  private static void validateLocalSymlinks(String tableLocation, String location)
+      throws IOException {
+    URI requested = normalizeLocation(location);
     Path lexicalRoot = Paths.get(normalizeLocation(tableLocation));
     Path root = lexicalRoot.toRealPath();
     Path scan = Paths.get(requested);
@@ -360,15 +383,6 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
       Preconditions.checkArgument(
           paths.noneMatch(Files::isSymbolicLink), "Symlinks are not allowed in the scan location");
     }
-  }
-
-  private static void validateRemoteLocation(
-      SparkSession spark, String tableLocation, String location) throws IOException {
-    if ("file".equals(normalizeLocation(location).getScheme())) {
-      return;
-    }
-    RemoteLocationValidator.validate(
-        spark.sparkContext().hadoopConfiguration(), tableLocation, location);
   }
 
   private static List<String> buildArguments() {

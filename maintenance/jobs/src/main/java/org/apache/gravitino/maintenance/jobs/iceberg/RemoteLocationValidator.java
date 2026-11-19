@@ -28,15 +28,29 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.fs.UnsupportedFileSystemException;
 
-/** Validates scan paths on Hadoop filesystems that can resolve symbolic links. */
+/**
+ * Validates scan paths on symlink-capable Hadoop filesystems such as HDFS.
+ *
+ * <p>Object-store schemes do not expose a POSIX symlink model; callers should skip this validator
+ * for those locations and rely on {@link OrphanFileLocationUtils} lexical containment.
+ */
 final class RemoteLocationValidator {
   private RemoteLocationValidator() {}
 
   static void validate(Configuration conf, String tableLocation, String location)
       throws IOException {
     Path scan = new Path(location);
-    FileSystem fs = scan.getFileSystem(conf);
+    FileSystem fs;
+    try {
+      fs = scan.getFileSystem(conf);
+    } catch (UnsupportedFileSystemException e) {
+      // Lexical containment is already enforced by the caller. Symlink inspection cannot run
+      // without a FileSystem implementation for this scheme.
+      OrphanFileLocationUtils.validateLocation(tableLocation, location);
+      return;
+    }
     validate(fs, new Path(tableLocation), scan);
   }
 
