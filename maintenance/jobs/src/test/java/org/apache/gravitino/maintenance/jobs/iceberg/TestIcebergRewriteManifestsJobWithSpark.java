@@ -41,6 +41,7 @@ import org.apache.gravitino.maintenance.jobs.TemplateArguments;
 import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyHandlerContext;
 import org.apache.gravitino.maintenance.optimizer.common.IcebergManifestStatistics;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.ManifestRewriteStrategyHandler;
 import org.apache.gravitino.maintenance.optimizer.recommender.job.GravitinoManifestRewriteJobAdapter;
 import org.apache.gravitino.maintenance.optimizer.recommender.strategy.GravitinoStrategy;
@@ -202,7 +203,9 @@ public class TestIcebergRewriteManifestsJobWithSpark {
     assertTrue(handler.shouldTrigger());
     Map<String, String> config =
         new GravitinoManifestRewriteJobAdapter()
-            .jobConfig(handler.evaluate().jobExecutionContext().orElseThrow());
+            .jobConfig(
+                handler.evaluate().jobExecutionContext().orElseThrow(),
+                IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
     assertEquals("1", config.get("spec_id"));
     assertEquals("manifest_catalog", config.get("catalog_name"));
     assertEquals("db.events", config.get("table_identifier"));
@@ -244,7 +247,9 @@ public class TestIcebergRewriteManifestsJobWithSpark {
     assertTrue(handler.shouldTrigger(), "An omitted spec must use the current Iceberg default");
     Map<String, String> config =
         new GravitinoManifestRewriteJobAdapter()
-            .jobConfig(handler.evaluate().jobExecutionContext().orElseThrow());
+            .jobConfig(
+                handler.evaluate().jobExecutionContext().orElseThrow(),
+                IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
     assertEquals("1", config.get("spec_id"));
 
     spark.sql(

@@ -32,6 +32,7 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.spark.Spark3Util;
@@ -230,6 +231,90 @@ public final class IcebergJobUtils {
     }
     String escaped = identifier.replace("`", "``");
     return "`" + escaped + "`";
+  }
+
+  /**
+   * Builds a backtick-quoted {@code catalog.ns…table} SQL reference from a Spark table identifier
+   * that may include hierarchical Iceberg namespace levels (e.g. {@code a.b.c.events}).
+   *
+   * @param catalogName Spark catalog name
+   * @param sparkTableIdentifier dotted schema…table identifier
+   * @return qualified SQL identifier
+   */
+  public static String qualifyCatalogTableSql(String catalogName, String sparkTableIdentifier) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(catalogName), "catalogName must not be blank");
+    StringBuilder sql = new StringBuilder(escapeSqlIdentifier(catalogName.trim()));
+    for (String level : IdentifierUtils.sparkTableIdentifierLevels(sparkTableIdentifier)) {
+      sql.append('.').append(escapeSqlIdentifier(level));
+    }
+    return sql.toString();
+  }
+
+  /**
+   * Qualifies an Iceberg metadata table such as {@code files} or {@code all_files}.
+   *
+   * @param catalogName Spark catalog name
+   * @param sparkTableIdentifier dotted schema…table identifier
+   * @param metadataTable metadata table name (for example {@code files})
+   * @return qualified SQL identifier including the metadata table
+   */
+  public static String qualifyCatalogMetadataTableSql(
+      String catalogName, String sparkTableIdentifier, String metadataTable) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(metadataTable), "metadataTable must not be blank");
+    return qualifyCatalogTableSql(catalogName, sparkTableIdentifier)
+        + "."
+        + escapeSqlIdentifier(metadataTable.trim());
+  }
+
+  /**
+   * Validates a Spark table identifier has at least {@code schema.table} levels.
+   *
+   * @param sparkTableIdentifier dotted schema…table identifier
+   * @return the split levels
+   */
+  public static String[] requireSparkTableIdentifier(String sparkTableIdentifier) {
+    return IdentifierUtils.sparkTableIdentifierLevels(sparkTableIdentifier);
+  }
+
+  /**
+   * Starts a {@code CALL catalog.system.<procedure>(} fragment shared by Iceberg maintenance jobs.
+   *
+   * @param catalogName Spark catalog name
+   * @param procedure system procedure name
+   * @return mutable SQL builder positioned after the opening parenthesis
+   */
+  public static StringBuilder beginSystemProcedureCall(String catalogName, String procedure) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(catalogName), "catalogName must not be blank");
+    Preconditions.checkArgument(StringUtils.isNotBlank(procedure), "procedure must not be blank");
+    return new StringBuilder("CALL ")
+        .append(escapeSqlIdentifier(catalogName))
+        .append(".system.")
+        .append(procedure)
+        .append("(");
+  }
+
+  /**
+   * Appends {@code table => '<identifier>'} using {@link #escapeSqlString(String)}.
+   *
+   * @param sql procedure CALL builder
+   * @param sparkTableIdentifier Spark table id
+   */
+  public static void appendSqlStringTableArg(StringBuilder sql, String sparkTableIdentifier) {
+    sql.append("table => '").append(escapeSqlString(sparkTableIdentifier)).append("'");
+  }
+
+  /**
+   * Appends {@code table => '<identifier>'} using {@link #escapeSparkCallStringArg(String)} for
+   * nested CALL string arguments.
+   *
+   * @param sql procedure CALL builder
+   * @param sparkTableIdentifier Spark table id
+   */
+  public static void appendSparkCallStringTableArg(StringBuilder sql, String sparkTableIdentifier) {
+    sql.append("table => '").append(escapeSparkCallStringArg(sparkTableIdentifier)).append("'");
   }
 
   /**

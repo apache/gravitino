@@ -27,6 +27,7 @@ import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyHandlerContext;
 import org.apache.gravitino.maintenance.optimizer.common.IcebergManifestStatistics;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.job.GravitinoManifestRewriteJobAdapter;
 import org.apache.gravitino.maintenance.optimizer.recommender.strategy.GravitinoStrategy;
 import org.apache.gravitino.policy.Policy;
@@ -101,7 +102,9 @@ class TestManifestRewriteStrategyHandler {
             statistics(100, 1)));
     Map<String, String> config =
         new GravitinoManifestRewriteJobAdapter()
-            .jobConfig(handler.evaluate().jobExecutionContext().orElseThrow());
+            .jobConfig(
+                handler.evaluate().jobExecutionContext().orElseThrow(),
+                IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
     Assertions.assertEquals(
         Map.of(
             "catalog_name",
@@ -147,7 +150,9 @@ class TestManifestRewriteStrategyHandler {
     Assertions.assertEquals(
         specId,
         new GravitinoManifestRewriteJobAdapter()
-            .jobConfig(handler.evaluate().jobExecutionContext().orElseThrow())
+            .jobConfig(
+                handler.evaluate().jobExecutionContext().orElseThrow(),
+                IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR)
             .get("spec_id"));
   }
 
@@ -192,7 +197,9 @@ class TestManifestRewriteStrategyHandler {
     Assertions.assertEquals(
         "0",
         new GravitinoManifestRewriteJobAdapter()
-            .jobConfig(handler.evaluate().jobExecutionContext().orElseThrow())
+            .jobConfig(
+                handler.evaluate().jobExecutionContext().orElseThrow(),
+                IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR)
             .get("spec_id"));
   }
 
@@ -205,7 +212,9 @@ class TestManifestRewriteStrategyHandler {
     Assertions.assertEquals(
         expected,
         new GravitinoManifestRewriteJobAdapter()
-            .jobConfig(handler.evaluate().jobExecutionContext().orElseThrow())
+            .jobConfig(
+                handler.evaluate().jobExecutionContext().orElseThrow(),
+                IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR)
             .get("use_caching"));
   }
 

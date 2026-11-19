@@ -353,11 +353,11 @@ function createService(github, { readWorkflow = sha => github.rest.repos.getCont
         : evaluateSuites(jobs, await suitesAt(base), selected.trusted);
     }
     if (selected.trusted && result.conclusion === 'success' && await acceptedBase(pr, base) !== base) {
-      result = requiredAction('Trusted CI tested a commit outside the current base branch. Dispatch trusted Fork CI again from the current default branch.');
+      result = requiredAction('Trusted CI tested a commit outside the current base branch. Dispatch trusted Fork CI again from the current upstream PR target branch.');
     }
     if (!selected.trusted && !sameDefinitions) {
       const note = 'CI workflow/action/script definitions or branch protection differ from the base. ' +
-        'After reviewing these changes, a committer must dispatch Fork CI from the current upstream default branch with this PR number.';
+        'After reviewing these changes, a committer must dispatch Fork CI from the current upstream PR target branch with this PR number.';
       // Approval of CI edits is separate from execution progress. Never turn a running fork
       // into a completed error, or hide an actual failure behind the trust requirement.
       result = needsSuiteChecks

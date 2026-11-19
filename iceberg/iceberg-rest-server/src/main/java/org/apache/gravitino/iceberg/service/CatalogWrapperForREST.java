@@ -46,6 +46,7 @@ import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.common.ops.RegisterTableRequestWithMetadata;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.cache.ScanPlanCache;
 import org.apache.gravitino.iceberg.service.cache.ScanPlanCacheKey;
@@ -909,7 +910,10 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     String currentUuid = super.loadTable(identifier).tableMetadata().uuid();
     String newUuid;
     try {
-      newUuid = loadTableMetadataFromLocation(request.metadataLocation()).uuid();
+      newUuid =
+          request instanceof RegisterTableRequestWithMetadata
+              ? ((RegisterTableRequestWithMetadata) request).tableMetadata().uuid()
+              : loadTableMetadataFromLocation(request.metadataLocation()).uuid();
     } catch (RuntimeException e) {
       // A metadata file that cannot be read is reported by the register itself.
       return;
