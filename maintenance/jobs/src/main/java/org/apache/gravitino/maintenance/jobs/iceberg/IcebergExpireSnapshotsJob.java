@@ -214,7 +214,10 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenance
 
   @Override
   public TableSnapshotMetrics collectBeforeMetrics(
-      SparkSession spark, String catalogName, String tableIdentifier) {
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      Map<String, String> argsByName) {
     long snapshotId = IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier);
     preExpireData = collectTableData(spark, catalogName, tableIdentifier);
     Map<String, Object> metrics = new HashMap<>();
