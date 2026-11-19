@@ -161,9 +161,7 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
   BaseCatalogFactory catalogFactoryForProvider(String provider) {
     return discoverFactories(
         catalogFactory ->
-            ((BaseCatalogFactory) catalogFactory)
-                .gravitinoCatalogProvider()
-                .equalsIgnoreCase(provider),
+            ((BaseCatalogFactory) catalogFactory).supportsProvider(provider),
         String.format(
             "Gravitino catalog provider [%s] matched multiple flink catalog factories, it should only match one.",
             provider));
