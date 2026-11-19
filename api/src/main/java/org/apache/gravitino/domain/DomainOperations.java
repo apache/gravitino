@@ -122,7 +122,8 @@ public interface DomainOperations {
    * deleting a published domain with sub-domains throws {@link IllegalArgumentException}.
    *
    * @param name The name of the domain.
-   * @return True if the domain is deleted, false if it does not exist.
+   * @return True if the domain is deleted, false if it does not exist or is a draft hidden from the
+   *     caller. A hidden draft is not deleted, so false does not mean the domain is absent.
    * @throws IllegalArgumentException If the domain is published.
    * @throws NonEmptyDomainException If the domain is a draft with sub-domains.
    */

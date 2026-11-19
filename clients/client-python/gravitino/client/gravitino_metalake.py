@@ -801,6 +801,8 @@ class GravitinoMetalake(
         """Delete a draft domain, preserving tags.
 
         Published domains (unpublish first) and parents with children are rejected.
+        Returns False if the domain is absent or is a draft hidden from the caller;
+        a hidden draft is not deleted, so False does not mean absent.
         """
         response = self.rest_client.delete(
             domain_path(self.name(), name),

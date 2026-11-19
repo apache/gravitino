@@ -1006,15 +1006,15 @@ unsafe segments before sending a request; the server enforces the full naming ru
 Backing tags, metadata object names and `nameContains` search text have separate rules.
 Encode metadata path parameters individually and supply query values with `--data-urlencode`.
 
-| HTTP status | Typical Domain behavior |
-| --- | --- |
-| 200 | Success with `code: 0`; empty queries return empty arrays; deleting an absent domain returns `dropped: false`. |
-| 400 | Invalid request: invalid domain names or filters, unsupported member types, illegal hierarchy/status transition, or deleting a published domain. |
-| 403 | Insufficient permission on a published domain, a required backing tag, or a reverse-lookup object. |
-| 404 | Missing metalake/domain/parent/tag/object, or a draft hidden from the caller. |
-| 409 | Duplicate domain/tag name, a tag that already backs another domain, deleting a draft parent with children, disabled metalake, or an optimistic lock conflict during domain alteration or deletion. |
-| 415 | Unsupported request Content-Type; the error response uses `application/json`. |
-| 5xx | Server failure; inspect the error response and server log. |
+| HTTP status | Typical Domain behavior                                                                                                                                                                            |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 200         | Success with `code: 0`; empty queries return empty arrays; deleting an absent domain, or a draft hidden from the caller, returns `dropped: false` and deletes nothing.                             |
+| 400         | Invalid request: invalid domain names or filters, unsupported member types, illegal hierarchy/status transition, or deleting a published domain.                                                   |
+| 403         | Insufficient permission on a published domain, a required backing tag, or a reverse-lookup object.                                                                                                 |
+| 404         | Missing metalake/domain/parent/tag/object, or a draft hidden from the caller. `DELETE` on a domain returns 404 only for a missing metalake.                                                        |
+| 409         | Duplicate domain/tag name, a tag that already backs another domain, deleting a draft parent with children, disabled metalake, or an optimistic lock conflict during domain alteration or deletion. |
+| 415         | Unsupported request Content-Type; the error response uses `application/json`.                                                                                                                      |
+| 5xx         | Server failure; inspect the error response and server log.                                                                                                                                         |
 
 Authentication failures follow the configured authenticator. The JSON error response contains the
 exception type and message; do not infer authorization from empty lists alone. Validation and

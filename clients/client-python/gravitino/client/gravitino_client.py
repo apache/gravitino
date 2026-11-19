@@ -951,5 +951,9 @@ class GravitinoClient(
         return self.get_metalake().alter_domain(name, *changes)
 
     def delete_domain(self, name: str) -> bool:
-        """Delete the named draft domain while preserving tags."""
+        """Delete the named draft domain while preserving tags.
+
+        Returns False if the domain is absent or is a draft hidden from the
+        caller; a hidden draft is not deleted.
+        """
         return self.get_metalake().delete_domain(name)
