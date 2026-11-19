@@ -69,8 +69,9 @@ public interface PolicyRoleRelMapper {
    * role, deleted_at) free of the deletion timestamp, which two removals of one role can otherwise
    * share.
    *
-   * <p>Nothing updates these rows, so the version in the WHERE clause never changes. Writers to one
-   * policy are serialised by the policy row they lock first.
+   * <p>A row's version never changes after it is written; the only update to these rows is the soft
+   * delete, which this statement excludes through {@code deleted_at = 0}. Writers to one policy are
+   * serialised by the policy row they lock first.
    *
    * @param relation The observed reference and version.
    * @return The number of deleted rows.

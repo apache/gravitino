@@ -494,13 +494,17 @@ public class PolicyMetaService {
       try {
         SessionUtils.doWithoutCommit(PolicyRoleRelMapper.class, mapper -> mapper.insert(added));
       } catch (RuntimeException re) {
-        // This table names roles exactly as the role table does, so a duplicate here is content
-        // naming one role twice under the backend's own equality: MySQL ignores trailing spaces,
-        // PostgreSQL does not, and each matches how that backend identifies a role. Report the
-        // role that collided instead of letting the caller's handler blame the policy name. The
-        // SQL failure is deliberately not chained: the handlers upstream look for a duplicate key
-        // through the cause chain and would rewrite this back into an already-existing policy.
+        // Only names the backend treats as equal can collide here, e.g. "analyst" and "analyst " on
+        // MySQL. Report the role, not "policy already exists". The SQL error is logged, not set as
+        // the cause: the caller's handler searches causes for a duplicate key and would report that
+        // again.
         if (ExceptionUtils.isDuplicateKey(re)) {
+          LOG.warn(
+              "Failed to write the reference to role {} for policy {} (id {})",
+              added.getRoleName(),
+              policyEntity.nameIdentifier(),
+              policyId,
+              re);
           throw new IllegalArgumentException(
               String.format(
                   "The content of policy %s names the role %s more than once; on this backend"
