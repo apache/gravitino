@@ -444,7 +444,9 @@ public class TestGlossaryTermMetaService extends TestJDBCBackend {
   @TestTemplate
   public void testListDoesNotFollowRenamedMetalake() throws Exception {
     assertOperationAfterMetalakeRename(
-        () -> Assertions.assertTrue(backend.list(NS, TYPE, true).isEmpty()));
+        () ->
+            Assertions.assertThrows(
+                NoSuchEntityException.class, () -> backend.list(NS, TYPE, true)));
   }
 
   @TestTemplate
@@ -477,6 +479,7 @@ public class TestGlossaryTermMetaService extends TestJDBCBackend {
 
   private void assertOperationAfterMetalakeRename(Executable operation) throws Exception {
     setupMetalake();
+    backend.insert(term(102L, "Original term").build(), false);
     Namespace renamed =
         Namespace.of("renamed", Entity.SYSTEM_CATALOG_RESERVED_NAME, "glossary_term");
     ExecutorService writer = Executors.newSingleThreadExecutor();

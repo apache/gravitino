@@ -376,6 +376,13 @@ public final class GlossaryTermMetaService {
         mapper -> {
           List<GlossaryTermSnapshotPO> rows =
               mapper.snapshot(metalake(ns).getMetalakeId(), ns.level(0), key);
+          if (rows.isEmpty()) {
+            throw new NoSuchEntityException("Metalake %s no longer exists", ns.level(0));
+          }
+          // A live parent with no matching terms contributes one outer-join row.
+          if (rows.get(0).getTermId() == null) {
+            return new ArrayList<>();
+          }
           Map<Long, GlossaryTermPO> definitions = new LinkedHashMap<>();
           Map<Long, List<String>> synonyms = new LinkedHashMap<>();
           for (GlossaryTermSnapshotPO row : rows) {
