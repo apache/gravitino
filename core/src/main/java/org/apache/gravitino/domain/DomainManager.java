@@ -669,14 +669,14 @@ public class DomainManager implements DomainDispatcher {
         !Objects.equals(name, parent), "Domain %s cannot be its own parent", name);
   }
 
-  // Checks that the locked backing tag allows the value and that no other domain has a binding of
-  // the tag that conflicts with it: a tag has either one binding without a value, or bindings with
-  // values where each value backs at most one domain.
+  // Checks that the locked backing tag allows the value, if any, and that no other domain has a
+  // binding of the tag that conflicts with it: a tag has either one binding without a value, or
+  // bindings with values where each value backs at most one domain. A binding without a value
+  // matches every assignment of the tag, so it is accepted whatever values the tag allows.
   private static void checkBinding(
       DomainEntity domain, Optional<String> value, LockedDomainState state) {
     TagEntity tag = lockedBackingTag(state);
-    tag.validateAllowedValue(
-        value.map(v -> TagValue.of(tag.name(), v)).orElseGet(() -> TagValue.noValue(tag.name())));
+    value.ifPresent(v -> tag.validateAllowedValue(TagValue.of(tag.name(), v)));
 
     for (DomainEntity bound : state.backingTagBindings()) {
       if (Objects.equals(bound.id(), domain.id())) {
