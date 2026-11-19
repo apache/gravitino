@@ -35,6 +35,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -156,6 +157,31 @@ class TestJdbcCatalogRefresh {
           assertThrows(IllegalStateException.class, () -> retained.newWriteBuilder(null))
               .getMessage()
               .contains("Restart the Spark session"));
+    } finally {
+      manager.close();
+    }
+  }
+
+  @Test
+  void rejectsRotationOfMixedCaseBypassPassword() {
+    Catalog source = source(mock(TableCatalog.class));
+    Map<String, String> properties = new HashMap<>(properties(URL));
+    properties.remove("jdbc-password");
+    properties.put("spark.bypass.PaSsWoRd", "first");
+    when(source.properties()).thenReturn(properties);
+    GravitinoClient client = mock(GravitinoClient.class);
+    when(client.loadCatalog("jdbc_refresh")).thenReturn(source);
+    GravitinoCatalogManager manager =
+        GravitinoCatalogManager.create(new SparkConf(false), "user", identity -> client);
+    try {
+      GravitinoJdbcCatalog catalog = new GravitinoJdbcCatalog();
+      catalog.initialize("jdbc_refresh", new CaseInsensitiveStringMap(Collections.emptyMap()));
+      properties.put("spark.bypass.PaSsWoRd", "second");
+      IllegalStateException error =
+          assertThrows(
+              IllegalStateException.class,
+              () -> catalog.loadSparkTable(Identifier.of(new String[] {"PUBLIC"}, "T")));
+      assertTrue(error.getMessage().contains("Restart the Spark session"));
     } finally {
       manager.close();
     }

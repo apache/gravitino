@@ -154,7 +154,7 @@ public class TestGravitinoJdbcCatalog {
       catalog.createAndInitSparkCatalog(
           "test",
           new CaseInsensitiveStringMap(Collections.emptyMap()),
-          catalog.initialCatalog.properties());
+          catalog.initializationProperties(catalog.initialCatalog));
 
       IllegalStateException exception =
           Assertions.assertThrows(
@@ -177,7 +177,7 @@ public class TestGravitinoJdbcCatalog {
       catalog.createAndInitSparkCatalog(
           "test",
           new CaseInsensitiveStringMap(Collections.emptyMap()),
-          catalog.initialCatalog.properties());
+          catalog.initializationProperties(catalog.initialCatalog));
 
       IllegalStateException exception =
           Assertions.assertThrows(

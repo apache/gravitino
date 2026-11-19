@@ -86,8 +86,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
     JDBCTableCatalog jdbcTableCatalog = new JDBCTableCatalog();
     sparkCatalogOptions = new HashMap<>(options.asCaseSensitiveMap());
-    Catalog initialCatalog = gravitinoCatalog();
-    Map<String, String> all = jdbcOptions(initialCatalog, options, properties);
+    Map<String, String> all = jdbcOptions(gravitinoCatalog(), options, properties);
     useTimestampNtz = false;
     if (supportsPreferTimestampNtz()) {
       String value = preferTimestampNtz(options, properties);
@@ -108,7 +107,6 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
     jdbcTableCatalog.initialize(name, new CaseInsensitiveStringMap(all));
     jdbcOptions = new HashMap<>(all);
     jdbcConnectionOptions = jdbcConnectionOptions(all);
-    catalogCreateTime = catalogCreateTime(initialCatalog);
     return jdbcTableCatalog;
   }
 
@@ -141,6 +139,8 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
 
   @Override
   protected Map<String, String> initializationProperties(Catalog catalog) {
+    // Bind the creation time to the same metadata snapshot that supplied the JDBC URL.
+    catalogCreateTime = catalogCreateTime(catalog);
     return propertiesWithSecrets(catalog);
   }
 
@@ -256,6 +256,18 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
     }
     Map<String, String> enriched = new HashMap<>(properties);
     enriched.putAll(CredentialInfos.nonExpiringCredentialInfo(credentials));
+    // Spark treats option names case-insensitively. Fold JDBC bypass aliases before the
+    // converter applies catalog properties, session options, and finally vended credentials.
+    for (String key : Arrays.asList("url", "user", "password")) {
+      String canonical = PropertiesConverter.SPARK_PROPERTY_PREFIX + key;
+      for (String property : properties.keySet()) {
+        if (property.startsWith(PropertiesConverter.SPARK_PROPERTY_PREFIX)
+            && property.equalsIgnoreCase(canonical)
+            && !property.equals(canonical)) {
+          enriched.putIfAbsent(canonical, enriched.remove(property));
+        }
+      }
+    }
     Map<String, String> result =
         getPropertiesConverter().toSparkCatalogProperties(options, enriched);
     applyJdbcCredential(credentials, result);
