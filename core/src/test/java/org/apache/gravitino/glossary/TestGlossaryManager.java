@@ -39,6 +39,7 @@ import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.apache.gravitino.exceptions.TermAlreadyExistsException;
 import org.apache.gravitino.exceptions.TermVersionConflictException;
@@ -59,6 +60,17 @@ class TestGlossaryManager extends TestJDBCBackend {
   private static final String LAKE = "glossary";
   private final AtomicLong ids = new AtomicLong(100);
   private final GlossaryManager manager = new GlossaryManager(ids::incrementAndGet, false);
+
+  @TestTemplate
+  void testListDistinguishesMissingAndEmptyMetalake() throws IOException {
+    NoSuchMetalakeException missing =
+        Assertions.assertThrows(NoSuchMetalakeException.class, () -> manager.listTerms(LAKE));
+    Assertions.assertTrue(missing.getMessage().contains(LAKE));
+    Assertions.assertInstanceOf(NoSuchEntityException.class, missing.getCause());
+
+    createAndInsertMakeLake(LAKE);
+    Assertions.assertTrue(manager.listTerms(LAKE).isEmpty());
+  }
 
   @TestTemplate
   void testCreateOwnerAndDropInEveryStatus() throws IOException {

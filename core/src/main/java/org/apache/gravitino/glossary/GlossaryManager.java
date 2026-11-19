@@ -30,6 +30,7 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.apache.gravitino.exceptions.TermAlreadyExistsException;
 import org.apache.gravitino.exceptions.TermVersionConflictException;
@@ -58,9 +59,17 @@ public final class GlossaryManager {
     this.handler = handler;
   }
 
-  /** Lists term definitions in the given metalake. */
+  /**
+   * Lists term definitions in the given metalake.
+   *
+   * @throws NoSuchMetalakeException if the metalake does not exist
+   */
   public List<GlossaryTermEntity> listTerms(String metalake) {
-    return terms.list(NamespaceUtil.ofGlossaryTerm(metalake));
+    try {
+      return terms.list(NamespaceUtil.ofGlossaryTerm(metalake));
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchMetalakeException(e, "Metalake %s does not exist", metalake);
+    }
   }
 
   /** Loads a definition by normalized name. */
