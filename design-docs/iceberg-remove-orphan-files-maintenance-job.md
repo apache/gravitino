@@ -511,12 +511,13 @@ Validation rules:
    duplicate slashes, resolve `.` / `..` segments, and strip trailing slashes.
 3. Reject the request unless the normalized `location` is the table location
    itself or a descendant of it.
-4. Reject symlinks or paths that resolve outside the table location after
-   normalization.
 
 Normalization must happen before the prefix check; comparing raw strings
 would let `s3://bucket/db/table/../other_table` pass a naive
-`startsWith` test.
+`startsWith` test. Iceberg does not treat POSIX symlinks as part of the
+orphan-cleanup contract (HDFS symlink support is incomplete; object stores
+have none), so the job relies on lexical containment rather than filesystem
+symlink walking.
 
 Validation happens in the job adapter (before submission) and again in the
 Spark job (before building the procedure call), so an ad-hoc job submission

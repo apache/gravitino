@@ -25,10 +25,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
-import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -36,7 +32,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
@@ -196,7 +191,7 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
       throws IOException {
     IcebergJobUtils.requireEscapedStringLiteralsDisabled(spark);
     Table table = IcebergJobUtils.loadIcebergTable(spark, catalogName, tableIdentifier);
-    String normalizedLocation = resolveAndValidateLocation(spark, table, location);
+    String normalizedLocation = resolveAndValidateLocation(table, location);
     List<Row> listed =
         callRemoveOrphanFiles(
             spark, catalogName, tableIdentifier, olderThan, normalizedLocation, true);
@@ -316,56 +311,19 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
   }
 
   private static String resolveAndValidateLocation(
-      SparkSession spark, String catalogName, String tableIdentifier, @Nullable String location)
-      throws IOException {
+      SparkSession spark, String catalogName, String tableIdentifier, @Nullable String location) {
     Table table = IcebergJobUtils.loadIcebergTable(spark, catalogName, tableIdentifier);
-    return resolveAndValidateLocation(spark, table, location);
+    return resolveAndValidateLocation(table, location);
   }
 
-  private static String resolveAndValidateLocation(
-      SparkSession spark, Table table, @Nullable String location) throws IOException {
+  private static String resolveAndValidateLocation(Table table, @Nullable String location) {
     // Direct callers may pass an empty template value without CLI argument parsing.
     if (location == null || location.codePoints().allMatch(Character::isWhitespace)) {
       location = table.location();
     }
+    // Lexical containment only — aligned with Iceberg DeleteOrphanFiles (no symlink model).
     OrphanFileLocationUtils.validateLocation(table.location(), location);
-    validateLocalLocation(table.location(), location);
-    validateRemoteLocation(spark, table.location(), location);
     return normalizeLocation(location).toString();
-  }
-
-  private static void validateLocalLocation(String tableLocation, String location)
-      throws IOException {
-    URI requested = normalizeLocation(location);
-    if (!"file".equals(requested.getScheme())) {
-      return;
-    }
-    Path lexicalRoot = Paths.get(normalizeLocation(tableLocation));
-    Path root = lexicalRoot.toRealPath();
-    Path scan = Paths.get(requested);
-    Preconditions.checkArgument(
-        scan.toRealPath().startsWith(root),
-        "Scan location resolves outside the table's storage location");
-    for (Path ancestor = scan;
-        ancestor != null && ancestor.startsWith(lexicalRoot);
-        ancestor = ancestor.getParent()) {
-      Preconditions.checkArgument(
-          !Files.isSymbolicLink(ancestor), "Symlinks are not allowed in the scan location");
-    }
-    // Do not follow symlinks during validation. Iceberg must never list another table through one.
-    try (Stream<Path> paths = Files.walk(scan)) {
-      Preconditions.checkArgument(
-          paths.noneMatch(Files::isSymbolicLink), "Symlinks are not allowed in the scan location");
-    }
-  }
-
-  private static void validateRemoteLocation(
-      SparkSession spark, String tableLocation, String location) throws IOException {
-    if ("file".equals(normalizeLocation(location).getScheme())) {
-      return;
-    }
-    RemoteLocationValidator.validate(
-        spark.sparkContext().hadoopConfiguration(), tableLocation, location);
   }
 
   private static List<String> buildArguments() {
