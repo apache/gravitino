@@ -57,12 +57,12 @@ can search for an article, read it, and follow its bindings under their existing
 
 ## Non-Goals
 
-1. **Review and publication approval**: changes take effect immediately. This proposal defines
-   no proposal, reviewer, approval queue or review API.
+1. **Review and publication approval**: content and status changes take effect immediately;
+   approval workflows and review APIs are outside the scope.
 2. **Domain-scoped or article-scoped definition grants**: definition privileges are granted on
    the metalake. Domains group articles; they do not authorize access to an article.
-3. **Web UI and agent writes**: clients use REST; MCP tools are read-only. An article editor is
-   outside this contribution.
+3. **Web UI and agent writes**: the design provides REST APIs and read-only MCP tools.
+   A web editor and agent write operations are outside the scope.
 4. **File ingestion, attachments and image upload**: the body is text. It may contain ordinary
    external links, but Gravitino does not host files, extract text or fetch linked content.
 5. **Ranked, fuzzy or semantic search and RAG**: substring search is sufficient for this scope.
@@ -72,17 +72,16 @@ can search for an article, read it, and follow its bindings under their existing
    bind its columns.
 7. **Metric bindings and version pinning**: bind a Semantic Model as an object, not an individual
    metric. A binding points to the target's identity and resolves its current state.
-8. **Historical version reads, article hierarchy, comparison and rollback**: this delivery has
-   no history-list or individual-version read API, including in Java and Python clients.
-   Articles form a flat list; comparison and rollback are also outside this delivery.
+8. **Historical version reads, article hierarchy, comparison and rollback**: public APIs and
+   Java/Python clients read current content only. Historical reads, comparison and rollback
+   are deferred. Articles form a flat list without parent-child relationships.
 
 ---
 
-## Delivery Scope and Tracking
+## Scope and Dependencies
 
-This is a design contribution. Merging it delivers no runtime feature. The local task IDs
-`T1`–`T14` in [Task Breakdown](#task-breakdown) describe implementation PRs; they are not GitHub
-issue numbers and do not imply that issues have been filed.
+The design covers the following capabilities. The task references link each capability to its
+implementation work in [Task Breakdown](#task-breakdown).
 
 | Capability                                      | Scope                                             | Tasks   |
 | ----------------------------------------------- | ------------------------------------------------- | ------- |
@@ -95,22 +94,17 @@ issue numbers and do not imply that issues have been filed.
 | Java, Python and read-only MCP                  | Same contracts and visibility as REST             | T10–T12 |
 | Integration, upgrade, performance and user docs | Release checks and documented operating limits    | T13–T14 |
 
-The Domain APIs are present on `main`. Article membership and the nonempty-Domain drop guard
-still need integration work in T5. Term bindings depend on the stable IDs, status checks and
-deletion hooks described in the Glossary design; that document is not evidence that the runtime
-interfaces have shipped. Article storage, ordinary asset bindings and other independent work
-can proceed before the Term integration is ready.
+Domain integration requires stable Domain IDs, hierarchy lookup, access checks and deletion
+fencing. Term bindings require stable Term IDs, current-status lookup and deletion hooks.
 
-Keep the four-table layout, internal snapshots and `live_version` from the start, but defer
-public history reads. This differs from Glossary Step 1's storage, which has a revision and
-audit but no snapshots; both initial public APIs expose current content only. Retaining
-snapshots still requires version-write, transaction and retention logic in this delivery.
+The four-table model stores a snapshot for each effective content change and uses `live_version`
+to select current content. Retaining snapshots preserves the exact title, body, Domains and
+bindings together, at the cost of additional storage and transactional writes.
 
-Historical version lists and individual-version reads, their authorization, public DTOs and
-Java/Python client methods are separate follow-up work. They can read the retained snapshots
-without changing these four tables or migrating current content. No follow-up issue is created
-by this document. Future history reads must apply the article's current read check and resolve
-deleted target IDs without attaching them to same-name replacements.
+Public APIs and Java/Python clients expose current content only. Historical version lists and
+individual-version reads can later use the retained snapshots without changing these four
+tables or migrating current content. Historical reads must apply the article's current read
+check and resolve deleted target IDs without attaching them to same-name replacements.
 
 ---
 
@@ -126,7 +120,7 @@ deleted target IDs without attaching them to same-name replacements.
    the current term and table; each target still requires its own read privilege.
 4. The analyst loads the article and saves a new body and another binding with its `ETag`.
    One new version becomes effective atomically. The response shows the current version;
-   the previous snapshot remains in storage without a public history-read API.
+   the previous snapshot remains in storage.
 5. An agent acting as the reader calls `search_kb_articles`, then `get_kb_article`. It receives
    the stored body with its format and only the bound objects it can read.
 6. To prepare content privately, the analyst can create or set the article to `DRAFT`. Only its
@@ -156,7 +150,7 @@ ArticleBinding { articleId, targetType, targetId, audit_info }
 ArticleDomain  { articleId, domainId, audit_info }
 ```
 
-`ArticleSnapshot` describes internal storage, not a public historical-version DTO. The Article's
+`ArticleSnapshot` is the internal representation of a stored content version. The Article's
 `version` identifies its current content snapshot; its ETag separately guards the store revision.
 
 - **Identity**: `metalake.articleName`. The name is immutable and unique in the metalake; the
@@ -271,7 +265,7 @@ belongs in the versioned fields.
   cannot see. Filter only response data. A body-only edit must not remove hidden bindings or
   Domain memberships.
 - Public loads, summaries and bindings read the current effective version only. Older snapshots
-  remain internal; this delivery adds no history service operation, REST route or client method.
+  remain internal.
   Stored target and Domain IDs remain unchanged after deletion for later historical resolution.
 - Keep every version until article deletion. `JDBCBackend.deleteOldVersionData` returns `0` for
   this entity type, so the normal old-version sweep does not remove history. Article deletion
@@ -279,9 +273,9 @@ belongs in the versioned fields.
 
 ### Domain membership
 
-An article belongs to zero or more Domains, using explicit `kb_article_domain_rel` rows. Do not
-reuse `glossary_term_domain_rel`, and do not infer Article membership from backing tags. Domain
-and Glossary integration share lifecycle rules, not physical membership rows.
+An article belongs to zero or more Domains, using explicit `kb_article_domain_rel` rows.
+Membership is part of the content snapshot and changes through Article operations. It is
+independent of backing-tag assignments, so tag changes cannot silently move an article.
 
 - Requests and responses use Domain names. Resolve names to stable IDs on write and return the
   current names on read. A rename changes neither membership nor history identity. An unknown
@@ -343,7 +337,7 @@ parent lifecycle. Removing a user does not delete their articles; MANAGE can rea
 
 ### Access control
 
-Use the Glossary definition privileges on the metalake: `VIEW_DEFINITION`, `CREATE_DEFINITION`
+Use the definition privileges on the metalake: `VIEW_DEFINITION`, `CREATE_DEFINITION`
 and `MANAGE_DEFINITIONS`, abbreviated VIEW, CREATE and MANAGE in this section.
 `MANAGE_DEFINITIONS` implies CREATE, and CREATE implies VIEW. Expand those implications and
 apply explicit Deny rules to every required capability. Every operation requires effective VIEW;
@@ -360,8 +354,8 @@ ownership never bypasses Deny.
 
 CREATE alone cannot read another owner's draft, and ownership alone cannot replace CREATE.
 Use the same rules on direct reads, lists, nested results, reverse lookups and MCP.
-Definition grants on a single article are rejected. Reader roles need only VIEW; until the
-platform provides an all-users role, admins grant it explicitly rather than assuming `PUBLIC`.
+Definition grants on a single article are rejected. Administrators explicitly grant VIEW to
+reader roles; there is no implicit `PUBLIC` or anonymous read grant.
 
 Resolve current article identity, owner and the authenticated principal's group IDs from the
 store/principal for each owner-based decision. Do not use shared name-to-ID or owner caches for
@@ -423,8 +417,8 @@ data, revision or success event. Tokens are concurrency guards, not credentials.
 
 An omitted header or `If-Match: *` skips only token comparison. CAS still applies and can return
 `409`; there is no automatic retry. A successful write returns the new token, including the
-unchanged token for a valid no-op. `If-Match` handling is new work in this proposal and must be
-implemented in the server and clients rather than assumed to exist on current resources.
+unchanged token for a valid no-op. Article REST resources and Java/Python clients use the same
+conditional-edit contract.
 
 ### REST API
 
@@ -540,7 +534,7 @@ creates one version, and an unversioned-only change creates none.
 
 `ArticleObjectIdentifier` contains `type`, an ordered `namespace` array and `name`. Each component
 is an exact string. Resolve them directly to stable IDs; do not concatenate and split a dotted
-name through `MetadataObjects.parse`. No existing Tag route or parser changes.
+name through `MetadataObjects.parse`.
 
 | Type                                                           | Namespace                  | Name              |
 | -------------------------------------------------------------- | -------------------------- | ----------------- |
@@ -617,7 +611,7 @@ relations and revision unchanged. External DDL outcomes have the separate limits
 ### Java and Python clients
 
 Add article operations on the metalake, using typed DTOs and structured object identifiers.
-The following are operation sketches, not replacements for an existing Article interface:
+The operations are:
 
 ```text
 KnowledgeBaseArticleOperations
@@ -644,8 +638,8 @@ after binding writes as well as alter. Convenience calls without a loaded token 
 header; they retain server CAS behavior. A `412` surfaces as a concurrent-modification error
 requiring reload. Neither client retries a mutation unconditionally after a conflict.
 
-Both clients expose the current Article version but no historical-version listing or loading
-method in this delivery. Those methods are added with the deferred history-read APIs.
+Both clients expose the current Article version. Historical-version listing and loading
+methods are deferred with the corresponding REST APIs.
 
 ### Agent integration
 
@@ -690,9 +684,9 @@ EntityStore transaction: article row + version snapshot + effective relations
 Route every version-producing write through a version-policy boundary whose default applies
 the complete new version immediately. Route explicit article deletion through its policy
 boundary too. Bindings and Domain changes must use the same path rather than editing projection
-tables independently. Extensions can replace that policy without forking the manager; this
-proposal introduces no extra workflow, storage table or endpoint for them. Required target
-cleanup stays store maintenance and updates revisions and audit without a content version.
+tables independently. The policy is an extension point for version writes and explicit deletion.
+Required target cleanup stays store maintenance and updates revisions and audit without a
+content version.
 
 Use the existing listener framework for list, load, create, alter and drop pre/success/failure
 events. Dedicated `AlterArticleBindings` events carry added and removed targets. Audit covers
@@ -702,21 +696,21 @@ writes emit no content-change success event. There is no new delivery or orderin
 This adds an object type, APIs and storage; existing resources keep their request contracts.
 Owner and audit dispatchers must recognize the new type. Role routes reject article-scoped
 definition grants.
-No required configuration is added. The body limit has a default; its concrete configuration
-key and documentation are delivered with T3/T14 using the ordinary OSS configuration namespace.
+The body-size limit is optional configuration with the default specified above and uses the
+ordinary OSS configuration namespace.
 
 ---
 
 ## Alternatives Considered
 
-| Approach                                  | Benefit                               | Limitation and decision                                                                                                                                            |
-| ----------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Keep only links to external wiki pages    | No article storage or editor required | Bodies cannot be searched or read through the metadata API under Article privileges. Keep source references, but store managed content.                            |
-| Put long explanations in Term fields      | Reuses Term identity and privileges   | One explanation can cover several terms and assets; it needs its own title, owner, status and history. Use a separate Article entity.                              |
-| Store content in Tag properties           | Reuses an existing metadata object    | Tag assignment, policy behavior and privileges do not model document content or snapshots. Reuse storage conventions, not Tag semantics.                           |
-| Update the body in place, with audit      | Fewer rows and simpler writes         | Audit does not preserve the exact title, body and bindings a reader previously saw. Keep complete content snapshots from the start.                                |
-| Infer Domain membership from backing tags | Matches ordinary asset membership     | Backing-tag changes could silently move articles and bypass their version history. Use explicit Article membership rows, following the selected Glossary approach. |
-| Split targets from dotted full names      | Shorter URL and one string per target | A literal dot in a column or namespace component is ambiguous. Use structured components throughout the new Article APIs.                                          |
+| Approach                                  | Benefit                               | Limitation and decision                                                                                                                                         |
+| ----------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Keep only links to external wiki pages    | No article storage or editor required | Bodies cannot be searched or read through the metadata API under Article privileges. Keep source references, but store managed content.                         |
+| Put long explanations in Term fields      | Reuses Term identity and privileges   | One explanation can cover several terms and assets; it needs its own title, owner, status and history. Use a separate Article entity.                           |
+| Store content in Tag properties           | Reuses an existing metadata object    | Tag assignment, policy behavior and privileges do not model document content or snapshots. Reuse storage conventions, not Tag semantics.                        |
+| Update the body in place, with audit      | Fewer rows and simpler writes         | Audit does not preserve the exact title, body and bindings a reader previously saw. Keep complete content snapshots from the start.                             |
+| Infer Domain membership from backing tags | Matches ordinary asset membership     | Backing-tag changes could silently move articles outside the versioned edit path. Explicit Article membership rows keep Domain changes in the content snapshot. |
+| Split targets from dotted full names      | Shorter URL and one string per target | A literal dot in a column or namespace component is ambiguous. Use structured components throughout the new Article APIs.                                       |
 
 The selected model adds storage and atomic projection updates, but gives each article its own
 identity and retained snapshots for future history reads. It also keeps bindings independent of
@@ -724,35 +718,30 @@ access policies and lets ordinary Domain backing-tag behavior remain unchanged.
 
 ---
 
-## Open Questions and Decisions
+## Design Decisions
 
-1. **Version storage now, history reads later (decided)**: keep the four-table layout,
-   `live_version`, snapshot writes and retention in the first implementation. Public reads and
-   clients expose current content only; add historical reads separately without changing this
-   schema. Unlike Glossary Step 1, internal content snapshots are retained from the start.
-2. **Immediate status and deletion (decided)**: default to `APPROVED`, allow direct status changes
-   and edits, and allow owner-with-CREATE or MANAGE deletion in every status. These are Article
-   rules; do not copy the Glossary's MANAGE-only deletion rule.
-3. **Domain membership (decided)**: use `kb_article_domain_rel`, with explicit nonempty-drop
-   protection. Do not add Article rows to the Term relation table or infer them from asset tags.
-4. **Default reader access (platform question)**: an all-users role is outside this design.
-   Until one exists, use explicit VIEW grants on reader roles. Implementation does not depend
-   on inventing `PUBLIC` or silently giving anonymous users access.
-5. **Integration prerequisites (to verify in implementation)**: T5 verifies Domain fencing,
-   hierarchy and deletion hooks against runtime code. T6 verifies stable Term IDs, approved-Term
-   detection and deletion cleanup. Missing hooks are explicit implementation work; a merged
-   design document is not a completed dependency.
-6. **Search implementation (conditional decision)**: start with escaped case-insensitive
-   substring queries. T13 measures the release target; if they cannot meet it, replace the
+1. **Version storage and read scope**: retain snapshots and `live_version` so content and its
+   relations change atomically. Public reads expose current content; retained snapshots support
+   later historical reads without a schema migration.
+2. **Immediate status and deletion**: default to `APPROVED`, allow direct status changes and
+   edits, and allow owner-with-CREATE or MANAGE deletion in every status. This supports direct
+   authoring and publication without an approval workflow.
+3. **Explicit Domain membership**: use `kb_article_domain_rel` and nonempty-drop protection.
+   Versioning membership with the body prevents independent tag operations from changing it.
+4. **Explicit reader grants**: administrators grant VIEW to reader roles. The design provides
+   no implicit `PUBLIC` or anonymous read grant.
+5. **Cross-object integration**: Domain membership requires hierarchy, visibility and deletion
+   fencing. Term bindings require stable IDs, approved-status checks and deletion cleanup.
+6. **Substring search**: escaped case-insensitive queries provide matching without a separate
+   search service. T13 measures the performance target; if the queries cannot meet it, replace the
    query implementation before release while keeping its matching and permission semantics.
 
 ---
 
 ## Testing
 
-This section defines acceptance for future implementation PRs. This design-only contribution
-checks Markdown, examples, references and contract consistency; it does not implement or run the
-runtime scenarios below.
+Acceptance tests cover Article contracts, transaction invariants, authorization, lifecycle
+integration, clients and agent reads, followed by upgrade and performance checks.
 
 ### Rules and invariants
 
@@ -981,25 +970,24 @@ on the metalake. Grant Domain/target access separately.
 
 ## Task Breakdown
 
-Each task is one implementation PR with its cases from Testing. Dependencies come first;
-independent tasks may proceed in parallel once their dependencies are merged. REST PRs update
-OpenAPI and run `./gradlew :docs:build`. No task in this section is delivered by this design PR.
+Tasks are ordered by dependency and reference their acceptance cases in Testing. Independent
+tasks can proceed in parallel. REST tasks include OpenAPI definitions and validation with
+`./gradlew :docs:build`.
 
 ### Prerequisites
 
-- Verify runtime Term identity, status and cleanup contracts before merging T6's Term bindings.
-  Keep asset-only work independent of missing Term code.
-- Verify Domain endpoint fencing and drop integration against the current implementation in T5.
-  Explicit Article membership is an extension, not existing backing-tag membership behavior.
-- Use explicit metalake reader grants. An all-users role is not a release prerequisite.
+- Term integration requires stable IDs, current status and deletion hooks. Asset bindings are
+  independent of Term integration.
+- Domain integration requires endpoint fencing, hierarchy lookup and membership checks on drop.
+- Readers receive explicit definition grants on the metalake.
 
 ### Group A: API and persistence
 
 - [ ] **T1. Add Article APIs** (`api/`, DTO contracts in `common/`). Define Article, body, status,
       current-version and summary contracts, structured object identifiers, operations, changes
       and errors;
-      add the metadata/entity type integration and metalake access point. Define the three
-      metalake definition privileges with the Glossary work if they are not already present.
+      add the metadata/entity type integration and metalake access point. Integrate the metalake
+      definition privileges listed in Access control.
       Depends on: none. Cases: T1.1–T1.3.
 - [ ] **T2. Add Article storage** (`core/`, `scripts/`). Implement entities, POs, mappers and
       services for all four tables and dialect upgrade scripts, atomic snapshots/projections,
