@@ -188,20 +188,20 @@ public class TestDomainOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testCreateSubdomainWithExistingValuedTag() {
+  public void testCreateSubdomainWithExistingTag() {
     when(dispatcher.createSubdomain(
-            "test", "Parent", "Finance", null, null, TagValue.of("department", "finance"), false))
+            "test", "Parent", "Finance", null, null, TagValue.noValue("department"), false))
         .thenReturn(domain(Domain.Status.DRAFT));
     try (Response response =
         send(
             "POST",
             BASE,
-            "{\"name\":\"Finance\",\"parent\":\"Parent\",\"backingTag\":{\"name\":\"department\",\"value\":\"finance\"}}")) {
+            "{\"name\":\"Finance\",\"parent\":\"Parent\",\"backingTag\":{\"name\":\"department\"}}")) {
       assertDomain(response, Domain.Status.DRAFT);
     }
     verify(dispatcher)
         .createSubdomain(
-            "test", "Parent", "Finance", null, null, TagValue.of("department", "finance"), false);
+            "test", "Parent", "Finance", null, null, TagValue.noValue("department"), false);
   }
 
   @Test
@@ -257,10 +257,7 @@ public class TestDomainOperations extends BaseOperationsTest {
       assertDomain(response, Domain.Status.DRAFT);
     }
     try (Response response =
-        send(
-            "PUT",
-            ITEM + "/backingTag",
-            "{\"backingTag\":{\"name\":\"department\",\"value\":\"finance\"}}")) {
+        send("PUT", ITEM + "/backingTag", "{\"backingTag\":{\"name\":\"department\"}}")) {
       assertDomain(response, Domain.Status.DRAFT);
     }
     try (Response response = send("PUT", ITEM + "/backingTag", "{\"backingTag\":null}")) {
@@ -268,7 +265,7 @@ public class TestDomainOperations extends BaseOperationsTest {
     }
     verify(dispatcher).attachDomain("test", "Finance", "Parent");
     verify(dispatcher).detachDomain("test", "Finance");
-    verify(dispatcher).updateBackingTag("test", "Finance", TagValue.of("department", "finance"));
+    verify(dispatcher).updateBackingTag("test", "Finance", TagValue.noValue("department"));
     verify(dispatcher).updateBackingTag("test", "Finance", null);
   }
 
@@ -305,7 +302,8 @@ public class TestDomainOperations extends BaseOperationsTest {
         new String[] {
           "{}",
           "{\"name\":\"Finance\"}",
-          "{\"name\":\"Finance\",\"backingTag\":{\"name\":\"t\",\"value\":\"v\",\"create\":true}}"
+          "{\"name\":\"Finance\",\"backingTag\":{\"name\":\"t\",\"value\":\"v\",\"create\":true}}",
+          "{\"name\":\"Finance\",\"backingTag\":{\"name\":\"t\",\"value\":\"v\"}}"
         }) {
       try (Response response = send("POST", BASE, json)) {
         assertError(response, 400);
@@ -330,9 +328,13 @@ public class TestDomainOperations extends BaseOperationsTest {
     try (Response response = send("PUT", ITEM + "/parent", "{\"parent\":null}")) {
       assertError(response, 400);
     }
-    try (Response response =
-        send("PUT", ITEM + "/backingTag", "{\"backingTag\":{\"name\":\" \"}}")) {
-      assertError(response, 400);
+    for (String json :
+        new String[] {
+          "{\"backingTag\":{\"name\":\" \"}}", "{\"backingTag\":{\"name\":\"t\",\"value\":\"v\"}}"
+        }) {
+      try (Response response = send("PUT", ITEM + "/backingTag", json)) {
+        assertError(response, 400);
+      }
     }
     verifyNoInteractions(dispatcher);
   }

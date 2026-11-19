@@ -39,7 +39,6 @@ from gravitino.api.rel.sql_representation import SQLRepresentation
 from gravitino.api.rel.types.types import Types
 from gravitino.api.semantic.dataset import Dataset
 from gravitino.api.semantic.semantic_model_definition import SemanticModelDefinition
-from gravitino.api.tag import TagValue
 from gravitino.api.tag.tag_change import TagChange
 from gravitino.auth.simple_auth_provider import SimpleAuthProvider
 from gravitino.client.metadata_object_domain_operations import (
@@ -88,7 +87,7 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
 
     def _domain(self, name):
         return self.lake.create_domain(
-            name, None, {}, TagValue(name.replace(".", "_") + " tag"), True
+            name, None, {}, name.replace(".", "_") + " tag", True
         )
 
     def _client(self, user):
@@ -198,9 +197,7 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
         self.assertEqual({"key": "value"}, renamed.properties())
         self.assertIsNone(draft.comment())
         self.assertEqual({}, draft.properties())
-        self.assertEqual(
-            TagValue(name.replace(".", "_") + " tag"), renamed.backing_tag()
-        )
+        self.assertEqual(name.replace(".", "_") + " tag", renamed.backing_tag())
         self.assertEqual(
             {},
             self.lake.alter_domain(
@@ -218,9 +215,7 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
         # The snapshot keeps its name, so reusing that name redirects future mutations.
         with self.assertRaises(NoSuchDomainException):
             draft.publish()
-        replacement = self.lake.create_domain(
-            name, None, None, TagValue("replacement"), True
-        )
+        replacement = self.lake.create_domain(name, None, None, "replacement", True)
         self.assertEqual(Domain.Status.PUBLISHED, draft.publish().status())
         self.assertEqual(Domain.Status.DRAFT, replacement.status())
         self.assertTrue(self.lake.delete_domain(name))
@@ -229,9 +224,7 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
     def test_hierarchy_and_backing_tag_errors(self):
         parent = self._domain("Parent_with_spaces")
         other = self._domain("Other_parent_name")
-        child = parent.create_subdomain(
-            "Tax_EU_child", None, None, TagValue("child tag"), True
-        )
+        child = parent.create_subdomain("Tax_EU_child", None, None, "child tag", True)
         self.assertEqual([child.name()], parent.list_subdomains())
         self.assertEqual(child.name(), parent.list_subdomains_info()[0].name())
 
@@ -255,25 +248,22 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
         self.assertIsNone(child.detach_from_parent().parent())
         self.assertEqual(parent.name(), child.parent())
 
-        # Binding changes preserve tags and reject conflicting assignments.
+        # A tag with allowed values can back a domain, and backs at most one domain.
         self.lake.create_tag("new tag", None, {}, ["finance", "risk"])
-        self.assertEqual(
-            TagValue("new tag", "finance"),
-            child.update_backing_tag(TagValue("new tag", "finance")).backing_tag(),
-        )
-        conflict = self.lake.create_domain(
-            "conflict", None, None, TagValue("new tag", "risk"), False
-        )
+        self.assertEqual("new tag", child.update_backing_tag("new tag").backing_tag())
         with self.assertRaises(BackingTagAlreadyBoundException):
-            conflict.update_backing_tag(TagValue("new tag", "finance"))
+            self.lake.create_domain("conflict", None, None, "new tag", False)
+        conflict = self._domain("conflict")
+        with self.assertRaises(BackingTagAlreadyBoundException):
+            conflict.update_backing_tag("new tag")
         with self.assertRaises(NoSuchTagException):
-            child.update_backing_tag(TagValue("missing"))
+            child.update_backing_tag("missing")
         self.assertIsNone(child.update_backing_tag(None).backing_tag())
-        self.assertEqual(TagValue("child tag"), child.backing_tag())
+        self.assertEqual("child tag", child.backing_tag())
         with self.assertRaises(TagAlreadyExistsException):
-            self.lake.create_domain("new", None, {}, TagValue("child tag"), True)
+            self.lake.create_domain("new", None, {}, "child tag", True)
         with self.assertRaises(DomainAlreadyExistsException):
-            self.lake.create_domain(parent.name(), None, {}, TagValue("unused"), True)
+            self.lake.create_domain(parent.name(), None, {}, "unused", True)
 
     def _assert_direct_members(self, finance):
         direct = {
@@ -301,29 +291,29 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
             [r.type() for r in direct["ice.schema.orders"].relations()],
         )
 
-    def test_members_relations_filters_and_nearest_assignment(self):
+    def test_members_relations_and_filters(self):
         catalog, table, hidden, view, semantic, fileset, model = self._catalogs()
         self.lake.create_tag("department", None, {}, ["finance", "risk"])
+        self.lake.create_tag("risk", None, {})
         finance = self.lake.create_domain(
-            "Finance_US_East", None, {}, TagValue("department", "finance"), False
+            "Finance_US_East", None, {}, "department", False
         )
-        risk = self.lake.create_domain(
-            "Risk_EU", None, {}, TagValue("department", "risk"), False
-        )
+        risk = self.lake.create_domain("Risk_EU", None, {}, "risk", False)
         child = finance.create_subdomain(
-            "Trading_US_with_spaces", None, {}, TagValue("trading"), True
+            "Trading_US_with_spaces", None, {}, "trading", True
         )
 
-        # The schema grants Finance membership; the table assignment takes precedence for Risk.
+        # The schema grants Finance membership whatever its value; different tags accumulate,
+        # so the hidden table is in both Finance and Risk.
         catalog.as_schemas().load_schema("schema").supports_tags().assign_tags(
-            [{"name": "department", "value": "finance"}]
+            [{"name": "department", "value": "risk"}]
         )
         table.supports_tags().assign_tags(["trading"])
-        hidden.supports_tags().assign_tags([{"name": "department", "value": "risk"}])
+        hidden.supports_tags().assign_tags(["risk"])
         fileset.supports_tags().assign_tags(
             [{"name": "department", "value": "finance"}]
         )
-        model.supports_tags().assign_tags([{"name": "department", "value": "finance"}])
+        model.supports_tags().assign_tags([{"name": "department", "value": "risk"}])
 
         # The same table has both inherited and subdomain relations, with no precedence.
         members = {
@@ -335,6 +325,7 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
                 "ice.schema.orders",
                 "ice.schema.orders_view",
                 "ice.schema.business",
+                "ice.schema.hidden",
                 "files.schema.data",
                 "models.schema.model",
             },
@@ -385,7 +376,7 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
             ],
         )
         self.assertEqual(
-            5,
+            6,
             len(
                 finance.list_members(
                     DomainMemberFilter(
@@ -444,9 +435,7 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
         if not self.authorization:
             self.skipTest("Requires an authorization-enabled server")
         parent = self._domain("Parent_auth_scope")
-        child = parent.create_subdomain(
-            "Child_auth_scope", None, {}, TagValue("child"), True
-        )
+        child = parent.create_subdomain("Child_auth_scope", None, {}, "child", True)
         reader = self._client("reader")
         manager = self._client("manager")
         outsider = self._client("outsider")
@@ -528,52 +517,48 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
             ],
         )
         with self.assertRaises(ForbiddenException):
-            creator.create_domain("denied", None, {}, TagValue("new tag"), True)
+            creator.create_domain("denied", None, {}, "new tag", True)
         self._grant(
             "creator",
             [SecurableObjects.of_metalake(self.name, [Privileges.allow("CREATE_TAG")])],
         )
 
         # Creating a backing tag needs CREATE_TAG in addition to domain management.
-        created = creator.create_domain(
-            "created", None, {}, TagValue("owned tag"), True
-        )
+        created = creator.create_domain("created", None, {}, "owned tag", True)
 
         # Managing a domain does not confer ownership of another user's tag.
         self.lake.create_tag("foreign tag", None, {})
         with self.assertRaises(ForbiddenException):
-            created.update_backing_tag(TagValue("foreign tag"))
+            created.update_backing_tag("foreign tag")
         with self.assertRaises(ForbiddenException):
-            creator.create_domain("foreign", None, {}, TagValue("foreign tag"), False)
+            creator.create_domain("foreign", None, {}, "foreign tag", False)
 
         self.lake.set_owner(
             MetadataObjects.parse("foreign tag", MetadataObject.Type.TAG),
             "creator",
             Owner.Type.USER,
         )
-        bound = creator.create_domain("bound", None, {}, TagValue("foreign tag"), False)
-        self.assertEqual(TagValue("foreign tag"), bound.backing_tag())
+        bound = creator.create_domain("bound", None, {}, "foreign tag", False)
+        self.assertEqual("foreign tag", bound.backing_tag())
         self.assertIsNone(bound.update_backing_tag(None).backing_tag())
         self.assertEqual(
-            TagValue("foreign tag"),
-            created.update_backing_tag(TagValue("foreign tag")).backing_tag(),
+            "foreign tag",
+            created.update_backing_tag("foreign tag").backing_tag(),
         )
         with self.assertRaises(BackingTagAlreadyBoundException):
-            creator.create_domain("conflict", None, {}, TagValue("foreign tag"), False)
+            creator.create_domain("conflict", None, {}, "foreign tag", False)
         with self.assertRaises(NoSuchTagException):
-            creator.create_domain("missing", None, {}, TagValue("missing tag"), False)
+            creator.create_domain("missing", None, {}, "missing tag", False)
 
     def test_authorization_member_access_without_tag_privileges(self):
         if not self.authorization:
             self.skipTest("Requires an authorization-enabled server")
         catalog, table, _, _, _, _, _ = self._catalogs()
         parent = self._domain("access_parent")
-        child = parent.create_subdomain(
-            "access_child", None, {}, TagValue("child tag"), True
-        )
+        child = parent.create_subdomain("access_child", None, {}, "child tag", True)
         parent.publish()
         catalog.as_schemas().load_schema("schema").supports_tags().assign_tags(
-            [parent.backing_tag().name()]
+            [parent.backing_tag()]
         )
         table.supports_tags().assign_tags(["child tag"])
 
@@ -679,7 +664,7 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
         first = self._domain("first").publish()
         second = self._domain("second").publish()
         child = first.create_subdomain(
-            "moving_child_name", None, {}, TagValue("moving tag"), True
+            "moving_child_name", None, {}, "moving tag", True
         ).publish()
         manager = self._client("moving_manager")
         owner = self._client("lake_owner")
@@ -774,111 +759,55 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
                 )
                 self.assertIsNone(relation.source().parent())
 
-    def test_nearest_tag_assignment_and_value_matching(self):
+    def test_membership_ignores_assignment_values(self):
         catalog, table = self._relational_table()
-        self.lake.create_tag("department", None, {}, ["finance", "risk", "Finance"])
-        finance = self.lake.create_domain(
-            "Finance", None, {}, TagValue("department", "finance"), False
+        # An existing tag with an allowed-values list backs a domain without a value.
+        self.lake.create_tag("department", None, {}, ["finance", "risk"])
+        finance = self.lake.create_domain("Finance", None, {}, "department", False)
+        self.assertEqual(
+            "department", self.lake.get_domain(finance.name()).backing_tag()
         )
-        risk = self.lake.create_domain(
-            "Risk", None, {}, TagValue("department", "risk"), False
-        )
-        capitalized = self.lake.create_domain(
-            "Capitalized", None, {}, TagValue("department", "Finance"), False
-        )
+
+        # A tag backs at most one domain, whether bound at creation or later.
+        with self.assertRaises(BackingTagAlreadyBoundException):
+            self.lake.create_domain("Risk", None, {}, "department", False)
+        risk = self._domain("Risk")
+        with self.assertRaises(BackingTagAlreadyBoundException):
+            risk.update_backing_tag("department")
+
         inherited_catalog = (
             DomainRelation.Type.INHERITED,
             MetadataObject.Type.CATALOG,
             "ice",
         )
-        inherited_schema = (
-            DomainRelation.Type.INHERITED,
-            MetadataObject.Type.SCHEMA,
-            "ice.schema",
-        )
         direct = (DomainRelation.Type.DIRECT, None, None)
-        schema_tags = catalog.as_schemas().load_schema("schema").supports_tags()
 
-        with self.assertRaises(IllegalArgumentException):
-            finance.update_backing_tag(TagValue("department", "unknown"))
-        self.assertEqual(
-            TagValue("department", "finance"),
-            self.lake.get_domain(finance.name()).backing_tag(),
-        )
-
-        # A nearer schema assignment masks the catalog's value of the same tag.
-        catalog.supports_tags().assign_tags(
-            [{"name": "department", "value": "finance"}]
-        )
+        # Any value on an inherited or direct assignment matches.
+        catalog.supports_tags().assign_tags([{"name": "department", "value": "risk"}])
         self._assert_table_relations(finance, table, {inherited_catalog})
-        self._assert_table_relations(capitalized, table, set())
-        schema_tags.assign_tags([{"name": "department", "value": "risk"}])
-        self._assert_table_relations(finance, table, set())
-        self._assert_table_relations(risk, table, {inherited_schema})
-
-        # Each direct value matches exactly; remaining values still mask inherited assignments.
-        table.supports_tags().assign_tags(
-            [
-                {"name": "department", "value": "finance"},
-                {"name": "department", "value": "Finance"},
-            ]
-        )
+        table.supports_tags().assign_tags([{"name": "department", "value": "finance"}])
         self._assert_table_relations(finance, table, {direct})
-        self._assert_table_relations(capitalized, table, {direct})
-        self._assert_table_relations(risk, table, set())
+
+        # Removing the direct assignment reveals the inherited one, then no membership.
         table.supports_tags().assign_tags(
             tags_to_remove=[{"name": "department", "value": "finance"}]
         )
-        self._assert_table_relations(finance, table, set())
-        self._assert_table_relations(capitalized, table, {direct})
-        self._assert_table_relations(risk, table, set())
-
-        # Removing assignments reveals the next ancestor, until no assignment remains.
-        table.supports_tags().assign_tags(
-            tags_to_remove=[{"name": "department", "value": "Finance"}]
-        )
-        self._assert_table_relations(risk, table, {inherited_schema})
-        schema_tags.assign_tags(
+        self._assert_table_relations(finance, table, {inherited_catalog})
+        catalog.supports_tags().assign_tags(
             tags_to_remove=[{"name": "department", "value": "risk"}]
         )
-        self._assert_table_relations(finance, table, {inherited_catalog})
-        catalog.supports_tags().assign_tags(
-            tags_to_remove=[{"name": "department", "value": "finance"}]
-        )
-        for domain in (finance, risk, capitalized):
-            self._assert_table_relations(domain, table, set())
-
-        # A backing binding without a value matches any valued or valueless assignment.
-        self.lake.create_tag("any-value", None, {})
-        any_value = self.lake.create_domain(
-            "Any", None, {}, TagValue("any-value"), False
-        )
-        table.supports_tags().assign_tags([{"name": "any-value", "value": "arbitrary"}])
-        self._assert_table_relations(any_value, table, {direct})
-        table.supports_tags().assign_tags(
-            tags_to_remove=[{"name": "any-value", "value": "arbitrary"}]
-        )
-        table.supports_tags().assign_tags(["any-value"])
-        self._assert_table_relations(any_value, table, {direct})
-        with self.assertRaises(BackingTagAlreadyBoundException):
-            self.lake.create_domain(
-                "Mixed", None, {}, TagValue("any-value", "arbitrary"), False
-            )
+        self._assert_table_relations(finance, table, set())
 
     def test_multiple_subdomain_relations_and_backing_tag_identity(self):
         catalog, table = self._relational_table()
         parent = self._domain("Parent")
-        first = parent.create_subdomain(
-            "First_child_A", None, {}, TagValue("first-tag"), True
-        )
-        second = parent.create_subdomain(
-            "Second_child_B", None, {}, TagValue("second-tag"), True
-        )
+        first = parent.create_subdomain("First_child_A", None, {}, "first-tag", True)
+        second = parent.create_subdomain("Second_child_B", None, {}, "second-tag", True)
         catalog.supports_tags().assign_tags(["first-tag"])
         catalog.as_schemas().load_schema("schema").supports_tags().assign_tags(
             ["second-tag"]
         )
-        table.supports_tags().assign_tags([parent.backing_tag().name()])
+        table.supports_tags().assign_tags([parent.backing_tag()])
         direct = (DomainRelation.Type.DIRECT, None, None)
         first_path = (
             DomainRelation.Type.VIA_SUBDOMAIN,
@@ -936,7 +865,7 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
         )
 
         # Removing one route must preserve the other routes and the member's own child scope.
-        table.supports_tags().assign_tags(tags_to_remove=[parent.backing_tag().name()])
+        table.supports_tags().assign_tags(tags_to_remove=[parent.backing_tag()])
         self._assert_table_relations(parent, table, {first_path, second_path})
         second.detach_from_parent()
         self._assert_table_relations(parent, table, {first_path})
@@ -958,7 +887,7 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
         # Tag identity survives rename, but deletion and same-name recreation cannot restore a binding.
         self.lake.alter_tag("first-tag", TagChange.rename("renamed-first-tag"))
         self.assertEqual(
-            "renamed-first-tag", self.lake.get_domain(first.name()).backing_tag().name()
+            "renamed-first-tag", self.lake.get_domain(first.name()).backing_tag()
         )
         self._assert_table_relations(parent, table, {first_path})
         self.lake.delete_tag("renamed-first-tag")
@@ -968,7 +897,7 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
         catalog.supports_tags().assign_tags(["renamed-first-tag"])
         self._assert_table_relations(first, table, set())
         self._assert_table_relations(parent, table, set())
-        first.update_backing_tag(TagValue("renamed-first-tag"))
+        first.update_backing_tag("renamed-first-tag")
         self._assert_table_relations(first, table, {inherited_catalog})
         self._assert_table_relations(parent, table, {first_path})
         first.update_backing_tag(None)
@@ -977,20 +906,18 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
     def test_invalid_hierarchy_atomic_creation_and_idempotence(self):
         parent = self._domain("Parent")
         other = self._domain("Other")
-        child = parent.create_subdomain("Child", None, {}, TagValue("child-tag"), True)
+        child = parent.create_subdomain("Child", None, {}, "child-tag", True)
 
         self.lake.create_tag("existing-valued-tag", None, {}, ["finance"])
         bound = parent.create_subdomain(
             "Bound",
             "existing tag",
             {"key": "value"},
-            TagValue("existing-valued-tag", "finance"),
+            "existing-valued-tag",
             False,
         )
         self.assertEqual(parent.name(), bound.parent())
-        self.assertEqual(
-            TagValue("existing-valued-tag", "finance"), bound.backing_tag()
-        )
+        self.assertEqual("existing-valued-tag", bound.backing_tag())
         self.assertEqual({"key": "value"}, bound.properties())
         with self.assertRaises(DomainAlreadyExistsException):
             self.lake.alter_domain(other.name(), DomainChange.rename(parent.name()))
@@ -998,17 +925,13 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
 
         # Rejected hierarchy or duplicate-name creation must not leave a domain or backing tag.
         with self.assertRaises(IllegalArgumentException):
-            child.create_subdomain(
-                "Grandchild", None, {}, TagValue("grandchild-tag"), True
-            )
+            child.create_subdomain("Grandchild", None, {}, "grandchild-tag", True)
         with self.assertRaises(NoSuchDomainException):
             self.lake.get_domain("Grandchild")
         with self.assertRaises(NoSuchTagException):
             self.lake.get_tag("grandchild-tag")
         with self.assertRaises(DomainAlreadyExistsException):
-            self.lake.create_domain(
-                parent.name(), None, {}, TagValue("unused-tag"), True
-            )
+            self.lake.create_domain(parent.name(), None, {}, "unused-tag", True)
         with self.assertRaises(NoSuchTagException):
             self.lake.get_tag("unused-tag")
         for domain, target in ((child, child), (other, child), (parent, other)):
