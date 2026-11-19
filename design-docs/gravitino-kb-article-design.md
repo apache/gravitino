@@ -459,7 +459,7 @@ Domain passes its own visibility check. Reverse lookup does not traverse Term→
 #### Pagination and binding previews
 
 Use ordinary `limit` and `offset`, without a cursor token. List, reverse-lookup and binding-list
-reads default to `limit=100`, `offset=0`; accept limits from 1 through 100 and nonnegative
+reads default to `limit=100`, `offset=0`; accept limits from 1 through 10,000 and nonnegative
 offsets, rejecting invalid values with `400`. Order bindings by stable `(target_id, target_type)`.
 Article summaries retain the title/name ordering described below. Apply root authorization,
 status filters and target visibility before offset and limit. A page contains only readable
@@ -475,7 +475,7 @@ the selected page. Article list/reverse pages retain their authorized `total` an
 
 An `ArticleSummary` embeds at most 20 readable Term entries and `termsHasMore`. A full Article
 response embeds Term and object previews with `termsHasMore` and `objectsHasMore`. A load accepts
-`limit` and `offset` for both binding sets, defaulting to 20 and 0, with the same maximum of 100.
+`limit` and `offset` for both binding sets, defaulting to 20 and 0, with the same maximum of 10,000.
 These parameters page bindings, not the body. Clients can instead page each set independently
 through the dedicated binding endpoints. Create and alter return the default previews; binding
 mutations return the first 100 readable entries of the updated set and `hasMore`, plus the
