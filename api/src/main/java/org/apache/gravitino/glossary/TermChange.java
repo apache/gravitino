@@ -73,7 +73,8 @@ public interface TermChange {
 
   /**
    * Creates a change to add a synonym to the term. A synonym cannot be the name of another term or
-   * of this term.
+   * of this term. Membership uses the normalized synonym key. Removing and adding an existing key
+   * in the same alter preserves its original display spelling, including case and internal spaces.
    *
    * @param synonym The synonym to add.
    * @return The term change.
@@ -85,7 +86,8 @@ public interface TermChange {
   }
 
   /**
-   * Creates a change to remove a synonym from the term.
+   * Creates a change to remove a synonym by normalized key. To replace its display spelling, commit
+   * the removal before adding the new spelling in a separate alter.
    *
    * @param synonym The synonym to remove.
    * @return The term change.

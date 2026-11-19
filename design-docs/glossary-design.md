@@ -1439,6 +1439,11 @@ also need `-PskipDockerTests=false` and a running Docker.
 
 **T6. Authorization**
 
+When wiring glossary terms into the shared authorizer, test owner reads on the writing node and
+a second node across create, rename, drop and same-name recreation with a different creator.
+Invalidate cached name-to-ID and owner mappings after the outer transaction commits. A rolled-back
+create or drop must preserve the last committed authorization result.
+
 The users for these cases:
 
 | User       | Privileges on the metalake                                              |

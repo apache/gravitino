@@ -36,7 +36,9 @@ import java.util.function.Function;
 import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity.EntityType;
+import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.apache.gravitino.exceptions.TermAlreadyExistsException;
 import org.apache.gravitino.exceptions.TermVersionConflictException;
@@ -96,6 +98,41 @@ class TestGlossaryManager extends TestJDBCBackend {
       Assertions.assertTrue(relations.listRelated(lakeId, neighbor.id()).isEmpty());
     }
     Assertions.assertEquals(1, manager.listTerms(LAKE).size());
+  }
+
+  @TestTemplate
+  void testCreatorOwnershipRollsBackAndFollowsNewIdentity() throws Exception {
+    createAndInsertMakeLake(LAKE);
+    GlossaryManager owned = new GlossaryManager(ids::incrementAndGet, true);
+    TermSpec spec =
+        TermSpec.builder("Account").withSynonyms("client").withSourceRef("import:1").build();
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> PrincipalUtils.doAs(new UserPrincipal("alice"), () -> owned.createTerm(LAKE, spec)));
+    Assertions.assertTrue(owned.listTerms(LAKE).isEmpty());
+
+    for (String user : List.of("alice", "bob")) {
+      backend.insert(
+          createUserEntity(
+              ids.incrementAndGet(), AuthorizationUtils.ofUserNamespace(LAKE), user, AUDIT_INFO),
+          false);
+      GlossaryTermEntity term =
+          PrincipalUtils.doAs(new UserPrincipal(user), () -> owned.createTerm(LAKE, spec));
+      Assertions.assertEquals(
+          user,
+          OwnerMetaService.getInstance()
+              .getOwner(term.nameIdentifier(), EntityType.GLOSSARY_TERM)
+              .map(UserEntity.class::cast)
+              .orElseThrow()
+              .name());
+      Assertions.assertTrue(owned.dropTerm(LAKE, term.name()));
+      Assertions.assertNull(
+          SessionUtils.getWithoutCommit(
+              OwnerMetaMapper.class,
+              mapper ->
+                  mapper.selectOwnerByMetadataObjectIdAndType(
+                      term.id(), EntityType.GLOSSARY_TERM.name())));
+    }
   }
 
   @TestTemplate
