@@ -162,11 +162,19 @@ ArticleDomain  { articleId, domainId, audit_info }
 - **Identity**: `metalake.articleName`. The name is immutable and unique in the metalake; the
   internal numeric article ID is stable. Add `KNOWLEDGE_BASE_ARTICLE` to `MetadataObject.Type`
   and `Entity.EntityType`, including the single-level object handling used by owner APIs.
-- **Generated name**: `name` is optional on create. Lower-case the title, replace runs of
-  non-ASCII letters and digits with `-`, trim the separators and cut to 128 characters. If the
-  result is empty, use `article-<shortId>` with 8 random lower-case alphanumeric characters,
-  regenerating on collision. A derived-name collision adds `-2`, `-3`, and so on, cutting the
-  base further to keep the whole name within 128 characters. A duplicate explicit name is `409`.
+- **Explicit name**: accept 1 to 128 Unicode code points, using letters, digits, combining marks,
+  `_` and `-`, with at least one letter or digit. Reject other characters with `400`, including
+  `/`, backslash, whitespace and control characters. Preserve the supplied spelling and case.
+- **Generated name**: `name` is optional on create. Lower-case the title using `Locale.ROOT`,
+  preserve Unicode letters, digits and combining marks, and replace each run of other characters
+  with `-`. Trim leading/trailing `-` and cut to 128 Unicode code points without splitting a
+  character. Chinese text is preserved: `收入计算说明` becomes `收入计算说明`, and
+  `收入 Calculation Guide` becomes `收入-calculation-guide`. Do not transliterate to Pinyin.
+  Use `article-<shortId>` only when the result contains no Unicode letter or digit, such as an
+  emoji-only or punctuation-only title. The suffix is 8 random lower-case alphanumeric
+  characters, regenerated on collision. A derived-name collision adds `-2`, `-3`, and so on,
+  cutting the base further to keep the whole name within 128 code points. A duplicate explicit
+  name is `409`. Changing the title later never changes the generated name.
 - **Title**: required, nonblank after trimming, at most 512 characters. Compare titles after
   trimming and ignoring case, independent of database collation. Among articles that are not
   `DEPRECATED`, titles are unique within the metalake. Deprecation releases the title; leaving
@@ -421,23 +429,53 @@ segment. Successful calls use HTTP `200` and the normal Gravitino response envel
 `code: 0`, as the Tag APIs do. The table names the other response fields; errors use the usual
 error envelope. Article and binding writes also carry the concurrency headers above.
 
-| Method and path                          | Request                                        | Response fields         | Behavior                                          |
-| ---------------------------------------- | ---------------------------------------------- | ----------------------- | ------------------------------------------------- |
-| `POST /kb-articles`                      | Create fields below                            | `article`               | Create identity, owner, version 1 and relations   |
-| `GET /kb-articles`                       | List filters below                             | `articles`, `total`     | Read visible summaries only                       |
-| `GET /kb-articles/{article}`             | No body                                        | `article`               | Read full current article                         |
-| `PUT /kb-articles/{article}`             | `updates` array                                | `article`               | Apply all changes atomically                      |
-| `DELETE /kb-articles/{article}`          | No body                                        | Existing `DropResponse` | Soft-delete article and related rows atomically   |
-| `GET /kb-articles/{article}/terms`       | No body                                        | `terms`                 | Read visible current Term bindings                |
-| `POST /kb-articles/{article}/terms`      | `termsToAdd`, `termsToRemove`: name arrays     | `terms`                 | Change Term bindings atomically                   |
-| `GET /kb-articles/{article}/objects`     | No body                                        | `objects`               | Read visible current asset bindings               |
-| `POST /kb-articles/{article}/objects`    | `objectsToAdd`, `objectsToRemove`: identifiers | `objects`               | Change asset bindings atomically                  |
-| `GET /glossary/terms/{term}/kb-articles` | `includeDeprecated`, default `false`           | `articles`              | Authorize Term root, then read article summaries  |
-| `GET /objects/{type}/kb-articles`        | `namespace`, `name`, `includeDeprecated`       | `articles`              | Authorize asset root, then read article summaries |
+Article names are stored and returned as Unicode strings, not URL-encoded strings. In every
+single-Article route, clients UTF-8 percent-encode the name as one path segment; server routing
+decodes it once. Java and Python clients must preserve Chinese and mixed-language names through
+create, load, alter, delete and binding calls. Percent-encoded length is not the name length.
+
+| Method and path                          | Request                                                     | Response fields                | Behavior                                           |
+| ---------------------------------------- | ----------------------------------------------------------- | ------------------------------ | -------------------------------------------------- |
+| `POST /kb-articles`                      | Create fields below                                         | `article`                      | Create identity, owner, version 1 and relations    |
+| `GET /kb-articles`                       | List filters below                                          | `articles`, `total`, `hasMore` | Read visible summaries only                        |
+| `GET /kb-articles/{article}`             | Binding `limit`, `offset`                                   | `article`                      | Read current content with bounded binding previews |
+| `PUT /kb-articles/{article}`             | `updates` array                                             | `article`                      | Apply all changes atomically                       |
+| `DELETE /kb-articles/{article}`          | No body                                                     | Existing `DropResponse`        | Soft-delete article and related rows atomically    |
+| `GET /kb-articles/{article}/terms`       | `limit`, `offset`                                           | `terms`, `hasMore`             | Page visible current Term bindings                 |
+| `POST /kb-articles/{article}/terms`      | `termsToAdd`, `termsToRemove`: name arrays                  | `terms`, `hasMore`             | Change bindings; return the first bounded page     |
+| `GET /kb-articles/{article}/objects`     | `limit`, `offset`                                           | `objects`, `hasMore`           | Page visible current asset bindings                |
+| `POST /kb-articles/{article}/objects`    | `objectsToAdd`, `objectsToRemove`: identifiers              | `objects`, `hasMore`           | Change bindings; return the first bounded page     |
+| `GET /glossary/terms/{term}/kb-articles` | `includeDeprecated`, `limit`, `offset`                      | `articles`, `total`, `hasMore` | Authorize Term root, then page summaries           |
+| `GET /objects/{type}/kb-articles`        | `namespace`, `name`, `includeDeprecated`, `limit`, `offset` | `articles`, `total`, `hasMore` | Authorize asset root, then page summaries          |
 
 The two reverse lookups return only `APPROVED` articles unless `includeDeprecated=true`, which
 also includes `DEPRECATED`. They never return drafts. Each returned article, Term, asset and
 Domain passes its own visibility check. Reverse lookup does not traverse Term→Asset bindings.
+
+#### Pagination and binding previews
+
+Use ordinary `limit` and `offset`, without a cursor token. List, reverse-lookup and binding-list
+reads default to `limit=100`, `offset=0`; accept limits from 1 through 100 and nonnegative
+offsets, rejecting invalid values with `400`. Order bindings by stable `(target_id, target_type)`.
+Article summaries retain the title/name ordering described below. Apply root authorization,
+status filters and target visibility before offset and limit. A page contains only readable
+results, without hidden-object counts. `hasMore` means another readable result exists; clients
+continue with the same filters, adding the returned item count to offset. Pages describe unchanged
+data; concurrent edits may move results between pages, as with the Article list.
+
+Binding pages return `terms` or `objects` plus `hasMore`, with no total. Term entries contain
+only name and current status, not full definitions or nested Term bindings; object entries use
+`ArticleObjectIdentifier`. Query the relation tables for the bounded page rather than loading
+the complete snapshot or all target DTOs and then truncating them. Batch target resolution for
+the selected page. Article list/reverse pages retain their authorized `total` and add `hasMore`.
+
+An `ArticleSummary` embeds at most 20 readable Term entries and `termsHasMore`. A full Article
+response embeds Term and object previews with `termsHasMore` and `objectsHasMore`. A load accepts
+`limit` and `offset` for both binding sets, defaulting to 20 and 0, with the same maximum of 100.
+These parameters page bindings, not the body. Clients can instead page each set independently
+through the dedicated binding endpoints. Create and alter return the default previews; binding
+mutations return the first 100 readable entries of the updated set and `hasMore`, plus the
+Article ETag. Pagination never changes the complete stored snapshot or the atomic mutation.
 
 #### Create and alter
 
@@ -474,9 +512,9 @@ Example create request:
 ```
 
 Create, load and alter return `{ "code": 0, "article": ... }`, where `article` has the typed
-fields in [Data model](#data-model), plus readable bound Terms and objects. Bound Term details
-include current status; object details use `ArticleObjectIdentifier`. Owner information is
-resolved through the existing Owner model, not stored in the version snapshot. `audit_info`
+fields in [Data model](#data-model), plus the bounded binding previews described above. Bound
+Term entries contain name and current status; object entries use `ArticleObjectIdentifier`.
+Owner information is resolved through the existing Owner model, not stored in the version snapshot. `audit_info`
 follows the standard AuditInfo DTO. These responses expose current content only.
 
 Alter follows the existing `updates` convention. Supported changes are `updateTitle`,
@@ -536,9 +574,12 @@ View columns and individual metrics are outside the supported set.
 - `q` matches any substring of the current title, a synonym or the current body, ignoring case.
   Search the stored body, including markup: a word in an HTML attribute can match. There is no
   relevance ranking or conversion to plain text.
-- Use bound parameters and escaped substring patterns with `LOWER(value) LIKE LOWER(?)` on all
-  three databases. Do not rely on database collation. `%`, `_` and `\` in user input match
-  literally. A full-text index may replace this implementation without changing the API.
+- Use bound parameters with `LOWER(value) LIKE LOWER(?) ESCAPE '!'` on all three databases,
+  following `SchemaPOStorageOps.escapeLikeMetacharacters`. Escape the input in order: `!` to
+  `!!`, `%` to `!%`, then `_` to `!_`; wrap the result in `%` for substring matching. Backslash
+  remains a literal character in the bound parameter. Do not rely on database collation or
+  default backslash escaping. A full-text index may replace this implementation without an
+  API change.
 - `domain` resolves the visible Domain and includes its subdomains. It combines with all other
   filters. `status` accepts one article status; the unfiltered list includes deprecated articles
   and those drafts the caller may read.
@@ -547,11 +588,11 @@ View columns and individual metrics are outside the supported set.
 - Sort by title, then immutable name. This breaks ties when a deprecated article shares a title
   with its replacement. Offset paging is stable for unchanged data, not a snapshot across
   independent requests while articles change.
-- Each `ArticleSummary` contains name, title, status, Domains, owner, readable bound Terms with
-  their status, content version and audit information, without a body. Batch owner and Term
+- Each `ArticleSummary` contains name, title, status, Domains, owner, the bounded Term preview
+  and `termsHasMore`, content version and audit information, without a body. Batch owner and Term
   lookups for the page rather than querying each article separately.
-- Return `{ "code": 0, "articles": [...], "total": 57 }`. `total` applies all filters and
-  authorization, independently of limit and offset. It never counts hidden articles.
+- Return `{ "code": 0, "articles": [...], "total": 57, "hasMore": true }`. `total` applies all
+  filters and authorization, independently of limit and offset. It never counts hidden articles.
 
 #### Errors
 
@@ -576,19 +617,22 @@ The following are operation sketches, not replacements for an existing Article i
 
 ```text
 KnowledgeBaseArticleOperations
-  listArticles(filter): ArticleSummary[] and total
-  loadArticle(name): KnowledgeBaseArticle
+  listArticles(filter): ArticlePage
+  loadArticle(name, limit = 20, offset = 0): KnowledgeBaseArticle
   createArticle(name?, title, body, domains?, status?, comment?, synonyms?,
                 sourceReference?, properties?, terms?, objects?): KnowledgeBaseArticle
   alterArticle(name, changes...): KnowledgeBaseArticle
   deleteArticle(name): boolean
-  listTermBindings(name): GlossaryTerm[]
-  alterTermBindings(name, termsToAdd, termsToRemove): GlossaryTerm[]
-  listAssetBindings(name): ArticleObjectIdentifier[]
-  alterAssetBindings(name, assetsToAdd, assetsToRemove): ArticleObjectIdentifier[]
-  listArticlesForTerm(term, includeDeprecated = false): ArticleSummary[]
-  listArticlesForObject(objectIdentifier, includeDeprecated = false): ArticleSummary[]
+  listTermBindings(name, limit = 100, offset = 0): TermBindingPage
+  alterTermBindings(name, termsToAdd, termsToRemove): TermBindingPage
+  listAssetBindings(name, limit = 100, offset = 0): AssetBindingPage
+  alterAssetBindings(name, assetsToAdd, assetsToRemove): AssetBindingPage
+  listArticlesForTerm(term, includeDeprecated = false, limit = 100, offset = 0): ArticlePage
+  listArticlesForObject(objectIdentifier, includeDeprecated = false, limit = 100, offset = 0): ArticlePage
 ```
+
+`ArticlePage` contains summaries, authorized total and `hasMore`; binding pages contain their
+typed entries and `hasMore`. Clients preserve the flags and expose limit/offset directly.
 
 Python exposes the equivalent snake_case methods. Both clients retain the opaque ETag from load
 or write in their Article handle, send it for conditional mutations and retain the next token
@@ -616,7 +660,9 @@ root to bypass that filter. Root status checks and returned content come from th
 snapshot. Authorization errors must not trigger an unfiltered or more privileged retry.
 
 Return the sanitized body as stored, with its `format`; do not convert HTML to Markdown. Tools
-preserve list pagination and total, and make continuation explicit when a result is incomplete.
+preserve list pagination, total and `hasMore`. `get_kb_article` accepts the load's binding limit
+and offset and preserves both binding-preview flags, so an agent can request subsequent pages
+without treating a preview as complete.
 Tool descriptions tell agents to read an article for explanation, then use existing metadata
 tools to load the authorized Term, table or Semantic Model. Translate structured identifier
 components into those tools' declared arguments; do not blindly forward binding JSON as kwargs.
@@ -747,7 +793,10 @@ Every storage mutation test checks these invariants for its metalake:
 
 #### T3: Manager and content
 
-- **T3.1**: generated names, suffix truncation, non-ASCII-only titles and explicit-name conflicts.
+- **T3.1**: generated names preserve Chinese, other Unicode letters/digits and combining marks;
+  mixed-language names and separators; code-point-safe truncation and collision suffixes;
+  emoji/punctuation-only fallback; explicit-name conflicts; title edits leave the name unchanged.
+  Explicit names reject slashes, backslash, whitespace and controls while accepting Unicode names.
 - **T3.2**: title conflicts ignoring case/spaces; concurrent create, title change and leaving
   DEPRECATED have one successful title claim.
 - **T3.3**: one version per mixed content request; no version for status/property-only changes or
@@ -794,7 +843,10 @@ Every storage mutation test checks these invariants for its metalake:
 #### T7: REST and conditional editing
 
 - **T7.1**: each route's request, success envelope, validation and error mapping; no historical
-  version-list or individual-version read route is registered.
+  version-list or individual-version read route is registered. Chinese and mixed-language
+  Article names round-trip through UTF-8 path encoding without double decoding.
+  Verify page defaults/bounds, stable order and visibility-before-pagination; all load, summary
+  and mutation previews are bounded and report accurate continuation without hidden counts.
 - **T7.2**: stale/malformed ETag, another metalake's token and same-name replacement with an equal
   revision; hidden roots return 404 first.
 - **T7.3**: stale no-op returns 412; valid no-op preserves ETag; successful writes return the next
@@ -807,10 +859,10 @@ Every storage mutation test checks these invariants for its metalake:
 #### T8: Lists and search
 
 - **T8.1**: title/synonym/body matches, case, non-ASCII text, stored HTML and literal `%`, `_`, `\`
-  on all databases.
+  and `!` on all databases, using an explicit `ESCAPE '!'` clause and mixed escape characters.
 - **T8.2**: combined Domain/status/typed-owner filters; invalid owner prefix rejected.
 - **T8.3**: summaries omit bodies, batch nested lookups and report authorized total independent of
-  page size.
+  page size; Term previews contain only bounded names/statuses with `termsHasMore`.
 - **T8.4**: title/name tie-break paging with a deprecated title reused by another article.
 
 #### T9: Events and audit
@@ -822,9 +874,11 @@ Every storage mutation test checks these invariants for its metalake:
 #### T10: Java client
 
 - **T10.1**: Java CRUD, current content version, bindings, reverse reads, filters and full error
-  mapping against REST; no public history-read operation.
+  mapping against REST; preserve limit/offset, page/preview flags and mutation-page responses;
+  no public history-read operation.
 - **T10.2**: ETag round trips across alter/binding writes, stale-token errors without retry, and
-  structured dotted-column identifiers.
+  structured dotted-column identifiers; Chinese and mixed-language Article names survive every
+  name-addressed operation without double encoding.
 
 #### T11: Python client
 
@@ -838,7 +892,7 @@ Every storage mutation test checks these invariants for its metalake:
 - **T12.2**: drafts/deprecated roots, hidden targets, Domain filtering and status changes racing
   reads; no unfiltered retry.
 - **T12.3**: stored-format body, pagination/total, incomplete-result continuation and target-tool
-  argument mapping.
+  argument mapping; agents can page both binding sets through load's limit/offset without a token.
 
 #### T13: Integration and release
 
@@ -973,11 +1027,13 @@ OpenAPI and run `./gradlew :docs:build`. No task in this section is delivered by
 
 - [ ] **T7. Add Article REST and OpenAPI** (`common/`, `server/`, `docs/open-api/`). Implement all
       current-resource routes, binding and reverse routes, envelopes, structured identifiers,
-      error mapping, optional identity/revision ETag handling and conditional mutations.
+      error mapping, bounded offset pages/previews, optional identity/revision ETag handling
+      and conditional mutations.
       Depends on: T5, T6. Cases: T7.1–T7.5.
 - [ ] **T8. Add filtered lists and search** (`core/`, `server/`). Implement escaped case-insensitive
       matching, Domain/status/typed-owner filters, authorized totals, stable tie-break ordering
-      and batched summary lookups. Depends on: T7. Cases: T8.1–T8.4.
+      and bounded, batched summary lookups with explicit SQL escape clauses.
+      Depends on: T7. Cases: T8.1–T8.4.
 - [ ] **T9. Add Article events and audit** (`core/`). Integrate lifecycle and binding dispatchers,
       authenticated actors and cleanup-loss records without adding delivery guarantees.
       Depends on: T6, T7. Cases: T9.1–T9.2.
