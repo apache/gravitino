@@ -27,11 +27,30 @@ import org.apache.gravitino.storage.relational.po.GlossaryTermSnapshotPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
 /** Glossary definition and synonym persistence in the caller transaction. */
 public interface GlossaryTermMetaMapper {
+  /** Looks up a live conflict on another term by normalized key. */
+  @Nullable
+  @Select({
+    "<script>SELECT term_id FROM glossary_term_meta WHERE metalake_id=#{metalakeId}",
+    "AND term_id != #{id} AND deleted_at=0 AND name_key IN",
+    "<foreach collection='keys' item='key' open='(' separator=',' close=')'>#{key}</foreach>",
+    "LIMIT 1</script>"
+  })
+  Long conflictingName(
+      @Param("metalakeId") long metalakeId, @Param("id") long id, @Param("keys") List<String> keys);
+
+  /** Looks up a live conflict on another term by normalized key. */
+  @Nullable
+  @Select(
+      "SELECT term_id FROM glossary_term_synonym WHERE metalake_id=#{metalakeId} AND synonym_key=#{key} AND term_id<>#{id} AND deleted_at=0 LIMIT 1")
+  Long conflictingSynonym(
+      @Param("metalakeId") long metalakeId, @Param("id") long id, @Param("key") String key);
+
   /** Locks the live definition, or returns null; the caller must fence its metalake first. */
   @Nullable
   @SelectProvider(type = GlossaryTermSQLProvider.class, method = "getForUpdate")

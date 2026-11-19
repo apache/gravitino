@@ -29,14 +29,17 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.glossary.GlossaryTerm.Status;
 import org.apache.gravitino.glossary.TermLink;
 import org.apache.gravitino.json.JsonUtils;
@@ -46,6 +49,7 @@ import org.apache.gravitino.meta.GlossaryTermNames;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.GlossaryTermPO;
 import org.apache.gravitino.storage.relational.po.GlossaryTermSnapshotPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
@@ -215,6 +219,11 @@ public final class GlossaryTermMetaService {
           long deletedAt = Math.max(1, System.currentTimeMillis());
           requireUpdated(mapper.delete(row.getTermId(), row.getCurrentVersion(), deletedAt), ident);
           mapper.deleteSynonyms(row.getTermId(), deletedAt);
+          SessionUtils.doWithoutCommit(
+              OwnerMetaMapper.class,
+              owners ->
+                  owners.softDeleteOwnerRelByMetadataObjectIdAndType(
+                      row.getTermId(), Entity.EntityType.GLOSSARY_TERM.name()));
           GlossaryTermRelService.getInstance().removeTerm(metalakeId, row.getTermId());
           return true;
         });
@@ -251,6 +260,60 @@ public final class GlossaryTermMetaService {
         });
   }
 
+  /** Runs a create request with the live parent and hierarchy locked through commit. */
+  public <T> T withHierarchyLock(Namespace namespace, Supplier<T> work) {
+    return transaction(
+        namespace,
+        true,
+        missing -> {
+          throw new NoSuchMetalakeException(
+              missing, "Metalake %s does not exist", namespace.level(0));
+        },
+        (mapper, metalakeId) -> work.get());
+  }
+
+  /**
+   * Locks the parent, optional hierarchy mutex, and current term before invoking the operation.
+   * Supplies an empty term if either the term or its parent is absent.
+   */
+  public <T> T withLockedTerm(
+      NameIdentifier ident,
+      boolean hierarchyLock,
+      Function<Optional<GlossaryTermEntity>, T> operation) {
+    return transaction(
+        ident.namespace(),
+        hierarchyLock,
+        missing -> operation.apply(Optional.empty()),
+        (mapper, metalakeId) -> {
+          GlossaryTermPO row = mapper.getForUpdate(metalakeId, GlossaryTermNames.key(ident.name()));
+          return operation.apply(
+              Optional.ofNullable(row).map(term -> fromPO(term, mapper, ident.namespace())));
+        });
+  }
+
+  /** Checks indexed name/synonym conflicts inside the caller's hierarchy transaction. */
+  public void checkTermNames(GlossaryTermEntity term) {
+    String name = GlossaryTermNames.key(term.name());
+    long metalakeId = metalake(term.namespace()).getMetalakeId();
+    SessionUtils.doWithoutCommit(
+        GlossaryTermMetaMapper.class,
+        mapper -> {
+          Preconditions.checkArgument(
+              mapper.conflictingSynonym(metalakeId, term.id(), name) == null,
+              "Term name conflicts with a synonym");
+          List<String> keys = new ArrayList<>();
+          for (String synonym : term.synonyms()) {
+            String key = GlossaryTermNames.key(synonym);
+            Preconditions.checkArgument(
+                !name.equals(key), "Term name conflicts with its own synonym");
+            keys.add(key);
+          }
+          Preconditions.checkArgument(
+              keys.isEmpty() || mapper.conflictingName(metalakeId, term.id(), keys) == null,
+              "Synonym conflicts with a term name");
+        });
+  }
+
   private void validateNamespace(Namespace ns) {
     Preconditions.checkArgument(
         ns != null
@@ -267,11 +330,30 @@ public final class GlossaryTermMetaService {
 
   private <T> T transaction(
       Namespace ns, boolean hierarchyLock, BiFunction<GlossaryTermMetaMapper, Long, T> work) {
+    return transaction(
+        ns,
+        hierarchyLock,
+        missing -> {
+          throw missing;
+        },
+        work);
+  }
+
+  private <T> T transaction(
+      Namespace ns,
+      boolean hierarchyLock,
+      Function<NoSuchEntityException, T> missingParent,
+      BiFunction<GlossaryTermMetaMapper, Long, T> work) {
     validateNamespace(ns);
     return SessionUtils.doWithCommitAndFetchResult(
         GlossaryTermMetaMapper.class,
         mapper -> {
-          MetalakePO observed = metalake(ns);
+          MetalakePO observed;
+          try {
+            observed = metalake(ns);
+          } catch (NoSuchEntityException e) {
+            return missingParent.apply(e);
+          }
           // Fence metalake deletion; definition row locks keep the root and synonyms consistent.
           // MySQL/PostgreSQL share the parent lock across terms. H2 uses an exclusive parent
           // lock instead, serializing operations within a metalake. This is not the glossary
@@ -282,8 +364,10 @@ public final class GlossaryTermMetaService {
               SessionUtils.getWithoutCommit(
                   MetalakeMetaMapper.class,
                   m -> m.selectMetalakeMetaByIdForShare(observed.getMetalakeId()));
-          if (locked == null || !Objects.equals(locked.getMetalakeName(), ns.level(0)))
-            throw new NoSuchEntityException("Metalake %s no longer exists", ns.level(0));
+          if (locked == null || !Objects.equals(locked.getMetalakeName(), ns.level(0))) {
+            return missingParent.apply(
+                new NoSuchEntityException("Metalake %s no longer exists", ns.level(0)));
+          }
           if (hierarchyLock) {
             // Term deletion must exclude new edges before locking the term itself.
             GlossaryTermRelService.getInstance().lockHierarchy(locked.getMetalakeId());
@@ -300,6 +384,13 @@ public final class GlossaryTermMetaService {
         mapper -> {
           List<GlossaryTermSnapshotPO> rows =
               mapper.snapshot(metalake(ns).getMetalakeId(), ns.level(0), key);
+          if (rows.isEmpty()) {
+            throw new NoSuchEntityException("Metalake %s no longer exists", ns.level(0));
+          }
+          // A live parent with no matching terms contributes one outer-join row.
+          if (rows.get(0).getTermId() == null) {
+            return new ArrayList<>();
+          }
           Map<Long, GlossaryTermPO> definitions = new LinkedHashMap<>();
           Map<Long, List<String>> synonyms = new LinkedHashMap<>();
           for (GlossaryTermSnapshotPO row : rows) {

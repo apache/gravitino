@@ -19,6 +19,7 @@
 package org.apache.gravitino.utils;
 
 import static org.apache.gravitino.Entity.EntityType.DOMAIN;
+import static org.apache.gravitino.Entity.EntityType.GLOSSARY_TERM;
 import static org.apache.gravitino.Entity.EntityType.GROUP;
 import static org.apache.gravitino.Entity.EntityType.JOB;
 import static org.apache.gravitino.Entity.EntityType.JOB_TEMPLATE;
@@ -58,7 +59,7 @@ public class NameIdentifierUtil {
   private NameIdentifierUtil() {}
 
   private static final Set<Entity.EntityType> SUPPORT_VIRTUAL_NAMESPACE_TYPES =
-      ImmutableSet.of(USER, GROUP, ROLE, TAG, POLICY, JOB, JOB_TEMPLATE, DOMAIN);
+      ImmutableSet.of(USER, GROUP, ROLE, TAG, POLICY, JOB, JOB_TEMPLATE, DOMAIN, GLOSSARY_TERM);
 
   /**
    * Create the metalake {@link NameIdentifierUtil} with the given name.
@@ -646,13 +647,13 @@ public class NameIdentifierUtil {
    *
    * @param ident The metadata object identifier to check
    * @param entityType The metadata object entity type
-   * @throws IllegalNameIdentifierException If the name contains the qualified-name separator
+   * @throws IllegalNameIdentifierException If the name contains a reserved qualified-name separator
    */
   public static void checkMetadataObjectName(NameIdentifier ident, Entity.EntityType entityType) {
     Preconditions.checkArgument(
         ident != null && entityType != null, "The identifier and entity type must not be null");
 
-    if (ident.name().contains(".")) {
+    if (entityType != GLOSSARY_TERM && ident.name().contains(".")) {
       throw new IllegalNameIdentifierException(
           "The %s name '%s' is unsupported because '.' is reserved as the qualified-name "
               + "separator.",
@@ -664,8 +665,8 @@ public class NameIdentifierUtil {
    * Convert the given {@link NameIdentifier} and {@link Entity.EntityType} to {@link
    * MetadataObject}.
    *
-   * <p>All object types reject dots in their names. Use {@link #toMetadataObjectForRead} when
-   * addressing an existing tag or policy with a legacy dotted name.
+   * <p>Glossary term names may contain dots. Use {@link #toMetadataObjectForRead} when addressing
+   * an existing tag or policy with a legacy dotted name.
    *
    * @param ident The identifier
    * @param entityType The entity type
@@ -739,6 +740,14 @@ public class NameIdentifierUtil {
       case ROLE:
         AuthorizationUtils.checkRole(ident);
         return MetadataObjects.of(null, ident.name(), MetadataObject.Type.ROLE);
+      case GLOSSARY_TERM:
+        Preconditions.checkArgument(
+            ident.namespace().length() == 3
+                && ident
+                    .namespace()
+                    .equals(NamespaceUtil.ofGlossaryTerm(ident.namespace().level(0))),
+            "Invalid glossary namespace");
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.GLOSSARY_TERM);
       case TAG:
         checkTag(ident);
         return MetadataObjects.of(null, ident.name(), MetadataObject.Type.TAG);
@@ -1025,6 +1034,7 @@ public class NameIdentifierUtil {
       case POLICY:
       case JOB:
       case JOB_TEMPLATE:
+      case GLOSSARY_TERM:
       case DOMAIN:
         return Entity.EntityType.METALAKE;
 
@@ -1072,6 +1082,8 @@ public class NameIdentifierUtil {
         return NamespaceUtil.ofJob(metalake);
       case JOB_TEMPLATE:
         return NamespaceUtil.ofJobTemplate(metalake);
+      case GLOSSARY_TERM:
+        return NamespaceUtil.ofGlossaryTerm(metalake);
       case DOMAIN:
         return NamespaceUtil.ofDomain(metalake);
       default:

@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Auditable;
@@ -121,6 +122,13 @@ public final class GlossaryTermEntity implements Entity, HasIdentifier, Auditabl
   public long version() {
     return version;
   }
+  /**
+   * Returns an opaque conditional-write token scoped to the metalake, term identity and revision.
+   */
+  public String revisionToken() {
+    String identity = namespace.level(0) + ":" + id + ":" + version;
+    return UUID.nameUUIDFromBytes(identity.getBytes(StandardCharsets.UTF_8)).toString();
+  }
   /** Returns the auditInfo. */
   public Audit auditInfo() {
     return auditInfo;
@@ -146,6 +154,13 @@ public final class GlossaryTermEntity implements Entity, HasIdentifier, Auditabl
     values.put(AUDIT_INFO, auditInfo);
     return Collections.unmodifiableMap(values);
   }
+  /** Checks the UTF-8 storage bound for a proposed definition. */
+  public static void validateDefinition(@Nullable String definition) {
+    Preconditions.checkArgument(
+        definition == null || definition.getBytes(StandardCharsets.UTF_8).length <= 16384,
+        "Definition exceeds 16384 UTF-8 bytes");
+  }
+
   /** Returns a definition builder. */
   public static Builder builder() {
     return new Builder();
@@ -247,10 +262,7 @@ public final class GlossaryTermEntity implements Entity, HasIdentifier, Auditabl
         GlossaryTermNames.validate(value.synonyms[i]);
       }
       if (value.sourceRef != null) GlossaryTermNames.validate(value.sourceRef);
-      Preconditions.checkArgument(
-          value.definition == null
-              || value.definition.getBytes(StandardCharsets.UTF_8).length <= 16384,
-          "Definition exceeds 16384 UTF-8 bytes");
+      validateDefinition(value.definition);
       GlossaryTermEntity copy = new GlossaryTermEntity();
       copy.id = value.id;
       copy.name = value.name;
