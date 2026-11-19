@@ -27,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GlossaryTermEntity;
@@ -48,7 +49,7 @@ final class TermEdits {
     return GlossaryTermEntity.builder()
         .withId(id)
         .withNamespace(namespace)
-        .withName(spec.name())
+        .withName(termName(spec.name()))
         .withDefinition(spec.definition())
         .withSynonyms(distinct.values().toArray(new String[0]))
         .withStatus(spec.status().orElse(GlossaryTerm.Status.APPROVED))
@@ -83,8 +84,7 @@ final class TermEdits {
     Set<String> originalSynonyms = Set.copyOf(synonyms.keySet());
     for (TermChange change : changes) {
       if (change instanceof TermChange.RenameTerm) {
-        name = GlossaryTermNames.display(((TermChange.RenameTerm) change).getNewName());
-        GlossaryTermNames.validate(name);
+        name = termName(((TermChange.RenameTerm) change).getNewName());
       } else if (change instanceof TermChange.UpdateDefinition) {
         definition = ((TermChange.UpdateDefinition) change).getNewDefinition();
         GlossaryTermEntity.validateDefinition(definition);
@@ -140,6 +140,15 @@ final class TermEdits {
                 .build())
         .withVersion(Math.addExact(current.version(), 1))
         .build();
+  }
+
+  private static String termName(String value) {
+    String display = GlossaryTermNames.display(value);
+    GlossaryTermNames.validate(display);
+    Preconditions.checkArgument(
+        !MetadataObjects.METADATA_OBJECT_RESERVED_NAME.equals(display),
+        "A glossary term cannot use the reserved metadata object name '*'");
+    return display;
   }
 
   private static Map<String, String> synonymsByKey(String[] values) {

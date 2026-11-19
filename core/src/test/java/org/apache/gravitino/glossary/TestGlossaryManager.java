@@ -99,6 +99,36 @@ class TestGlossaryManager extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testReservedNameCannotBeCreatedOrRenamed() throws IOException {
+    createAndInsertMakeLake(LAKE);
+    String user = PrincipalUtils.getCurrentUserName();
+    backend.insert(
+        createUserEntity(90L, AuthorizationUtils.ofUserNamespace(LAKE), user, AUDIT_INFO), false);
+    for (boolean authorization : List.of(false, true)) {
+      GlossaryManager scoped = new GlossaryManager(ids::incrementAndGet, authorization);
+      String name = authorization ? "owned" : "unowned";
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> scoped.createTerm(LAKE, TermSpec.builder(" * ").build()));
+      GlossaryTermEntity term = scoped.createTerm(LAKE, TermSpec.builder(name).build());
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> scoped.alterTerm(LAKE, name, TermChange.rename(" * ")));
+      Assertions.assertEquals(term.revisionToken(), scoped.getTerm(LAKE, name).revisionToken());
+      if (authorization) {
+        Assertions.assertEquals(
+            user,
+            OwnerMetaService.getInstance()
+                .getOwner(term.nameIdentifier(), EntityType.GLOSSARY_TERM)
+                .map(UserEntity.class::cast)
+                .orElseThrow()
+                .name());
+      }
+    }
+    Assertions.assertThrows(NoSuchTermException.class, () -> manager.getTerm(LAKE, "*"));
+  }
+
+  @TestTemplate
   void testEffectiveChangesAndConflicts() throws IOException {
     createAndInsertMakeLake(LAKE);
     GlossaryTermEntity term =
