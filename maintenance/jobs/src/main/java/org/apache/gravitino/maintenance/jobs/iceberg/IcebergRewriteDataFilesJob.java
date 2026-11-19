@@ -227,13 +227,8 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
       String whereClause,
       String optionsJson) {
 
-    StringBuilder sql = new StringBuilder();
-    sql.append("CALL ")
-        .append(IcebergJobUtils.escapeSqlIdentifier(catalogName))
-        .append(".system.rewrite_data_files(");
-    sql.append("table => '")
-        .append(IcebergJobUtils.escapeSparkCallStringArg(tableIdentifier))
-        .append("'");
+    StringBuilder sql = IcebergJobUtils.beginSystemProcedureCall(catalogName, "rewrite_data_files");
+    IcebergJobUtils.appendSparkCallStringTableArg(sql, tableIdentifier);
 
     if (strategy != null && !strategy.isEmpty()) {
       sql.append(", strategy => '")
