@@ -537,30 +537,18 @@ components:
       additionalProperties: false
       properties:
         <<: *policy-execution-peer-properties
-        manifest_count_critical:
-          type: integer
-          format: int64
-          minimum: 1
-          default: 500
-          description: Inclusive count trigger, regardless of size. Must be at least manifest_count_warning.
-        manifest_count_warning:
+        manifest_count_threshold:
           type: integer
           format: int64
           minimum: 1
           default: 100
-          description: Inclusive minimum count for the average-size trigger.
-        avg_manifest_size_threshold_bytes:
-          type: integer
-          format: int64
-          minimum: 1
-          default: 8388608
-          description: Exclusive average manifest size threshold in bytes.
+          description: Inclusive manifest count trigger. Aligns with Iceberg commit.manifest.min-count-to-merge.
         spec_id:
           type: integer
           format: int32
           minimum: 0
           nullable: true
-          description: Existing partition spec. Omission resolves Iceberg's current default spec from table metadata. If it cannot be resolved, the table is skipped. The evaluated ID is retained through job submission.
+          description: Existing partition spec. Omission uses Iceberg's current default at evaluation (optimizer retains the resolved ID through submit) or at TMS job runtime.
         use_caching:
           type: boolean
           nullable: true
