@@ -216,7 +216,7 @@ if [ "$FROM_VERSION" = "1.3.0" ]; then
     --set image.registry="" \
     --set image.repository="${KIND_REGISTRY}/gravitino" \
     --set image.tag="${tag}" \
-    --set "podAnnotations.schema-migrate-cross=$(date +%s)"
+    --set-string "podAnnotations.schema-migrate-cross=$(date +%s)"
 
   bash "$CHECK_SCRIPT" "$NAMESPACE" "$RELEASE_NAME" "$ENGINE"
 
@@ -240,7 +240,7 @@ else
     --set image.repository="${KIND_REGISTRY}/gravitino" \
     --set image.tag="${tag}" \
     --set "schema.baselineVersion=${FROM_VERSION}" \
-    --set "podAnnotations.schema-migrate-cross=$(date +%s)"
+    --set-string "podAnnotations.schema-migrate-cross=$(date +%s)"
 
   bash "$CHECK_SCRIPT" "$NAMESPACE" "$RELEASE_NAME" "$ENGINE"
 

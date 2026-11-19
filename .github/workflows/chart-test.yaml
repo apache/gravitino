@@ -221,22 +221,7 @@ jobs:
       - name: Set up kubectl
         uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d
 
-      - name: Run chart-testing (install default,gravitino)
-        if: steps.list-changed.outputs.changed == 'true'
-        run: ct install --charts dev/charts/gravitino --target-branch ${{ steps.checkout.outputs.base-ref }} --helm-extra-set-args "--set image.registry="" --set image.repository=${KIND_REGISTRY}/gravitino"
-
-      - name: Run chart-testing (install default,gravitino-iceberg-rest-server)
-        if: steps.list-changed.outputs.changed == 'true'
-        run: ct install --charts dev/charts/gravitino-iceberg-rest-server --target-branch ${{ steps.checkout.outputs.base-ref }} --helm-extra-set-args "--set image.registry="" --set image.repository=${KIND_REGISTRY}/gravitino-iceberg-rest"
-
-      - name: Run chart-testing (install gravitino with mysql enable,replicas 2)
-        if: steps.list-changed.outputs.changed == 'true'
-        run: ct install --charts=dev/charts/gravitino --helm-extra-set-args "--values dev/charts/gravitino/resources/scenarios/ci-values.yaml --set image.registry="" --set image.repository=${KIND_REGISTRY}/gravitino" --target-branch ${{ steps.checkout.outputs.base-ref }}
-
-      - name: Run chart-testing (install gravitino with postgresql enable)
-        if: steps.list-changed.outputs.changed == 'true'
-        run: ct install --charts=dev/charts/gravitino --helm-extra-set-args "--values dev/charts/gravitino/resources/scenarios/pg-values.yaml --set image.registry="" --set image.repository=${KIND_REGISTRY}/gravitino" --target-branch ${{ steps.checkout.outputs.base-ref }}
-
+      # Schema-migrate scenarios first so chart bugs fail before the slower ct matrix.
       - name: Schema migrate fresh install and same-revision upgrade (mysql)
         if: steps.list-changed.outputs.changed == 'true'
         run: |
@@ -262,27 +247,14 @@ jobs:
             --set image.repository="${KIND_REGISTRY}/gravitino" \
             --set image.tag="${tag}"
           bash dev/ci/check-schema-migrate.sh "$NS" "$RELEASE" mysql
+          # Annotations must be strings; bare --set turns epoch into int and SSA fails.
           helm upgrade "$RELEASE" ./dev/charts/gravitino -n "$NS" --wait --timeout 10m \
             --values dev/charts/gravitino/resources/scenarios/schema-migrate-mysql.yaml \
             --set image.registry="" \
             --set image.repository="${KIND_REGISTRY}/gravitino" \
             --set image.tag="${tag}" \
-            --set "podAnnotations.schema-migrate-upgrade=$(date +%s)"
+            --set-string "podAnnotations.schema-migrate-upgrade=$(date +%s)"
           bash dev/ci/check-schema-migrate.sh "$NS" "$RELEASE" mysql
-
-      - name: Schema migrate cross-version upgrade matrix (mysql/postgresql × 1.2.0/1.3.0)
-        if: steps.list-changed.outputs.changed == 'true'
-        run: |
-          set -euo pipefail
-          chmod +x dev/ci/chart-schema-migrate-cross-version.sh
-          for ENGINE in mysql postgresql; do
-            for FROM_VERSION in 1.2.0 1.3.0; do
-              echo "::group::cross-version ${ENGINE} from ${FROM_VERSION}"
-              ENGINE="${ENGINE}" FROM_VERSION="${FROM_VERSION}" \
-                bash dev/ci/chart-schema-migrate-cross-version.sh
-              echo "::endgroup::"
-            done
-          done
 
       - name: Schema migrate fresh install (postgresql)
         if: steps.list-changed.outputs.changed == 'true'
@@ -309,6 +281,36 @@ jobs:
             --set image.repository="${KIND_REGISTRY}/gravitino" \
             --set image.tag="${tag}"
           bash dev/ci/check-schema-migrate.sh "$NS" "$RELEASE" postgresql
+
+      - name: Schema migrate cross-version upgrade matrix (mysql/postgresql × 1.2.0/1.3.0)
+        if: steps.list-changed.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          chmod +x dev/ci/chart-schema-migrate-cross-version.sh
+          for ENGINE in mysql postgresql; do
+            for FROM_VERSION in 1.2.0 1.3.0; do
+              echo "::group::cross-version ${ENGINE} from ${FROM_VERSION}"
+              ENGINE="${ENGINE}" FROM_VERSION="${FROM_VERSION}" \
+                bash dev/ci/chart-schema-migrate-cross-version.sh
+              echo "::endgroup::"
+            done
+          done
+
+      - name: Run chart-testing (install default,gravitino)
+        if: steps.list-changed.outputs.changed == 'true'
+        run: ct install --charts dev/charts/gravitino --target-branch ${{ steps.checkout.outputs.base-ref }} --helm-extra-set-args "--set image.registry="" --set image.repository=${KIND_REGISTRY}/gravitino"
+
+      - name: Run chart-testing (install default,gravitino-iceberg-rest-server)
+        if: steps.list-changed.outputs.changed == 'true'
+        run: ct install --charts dev/charts/gravitino-iceberg-rest-server --target-branch ${{ steps.checkout.outputs.base-ref }} --helm-extra-set-args "--set image.registry="" --set image.repository=${KIND_REGISTRY}/gravitino-iceberg-rest"
+
+      - name: Run chart-testing (install gravitino with mysql enable,replicas 2)
+        if: steps.list-changed.outputs.changed == 'true'
+        run: ct install --charts=dev/charts/gravitino --helm-extra-set-args "--values dev/charts/gravitino/resources/scenarios/ci-values.yaml --set image.registry="" --set image.repository=${KIND_REGISTRY}/gravitino" --target-branch ${{ steps.checkout.outputs.base-ref }}
+
+      - name: Run chart-testing (install gravitino with postgresql enable)
+        if: steps.list-changed.outputs.changed == 'true'
+        run: ct install --charts=dev/charts/gravitino --helm-extra-set-args "--values dev/charts/gravitino/resources/scenarios/pg-values.yaml --set image.registry="" --set image.repository=${KIND_REGISTRY}/gravitino" --target-branch ${{ steps.checkout.outputs.base-ref }}
 
       - name: Run chart-testing (install default,gravitino-lance-rest-server)
         if: steps.list-changed.outputs.changed == 'true'
