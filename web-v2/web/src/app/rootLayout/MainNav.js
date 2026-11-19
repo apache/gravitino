@@ -28,6 +28,7 @@ import { ROUTES } from '@/config/routes'
 import { usePathname, useSearchParams } from 'next/navigation'
 
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
+import { MCP_GATEWAY_URI_KEY } from '@/lib/api/mcpGateway'
 import { getCurrentEntityOwner } from '@/lib/store/metalakes'
 import { to } from '@/lib/utils'
 
@@ -40,18 +41,26 @@ export function MainNav() {
   const currentMetalake = searchParams.get('metalake')
   const auth = useAppSelector(state => state.auth)
   const sys = useAppSelector(state => state.sys)
-  const { anthEnable, authUser } = auth
+  const { anthEnable, authUser, systemConfig } = auth
   const dispatch = useAppDispatch()
+
+  // The gateway takes the token of an OAuth sign-in, so other sign-ins can't use it.
+  const hasMcpGateway = !!systemConfig?.[MCP_GATEWAY_URI_KEY] && auth.authType === 'oauth'
 
   useEffect(() => {
     const init = async () => {
-      if (pathname === '/metalakes' && !searchParams.get('metalake')) {
+      const mcpItems = hasMcpGateway
+        ? [{ key: ROUTES.Mcp, icon: <Icons.iconify icon='carbon:plug' className='my-icon' />, label: 'MCP' }]
+        : []
+      const onMcpPage = pathname.startsWith(ROUTES.Mcp)
+      if ((pathname === '/metalakes' || onMcpPage) && !searchParams.get('metalake')) {
         setItems([
           {
             key: ROUTES.Metalakes,
             icon: <Icons.iconify icon='carbon:cloudy' className='my-icon' />,
             label: 'Metalakes'
-          }
+          },
+          ...mcpItems
         ])
       } else {
         const items = [
@@ -125,9 +134,11 @@ export function MainNav() {
             })
           }
         }
-        setItems(items)
+        setItems([...items, ...mcpItems])
       }
-      if (currentMetalake) {
+      if (onMcpPage) {
+        setCurrent(ROUTES.Mcp)
+      } else if (currentMetalake) {
         if (pathname.startsWith('/catalogs')) {
           setCurrent(ROUTES.Catalogs)
         } else {
@@ -138,7 +149,7 @@ export function MainNav() {
       }
     }
     init()
-  }, [pathname, anthEnable, authUser, currentMetalake])
+  }, [pathname, anthEnable, authUser, currentMetalake, hasMcpGateway])
 
   const onClick = menuItem => {
     setCurrent(menuItem.key)
