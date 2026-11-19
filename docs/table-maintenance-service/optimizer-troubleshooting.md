@@ -32,6 +32,11 @@ These come back from the CLI immediately and name the problem.
 
 **`Specified optimizer config file does not exist`** — check the `--conf-path` value and the file's permissions.
 
+**`submit-update-stats-job` fails on dry-run with `gravitino_uri` / `GET /configs` errors** — dry-run still
+loads `gravitino.schema.separator` from the Gravitino server named by `updater-options.gravitino_uri`.
+The URI must be reachable even when no Spark job is submitted. Missing `gravitino_uri`, an
+unreachable host, or a `/configs` response without `gravitino.schema.separator` all fail the command.
+
 **`No StrategyHandler class configured for strategy type ...`** — the strategy handler mapping is missing from the CLI configuration:
 
 ```properties

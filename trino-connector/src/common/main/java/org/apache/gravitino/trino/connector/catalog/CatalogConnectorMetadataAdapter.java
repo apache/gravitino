@@ -170,6 +170,17 @@ public class CatalogConnectorMetadataAdapter {
   }
 
   /**
+   * Returns whether a table that a failed CREATE TABLE AS SELECT created can be dropped without
+   * deleting data that its location held before the statement ran.
+   *
+   * @param tableMetadata the metadata of the table being created
+   * @return true if the table can be dropped when the statement fails
+   */
+  public boolean canDropFailedNewTable(ConnectorTableMetadata tableMetadata) {
+    return true;
+  }
+
+  /**
    * Converts the columns of a Gravitino table to Trino columns. A column whose type Trino cannot
    * represent is left out with a warning, so that the other columns of the table stay queryable.
    *
