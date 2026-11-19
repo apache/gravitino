@@ -146,6 +146,16 @@ public class TestPaimonPropertiesConverter {
   }
 
   @Test
+  void testHiveBackendPropertiesForUnsupportedFormat() {
+    // A provider that Paimon does not support as a format table format keeps a Paimon table, as in
+    // Paimon's own SparkCatalog. Paimon 1.2 has no text format table.
+    Assertions.assertEquals(
+        ImmutableMap.of("k1", "v1"),
+        paimonPropertiesConverter.toHiveBackendTableProperties(
+            ImmutableMap.of(TableCatalog.PROP_PROVIDER, "text", "k1", "v1")));
+  }
+
+  @Test
   void testHiveBackendPropertiesWithLocation() {
     // LOCATION is passed to Paimon as the table path; Spark's external flag is dropped.
     Assertions.assertEquals(

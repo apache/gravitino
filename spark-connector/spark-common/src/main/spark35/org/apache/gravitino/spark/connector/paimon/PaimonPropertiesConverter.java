@@ -27,6 +27,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonPropertiesUtils;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
+import org.apache.paimon.spark.SparkSource;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 
 public class PaimonPropertiesConverter implements PropertiesConverter {
@@ -70,8 +71,9 @@ public class PaimonPropertiesConverter implements PropertiesConverter {
   /**
    * Converts the Spark table properties of a table created in a Paimon catalog with the Hive
    * backend, the only Paimon backend that can create format tables. It follows Paimon's own
-   * SparkCatalog: a file format provider (csv, json, orc, parquet, ...) from the USING clause makes
-   * a format table of that format, "paimon" or no provider keeps a Paimon table, and LOCATION
+   * SparkCatalog: a provider from the USING clause that Paimon supports as a format table format
+   * ({@code SparkSource.FORMAT_NAMES}, which depends on the Paimon version) makes a format table of
+   * that format; any other provider, "paimon" or no provider keeps a Paimon table; and LOCATION
    * becomes the Paimon table path. Other backends keep the properties as they are.
    *
    * @param properties the Spark table properties, already converted by {@link
@@ -82,7 +84,8 @@ public class PaimonPropertiesConverter implements PropertiesConverter {
     Map<String, String> tableProperties = new HashMap<>(properties);
     String provider = tableProperties.remove(TableCatalog.PROP_PROVIDER);
     if (StringUtils.isNotBlank(provider)
-        && !PaimonPropertiesConstants.PAIMON_PROVIDER.equalsIgnoreCase(provider)) {
+        && !PaimonPropertiesConstants.PAIMON_PROVIDER.equalsIgnoreCase(provider)
+        && SparkSource.FORMAT_NAMES().contains(provider.toLowerCase(Locale.ROOT))) {
       tableProperties.put(
           PaimonPropertiesConstants.PAIMON_TABLE_TYPE,
           PaimonPropertiesConstants.PAIMON_TABLE_TYPE_FORMAT_TABLE);

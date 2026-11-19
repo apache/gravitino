@@ -188,6 +188,22 @@ public abstract class SparkPaimonCatalogHiveBackendIT extends SparkPaimonCatalog
   }
 
   @Test
+  void testCreateTableUsingUnsupportedFormatIsNotAFormatTable() {
+    // Paimon 1.2 has no text format table, so its SparkCatalog creates a Paimon table for USING
+    // text.
+    String tableName = "test_create_using_text";
+    dropTableIfExists(tableName);
+    sql(String.format("CREATE TABLE %s (value STRING) USING text", tableName));
+    Map<String, String> paimonOptions = getPaimonOptions(tableName);
+    Assertions.assertNotEquals("format-table", paimonOptions.get("type"));
+    Assertions.assertNull(paimonOptions.get("file.format"));
+    sql(String.format("INSERT INTO %s VALUES ('a')", tableName));
+    Assertions.assertEquals(
+        Arrays.asList("a"), getQueryData(String.format("SELECT value FROM %s", tableName)));
+    sql(String.format("DROP TABLE %s", tableName));
+  }
+
+  @Test
   @Override
   protected void testCreateDatasourceFormatPartitionTable() {
     // With the Hive backend, USING PARQUET creates a Paimon format table, as in Paimon's own
