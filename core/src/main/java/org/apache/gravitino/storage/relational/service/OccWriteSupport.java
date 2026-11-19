@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Function;
@@ -37,6 +39,13 @@ import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
  * relational metadata services.
  */
 public class OccWriteSupport {
+
+  /**
+   * The most children one versioned batch soft delete may guard. Every child adds an {@code (id = ?
+   * AND current_version = ?)} term to the statement, and a long OR chain is slow to plan on MySQL
+   * and exceeds the 65,535 bind parameter limit of PostgreSQL beyond 32,767 children.
+   */
+  @VisibleForTesting static final int CHILD_DELETE_BATCH_SIZE = 500;
 
   private OccWriteSupport() {}
 
@@ -161,8 +170,10 @@ public class OccWriteSupport {
   /**
    * Executes a batch soft delete of child entities guarded by their individual versions.
    *
-   * <p>If the affected row count does not match the size of the child list, throws a concurrent
-   * child modification exception via {@link ExceptionUtils#concurrentChildModification}.
+   * <p>The children are deleted in chunks of at most {@link #CHILD_DELETE_BATCH_SIZE}. All chunks
+   * run in the caller's transaction, so a failure rolls back the chunks already deleted. If the
+   * affected row count does not match the size of the child list, throws a concurrent child
+   * modification exception via {@link ExceptionUtils#concurrentChildModification}.
    *
    * @param <T> the persistent object (PO) type of the child entities
    * @param parentIdentifier the name identifier of the parent entity
@@ -180,9 +191,11 @@ public class OccWriteSupport {
     if (children == null || children.isEmpty()) {
       return;
     }
-    int deleted = softDeleteOps.applyAsInt(children);
-    if (deleted != children.size()) {
-      throw ExceptionUtils.concurrentChildModification(childType, parentType, parentIdentifier);
+    for (List<T> chunk : Lists.partition(children, CHILD_DELETE_BATCH_SIZE)) {
+      int deleted = softDeleteOps.applyAsInt(chunk);
+      if (deleted != chunk.size()) {
+        throw ExceptionUtils.concurrentChildModification(childType, parentType, parentIdentifier);
+      }
     }
   }
 

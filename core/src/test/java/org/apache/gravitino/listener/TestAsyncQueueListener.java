@@ -20,16 +20,21 @@
 package org.apache.gravitino.listener;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
@@ -98,6 +103,121 @@ class TestAsyncQueueListener {
       executor.shutdownNow();
       assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
     }
+  }
+
+  @Test
+  void testStopIsIdempotent() {
+    // Do not block the WARN log the dispatcher thread writes when it is interrupted.
+    blockingAppender.releaseFirstLog.countDown();
+    EventListenerPlugin innerListener = mock(EventListenerPlugin.class);
+    AsyncQueueListener listener = new AsyncQueueListener(List.of(innerListener), "test", 1, 1);
+    listener.start();
+
+    listener.stop();
+    listener.stop();
+
+    verify(innerListener, times(1)).stop();
+  }
+
+  @Test
+  void testStopWhenCallerIsInterrupted() {
+    blockingAppender.releaseFirstLog.countDown();
+    EventListenerPlugin innerListener = mock(EventListenerPlugin.class);
+    AsyncQueueListener listener =
+        new AsyncQueueListener(List.of(innerListener), "interrupted-caller", 10, 1);
+    listener.start();
+
+    Thread.currentThread().interrupt();
+    listener.stop();
+
+    // The caller keeps its interrupt status, and the dispatcher thread is still stopped.
+    assertTrue(Thread.interrupted());
+    assertFalse(
+        Thread.getAllStackTraces().keySet().stream()
+            .anyMatch(
+                thread ->
+                    thread.getName().equals("async-queue-listener-interrupted-caller")
+                        && thread.isAlive()));
+    verify(innerListener, times(1)).stop();
+  }
+
+  @Test
+  void testStopDrainsQueuedEvents() {
+    blockingAppender.releaseFirstLog.countDown();
+    AtomicInteger processedEvents = new AtomicInteger();
+    EventListenerPlugin slowListener =
+        new EventListenerPlugin() {
+          @Override
+          public void init(Map<String, String> properties) {}
+
+          @Override
+          public void start() {}
+
+          @Override
+          public void stop() {}
+
+          @Override
+          public void onPostEvent(Event event) {
+            try {
+              Thread.sleep(50);
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              return;
+            }
+            processedEvents.incrementAndGet();
+          }
+        };
+    AsyncQueueListener listener = new AsyncQueueListener(List.of(slowListener), "test", 10, 10);
+    listener.start();
+
+    Event event = mock(Event.class);
+    for (int i = 0; i < 5; i++) {
+      listener.onPostEvent(event);
+    }
+    listener.stop();
+
+    assertEquals(5, processedEvents.get());
+  }
+
+  @Test
+  void testStopInterruptsDispatcherThatDoesNotFinishInTime() throws Exception {
+    blockingAppender.releaseFirstLog.countDown();
+    CountDownLatch neverReleased = new CountDownLatch(1);
+    CountDownLatch entered = new CountDownLatch(1);
+    EventListenerPlugin blockedListener =
+        new EventListenerPlugin() {
+          @Override
+          public void init(Map<String, String> properties) {}
+
+          @Override
+          public void start() {}
+
+          @Override
+          public void stop() {}
+
+          @Override
+          public void onPostEvent(Event event) {
+            entered.countDown();
+            try {
+              neverReleased.await();
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
+          }
+        };
+    AsyncQueueListener listener = new AsyncQueueListener(List.of(blockedListener), "test", 10, 1);
+    listener.start();
+    listener.onPostEvent(mock(Event.class));
+    assertTrue(entered.await(30, TimeUnit.SECONDS));
+
+    long startNanos = System.nanoTime();
+    listener.stop();
+
+    // Stop waits at most twice dispatcherJoinSeconds: once to drain, once after the interrupt.
+    // The dispatcher exits right after the interrupt, so stop() takes a little over 1 second.
+    long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+    assertTrue(elapsedMillis >= 900, "stop() returned before the drain timeout: " + elapsedMillis);
+    assertTrue(elapsedMillis < 5000, "stop() took too long: " + elapsedMillis);
   }
 
   private static class BlockingAppender extends AbstractAppender {

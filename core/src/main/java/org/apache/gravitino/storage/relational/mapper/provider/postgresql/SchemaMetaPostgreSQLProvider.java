@@ -51,7 +51,7 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
         + " #{schemaMeta.lastVersion},"
         + " #{schemaMeta.deletedAt}"
         + " )"
-        + " ON CONFLICT(schema_id) DO UPDATE SET"
+        + " ON CONFLICT(schema_id, deleted_at) DO UPDATE SET"
         + " schema_name = #{schemaMeta.schemaName},"
         + " metalake_id = #{schemaMeta.metalakeId},"
         + " catalog_id = #{schemaMeta.catalogId},"
@@ -85,7 +85,7 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
         + " #{po.schemaComment}, #{po.properties}, #{po.auditInfo},"
         + " #{po.currentVersion}, #{po.lastVersion}, #{po.deletedAt})"
         + "</foreach>"
-        + " ON CONFLICT(schema_id) DO UPDATE SET"
+        + " ON CONFLICT(schema_id, deleted_at) DO UPDATE SET"
         + " schema_name = EXCLUDED.schema_name,"
         + " metalake_id = EXCLUDED.metalake_id,"
         + " catalog_id = EXCLUDED.catalog_id,"
@@ -122,6 +122,7 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
         + " last_version = #{newSchemaMeta.lastVersion},"
         + " deleted_at = #{newSchemaMeta.deletedAt}"
         + " WHERE schema_id = #{oldSchemaMeta.schemaId}"
+        + " AND catalog_id = #{oldSchemaMeta.catalogId}"
         + " AND current_version = #{oldSchemaMeta.currentVersion}"
         + " AND deleted_at = 0";
   }
@@ -159,7 +160,11 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
         + TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
-        + " WHERE deleted_at = 0 AND "
+        + " WHERE deleted_at = 0 AND schema_id IN "
+        + "<foreach collection='schemaMetas' item='item' separator=',' open='(' close=')'>"
+        + "#{item.schemaId}"
+        + "</foreach>"
+        + " AND "
         + "<foreach collection='schemaMetas' item='item' separator=' OR ' open='(' close=')'>"
         + "(schema_id = #{item.schemaId} AND current_version = #{item.currentVersion})"
         + "</foreach>"
@@ -171,7 +176,7 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "
         + TABLE_NAME
-        + " WHERE schema_id IN (SELECT schema_id FROM "
+        + " WHERE ctid IN (SELECT ctid FROM "
         + TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }

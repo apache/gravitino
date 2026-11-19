@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.gravitino.Entity;
@@ -165,12 +166,42 @@ public class TestNameIdentifierUtil {
             NameIdentifierUtil.ofTag("metalake1", "tag1"), Entity.EntityType.TAG);
     assertEquals(expectedTagObject, tagObject);
 
+    // Test a domain identifier.
+    NameIdentifier domain = NameIdentifierUtil.ofDomain("metalake1", "Finance_Trading");
+    assertEquals(NamespaceUtil.ofDomain("metalake1"), domain.namespace());
+    assertEquals(
+        MetadataObjects.parse("Finance_Trading", MetadataObject.Type.DOMAIN),
+        NameIdentifierUtil.toMetadataObject(domain, Entity.EntityType.DOMAIN));
+    assertEquals(
+        domain,
+        NameIdentifierUtil.buildNameIdentifier(
+            Entity.EntityType.DOMAIN,
+            "Finance_Trading",
+            ImmutableMap.of(Entity.EntityType.METALAKE, "metalake1")));
+    assertEquals(
+        NameIdentifier.of("metalake1"),
+        NameIdentifierUtil.parentNameIdentifier(domain, Entity.EntityType.DOMAIN));
+    assertThrows(
+        IllegalNamespaceException.class,
+        () ->
+            NameIdentifierUtil.toMetadataObject(
+                NameIdentifier.of("metalake1", "Finance"), Entity.EntityType.DOMAIN));
+
     // test model version is not convertible to MetadataObject
     NameIdentifier modelVersion =
         NameIdentifier.of("metalake1", "catalog1", "schema1", "model1", "0");
     assertThrows(
         IllegalArgumentException.class,
         () -> NameIdentifierUtil.toMetadataObject(modelVersion, Entity.EntityType.MODEL_VERSION));
+  }
+
+  /** Domain names use the same identifier rules as catalogs. */
+  @Test
+  public void testRejectDottedDomainMetadataObjectName() {
+    NameIdentifier domain = NameIdentifier.of("metalake1", "Finance.Trading");
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> NameIdentifierUtil.toMetadataObject(domain, Entity.EntityType.DOMAIN));
   }
 
   @Test
@@ -195,6 +226,55 @@ public class TestNameIdentifierUtil {
         "The TOPIC name 'orders.created.v1' is unsupported because '.' is reserved as the "
             + "qualified-name separator.",
         topicException.getMessage());
+  }
+
+  /** Legacy tag/policy names retain their literal name and type for authorization and cleanup. */
+  @Test
+  public void testLegacyDottedTagAndPolicyMetadataObjects() {
+    for (Entity.EntityType type :
+        new Entity.EntityType[] {Entity.EntityType.TAG, Entity.EntityType.POLICY}) {
+      NameIdentifier ident =
+          type == Entity.EntityType.TAG
+              ? NameIdentifierUtil.ofTag("metalake1", "legacy.with.dot")
+              : NameIdentifierUtil.ofPolicy("metalake1", "legacy.with.dot");
+      assertThrows(
+          IllegalNameIdentifierException.class,
+          () -> NameIdentifierUtil.toMetadataObject(ident, type));
+      MetadataObject object = NameIdentifierUtil.toMetadataObjectForRead(ident, type);
+      assertEquals("legacy.with.dot", object.name());
+      assertEquals("legacy.with.dot", object.fullName());
+      assertEquals(MetadataObject.Type.valueOf(type.name()), object.type());
+      assertEquals(null, object.parent());
+      assertEquals(ident, MetadataObjectUtil.toEntityIdent("metalake1", object));
+      assertThrows(
+          IllegalNameIdentifierException.class,
+          () -> NameIdentifierUtil.checkMetadataObjectName(ident, type));
+    }
+  }
+
+  /** The read conversion retains namespace and external-object name validation. */
+  @Test
+  public void testReadConversionRetainsStrictValidation() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> NameIdentifierUtil.toMetadataObjectForRead(null, Entity.EntityType.TAG));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> NameIdentifierUtil.toMetadataObjectForRead(NameIdentifier.of("tag"), null));
+    for (Entity.EntityType type :
+        new Entity.EntityType[] {Entity.EntityType.TAG, Entity.EntityType.POLICY}) {
+      assertThrows(
+          IllegalNamespaceException.class,
+          () -> NameIdentifierUtil.toMetadataObjectForRead(NameIdentifier.of("legacy.tag"), type));
+    }
+    NameIdentifier table = NameIdentifier.of("metalake1", "catalog1", "schema1", "sales.2024");
+    assertThrows(
+        IllegalNameIdentifierException.class,
+        () -> NameIdentifierUtil.toMetadataObjectForRead(table, Entity.EntityType.TABLE));
+    NameIdentifier valid = NameIdentifier.of("metalake1", "catalog1", "schema1", "sales");
+    assertEquals(
+        NameIdentifierUtil.toMetadataObject(valid, Entity.EntityType.TABLE),
+        NameIdentifierUtil.toMetadataObjectForRead(valid, Entity.EntityType.TABLE));
   }
 
   @Test

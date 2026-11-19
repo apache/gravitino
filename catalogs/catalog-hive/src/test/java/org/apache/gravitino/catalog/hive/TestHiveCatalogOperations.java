@@ -46,11 +46,13 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -62,20 +64,25 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.dto.rel.DistributionDTO;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.hive.CachedClientPool;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.hive.client.HiveClient;
 import org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewChange;
+import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
@@ -91,6 +98,68 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 class TestHiveCatalogOperations {
+  @Test
+  void testDerivedSchemaMetadataAltersPreserveMarkerAndRejectColumnChanges() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+    CachedClientPool pool = mock(CachedClientPool.class);
+    HiveClient client = mock(HiveClient.class);
+    when(pool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(client);
+            });
+    op.clientPool = pool;
+    HiveTable derived =
+        HiveTable.builder()
+            .withName("csv")
+            .withCatalogName("hive")
+            .withDatabaseName("db")
+            .withColumns(new Column[] {Column.of("value", Types.StringType.get())})
+            .withProperties(Maps.newHashMap())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("tester").withCreateTime(Instant.now()).build())
+            .build();
+    derived.setOriginalStorageColumns(
+        List.of(
+            Column.of("value", Types.UnparsedType.of("<derived from deserializer>"), "original")));
+    when(client.getTable(anyString(), anyString(), anyString())).thenReturn(derived);
+    ArgumentCaptor<HiveTable> altered = ArgumentCaptor.forClass(HiveTable.class);
+    doNothing()
+        .when(client)
+        .alterTable(anyString(), eq("db"), eq("csv"), altered.capture(), anyBoolean());
+
+    op.alterTable(
+        NameIdentifier.of("db", "csv"),
+        TableChange.setProperty("key", "value"),
+        TableChange.updateComment("updated"));
+    HiveTable metadataOnly = altered.getValue();
+    Assertions.assertEquals("value", metadataOnly.properties().get("key"));
+    Assertions.assertEquals("updated", metadataOnly.comment());
+    Assertions.assertEquals(
+        "<derived from deserializer>",
+        ((Types.UnparsedType) metadataOnly.originalStorageColumns().get(0).dataType())
+            .unparsedType());
+    op.alterTable(NameIdentifier.of("db", "csv"), TableChange.rename("renamed"));
+    Assertions.assertEquals("renamed", altered.getValue().name());
+    Assertions.assertEquals(
+        derived.originalStorageColumns(), altered.getValue().originalStorageColumns());
+
+    IllegalArgumentException failure =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                op.alterTable(
+                    NameIdentifier.of("db", "csv"),
+                    TableChange.addColumn(
+                        new String[] {"added"},
+                        Types.StringType.get(),
+                        TableChange.ColumnPosition.defaultPos())));
+    Assertions.assertTrue(failure.getMessage().contains("SerDe-derived table"));
+    verify(client, times(2)).alterTable(anyString(), anyString(), anyString(), any(), anyBoolean());
+  }
+
   @Test
   void testPropertyMeta() {
     Map<String, PropertyEntry<?>> propertyEntryMap =
@@ -235,6 +304,79 @@ class TestHiveCatalogOperations {
     Assertions.assertEquals(
         "Failed to run getAllDatabases in Hive Metastore: mock connection exception",
         exception.getMessage());
+  }
+
+  @Test
+  void testRejectNonHashDistributionBeforeMetastoreAccess() throws Exception {
+    for (Strategy strategy : new Strategy[] {Strategy.RANGE, Strategy.EVEN, Strategy.NONE}) {
+      try (HiveCatalogOperations op = new HiveCatalogOperations()) {
+        op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+        CachedClientPool pool = mock(CachedClientPool.class);
+        HiveClient client = mock(HiveClient.class);
+        when(client.getDatabase(anyString(), anyString()))
+            .thenReturn(HiveSchema.builder().withCatalogName("hive").withName("db").build());
+        when(pool.run(any()))
+            .thenAnswer(
+                invocation -> {
+                  ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+                  return action.run(client);
+                });
+        op.clientPool = pool;
+        IllegalArgumentException error =
+            Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                    op.createTable(
+                        NameIdentifier.of("db", "invalid_distribution"),
+                        new Column[] {Column.of("id", Types.IntegerType.get(), null)},
+                        null,
+                        Map.of("is_generic", "true"),
+                        new Transform[0],
+                        Distributions.fields(strategy, 4, new String[] {"id"}),
+                        new SortOrder[0],
+                        new Index[0]));
+        Assertions.assertTrue(error.getMessage().contains("HASH"));
+        verifyNoInteractions(pool, client);
+      }
+    }
+  }
+
+  @Test
+  void testHashAndStructuralNoneDistributionsRemainSupported() throws Exception {
+    try (HiveCatalogOperations op = new HiveCatalogOperations()) {
+      op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+      CachedClientPool pool = mock(CachedClientPool.class);
+      HiveClient client = mock(HiveClient.class);
+      when(client.getDatabase(anyString(), anyString()))
+          .thenReturn(HiveSchema.builder().withCatalogName("hive").withName("db").build());
+      when(pool.run(any()))
+          .thenAnswer(
+              invocation -> {
+                ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+                return action.run(client);
+              });
+      op.clientPool = pool;
+      for (Distribution distribution :
+          new Distribution[] {
+            Distributions.fields(Strategy.HASH, 4, new String[] {"id"}),
+            Distributions.NONE,
+            Distributions.of(Strategy.NONE, 0),
+            DistributionDTO.NONE
+          }) {
+        Assertions.assertDoesNotThrow(
+            () ->
+                op.createTable(
+                    NameIdentifier.of("db", "supported_distribution"),
+                    new Column[] {Column.of("id", Types.IntegerType.get(), null)},
+                    null,
+                    Map.of("is_generic", "true"),
+                    new Transform[0],
+                    distribution,
+                    new SortOrder[0],
+                    new Index[0]));
+      }
+      verify(client, times(4)).createTable(any());
+    }
   }
 
   @Test
@@ -667,6 +809,48 @@ class TestHiveCatalogOperations {
   }
 
   @Test
+  void testCreateSparkViewRejectsNonNullDefaultCatalogOrSchema() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveSchema schema = HiveSchema.builder().withCatalogName("hive").withName("db").build();
+    when(hiveClient.getDatabase(anyString(), anyString())).thenReturn(schema);
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    String[][] defaults = {{"analytics", "mart"}, {"analytics", null}, {null, "mart"}};
+    for (String[] pair : defaults) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  op.createView(
+                      NameIdentifier.of("db", "v_spark"),
+                      null,
+                      new Column[0],
+                      new SQLRepresentation[] {
+                        SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+                      },
+                      pair[0],
+                      pair[1],
+                      Maps.newHashMap(ImmutableMap.of("spark.sql.create.version", "3.5.3"))));
+
+      Assertions.assertTrue(
+          exception
+              .getMessage()
+              .contains("does not support non-null defaultCatalog/defaultSchema"));
+    }
+    verify(hiveClient, never()).createTable(any());
+  }
+
+  @Test
   void testCreateViewAcceptsSparkDialect() throws Exception {
     HiveCatalogOperations op = new HiveCatalogOperations();
     op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
@@ -1062,10 +1246,84 @@ class TestHiveCatalogOperations {
   }
 
   @Test
-  void testAlterViewReplaceRejectsExistingNonDefaultOwner() throws Exception {
-    // Gravitino's view model has no owner concept; replacing a native Trino view that has a
-    // non-null owner (a SECURITY DEFINER view) would silently turn it into an ownerless view.
-    assertReplaceRejectsUnrepresentableNativeView(
+  void testAlterViewReplacePropagatesNewOwnerProperty() throws Exception {
+    // The owner round-trips through the TRINO_VIEW_OWNER_PROPERTY reserved property: a SetProperty
+    // change alongside ReplaceView must land in the re-encoded native Trino payload as the new
+    // SECURITY DEFINER owner.
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    String encoded =
+        TrinoNativeViewCodec.encode(
+            new TrinoNativeViewCodec.ViewDefinition(
+                "SELECT 1",
+                null,
+                null,
+                List.of(new TrinoNativeViewCodec.ViewColumn("c1", "integer", null)),
+                null,
+                null,
+                true,
+                List.of()));
+    HiveTable currentTable =
+        HiveTable.builder()
+            .withName("v_hive")
+            .withCatalogName("hive")
+            .withDatabaseName("db")
+            .withColumns(new Column[0])
+            .withComment("Presto View")
+            .withProperties(
+                Maps.newHashMap(
+                    ImmutableMap.of(
+                        HiveConstants.TABLE_TYPE,
+                        TableType.VIRTUAL_VIEW.name(),
+                        "presto_view",
+                        "true")))
+            .withViewOriginalText(encoded)
+            .build();
+    when(hiveClient.getTable(anyString(), anyString(), anyString())).thenReturn(currentTable);
+
+    ArgumentCaptor<HiveTable> hiveTableCaptor = ArgumentCaptor.forClass(HiveTable.class);
+    doNothing()
+        .when(hiveClient)
+        .alterTable(anyString(), anyString(), anyString(), hiveTableCaptor.capture());
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    op.alterView(
+        NameIdentifier.of("db", "v_hive"),
+        ViewChange.setProperty(HiveViewCatalogOperations.TRINO_VIEW_OWNER_PROPERTY, "alice"),
+        ViewChange.replaceView(
+            new Column[] {Column.of("c1", Types.IntegerType.get())},
+            new SQLRepresentation[] {
+              SQLRepresentation.builder().withDialect("trino").withSql("SELECT 2").build()
+            },
+            null,
+            null,
+            null));
+
+    TrinoNativeViewCodec.ViewDefinition decoded =
+        TrinoNativeViewCodec.decode(hiveTableCaptor.getValue().viewOriginalText());
+    Assertions.assertEquals("alice", decoded.owner);
+    Assertions.assertFalse(decoded.runAsInvoker);
+  }
+
+  @Test
+  void testAlterViewReplaceClearsOwnerWhenPropertyRemoved() throws Exception {
+    // Replacing a SECURITY DEFINER view with RemoveProperty(owner) alongside ReplaceView must
+    // clear the owner in the re-encoded payload, downgrading it to SECURITY INVOKER.
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    String encoded =
         TrinoNativeViewCodec.encode(
             new TrinoNativeViewCodec.ViewDefinition(
                 "SELECT 1",
@@ -1074,15 +1332,72 @@ class TestHiveCatalogOperations {
                 List.of(new TrinoNativeViewCodec.ViewColumn("c1", "integer", null)),
                 null,
                 "alice",
-                true,
-                List.of())));
+                false,
+                List.of()));
+    HiveTable currentTable =
+        HiveTable.builder()
+            .withName("v_hive")
+            .withCatalogName("hive")
+            .withDatabaseName("db")
+            .withColumns(new Column[0])
+            .withComment("Presto View")
+            .withProperties(
+                Maps.newHashMap(
+                    ImmutableMap.of(
+                        HiveConstants.TABLE_TYPE,
+                        TableType.VIRTUAL_VIEW.name(),
+                        "presto_view",
+                        "true",
+                        HiveViewCatalogOperations.TRINO_VIEW_OWNER_PROPERTY,
+                        "alice")))
+            .withViewOriginalText(encoded)
+            .build();
+    when(hiveClient.getTable(anyString(), anyString(), anyString())).thenReturn(currentTable);
+
+    ArgumentCaptor<HiveTable> hiveTableCaptor = ArgumentCaptor.forClass(HiveTable.class);
+    doNothing()
+        .when(hiveClient)
+        .alterTable(anyString(), anyString(), anyString(), hiveTableCaptor.capture());
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    op.alterView(
+        NameIdentifier.of("db", "v_hive"),
+        ViewChange.removeProperty(HiveViewCatalogOperations.TRINO_VIEW_OWNER_PROPERTY),
+        ViewChange.replaceView(
+            new Column[] {Column.of("c1", Types.IntegerType.get())},
+            new SQLRepresentation[] {
+              SQLRepresentation.builder().withDialect("trino").withSql("SELECT 2").build()
+            },
+            null,
+            null,
+            null));
+
+    TrinoNativeViewCodec.ViewDefinition decoded =
+        TrinoNativeViewCodec.decode(hiveTableCaptor.getValue().viewOriginalText());
+    Assertions.assertNull(decoded.owner);
+    Assertions.assertTrue(decoded.runAsInvoker);
   }
 
   @Test
-  void testAlterViewReplaceRejectsExistingRunAsInvokerFalse() throws Exception {
-    // runAsInvoker=false means SECURITY DEFINER; Gravitino always writes runAsInvoker=true, so
-    // replacing such a view would silently downgrade it to SECURITY INVOKER.
-    assertReplaceRejectsUnrepresentableNativeView(
+  void testAlterViewReplacePreservesOwnerOfGenuinelyNativeViewWithUnchangedOwner()
+      throws Exception {
+    // A genuinely-native view's owner lives only in the encoded payload, never in the raw HMS
+    // parameters (unlike a Gravitino-created view, which also stores it as a property). Replacing
+    // such a view as the same owner emits no SetProperty for it (callers like
+    // CatalogConnectorMetadata.createView() only emit one when the owner actually changes), so
+    // ReplaceView alone must still preserve the owner instead of silently downgrading to INVOKER.
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    String encoded =
         TrinoNativeViewCodec.encode(
             new TrinoNativeViewCodec.ViewDefinition(
                 "SELECT 1",
@@ -1090,9 +1405,189 @@ class TestHiveCatalogOperations {
                 null,
                 List.of(new TrinoNativeViewCodec.ViewColumn("c1", "integer", null)),
                 null,
-                null,
+                "alice",
                 false,
-                List.of())));
+                List.of()));
+    HiveTable currentTable =
+        HiveTable.builder()
+            .withName("v_hive")
+            .withCatalogName("hive")
+            .withDatabaseName("db")
+            .withColumns(new Column[0])
+            .withComment("Presto View")
+            .withProperties(
+                Maps.newHashMap(
+                    ImmutableMap.of(
+                        HiveConstants.TABLE_TYPE,
+                        TableType.VIRTUAL_VIEW.name(),
+                        "presto_view",
+                        "true")))
+            .withViewOriginalText(encoded)
+            .build();
+    when(hiveClient.getTable(anyString(), anyString(), anyString())).thenReturn(currentTable);
+
+    ArgumentCaptor<HiveTable> hiveTableCaptor = ArgumentCaptor.forClass(HiveTable.class);
+    doNothing()
+        .when(hiveClient)
+        .alterTable(anyString(), anyString(), anyString(), hiveTableCaptor.capture());
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    op.alterView(
+        NameIdentifier.of("db", "v_hive"),
+        ViewChange.replaceView(
+            new Column[] {Column.of("c1", Types.IntegerType.get())},
+            new SQLRepresentation[] {
+              SQLRepresentation.builder().withDialect("trino").withSql("SELECT 2").build()
+            },
+            null,
+            null,
+            null));
+
+    TrinoNativeViewCodec.ViewDefinition decoded =
+        TrinoNativeViewCodec.decode(hiveTableCaptor.getValue().viewOriginalText());
+    Assertions.assertEquals("alice", decoded.owner);
+    Assertions.assertFalse(decoded.runAsInvoker);
+  }
+
+  @Test
+  void testLoadViewPrefersHmsOwnerOverStalePayloadOwner() throws Exception {
+    // Native Trino treats the HMS table owner as authoritative over the owner encoded in the
+    // view payload: `ALTER VIEW v SET AUTHORIZATION USER bob` updates only the HMS owner, leaving
+    // the payload-encoded owner (here, alice) stale. Loading the view must surface the live HMS
+    // owner, not the stale payload one.
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveTable currentTable =
+        buildNativeTrinoViewTable(/* payloadOwner= */ "alice", /* hmsOwner= */ "bob", Map.of());
+    when(hiveClient.getTable(anyString(), anyString(), anyString())).thenReturn(currentTable);
+    HiveCatalogOperations op = newHiveCatalogOperationsBackedBy(hiveClient);
+
+    View loaded = op.loadView(NameIdentifier.of("db", "v_trino"));
+    Assertions.assertEquals(
+        "bob", loaded.properties().get(HiveViewCatalogOperations.TRINO_VIEW_OWNER_PROPERTY));
+  }
+
+  @Test
+  void testAlterViewReplaceSyncsHmsOwnerWithPayloadOwner() throws Exception {
+    // Fixing the load path to prefer the live HMS owner would, on its own, make a Gravitino
+    // replace that only updates the payload owner immediately "lose" that change on the next
+    // load. The HMS owner must be kept in sync whenever the connector-managed owner property
+    // changes.
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveTable currentTable =
+        buildNativeTrinoViewTable(
+            /* payloadOwner= */ "alice",
+            /* hmsOwner= */ "alice",
+            Map.of(HiveViewCatalogOperations.TRINO_VIEW_OWNER_PROPERTY, "alice"));
+    when(hiveClient.getTable(anyString(), anyString(), anyString())).thenReturn(currentTable);
+
+    ArgumentCaptor<HiveTable> hiveTableCaptor = ArgumentCaptor.forClass(HiveTable.class);
+    doNothing()
+        .when(hiveClient)
+        .alterTable(anyString(), anyString(), anyString(), hiveTableCaptor.capture());
+    HiveCatalogOperations op = newHiveCatalogOperationsBackedBy(hiveClient);
+
+    op.alterView(
+        NameIdentifier.of("db", "v_trino"),
+        ViewChange.setProperty(HiveViewCatalogOperations.TRINO_VIEW_OWNER_PROPERTY, "bob"),
+        ViewChange.replaceView(
+            new Column[] {Column.of("c1", Types.IntegerType.get())},
+            new SQLRepresentation[] {
+              SQLRepresentation.builder().withDialect("trino").withSql("SELECT 2").build()
+            },
+            null,
+            null,
+            null));
+
+    Assertions.assertEquals("bob", hiveTableCaptor.getValue().auditInfo().creator());
+  }
+
+  @Test
+  void testAlterViewReplacePreservesEffectiveOwnerWhenPayloadOwnerIsStale() throws Exception {
+    // The caller (e.g. CatalogConnectorMetadata.createView()) observes the current owner through
+    // loadView(), which already prefers the live HMS owner (bob) over the stale payload owner
+    // (alice). Replacing the view as bob therefore emits no owner SetProperty, since the caller
+    // sees no change. alterView() must seed its own notion of "current owner" from that same
+    // effective HMS owner, not the stale payload owner, or it silently overwrites HMS back to
+    // alice.
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveTable currentTable =
+        buildNativeTrinoViewTable(/* payloadOwner= */ "alice", /* hmsOwner= */ "bob", Map.of());
+    when(hiveClient.getTable(anyString(), anyString(), anyString())).thenReturn(currentTable);
+
+    ArgumentCaptor<HiveTable> hiveTableCaptor = ArgumentCaptor.forClass(HiveTable.class);
+    doNothing()
+        .when(hiveClient)
+        .alterTable(anyString(), anyString(), anyString(), hiveTableCaptor.capture());
+    HiveCatalogOperations op = newHiveCatalogOperationsBackedBy(hiveClient);
+
+    op.alterView(
+        NameIdentifier.of("db", "v_trino"),
+        ViewChange.replaceView(
+            new Column[] {Column.of("c1", Types.IntegerType.get())},
+            new SQLRepresentation[] {
+              SQLRepresentation.builder().withDialect("trino").withSql("SELECT 2").build()
+            },
+            null,
+            null,
+            null));
+
+    Assertions.assertEquals("bob", hiveTableCaptor.getValue().auditInfo().creator());
+    TrinoNativeViewCodec.ViewDefinition decoded =
+        TrinoNativeViewCodec.decode(hiveTableCaptor.getValue().viewOriginalText());
+    Assertions.assertEquals("bob", decoded.owner);
+  }
+
+  @Test
+  void testAlterViewRenamePreservesEffectiveOwnerWhenPayloadOwnerIsStale() throws Exception {
+    // A rename doesn't touch the owner at all, so it must not revert HMS ownership back to the
+    // stale payload owner either.
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveTable currentTable =
+        buildNativeTrinoViewTable(/* payloadOwner= */ "alice", /* hmsOwner= */ "bob", Map.of());
+    when(hiveClient.getTable(anyString(), anyString(), eq("v_trino"))).thenReturn(currentTable);
+    when(hiveClient.getTable(anyString(), anyString(), eq("v_trino2")))
+        .thenThrow(new NoSuchTableException("v_trino2 does not exist"));
+
+    ArgumentCaptor<HiveTable> hiveTableCaptor = ArgumentCaptor.forClass(HiveTable.class);
+    doNothing()
+        .when(hiveClient)
+        .alterTable(anyString(), anyString(), anyString(), hiveTableCaptor.capture());
+    HiveCatalogOperations op = newHiveCatalogOperationsBackedBy(hiveClient);
+
+    op.alterView(NameIdentifier.of("db", "v_trino"), ViewChange.rename("v_trino2"));
+
+    Assertions.assertEquals("bob", hiveTableCaptor.getValue().auditInfo().creator());
+  }
+
+  @Test
+  void testAlterViewRenameDoesNotReassignOwnerForInvokerView() throws Exception {
+    // A SECURITY INVOKER native view has no owner in its payload at all, so currentOwner stays
+    // null and TRINO_VIEW_OWNER_PROPERTY is never seeded into updatedProperties. The owner-sync
+    // block must not run in that case: resolveHmsOwner() falls back to the current principal when
+    // the property is absent, which would otherwise reassign real HMS ownership (here, alice) to
+    // whoever happens to run an unrelated change like this rename.
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveTable currentTable =
+        buildNativeTrinoViewTable(/* payloadOwner= */ null, /* hmsOwner= */ "alice", Map.of());
+    when(hiveClient.getTable(anyString(), anyString(), eq("v_trino"))).thenReturn(currentTable);
+    when(hiveClient.getTable(anyString(), anyString(), eq("v_trino2")))
+        .thenThrow(new NoSuchTableException("v_trino2 does not exist"));
+
+    ArgumentCaptor<HiveTable> hiveTableCaptor = ArgumentCaptor.forClass(HiveTable.class);
+    doNothing()
+        .when(hiveClient)
+        .alterTable(anyString(), anyString(), anyString(), hiveTableCaptor.capture());
+    HiveCatalogOperations op = newHiveCatalogOperationsBackedBy(hiveClient);
+
+    op.alterView(NameIdentifier.of("db", "v_trino"), ViewChange.rename("v_trino2"));
+
+    Assertions.assertEquals("alice", hiveTableCaptor.getValue().auditInfo().creator());
   }
 
   @Test
@@ -1101,17 +1596,92 @@ class TestHiveCatalogOperations {
     // non-empty path would silently discard it. TrinoNativeViewCodec.encode() always writes an
     // empty path (Gravitino itself never produces one), so this payload is built by hand to
     // simulate a view created directly by a native Trino connector with a non-empty path.
-    String encoded =
-        "/* Presto View: "
-            + Base64.getEncoder()
-                .encodeToString(
-                    ("{\"originalSql\":\"SELECT 1\",\"catalog\":null,\"schema\":null,"
-                            + "\"columns\":[{\"name\":\"c1\",\"type\":\"integer\",\"comment\":null}],"
-                            + "\"comment\":null,\"owner\":null,\"runAsInvoker\":true,"
-                            + "\"path\":[{\"catalog\":\"c\",\"schema\":\"s\"}]}")
-                        .getBytes(StandardCharsets.UTF_8))
-            + " */";
-    assertReplaceRejectsUnrepresentableNativeView(encoded);
+    assertReplaceRejectsUnrepresentableNativeView(nativeViewPayloadWithNonEmptyPath());
+  }
+
+  @Test
+  void testAlterViewRenameRejectsExistingNonEmptyPathBeforeMutatingHms() throws Exception {
+    // A rename (or any non-ReplaceView change) doesn't touch the view's encoded payload, so it
+    // was previously allowed to proceed even on a native view with an unrepresentable non-empty
+    // path - only to have the HMS rename already succeed and then throw while toHiveView() built
+    // the return value, reporting a successful mutation as a failure. The rejection must happen
+    // upfront, before alterTable() is ever called.
+    String encoded = nativeViewPayloadWithNonEmptyPath();
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveTable currentTable =
+        HiveTable.builder()
+            .withName("v_trino")
+            .withCatalogName("hive")
+            .withDatabaseName("db")
+            .withColumns(new Column[0])
+            .withComment("Presto View")
+            .withProperties(
+                Maps.newHashMap(
+                    ImmutableMap.of(
+                        HiveConstants.TABLE_TYPE,
+                        TableType.VIRTUAL_VIEW.name(),
+                        "presto_view",
+                        "true")))
+            .withViewOriginalText(encoded)
+            .build();
+    when(hiveClient.getTable(anyString(), anyString(), anyString())).thenReturn(currentTable);
+    HiveCatalogOperations op = newHiveCatalogOperationsBackedBy(hiveClient);
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> op.alterView(NameIdentifier.of("db", "v_trino"), ViewChange.rename("v_trino2")));
+
+    verify(hiveClient, never()).alterTable(anyString(), anyString(), anyString(), any());
+  }
+
+  @Test
+  void testLoadViewRejectsNonEmptyPath() throws Exception {
+    // Gravitino's view model has no SQL path (SET PATH) concept; silently dropping a non-empty
+    // path on load would let an unqualified function resolve differently than the native Trino
+    // view's creator intended. TrinoNativeViewCodec.encode() always writes an empty path
+    // (Gravitino itself never produces one), so this payload is built by hand to simulate a view
+    // created directly by a native Trino connector with a non-empty path.
+    String encoded = nativeViewPayloadWithNonEmptyPath();
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveTable currentTable =
+        HiveTable.builder()
+            .withName("v_trino")
+            .withCatalogName("hive")
+            .withDatabaseName("db")
+            .withColumns(new Column[0])
+            .withComment("Presto View")
+            .withProperties(
+                Maps.newHashMap(
+                    ImmutableMap.of(
+                        HiveConstants.TABLE_TYPE,
+                        TableType.VIRTUAL_VIEW.name(),
+                        "presto_view",
+                        "true")))
+            .withViewOriginalText(encoded)
+            .build();
+    when(hiveClient.getTable(anyString(), anyString(), anyString())).thenReturn(currentTable);
+    HiveCatalogOperations op = newHiveCatalogOperationsBackedBy(hiveClient);
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> op.loadView(NameIdentifier.of("db", "v_trino")));
+  }
+
+  /**
+   * Builds a native "Presto View" payload with a non-empty SQL path by hand.
+   * TrinoNativeViewCodec.encode() always writes an empty path (Gravitino itself never produces
+   * one), so this simulates a view created directly by a native Trino connector with a non-empty
+   * path (e.g. one set via {@code SET PATH} before {@code CREATE VIEW}).
+   */
+  private static String nativeViewPayloadWithNonEmptyPath() {
+    return "/* Presto View: "
+        + Base64.getEncoder()
+            .encodeToString(
+                ("{\"originalSql\":\"SELECT 1\",\"catalog\":null,\"schema\":null,"
+                        + "\"columns\":[{\"name\":\"c1\",\"type\":\"integer\",\"comment\":null}],"
+                        + "\"comment\":null,\"owner\":null,\"runAsInvoker\":true,"
+                        + "\"path\":[{\"catalog\":\"c\",\"schema\":\"s\"}]}")
+                    .getBytes(StandardCharsets.UTF_8))
+        + " */";
   }
 
   private void assertReplaceRejectsUnrepresentableNativeView(String encoded) throws Exception {
@@ -1540,6 +2110,59 @@ class TestHiveCatalogOperations {
   }
 
   @Test
+  void testAlterSparkViewReplaceRejectsNonNullDefaultCatalogAndSchema() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveTable currentTable =
+        HiveTable.builder()
+            .withName("v_spark")
+            .withCatalogName("hive")
+            .withDatabaseName("db")
+            .withColumns(new Column[0])
+            .withProperties(
+                Maps.newHashMap(
+                    ImmutableMap.of(
+                        HiveConstants.TABLE_TYPE,
+                        TableType.VIRTUAL_VIEW.name(),
+                        "spark.sql.create.version",
+                        "3.5.3")))
+            .withViewOriginalText("SELECT 1")
+            .build();
+    when(hiveClient.getTable(anyString(), anyString(), anyString())).thenReturn(currentTable);
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                op.alterView(
+                    NameIdentifier.of("db", "v_spark"),
+                    ViewChange.replaceView(
+                        new Column[0],
+                        new SQLRepresentation[] {
+                          SQLRepresentation.builder()
+                              .withDialect("spark")
+                              .withSql("SELECT 2")
+                              .build()
+                        },
+                        "analytics",
+                        "mart",
+                        null)));
+
+    Assertions.assertTrue(
+        exception.getMessage().contains("does not support non-null defaultCatalog/defaultSchema"));
+  }
+
+  @Test
   void testDropViewThrowsForUnexpectedException() throws Exception {
     HiveCatalogOperations op = new HiveCatalogOperations();
     op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
@@ -1775,5 +2398,60 @@ class TestHiveCatalogOperations {
     // No changes: nothing to optimize, keep the default behavior.
     Assertions.assertFalse(HiveCatalogOperations.canSkipStatsUpdate(new TableChange[] {}));
     Assertions.assertFalse(HiveCatalogOperations.canSkipStatsUpdate(null));
+  }
+
+  /**
+   * Builds a native Trino "Presto View" {@code v_trino} table whose encoded payload carries {@code
+   * payloadOwner} while the live HMS table owner (audit creator) is {@code hmsOwner} — shared
+   * fixture for the HMS-owner-vs-payload-owner reconciliation tests.
+   */
+  private static HiveTable buildNativeTrinoViewTable(
+      String payloadOwner, String hmsOwner, Map<String, String> extraProperties) {
+    String encoded =
+        TrinoNativeViewCodec.encode(
+            new TrinoNativeViewCodec.ViewDefinition(
+                "SELECT 1",
+                null,
+                null,
+                List.of(new TrinoNativeViewCodec.ViewColumn("c1", "integer", null)),
+                null,
+                payloadOwner,
+                false,
+                List.of()));
+    Map<String, String> properties =
+        Maps.newHashMap(
+            ImmutableMap.of(
+                HiveConstants.TABLE_TYPE, TableType.VIRTUAL_VIEW.name(), "presto_view", "true"));
+    properties.putAll(extraProperties);
+    return HiveTable.builder()
+        .withName("v_trino")
+        .withCatalogName("hive")
+        .withDatabaseName("db")
+        .withColumns(new Column[0])
+        .withComment("Presto View")
+        .withProperties(properties)
+        .withViewOriginalText(encoded)
+        .withAuditInfo(AuditInfo.builder().withCreator(hmsOwner).build())
+        .build();
+  }
+
+  /**
+   * Creates a {@link HiveCatalogOperations} whose client pool delegates every call directly to
+   * {@code hiveClient}, for tests that only need to stub the client itself.
+   */
+  private static HiveCatalogOperations newHiveCatalogOperationsBackedBy(HiveClient hiveClient)
+      throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+    return op;
   }
 }

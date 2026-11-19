@@ -25,8 +25,10 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.ImmutableBiMap;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
@@ -36,6 +38,7 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
+import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -65,6 +68,7 @@ public class MetadataObjectUtil {
           .put(MetadataObject.Type.VIEW, Entity.EntityType.VIEW)
           .put(MetadataObject.Type.SEMANTIC_MODEL, Entity.EntityType.SEMANTIC_MODEL)
           .put(MetadataObject.Type.FUNCTION, Entity.EntityType.FUNCTION)
+          .put(MetadataObject.Type.DOMAIN, Entity.EntityType.DOMAIN)
           .build();
 
   private MetadataObjectUtil() {}
@@ -101,6 +105,16 @@ public class MetadataObjectUtil {
   }
 
   /**
+   * Returns the entity types that metadata object types are mapped to. A metadata object type that
+   * is not backed by an entity yet has no entry here.
+   *
+   * @return The entity types of the metadata objects.
+   */
+  public static Set<Entity.EntityType> metadataObjectEntityTypes() {
+    return TYPE_TO_TYPE_MAP.values();
+  }
+
+  /**
    * Convert the given {@link MetadataObject} full name to the corresponding {@link NameIdentifier}.
    *
    * @param metalakeName The metalake name
@@ -126,6 +140,10 @@ public class MetadataObjectUtil {
         return NameIdentifierUtil.ofJob(metalakeName, metadataObject.name());
       case JOB_TEMPLATE:
         return NameIdentifierUtil.ofJobTemplate(metalakeName, metadataObject.name());
+      case DOMAIN:
+        String domainName = metadataObject.fullName();
+        NameValidationUtils.validateName("domain", domainName);
+        return NameIdentifierUtil.ofDomain(metalakeName, domainName);
       case VIEW:
       case SEMANTIC_MODEL:
       case CATALOG:
@@ -336,9 +354,54 @@ public class MetadataObjectUtil {
         }
         break;
 
+      case DOMAIN:
+        NameIdentifierUtil.checkDomain(identifier);
+        try {
+          env.internalDomainDispatcher().getDomain(metalake, object.fullName());
+        } catch (NoSuchDomainException e) {
+          throw exceptionToThrowSupplier.get();
+        }
+        break;
+
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the type %s", object.type()));
+    }
+  }
+
+  /**
+   * Checks metadata objects, checking each distinct table only once for tables and their columns.
+   *
+   * <p>Every object's identifier is validated. Successful table checks are shared only within this
+   * call. Like {@link #checkMetadataObject(String, MetadataObject)}, this must be called outside
+   * the tree lock because checking an object may load it into the entity store.
+   *
+   * @param metalake The metalake name.
+   * @param objects The metadata objects to check, in order.
+   * @throws NoSuchMetadataObjectException if a metadata object does not exist.
+   */
+  public static void checkMetadataObjects(String metalake, List<MetadataObject> objects) {
+    Set<NameIdentifier> checkedTables = new HashSet<>();
+    for (MetadataObject object : objects) {
+      Preconditions.checkArgument(object != null, "metadataObject cannot be null");
+      if (object.type() != MetadataObject.Type.TABLE
+          && object.type() != MetadataObject.Type.COLUMN) {
+        checkMetadataObject(metalake, object);
+        continue;
+      }
+
+      NameIdentifier identifier = toEntityIdent(metalake, object);
+      NameIdentifier tableIdentifier;
+      if (object.type() == MetadataObject.Type.COLUMN) {
+        NameIdentifierUtil.checkColumn(identifier);
+        tableIdentifier = NameIdentifier.of(identifier.namespace().levels());
+      } else {
+        NameIdentifierUtil.checkTable(identifier);
+        tableIdentifier = identifier;
+      }
+      if (checkedTables.add(tableIdentifier)) {
+        checkMetadataObject(metalake, object);
+      }
     }
   }
 

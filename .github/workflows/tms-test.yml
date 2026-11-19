@@ -1,0 +1,94 @@
+name: TMS Test
+
+on:
+  workflow_call:
+    inputs:
+      base-ref:
+        type: string
+        required: false
+        default: ''
+      base-sha:
+        type: string
+        required: false
+        default: ''
+      head-repository:
+        type: string
+        required: false
+        default: ''
+      head-sha:
+        type: string
+        required: false
+        default: ''
+      sync:
+        type: string
+        required: false
+        default: ''
+  workflow_dispatch:
+
+concurrency:
+  group: fork-ci-tms-${{ inputs.head-sha || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
+        id: checkout
+      - name: Disable Git automatic maintenance
+        run: git config --local maintenance.auto false
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d
+        id: filter
+        with:
+          base: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.base-sha || steps.checkout.outputs.base-ref }}
+          ref: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.head-sha || github.ref }}
+          filters: |
+            source_changes:
+              - plugins/maintenance/**
+              - maintenance/maintenance-common/**
+              - clients/client-java/**
+              - clients/client-java-runtime/**
+              - integration-test-common/**
+              - core/**
+              - server/**
+              - server-common/**
+              - gradle/**
+              - gradlew
+              - dev/**
+              - build.gradle.kts
+              - gradle.properties
+              - settings.gradle.kts
+              - .github/workflows/tms-test.yml
+              - .github/workflows/tms-test-action.yml
+      - name: Detect plugins/maintenance module
+        id: module
+        run: |
+          if [ -f plugins/maintenance/build.gradle.kts ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+    outputs:
+      source_changes: ${{ steps.filter.outputs.source_changes }}
+      module_exists: ${{ steps.module.outputs.exists }}
+
+  tms-test:
+    needs: changes
+    if: needs.changes.outputs.source_changes == 'true' && needs.changes.outputs.module_exists == 'true'
+    uses: ./.github/workflows/tms-test-action.yml
+    with:
+      base-ref: ${{ inputs.base-ref }}
+      base-sha: ${{ inputs.base-sha }}
+      head-repository: ${{ inputs.head-repository }}
+      head-sha: ${{ inputs.head-sha }}
+      sync: ${{ inputs.sync }}
+      java-version: '17'

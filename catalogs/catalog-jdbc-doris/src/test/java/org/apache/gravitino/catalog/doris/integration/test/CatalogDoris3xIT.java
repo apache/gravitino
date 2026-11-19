@@ -79,6 +79,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Integration tests for Doris 3.0.x specific features: INVERTED index syntax, Auto Increment, and
@@ -124,6 +126,49 @@ public class CatalogDoris3xIT extends BaseIT {
   public void resetSchema() {
     catalog.asSchemas().dropSchema(schemaName, true);
     createSchema();
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "O'Brien",
+        "quote\\' and \\new\\path; \"double\"",
+        "owner's a\"\"b \"value\"\\path",
+        "ends with \\"
+      })
+  void testCreateTableStringDefaultIsStoredVerbatim(String defaultValue) throws Exception {
+    TableCatalog tables = catalog.asTableCatalog();
+    NameIdentifier identifier =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("create_default"));
+    tables.createTable(
+        identifier,
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), null, false, false, null),
+          Column.of(
+              "col1",
+              Types.VarCharType.of(255),
+              null,
+              true,
+              false,
+              Literals.varcharLiteral(255, defaultValue))
+        },
+        null,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.hash(1, NamedReference.field("id")),
+        null);
+
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl + schemaName, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(String.format("INSERT INTO `%s` (id) VALUES (1)", identifier.name()));
+      try (ResultSet result =
+          statement.executeQuery(String.format("SELECT col1 FROM `%s`", identifier.name()))) {
+        assertTrue(result.next());
+        assertEquals(defaultValue, result.getString(1));
+      }
+    }
   }
 
   private void createMetalake() {

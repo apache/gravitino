@@ -18,11 +18,56 @@
  */
 package org.apache.gravitino.dto.requests;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.Collections;
+import java.util.Locale;
+import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.json.JsonUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestFilesetUpdatesRequest {
+
+  @Test
+  void testUpdateTypeSerialization() throws JsonProcessingException {
+    for (Fileset.Type type : Fileset.Type.values()) {
+      FilesetUpdateRequest update = new FilesetUpdateRequest.UpdateFilesetTypeRequest(type);
+      FilesetUpdatesRequest request = new FilesetUpdatesRequest(Collections.singletonList(update));
+      request.validate();
+      String json = JsonUtils.objectMapper().writeValueAsString(request);
+      Assertions.assertEquals(
+          "updateType", JsonUtils.objectMapper().readTree(json).at("/updates/0/@type").asText());
+      Assertions.assertEquals(
+          type.name().toLowerCase(Locale.ROOT),
+          JsonUtils.objectMapper().readTree(json).at("/updates/0/newType").asText());
+      FilesetUpdatesRequest decoded =
+          JsonUtils.objectMapper().readValue(json, FilesetUpdatesRequest.class);
+      decoded.validate();
+      Assertions.assertEquals(1, decoded.getUpdates().size());
+      Assertions.assertEquals(
+          FilesetChange.updateType(type), decoded.getUpdates().get(0).filesetChange());
+    }
+  }
+
+  @Test
+  void testUpdateTypeValidation() throws JsonProcessingException {
+    for (String update :
+        new String[] {
+          "{\"@type\":\"updateType\"}", "{\"@type\":\"updateType\",\"newType\":null}"
+        }) {
+      FilesetUpdateRequest request =
+          JsonUtils.objectMapper().readValue(update, FilesetUpdateRequest.class);
+      Assertions.assertThrows(IllegalArgumentException.class, request::validate);
+    }
+    Assertions.assertThrows(
+        JsonProcessingException.class,
+        () ->
+            JsonUtils.objectMapper()
+                .readValue(
+                    "{\"@type\":\"updateType\",\"newType\":\"unknown\"}",
+                    FilesetUpdateRequest.class));
+  }
 
   @Test
   public void testValidateWithNullUpdates() {

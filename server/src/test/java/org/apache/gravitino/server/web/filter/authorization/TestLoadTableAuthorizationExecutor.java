@@ -20,12 +20,20 @@
 package org.apache.gravitino.server.web.filter.authorization;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
@@ -39,6 +47,8 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
@@ -109,14 +119,31 @@ public class TestLoadTableAuthorizationExecutor {
     GravitinoEnv env = mock(GravitinoEnv.class);
     TableDispatcher internalTableDispatcher = mock(TableDispatcher.class);
     when(env.internalTableDispatcher()).thenReturn(internalTableDispatcher);
-    when(internalTableDispatcher.tableExists(tableIdentifier)).thenReturn(false);
+    when(internalTableDispatcher.loadTable(tableIdentifier))
+        .thenThrow(new NoSuchTableException("Table is absent"));
 
     try (MockedStatic<GravitinoEnv> mockedEnv = mockStatic(GravitinoEnv.class)) {
       mockedEnv.when(GravitinoEnv::getInstance).thenReturn(env);
+      assertThrows(
+          NoSuchTableException.class, () -> executor.execute(new AuthorizationRequestContext()));
+      doReturn(mock(Table.class)).when(internalTableDispatcher).loadTable(tableIdentifier);
+      assertFalse(executor.execute(new AuthorizationRequestContext()));
+      IllegalStateException failure = new IllegalStateException("Table backend unavailable");
+      doThrow(failure).when(internalTableDispatcher).loadTable(tableIdentifier);
+      assertSame(
+          failure,
+          assertThrows(
+              IllegalStateException.class,
+              () -> executor.execute(new AuthorizationRequestContext())));
+      verify(internalTableDispatcher, times(3)).loadTable(tableIdentifier);
+      reset(internalTableDispatcher);
+      when(existenceEvaluator.evaluate(anyMap(), anyMap(), any(), any())).thenReturn(false);
+      assertFalse(executor.execute(new AuthorizationRequestContext()));
+      verifyNoInteractions(internalTableDispatcher);
+      when(primaryEvaluator.evaluate(anyMap(), anyMap(), any(), any())).thenReturn(true);
       assertTrue(executor.execute(new AuthorizationRequestContext()));
+      verifyNoInteractions(internalTableDispatcher);
     }
-
-    verify(internalTableDispatcher).tableExists(tableIdentifier);
   }
 
   private static LoadTableAuthorizationExecutor createExecutor(

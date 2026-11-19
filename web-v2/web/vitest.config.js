@@ -21,6 +21,7 @@ import { defineConfig } from 'vitest/config'
 import { resolve } from 'path'
 
 export default defineConfig({
+  esbuild: { loader: 'tsx', include: /src\/.*\.[jt]sx?$/, exclude: [], jsx: 'automatic' },
   test: {
     globals: true,
     environment: 'jsdom',
@@ -44,6 +45,8 @@ export default defineConfig({
     }
   },
   resolve: {
+    // Some browser dependencies publish only a module entry, without a main entry.
+    mainFields: ['module', 'main'],
     alias: {
       '@': resolve(__dirname, './src')
     }

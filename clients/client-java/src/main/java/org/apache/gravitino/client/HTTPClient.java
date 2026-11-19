@@ -48,6 +48,7 @@ import org.apache.gravitino.rest.RESTUtils;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequest;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
 import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.impl.DefaultHttpRequestRetryStrategy;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
@@ -68,6 +69,7 @@ import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.net.URIBuilder;
 import org.apache.hc.core5.reactor.ssl.SSLBufferMode;
+import org.apache.hc.core5.util.TimeValue;
 
 /**
  * An HttpClient for usage with the REST catalog.
@@ -148,6 +150,9 @@ public class HTTPClient implements RESTClient {
         GravitinoClientConfiguration.buildFromProperties(properties);
 
     HttpClientBuilder clientBuilder = HttpClients.custom();
+    clientBuilder.setRetryStrategy(
+        new DefaultHttpRequestRetryStrategy(
+            clientConfiguration.getClientRetryTimes(), TimeValue.ofSeconds(1)));
     clientBuilder.setConnectionManager(
         configureConnectionManager(clientConfiguration, tlsConfigurer));
 

@@ -29,6 +29,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -61,8 +62,10 @@ import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -72,6 +75,7 @@ import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
+import org.mockito.Mockito;
 
 public class TestCatalogMetaService extends TestJDBCBackend {
 
@@ -622,6 +626,53 @@ public class TestCatalogMetaService extends TestJDBCBackend {
     assertEquals(0, countActiveTableVersionRows(table.id()));
   }
 
+  @TestTemplate
+  public void testCascadeDeleteCatalogWithMoreSchemasThanOneChunk() throws IOException {
+    String catalogName = "catalog_many_schemas";
+    CatalogEntity catalog = createAndInsertCatalog(metalakeName, catalogName);
+    int schemaCount = OccWriteSupport.CHILD_DELETE_BATCH_SIZE + 1;
+    for (int i = 0; i < schemaCount; i++) {
+      createAndInsertSchema(metalakeName, catalogName, "schema_" + i);
+    }
+
+    // Make the snapshot of the last schema stale, so only the second chunk misses a row. The
+    // first chunk is already deleted by then and must roll back with the failed cascade.
+    CatalogMetaService service = Mockito.spy(CatalogMetaService.getInstance());
+    Mockito.doAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              List<SchemaPO> schemaPOs = (List<SchemaPO>) invocation.callRealMethod();
+              List<SchemaPO> staleSchemaPOs = new ArrayList<>(schemaPOs);
+              SchemaPO last = staleSchemaPOs.get(staleSchemaPOs.size() - 1);
+              staleSchemaPOs.set(
+                  staleSchemaPOs.size() - 1,
+                  SchemaPO.builder()
+                      .withSchemaId(last.getSchemaId())
+                      .withSchemaName(last.getSchemaName())
+                      .withMetalakeId(last.getMetalakeId())
+                      .withCatalogId(last.getCatalogId())
+                      .withSchemaComment(last.getSchemaComment())
+                      .withProperties(last.getProperties())
+                      .withAuditInfo(last.getAuditInfo())
+                      .withCurrentVersion(last.getCurrentVersion() + 1)
+                      .withLastVersion(last.getLastVersion() + 1)
+                      .withDeletedAt(last.getDeletedAt())
+                      .build());
+              return staleSchemaPOs;
+            })
+        .when(service)
+        .listSchemaPOsForCascade(catalog.id());
+
+    assertThrows(
+        OptimisticLockException.class, () -> service.deleteCatalog(catalog.nameIdentifier(), true));
+    assertTrue(backend.exists(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+    assertEquals(schemaCount, countActiveSchemas(catalog.id()));
+
+    assertTrue(CatalogMetaService.getInstance().deleteCatalog(catalog.nameIdentifier(), true));
+    assertFalse(backend.exists(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+    assertEquals(0, countActiveSchemas(catalog.id()));
+  }
+
   private List<Throwable> insertCatalogsConcurrently(CatalogEntity first, CatalogEntity second)
       throws Exception {
     ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -704,6 +755,12 @@ public class TestCatalogMetaService extends TestJDBCBackend {
     } catch (SQLException e) {
       throw new RuntimeException("SQL execution failed", e);
     }
+  }
+
+  private int countActiveSchemas(Long catalogId) {
+    return SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsByCatalogId(catalogId))
+        .size();
   }
 
   private int countActiveTableVersionRows(Long tableId) {

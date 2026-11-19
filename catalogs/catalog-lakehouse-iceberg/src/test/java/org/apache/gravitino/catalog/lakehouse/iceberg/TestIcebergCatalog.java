@@ -22,6 +22,7 @@ import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalog.CATA
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalog.SCHEMA_PROPERTIES_META;
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalog.TABLE_PROPERTIES_META;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Map;
@@ -31,6 +32,7 @@ import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.JdbcCredential;
@@ -129,11 +131,13 @@ public class TestIcebergCatalog {
     Map<String, String> conf = Maps.newHashMap();
     IcebergCatalog icebergCatalog =
         new IcebergCatalog().withCatalogConf(conf).withCatalogEntity(entity);
+    Assertions.assertTrue(
+        icebergCatalog.newCapability().caseSensitiveOnName(Capability.Scope.SCHEMA).supported());
     CatalogOperations catalogOperations = icebergCatalog.ops();
     Assertions.assertTrue(catalogOperations instanceof IcebergCatalogOperations);
 
     IcebergCatalogWrapper icebergCatalogWrapper =
-        ((IcebergCatalogOperations) catalogOperations).icebergCatalogWrapper;
+        ((IcebergCatalogOperations) catalogOperations).backend.wrapper();
     ListNamespacesResponse listNamespacesResponse =
         icebergCatalogWrapper.listNamespace(org.apache.iceberg.catalog.Namespace.empty());
     Assertions.assertTrue(listNamespacesResponse.namespaces().isEmpty());
@@ -501,5 +505,15 @@ public class TestIcebergCatalog {
     Assertions.assertTrue(credentialProviders.contains(JdbcCredential.JDBC_CREDENTIAL_TYPE));
     Assertions.assertTrue(
         credentialProviders.contains(AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE));
+  }
+
+  @Test
+  void testPathBasedCredentialProvidersAllowed() {
+    IcebergCatalog catalog = new IcebergCatalog();
+    Assertions.assertTrue(catalog.supportsPathBasedCredentials());
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog.validateCredentialProviders(
+                ImmutableMap.of(CredentialConstants.CREDENTIAL_PROVIDERS, "s3-token,gcs-token")));
   }
 }

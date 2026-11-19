@@ -21,6 +21,8 @@ package org.apache.gravitino.storage.relational.mapper.provider;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.DomainRelMapper;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
@@ -44,6 +46,8 @@ import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelSourceMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
@@ -64,6 +68,8 @@ public class DefaultMapperPackageProvider implements MapperPackageProvider {
   public List<Class<?>> getMapperClasses() {
     return ImmutableList.of(
         CatalogMetaMapper.class,
+        DomainMetaMapper.class,
+        DomainRelMapper.class,
         EntityChangeLogMapper.class,
         FilesetMetaMapper.class,
         FilesetVersionMapper.class,
@@ -87,6 +93,8 @@ public class DefaultMapperPackageProvider implements MapperPackageProvider {
         SchemaMetaMapper.class,
         SecurableObjectMapper.class,
         SemanticModelMetaMapper.class,
+        SemanticModelMetricMapper.class,
+        SemanticModelSourceMapper.class,
         SemanticModelVersionInfoMapper.class,
         StatisticMetaMapper.class,
         TableColumnMapper.class,

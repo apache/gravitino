@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.catalog.lakehouse.iceberg.ops;
 
+import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants.DEFAULT_SPEC_ID;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -57,6 +59,7 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.types.Type.PrimitiveType;
 import org.apache.iceberg.types.Types.NestedField;
 
+/** Converts Gravitino table changes and identifiers to Iceberg operations. */
 public class IcebergCatalogWrapperHelper {
   @VisibleForTesting public static final Joiner DOT = Joiner.on(".");
   private static final Set<String> IcebergReservedProperties =
@@ -64,15 +67,10 @@ public class IcebergCatalogWrapperHelper {
           "location",
           "comment",
           "current-snapshot-id",
+          DEFAULT_SPEC_ID,
           "cherry-pick-snapshot-id",
           "sort-order",
           "identifier-fields");
-
-  private Catalog icebergCatalog;
-
-  public IcebergCatalogWrapperHelper(Catalog icebergCatalog) {
-    this.icebergCatalog = icebergCatalog;
-  }
 
   private void doDeleteColumn(
       UpdateSchema icebergUpdateSchema, DeleteColumn deleteColumn, Schema icebergTableSchema) {
@@ -230,8 +228,19 @@ public class IcebergCatalogWrapperHelper {
     icebergUpdateSchema.commit();
   }
 
+  /**
+   * Builds an {@link IcebergTableChange} using the given catalog to load the table. Call this
+   * method inside {@code IcebergCatalogWrapper.buildAndUpdateTable} so that the metadata.json read
+   * and transaction construction run within the proxy's Kerberos impersonation context. Passing a
+   * catalog alone does not establish that context.
+   *
+   * @param catalog the Iceberg catalog to use for loading the table
+   * @param gravitinoNameIdentifier the Gravitino name identifier of the table
+   * @param tableChanges the changes to apply
+   * @return the built table change containing the transaction
+   */
   public IcebergTableChange buildIcebergTableChanges(
-      NameIdentifier gravitinoNameIdentifier, TableChange... tableChanges) {
+      Catalog catalog, NameIdentifier gravitinoNameIdentifier, TableChange... tableChanges) {
 
     TableIdentifier icebergTableIdentifier = buildIcebergTableIdentifier(gravitinoNameIdentifier);
 
@@ -263,7 +272,7 @@ public class IcebergCatalogWrapperHelper {
       }
     }
 
-    Table icebergBaseTable = icebergCatalog.loadTable(icebergTableIdentifier);
+    Table icebergBaseTable = catalog.loadTable(icebergTableIdentifier);
     Transaction transaction = icebergBaseTable.newTransaction();
     IcebergTableChange icebergTableChange =
         new IcebergTableChange(icebergTableIdentifier, transaction);

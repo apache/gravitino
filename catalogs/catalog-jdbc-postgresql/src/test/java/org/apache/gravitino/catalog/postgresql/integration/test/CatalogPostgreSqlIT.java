@@ -48,6 +48,7 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.postgresql.integration.test.service.PostgreSqlService;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.dto.requests.TableUpdateRequest;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -85,6 +86,9 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
@@ -132,7 +136,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
     clearTableAndSchema();
     String[] schemaNames = catalog.asSchemas().listSchemas();
     for (String schemaName : schemaNames) {
-      catalog.asSchemas().dropSchema(schemaName, true);
+      clearTableAndSchema(schemaName);
     }
     metalake.disableCatalog(catalogName);
     metalake.dropCatalog(catalogName);
@@ -148,6 +152,12 @@ public class CatalogPostgreSqlIT extends BaseIT {
   }
 
   private void clearTableAndSchema() {
+    clearTableAndSchema(schemaName);
+  }
+
+  private void clearTableAndSchema(String schemaName) {
+    // PostgreSQL schema drops are restrictive even when cascade is requested. Remove the test
+    // tables explicitly before dropping each schema, including schemas created outside the fixture.
     NameIdentifier[] nameIdentifiers =
         catalog.asTableCatalog().listTables(Namespace.of(schemaName));
     for (NameIdentifier nameIdentifier : nameIdentifiers) {
@@ -454,18 +464,15 @@ public class CatalogPostgreSqlIT extends BaseIT {
     SupportsSchemas schemas = catalog.asSchemas();
     String schemaName = RandomNameUtils.genRandomName("ct_db");
 
-    // should throw an exception with string that might contain SQL injection
+    // Creation rejects SQL-looking names. Drops address existing native identifiers, so a
+    // nonexistent name within PostgreSQL's byte limit returns false instead of executing SQL.
     String sqlInjection = schemaName + "; DROP TABLE important_table; -- ";
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> {
           schemas.createSchema(sqlInjection, null, null);
         });
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> {
-          schemas.dropSchema(sqlInjection, false);
-        });
+    Assertions.assertFalse(schemas.dropSchema(sqlInjection, false));
 
     String sqlInjection1 = schemaName + "; SELECT pg_sleep(10);";
     Assertions.assertThrows(
@@ -473,11 +480,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
         () -> {
           schemas.createSchema(sqlInjection1, null, null);
         });
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> {
-          schemas.dropSchema(sqlInjection1, false);
-        });
+    Assertions.assertFalse(schemas.dropSchema(sqlInjection1, false));
 
     String sqlInjection2 =
         schemaName + "`; UPDATE Users SET password = 'newpassword' WHERE username = 'admin'; -- ";
@@ -512,11 +515,29 @@ public class CatalogPostgreSqlIT extends BaseIT {
         () -> {
           schemas.createSchema(invalidInput2, null, null);
         });
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> {
-          schemas.dropSchema(invalidInput2, false);
-        });
+    Assertions.assertFalse(schemas.dropSchema(invalidInput2, false));
+  }
+
+  @Test
+  void testDropNativeSchemaNameTreatsSqlAsIdentifier() {
+    SupportsSchemas schemas = catalog.asSchemas();
+    String survivor = RandomNameUtils.genRandomName("keep");
+    String nativeName = "native\"; DROP SCHEMA " + survivor + "; --";
+    String quotedName = "\"" + nativeName.replace("\"", "\"\"") + "\"";
+    schemas.createSchema(survivor, null, Collections.emptyMap());
+    try {
+      postgreSqlService.executeQuery("CREATE SCHEMA " + quotedName);
+      Assertions.assertEquals(nativeName, schemas.loadSchema(nativeName).name());
+      Assertions.assertTrue(schemas.dropSchema(nativeName, false));
+      Assertions.assertFalse(schemas.dropSchema(nativeName, false));
+      Assertions.assertEquals(survivor, schemas.loadSchema(survivor).name());
+      Assertions.assertThrows(
+          NoSuchSchemaException.class,
+          () -> postgreSqlService.loadSchema(NameIdentifier.of(nativeName)));
+    } finally {
+      postgreSqlService.executeQuery("DROP SCHEMA IF EXISTS " + quotedName);
+      schemas.dropSchema(survivor, false);
+    }
   }
 
   @Test
@@ -1084,12 +1105,11 @@ public class CatalogPostgreSqlIT extends BaseIT {
           Assertions.assertEquals(Literals.varcharLiteral(200, "curdate()"), column.defaultValue());
           break;
         case "varchar200_col_2":
-          Assertions.assertEquals(
-              Literals.varcharLiteral(200, "CURRENT_DATE"), column.defaultValue());
+          // An expression default must not be mistaken for a string literal of the same text.
+          Assertions.assertEquals(UnparsedExpression.of("CURRENT_DATE"), column.defaultValue());
           break;
         case "varchar200_col_3":
-          Assertions.assertEquals(
-              Literals.varcharLiteral(200, "CURRENT_TIMESTAMP"), column.defaultValue());
+          Assertions.assertEquals(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, column.defaultValue());
           break;
         case "date_col_1":
           Assertions.assertEquals(UnparsedExpression.of("CURRENT_DATE"), column.defaultValue());
@@ -1129,7 +1149,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
           Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, column.defaultValue());
           break;
         case "character_col_3":
-          Assertions.assertEquals(Literals.stringLiteral("''::bpchar"), column.defaultValue());
+          Assertions.assertEquals(Literals.stringLiteral(""), column.defaultValue());
           break;
         default:
           Assertions.fail("Unexpected column name: " + column.name());
@@ -1680,6 +1700,53 @@ public class CatalogPostgreSqlIT extends BaseIT {
     // PostgreSQL array elements are always nullable
     Assertions.assertEquals(
         Types.ListType.of(Types.IntegerType.get(), true), loadedTable.columns()[2].dataType());
+  }
+
+  @ParameterizedTest
+  @NullSource
+  @ValueSource(booleans = {false, true})
+  void testDeleteConstraintBackedIndexes(Boolean ifExists) {
+    NameIdentifier ident =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("test_delete_indexes"));
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        ident,
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), null, false, false, null),
+          Column.of("code", Types.IntegerType.get(), null, false, false, null)
+        },
+        null,
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[] {
+          Indexes.primary("delete_pk", new String[][] {{"id"}}),
+          Indexes.unique("delete_uk", new String[][] {{"code"}})
+        });
+
+    TableUpdateRequest.DeleteTableIndexRequest primary =
+        new TableUpdateRequest.DeleteTableIndexRequest("delete_pk", ifExists);
+    TableUpdateRequest.DeleteTableIndexRequest unique =
+        new TableUpdateRequest.DeleteTableIndexRequest("delete_uk", ifExists);
+    Table updated = tableCatalog.alterTable(ident, primary.tableChange());
+    Assertions.assertEquals(1, updated.index().length);
+    Assertions.assertEquals("delete_uk", updated.index()[0].name());
+
+    updated = tableCatalog.alterTable(ident, unique.tableChange());
+    Assertions.assertEquals(0, updated.index().length);
+    Assertions.assertEquals(0, tableCatalog.loadTable(ident).index().length);
+
+    // IF EXISTS applies to the constraint, including after both indexes have been removed.
+    tableCatalog.alterTable(
+        ident,
+        TableChange.deleteIndex("delete_pk", true),
+        TableChange.deleteIndex("delete_uk", true));
+    RuntimeException missing =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> tableCatalog.alterTable(ident, TableChange.deleteIndex("delete_pk", false)));
+    Assertions.assertTrue(missing.getMessage().contains("delete_pk"), missing.getMessage());
   }
 
   @Test

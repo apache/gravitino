@@ -32,6 +32,8 @@ import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoClientUtils;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
+import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 
 /** Submits optimizer jobs to Gravitino using job template adapters. */
 public class GravitinoJobSubmitter implements JobSubmitter {
@@ -51,8 +53,12 @@ public class GravitinoJobSubmitter implements JobSubmitter {
       ImmutableMap.of(
           IcebergDataCompactionContent.JOB_TEMPLATE_NAME_VALUE,
           GravitinoCompactionJobAdapter.class,
+          IcebergRewriteManifestsContent.JOB_TEMPLATE_NAME_VALUE,
+          GravitinoManifestRewriteJobAdapter.class,
           IcebergOrphanFileRemovalContent.JOB_TEMPLATE_NAME_VALUE,
-          GravitinoOrphanFileRemovalJobAdapter.class);
+          GravitinoOrphanFileRemovalJobAdapter.class,
+          IcebergSnapshotExpirationContent.JOB_TEMPLATE_NAME_VALUE,
+          GravitinoSnapshotExpirationJobAdapter.class);
 
   @Override
   public String name() {
@@ -119,10 +125,30 @@ public class GravitinoJobSubmitter implements JobSubmitter {
       OptimizerConfig optimizerConfig,
       JobExecutionContext jobExecutionContext,
       GravitinoJobAdapter jobAdapter) {
+    String schemaSeparator =
+        GravitinoClientUtils.fetchSchemaSeparator(
+            optimizerConfig == null
+                ? null
+                : optimizerConfig.get(OptimizerConfig.GRAVITINO_URI_CONFIG));
+    return buildJobConfig(optimizerConfig, jobExecutionContext, jobAdapter, schemaSeparator);
+  }
+
+  /**
+   * Same as {@link #buildJobConfig(OptimizerConfig, JobExecutionContext, GravitinoJobAdapter)} with
+   * an already-resolved schema separator (for tests that do not hit {@code GET /configs}).
+   */
+  @VisibleForTesting
+  static Map<String, String> buildJobConfig(
+      OptimizerConfig optimizerConfig,
+      JobExecutionContext jobExecutionContext,
+      GravitinoJobAdapter jobAdapter,
+      String schemaSeparator) {
     Map<String, String> submitterConfigs =
         optimizerConfig == null ? Map.of() : optimizerConfig.jobSubmitterConfigs();
     Map<String, String> adapterConfigs =
-        jobAdapter == null ? Map.of() : jobAdapter.jobConfig(jobExecutionContext);
+        jobAdapter == null
+            ? Map.of()
+            : jobAdapter.jobConfig(jobExecutionContext, submitterConfigs, schemaSeparator);
 
     Map<String, String> mergedConfigs = new LinkedHashMap<>();
     mergedConfigs.putAll(submitterConfigs);

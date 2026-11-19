@@ -42,6 +42,37 @@ public interface SemanticModelCatalog {
   NameIdentifier[] listSemanticModels(Namespace namespace) throws NoSuchSchemaException;
 
   /**
+   * Lists metric identifiers across the Semantic Models in a schema.
+   *
+   * <p>Results are sorted by containing model identifier and then case-sensitive metric name.
+   * Catalog-scoped clients accept a schema namespace and return identifiers with namespace {@code
+   * [schema, semanticModel]}; server-side operations use full namespaces.
+   *
+   * @param namespace The schema namespace.
+   * @return The metric identifiers, or an empty array if there are none.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws UnsupportedOperationException If metric listing is not supported.
+   */
+  default NameIdentifier[] listMetrics(Namespace namespace) throws NoSuchSchemaException {
+    throw new UnsupportedOperationException("Metric listing is not supported");
+  }
+
+  /**
+   * Lists complete metric definitions across the Semantic Models in a schema.
+   *
+   * <p>Namespaces and ordering follow {@link #listMetrics(Namespace)}. Each result contains the
+   * definition from its model's current committed version.
+   *
+   * @param namespace The schema namespace.
+   * @return The metrics and their namespaces, or an empty array if there are none.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws UnsupportedOperationException If metric info listing is not supported.
+   */
+  default SemanticModelMetric[] listMetricInfos(Namespace namespace) throws NoSuchSchemaException {
+    throw new UnsupportedOperationException("Metric info listing is not supported");
+  }
+
+  /**
    * Loads a Semantic Model by identifier.
    *
    * @param ident The Semantic Model identifier.

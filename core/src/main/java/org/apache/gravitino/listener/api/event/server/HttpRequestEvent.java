@@ -55,12 +55,13 @@ public final class HttpRequestEvent extends Event {
    * Constructs an {@code HttpRequestEvent}.
    *
    * @param user the authenticated user, or {@code "unknown"} if authentication had not completed.
-   * @param remoteAddress the client IP resolved by the filter (X-Forwarded-For or raw socket
-   *     address). Stored explicitly, rather than relying on the base {@link Event} behaviour of
-   *     reading {@code RequestContext.getRemoteAddress()} at construction time, so this event still
-   *     carries a correct address even on a server that does not install {@code
-   *     RequestContextFilter} at all (all servers in this codebase currently do, but this keeps the
-   *     event resilient to one that doesn't).
+   * @param remoteAddress the client IP resolved by the filter (the TCP peer address, or the
+   *     right-most untrusted X-Forwarded-For entry behind a configured trusted proxy). Stored
+   *     explicitly, rather than relying on the base {@link Event} behaviour of reading {@code
+   *     RequestContext.getRemoteAddress()} at construction time, so this event still carries a
+   *     correct address even on a server that does not install {@code RequestContextFilter} at all
+   *     (all servers in this codebase currently do, but this keeps the event resilient to one that
+   *     doesn't).
    * @param httpMethod the HTTP method (e.g. {@code "GET"}, {@code "POST"}).
    * @param requestUri the request URI path (e.g. {@code "/search/query"}).
    * @param statusCode the HTTP response status code (e.g. {@code 200}).

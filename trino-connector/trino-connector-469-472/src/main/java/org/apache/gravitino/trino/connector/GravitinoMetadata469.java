@@ -57,7 +57,7 @@ public class GravitinoMetadata469 extends GravitinoMetadata {
       ConnectorTableHandle tableHandle,
       ColumnMetadata column,
       ColumnPosition position) {
-    GravitinoColumn gravitinoColumn = metadataAdapter.createColumn(column);
+    GravitinoColumn gravitinoColumn = createColumn(tableHandle, column);
     catalogConnectorMetadata.addColumn(getTableName(tableHandle), gravitinoColumn);
   }
 
@@ -105,6 +105,16 @@ public class GravitinoMetadata469 extends GravitinoMetadata {
             executeProperties,
             retryMode)
         .map(GravitinoTableExecuteHandle::new);
+  }
+
+  @Override
+  public void finishTableExecute(
+      ConnectorSession session,
+      ConnectorTableExecuteHandle tableExecuteHandle,
+      Collection<Slice> fragments,
+      List<Object> tableExecuteState) {
+    internalMetadata.finishTableExecute(
+        session, GravitinoHandle.unWrap(tableExecuteHandle), fragments, tableExecuteState);
   }
 
   @Override

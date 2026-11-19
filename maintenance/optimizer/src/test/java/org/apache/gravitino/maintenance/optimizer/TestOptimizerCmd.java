@@ -19,13 +19,16 @@
 
 package org.apache.gravitino.maintenance.optimizer;
 
+import com.sun.net.httpserver.HttpServer;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.List;
+import java.util.regex.Pattern;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.monitor.evaluator.MetricsEvaluatorForTest;
 import org.apache.gravitino.maintenance.optimizer.monitor.job.TableJobRelationProviderForTest;
@@ -37,10 +40,46 @@ import org.apache.gravitino.maintenance.optimizer.recommender.TableMetadataProvi
 import org.apache.gravitino.maintenance.optimizer.updater.MetricsUpdaterForTest;
 import org.apache.gravitino.maintenance.optimizer.updater.StatisticsCalculatorForTest;
 import org.apache.gravitino.maintenance.optimizer.updater.StatisticsUpdaterForTest;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 class TestOptimizerCmd {
+
+  // A spark_master entry with an empty value in the printed job configuration.
+  private static final Pattern EMPTY_SPARK_MASTER = Pattern.compile("\\bspark_master=\\s*[,}]");
+
+  /**
+   * Local {@code GET /configs} stub so submit-update-stats-job dry-run can resolve {@code
+   * gravitino.schema.separator} without a full Gravitino server (CI has none on :8090).
+   */
+  private static HttpServer configsServer;
+
+  private static String configsServerUri;
+
+  @BeforeAll
+  static void startConfigsServer() throws Exception {
+    configsServer = HttpServer.create(new InetSocketAddress(0), 0);
+    configsServer.createContext(
+        "/configs",
+        exchange -> {
+          byte[] body = "{\"gravitino.schema.separator\":\":\"}".getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          exchange.getResponseBody().write(body);
+          exchange.close();
+        });
+    configsServer.start();
+    configsServerUri = "http://127.0.0.1:" + configsServer.getAddress().getPort();
+  }
+
+  @AfterAll
+  static void stopConfigsServer() {
+    if (configsServer != null) {
+      configsServer.stop(0);
+    }
+  }
 
   @Test
   void testGlobalHelpIncludesImplementedCommands() {
@@ -497,7 +536,8 @@ class TestOptimizerCmd {
     Assertions.assertTrue(output[0].contains("jobTemplate=builtin-iceberg-update-stats"));
     Assertions.assertTrue(output[0].contains("update_mode=stats"));
     Assertions.assertTrue(output[0].contains("table_identifier=ab.t1"));
-    Assertions.assertTrue(output[0].contains("spark_master=local[*]"));
+    // Without a configured master, the job executor decides it.
+    Assertions.assertTrue(EMPTY_SPARK_MASTER.matcher(output[0]).find(), output[0]);
     Assertions.assertTrue(output[0].contains("catalog_type=rest"));
     Assertions.assertTrue(output[0].contains("catalog_uri=http://localhost:9001/iceberg"));
     Assertions.assertTrue(output[0].contains("warehouse_location=/tmp/warehouse"));
@@ -548,19 +588,29 @@ class TestOptimizerCmd {
             "--update-mode",
             "metrics",
             "--updater-options",
-            "{\"metrics_updater\":\"custom-metrics-updater\"}",
+            "{\"gravitino_uri\":\""
+                + configsServerUri
+                + "\",\"metrics_updater\":\"custom-metrics-updater\"}",
             "--spark-conf",
             "{\"spark.sql.catalog.rest\":\"org.apache.iceberg.spark.SparkCatalog\","
                 + "\"spark.sql.catalog.rest.type\":\"rest\","
                 + "\"spark.sql.catalog.rest.uri\":\"http://localhost:9001/iceberg\","
                 + "\"spark.sql.catalog.rest.warehouse\":\"/tmp/warehouse\","
-                + "\"spark.sql.extensions\":\"org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions\"}",
+                + "\"spark.sql.extensions\":\"org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions\","
+                + "\"spark.master\":\"local[2]\"}",
             "--dry-run",
             "--conf-path",
             confPath.toString());
     Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
     Assertions.assertTrue(output[0].contains("custom-metrics-updater"));
     Assertions.assertTrue(output[0].contains("spark.sql.catalog.rest"));
+    // The master of spark_conf isn't passed as the spark_master parameter, and the user is told.
+    Assertions.assertTrue(EMPTY_SPARK_MASTER.matcher(output[0]).find(), output[0]);
+    Assertions.assertTrue(
+        output[0].contains(
+            "WARN: spark.master=local[2] in the Spark configurations is ignored by the job."
+                + " Set gravitino.optimizer.jobSubmitterConfig.spark_master instead."),
+        output[0]);
   }
 
   @Test
@@ -671,12 +721,14 @@ class TestOptimizerCmd {
     String content =
         String.join(
                 System.lineSeparator(),
-                "gravitino.optimizer.gravitinoUri = http://localhost:8090",
+                "gravitino.optimizer.gravitinoUri = " + configsServerUri,
                 "gravitino.optimizer.gravitinoMetalake = test",
                 "gravitino.optimizer.gravitinoDefaultCatalog = rest",
                 "gravitino.optimizer.jobSubmitterConfig.update_mode = stats",
                 "gravitino.optimizer.jobSubmitterConfig.updater_options = "
-                    + "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\"}",
+                    + "{\"gravitino_uri\":\""
+                    + configsServerUri
+                    + "\",\"metalake\":\"test\"}",
                 "gravitino.optimizer.jobSubmitterConfig.spark_conf = "
                     + "{\"spark.sql.catalog.rest\":\"org.apache.iceberg.spark.SparkCatalog\","
                     + "\"spark.sql.catalog.rest.type\":\"rest\","
@@ -695,12 +747,14 @@ class TestOptimizerCmd {
     String content =
         String.join(
                 System.lineSeparator(),
-                "gravitino.optimizer.gravitinoUri = http://localhost:8090",
+                "gravitino.optimizer.gravitinoUri = " + configsServerUri,
                 "gravitino.optimizer.gravitinoMetalake = test",
                 "gravitino.optimizer.gravitinoDefaultCatalog = rest",
                 "gravitino.optimizer.jobSubmitterConfig.update_mode = stats",
                 "gravitino.optimizer.jobSubmitterConfig.updater_options = "
-                    + "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\"}")
+                    + "{\"gravitino_uri\":\""
+                    + configsServerUri
+                    + "\",\"metalake\":\"test\"}")
             + System.lineSeparator();
     Files.writeString(confPath, content, StandardCharsets.UTF_8);
     confPath.toFile().deleteOnExit();
@@ -713,12 +767,14 @@ class TestOptimizerCmd {
     String content =
         String.join(
                 System.lineSeparator(),
-                "gravitino.optimizer.gravitinoUri = http://localhost:8090",
+                "gravitino.optimizer.gravitinoUri = " + configsServerUri,
                 "gravitino.optimizer.gravitinoMetalake = test",
                 "gravitino.optimizer.gravitinoDefaultCatalog = rest",
                 "gravitino.optimizer.jobSubmitterConfig.update_mode = stats",
                 "gravitino.optimizer.jobSubmitterConfig.updater_options = "
-                    + "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\"}",
+                    + "{\"gravitino_uri\":\""
+                    + configsServerUri
+                    + "\",\"metalake\":\"test\"}",
                 "gravitino.optimizer.jobSubmitterConfig.spark_conf = "
                     + "{\"spark.sql.catalog.rest\":\"org.apache.iceberg.spark.SparkCatalog\","
                     + "\"spark.sql.catalog.rest.type\":\"rest\","
@@ -735,12 +791,14 @@ class TestOptimizerCmd {
     String content =
         String.join(
                 System.lineSeparator(),
-                "gravitino.optimizer.gravitinoUri = http://localhost:8090",
+                "gravitino.optimizer.gravitinoUri = " + configsServerUri,
                 "gravitino.optimizer.gravitinoMetalake = test",
                 "gravitino.optimizer.gravitinoDefaultCatalog = rest",
                 "gravitino.optimizer.jobSubmitterConfig.update_mode = stats",
                 "gravitino.optimizer.jobSubmitterConfig.updater_options = "
-                    + "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\"}",
+                    + "{\"gravitino_uri\":\""
+                    + configsServerUri
+                    + "\",\"metalake\":\"test\"}",
                 "gravitino.optimizer.jobSubmitterConfig.spark_conf = "
                     + "{\"spark.sql.catalog.rest\":\"org.apache.iceberg.spark.SparkCatalog\","
                     + "\"spark.sql.catalog.rest.type\":\"rest\","

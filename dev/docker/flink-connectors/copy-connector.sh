@@ -27,8 +27,8 @@
 #                     Useful for `docker run --rm <image>`.
 #
 # The available versions are DISCOVERED at runtime from the directories baked
-# into /connectors (flink-<ver>). All versions are Scala 2.12 only (Flink does
-# not support Scala 2.13).
+# into /connectors (flink-<ver>). Flink 1.x jars use the Scala 2.12 suffix;
+# Flink 2.x jars have no Scala suffix.
 #
 # As an init container, a missing /target volume is treated as an error so a
 # misconfigured pod fails fast instead of letting the engine start without the
@@ -44,7 +44,7 @@ list_available_versions() {
 }
 
 if [ "${LIST_VERSIONS}" = "true" ]; then
-  echo "Apache Gravitino Flink connector jars available at /connectors/ (all Scala 2.12):"
+  echo "Apache Gravitino Flink connector jars available at /connectors/:"
   echo ""
   list_available_versions
   echo ""
@@ -64,12 +64,12 @@ SOURCE_DIR="/connectors/flink-${FLINK_VERSION}"
 if [ ! -d "$SOURCE_DIR" ]; then
   echo "ERROR: Flink version ${FLINK_VERSION} is not supported by this image." >&2
   echo "" >&2
-  echo "Available versions (all Scala 2.12):" >&2
+  echo "Available versions:" >&2
   list_available_versions >&2
   exit 1
 fi
 
-echo "Copying Flink ${FLINK_VERSION} connector (Scala 2.12) to /target/..."
+echo "Copying Flink ${FLINK_VERSION} connector to /target/..."
 cp "${SOURCE_DIR}"/*.jar /target/
 echo "Done. Jars copied to /target/:"
 ls -1 /target/*.jar 2>/dev/null

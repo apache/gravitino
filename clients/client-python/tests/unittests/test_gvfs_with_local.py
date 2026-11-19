@@ -17,7 +17,9 @@
 import base64
 import os
 import random
+import shutil
 import string
+import tempfile
 import time
 import unittest
 from datetime import datetime
@@ -32,6 +34,9 @@ from fsspec.implementations.local import LocalFileSystem
 
 from gravitino import gvfs, NameIdentifier
 from gravitino.auth.auth_constants import AuthConstants
+from gravitino.auth.oauth2_client_authentication_method import (
+    OAuth2ClientAuthenticationMethod,
+)
 from gravitino.constants.timeout import TIMEOUT
 from gravitino.exceptions.base import (
     GravitinoRuntimeException,
@@ -52,7 +57,6 @@ from tests.unittests.auth.mock_base import (
 # pylint: disable=protected-access,too-many-lines,too-many-locals
 
 
-# pylint: disable=C0302
 def generate_unique_random_string(length):
     characters = string.ascii_letters + string.digits
     random_string = "".join(random.sample(characters, length))
@@ -71,20 +75,15 @@ def generate_unique_random_string(length):
 class TestLocalFilesystem(unittest.TestCase):
     _metalake_name: str = "metalake_demo"
     _server_uri = "http://localhost:9090"
-    _local_base_dir_path: str = "file:/tmp/fileset"
-    _fileset_dir: str = (
-        f"{_local_base_dir_path}/{generate_unique_random_string(10)}/fileset_catalog/tmp"
-    )
 
     def setUp(self) -> None:
+        temporary = tempfile.mkdtemp(prefix="gravitino-gvfs-local-")
+        self.addCleanup(shutil.rmtree, temporary)
+        self._local_base_dir_path = f"file:{temporary}"
+        self._fileset_dir = f"{self._local_base_dir_path}/fileset_catalog/tmp"
         local_fs = LocalFileSystem()
         if not local_fs.exists(self._fileset_dir):
             local_fs.mkdir(self._fileset_dir)
-
-    def tearDown(self) -> None:
-        local_fs = LocalFileSystem()
-        if local_fs.exists(self._local_base_dir_path):
-            local_fs.rm(self._local_base_dir_path, recursive=True)
 
     def test_request_headers(self, *mock_methods):
         options = {
@@ -1482,3 +1481,41 @@ class TestLocalFilesystem(unittest.TestCase):
             fs_default._operations._auto_create_location,
             "auto_create_location should default to True",
         )
+
+    def test_oauth2_client_authentication_method(self, *mock_methods):
+        for method_value in (
+            OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC.value,
+            "CLIENT_SECRET_BASIC",
+        ):
+            options = {
+                GVFSConfig.AUTH_TYPE: GVFSConfig.OAUTH2_AUTH_TYPE,
+                GVFSConfig.OAUTH2_SERVER_URI: "http://127.0.0.1:1082",
+                GVFSConfig.OAUTH2_CREDENTIAL: "client_id:client_secret",
+                GVFSConfig.OAUTH2_SCOPE: "test",
+                GVFSConfig.OAUTH2_PATH: "token/test",
+                GVFSConfig.OAUTH2_CLIENT_AUTHENTICATION_METHOD: method_value,
+            }
+
+            mocked_jwt = mock_jwt(
+                sub="gravitino", exp=GENERATED_TIME + 10000, aud="service1"
+            )
+
+            with patch(
+                "gravitino.auth.default_oauth2_token_provider.DefaultOAuth2TokenProvider._fetch_token",
+                return_value=mocked_jwt,
+            ):
+                fs = gvfs.GravitinoVirtualFileSystem(
+                    server_uri=self._server_uri,
+                    metalake_name=self._metalake_name,
+                    options=options,
+                    skip_instance_cache=True,
+                )
+
+                client = fs._operations._get_gravitino_client()
+                provider = client._rest_client.auth_data_provider
+
+                self.assertEqual(
+                    OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC,
+                    provider._authentication_method,
+                    method_value,
+                )

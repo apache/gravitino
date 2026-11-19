@@ -19,6 +19,8 @@
 package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
+import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
@@ -31,11 +33,12 @@ import org.apache.gravitino.rest.RESTRequest;
 public class CatalogSetRequest implements RESTRequest {
 
   @JsonProperty("inUse")
-  private final boolean inUse;
+  @Getter(AccessLevel.NONE)
+  private final Boolean inUse;
 
   /** Default constructor for CatalogSetRequest. */
   public CatalogSetRequest() {
-    this(false);
+    this.inUse = null;
   }
 
   /**
@@ -48,12 +51,23 @@ public class CatalogSetRequest implements RESTRequest {
   }
 
   /**
-   * Validates the request. No validation needed.
+   * Validates that the requested state was explicitly provided.
    *
    * @throws IllegalArgumentException If the request is invalid.
    */
   @Override
   public void validate() throws IllegalArgumentException {
-    // No validation needed
+    Preconditions.checkArgument(inUse != null, "inUse field is required and must not be null");
+  }
+
+  /**
+   * Returns the explicitly requested state.
+   *
+   * @return whether the object should be in use
+   * @throws IllegalArgumentException if the state was not provided
+   */
+  public boolean isInUse() {
+    validate();
+    return inUse;
   }
 }

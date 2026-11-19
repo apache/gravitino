@@ -26,6 +26,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.job.JobHandle;
+import org.apache.gravitino.job.JobRuntimeTemplateMaskUtils;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.meta.JobEntity;
 import org.slf4j.Logger;
@@ -89,18 +90,22 @@ public final class JobInfo {
 
   /**
    * Deserializes the job entity's stored runtime job template JSON, if any, back into a {@link
-   * JobTemplate}. This is called from inside the event dispatcher's try block for getJob/runJob/
-   * cancelJob, after the underlying operation has already succeeded (or, for cancelJob, after the
-   * external cancel call and entity update have already happened) - a malformed or
-   * forward-incompatible stored value (e.g. a job type unknown to this server version) must not
-   * turn that already-completed operation into a 500, so failures here are logged and swallowed
-   * rather than propagated.
+   * JobTemplate}. For a Spark runtime template, sensitive-named keys inside {@code
+   * --updater-options} and {@code --spark-conf} JSON arguments are masked via {@link
+   * JobRuntimeTemplateMaskUtils} before the template is exposed on the event path. This does not
+   * mask the separate {@code jobConf} map on run-job events. This is called from inside the event
+   * dispatcher's try block for getJob/runJob/cancelJob, after the underlying operation has already
+   * succeeded (or, for cancelJob, after the external cancel call and entity update have already
+   * happened) - a malformed or forward-incompatible stored value (e.g. a job type unknown to this
+   * server version) must not turn that already-completed operation into a 500, so failures here are
+   * logged and swallowed rather than propagated.
    */
   private static JobTemplate toRuntimeJobTemplate(JobEntity jobEntity) {
     try {
       JobTemplateDTO runtimeJobTemplateDTO =
-          DTOConverters.fromRuntimeJobTemplateJson(
-              jobEntity.runtimeJobTemplate(), jobEntity.name());
+          JobRuntimeTemplateMaskUtils.maskSensitiveFields(
+              DTOConverters.fromRuntimeJobTemplateJson(
+                  jobEntity.runtimeJobTemplate(), jobEntity.name()));
       return runtimeJobTemplateDTO == null ? null : DTOConverters.fromDTO(runtimeJobTemplateDTO);
     } catch (Exception e) {
       LOG.warn(
@@ -183,7 +188,8 @@ public final class JobInfo {
 
   /**
    * Returns the resolved job template that was actually submitted for execution, with placeholders
-   * replaced. Its executable, scripts, jars, files and archives are the URIs from the template.
+   * replaced. For a Spark template, sensitive-named keys inside {@code --updater-options} and
+   * {@code --spark-conf} JSON arguments are masked for the event path.
    *
    * @return the runtime job template, or null for jobs run before this field was introduced
    */

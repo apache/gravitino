@@ -38,6 +38,7 @@ import org.apache.gravitino.catalog.jdbc.JdbcSchema;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.slf4j.Logger;
@@ -170,6 +171,7 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
    * @param databaseName The name of the database.
    * @param cascade cascade If set to true, drops all the tables in the schema as well.
    * @return the SQL statement to drop a database with the given name.
+   * @throws NonEmptySchemaException if the database contains tables and cascade is false
    */
   protected String generateDropDatabaseSql(String databaseName, boolean cascade) {
     final String dropDatabaseSql = String.format("DROP DATABASE `%s`", databaseName);
@@ -183,10 +185,8 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
         // Execute the query and check if there exists any tables in the database
         try (ResultSet resultSet = statement.executeQuery(query)) {
           if (resultSet.next()) {
-            throw new IllegalStateException(
-                String.format(
-                    "Database %s is not empty, the value of cascade should be true.",
-                    databaseName));
+            throw new NonEmptySchemaException(
+                "Database %s is not empty, the value of cascade should be true.", databaseName);
           }
         }
       }

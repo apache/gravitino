@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.nio.file.Paths;
 import java.util.Objects;
+import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 
 /** Lexical containment checks shared by orphan cleanup submission and execution. */
 public final class OrphanFileLocationUtils {
@@ -57,20 +58,9 @@ public final class OrphanFileLocationUtils {
    * @return normalized URI
    */
   public static URI normalizeLocation(String value) {
-    // Reject ambiguous encoded paths rather than allowing different filesystem decoders to
-    // interpret the containment check and the subsequent listing differently.
-    Preconditions.checkArgument(
-        !value.isEmpty() && !value.contains("%") && !value.contains("\\"),
-        "Invalid scan location: %s",
-        value);
-    URI uri = URI.create(value);
-    Preconditions.checkArgument(
-        uri.getQuery() == null
-            && uri.getFragment() == null
-            && uri.getPath() != null
-            && uri.getPath().startsWith("/"),
-        "Scan location must be an absolute path without query or fragment: %s",
-        value);
+    // Reuse policy write-time syntax checks so create/update and job submission reject the same
+    // illegal characters (spaces, control chars, query/fragment, encodings).
+    URI uri = IcebergOrphanFileRemovalContent.parseAndValidateLocation(value);
     if (uri.getScheme() == null || "file".equals(uri.getScheme())) {
       return (uri.getScheme() == null ? Paths.get(value) : Paths.get(uri)).normalize().toUri();
     }

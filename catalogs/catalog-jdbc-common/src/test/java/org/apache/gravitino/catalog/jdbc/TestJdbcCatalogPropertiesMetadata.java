@@ -19,8 +19,15 @@
 package org.apache.gravitino.catalog.jdbc;
 
 import com.google.common.collect.ImmutableMap;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import org.apache.commons.dbcp2.BasicDataSource;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
@@ -36,14 +43,105 @@ import org.apache.gravitino.catalog.jdbc.operation.SqliteTableOperations;
 import org.apache.gravitino.catalog.jdbc.utils.TestDataSourceValidation.UnsupportedValidationDriver;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.sqlite.JDBC;
 
 public class TestJdbcCatalogPropertiesMetadata {
+
+  @Test
+  void testConfigurationValidationDoesNotDependOnBackendVerification() {
+    for (Map<String, String> invalid :
+        List.of(
+            Map.of("jdbc-driver", "java.lang.String"),
+            Map.of("jdbc-driver", "missing.Driver"),
+            Map.of("jdbc-url", "jdbc:postgresql://localhost/unused"),
+            Map.of("jdbc.pool.test-on-borrow", "maybe"),
+            Map.of("verify-on-create", "yes"),
+            Map.of("jdbc.pool.min-size", "0"),
+            Map.of("jdbc.pool.max-size", "-1"),
+            Map.of("jdbc.pool.min-size", "5", "jdbc.pool.max-size", "2"),
+            Map.of("jdbc.pool.connect-timeout-ms", "2147483648"))) {
+      Map<String, String> properties = poolWaitProperties();
+      properties.put("verify-on-create", "false");
+      properties.putAll(invalid);
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> new TestJdbcCatalog().validateConfiguration(properties),
+          invalid.toString());
+    }
+    Map<String, String> unavailable = poolWaitProperties();
+    unavailable.put("jdbc-driver", NoConnectionDriver.class.getName());
+    unavailable.put("jdbc-url", "jdbc:sqlite:unavailable");
+    unavailable.put("verify-on-create", "false");
+    // A static settings check must not attempt a connection to this unavailable backend.
+    Assertions.assertDoesNotThrow(() -> new TestJdbcCatalog().validateConfiguration(unavailable));
+  }
+
+  @Test
+  void testValidationUsesTheSameBypassPrecedenceAsOperations() {
+    Map<String, String> properties = poolWaitProperties();
+    properties.put("verify-on-create", "false");
+    properties.put("gravitino.bypass.jdbc.pool.min-size", "5");
+    properties.put("jdbc.pool.max-size", "2");
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> new TestJdbcCatalog().validateConfiguration(properties));
+    properties.put("jdbc.pool.min-size", "1");
+    // Canonical JDBC settings override prefixed settings.
+    Assertions.assertDoesNotThrow(() -> new TestJdbcCatalog().validateConfiguration(properties));
+    properties.put("url", "ignored property");
+    Assertions.assertDoesNotThrow(() -> new TestJdbcCatalog().validateConfiguration(properties));
+    Assertions.assertFalse(
+        buildCatalog(Map.of("gravitino.bypass.verify-on-create", "false"))
+            .shouldValidateOnCreate());
+    Assertions.assertTrue(
+        buildCatalog(
+                Map.of("verify-on-create", "true", "gravitino.bypass.verify-on-create", "false"))
+            .shouldValidateOnCreate());
+    properties.put("gravitino.bypass.initialSize", "1");
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class,
+        () -> new TestJdbcCatalog().validateConfiguration(properties));
+  }
+
+  @Test
+  void testNativePoolPropertySyntaxIsValidatedWithoutBackendVerification() {
+    for (String key : List.of("maxWaitMillis", "maxIdle")) {
+      Map<String, String> properties = poolWaitProperties();
+      properties.put("verify-on-create", "false");
+      properties.put("gravitino.bypass." + key, "not-a-number");
+      IllegalArgumentException error =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> new TestJdbcCatalog().validateConfiguration(properties));
+      Assertions.assertTrue(error.getMessage().contains(key));
+    }
+  }
+
+  @Test
+  void testBooleanConnectionSettingsAreVisibleAndStrict() {
+    JdbcCatalogPropertiesMetadata metadata = new JdbcCatalogPropertiesMetadata();
+    Assertions.assertFalse(metadata.isHiddenProperty(JdbcConfig.VERIFY_ON_CREATE.getKey()));
+    Assertions.assertFalse(metadata.isHiddenProperty(JdbcConfig.TEST_ON_BORROW.getKey()));
+    for (String value : new String[] {"yes", "1", "perhaps", ""}) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              buildCatalog(ImmutableMap.of(JdbcConfig.VERIFY_ON_CREATE.getKey(), value))
+                  .shouldValidateOnCreate());
+    }
+    Assertions.assertTrue(
+        buildCatalog(ImmutableMap.of("verify-on-create", "TRUE")).shouldValidateOnCreate());
+    Assertions.assertFalse(
+        buildCatalog(ImmutableMap.of("verify-on-create", "FALSE")).shouldValidateOnCreate());
+  }
 
   @Test
   public void testPoolSizePropertiesAreNotHidden() {
@@ -66,6 +164,87 @@ public class TestJdbcCatalogPropertiesMetadata {
     Assertions.assertFalse(
         buildCatalog(ImmutableMap.of(JdbcConfig.VERIFY_ON_CREATE.getKey(), "false"))
             .shouldValidateOnCreate());
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "none,none,none,30000",
+    "1250,none,none,1250",
+    "none,2300,none,2300",
+    "1250,2300,none,1250",
+    "none,none,3400,3400",
+    "1250,none,3400,1250"
+  })
+  void testPoolMaxWaitReachesCatalogDataSource(
+      String canonical, String bypass, String dbcpBypass, long expected) throws Exception {
+    Map<String, String> properties = poolWaitProperties();
+    if (!"none".equals(canonical)) {
+      properties.put(JdbcConfig.POOL_MAX_WAIT_MS.getKey(), canonical);
+    }
+    if (!"none".equals(bypass)) {
+      properties.put("gravitino.bypass." + JdbcConfig.POOL_MAX_WAIT_MS.getKey(), bypass);
+    }
+    if (!"none".equals(dbcpBypass)) {
+      // The DBCP-native key documented as the bypass example in the JDBC catalog docs.
+      properties.put("gravitino.bypass.maxWaitMillis", dbcpBypass);
+    }
+    JdbcCatalogPropertiesMetadata metadata = new JdbcCatalogPropertiesMetadata();
+    Assertions.assertTrue(metadata.containsProperty(JdbcConfig.POOL_MAX_WAIT_MS.getKey()));
+    Assertions.assertFalse(metadata.isHiddenProperty(JdbcConfig.POOL_MAX_WAIT_MS.getKey()));
+    Assertions.assertFalse(metadata.isImmutableProperty(JdbcConfig.POOL_MAX_WAIT_MS.getKey()));
+    try (JdbcCatalogOperations operations = poolWaitOperations()) {
+      operations.initialize(properties, poolWaitCatalogInfo(properties), new TestJdbcCatalog());
+      BasicDataSource pool = (BasicDataSource) FieldUtils.readField(operations, "dataSource", true);
+      Assertions.assertEquals(expected, pool.getMaxWaitDuration().toMillis());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"0", "-1", "not-a-number"})
+  void testInvalidPoolMaxWaitIsRejected(String value) {
+    Map<String, String> properties = poolWaitProperties();
+    properties.put(JdbcConfig.POOL_MAX_WAIT_MS.getKey(), value);
+    try (JdbcCatalogOperations operations = poolWaitOperations()) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              operations.initialize(
+                  properties, poolWaitCatalogInfo(properties), new TestJdbcCatalog()));
+    }
+  }
+
+  private static Map<String, String> poolWaitProperties() {
+    return new HashMap<>(
+        Map.of(
+            JdbcConfig.JDBC_URL.getKey(),
+            "jdbc:sqlite::memory:",
+            JdbcConfig.JDBC_DRIVER.getKey(),
+            "org.sqlite.JDBC",
+            JdbcConfig.USERNAME.getKey(),
+            "user",
+            JdbcConfig.PASSWORD.getKey(),
+            "password"));
+  }
+
+  private static CatalogInfo poolWaitCatalogInfo(Map<String, String> properties) {
+    return new CatalogInfo(
+        1L,
+        "jdbc_catalog",
+        Catalog.Type.RELATIONAL,
+        "jdbc-test",
+        "test",
+        properties,
+        AuditInfo.builder().withCreator("test").withCreateTime(Instant.EPOCH).build(),
+        Namespace.of("metalake"));
+  }
+
+  private static JdbcCatalogOperations poolWaitOperations() {
+    return new JdbcCatalogOperations(
+        new SqliteExceptionConverter(),
+        new SqliteTypeConverter(),
+        new SqliteDatabaseOperations(":memory:"),
+        new SqliteTableOperations(),
+        new SqliteColumnDefaultValueConverter());
   }
 
   private static JdbcCatalog buildCatalog(Map<String, String> extraProperties) {
@@ -208,6 +387,15 @@ public class TestJdbcCatalogPropertiesMetadata {
             Assertions.assertThrows(ConnectionFailedException.class, operations::getDiverInfo);
         Assertions.assertTrue(exception.getMessage().contains("isValid is not supported"));
       }
+    }
+  }
+
+  /** A driver that proves settings validation does not open a connection. */
+  public static class NoConnectionDriver extends JDBC {
+    /** {@inheritDoc} */
+    @Override
+    public Connection connect(String url, Properties properties) throws SQLException {
+      throw new AssertionError("Configuration validation must not open a connection");
     }
   }
 

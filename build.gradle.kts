@@ -27,20 +27,27 @@ import com.github.jk1.license.filter.LicenseBundleNormalizer
 import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
+import groovy.json.JsonSlurper
 import net.ltgt.gradle.errorprone.errorprone
 import org.apache.tools.zip.ZipEntry
 import org.apache.tools.zip.ZipOutputStream
 import org.gradle.api.attributes.java.TargetJvmVersion
+import org.gradle.api.publish.maven.tasks.GenerateMavenPom
+import org.gradle.api.publish.tasks.GenerateModuleMetadata
 import org.gradle.api.services.BuildService
 import org.gradle.api.services.BuildServiceParameters
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.internal.os.OperatingSystem
 import org.gradle.kotlin.dsl.support.serviceOf
+import org.w3c.dom.Element
+import org.w3c.dom.Node
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.util.Locale
+import java.util.Properties
 import java.util.zip.ZipFile
+import javax.xml.parsers.DocumentBuilderFactory
 
 Locale.setDefault(Locale.US)
 
@@ -305,6 +312,95 @@ class LegalFilesTransformer(
   }
 }
 
+/**
+ * Removes the Apache Avro copy that hadoop-client-runtime shades under
+ * org/apache/hadoop/shaded/org/apache/avro when it is older than 1.11.4.
+ *
+ * Hadoop 3.3.6 shades Avro 1.7.7, and a dependency constraint cannot replace classes that live inside
+ * another jar. Within Hadoop the shaded Avro only backs Avro serialization (SequenceFile, MapReduce job
+ * history, `hadoop fs -text`), which Gravitino does not use; the FileSystem, HDFS and Kerberos code
+ * paths do not load it. Other jars pass through unchanged. Remove this transform once Hadoop is
+ * upgraded to a release that shades Avro 1.11.4 or later (Hadoop 3.4.2+).
+ */
+@CacheableTransform
+abstract class StripShadedAvroTransform : TransformAction<TransformParameters.None> {
+  companion object {
+    val STRIPPED: Attribute<Boolean> =
+      Attribute.of("org.apache.gravitino.shaded-avro-stripped", Boolean::class.javaObjectType)
+    const val SHADED_AVRO_PREFIX = "org/apache/hadoop/shaded/org/apache/avro/"
+    const val AVRO_METADATA_PREFIX = "META-INF/maven/org.apache.avro/"
+    const val AVRO_POM_PROPERTIES = "META-INF/maven/org.apache.avro/avro/pom.properties"
+    private val MIN_AVRO_VERSION = listOf(1, 11, 4)
+
+    /** Returns true if the dotted [version] is lower than 1.11.4. */
+    fun isOutdatedAvro(version: String): Boolean {
+      val parts = version.split('.', '-').map { it.toIntOrNull() ?: 0 }
+      for (i in MIN_AVRO_VERSION.indices) {
+        val part = parts.getOrElse(i) { 0 }
+        if (part != MIN_AVRO_VERSION[i]) {
+          return part < MIN_AVRO_VERSION[i]
+        }
+      }
+      return false
+    }
+  }
+
+  @get:InputArtifact
+  @get:PathSensitive(PathSensitivity.NAME_ONLY)
+  abstract val inputArtifact: Provider<FileSystemLocation>
+
+  override fun transform(outputs: TransformOutputs) {
+    val input = inputArtifact.get().asFile
+    if (!input.isFile || !input.name.startsWith("hadoop-client-runtime-") || !input.name.endsWith(".jar")) {
+      outputs.file(inputArtifact)
+      return
+    }
+
+    val avroVersion = ZipFile(input).use { jar ->
+      jar.getEntry(AVRO_POM_PROPERTIES)?.let { entry ->
+        Properties().apply { jar.getInputStream(entry).use { load(it) } }.getProperty("version")
+      }
+    }
+    if (avroVersion == null || !isOutdatedAvro(avroVersion)) {
+      outputs.file(inputArtifact)
+      return
+    }
+
+    // Keep the original file name so that the distribution layout and license reports do not change.
+    val output = outputs.file(input.name)
+    var removed = 0
+    ZipFile(input).use { jar ->
+      ZipOutputStream(output).use { out ->
+        jar.entries().asSequence().forEach { source ->
+          if (source.name.startsWith(SHADED_AVRO_PREFIX) || source.name.startsWith(AVRO_METADATA_PREFIX)) {
+            removed++
+            return@forEach
+          }
+          val entry = ZipEntry(source.name)
+          entry.time = source.time
+          out.putNextEntry(entry)
+          if (!source.isDirectory) {
+            jar.getInputStream(source).use { it.copyTo(out) }
+          }
+          out.closeEntry()
+        }
+      }
+    }
+    if (removed == 0) {
+      throw GradleException("Expected shaded Avro $avroVersion entries in ${input.name}, found none")
+    }
+  }
+}
+
+// Projects whose runtime libraries ship hadoop-client-runtime in the distribution.
+val shadedAvroStrippedProjects = setOf(
+  ":authorizations:authorization-ranger",
+  ":catalogs:catalog-fileset",
+  ":catalogs:catalog-lakehouse-iceberg",
+  ":iceberg:iceberg-rest-server",
+  ":iceberg:iceberg-rest-server-experiment"
+)
+
 val snappyJavaVersion: String = libs.versions.snappy.java.get()
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
@@ -405,7 +501,11 @@ allprojects {
         // logging so plugin log output routes into Trino's unified log, instead of SLF4J.
         // integration-test is intentionally excluded from this carve-out: it runs outside
         // Trino's isolated plugin classloader, so it should keep using SLF4J as normal.
-        if (!project.path.startsWith(":trino-connector:trino-connector")) {
+        // The :trino-connector project itself formats the shared common-* source trees.
+        val isTrinoPluginSource =
+          project.path == ":trino-connector" ||
+            project.path.startsWith(":trino-connector:trino-connector")
+        if (!isTrinoPluginSource) {
           replaceRegex(
             "Use SLF4J Logger instead of other logging frameworks",
             "import\\s+.*\\.(Logger|LoggerFactory);",
@@ -514,9 +614,14 @@ allprojects {
 
       val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
       param.environment("dockerTest", dockerTest.toString())
+      // Must stay inside doFirst: tasks such as :core's database lanes set this flag in their own
+      // configuration action, which may run after this configureEach action registers.
+      val includeDockerTaggedTests =
+        param.extensions.extraProperties.properties["includeDockerTaggedTests"] as? Boolean
+          ?: dockerTest
       val dorisMultiVersion = project.hasProperty("dorisMultiVersionTest")
       param.useJUnitPlatform {
-        if (!dockerTest) {
+        if (!includeDockerTaggedTests) {
           excludeTags("gravitino-docker-test")
         }
         if (!dorisMultiVersion) {
@@ -578,6 +683,7 @@ fun excludePackagesForSparkConnector(project: Project) {
 }
 
 val commonsBeanutilsVersion: String = libs.versions.commons.beanutils.get()
+val httpcore5Version: String = libs.versions.httpcore5.get()
 
 subprojects {
   // Gravitino Python client project didn't need to apply the java plugin
@@ -599,13 +705,41 @@ subprojects {
   // Force upgrade commons-beanutils/snappy-java for all subprojects to resolve outdated transitive versions
   // commons-beanutils: pulled by Hadoop, Hive, Spark, Flink, etc.
   // snappy-java: pulled by Hadoop, Kafka, Iceberg, etc.
+  // httpcore5/httpcore5-h2: pulled by httpclient5 (directly and via Iceberg), whose POM still
+  // manages them on the 5.3/5.4.0 line; force the 5.4.4 patch so every module uses the same,
+  // latest 5.4 patch. It stays API-compatible with the httpclient5 versions on the classpath.
   configurations.all {
     resolutionStrategy.force("commons-beanutils:commons-beanutils:$commonsBeanutilsVersion")
     resolutionStrategy.force("org.xerial.snappy:snappy-java:$snappyJavaVersion")
+    resolutionStrategy.force("org.apache.httpcomponents.core5:httpcore5:$httpcore5Version")
+    resolutionStrategy.force("org.apache.httpcomponents.core5:httpcore5-h2:$httpcore5Version")
 
     // Exclude log4j 1.x (CVE-2020-9493, CVSS 9.8) pulled transitively by Hive and Hadoop.
     // The safe log4j-1.2-api bridge from Log4j 2.x is already included in the log4j bundle.
     exclude(group = "log4j", module = "log4j")
+  }
+  // Strip the outdated Avro shaded into hadoop-client-runtime, see StripShadedAvroTransform.
+  // The test classpaths use the same jar so that tests run against what the distribution ships.
+  if (project.path in shadedAvroStrippedProjects) {
+    dependencies {
+      attributesSchema {
+        attribute(StripShadedAvroTransform.STRIPPED)
+      }
+      artifactTypes.getByName(ArtifactTypeDefinition.JAR_TYPE) {
+        attributes.attribute(StripShadedAvroTransform.STRIPPED, false)
+      }
+      // The source is not restricted to the "jar" artifact type: with that restriction, artifacts
+      // such as hadoop-yarn-server-tests on the test classpaths had no matching variant. The
+      // transform passes every artifact other than hadoop-client-runtime through unchanged.
+      registerTransform(StripShadedAvroTransform::class) {
+        from.attribute(StripShadedAvroTransform.STRIPPED, false)
+        to.attribute(StripShadedAvroTransform.STRIPPED, true)
+      }
+    }
+    configurations.matching { it.name == "runtimeClasspath" || it.name == "testRuntimeClasspath" }
+      .configureEach {
+        attributes.attribute(StripShadedAvroTransform.STRIPPED, true)
+      }
   }
 
   repositories {
@@ -620,6 +754,7 @@ subprojects {
     ":catalogs:hadoop-auth",
     ":catalogs:hadoop-common",
     ":maintenance:jobs",
+    ":maintenance:maintenance-common",
     ":maintenance:optimizer-api",
     ":maintenance:updaters",
     ":clients",
@@ -632,7 +767,9 @@ subprojects {
   // though the rest of :spark-connector (3.x) stays on Java 8.
   val jdk17OnlyProjectPaths = setOf(
     ":spark-connector:spark-4.0",
-    ":spark-connector:spark-runtime-4.0"
+    ":spark-connector:spark-runtime-4.0",
+    ":spark-connector:spark-4.1",
+    ":spark-connector:spark-runtime-4.1"
   )
 
   fun compatibleWithJDK8(project: Project): Boolean {
@@ -805,12 +942,13 @@ subprojects {
     ":common" to listOf("iceberg", "hadoop"),
     ":core" to listOf("spark", "iceberg", "kafka", "aws"),
     ":clients:client-java" to listOf("iceberg"),
-    ":catalogs:catalog-common" to listOf("doris"),
+    ":bundles:aws" to listOf("doris"),
     ":catalogs:hive-metastore-common" to listOf("iceberg"),
     ":catalogs:catalog-lakehouse-iceberg" to listOf("iceberg"),
     ":catalogs:catalog-lakehouse-paimon" to listOf("paimon"),
     ":spark-connector:spark-3.5" to listOf("iceberg"),
     ":spark-connector:spark-4.0" to listOf("iceberg"),
+    ":spark-connector:spark-4.1" to listOf("iceberg"),
     ":server-common" to listOf("hadoop"),
     ":iceberg:iceberg-common" to listOf("iceberg"),
     ":iceberg:iceberg-rest-server" to listOf("iceberg"),
@@ -827,7 +965,8 @@ subprojects {
     // SparkTransformConverter's Iceberg-derived findWidth method is private and absent from Javadoc.
     sourceNotices.set(
       when (project.path) {
-        ":spark-connector:spark-3.5", ":spark-connector:spark-4.0" -> sourceNoticeNames.filterNot { it == "iceberg" }
+        ":spark-connector:spark-3.5", ":spark-connector:spark-4.0", ":spark-connector:spark-4.1" ->
+          sourceNoticeNames.filterNot { it == "iceberg" }
         else -> sourceNoticeNames
       }
     )
@@ -873,6 +1012,84 @@ subprojects {
     shadowJar.configure {
       dependsOn(bundledLegalFiles)
       transform(LegalFilesTransformer(bundledLegalFiles.get().outputArchive.get().asFile))
+    }
+
+    // A module that declares a `shadedDependencies` configuration packages those inputs into its
+    // shaded jar, so they must not be republished as dependencies: consumers resolving the
+    // coordinate would otherwise download unshaded copies of the classes the jar already contains.
+    // See https://github.com/apache/gravitino/issues/13171
+    afterEvaluate {
+      if (configurations.findByName("shadedDependencies") == null) {
+        return@afterEvaluate
+      }
+      // The plain `jar` is an empty placeholder (classifier `empty`); the actual content lives in
+      // the shaded jar. Point the ordinary Java variants at the shaded jar so consumers resolving
+      // through Gradle module metadata get the implementation classes. Otherwise `runtimeElements`
+      // selects the empty jar and, with the bundled inputs no longer published as dependencies,
+      // consumers receive neither the classes nor the transitive dependencies.
+      listOf("apiElements", "runtimeElements").forEach { variantName ->
+        configurations.named(variantName) {
+          outgoing.artifacts.clear()
+          outgoing.artifact(tasks.named("shadowJar"))
+        }
+      }
+      val generatePom = tasks.named<GenerateMavenPom>("generatePomFileForMavenJavaPublication")
+      val verifyShadedRuntimePom = tasks.register("verifyShadedRuntimePom") {
+        group = "verification"
+        description = "Fails when a self-contained shaded artifact republishes bundled inputs."
+        val pom = generatePom.map { it.destination }
+        dependsOn(generatePom)
+        doLast {
+          val document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(pom.get())
+          val published = document.getElementsByTagName("dependency")
+          check(published.length == 0) {
+            val coordinates =
+              (0 until published.length).joinToString { index ->
+                val element = published.item(index) as Element
+                val children = (0 until element.childNodes.length).map { element.childNodes.item(it) }
+                fun childText(name: String) =
+                  children
+                    .firstOrNull { it.nodeType == Node.ELEMENT_NODE && it.nodeName == name }
+                    ?.textContent
+                "${childText("groupId")}:${childText("artifactId")}"
+              }
+            "${project.path} publishes dependencies its jar already contains: $coordinates"
+          }
+        }
+      }
+      val generateMetadata =
+        tasks.named<GenerateModuleMetadata>("generateMetadataFileForMavenJavaPublication")
+      val shadedJarName = tasks.named<ShadowJar>("shadowJar").flatMap { it.archiveFileName }
+      val verifyShadedRuntimeModuleMetadata =
+        tasks.register("verifyShadedRuntimeModuleMetadata") {
+          group = "verification"
+          description =
+            "Fails when the ordinary Java variants do not expose the shaded jar, or republish bundled dependencies."
+          dependsOn(generateMetadata)
+          val metadataFile = generateMetadata.flatMap { it.outputFile }
+          doLast {
+            @Suppress("UNCHECKED_CAST")
+            val variants =
+              (JsonSlurper().parse(metadataFile.get().asFile) as Map<String, Any>)["variants"]
+                as List<Map<String, Any>>
+            listOf("apiElements", "runtimeElements").forEach { variantName ->
+              val variant = variants.first { it["name"] == variantName }
+
+              @Suppress("UNCHECKED_CAST")
+              val files = (variant["files"] as List<Map<String, String>>).map { it["name"] }
+              check(files == listOf(shadedJarName.get())) {
+                "${project.path} variant $variantName publishes $files instead of the shaded jar ${shadedJarName.get()}"
+              }
+              check((variant["dependencies"] as? List<*>).orEmpty().isEmpty()) {
+                "${project.path} variant $variantName republishes dependencies its jar already contains"
+              }
+            }
+          }
+        }
+      tasks.named("check") {
+        dependsOn(verifyShadedRuntimePom)
+        dependsOn(verifyShadedRuntimeModuleMetadata)
+      }
     }
   }
   if (project.path == ":clients:cli") {
@@ -1019,7 +1236,17 @@ subprojects {
       val extraArgs = project.property("extraJvmArgs") as List<String>
       jvmArgs = listOf("-Xmx4G") + extraArgs
       useJUnitPlatform()
-      finalizedBy(tasks.getByName("jacocoTestReport"))
+      val isCoreSuiteTask =
+        project.path == ":core" &&
+          name in setOf(
+          "coreUnitTest",
+          "coreH2Test",
+          "coreMySQLTest",
+          "corePostgreSQLTest"
+        )
+      if (!isCoreSuiteTask) {
+        finalizedBy(tasks.getByName("jacocoTestReport"))
+      }
     }
   }
 
@@ -1168,10 +1395,12 @@ tasks {
         "copyJobsLib",
         ":authorizations:copyLibAndConfig",
         ":iceberg:iceberg-rest-server:copyLibAndConfigs",
+        ":iceberg:iceberg-rest-server-experiment:copyLibAndConfigs",
         ":lance:lance-rest-server:copyLibAndConfigs",
         ":maintenance:optimizer:copyLibAndConfigs",
         ":plugins:idp-basic:copyLibAndConfigs",
-        ":plugins:tms:copyLibAndConfigs"
+        ":plugins:maintenance:copyLibAndConfigs",
+        ":plugins:k8s-job-executor:copyLibAndConfigs"
       )
     if (!skipWeb) {
       dependencies.add(":web:web:build")
@@ -1343,18 +1572,19 @@ tasks {
   }
 
   val compileTrinoConnector by registering {
-    dependsOn("trino-connector:trino-connector-473-478:copyLibs")
+    dependsOn("trino-connector:trino-connector-482-483:copyLibs")
     group = "gravitino distribution"
   }
 
   val assembleDistribution by registering(Tar::class) {
     dependsOn(
       compileDistribution,
-      ":trino-connector:trino-connector-440-445:assembleTrinoConnector",
-      ":trino-connector:trino-connector-446-451:assembleTrinoConnector",
-      ":trino-connector:trino-connector-452-468:assembleTrinoConnector",
       ":trino-connector:trino-connector-469-472:assembleTrinoConnector",
-      ":trino-connector:trino-connector-473-478:assembleTrinoConnector",
+      ":trino-connector:trino-connector-473-477:assembleTrinoConnector",
+      ":trino-connector:trino-connector-478-479:assembleTrinoConnector",
+      ":trino-connector:trino-connector-480:assembleTrinoConnector",
+      ":trino-connector:trino-connector-481:assembleTrinoConnector",
+      ":trino-connector:trino-connector-482-483:assembleTrinoConnector",
       "assembleIcebergRESTServer",
       "assembleLanceRESTServer"
     )

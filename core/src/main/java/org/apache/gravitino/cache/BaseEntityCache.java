@@ -107,10 +107,10 @@ public abstract class BaseEntityCache implements EntityCache {
   public final <E extends Entity & HasIdentifier> void put(E entity) {
     Preconditions.checkArgument(entity != null, "Entity cannot be null");
 
-    // Called before the cacheability check and before any subclass takes this entity's lock: it
-    // may take another key's lock (e.g. the model key when inserting a model version), and nesting
-    // two entity locks could deadlock. A non-cacheable entity can still invalidate a cacheable one,
-    // so this runs for every entity.
+    // Called before the cacheability check: a non-cacheable entity can still invalidate a cacheable
+    // one, so this runs for every entity. The caller may already hold this entity's lock, so the
+    // hook must not take another entity's lock (see
+    // SupportsEntityStoreCache#invalidateOnKeyChange).
     invalidateOnKeyChange(entity);
 
     if (!isCacheable(entity.type())) {

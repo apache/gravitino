@@ -233,6 +233,10 @@ public class TestJdbcCatalogCredential {
     Assertions.assertEquals("test-user", publicProps.get(JdbcConfig.USERNAME.getKey()));
     Assertions.assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE, publicProps.get(JdbcConfig.PASSWORD.getKey()));
+    // The inferred provider name is exposed without backfill
+    Assertions.assertEquals(
+        JdbcCredential.JDBC_CREDENTIAL_TYPE,
+        publicProps.get(CredentialConstants.CREDENTIAL_PROVIDERS));
 
     // propertiesWithCredentialProviders must still see the raw credentials
     Map<String, String> credProps = jdbcCatalog.propertiesWithCredentialProviders();

@@ -22,7 +22,6 @@ package org.apache.gravitino.server.authorization;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ObjectArrays;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
@@ -33,7 +32,6 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CapabilityHelpers;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.capability.Capability;
@@ -106,8 +104,10 @@ public class MetadataIdConverter {
   /**
    * Normalizes a metadata object's name using the same catalog rules as ID resolution.
    *
-   * <p>Types without a catalog capability scope retain their names. Semantic model leaves remain
-   * case sensitive, while column names and their table/schema parents follow their own scopes.
+   * <p>Types without a catalog capability scope retain their names. The rules come from {@link
+   * CapabilityHelpers#normalizeMetadataIdentifier}, which tag operations also use: Semantic Model
+   * leaves keep their case, tables and column parents resolve to physical names, and a column keeps
+   * a name that exactly matches a stored column.
    *
    * @param metadataObject the object whose name will be normalized
    * @param metalake the metalake name
@@ -152,33 +152,9 @@ public class MetadataIdConverter {
     if (scope == null) {
       return ident;
     }
-
-    Capability capability = CapabilityHelpers.getCapability(ident, catalogManager);
-    if (scope == Capability.Scope.COLUMN) {
-      // The NameIdentifier overload applies SCHEMA to the namespace and TABLE to the leaf.
-      NameIdentifier table =
-          CapabilityHelpers.applyCaseSensitive(
-              NameIdentifier.of(ident.namespace().levels()), Capability.Scope.TABLE, capability);
-      return NameIdentifier.of(
-          Namespace.of(ObjectArrays.concat(table.namespace().levels(), table.name())),
-          CapabilityHelpers.applyCaseSensitiveOnName(scope, ident.name(), capability));
-    }
-
-    if (scope == Capability.Scope.SEMANTIC_MODEL) {
-      return NameIdentifier.of(
-          CapabilityHelpers.applyCaseSensitive(ident.namespace(), scope, capability), ident.name());
-    }
-
-    NameIdentifier normalized = CapabilityHelpers.applyCaseSensitive(ident, scope, capability);
-
-    // For a table, resolve the normalized name to the physically stored name through the same
-    // shared resolver the table dispatcher uses, so the identifier authorized here is the
-    // identifier the operation later runs on. For catalogs that do not implement the resolution
-    // capability (the vast majority) this is a pure identity call with no extra source access.
-    if (scope == Capability.Scope.TABLE) {
-      return CapabilityHelpers.resolvePhysicalTableName(normalized, catalogManager);
-    }
-    return normalized;
+    // Tag operations use the same helper, so authorization checks the object they change.
+    return CapabilityHelpers.normalizeMetadataIdentifier(
+        ident, scope, catalogManager, () -> GravitinoEnv.getInstance().entityStore());
   }
 
   private static Optional<Long> loadId(MetadataObject metadataObject, NameIdentifier ident) {

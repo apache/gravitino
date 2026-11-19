@@ -190,6 +190,115 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
     compareTwoColumns(createdTable.columns(), retrievedTable.columns());
   }
 
+  /** Verifies batched column ID reads across query boundaries on every backend. */
+  @TestTemplate
+  public void testBatchGetColumnIdsForWideTable() throws IOException {
+    createParentEntities(METALAKE_NAME, "catalog1", "schema1", AUDIT_INFO);
+    List<ColumnEntity> columns = new ArrayList<>();
+    for (int i = 0; i < WIDE_TABLE_COLUMN_COUNT; i++) {
+      columns.add(newIntColumn("column_" + i, i, "comment"));
+    }
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("wide_table")
+            .withNamespace(Namespace.of(METALAKE_NAME, "catalog1", "schema1"))
+            .withColumns(columns)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(table, false);
+    TableColumnMetaService service = TableColumnMetaService.getInstance();
+    for (int count : new int[] {0, 1, 499, 500, 501, 1001, WIDE_TABLE_COLUMN_COUNT}) {
+      List<ColumnEntity> requested = columns.subList(0, count);
+      Map<String, Long> expected =
+          requested.stream().collect(Collectors.toMap(ColumnEntity::name, ColumnEntity::id));
+      Assertions.assertEquals(
+          expected,
+          service.getColumnIdsByTableIdAndNames(
+              table.id(), requested.stream().map(ColumnEntity::name).collect(Collectors.toList())));
+    }
+    List<String> names = columns.stream().map(ColumnEntity::name).collect(Collectors.toList());
+    names.add(columns.get(0).name());
+    Assertions.assertEquals(
+        WIDE_TABLE_COLUMN_COUNT, service.getColumnIdsByTableIdAndNames(table.id(), names).size());
+    names.add("missing_column");
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> service.getColumnIdsByTableIdAndNames(table.id(), names));
+  }
+
+  /** Verifies batch lookups follow renames, deletions and replacement IDs within one table. */
+  @TestTemplate
+  public void testBatchGetColumnIdsFollowsColumnLifecycle() throws IOException {
+    createParentEntities(METALAKE_NAME, "catalog1", "schema1", AUDIT_INFO);
+    ColumnEntity dropped = newIntColumn("dropped", 0, "comment");
+    ColumnEntity renamed = newIntColumn("renamed", 1, "comment");
+    ColumnEntity kept = newIntColumn("kept", 2, "comment");
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table1")
+            .withNamespace(Namespace.of(METALAKE_NAME, "catalog1", "schema1"))
+            .withColumns(Lists.newArrayList(dropped, renamed, kept))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(table, false);
+    TableColumnMetaService service = TableColumnMetaService.getInstance();
+    Assertions.assertEquals(
+        Map.of("dropped", dropped.id(), "renamed", renamed.id(), "kept", kept.id()),
+        service.getColumnIdsByTableIdAndNames(table.id(), List.of("dropped", "renamed", "kept")));
+
+    ColumnEntity renamedColumn = newIntColumn("new_name", 1, "comment", renamed.id());
+    TableEntity updated =
+        TableEntity.builder()
+            .withId(table.id())
+            .withName(table.name())
+            .withNamespace(table.namespace())
+            .withColumns(Lists.newArrayList(renamedColumn, kept))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().updateTable(table.nameIdentifier(), ignored -> updated);
+    Assertions.assertEquals(
+        Map.of("new_name", renamed.id(), "kept", kept.id()),
+        service.getColumnIdsByTableIdAndNames(table.id(), List.of("new_name", "kept")));
+    for (String missing : List.of("dropped", "renamed", "missing")) {
+      Assertions.assertThrows(
+          NoSuchEntityException.class,
+          () -> service.getColumnIdsByTableIdAndNames(table.id(), List.of("kept", missing)));
+    }
+
+    ColumnEntity replacement = newIntColumn("dropped", 0, "replacement");
+    TableEntity replaced =
+        TableEntity.builder()
+            .withId(table.id())
+            .withName(table.name())
+            .withNamespace(table.namespace())
+            .withColumns(Lists.newArrayList(replacement, renamedColumn, kept))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().updateTable(table.nameIdentifier(), ignored -> replaced);
+    Assertions.assertEquals(
+        Map.of("dropped", replacement.id(), "new_name", renamed.id(), "kept", kept.id()),
+        service.getColumnIdsByTableIdAndNames(table.id(), List.of("dropped", "new_name", "kept")));
+
+    ColumnEntity otherColumn = newIntColumn("kept", 0, "other table");
+    TableEntity otherTable =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table2")
+            .withNamespace(table.namespace())
+            .withColumns(Lists.newArrayList(otherColumn))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(otherTable, false);
+    Assertions.assertEquals(
+        Map.of("kept", kept.id()),
+        service.getColumnIdsByTableIdAndNames(table.id(), List.of("kept")));
+    Assertions.assertEquals(
+        Map.of("kept", otherColumn.id()),
+        service.getColumnIdsByTableIdAndNames(otherTable.id(), List.of("kept")));
+  }
+
   @TestTemplate
   public void testDropColumnsRemovesTheirRelationsInBatches() throws Exception {
     String catalogName = "catalog1";

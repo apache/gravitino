@@ -112,6 +112,15 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
     return true;
   }
 
+  /**
+   * Whether the catalog accepts arbitrary table properties, such as {@code 'test key' = 'test
+   * value'}, at creation time. Catalogs that validate table properties against a fixed set reject
+   * them.
+   */
+  protected boolean supportsCustomTableProperties() {
+    return true;
+  }
+
   protected boolean defaultValueWithNullLiterals() {
     return false;
   }
@@ -315,16 +324,15 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
                   "CREATE TABLE %s "
                       + "(string_type STRING COMMENT 'string_type', "
                       + " double_type DOUBLE COMMENT 'double_type')"
-                      + " COMMENT '%s' WITH ("
-                      + "'%s' = '%s')",
-                  tableName, comment, key, value);
+                      + " COMMENT '%s'%s",
+                  tableName, comment, customTablePropertiesClause(key, value));
           TestUtils.assertTableResult(result, ResultKind.SUCCESS);
 
           Table table =
               catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
           Assertions.assertNotNull(table);
           Assertions.assertEquals(comment, table.comment());
-          if (supportTablePropertiesOperation()) {
+          if (supportTablePropertiesOperation() && supportsCustomTableProperties()) {
             Assertions.assertEquals(value, table.properties().get(key));
           }
           Column[] columns =
@@ -369,9 +377,8 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
                   + " cc int,"
                   + "  PRIMARY KEY (aa,bb) NOT ENFORCED"
                   + ")"
-                  + " COMMENT '%s' WITH ("
-                  + "'%s' = '%s')",
-              tableName, comment, key, value);
+                  + " COMMENT '%s'%s",
+              tableName, comment, customTablePropertiesClause(key, value));
           Table table =
               catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
           Assertions.assertEquals(1, table.index().length);
@@ -511,7 +518,9 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
                   NameIdentifier.of(databaseName, "test_desc_table"),
                   columns,
                   comment,
-                  ImmutableMap.of("k1", "v1"));
+                  supportsCustomTableProperties()
+                      ? ImmutableMap.of("k1", "v1")
+                      : ImmutableMap.of());
 
           Optional<org.apache.flink.table.catalog.Catalog> flinkCatalog =
               tableEnv.getCatalog(catalog.name());
@@ -730,10 +739,8 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
                   "CREATE TABLE %s "
                       + "(user_id BIGINT COMMENT 'USER_ID', "
                       + " order_amount INT COMMENT 'ORDER_AMOUNT')"
-                      + " COMMENT 'test comment'"
-                      + " WITH ("
-                      + "'%s' = '%s')",
-                  tableName, "test key", "test value");
+                      + " COMMENT 'test comment'%s",
+                  tableName, customTablePropertiesClause("test key", "test value"));
           TestUtils.assertTableResult(result, ResultKind.SUCCESS);
           result = sql("ALTER TABLE %s MODIFY order_amount INT COMMENT 'new comment2'", tableName);
           TestUtils.assertTableResult(result, ResultKind.SUCCESS);
@@ -1132,5 +1139,9 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
         },
         true,
         supportDropCascade());
+  }
+
+  private String customTablePropertiesClause(String key, String value) {
+    return supportsCustomTableProperties() ? String.format(" WITH ('%s' = '%s')", key, value) : "";
   }
 }

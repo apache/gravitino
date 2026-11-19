@@ -19,11 +19,12 @@ Choose the package by your Trino server version first.
 
 | Trino server version | Connector package segment |
 |----------------------|---------------------------|
-| 440-445              | `trino-connector-440-445` |
-| 446-451              | `trino-connector-446-451` |
-| 452-468              | `trino-connector-452-468` |
 | 469-472              | `trino-connector-469-472` |
-| 473-478              | `trino-connector-473-478` |
+| 473-477              | `trino-connector-473-477` |
+| 478-479              | `trino-connector-478-479` |
+| 480                  | `trino-connector-480`     |
+| 481                  | `trino-connector-481`     |
+| 482-483              | `trino-connector-482-483` |
 
 For Trino `469`, choose the `trino-connector-469-472` package.
 
@@ -148,6 +149,11 @@ gravitino.metalake=test
 - The `gravitino.uri` defines the connection information about Gravitino server. Make sure your container can access the Gravitino server.
 
 Full configurations for Apache Gravitino Trino connector can be seen [here](configuration.md)
+
+If the Gravitino server requires authentication, Iceberg catalogs routed through the Iceberg REST
+server need OAuth2, because Trino's Iceberg REST client does not support Basic or Kerberos. Set
+`gravitino.iceberg.rest-catalog.security=OAUTH2` and its `oauth2.*` properties; see
+[Authenticating to the Iceberg REST Server](./catalog-iceberg.md#authenticating-to-the-iceberg-rest-server).
 
 If you haven't created the metalake named `test`, you can use the following command to create it.
 

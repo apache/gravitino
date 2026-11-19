@@ -29,41 +29,89 @@ install it in your local.
 pip install apache-gravitino
 ```
 
+The base installation provides the Gravitino metadata client. For GVFS with local `file://` paths
+and no remote backend, install only the shared GVFS dependencies:
+
+```shell
+pip install "apache-gravitino[gvfs]"
+```
+
+For a remote storage backend, install its extra, for example:
+
+```shell
+pip install "apache-gravitino[hdfs]"
+pip install "apache-gravitino[s3]"
+pip install "apache-gravitino[gcs]"
+pip install "apache-gravitino[oss]"
+pip install "apache-gravitino[azure]"
+```
+
+To preserve the previous installation profile that included all GVFS backends, install
+`apache-gravitino[storage]`. Ray Data applications that only use Gravitino for metadata can install
+the base Gravitino client alongside their Ray Data dependencies without installing these storage
+extras.
+
 1. [Manage metalake using Gravitino Python API](./manage-metalake-using-gravitino.md?language=python)
 2. [Manage fileset metadata using Gravitino Python API](./manage-fileset-metadata-using-gravitino.md?language=python)
+3. [Manage Semantic Model metadata using Gravitino Python API](./manage-semantic-model-metadata-using-gravitino.md?language=python)
+4. [Manage view metadata using Gravitino Python API](./manage-view-metadata-using-gravitino.md?language=python)
+
+### View Operations
+
+Use `as_view_catalog()` on a loaded relational catalog to manage views. The
+[View guide](./manage-view-metadata-using-gravitino.md?language=python) includes Python examples for view
+creation, list/load, alteration (rename, set/remove property, and replace), and drop operations.
+
+### HTTP Error Handling
+
+Valid Gravitino and OAuth2 error responses retain their existing domain exceptions.
+When an HTTP error has an empty, unreadable or invalid error response, the client raises
+`gravitino.exceptions.base.HTTPResponseException`, a subclass of `RESTException`.
+Its `status_code`, `request_method` and `endpoint` attributes describe the HTTP status,
+the original client request method and its origin (scheme, hostname and optional port).
+Applications can catch `RESTException` to include these fallback failures.
+
+Fallback diagnostics omit URL credentials, paths, query parameters, fragments, request data,
+response headers and response bodies. The default traceback suppresses the underlying
+HTTP and decoding exception chain. Existing domain error messages are unchanged.
+This replaces the decoding or validation exceptions previously exposed for invalid HTTP
+error responses, and bypasses custom error handlers for empty or invalid error responses.
+Connection failures and timeouts before an HTTP error response retain their existing behavior.
+The client does not retry requests as part of this error handling.
+
+### Runtime dependency ranges
+
+The metadata client and optional storage or Lance integrations use these runtime
+requirements. Development and standard integration-test dependencies are pinned separately.
+
+| Installation | Runtime requirements |
+| --- | --- |
+| Core | `dataclasses-json>=0.6.7,<0.7`, `simplejson>=3.20.1,<5` |
+| GVFS shared | `cachetools>=7.1.4,<8`, `fsspec>=2023.12.1`, `readerwriterlock>=1.0.9,<2` |
+| HDFS | `pyarrow>=17.0.0,<27` |
+| S3 | `s3fs>=2023.12.1` |
+| GCS | `gcsfs>=2023.12.1` |
+| OSS | `ossfs>=2025.5.0` |
+| Azure | `adlfs>=2026.2.0` |
+| Lance | `ray>=2.55.1`, `lance-ray>=0.3.0,<1` |
+
+Backend libraries also constrain their dependencies. For example, s3fs and gcsfs
+2023.12.1 both require fsspec 2023.12.1. The installer selects a compatible combination
+when multiple extras or `[storage]` are requested. The storage profile does not include
+`[lance]`; request both extras when both features are needed.
+
+Python package compatibility also applies. For example, PyArrow 26 requires Python 3.11
+or later. The allowed ranges do not imply that every version combination has been tested.
 
 ### Semantic Model Ossie Import and Export
 
-Import a standalone Apache Ossie YAML or JSON document into an existing schema of a
-relational catalog. Its dataset sources must refer to existing tables or views in the
-same metalake. The document supplies the model name; importing an existing name raises
-`SemanticModelAlreadyExistsException` without replacing it.
+Use `as_semantic_model_catalog()` on a loaded relational catalog to manage Semantic Models.
+The [Semantic Model guide](./manage-semantic-model-metadata-using-gravitino.md?language=python)
+includes Python examples for native creation, list/load, alteration, deletion, and Apache Ossie
+YAML/JSON import and export, along with the source and permission requirements.
 
-```python
-from pathlib import Path
-
-from gravitino import GravitinoClient, NameIdentifier
-from gravitino.namespace import Namespace
-
-client = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
-try:
-    models = client.load_catalog("catalog").as_semantic_model_catalog()
-    model = models.import_ossie_document(
-        Namespace.of("schema"), Path("sales.ossie.yaml").read_text(encoding="utf-8")
-    )
-    document = models.export_ossie_document(
-        NameIdentifier.of("schema", model.name()), document_format="json"
-    )
-    Path("sales.ossie.json").write_text(document, encoding="utf-8")
-finally:
-    client.close()
-```
-
-Both methods default to `document_format="yaml"`; use `"json"` for JSON input or output.
-The SDK transfers document text directly and requires no YAML parser. Import returns a
-`SemanticModel` using the existing lossless JSON decoder, while export returns the server's
-text unchanged. Model properties are exchanged through the root `GRAVITINO_PROPERTIES`
-custom extension, and `ossie-version` supplies the document version.
+The SDK transfers Ossie document text directly and requires no YAML parser. Import and export
+default to `document_format="yaml"`; use `"json"` for JSON documents.
 
 ### Fileset Example
 
@@ -80,7 +128,7 @@ contains the following code snippets:
 
 1. Install HDFS Python client.
 2. Create a HDFS client to connect HDFS and to do some test operations.
-3. Install Gravitino Python client.
+3. Install the Gravitino Python client with HDFS support: `pip install "apache-gravitino[hdfs]"`.
 4. Initialize Gravitino admin client and create a Gravitino metalake.
 5. Initialize Gravitino client and list metalakes.
 6. Create a Gravitino `Catalog` and special `type` is `Catalog.Type.FILESET` and `provider` is
@@ -223,7 +271,11 @@ Process finished with exit code 0
 + User documentation: https://gravitino.apache.org/docs/
 + Slack Community: [https://the-asf.slack.com#gravitino](https://the-asf.slack.com/archives/C078RESTT19)
 
+## Domains
+
+See [Manage domains](./manage-domains-in-gravitino.md) for a complete executable example
+covering creation, publication, tag membership, reverse lookup and cleanup.
+
 ## License
 
 Gravitino is under the Apache License Version 2.0, See the [LICENSE](https://github.com/apache/gravitino/blob/main/LICENSE) for the details.
-

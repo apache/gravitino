@@ -34,6 +34,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Stream;
 import javax.servlet.http.HttpServletRequest;
@@ -82,7 +83,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 
@@ -453,6 +456,27 @@ public class TestFilesetOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testRenameFilesetToExistingName() {
+    FilesetAlreadyExistsException exception =
+        new FilesetAlreadyExistsException("Fileset existing already exists");
+    doThrow(exception).when(dispatcher).alterFileset(any(), any(FilesetChange.class));
+    FilesetUpdatesRequest request =
+        new FilesetUpdatesRequest(
+            Collections.singletonList(new FilesetUpdateRequest.RenameFilesetRequest("existing")));
+    try (Response response =
+        target(filesetPath(metalake, catalog, schema) + "fileset1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ALREADY_EXISTS_CODE, error.getCode());
+      Assertions.assertEquals(FilesetAlreadyExistsException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(error.getMessage().contains(exception.getMessage()));
+    }
+  }
+
+  @Test
   public void testRenameFileset() {
     FilesetUpdateRequest req = new FilesetUpdateRequest.RenameFilesetRequest("new name");
     Fileset fileset =
@@ -494,6 +518,37 @@ public class TestFilesetOperations extends BaseOperationsTest {
         mockFileset(
             "fileset1", Fileset.Type.MANAGED, "new comment", "mock location", ImmutableMap.of());
     assertUpdateFileset(new FilesetUpdatesRequest(ImmutableList.of(req)), fileset);
+  }
+
+  @ParameterizedTest
+  @EnumSource(Fileset.Type.class)
+  void testUpdateFilesetType(Fileset.Type type) {
+    FilesetUpdateRequest req = new FilesetUpdateRequest.UpdateFilesetTypeRequest(type);
+    Fileset fileset =
+        mockFileset("fileset1", type, "comment", "mock location", ImmutableMap.of("k1", "v1"));
+    assertUpdateFileset(new FilesetUpdatesRequest(ImmutableList.of(req)), fileset);
+    Mockito.verify(dispatcher)
+        .alterFileset(
+            NameIdentifier.of(metalake, catalog, schema, "fileset1"),
+            FilesetChange.updateType(type));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "{\"updates\":[{\"@type\":\"updateType\"}]}",
+        "{\"updates\":[{\"@type\":\"updateType\",\"newType\":null}]}",
+        "{\"updates\":[{\"@type\":\"updateType\",\"newType\":\"unknown\"}]}"
+      })
+  void testUpdateFilesetTypeRejectsInvalidRequest(String json) {
+    try (Response response =
+        target(filesetPath(metalake, catalog, schema) + "fileset1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(json, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(400, response.getStatus());
+      Mockito.verifyNoInteractions(dispatcher);
+    }
   }
 
   @Test

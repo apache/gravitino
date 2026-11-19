@@ -24,6 +24,9 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Collections;
@@ -56,6 +59,8 @@ import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("gravitino-docker-test")
 public class TestDorisTablePartitionOperations extends TestDoris {
@@ -356,5 +361,87 @@ public class TestDorisTablePartitionOperations extends TestDoris {
 
     // drop non-existing partition
     assertFalse(tablePartitionOperations.dropPartition("p3"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {1, 2})
+  void testEscapedListPartitionValues(int partitionColumns) throws Exception {
+    String tableName = GravitinoITUtils.genRandomName("escaped_list_partition");
+    JdbcColumn[] columns = {
+      JdbcColumn.builder()
+          .withName("col1")
+          .withType(Types.VarCharType.of(128))
+          .withNullable(false)
+          .build(),
+      JdbcColumn.builder()
+          .withName("col2")
+          .withType(Types.VarCharType.of(128))
+          .withNullable(false)
+          .build()
+    };
+    String[] values = {"say \"hi\" C:\\temp\\; --", "5\" pipe C:\\next\\"};
+    Literal<?>[][] initial =
+        partitionColumns == 1
+            ? new Literal<?>[][] {{Literals.stringLiteral(values[0])}}
+            : new Literal<?>[][] {
+              {Literals.stringLiteral(values[0]), Literals.stringLiteral(values[0])}
+            };
+    ListPartition created = Partitions.list("p_created", initial, Collections.emptyMap());
+    Transform transform =
+        Transforms.list(
+            partitionColumns == 1 ? new String[][] {{"col1"}} : new String[][] {{"col1"}, {"col2"}},
+            new ListPartition[] {created});
+    TABLE_OPERATIONS.create(
+        databaseName,
+        tableName,
+        columns,
+        "escaped partition values",
+        Map.of("replication_num", "1"),
+        new Transform[] {transform},
+        Distributions.hash(1, NamedReference.field("col1")),
+        new Index[0]);
+    try {
+      JdbcTable table =
+          JdbcTable.builder()
+              .withName(tableName)
+              .withDatabaseName(databaseName)
+              .withColumns(columns)
+              .withPartitioning(new Transform[] {transform})
+              .build();
+      JdbcTablePartitionOperations partitions =
+          new DorisTablePartitionOperations(
+              DATA_SOURCE, table, JDBC_EXCEPTION_CONVERTER, TYPE_CONVERTER);
+      Literal<?>[][] added =
+          partitionColumns == 1
+              ? new Literal<?>[][] {{Literals.stringLiteral(values[1])}}
+              : new Literal<?>[][] {
+                {Literals.stringLiteral(values[1]), Literals.stringLiteral(values[1])}
+              };
+      partitions.addPartition(Partitions.list("p_added", added, Collections.emptyMap()));
+      // Inserting the original values proves both DDL paths preserved the partition keys.
+      try (Connection connection = DATA_SOURCE.getConnection()) {
+        connection.setCatalog(databaseName);
+        for (String value : values) {
+          try (PreparedStatement insert =
+              connection.prepareStatement("INSERT INTO `" + tableName + "` VALUES (?, ?)")) {
+            insert.setString(1, value);
+            insert.setString(2, value);
+            insert.executeUpdate();
+          }
+          try (PreparedStatement select =
+              connection.prepareStatement(
+                  "SELECT COUNT(*) FROM `" + tableName + "` WHERE col1 = ? AND col2 = ?")) {
+            select.setString(1, value);
+            select.setString(2, value);
+            try (ResultSet result = select.executeQuery()) {
+              assertTrue(result.next());
+              assertEquals(1, result.getInt(1));
+            }
+          }
+        }
+      }
+    } finally {
+      TABLE_OPERATIONS.drop(databaseName, tableName);
+    }
   }
 }

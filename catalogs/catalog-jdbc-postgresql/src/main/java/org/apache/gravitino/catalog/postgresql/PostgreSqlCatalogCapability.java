@@ -18,7 +18,10 @@
  */
 package org.apache.gravitino.catalog.postgresql;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.Set;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 
@@ -40,14 +43,40 @@ public class PostgreSqlCatalogCapability implements Capability {
   private static final Set<String> POSTGRESQL_RESERVED_WORDS =
       Set.of("pg_catalog", "information_schema");
 
+  /** {@inheritDoc} */
+  @Override
+  public CapabilityResult specificationOnExistingName(Scope scope, String name) {
+    if (scope != Scope.TABLE && scope != Scope.SCHEMA && scope != Scope.COLUMN) {
+      return specificationOnName(scope, name);
+    }
+    if (MetadataObjects.METADATA_OBJECT_RESERVED_NAME.equals(name)) {
+      return CapabilityResult.unsupported("The metadata wildcard name is reserved");
+    }
+    if (name.isEmpty()
+        || name.indexOf('\0') >= 0
+        || name.getBytes(StandardCharsets.UTF_8).length > 63) {
+      return CapabilityResult.unsupported(
+          "PostgreSQL native names must contain 1 to 63 UTF-8 bytes and no NUL");
+    }
+    if (scope == Scope.SCHEMA
+        && POSTGRESQL_RESERVED_WORDS.contains(name.toLowerCase(Locale.ROOT))) {
+      return CapabilityResult.unsupported("PostgreSQL system schema names are reserved");
+    }
+    return CapabilityResult.SUPPORTED;
+  }
+
   @Override
   public CapabilityResult specificationOnName(Scope scope, String name) {
-    if (!name.matches(POSTGRESQL_NAME_PATTERN)) {
+    if (!name.matches(POSTGRESQL_NAME_PATTERN)
+        || name.getBytes(StandardCharsets.UTF_8).length > 63) {
       return CapabilityResult.unsupported(
-          String.format("The %s name '%s' is illegal.", scope, name));
+          String.format(
+              "The %s name '%s' is illegal. Names must use supported characters and contain at most 63 UTF-8 bytes.",
+              scope, name));
     }
 
-    if (scope == Scope.SCHEMA && POSTGRESQL_RESERVED_WORDS.contains(name.toLowerCase())) {
+    if (scope == Scope.SCHEMA
+        && POSTGRESQL_RESERVED_WORDS.contains(name.toLowerCase(Locale.ROOT))) {
       return CapabilityResult.unsupported(
           String.format("The %s name '%s' is reserved and cannot be used.", scope, name));
     }

@@ -23,9 +23,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Locale;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.dto.responses.NameListResponse;
-import org.apache.gravitino.dto.responses.PolicyListResponse;
+import org.apache.gravitino.dto.responses.MetadataObjectPolicyListResponse;
+import org.apache.gravitino.dto.responses.PolicyNameListResponse;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyList;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rest.RESTUtils;
 
@@ -47,35 +48,45 @@ class MetadataObjectPolicyOperations implements SupportsPolicies {
             "api/metalakes/%s/objects/%s/%s/policies",
             RESTUtils.encodeString(metalakeName),
             metadataObject.type().name().toLowerCase(Locale.ROOT),
-            RESTUtils.encodeString(metadataObject.fullName()));
+            RESTUtils.encodeMetadataObjectName(metadataObject));
   }
 
   @Override
   public String[] listPolicies() {
-    NameListResponse resp =
+    return listPoliciesWithVisibility().policies();
+  }
+
+  @Override
+  public PolicyList<String> listPoliciesWithVisibility() {
+    PolicyNameListResponse resp =
         restClient.get(
             policyRequestPath,
-            NameListResponse.class,
+            PolicyNameListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.policyErrorHandler());
 
     resp.validate();
-    return resp.getNames();
+    return new PolicyList<>(resp.getNames(), resp.hasInaccessiblePolicies());
   }
 
   @Override
   public Policy[] listPolicyInfos() {
-    PolicyListResponse resp =
+    return listPolicyInfosWithVisibility().policies();
+  }
+
+  @Override
+  public PolicyList<Policy> listPolicyInfosWithVisibility() {
+    MetadataObjectPolicyListResponse resp =
         restClient.get(
             policyRequestPath,
             ImmutableMap.of("details", "true"),
-            PolicyListResponse.class,
+            MetadataObjectPolicyListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.policyErrorHandler());
 
     resp.validate();
-    return Arrays.stream(resp.getPolicies())
-        .map(policyDTO -> new GenericPolicy(policyDTO))
-        .toArray(Policy[]::new);
+    Policy[] policies =
+        Arrays.stream(resp.getPolicies()).map(GenericPolicy::new).toArray(Policy[]::new);
+    return new PolicyList<>(policies, resp.hasInaccessiblePolicies());
   }
 }

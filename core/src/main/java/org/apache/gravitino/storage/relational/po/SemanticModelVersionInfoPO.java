@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.po;
 
 import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
@@ -40,7 +41,11 @@ public class SemanticModelVersionInfoPO {
   private Integer version;
   private String semanticModelName;
   private String semanticModelComment;
-  private String semanticModelDefinition;
+  private String datasets;
+  @Nullable private String relationships;
+  @Nullable private String metrics;
+  @Nullable private String aiContext;
+  @Nullable private String customExtensions;
   private String properties;
   private String auditInfo;
   private Long deletedAt;
@@ -58,7 +63,11 @@ public class SemanticModelVersionInfoPO {
       Integer version,
       String semanticModelName,
       String semanticModelComment,
-      String semanticModelDefinition,
+      String datasets,
+      @Nullable String relationships,
+      @Nullable String metrics,
+      @Nullable String aiContext,
+      @Nullable String customExtensions,
       String properties,
       String auditInfo,
       Long deletedAt) {
@@ -70,8 +79,7 @@ public class SemanticModelVersionInfoPO {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(semanticModelName), "Semantic Model name cannot be empty");
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(semanticModelDefinition),
-        "Semantic Model definition cannot be empty");
+        StringUtils.isNotBlank(datasets), "Semantic Model datasets cannot be empty");
     Preconditions.checkArgument(StringUtils.isNotBlank(auditInfo), "Audit info cannot be empty");
     Preconditions.checkArgument(deletedAt != null, "Deleted at is required");
 
@@ -83,7 +91,11 @@ public class SemanticModelVersionInfoPO {
     this.version = version;
     this.semanticModelName = semanticModelName;
     this.semanticModelComment = semanticModelComment;
-    this.semanticModelDefinition = semanticModelDefinition;
+    this.datasets = datasets;
+    this.relationships = relationships;
+    this.metrics = metrics;
+    this.aiContext = aiContext;
+    this.customExtensions = customExtensions;
     this.properties = properties;
     this.auditInfo = auditInfo;
     this.deletedAt = deletedAt;

@@ -28,21 +28,28 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.domain.SupportsDomains;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyList;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagList;
 import org.apache.gravitino.tag.TagValue;
 
 /** An immutable client-side Semantic Model returned by the Gravitino REST API. */
-class GenericSemanticModel implements SemanticModel, SupportsTags, SupportsPolicies {
+class GenericSemanticModel
+    implements SemanticModel, SupportsTags, SupportsDomains, SupportsPolicies {
 
   private final String name;
   private final SemanticModelDefinition definition;
   private final Map<String, String> properties;
   private final Audit audit;
+  private final MetadataObjectDomainOperations objectDomainOperations;
+
   private final MetadataObjectTagOperations objectTagOperations;
   private final MetadataObjectPolicyOperations objectPolicyOperations;
 
@@ -65,6 +72,9 @@ class GenericSemanticModel implements SemanticModel, SupportsTags, SupportsPolic
             MetadataObject.Type.SEMANTIC_MODEL);
     this.objectTagOperations =
         new MetadataObjectTagOperations(
+            semanticModelNamespace.level(0), metadataObject, restClient);
+    this.objectDomainOperations =
+        new MetadataObjectDomainOperations(
             semanticModelNamespace.level(0), metadataObject, restClient);
     this.objectPolicyOperations =
         new MetadataObjectPolicyOperations(
@@ -104,6 +114,24 @@ class GenericSemanticModel implements SemanticModel, SupportsTags, SupportsPolic
 
   /** {@inheritDoc} */
   @Override
+  public SupportsDomains supportsDomains() {
+    return this;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String[] listDomains() {
+    return objectDomainOperations.listDomains();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Domain[] listDomainsInfo() {
+    return objectDomainOperations.listDomainsInfo();
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public SupportsTags supportsTags() {
     return this;
   }
@@ -122,8 +150,20 @@ class GenericSemanticModel implements SemanticModel, SupportsTags, SupportsPolic
 
   /** {@inheritDoc} */
   @Override
+  public TagList<String> listTagsWithVisibility() {
+    return objectTagOperations.listTagsWithVisibility();
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public Tag[] listTagsInfo() {
     return objectTagOperations.listTagsInfo();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public TagList<Tag> listTagsInfoWithVisibility() {
+    return objectTagOperations.listTagsInfoWithVisibility();
   }
 
   /** {@inheritDoc} */
@@ -152,8 +192,20 @@ class GenericSemanticModel implements SemanticModel, SupportsTags, SupportsPolic
 
   /** {@inheritDoc} */
   @Override
+  public PolicyList<String> listPoliciesWithVisibility() {
+    return objectPolicyOperations.listPoliciesWithVisibility();
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public Policy[] listPolicyInfos() {
     return objectPolicyOperations.listPolicyInfos();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public PolicyList<Policy> listPolicyInfosWithVisibility() {
+    return objectPolicyOperations.listPolicyInfosWithVisibility();
   }
 
   /** {@inheritDoc} */

@@ -72,8 +72,9 @@ the path mapping and convert automatically.
 | `fs.gravitino.client.request.header.`                 | The configuration key prefix for the Gravitino client request header. You can set the request header for the Gravitino client.                                                                                                                                                                                                                                         | (none)                                                         | No                                  |
 | `fs.gravitino.enableCredentialVending`                | Whether to enable credential vending for the Gravitino Virtual File System.                                                                                                                                                                                                                                                                                            | `false`                                                        | No                                  |
 | `fs.gravitino.client.`                                | The configuration key prefix for the Gravitino client config.                                                                                                                                                                                                                                                                                                          | (none)                                                         | No                                  |
-| `fs.gravitino.filesetMetadataCache.enable`            | Whether to cache the fileset, fileset schema or fileset catalog metadata in the Gravitino Virtual File System. Note that this cache causes a side effect: if you modify the fileset or fileset catalog metadata, the client cannot see the latest changes.                                                                                                             | `false`                                                        | No                                  |
+| `fs.gravitino.filesetMetadataCache.cache.enable`      | Whether to cache the fileset, fileset schema or fileset catalog metadata in the Gravitino Virtual File System. Note that this cache causes a side effect: while an entry is cached, the client does not see changes to the fileset, its schema or its catalog, including their properties. Secrets are still fetched for every operation.                                                                                                             | `false`                                                        | No                                  |
 | `fs.gravitino.autoCreateLocation`                     | The configuration key for whether to enable auto-creation of fileset location when the server-side filesystem ops are disabled and the location does not exist.                                                                                                                                                                                                        | `true`                                                         | No                                  |
+| `fs.gravitino.kerberos.access.filesets`               | Comma-separated fileset paths, such as `gvfs://fileset/catalog/schema/fileset`, to collect Hadoop delegation tokens for. Needed on Kerberized HDFS when a job reads filesets stored outside `fs.defaultFS`. See [Via Apache Spark](#via-apache-spark).                                                                                                                 | (none)                                                         | No                                  |
 | `fs.path.config.<name>`                               | Defines a logical location entry. Set `fs.path.config.<name>` to the real base URI (for example, `hdfs://cluster1/`). Any key that starts with the same prefix (such as `fs.path.config.<name>.config.resource`) is treated as a location-scoped property and will be forwarded to the underlying filesystem client. Note: location names must not contain (`.`, `_`). | (none)                                                         | No                                  |
 
 To configure the Gravitino client, use properties prefixed with `fs.gravitino.client.`. These properties will be passed to the Gravitino client after removing the `fs.` prefix.
@@ -280,6 +281,27 @@ fs.getFileStatus(filesetPath);
     rdd.foreach(println)
     ```
 
+4. Collect delegation tokens for filesets on Kerberized HDFS (if necessary).
+
+   On YARN with Kerberized HDFS, executors authenticate to HDFS with delegation tokens that Spark
+   collects when the application starts. Spark gets a token for `fs.defaultFS` by itself. If a
+   fileset is stored on another HDFS cluster, list it so that GVFS collects a token for that
+   cluster too:
+
+    ```shell
+    --conf spark.kerberos.access.hadoopFileSystems=gvfs://fileset
+    --conf spark.hadoop.fs.gravitino.kerberos.access.filesets=gvfs://fileset/test_catalog/test_schema/test_fileset_1,gvfs://fileset/test_catalog/test_schema/test_fileset_2
+    ```
+
+   `gvfs://fileset` makes Spark ask GVFS for tokens, and GVFS then collects one for each fileset
+   listed in `fs.gravitino.kerberos.access.filesets`. Listing the filesets in
+   `spark.kerberos.access.hadoopFileSystems` instead doesn't work: Spark asks GVFS for tokens
+   without passing the path, so GVFS never sees which filesets were listed there.
+
+   GVFS only returns tokens owned by the current user. A fileset that authenticates with its own
+   Kerberos principal and keytab (`authentication.kerberos.*`) without impersonation gets no token,
+   since its executors log in with that keytab instead.
+
 #### Via TensorFlow
 
 For Tensorflow to support GVFS, you need to recompile the [tensorflow-io](https://github.com/tensorflow/io) module.
@@ -451,7 +473,7 @@ to recompile the native libraries like `libhdfs` and others, and completely repl
 | `client_request_header_`        | The configuration key prefix for the Gravitino client request header. You can set the request header for the Gravitino client.                                                                                                                                                                                                                                         | (none)                                                               | No                                |
 | `enable_credential_vending`     | Whether to enable credential vending for the Gravitino Virtual File System.                                                                                                                                                                                                                                                                                            | `false`                                                              | No                                |
 | `gvfs_gravitino_client_`        | The configuration key prefix for the Gravitino client. You can set the config for the Gravitino client.                                                                                                                                                                                                                                                                | (none)                                                               | No                                |
-| `enable_fileset_metadata_cache` | Whether to cache the fileset or fileset catalog metadata in the Gravitino Virtual File System. Note that this cache causes a side effect: if you modify the fileset or fileset catalog metadata, the client cannot see the latest changes.                                                                                                                             | `false`                                                              | No                                |
+| `enable_fileset_metadata_cache` | Whether to cache the fileset, fileset schema or fileset catalog metadata in the Gravitino Virtual File System. Note that this cache causes a side effect: while an entry is cached, the client does not see changes to the fileset, its schema or its catalog, including their properties. Secrets are still fetched for every operation.                                                                                                                             | `false`                                                              | No                                |
 | `auto_create_location`          | The configuration key for whether to enable auto-creation of fileset location when the server-side filesystem ops are disabled and the location does not exist.                                                                                                                                                                                                        | `true`                                                               | No                                |
 | `fs_path_config_<name>`         | Defines a logical location entry. Set `fs_path_config_<name>` to the real base URI (for example, `hdfs://cluster1/`). Any key that starts with the same prefix (such as `fs_path_config_<name>_config.resource`) is treated as a location-scoped property and will be forwarded to the underlying filesystem client. Note: location names must not contain (`.`, `_`). | (none)                                                               | No                                |
 
@@ -519,12 +541,19 @@ For fileset with multiple locations, you can specify which location to access us
 3. If neither is specified, the system will use the value of `default-location-name` from the fileset properties
 :::
 
-1. Make sure to obtain the Gravitino library.
-   You can get it by [pip](https://pip.pypa.io/en/stable/installation/):
+1. Install the Gravitino Python client with the extra for your storage backend using
+   [pip](https://pip.pypa.io/en/stable/installation/). The base installation provides only the
+   metadata client and does not install GVFS dependencies. The following HDFS example requires
+   the `hdfs` extra:
 
     ```shell
-    pip install apache-gravitino
+    pip install "apache-gravitino[hdfs]"
     ```
+
+   For local `file://` paths, use `apache-gravitino[gvfs]`. For cloud storage, choose
+   `apache-gravitino[s3]`, `apache-gravitino[gcs]`, `apache-gravitino[oss]`, or
+   `apache-gravitino[azure]` for the corresponding backend. Each backend extra includes the shared
+   GVFS dependencies. Use `apache-gravitino[storage]` to install all supported GVFS backends.
 
 2. Configuring the Hadoop environment.
    You should ensure that the Python client has Kerberos authentication information and

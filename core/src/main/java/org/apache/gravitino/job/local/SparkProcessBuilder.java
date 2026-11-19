@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.job.JobRuntimeTemplateMaskUtils;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -117,8 +118,13 @@ public class SparkProcessBuilder extends LocalProcessBuilder {
       commandList.add(String.join(",", sparkJobTemplate.archives()));
     }
 
-    // Add the Spark configs
+    // Add the Spark configs. A blank value means the configuration isn't set, as it is what an
+    // optional template parameter such as {{spark_jars:-}} becomes, and spark-submit would reject
+    // or misread a blank value of some configurations, such as spark.master.
     for (Map.Entry<String, String> entry : sparkJobTemplate.configs().entrySet()) {
+      if (StringUtils.isBlank(entry.getValue())) {
+        continue;
+      }
       commandList.add("--conf");
       commandList.add(entry.getKey() + "=" + entry.getValue());
     }
@@ -147,9 +153,10 @@ public class SparkProcessBuilder extends LocalProcessBuilder {
     builder.redirectOutput(outputFile);
     builder.redirectError(errorFile);
 
+    // Mask JSON bags and sensitive --conf for the log only; ProcessBuilder keeps plaintext.
     LOG.info(
         "Starting local Spark job with command: {}, environment variable names: {}",
-        Joiner.on(" ").join(commandList),
+        Joiner.on(" ").join(JobRuntimeTemplateMaskUtils.maskSensitiveArguments(commandList)),
         Joiner.on(", ").join(sparkJobTemplate.environments().keySet()));
 
     try {

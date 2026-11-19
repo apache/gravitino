@@ -46,6 +46,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
+import org.apache.gravitino.integration.test.container.DatabaseContainer.Durability;
 import org.apache.gravitino.integration.test.util.CloseableGroup;
 import org.apache.gravitino.integration.test.util.CommandExecutor;
 import org.apache.gravitino.integration.test.util.ITUtils;
@@ -130,10 +131,6 @@ public class ContainerSuite implements Closeable {
         }
       }
     }
-  }
-
-  public static boolean initialized() {
-    return initialized;
   }
 
   public static ContainerSuite getInstance() {
@@ -386,19 +383,16 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startMySQLContainer(TestDatabaseName testDatabaseName) {
-    ITUtils.cleanDisk();
     if (mySQLContainer == null) {
       synchronized (ContainerSuite.class) {
         if (mySQLContainer == null) {
+          ITUtils.cleanDisk();
           initIfNecessary();
           // Start MySQL container
           MySQLContainer.Builder mysqlBuilder =
               MySQLContainer.builder()
                   .withHostName("gravitino-ci-mysql")
-                  .withEnvVars(
-                      ImmutableMap.<String, String>builder()
-                          .put("MYSQL_ROOT_PASSWORD", "root")
-                          .build())
+                  .withDurability(Durability.fromSystemProperty())
                   .withExposePorts(ImmutableSet.of(MySQLContainer.MYSQL_PORT))
                   .withNetwork(network);
 
@@ -424,10 +418,7 @@ public class ContainerSuite implements Closeable {
               MySQLContainer.builder()
                   .withImage("mysql:5.7")
                   .withHostName("gravitino-ci-mysql-v5")
-                  .withEnvVars(
-                      ImmutableMap.<String, String>builder()
-                          .put("MYSQL_ROOT_PASSWORD", "root")
-                          .build())
+                  .withDurability(Durability.fromSystemProperty())
                   .withExposePorts(ImmutableSet.of(MySQLContainer.MYSQL_PORT))
                   .withNetwork(network);
 
@@ -443,21 +434,17 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startPostgreSQLContainer(TestDatabaseName testDatabaseName, PGImageName pgImageName) {
-    ITUtils.cleanDisk();
     if (!pgContainerMap.containsKey(pgImageName)) {
       synchronized (ContainerSuite.class) {
         if (!pgContainerMap.containsKey(pgImageName)) {
+          ITUtils.cleanDisk();
           initIfNecessary();
           // Start PostgreSQL container
           PostgreSQLContainer.Builder pgBuilder =
               PostgreSQLContainer.builder()
                   .withImage(pgImageName.toString())
                   .withHostName(PostgreSQLContainer.HOST_NAME)
-                  .withEnvVars(
-                      ImmutableMap.<String, String>builder()
-                          .put("POSTGRES_USER", PostgreSQLContainer.USER_NAME)
-                          .put("POSTGRES_PASSWORD", PostgreSQLContainer.PASSWORD)
-                          .build())
+                  .withDurability(Durability.fromSystemProperty())
                   .withExposePorts(ImmutableSet.of(PostgreSQLContainer.PG_PORT))
                   .withNetwork(network);
 

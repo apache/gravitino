@@ -55,6 +55,8 @@ public class TestK8sJobExecutorConfigs {
     Assertions.assertEquals(604_800_000L, configs.sparkTtlAfterStopMs());
     Assertions.assertEquals(3_600_000L, configs.sparkDriverStartTimeoutMs());
     Assertions.assertEquals(3_600_000L, configs.sparkDriverReadyTimeoutMs());
+    Assertions.assertEquals(
+        "local:///opt/gravitino/jobs/gravitino-jobs.jar", configs.sparkBuiltinJobsJar());
     Assertions.assertTrue(configs.sparkConf().isEmpty());
   }
 
@@ -66,6 +68,7 @@ public class TestK8sJobExecutorConfigs {
     map.put(K8sJobExecutorConfigs.NAME_PREFIX, "gvt-a");
     map.put(K8sJobExecutorConfigs.STATUS_CACHE_TTL_MS, "0");
     map.put(K8sJobExecutorConfigs.SPARK_TTL_AFTER_STOP_MS, "1000");
+    map.put(K8sJobExecutorConfigs.SPARK_BUILTIN_JOBS_JAR, " https://repo/gravitino-jobs.jar ");
     map.put("spark.conf.spark.executor.instances", "2");
     map.put("spark.conf.", "ignored");
 
@@ -76,6 +79,7 @@ public class TestK8sJobExecutorConfigs {
     Assertions.assertEquals("gvt-a", configs.namePrefix());
     Assertions.assertEquals(0L, configs.statusCacheTtlMs());
     Assertions.assertEquals(1000L, configs.sparkTtlAfterStopMs());
+    Assertions.assertEquals("https://repo/gravitino-jobs.jar", configs.sparkBuiltinJobsJar());
     Assertions.assertEquals(ImmutableMap.of("spark.executor.instances", "2"), configs.sparkConf());
   }
 
@@ -185,6 +189,10 @@ public class TestK8sJobExecutorConfigs {
     assertInvalid(K8sJobExecutorConfigs.REQUEST_RETRIES, "-1");
     assertInvalid(K8sJobExecutorConfigs.REQUEST_RETRIES, "many");
     assertInvalid(K8sJobExecutorConfigs.SPARK_DRIVER_START_TIMEOUT_MS, "1h");
+    // The built-in jobs jar must be reachable from the cluster, not a path on the server.
+    assertInvalid(K8sJobExecutorConfigs.SPARK_BUILTIN_JOBS_JAR, "/opt/gravitino/jobs.jar");
+    assertInvalid(K8sJobExecutorConfigs.SPARK_BUILTIN_JOBS_JAR, "file:///opt/gravitino/jobs.jar");
+    assertInvalid(K8sJobExecutorConfigs.SPARK_BUILTIN_JOBS_JAR, "C:\\gravitino\\jobs.jar");
   }
 
   private static void assertInvalid(String... keyValues) {

@@ -35,6 +35,16 @@ import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.ibatis.annotations.Param;
 
 public class SchemaMetaBaseSQLProvider {
+  private static final String SELECT_SCHEMA_BY_ID =
+      "SELECT schema_id as schemaId, schema_name as schemaName,"
+          + " metalake_id as metalakeId, catalog_id as catalogId,"
+          + " schema_comment as schemaComment, properties, audit_info as auditInfo,"
+          + " current_version as currentVersion, last_version as lastVersion,"
+          + " deleted_at as deletedAt"
+          + " FROM "
+          + TABLE_NAME
+          + " WHERE schema_id = #{schemaId}";
+
   public String listSchemaPOsByCatalogId(@Param("catalogId") Long catalogId) {
     return "SELECT schema_id as schemaId, schema_name as schemaName,"
         + " metalake_id as metalakeId, catalog_id as catalogId,"
@@ -180,14 +190,7 @@ public class SchemaMetaBaseSQLProvider {
   }
 
   public String selectSchemaMetaById(@Param("schemaId") Long schemaId) {
-    return "SELECT schema_id as schemaId, schema_name as schemaName,"
-        + " metalake_id as metalakeId, catalog_id as catalogId,"
-        + " schema_comment as schemaComment, properties, audit_info as auditInfo,"
-        + " current_version as currentVersion, last_version as lastVersion,"
-        + " deleted_at as deletedAt"
-        + " FROM "
-        + TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+    return SELECT_SCHEMA_BY_ID + " AND deleted_at = 0";
   }
 
   /** Returns SQL that checks whether an active child exists in the schema. */
@@ -347,6 +350,7 @@ public class SchemaMetaBaseSQLProvider {
         + " last_version = #{newSchemaMeta.lastVersion},"
         + " deleted_at = #{newSchemaMeta.deletedAt}"
         + " WHERE schema_id = #{oldSchemaMeta.schemaId}"
+        + " AND catalog_id = #{oldSchemaMeta.catalogId}"
         + " AND current_version = #{oldSchemaMeta.currentVersion}"
         + " AND deleted_at = 0";
   }
@@ -375,14 +379,21 @@ public class SchemaMetaBaseSQLProvider {
         + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
-  /** Returns SQL that soft-deletes schemas using identifier-and-version pairs. */
+  /**
+   * Returns SQL that soft-deletes schemas using identifier-and-version pairs. The leading IN list
+   * lets the database find the rows by primary key instead of scanning the table for the OR chain.
+   */
   public String softDeleteSchemaMetasWithVersion(@Param("schemaMetas") List<SchemaPO> schemaPOs) {
     return "<script>"
         + "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.MYSQL
-        + " WHERE deleted_at = 0 AND "
+        + " WHERE deleted_at = 0 AND schema_id IN "
+        + "<foreach collection='schemaMetas' item='item' separator=',' open='(' close=')'>"
+        + "#{item.schemaId}"
+        + "</foreach>"
+        + " AND "
         + "<foreach collection='schemaMetas' item='item' separator=' OR ' open='(' close=')'>"
         + "(schema_id = #{item.schemaId} AND current_version = #{item.currentVersion})"
         + "</foreach>"

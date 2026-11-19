@@ -15,7 +15,7 @@ model and how object policy lookup works, see
 [Policies](./policies.md). To move from direct object policy associations, follow
 [Migration Guide](./migration-guide.md).
 
-The Python client does not cover policies, so the examples below are REST and Java only.
+The examples below cover REST, Java, and the Python client.
 
 ## Policy Operations
 
@@ -26,6 +26,11 @@ and optional properties. For a built-in policy, `supportedObjectTypes` cannot be
 creation. Updating custom policy content replaces the whole content and can change this field.
 Object policy lookup does not filter by this field; consumers decide which policy types they can
 use.
+
+`policyType` accepts the known wire values case-insensitively (for example `CUSTOM` and
+`System_Iceberg_Compaction`). Gravitino stores and returns the canonical lowercase value listed in
+the OpenAPI schema. Unknown types such as `system_iceberg_bogus` return HTTP 400 that names the
+type.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -59,6 +64,28 @@ PolicyContent content = PolicyContents.custom(
 
 Policy policy = client.createPolicy(
     "retention_30d", "custom", "Thirty day retention", true, content);
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+from gravitino.api.policy.policy_contents import PolicyContents
+from gravitino.api.metadata_object import MetadataObject
+
+content = PolicyContents.CustomContent(
+    {"retentionDays": 30},
+    {
+        MetadataObject.Type.CATALOG,
+        MetadataObject.Type.SCHEMA,
+        MetadataObject.Type.TABLE,
+    },
+    {"owner": "platform"},
+)
+
+policy = client.create_policy(
+    "retention_30d", "custom", "Thirty day retention", True, content
+)
 ```
 
 </TabItem>
@@ -101,6 +128,14 @@ Policy[] policies = client.listPolicyInfos();
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+policy_names = client.list_policies()
+policies = client.list_policy_infos()
+```
+
+</TabItem>
 </Tabs>
 
 ### Get a Policy
@@ -118,6 +153,13 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 Policy policy = client.getPolicy("retention_30d");
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+policy = client.get_policy("retention_30d")
 ```
 
 </TabItem>
@@ -170,6 +212,29 @@ Policy policy = client.alterPolicy(
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+from gravitino.api.policy.policy_change import PolicyChange
+from gravitino.api.policy.policy_contents import PolicyContents
+from gravitino.api.metadata_object import MetadataObject
+
+new_content = PolicyContents.CustomContent(
+    {"retentionDays": 90},
+    {
+        MetadataObject.Type.CATALOG,
+        MetadataObject.Type.SCHEMA,
+        MetadataObject.Type.TABLE,
+    },
+    {"owner": "platform"},
+)
+
+policy = client.alter_policy(
+    "retention_30d", PolicyChange.update_content("custom", new_content)
+)
+```
+
+</TabItem>
 </Tabs>
 
 ### Enable or Disable a Policy
@@ -195,6 +260,14 @@ client.enablePolicy("retention_30d");
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+client.disable_policy("retention_30d")
+client.enable_policy("retention_30d")
+```
+
+</TabItem>
 </Tabs>
 
 ### Delete a Policy
@@ -214,6 +287,13 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 client.deletePolicy("retention_30d");
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+client.delete_policy("retention_30d")
 ```
 
 </TabItem>
@@ -262,6 +342,20 @@ PolicyTagAssociation association = client.addPolicyForTag(
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+from gravitino.api.policy.policy_association_selector import TagValueSelector
+
+association = client.add_policy_for_tag(
+    "data_domain", "retention_30d", TagValueSelector.of("finance")
+)
+
+# Match any assignment of data_domain instead:
+# client.add_policy_for_tag("data_domain", "retention_30d")
+```
+
+</TabItem>
 </Tabs>
 
 The request fails with a conflict if the policy is already associated with the tag.
@@ -292,6 +386,19 @@ PolicyTagAssociation[] tags = client.listTagAssociationsForPolicy("retention_30d
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+policies = client.list_policy_associations_for_tag("data_domain")
+tags = client.list_tag_associations_for_policy("retention_30d")
+
+for association in policies:
+    policy = association.policy()
+    tag = association.tag()
+    selector = association.selector()
+```
+
+</TabItem>
 </Tabs>
 
 ### Remove an Association
@@ -312,6 +419,13 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 client.removePolicyFromTag("data_domain", "retention_30d");
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+client.remove_policy_from_tag("data_domain", "retention_30d")
 ```
 
 </TabItem>
@@ -343,6 +457,10 @@ The response includes policies derived from effective tags assigned to the objec
 With `details=true`, the response returns full policy objects instead of policy names.
 Each policy includes an `inherited` field, which is `true` when it matches only through a tag
 assigned to an ancestor of the object. Disabled policies do not appear in this result.
+Both response modes include `hasInaccessiblePolicies`. Gravitino resolves policies from direct and
+inherited tag assignments before authorization filtering, so the flag also covers policies omitted
+from inherited associations. The flag reveals only that at least one policy was omitted; it does not
+reveal the policy's name, count, details, or inheritance source.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -350,6 +468,16 @@ assigned to an ancestor of the object. Disabled policies do not appear in this r
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
   "http://localhost:8090/api/metalakes/test/objects/table/catalog1.schema1.customers/policies?details=true"
+```
+
+If every applicable policy is inaccessible, the response contains an empty list and sets the flag:
+
+```json
+{
+  "code": 0,
+  "policies": [],
+  "hasInaccessiblePolicies": true
+}
 ```
 
 </TabItem>
@@ -360,9 +488,55 @@ Table customers =
     client.loadCatalog("catalog1")
         .asTableCatalog()
         .loadTable(NameIdentifier.of("schema1", "customers"));
-String[] policyNames = customers.supportsPolicies().listPolicies();
-Policy[] policies = customers.supportsPolicies().listPolicyInfos();
+PolicyList<String> nameList = customers.supportsPolicies().listPoliciesWithVisibility();
+String[] policyNames = nameList.policies();
+boolean omittedPolicies = nameList.hasInaccessiblePolicies();
+
+PolicyList<Policy> detailList = customers.supportsPolicies().listPolicyInfosWithVisibility();
+Policy[] policies = detailList.policies();
+boolean omittedPolicyDetails = detailList.hasInaccessiblePolicies();
 ```
+
+The existing `listPolicies()` and `listPolicyInfos()` methods continue to return only the visible
+arrays.
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+from gravitino import NameIdentifier
+
+customers = (
+    client.load_catalog("catalog1")
+    .as_table_catalog()
+    .load_table(NameIdentifier.of("schema1", "customers"))
+)
+
+name_list = customers.supports_policies().list_policies_with_visibility()
+policy_names = name_list.policies()
+omitted_policies = name_list.has_inaccessible_policies()
+
+detail_list = customers.supports_policies().list_policy_infos_with_visibility()
+policies = detail_list.policies()
+omitted_policy_details = detail_list.has_inaccessible_policies()
+
+# The existing list_policies() and list_policy_infos() methods continue to
+# return only the visible lists.
+```
+
+The `inherited` flag on a listed `Policy` is `True` when the policy matches only through a tag
+assigned to an ancestor of the object, and `False` when the tag is assigned to the object itself.
+It is `None` when the policy is returned outside object lookup, for example from
+`client.get_policy(...)`.
 
 </TabItem>
 </Tabs>
+
+Interpret the visible list and `hasInaccessiblePolicies` together:
+
+| Visible list | `hasInaccessiblePolicies` | Meaning |
+|---|---:|---|
+| Empty | `false` | No enabled policy applies to the object. |
+| Empty | `true` | All applicable policies are inaccessible. |
+| Non-empty | `true` | The response includes visible policies and omits at least one inaccessible policy. |
+| Non-empty | `false` | All applicable policies are visible. |

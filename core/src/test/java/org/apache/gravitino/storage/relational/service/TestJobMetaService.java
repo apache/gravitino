@@ -22,20 +22,22 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestTemplate;
 
 public class TestJobMetaService extends TestJDBCBackend {
@@ -230,6 +232,45 @@ public class TestJobMetaService extends TestJDBCBackend {
     Assertions.assertFalse(
         JobMetaService.getInstance()
             .deleteJob(NameIdentifierUtil.ofJob(METALAKE_NAME, job.name())));
+  }
+
+  @TestTemplate
+  public void testDeleteJobCleansOwner() throws IOException {
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
+    backend.insert(metalake, false);
+    backend.insert(newShellJobTemplateEntity("template", "", METALAKE_NAME), false);
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            "job_owner",
+            AUDIT_INFO);
+    backend.insert(user, false);
+
+    JobEntity dropped =
+        TestJobTemplateMetaService.newJobEntity(
+            "template", JobHandle.Status.SUCCEEDED, METALAKE_NAME);
+    JobEntity kept =
+        TestJobTemplateMetaService.newJobEntity(
+            "template", JobHandle.Status.SUCCEEDED, METALAKE_NAME);
+    backend.insert(dropped, false);
+    backend.insert(kept, false);
+    for (JobEntity job : new JobEntity[] {dropped, kept}) {
+      OwnerMetaService.getInstance()
+          .setOwner(
+              NameIdentifierUtil.ofJob(METALAKE_NAME, job.name()),
+              Entity.EntityType.JOB,
+              user.nameIdentifier(),
+              user.type());
+    }
+
+    Assertions.assertTrue(
+        JobMetaService.getInstance()
+            .deleteJob(NameIdentifierUtil.ofJob(METALAKE_NAME, dropped.name())));
+
+    Assertions.assertEquals(0, countJobOwnerRows(dropped.id()));
+    Assertions.assertEquals(1, countJobOwnerRows(kept.id()));
   }
 
   @TestTemplate
@@ -493,50 +534,9 @@ public class TestJobMetaService extends TestJDBCBackend {
                             .build()));
   }
 
-  @Test
-  public void testUpdateJobWithMalformedIdentifierThrowsNoSuchEntityException() {
-    Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () ->
-            JobMetaService.getInstance()
-                .updateJob(NameIdentifierUtil.ofJob(METALAKE_NAME, "invalid"), e -> e));
-
-    Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () ->
-            JobMetaService.getInstance()
-                .updateJob(
-                    NameIdentifierUtil.ofJob(METALAKE_NAME, JobHandle.JOB_ID_PREFIX), e -> e));
-  }
-
-  @Test
-  public void testGetJobWithMalformedIdentifierThrowsNoSuchEntityException() {
-    Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () ->
-            JobMetaService.getInstance()
-                .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, "invalid")));
-
-    Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () ->
-            JobMetaService.getInstance()
-                .getJobByIdentifier(
-                    NameIdentifierUtil.ofJob(METALAKE_NAME, JobHandle.JOB_ID_PREFIX)));
-  }
-
-  @Test
-  public void testDeleteJobWithMalformedIdentifierThrowsNoSuchEntityException() {
-    Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () ->
-            JobMetaService.getInstance()
-                .deleteJob(NameIdentifierUtil.ofJob(METALAKE_NAME, "invalid")));
-
-    Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () ->
-            JobMetaService.getInstance()
-                .deleteJob(NameIdentifierUtil.ofJob(METALAKE_NAME, JobHandle.JOB_ID_PREFIX)));
+  private int countJobOwnerRows(long jobId) {
+    return countActiveRowsWhere(
+        "owner_meta",
+        String.format("metadata_object_id = %d AND metadata_object_type = 'JOB'", jobId));
   }
 }

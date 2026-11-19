@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import static org.apache.gravitino.semantic.SemanticModelTestUtils.sources;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -60,6 +61,7 @@ import org.apache.gravitino.semantic.Dataset;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -94,7 +96,8 @@ public class TestSemanticModelEvent {
         identifier,
         semanticModel.comment(),
         semanticModel.definition(),
-        semanticModel.properties());
+        semanticModel.properties(),
+        sources(semanticModel.definition()));
 
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
@@ -137,7 +140,7 @@ public class TestSemanticModelEvent {
   void testAlterSemanticModelEvent() {
     NameIdentifier identifier = NameIdentifier.of(NAMESPACE, semanticModel.name());
     SemanticModelChange change = SemanticModelChange.setProperty("a", "b");
-    dispatcher.alterSemanticModel(identifier, change);
+    dispatcher.alterSemanticModel(identifier, SemanticModelSourceUpdate.preserve(), change);
 
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
@@ -209,7 +212,8 @@ public class TestSemanticModelEvent {
                 identifier,
                 semanticModel.comment(),
                 semanticModel.definition(),
-                semanticModel.properties()));
+                semanticModel.properties(),
+                sources(semanticModel.definition())));
 
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
@@ -245,7 +249,9 @@ public class TestSemanticModelEvent {
     SemanticModelChange change = SemanticModelChange.setProperty("a", "b");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
-        () -> failureDispatcher.alterSemanticModel(identifier, change));
+        () ->
+            failureDispatcher.alterSemanticModel(
+                identifier, SemanticModelSourceUpdate.preserve(), change));
 
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
@@ -416,8 +422,14 @@ public class TestSemanticModelEvent {
         Arrays.<Consumer<SemanticModelEventDispatcher>>asList(
             d -> d.listSemanticModels(NAMESPACE),
             d -> d.loadSemanticModel(identifier),
-            d -> d.createSemanticModel(identifier, "comment", definition(), ImmutableMap.of()),
-            d -> d.alterSemanticModel(identifier, SemanticModelChange.setProperty("a", "b")),
+            d ->
+                d.createSemanticModel(
+                    identifier, "comment", definition(), ImmutableMap.of(), sources(definition())),
+            d ->
+                d.alterSemanticModel(
+                    identifier,
+                    SemanticModelSourceUpdate.preserve(),
+                    SemanticModelChange.setProperty("a", "b")),
             d -> d.dropSemanticModel(identifier))) {
       DummyEventListener listener = new DummyEventListener();
       SemanticModelEventDispatcher eventDispatcher =
@@ -452,7 +464,9 @@ public class TestSemanticModelEvent {
     IllegalArgumentException exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> eventDispatcher.alterSemanticModel(identifier, changes));
+            () ->
+                eventDispatcher.alterSemanticModel(
+                    identifier, SemanticModelSourceUpdate.preserve(), changes));
 
     Assertions.assertEquals("At least one change is required", exception.getMessage());
     Assertions.assertEquals(1, listener.getPreEvents().size());
@@ -528,7 +542,11 @@ public class TestSemanticModelEvent {
   private SemanticModelDispatcher mockSemanticModelDispatcher() {
     SemanticModelDispatcher d = mock(SemanticModelDispatcher.class);
     when(d.createSemanticModel(
-            any(NameIdentifier.class), any(), any(SemanticModelDefinition.class), any(Map.class)))
+            any(NameIdentifier.class),
+            any(),
+            any(SemanticModelDefinition.class),
+            any(Map.class),
+            any()))
         .thenReturn(semanticModel);
     when(d.loadSemanticModel(any(NameIdentifier.class))).thenReturn(semanticModel);
     when(d.semanticModelExists(any(NameIdentifier.class))).thenReturn(true);
@@ -538,7 +556,7 @@ public class TestSemanticModelEvent {
             new NameIdentifier[] {
               NameIdentifier.of(NAMESPACE, "model1"), NameIdentifier.of(NAMESPACE, "model2")
             });
-    when(d.alterSemanticModel(any(NameIdentifier.class), any(SemanticModelChange.class)))
+    when(d.alterSemanticModel(any(NameIdentifier.class), any(), any(SemanticModelChange.class)))
         .thenReturn(semanticModel);
     return d;
   }

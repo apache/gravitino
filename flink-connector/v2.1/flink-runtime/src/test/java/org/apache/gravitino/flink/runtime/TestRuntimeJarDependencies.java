@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.flink.runtime;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -26,7 +27,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.stream.Collectors;
@@ -69,14 +72,32 @@ class TestRuntimeJarDependencies {
       try (InputStream in = jarFile.getInputStream(factoryServiceEntry)) {
         factoryServices = new String(in.readAllBytes(), StandardCharsets.UTF_8);
       }
-      assertTrue(
-          factoryServices.contains(
-              "org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactory"),
-          "Runtime jar should include the shared catalog-store factory descriptor");
-      assertTrue(
-          factoryServices.contains(
-              "org.apache.gravitino.flink.connector.paimon.GravitinoPaimonCatalogFactoryFlink21"),
-          "Runtime jar should include the version-specific catalog factory descriptor");
+      List<String> gravitinoFactories =
+          factoryServices
+              .lines()
+              .map(line -> line.split("#", 2)[0].trim())
+              .filter(line -> line.startsWith("org.apache.gravitino.flink."))
+              .collect(Collectors.toList());
+      Set<String> expectedFactories =
+          Set.of(
+              "org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactory",
+              "org.apache.gravitino.flink.connector.paimon.GravitinoPaimonCatalogFactoryFlink21",
+              "org.apache.gravitino.flink.connector.iceberg.GravitinoIcebergCatalogFactoryFlink21",
+              "org.apache.gravitino.flink.connector.jdbc.mysql.GravitinoMysqlJdbcCatalogFactoryFlink21",
+              "org.apache.gravitino.flink.connector.jdbc.postgresql.GravitinoPostgresJdbcCatalogFactoryFlink21");
+      assertEquals(
+          expectedFactories,
+          new HashSet<>(gravitinoFactories),
+          "Runtime jar should register exactly the shared catalog-store and four Flink 2.1 factories");
+      assertEquals(
+          expectedFactories.size(),
+          gravitinoFactories.size(),
+          "Runtime jar should not contain duplicate Gravitino factory registrations");
+      for (String factory : expectedFactories) {
+        assertNotNull(
+            jarFile.getJarEntry(factory.replace('.', '/') + ".class"),
+            "Registered factory class should exist in runtime jar: " + factory);
+      }
     }
   }
 }

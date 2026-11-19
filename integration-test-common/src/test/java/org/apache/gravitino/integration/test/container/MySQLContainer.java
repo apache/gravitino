@@ -19,26 +19,23 @@
 package org.apache.gravitino.integration.test.container;
 
 import static java.lang.String.format;
-import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.google.common.collect.ImmutableSet;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
-import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.Container;
 import org.testcontainers.containers.Network;
+import org.testcontainers.utility.DockerImageName;
 
-public class MySQLContainer extends BaseContainer {
+public class MySQLContainer extends DatabaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(MySQLContainer.class);
 
   public static final String DEFAULT_IMAGE = "mysql:8.0";
@@ -46,6 +43,9 @@ public class MySQLContainer extends BaseContainer {
   public static final int MYSQL_PORT = 3306;
   public static final String USER_NAME = "root";
   public static final String PASSWORD = "root";
+  private static final String DATA_DIR = "/var/lib/mysql";
+  private static final String DEFAULT_CONFIG = "mysql-conf/default";
+  private static final String DISPOSABLE_CONFIG = "mysql-conf/disposable";
 
   public static Builder builder() {
     return new Builder();
@@ -53,13 +53,23 @@ public class MySQLContainer extends BaseContainer {
 
   protected MySQLContainer(
       String image,
+      Durability durability,
       String hostName,
       Set<Integer> ports,
       Map<String, String> extraHosts,
       Map<String, String> filesToMount,
       Map<String, String> envVars,
       Optional<Network> network) {
-    super(image, hostName, ports, extraHosts, filesToMount, envVars, network);
+    super(
+        module(image, durability),
+        durability,
+        hostName,
+        ports,
+        extraHosts,
+        filesToMount,
+        envVars,
+        network);
+    applyDurability(DATA_DIR);
   }
 
   @Override
@@ -71,73 +81,26 @@ public class MySQLContainer extends BaseContainer {
   @Override
   public void start() {
     super.start();
-    Preconditions.check("MySQL container startup failed!", checkContainerStatus(5));
-  }
-
-  @Override
-  protected boolean checkContainerStatus(int retryLimit) {
-    await()
-        .atMost(10, TimeUnit.SECONDS)
-        .pollInterval(10 / retryLimit, TimeUnit.SECONDS)
-        .until(
-            () -> {
-              try {
-                String[] commandAndArgs =
-                    new String[] {
-                      "mysqladmin",
-                      "ping",
-                      "-h",
-                      "localhost",
-                      "-u",
-                      getUsername(),
-                      String.format("-p%s", getPassword())
-                    };
-                Container.ExecResult execResult = executeInContainer(commandAndArgs);
-                if (execResult.getExitCode() != 0) {
-                  String message =
-                      format(
-                          "Command [%s] exited with %s",
-                          String.join(" ", commandAndArgs), execResult.getExitCode());
-                  LOG.error("{}", message);
-                  LOG.error("stderr: {}", execResult.getStderr());
-                  LOG.error("stdout: {}", execResult.getStdout());
-                } else {
-                  LOG.info("MySQL container startup success!");
-                  return true;
-                }
-              } catch (RuntimeException e) {
-                LOG.error(e.getMessage(), e);
-              }
-              return false;
-            });
-
-    return true;
+    logDurability(
+        List.of("datadir", "innodb_flush_log_at_trx_commit", "log_bin", "innodb_doublewrite"),
+        "mysql",
+        "-u" + getUsername(),
+        "-p" + getPassword(),
+        "--batch",
+        "--skip-column-names",
+        "-e",
+        "SELECT @@datadir, @@innodb_flush_log_at_trx_commit, @@log_bin, @@innodb_doublewrite");
   }
 
   public void createDatabase(TestDatabaseName testDatabaseName) {
-    String mySQLJdbcUrl =
-        StringUtils.substring(
-            getJdbcUrl(testDatabaseName), 0, getJdbcUrl(testDatabaseName).lastIndexOf("/"));
-
-    // Fix https://github.com/apache/gravitino/issues/6392, MYSQL JDBC driver may not load
-    // automatically.
-    try {
-      Class.forName("com.mysql.jdbc.Driver");
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to load MySQL JDBC driver", e);
+    // validate database name to ensure it only contains safe characters
+    String databaseName = testDatabaseName.toString();
+    if (!isValidDatabaseName(databaseName)) {
+      throw new IllegalArgumentException("Invalid database name: " + databaseName);
     }
 
-    // change password for root user, Gravitino API must set password in catalog properties
-    try (Connection connection =
-            DriverManager.getConnection(mySQLJdbcUrl, USER_NAME, getPassword());
+    try (Connection connection = db.createConnection("");
         Statement statement = connection.createStatement()) {
-
-      // validate database name to ensure it only contains safe characters
-      String databaseName = testDatabaseName.toString();
-      if (!isValidDatabaseName(databaseName)) {
-        throw new IllegalArgumentException("Invalid database name: " + databaseName);
-      }
-
       String query = String.format("CREATE DATABASE IF NOT EXISTS `%s`;", databaseName);
       // FIXME: String, which is used in SQL, can be unsafe
       statement.execute(query);
@@ -159,14 +122,6 @@ public class MySQLContainer extends BaseContainer {
     return databaseName.matches("^[a-zA-Z0-9_$]+$");
   }
 
-  public String getUsername() {
-    return USER_NAME;
-  }
-
-  public String getPassword() {
-    return PASSWORD;
-  }
-
   public String getJdbcUrl() {
     return format("jdbc:mysql://%s:%d", getContainerIpAddress(), MYSQL_PORT);
   }
@@ -179,8 +134,27 @@ public class MySQLContainer extends BaseContainer {
     return DriverManager.getDriver(getJdbcUrl(testDatabaseName)).getClass().getName();
   }
 
+  private static org.testcontainers.containers.MySQLContainer<?> module(
+      String image, Durability durability) {
+    // The image may be a mirror or a custom tag; the module only needs a MySQL server.
+    return new org.testcontainers.containers.MySQLContainer<>(
+            DockerImageName.parse(image).asCompatibleSubstituteFor("mysql"))
+        .withUsername(USER_NAME)
+        .withPassword(PASSWORD)
+        // The module always creates a database. Its default, "test", is also a schema name catalog
+        // tests create, so name MySQL's own system database instead.
+        .withDatabaseName("mysql")
+        // Our own config replaces the one Testcontainers 1.x bundles, so the server settings do not
+        // depend on the Testcontainers version; it carries the disposable settings too.
+        .withConfigurationOverride(
+            durability == Durability.DISPOSABLE ? DISPOSABLE_CONFIG : DEFAULT_CONFIG)
+        // The module's readiness check queries the database and ignores BaseContainer's startup
+        // timeout, so it gets the same budget here.
+        .withStartupTimeoutSeconds(300);
+  }
+
   public static class Builder
-      extends BaseContainer.Builder<MySQLContainer.Builder, MySQLContainer> {
+      extends DatabaseContainer.Builder<MySQLContainer.Builder, MySQLContainer> {
 
     private Builder() {
       this.image = DEFAULT_IMAGE;
@@ -191,7 +165,7 @@ public class MySQLContainer extends BaseContainer {
     @Override
     public MySQLContainer build() {
       return new MySQLContainer(
-          image, hostName, exposePorts, extraHosts, filesToMount, envVars, network);
+          image, durability, hostName, exposePorts, extraHosts, filesToMount, envVars, network);
     }
   }
 }

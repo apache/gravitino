@@ -115,15 +115,23 @@ public class TableMetaSQLProviderFactory {
   }
 
   /**
-   * Returns SQL that soft-deletes a table with a version check.
+   * Soft-deletes an observed table registration in the same catalog lifetime.
    *
-   * @param tableId the table ID
-   * @param currentVersion the version observed by the caller
-   * @return the version-checked delete SQL
+   * @param tableId the stable external identity
+   * @param currentVersion the observed row version
+   * @param catalogId the observed parent catalog identity
+   * @param schemaId the observed parent schema identity
+   * @param tableName the observed table name
+   * @return the guarded soft-delete SQL
    */
   public static String softDeleteTableMetasByTableId(
-      @Param("tableId") Long tableId, @Param("currentVersion") Long currentVersion) {
-    return getProvider().softDeleteTableMetasByTableId(tableId, currentVersion);
+      @Param("tableId") Long tableId,
+      @Param("currentVersion") Long currentVersion,
+      @Param("catalogId") Long catalogId,
+      @Param("schemaId") Long schemaId,
+      @Param("tableName") String tableName) {
+    return getProvider()
+        .softDeleteTableMetasByTableId(tableId, currentVersion, catalogId, schemaId, tableName);
   }
 
   public static String softDeleteTableMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
@@ -146,5 +154,35 @@ public class TableMetaSQLProviderFactory {
   public static String batchSelectTableByIdentifier(
       @Param("schemaId") Long schemaId, @Param("tableNames") List<String> tableNames) {
     return getProvider().batchSelectTableByIdentifier(schemaId, tableNames);
+  }
+  /**
+   * Returns the single-statement table snapshot SQL for a schema ID and name.
+   *
+   * @param schemaId the parent schema ID
+   * @param tableName the table name
+   * @return the aggregate select SQL
+   */
+  public static String selectTableWithColumnsBySchemaIdAndName(
+      @Param("schemaId") Long schemaId, @Param("tableName") String tableName) {
+    return getProvider().selectTableWithColumnsBySchemaIdAndName(schemaId, tableName);
+  }
+
+  /**
+   * Returns the single-statement table snapshot SQL for a full name.
+   *
+   * @param metalakeName the metalake name
+   * @param catalogName the catalog name
+   * @param schemaName the physical schema name
+   * @param tableName the table name
+   * @return the aggregate select SQL
+   */
+  public static String selectTableWithColumnsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("tableName") String tableName) {
+    return getProvider()
+        .selectTableWithColumnsByFullQualifiedName(
+            metalakeName, catalogName, schemaName, tableName);
   }
 }

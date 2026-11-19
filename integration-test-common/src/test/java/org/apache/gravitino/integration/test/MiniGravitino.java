@@ -57,6 +57,7 @@ import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.GravitinoServer;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.apache.gravitino.storage.relational.database.H2Database;
 import org.junit.platform.commons.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -277,6 +278,36 @@ public class MiniGravitino {
     return customConfigs;
   }
 
+  // Customize the config file
+  @VisibleForTesting
+  void customizeConfigFile(String configTempFileName, String configFileName) throws IOException {
+    Map<String, String> configMap = new HashMap<>();
+    configMap.put(
+        GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
+        String.valueOf(RESTUtils.findAvailablePort(2000, 3000)));
+
+    configMap.putAll(getIcebergRestServiceConfigs());
+    configMap.putAll(getLanceRestServiceConfigs(configMap));
+    configMap.putAll(context.customConfig);
+
+    Properties configProperties = serverConfig.loadPropertiesFromFile(new File(configTempFileName));
+    configProperties.putAll(configMap);
+    // Match server startup: load JVM properties first, then apply the generated file's overrides.
+    ServerConfig config = new ServerConfig();
+    config.loadFromProperties(configProperties);
+    String jdbcUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
+    if (Configs.DEFAULT_RELATIONAL_JDBC_BACKEND_URL.equals(jdbcUrl)) {
+      // H2 2.2.224 can panic when its asynchronous chunk writer checks free-space state while
+      // another thread removes unused chunks (h2database/h2database#4048). Synchronous writes
+      // avoid that pipeline in the default embedded test database. Preserve explicit JDBC URLs
+      // so tests can still select other backends or exercise different H2 settings.
+      configProperties.setProperty(
+          Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY,
+          H2Database.getConnectionUrl(config) + ";WRITE_DELAY=0");
+    }
+    ITUtils.overwriteConfigFile(configFileName, configProperties);
+  }
+
   private Map<String, String> getLanceRestServiceConfigs(Map<String, String> configMap)
       throws IOException {
     if (context.ignoreLanceAuxRestService) {
@@ -328,20 +359,5 @@ public class MiniGravitino {
         LOG.warn("Failed to delete MiniGravitino configuration directory {}", mockConfDir, e);
       }
     }
-  }
-
-  // Customize the config file
-  private void customizeConfigFile(String configTempFileName, String configFileName)
-      throws IOException {
-    Map<String, String> configMap = new HashMap<>();
-    configMap.put(
-        GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
-        String.valueOf(RESTUtils.findAvailablePort(2000, 3000)));
-
-    configMap.putAll(getIcebergRestServiceConfigs());
-    configMap.putAll(getLanceRestServiceConfigs(configMap));
-    configMap.putAll(context.customConfig);
-
-    ITUtils.rewriteConfigFile(configTempFileName, configFileName, configMap);
   }
 }

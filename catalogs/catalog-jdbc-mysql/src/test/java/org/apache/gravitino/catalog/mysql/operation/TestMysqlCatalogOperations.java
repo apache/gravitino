@@ -19,8 +19,14 @@
 package org.apache.gravitino.catalog.mysql.operation;
 
 import java.sql.SQLException;
+import java.time.Instant;
+import java.util.Map;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.jdbc.MySQLProtocolCompatibleCatalogOperations;
 import org.apache.gravitino.catalog.mysql.MysqlCatalog;
+import org.apache.gravitino.connector.CatalogInfo;
+import org.apache.gravitino.meta.AuditInfo;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -29,9 +35,21 @@ public class TestMysqlCatalogOperations extends TestMysql {
 
   @Test
   public void testCheckJDBCDriver() throws SQLException {
-    MySQLProtocolCompatibleCatalogOperations catalogOperations =
+    Map<String, String> properties = getMySQLCatalogProperties();
+    CatalogInfo info =
+        new CatalogInfo(
+            1L,
+            "mysql_driver_test",
+            Catalog.Type.RELATIONAL,
+            "jdbc-mysql",
+            "test",
+            properties,
+            AuditInfo.builder().withCreator("test").withCreateTime(Instant.EPOCH).build(),
+            Namespace.of("metalake"));
+    try (MySQLProtocolCompatibleCatalogOperations catalogOperations =
         new MySQLProtocolCompatibleCatalogOperations(
-            null, null, DATABASE_OPERATIONS, TABLE_OPERATIONS, null);
-    catalogOperations.initialize(getMySQLCatalogProperties(), null, new MysqlCatalog());
+            null, null, DATABASE_OPERATIONS, TABLE_OPERATIONS, null)) {
+      catalogOperations.initialize(properties, info, new MysqlCatalog());
+    }
   }
 }

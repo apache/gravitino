@@ -20,6 +20,7 @@ Spark clients use a different Iceberg version than the Gravitino server (1.11.0)
 |---------------|----------------|-----------------|---------------------------------------------------------|-----------------------------------------------------------------------------------|
 | 3.5           | 2.12 or 2.13   | 1.11.0          | `iceberg-spark-runtime-3.5_${scala-version}-1.11.0.jar` | `gravitino-spark-connector-runtime-3.5_${scala-version}-${gravitino-version}.jar` |
 | 4.0           | 2.13           | 1.11.0          | `iceberg-spark-runtime-4.0_2.13-1.11.0.jar`             | `gravitino-spark-connector-runtime-4.0_2.13-${gravitino-version}.jar`             |
+| 4.1           | 2.13           | 1.11.0          | `iceberg-spark-runtime-4.1_2.13-1.11.0.jar`             | `gravitino-spark-connector-runtime-4.1_2.13-${gravitino-version}.jar`             |
 
 Replace `${scala-version}` with `2.12` or `2.13`, and `${gravitino-version}` with your Gravitino release version.
 
@@ -197,6 +198,12 @@ spark.sql.gravitino.iceberg.rest.rest.auth.basic.password  <password>
 See [Connect Spark to Iceberg REST](../iceberg-rest-engine/spark.md) for the full set of supported
 `rest.auth.*` properties and how to configure them when connecting directly to the IRC endpoint.
 
+When the Gravitino client uses Basic authentication (`spark.sql.gravitino.authType=basic`), the connector reuses its user name and password for IRC. Any `rest.auth.*` or `token` property set through `spark.sql.gravitino.iceberg.rest.*` disables the reuse.
+
+When the Gravitino client uses token authentication (`spark.sql.gravitino.authType=token`), the connector passes its bearer token to IRC as the Iceberg `token` property. The token is read when the catalog is initialized and isn't refreshed afterwards. Any `rest.auth.*` or `token` property set through `spark.sql.gravitino.iceberg.rest.*` disables the reuse.
+
+Kerberos can't be carried to IRC because the Iceberg REST client doesn't support SPNEGO. With `spark.sql.gravitino.authType=kerberos`, a routed Iceberg catalog fails at initialization unless its authentication is configured through `spark.sql.gravitino.iceberg.rest.*`.
+
 When the Gravitino client uses OAuth2, the connector reuses its OAuth2 client configuration for IRC by
 default. This avoids duplicating configuration when both endpoints accept the same client identity. The
 equivalent explicit setting is:
@@ -254,7 +261,12 @@ a `NoClassDefFoundError` that does not identify the missing bundle directly.
 
 ### OSS
 
-Please downloading the [Aliyun OSS SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip) and copy `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` in the classpath of Spark.
+Download the [Aliyun OSS SDK](https://repo1.maven.org/maven2/com/aliyun/oss/aliyun-sdk-oss/3.18.5/aliyun-sdk-oss-3.18.5.jar)
+version that matches the Iceberg runtime from the table above (3.18.5 for Iceberg 1.11.0), together with
+[jdom2](https://repo1.maven.org/maven2/org/jdom/jdom2/2.0.6.1/jdom2-2.0.6.1.jar), and place
+`aliyun-sdk-oss-3.18.5.jar` and `jdom2-2.0.6.1.jar` on the Spark driver and executor classpaths.
+Iceberg 1.11.0 expects `OSS#deleteObject(String, String)` to return `VoidResult`, which is only true
+from SDK 3.12.0 onward; with 3.10.2 every OSS delete fails with `NoSuchMethodError`.
 
 ### GCS
 

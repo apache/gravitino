@@ -101,6 +101,9 @@ dependencies {
   implementation(project(":catalogs:catalog-common")) {
     exclude("org.apache.logging.log4j")
   }
+  implementation(project(":bundles:aws")) {
+    exclude("*")
+  }
   implementation(libs.guava)
   implementation(libs.caffeine)
 
@@ -129,6 +132,15 @@ dependencies {
 
   testImplementation(project(":api")) {
     exclude("org.apache.logging.log4j")
+  }
+  if (scalaVersion == "2.12") {
+    // Reuse backend metadata conversion without adding another Hive dependency tree.
+    testImplementation(project(":catalogs:catalog-lakehouse-paimon")) {
+      isTransitive = false
+    }
+    tasks.named("compileTestJava") {
+      dependsOn(":catalogs:catalog-lakehouse-paimon:runtimeJars")
+    }
   }
   testImplementation(project(":catalogs:catalog-glue")) {
     exclude("org.apache.logging.log4j")

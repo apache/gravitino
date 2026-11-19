@@ -83,10 +83,11 @@ public interface SupportsMetalakes {
    * @param changes The changes to apply.
    * @return The altered metalake.
    * @throws NoSuchMetalakeException If the metalake does not exist.
+   * @throws MetalakeAlreadyExistsException If the new name is already used by another metalake.
    * @throws IllegalArgumentException If the changes cannot be applied to the metalake.
    */
   Metalake alterMetalake(String name, MetalakeChange... changes)
-      throws NoSuchMetalakeException, IllegalArgumentException;
+      throws NoSuchMetalakeException, MetalakeAlreadyExistsException, IllegalArgumentException;
 
   /**
    * Drop a metalake with specified name. Please make sure:

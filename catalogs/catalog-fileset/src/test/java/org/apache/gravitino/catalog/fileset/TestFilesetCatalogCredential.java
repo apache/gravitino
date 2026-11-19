@@ -133,4 +133,14 @@ public class TestFilesetCatalogCredential {
             .get(CredentialConstants.CREDENTIAL_PROVIDERS)
             .contains(COSSecretKeyCredential.COS_SECRET_KEY_CREDENTIAL_TYPE));
   }
+
+  @Test
+  void testPathBasedCredentialProvidersAllowed() {
+    FilesetCatalogImpl catalog = newCatalog(Maps.newHashMap());
+    Assertions.assertTrue(catalog.supportsPathBasedCredentials());
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog.validateCredentialProviders(
+                ImmutableMap.of(CredentialConstants.CREDENTIAL_PROVIDERS, "s3-token,gcs-token")));
+  }
 }

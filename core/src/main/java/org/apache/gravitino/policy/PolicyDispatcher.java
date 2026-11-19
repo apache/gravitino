@@ -20,6 +20,9 @@
 package org.apache.gravitino.policy;
 
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.annotation.Evolving;
@@ -163,4 +166,19 @@ public interface PolicyDispatcher {
    * @return The array of policies associated with the specified metadata object.
    */
   PolicyEntity[] listPolicyInfosForMetadataObject(String metalake, MetadataObject metadataObject);
+
+  /**
+   * Lists effective policies for several metadata objects in the same metalake.
+   *
+   * @param metalake the metalake name
+   * @param metadataObjects the objects to resolve
+   * @return policies keyed by metadata object, including empty results
+   */
+  default Map<MetadataObject, PolicyEntity[]> listPolicyInfosForMetadataObjects(
+      String metalake, List<MetadataObject> metadataObjects) {
+    Map<MetadataObject, PolicyEntity[]> result = new LinkedHashMap<>();
+    metadataObjects.forEach(
+        object -> result.put(object, listPolicyInfosForMetadataObject(metalake, object)));
+    return result;
+  }
 }

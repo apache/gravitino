@@ -24,6 +24,8 @@ import java.util.Map;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestJdbcConnectionTimeouts {
 
@@ -128,16 +130,29 @@ public class TestJdbcConnectionTimeouts {
     assertPostgresConnectSeconds("1999", "2");
   }
 
-  @Test
-  void testPostgresSecondsConversionAtMaxAllowedValue() {
-    // The config caps the value at Integer.MAX_VALUE ms; the ceiling conversion stays correct and
-    // within int range at that bound (and is overflow-safe for the whole positive long range).
-    long millis = Integer.MAX_VALUE;
-    long expectedSeconds = (millis - 1L) / 1000L + 1L;
-    assertPostgresConnectSeconds(Long.toString(millis), Long.toString(expectedSeconds));
-    Assertions.assertTrue(expectedSeconds > 1L, "conversion must not collapse to 1 second");
-    Assertions.assertTrue(
-        expectedSeconds <= Integer.MAX_VALUE, "converted seconds must fit the driver int range");
+  @ParameterizedTest
+  @ValueSource(longs = {2147482999L, 2147483000L, 2147483001L, 2147483646L, 2147483647L})
+  void testPostgresTimeoutsFitDriverMilliseconds(long millis) {
+    Map<String, String> props =
+        Map.of(
+            DRIVER_KEY, "org.postgresql.Driver",
+            URL_KEY, "jdbc:postgresql://host:5432/db",
+            CONNECT_TIMEOUT_MS_KEY, Long.toString(millis));
+    Map<String, String> pooled =
+        JdbcConnectionTimeouts.connectionProperties(config(props), props.get(URL_KEY));
+    Map<String, String> probe =
+        JdbcConnectionTimeouts.probeConnectionProperties(config(props), props.get(URL_KEY));
+
+    // PostgreSQL multiplies its integer timeout seconds by 1000 before setting socket timeouts.
+    // A value that fits an int in seconds can still overflow in that conversion.
+    for (String seconds : probe.values()) {
+      int driverMillis = Math.multiplyExact(Integer.parseInt(seconds), 1000);
+      Assertions.assertTrue(driverMillis > 0, "driver timeout must remain positive");
+    }
+    Assertions.assertEquals(Map.of(CONNECT_TIMEOUT, "2147483"), pooled);
+    Assertions.assertEquals(
+        Map.of(CONNECT_TIMEOUT, "2147483", SOCKET_TIMEOUT, "2147483", "loginTimeout", "2147483"),
+        probe);
   }
 
   private static void assertPostgresConnectSeconds(String millis, String expectedSeconds) {

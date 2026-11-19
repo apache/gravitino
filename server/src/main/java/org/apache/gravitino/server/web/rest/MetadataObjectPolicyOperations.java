@@ -39,8 +39,8 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.dto.policy.PolicyDTO;
-import org.apache.gravitino.dto.responses.NameListResponse;
-import org.apache.gravitino.dto.responses.PolicyListResponse;
+import org.apache.gravitino.dto.responses.MetadataObjectPolicyListResponse;
+import org.apache.gravitino.dto.responses.PolicyNameListResponse;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.policy.PolicyDispatcher;
@@ -93,9 +93,11 @@ public class MetadataObjectPolicyOperations {
             MetadataObject object =
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+            TagOperations.checkVisibleTag(metalake, object);
 
             PolicyEntity[] policies =
                 policyDispatcher.listPolicyInfosForMetadataObject(metalake, object);
+            int policyCount = policies.length;
             policies =
                 MetadataAuthzHelper.filterByExpression(
                     metalake,
@@ -103,6 +105,7 @@ public class MetadataObjectPolicyOperations {
                     Entity.EntityType.POLICY,
                     policies,
                     policy -> NameIdentifierUtil.ofPolicy(metalake, policy.name()));
+            boolean hasInaccessiblePolicies = policies.length < policyCount;
 
             PolicyDTO[] policyDTOs =
                 Arrays.stream(policies)
@@ -119,7 +122,8 @@ public class MetadataObjectPolicyOperations {
                   type,
                   fullName,
                   metalake);
-              return Utils.ok(new PolicyListResponse(policyDTOs));
+              return Utils.ok(
+                  new MetadataObjectPolicyListResponse(policyDTOs, hasInaccessiblePolicies));
 
             } else {
               String[] policyNames =
@@ -131,7 +135,7 @@ public class MetadataObjectPolicyOperations {
                   type,
                   fullName,
                   metalake);
-              return Utils.ok(new NameListResponse(policyNames));
+              return Utils.ok(new PolicyNameListResponse(policyNames, hasInaccessiblePolicies));
             }
           });
 

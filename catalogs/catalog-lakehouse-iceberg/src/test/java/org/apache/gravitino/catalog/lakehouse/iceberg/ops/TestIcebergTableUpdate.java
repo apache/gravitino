@@ -24,7 +24,6 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.TableChange.ColumnPosition;
 import org.apache.gravitino.rel.types.Types;
@@ -83,18 +82,17 @@ public class TestIcebergTableUpdate {
   @BeforeEach
   public void init() {
     icebergCatalogWrapper = new IcebergCatalogWrapper(new IcebergConfig(Collections.emptyMap()));
-    icebergCatalogWrapperHelper =
-        new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());
+    icebergCatalogWrapperHelper = new IcebergCatalogWrapperHelper();
     createNamespace(TEST_NAMESPACE_NAME);
     createTable(TEST_NAMESPACE_NAME, TEST_TABLE_NAME);
   }
 
   public LoadTableResponse updateTable(
       NameIdentifier gravitinoNameIdentifier, TableChange... gravitinoTableChanges) {
-    IcebergTableChange icebergTableChange =
-        icebergCatalogWrapperHelper.buildIcebergTableChanges(
-            gravitinoNameIdentifier, gravitinoTableChanges);
-    return icebergCatalogWrapper.updateTable(icebergTableChange);
+    return icebergCatalogWrapper.buildAndUpdateTable(
+        catalog ->
+            icebergCatalogWrapperHelper.buildIcebergTableChanges(
+                catalog, gravitinoNameIdentifier, gravitinoTableChanges));
   }
 
   private void createNamespace(String namespace) {
@@ -161,6 +159,17 @@ public class TestIcebergTableUpdate {
               Assertions.assertThrowsExactly(
                   IllegalArgumentException.class, () -> updateTable(identifier, removeProperty1));
             });
+  }
+
+  /** Rejects attempts to modify the default spec through ordinary table properties. */
+  @Test
+  public void testDefaultSpecPropertyIsReadOnly() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> updateTable(identifier, TableChange.setProperty("default-spec-id", "1")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> updateTable(identifier, TableChange.removeProperty("default-spec-id")));
   }
 
   @Test

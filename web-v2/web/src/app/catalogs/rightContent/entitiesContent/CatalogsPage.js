@@ -31,7 +31,6 @@ import { switchInUseCatalog, deleteCatalog, updateCatalogInUse } from '@/lib/sto
 import { TreeRefContext } from '../../page'
 import Tags from '@/components/CustomTags'
 import Icons from '@/components/Icons'
-import Policies from '@/components/PolicyTag'
 import Link from 'next/link'
 import Loading from '@/components/Loading'
 
@@ -252,20 +251,6 @@ export default function CatalogsPage() {
               metadataObjectType={'catalog'}
               metadataObjectFullName={record.name}
               key={`catalog-${record.name}-tags`}
-            />
-          ) : null
-      },
-      {
-        title: 'Policies',
-        dataIndex: 'policies',
-        key: 'policies',
-        ellipsis: true,
-        render: (_, record) =>
-          record?.node === 'catalog' ? (
-            <Policies
-              metadataObjectType={'catalog'}
-              metadataObjectFullName={record.name}
-              key={`catalog-${record.name}-policies`}
             />
           ) : null
       },

@@ -20,6 +20,12 @@ Gravitino server provides a pluggable lineage framework to receive, process, and
 | `gravitino.lineage.${sinkName}.sinkClass`     | The name of the lineage sink class which should implement `org.apache.gravitino.lineage.sink.LineageSink` interface.                                                                                                                                       | (none)                                                 | No       |
 | `gravitino.lineage.queueCapacity`             | The total capacity of lineage event queues. When there are multiple lineage sinks, each sink utilizes an isolated event queue. The capacity of each queue is calculated by dividing the value of `gravitino.lineage.queueCapacity` by the number of sinks. | 10000                                                  | No       |
 
+The queue capacity must be positive. Each sink receives
+`max(1, floor(queueCapacity / numberOfSinks))` queue slots. Any division remainder is
+unused; when the total is smaller than the number of sinks, each sink still receives
+one slot. The legacy key `gravitino.lineage.sinkQueueCapacity` is also accepted;
+`gravitino.lineage.queueCapacity` takes precedence when both are configured.
+
 ## Lineage HTTP Source
 
 Http source provides an endpoint which follows [OpenLineage API spec](https://openlineage.io/apidocs/openapi/) to receive OpenLineage run event. The following use example:

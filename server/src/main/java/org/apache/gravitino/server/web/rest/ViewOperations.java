@@ -49,6 +49,7 @@ import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -163,13 +164,18 @@ public class ViewOperations {
   @ResponseMetered(name = "load-view", absolute = true)
   @AuthorizationExpression(
       expression = AuthorizationExpressionConstants.LOAD_VIEW_AUTHORIZATION_EXPRESSION,
+      allowCheckExistence =
+          AuthorizationExpressionConstants.PROBE_TABLE_LIKE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.VIEW)
   public Response loadView(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      @PathParam("view") @AuthorizationMetadata(type = Entity.EntityType.VIEW) String view) {
+      @PathParam("view")
+          @AuthorizationMetadata(type = Entity.EntityType.VIEW)
+          @AuthorizationRequest(type = AuthorizationRequest.RequestType.LOAD_VIEW)
+          String view) {
     LOG.info("Received load view request for view: {}.{}.{}.{}", metalake, catalog, schema, view);
     try {
       return Utils.doAs(

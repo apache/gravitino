@@ -26,6 +26,8 @@ import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("gravitino-docker-test")
 public class TestDorisDatabaseOperations extends TestDoris {
@@ -46,6 +48,23 @@ public class TestDorisDatabaseOperations extends TestDoris {
         () -> DATABASE_OPERATIONS.create(databaseName, "", properties));
 
     testDropDatabase(databaseName);
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "a\" = \"b",
+        "a\"\"b",
+        "two\\\\backslashes and trailing\\",
+        " leading and trailing whitespace "
+      })
+  void testRawDatabasePropertiesRoundTrip(String value) {
+    String databaseName = RandomNameUtils.genRandomName("it_db_raw");
+    try {
+      testBaseOperation(databaseName, Map.of("property1", value), value);
+    } finally {
+      DATABASE_OPERATIONS.delete(databaseName, true);
+    }
   }
 
   @Test

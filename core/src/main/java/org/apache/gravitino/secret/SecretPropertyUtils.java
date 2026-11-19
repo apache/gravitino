@@ -89,9 +89,12 @@ public final class SecretPropertyUtils {
    * <ul>
    *   <li>{@code metadata == null}: do <strong>not</strong> recover (URN-only). Used when the
    *       catalog does not expose properties metadata for the entity type.
-   *   <li>declared {@code hidden}: always recover, without the sensitive-keyword gate — so
-   *       shortening {@link Configs#SENSITIVE_KEY_KEYWORDS} cannot leave a masked property without
-   *       a recovery path.
+   *   <li>declared {@code hidden} and not {@code reserved}: always recover, without the
+   *       sensitive-keyword gate — so shortening {@link Configs#SENSITIVE_KEY_KEYWORDS} cannot
+   *       leave a masked property without a recovery path.
+   *   <li>declared {@code reserved} and {@code hidden} (for example {@code gravitino.identifier}):
+   *       never recover — these are internal system properties omitted from API responses, not user
+   *       secrets.
    *   <li>undeclared: recover only when the key name matches {@link #isSensitivePropertyKey}
    *       (historical fuzzy recovery).
    *   <li>declared non-hidden: never recover here (for example {@code credential-providers} stays
@@ -112,7 +115,9 @@ public final class SecretPropertyUtils {
       return false;
     }
     if (metadata.containsProperty(key)) {
-      return metadata.isHiddenProperty(key);
+      // Align with HiddenPropertyMaskUtils: reserved+hidden keys are internal (e.g.
+      // gravitino.identifier) and must not appear in getSecrets.
+      return metadata.isHiddenProperty(key) && !metadata.isReservedProperty(key);
     }
     return isSensitivePropertyKey(key);
   }
@@ -154,9 +159,10 @@ public final class SecretPropertyUtils {
    *   <li>Include every entry where {@link #isSecretProperty} is true, resolving the secret URN via
    *       {@link SecretManager#readSecret}.
    *   <li>Include every inline entry when {@link #shouldRecoverSensitiveNamedSecret} is true:
-   *       declared {@code hidden} (no keyword gate), or undeclared with a sensitive-looking name.
-   *       Declared non-hidden keys are excluded even when the name looks sensitive. When {@code
-   *       metadata} is {@code null}, inline plaintext is not recovered (URN-only).
+   *       declared {@code hidden} and not {@code reserved} (no keyword gate), or undeclared with a
+   *       sensitive-looking name. Reserved+hidden keys (for example {@code gravitino.identifier})
+   *       and declared non-hidden keys are excluded. When {@code metadata} is {@code null}, inline
+   *       plaintext is not recovered (URN-only).
    * </ol>
    *
    * <p>Normal non-sensitive, non-hidden properties are not included. Clients merge this map over
@@ -288,7 +294,7 @@ public final class SecretPropertyUtils {
    * @param plaintext the plaintext from the binding
    */
   public static void validateAlterSecretBindingPlaintext(String plaintext) {
-    Preconditions.checkArgument(plaintext != null, "plaintext must not be null");
+    Preconditions.checkArgument(StringUtils.isNotBlank(plaintext), "plaintext must not be blank");
     Preconditions.checkArgument(
         !"******".equals(plaintext),
         "setSecretBinding plaintext must not be the masked placeholder ******");
@@ -366,6 +372,49 @@ public final class SecretPropertyUtils {
   }
 
   /**
+   * Returns the entity id that writing a write-through secret for {@code property} requires.
+   *
+   * <p>A write-through URN embeds the entity id, so an entity Gravitino has no id for yet, such as
+   * an external schema or fileset that was never imported, cannot bind one.
+   *
+   * @param entityId the entity id, or null if it cannot be resolved
+   * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
+   * @param property the property key
+   * @return {@code entityId}
+   * @throws IllegalArgumentException if {@code entityId} is null
+   */
+  static long requireEntityIdForWriteThrough(
+      @Nullable Long entityId, String entityType, String property) {
+    // Loading an external schema imports it, which gives it an id; filesets have no such path.
+    Preconditions.checkArgument(
+        entityId != null,
+        "Cannot alter the write-through secret of property %s: the %s has no Gravitino entity id"
+            + " yet%s",
+        property,
+        entityType,
+        "schema".equals(entityType) ? "; load the schema to import it first" : "");
+    return entityId;
+  }
+
+  /**
+   * Rejects changing {@code property} when it holds a write-through secret URN and the entity id
+   * cannot be resolved, because releasing that secret needs the id.
+   *
+   * @param entityId the entity id, or null if it cannot be resolved
+   * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
+   * @param property the property key
+   * @param currentValue the current value of {@code property} (may be null)
+   * @throws IllegalArgumentException if {@code entityId} is null and {@code currentValue} is a
+   *     write-through secret URN of this entity type and property
+   */
+  static void checkWriteThroughHasEntityId(
+      @Nullable Long entityId, String entityType, String property, @Nullable String currentValue) {
+    if (entityId == null && isWriteThroughUrn(property, currentValue, entityType)) {
+      requireEntityIdForWriteThrough(null, entityType, property);
+    }
+  }
+
+  /**
    * Omits cloud access-key pair properties from a plaintext secrets map for {@code USE_SECRETS}
    * callers. Delegates to {@link
    * CloudStorageCredentialPropertyKeys#omitCloudAccessKeyPairProperties}.
@@ -376,5 +425,26 @@ public final class SecretPropertyUtils {
   public static Map<String, String> omitCloudAccessKeyPairSecrets(
       @Nullable Map<String, String> secrets) {
     return CloudStorageCredentialPropertyKeys.omitCloudAccessKeyPairProperties(secrets);
+  }
+
+  /**
+   * Returns whether {@code value} is a write-through secret URN {@code
+   * entityType:entityId:propertyKey} for this entity type and property, whichever entity id it
+   * names.
+   */
+  private static boolean isWriteThroughUrn(
+      String propertyKey, @Nullable String value, String entityType) {
+    if (!isSecretProperty(propertyKey, value)) {
+      return false;
+    }
+    try {
+      List<String> segments = SecretUrn.parse(value).identifierSegments();
+      return segments.size() == 3
+          && entityType.equals(segments.get(0))
+          && StringUtils.isNumeric(segments.get(1))
+          && propertyKey.equals(segments.get(2));
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
   }
 }

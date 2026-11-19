@@ -25,6 +25,7 @@ import java.util.TreeMap;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.job.JobExecutorFactory;
 
 /**
  * The configurations of the {@code k8s} job executor, set with the {@code
@@ -33,9 +34,14 @@ import org.apache.commons.lang3.StringUtils;
 public class K8sJobExecutorConfigs {
 
   /** The name of the job executor. */
-  public static final String K8S_JOB_EXECUTOR_NAME = "k8s";
+  public static final String K8S_JOB_EXECUTOR_NAME = JobExecutorFactory.K8S_JOB_EXECUTOR_NAME;
 
-  /** The name of the Kubernetes cluster the jobs run in, which is part of the job execution id. */
+  /**
+   * The name of the Kubernetes cluster the jobs run in, which is part of the job execution id. It
+   * must be the same on every Gravitino server, and must not be changed while jobs run: the jobs
+   * submitted under another name can't be queried nor cancelled, and stay unfinished until it is
+   * changed back.
+   */
   public static final String CLUSTER = "cluster";
 
   /** The default cluster name. */
@@ -105,7 +111,11 @@ public class K8sJobExecutorConfigs {
   /** The default status cache TTL, 5 seconds. */
   public static final long DEFAULT_STATUS_CACHE_TTL_MS = 5_000L;
 
-  /** A job whose resource still has no status after this time is considered failed. */
+  /**
+   * A job whose resource still has no status after this time is considered failed, and its resource
+   * is deleted. A job whose resource has a status without any state this version can read, for
+   * example of a newer operator, stays unfinished instead, until the operator deletes the resource.
+   */
   public static final String NO_STATUS_TIMEOUT_MS = "noStatusTimeoutInMs";
 
   /** The default no status timeout, 10 minutes. */
@@ -148,6 +158,20 @@ public class K8sJobExecutorConfigs {
   public static final long DEFAULT_SPARK_START_TIMEOUT_MS = 60 * 60 * 1000L;
 
   /**
+   * The URI of the jar of the built-in jobs that the Spark driver and executors can reach. It
+   * replaces the executable of a built-in job template, which is the path of the jar on the
+   * Gravitino server.
+   */
+  public static final String SPARK_BUILTIN_JOBS_JAR = "spark.builtinJobsJar";
+
+  /**
+   * The default URI of the jar of the built-in jobs, a file in the Spark image or in a volume
+   * mounted into the Spark pods.
+   */
+  public static final String DEFAULT_SPARK_BUILTIN_JOBS_JAR =
+      "local:///opt/gravitino/jobs/gravitino-jobs.jar";
+
+  /**
    * The prefix of the default Spark configurations of every Spark job. The job's own Spark
    * configurations take precedence.
    */
@@ -180,6 +204,7 @@ public class K8sJobExecutorConfigs {
   private final long sparkTtlAfterStopMs;
   private final long sparkDriverStartTimeoutMs;
   private final long sparkDriverReadyTimeoutMs;
+  private final String sparkBuiltinJobsJar;
   private final Map<String, String> sparkConf;
 
   /**
@@ -281,6 +306,14 @@ public class K8sJobExecutorConfigs {
         positiveLongValue(configs, SPARK_DRIVER_START_TIMEOUT_MS, DEFAULT_SPARK_START_TIMEOUT_MS);
     this.sparkDriverReadyTimeoutMs =
         positiveLongValue(configs, SPARK_DRIVER_READY_TIMEOUT_MS, DEFAULT_SPARK_START_TIMEOUT_MS);
+    this.sparkBuiltinJobsJar =
+        stringValue(configs, SPARK_BUILTIN_JOBS_JAR, DEFAULT_SPARK_BUILTIN_JOBS_JAR);
+    Preconditions.checkArgument(
+        K8sJobResourceUtils.isClusterReachable(sparkBuiltinJobsJar),
+        "%s must be a URI the Spark driver and executors can reach, such as local:// for a file"
+            + " in the image, https://, s3a:// or hdfs://, not a path on the Gravitino server: %s",
+        SPARK_BUILTIN_JOBS_JAR,
+        sparkBuiltinJobsJar);
 
     Map<String, String> conf = new TreeMap<>();
     configs.forEach(
@@ -475,6 +508,15 @@ public class K8sJobExecutorConfigs {
    */
   public long sparkDriverReadyTimeoutMs() {
     return sparkDriverReadyTimeoutMs;
+  }
+
+  /**
+   * Returns the URI of the jar of the built-in jobs that the Spark driver and executors can reach.
+   *
+   * @return the URI of the built-in jobs jar
+   */
+  public String sparkBuiltinJobsJar() {
+    return sparkBuiltinJobsJar;
   }
 
   /**

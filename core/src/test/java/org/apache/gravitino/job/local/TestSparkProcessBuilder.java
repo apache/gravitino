@@ -151,6 +151,30 @@ public class TestSparkProcessBuilder {
   }
 
   @Test
+  public void testGenerateSparkSubmitCommandSkipsBlankConfigs() {
+    SparkJobTemplate template =
+        SparkJobTemplate.builder()
+            .withName("template")
+            .withExecutable("/path/to/spark-demo.jar")
+            .withClassName("com.example.MainClass")
+            .withConfigs(
+                ImmutableMap.of(
+                    "spark.master", "",
+                    "spark.jars", " ",
+                    "spark.executor.memory", "2g"))
+            .build();
+
+    List<String> command =
+        SparkProcessBuilder.generateSparkSubmitCommand("/path/to/spark-submit", template);
+
+    Assertions.assertEquals(1, Collections.frequency(command, "--conf"));
+    int idxConf = command.indexOf("--conf");
+    Assertions.assertEquals("spark.executor.memory=2g", command.get(idxConf + 1));
+    Assertions.assertTrue(command.stream().noneMatch(arg -> arg.startsWith("spark.master")));
+    Assertions.assertTrue(command.stream().noneMatch(arg -> arg.startsWith("spark.jars")));
+  }
+
+  @Test
   public void testResolveSparkSubmit() throws IOException {
     File validSparkHome = Files.createTempDirectory("gravitino-test-spark-home").toFile();
     File invalidSparkHome = Files.createTempDirectory("gravitino-test-no-spark-home").toFile();

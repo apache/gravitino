@@ -18,6 +18,11 @@ The Iceberg REST server and the main Gravitino server expose different interface
 | Interfaces         | [Iceberg REST API spec](https://github.com/apache/iceberg/blob/main/open-api/rest-catalog-open-api.yaml) | [Gravitino unified interfaces](https://gravitino.apache.org/docs/latest/api/rest/gravitino-rest-api) |
 | Managed table type | Iceberg table only                                                                                       | JDBC, Hive, Iceberg, Hudi, Paimon, etc                                                               |
 
+Tables created by other engines that publish Iceberg metadata through this service, for example Paimon
+tables with `metadata.iceberg.storage` set to `rest-catalog`, are served as the producing engine published
+them, so that engine's visibility rules still apply. For Paimon primary-key tables, see
+[Iceberg compatibility](./lakehouse-paimon-catalog.md#iceberg-compatibility).
+
 ### Capabilities
 
 The Iceberg REST server provides:
@@ -102,13 +107,29 @@ The server-level `gravitino.fetchFile.blockUnsafeRemoteUri` configuration contro
 
 #### Auxiliary Service
 
-| Configuration item                 | Description                                                                                                                                                                                                                            | Default value | Required |
-|------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
-| `gravitino.auxService.names`       | The auxiliary service name of the Gravitino Iceberg REST catalog service. Use **`iceberg-rest`**.                                                                                                                                      | (none)        | Yes      |
-| `gravitino.iceberg-rest.classpath` | The classpath of the Gravitino Iceberg REST catalog service; includes the directory containing jars and configuration. It supports both absolute and relative paths, for example, `iceberg-rest-server/libs, iceberg-rest-server/conf` | (none)        | Yes      |
+| Configuration item                 | Description                                                                                                                                                                                                                                                                                                                                 | Default value | Required |
+|------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `gravitino.auxService.names`       | The auxiliary service name of the Gravitino Iceberg REST catalog service. Use **`iceberg-rest`**.                                                                                                                                                                                                                                           | (none)        | Yes      |
+| `gravitino.iceberg-rest.classpath` | The classpath of the Gravitino Iceberg REST catalog service. Use `iceberg-rest-server/libs, iceberg-rest-server/conf` for the regular Iceberg dependencies or `iceberg-rest-server-experiment/libs, iceberg-rest-server-experiment/conf` for the experimental dependencies. It supports both absolute and relative paths. | (none)        | Yes      |
 
 These settings apply only to `gravitino.conf`.
 Do not add them to the standalone server configuration.
+
+The auxiliary service name and all Iceberg REST configuration keys remain the same when using the
+experimental dependencies. Only select the experimental classpath:
+
+```properties
+gravitino.auxService.names = iceberg-rest
+gravitino.iceberg-rest.classpath = iceberg-rest-server-experiment/libs, iceberg-rest-server-experiment/conf
+```
+
+The selected directory is prepended to the Iceberg REST auxiliary service classpath. Only one of
+the regular and experimental directories can be active at a time. The selection takes effect when
+Iceberg classes are absent from the Gravitino server's base classpath; the binary distribution is
+packaged this way. The service logs the loaded Iceberg version and code source during startup so
+the effective runtime can be verified. The experimental directory uses the Datastrato Iceberg
+distribution published under the `com.datastrato` Maven group. Its version is pinned by
+`datastrato-iceberg` in `gradle/libs.versions.toml`, independently of the regular Iceberg version.
 
 #### HTTP Server
 
@@ -123,12 +144,19 @@ Do not add them to the standalone server configuration.
 | `gravitino.iceberg-rest.idleTimeout`             | The timeout in ms of idle connections.                                                                                                                                                        | `30000`                                                                      | No       |
 | `gravitino.iceberg-rest.requestHeaderSize`       | The maximum size of an HTTP request.                                                                                                                                                          | `131072`                                                                     | No       |
 | `gravitino.iceberg-rest.responseHeaderSize`      | The maximum size of an HTTP response.                                                                                                                                                         | `131072`                                                                     | No       |
-| `gravitino.iceberg-rest.includeErrorStackTrace`  | Whether error responses include server-side stack traces. Set this to `false` in new deployments because responses can expose internal implementation details. | `true`                                                                       | No       |
+| `gravitino.iceberg-rest.includeErrorStackTrace`  | Whether error responses include server-side stack traces. Set this to `false` in new deployments because responses can expose internal implementation details.                                | `true`                                                                       | No       |
+| `gravitino.iceberg-rest.metrics.enabled`         | Whether standalone mode serves metrics endpoints. Ignored in auxiliary mode; use the Gravitino server endpoint there. Enable only on a trusted network.                                       | `false`                                                                      | No       |
 | `gravitino.iceberg-rest.customFilters`           | Comma-separated list of filter class names to apply to the APIs.                                                                                                                              | (none)                                                                       | No       |
+| `gravitino.iceberg-rest.trustedProxies`          | Comma-separated list of IP addresses or CIDR blocks of reverse proxies whose `X-Forwarded-For` header is trusted when recording the client address in audit events.                          | (none)                                                                       | No       |
 | `gravitino.iceberg-rest.advertised-uri`          | The public endpoint reported to clients that discover the service through the Gravitino server. Must be an absolute `http`/`https` URI with a host and no query or fragment.                  | (none)                                                                       | No       |
 
 The filter in `customFilters` should be a standard javax servlet filter.
 Specify filter parameters by setting configuration entries in the style `gravitino.iceberg-rest.<class name of filter>.param.<param name>=<value>`.
+
+`trustedProxies` works as described for
+[`gravitino.server.webserver.trustedProxies`](./gravitino-server-config.md#http-server). When it is
+empty, `X-Forwarded-For` is ignored and the TCP peer address is recorded. The service listens on its
+own port even in auxiliary mode, so set this key separately from the Gravitino server's.
 
 Set `gravitino.iceberg-rest.advertised-uri` when clients such as the Trino connector reach the service through a reverse proxy whose scheme, host, port or path differs from the listener's, for example `https://iceberg.example.com/iceberg/`.
 An explicit port must be in the range 1-65535; an invalid value makes discovery requests fail instead of advertising an unreachable endpoint.
@@ -154,6 +182,32 @@ The settings below tune the background workers and are optional.
 | `gravitino.iceberg-rest.async-cleanup.heartbeat-timeout-secs` | Age in seconds after which a running job with no fresh heartbeat can be reclaimed by another worker. | `300`         | No       |
 | `gravitino.iceberg-rest.async-cleanup.max-attempts`           | Number of failed attempts before a cleanup job is marked `FAILED`.                                   | `5`           | No       |
 | `gravitino.iceberg-rest.async-cleanup.retention-hours`        | Retention time for terminal `SUCCEEDED` or `FAILED` cleanup rows before pruning.                     | `720`         | No       |
+
+#### Idempotency Key
+
+The Iceberg REST spec defines an optional `Idempotency-Key` header on mutation endpoints so that a client can safely retry a request whose response it never saw. When enabled and the header is present, the server reserves the key, executes the mutation, and stores the response for replay while the record remains available.
+
+Support is disabled by default. Once enabled, the reuse window is advertised as `idempotency-key-lifetime` in `GET /v1/config`; per the spec, clients must assume idempotency is unsupported when that field is absent.
+
+The header applies to the create, update, drop, register, and rename endpoints for tables, namespaces, and views. Its value must be a UUIDv7 in string form ([RFC 9562](https://www.rfc-editor.org/rfc/rfc9562)); anything else returns `400 Bad Request`. Keys must be globally unique: reusing one with a different HTTP method, path, or query returns `409 Conflict`, and so does a retry that arrives while the first request is still running (with a `Retry-After` header). Successful and deterministic terminal `4xx` responses are stored and replayed, while `5xx`, `401`, `403`, and `419` responses release the key so the client can retry with it.
+
+| Configuration item                                | Description                                                                                                                                                                  | Default value | Required |
+|---------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `gravitino.iceberg-rest.idempotency-enabled`      | Whether to honor the `Idempotency-Key` header. When `false`, the header is ignored and no lifetime is advertised.                                                             | `false`       | No       |
+| `gravitino.iceberg-rest.idempotency-key-lifetime` | The client reuse window for a key, an ISO-8601 duration such as `PT30M`. Advertised to clients as `idempotency-key-lifetime`.                                                 | `PT30M`       | No       |
+| `gravitino.iceberg-rest.idempotency-store-type`   | The store holding idempotency records, either the `in-memory` short name or the fully-qualified class name of an `IdempotencyStore` implementation.                           | `in-memory`   | No       |
+| `gravitino.iceberg-rest.idempotency-max-entries`  | The maximum number of records retained by the in-memory store. Records beyond it are evicted before their reuse window elapses.                                               | `10000`       | No       |
+
+Phase-1 limitations:
+
+- Request identity covers the HTTP method, path, and query parameters. It does **not** compare request bodies or behavior-changing headers such as `X-Iceberg-Access-Delegation`. Reusing a key on the same URL with a changed body or header replays the first response; it does not apply the changed request. Always generate a new key for a different logical operation. Request validation runs before replay, so a retry with an invalid body can return `400 Bad Request` even if the key already has a stored success.
+- Replay preserves the status and JSON body but omits response headers such as `ETag`. Load the table again if the client needs its current ETag.
+- The catalog mutation and response persistence are not one transaction. A crash, serialization failure, lost reservation, or post-commit failure can leave a successful mutation without a replayable response. A retry can then execute again. Claim fencing protects replacement records, but cannot undo or fence catalog side effects.
+- This phase does not schedule `IdempotencyStore.purgeExpired`. The in-memory store reclaims expired entries through Caffeine. Custom stores must enforce expiry on reads/reservations and arrange their own cleanup; durable-store purge scheduling belongs to the JDBC follow-up.
+
+:::caution
+Enabling `idempotency-enabled=true` with the default `idempotency-store-type=in-memory` on more than one replica does **not** provide cluster-wide deduplication: retries can execute a mutation twice. The `in-memory` store is node-local and not durable. A retry routed to another replica, or to a replica that restarted, finds no record and re-executes the mutation, and its size bound can evict a record before its reuse window elapses, including an in-flight reservation. A retry can then run concurrently with the original mutation. Use it for single-node deployments, development, and testing.
+:::
 
 ### Catalog Backend Configuration
 
@@ -236,6 +290,42 @@ IRC1 must also configure S3 configurations if the client side requests credentia
 :::caution
 If IRC2 does not enforce authorization, keeping `gravitino.iceberg-rest.disable-rest-authz=true` can leave operations unprotected. Set it to `false` to enforce authorization in IRC1.
 :::
+
+##### Service account connection
+
+By default IRC1 forwards each user's access token to IRC2, so IRC2 must trust the same identity provider and authorize every user itself. To federate a catalog that cannot do that, such as a managed catalog that accepts only its own API token, connect IRC1 to IRC2 as a service account. IRC1 then presents one configured credential on every request to IRC2 and authorizes each user against Gravitino's own grants before anything is proxied. A catalog connected as a service account always enforces authorization in IRC1, whatever `disable-rest-authz` is set to, and IRC1 refuses to serve it when authorization is disabled. Because IRC2 vends storage credentials for the service account rather than for the calling user, such a catalog also always issues storage credentials through Gravitino, as described below.
+
+| Configuration item                                    | Description                                                                                                                                         | Default value | Required                                    |
+|-------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|---------------|---------------------------------------------|
+| `gravitino.iceberg-rest.rest-backend-auth-type`       | How IRC1 authenticates to IRC2. `user-token` forwards the calling user's access token. `service-account` connects with the credential below.        | `user-token`  | No                                          |
+| `gravitino.iceberg-rest.rest-backend-token`           | Static bearer token the service account presents to IRC2.                                                                                          | (none)        | One of token or credential with `service-account` |
+| `gravitino.iceberg-rest.rest-backend-credential`      | OAuth2 client credential (`client_id:client_secret`) the service account exchanges for a token.                                                    | (none)        | One of token or credential with `service-account` |
+| `gravitino.iceberg-rest.rest-backend-oauth2-server-uri` | OAuth2 token endpoint for the client credential. Defaults to IRC2's own token endpoint.                                                          | (none)        | No                                          |
+| `gravitino.iceberg-rest.rest-backend-scope`           | OAuth2 scope requested with the client credential.                                                                                                 | (none)        | No                                          |
+
+##### Gravitino-issued storage credentials
+
+By default IRC1 passes through the storage credentials IRC2 vends. Some catalogs vend broad, long-lived credentials, for example the catalog token's own storage keys scoped to the whole bucket. Set `rest-backend-storage-credential-source` to `local` and IRC1 stops asking IRC2 for credentials. It issues them through its own `credential-providers` instead, scoped to the table location, read-only unless the caller holds write privileges on the table, exactly as for a local catalog. Credentials IRC2 returns unasked are dropped. Here `local` means credentials issued by IRC1; `remote` means credentials issued by IRC2. This setting controls storage credentials, independently of the credentials IRC1 uses to authenticate to IRC2.
+
+| Configuration item                                      | Description                                                                                                                                       | Default value | Required |
+|---------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `gravitino.iceberg-rest.rest-backend-storage-credential-source` | Who issues storage credentials for tables of the federated catalog. `remote` passes through IRC2's credentials. `local` uses IRC1's `credential-providers`. A `service-account` catalog always uses `local`, regardless of this setting. | `remote`      | No       |
+
+IRC1 configuration example federating a catalog that accepts only a static API token, with Gravitino issuing the storage credentials:
+
+```text
+gravitino.iceberg-rest.catalog-backend = rest
+gravitino.iceberg-rest.uri = https://catalog.example.com/v1
+gravitino.iceberg-rest.warehouse = example_warehouse
+gravitino.iceberg-rest.rest-backend-auth-type = service-account
+gravitino.iceberg-rest.rest-backend-token = xx
+gravitino.iceberg-rest.rest-backend-storage-credential-source = local
+gravitino.iceberg-rest.credential-providers = s3-token
+gravitino.iceberg-rest.s3-access-key-id = xx
+gravitino.iceberg-rest.s3-secret-access-key = xx
+gravitino.iceberg-rest.s3-region = xx
+gravitino.iceberg-rest.s3-role-arn = xx
+```
 
 `data-access` is returned in `/v1/config` defaults for REST clients:
 
@@ -660,6 +750,18 @@ The `clients` property for example:
 `catalog-impl` has no effect.
 :::
 
+Unknown Iceberg catalog keys are passed through after the `gravitino.iceberg-rest.` prefix is stripped. For a PostgreSQL JDBC backend, a repeatedly executed prepared statement can switch to a generic plan after a few runs and make namespace/table existence checks much slower. Scope `plan_cache_mode=force_custom_plan` to Gravitino's connections with:
+
+```properties
+gravitino.iceberg-rest.jdbc.options = -c plan_cache_mode=force_custom_plan
+```
+
+That maps to Iceberg's `jdbc.options` JDBC connection property, so you do not need database-owner privileges.
+
+| Configuration item                    | Description                                                                                                                                                         | Default value | Required |
+|---------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `gravitino.iceberg-rest.jdbc.options` | Extra JDBC connection options passed through to the Iceberg JDBC catalog. For PostgreSQL, `-c plan_cache_mode=force_custom_plan` keeps existence checks on custom plans. | (none)        | No       |
+
 #### Event Listeners
 
 Gravitino generates pre-event and post-event for table operations and provide a pluggable event listener to allow you to inject custom logic. For more details, refer to [Event listener configuration](gravitino-server-config.md#event-listener-configuration).
@@ -748,7 +850,7 @@ Root-level aliases are also available for global traffic managers that require p
 
 After an observed `OutOfMemoryError`, all health endpoints and root aliases return 503 with a `jvm` failure until restart. See [out-of-memory failures](health-and-readiness.md#out-of-memory-failures) for detection scope.
 
-All endpoints return a JSON body with the same shape as the main Gravitino server. The `code` field is always `0`. `status` is `UP` or `DOWN`. Liveness reports `httpServer` and readiness reports `catalogWrapperManager`.
+All endpoints return a JSON body with the same shape as the main Gravitino server. The `code` field is always `0`. Both the top-level `status` and each `checks[].status` use uppercase `UP` or `DOWN`, unlike the lowercase `up`/`down` returned by Gravitino and Lance REST. Liveness reports `httpServer` and readiness reports `catalogWrapperManager`.
 
 Healthy response (HTTP 200):
 

@@ -226,6 +226,67 @@ tasks {
     environment = envMap
   }
 
+  val rayIcebergPythonVersion = project.rootProject.extra["pythonVersion"].toString()
+  val rayIcebergOsDir = when {
+    org.gradle.internal.os.OperatingSystem.current().isMacOsX -> "MacOSX"
+    org.gradle.internal.os.OperatingSystem.current().isLinux -> "Linux"
+    else -> throw GradleException("Ray Iceberg IT only supports macOS and Linux")
+  }
+  val rayIcebergMiniforgeDir =
+    project.file("${project.rootDir}/.gradle/python/$rayIcebergOsDir/Miniforge3")
+  val rayIcebergCondaExecutable = rayIcebergMiniforgeDir.resolve("bin/conda")
+  val rayIcebergEnvDir =
+    project.layout.buildDirectory.dir("ray-iceberg-it-env").get().asFile
+  val rayIcebergPythonExecutable = rayIcebergEnvDir.resolve("bin/python")
+
+  val rayIcebergDependencies by registering {
+    group = "verification"
+    description = "Install the dependencies for the Ray Iceberg IT."
+    dependsOn("miniforgeSetup")
+    doLast {
+      if (!rayIcebergPythonExecutable.exists()) {
+        project.exec {
+          executable = rayIcebergCondaExecutable.absolutePath
+          args = listOf(
+            "create", "--prefix", rayIcebergEnvDir.absolutePath,
+            "python=$rayIcebergPythonVersion", "--yes"
+          )
+        }
+      }
+      project.exec {
+        executable = rayIcebergPythonExecutable.absolutePath
+        workingDir = projectDir
+        args = listOf(
+          "-m", "pip", "install", "-e", ".", "-r", "requirements-ray-iceberg.txt"
+        )
+      }
+      project.exec {
+        executable = rayIcebergPythonExecutable.absolutePath
+        workingDir = projectDir
+        args = listOf("scripts/generate_version.py")
+      }
+    }
+  }
+
+  register("rayIcebergIT") {
+    group = "verification"
+    description = "Run the Gravitino Iceberg REST contract test with Ray Data."
+    dependsOn(rayIcebergDependencies, startGravitinoServer)
+    finalizedBy(stopGravitinoServer)
+    doLast {
+      project.exec {
+        executable = rayIcebergPythonExecutable.absolutePath
+        workingDir = projectDir.resolve("./tests/integration")
+        environment("PROJECT_VERSION", project.version)
+        environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
+        environment("START_EXTERNAL_GRAVITINO", "true")
+        environment("RAY_ICEBERG_IT_REQUIRED", "true")
+        environment("PYTHONPATH", "${project.rootDir.path}/clients/client-python")
+        args = listOf("-m", "unittest", "-v", "test_ray_iceberg")
+      }
+    }
+  }
+
   val unitCoverageReport by registering(VenvTask::class){
     venvExec = "coverage"
     args = listOf("html")
@@ -249,14 +310,17 @@ tasks {
   // Run tests/integration/test_lance_ray.py against multiple lance-ray
   // versions. Each version is exercised inside its own venv under
   // build/lance-ray-matrix/.venv-<version>/ (cached across runs).
-  // Override the matrix with `-PlanceRayVersions=0.4.2,0.3.0`.
+  // Override the matrix with `-PlanceRayVersions=0.4.2=0.7.5,0.3.0=0.7.5`,
+  // where each entry pairs a lance-ray version with the lance-namespace
+  // client it is tested against.
   // Override the bootstrap interpreter with `-PlanceRayPython=/path/to/python`.
   register("lanceRayMatrixTest") {
     group = "verification"
     description =
       "Run tests/integration/test_lance_ray.py against multiple lance-ray " +
-        "versions. Override with -PlanceRayVersions=<csv> (default: " +
-        "tracks docs/lance-rest-integration.md Compatibility Matrix)."
+        "versions. Override with -PlanceRayVersions=<csv>, where each entry " +
+        "is <lance-ray-version>=<lance-namespace-version> (default: tracks " +
+        "docs/lance-rest-integration.md Compatibility Matrix)."
 
     val versions = project.findProperty("lanceRayVersions") as? String
     val keepGoing = project.hasProperty("lanceRayKeepGoing")
@@ -292,7 +356,7 @@ tasks {
     doLast {
       gravitinoServer("start")
       try {
-        val args = mutableListOf(
+        val matrixArgs = mutableListOf(
           pythonExecutable,
           script.absolutePath,
           "--python",
@@ -301,15 +365,15 @@ tasks {
           gravitinoHome.absolutePath,
         )
         if (!versions.isNullOrBlank()) {
-          args += listOf("--versions", versions)
+          matrixArgs += listOf("--versions", versions)
         }
         if (keepGoing) {
-          args += "--keep-going"
+          matrixArgs += "--keep-going"
         }
-        val proc = ProcessBuilder(args)
-          .inheritIO()
-          .start()
-        val exit = proc.waitFor()
+        val exit = project.exec {
+          commandLine(matrixArgs)
+          isIgnoreExitValue = true
+        }.exitValue
         if (exit != 0) {
           throw GradleException("lance-ray matrix failed with exit code $exit")
         }
@@ -359,6 +423,64 @@ tasks {
 
     doLast {
       delete("README.md")
+    }
+  }
+
+  register("coreCompatibilityTest") {
+    group = "verification"
+    description = "Verify installed core SDK artifacts in isolated Ray dependency environments."
+    dependsOn(distribution)
+    val serverHome = rootDir.resolve("distribution/package")
+    val serverHomeAll = rootDir.resolve("distribution/package-all")
+    // compileDistribution cleans both directories, which may contain existing data.
+    if (!serverHome.exists() && !serverHomeAll.exists()) {
+      dependsOn(":compileDistribution")
+    }
+
+    fun interpreter(version: String, property: String): String {
+      val explicit = (project.findProperty(property) as? String)?.takeIf { it.isNotBlank() }
+      if (explicit != null) {
+        return explicit
+      }
+      val osDir = if (org.gradle.internal.os.OperatingSystem.current().isMacOsX) {
+        "MacOSX"
+      } else {
+        "Linux"
+      }
+      val conda = file("${project.rootDir}/.gradle/python/$osDir/Miniforge3/envs/python-$version/bin/python")
+      return if (conda.exists()) conda.absolutePath else "python$version"
+    }
+
+    doLast {
+      if (!serverHome.resolve("bin/gravitino.sh").isFile ||
+          !serverHome.resolve("libs").isDirectory) {
+        throw GradleException(
+          "Gravitino server distribution is incomplete; protect existing distribution data " +
+            "before rebuilding with ./gradlew compileDistribution -PskipWeb=true -x test"
+        )
+      }
+      val artifacts = projectDir.resolve("dist").listFiles { file ->
+        file.name.startsWith("apache-gravitino-") || file.name.startsWith("apache_gravitino-")
+      }?.filter { it.name.endsWith(".tar.gz") } ?: emptyList()
+      if (artifacts.size != 1) {
+        throw GradleException("Expected one Python client source distribution")
+      }
+      val args = mutableListOf(
+        interpreter("3.12", "coreCompatibilityPython"),
+        projectDir.resolve("scripts/run_core_compatibility_matrix.py").absolutePath,
+        "--artifact", artifacts.single().absolutePath,
+        "--python", interpreter("3.12", "coreCompatibilityPython"),
+        "--minimum-python", interpreter("3.10", "coreCompatibilityMinimumPython"),
+        "--gravitino-uri", "http://localhost:8090",
+        "--gravitino-home", serverHome.absolutePath,
+      )
+      (project.findProperty("coreCompatibilityCases") as? String)?.let {
+        args += listOf("--cases", it)
+      }
+      val process = ProcessBuilder(args).inheritIO().start()
+      if (process.waitFor() != 0) {
+        throw GradleException("Core SDK compatibility matrix failed")
+      }
     }
   }
 

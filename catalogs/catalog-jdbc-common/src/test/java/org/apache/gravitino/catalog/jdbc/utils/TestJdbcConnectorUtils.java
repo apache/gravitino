@@ -24,6 +24,32 @@ import org.junit.jupiter.api.Test;
 public class TestJdbcConnectorUtils {
 
   @Test
+  void testExistingColumnNamesAllowQuotedContentButRejectInvalidNames() {
+    for (String name : new String[] {"native column", "native.column", "col`name", "col\"name"}) {
+      Assertions.assertTrue(JdbcConnectorUtils.existingQuotedColumnName(name).supported());
+    }
+    for (String name : new String[] {"", "bad\0name", "*"}) {
+      Assertions.assertFalse(JdbcConnectorUtils.existingQuotedColumnName(name).supported());
+    }
+  }
+
+  @Test
+  void testExistingTableNamesRejectMetadataSeparators() {
+    Assertions.assertTrue(JdbcConnectorUtils.existingQuotedTableName("native table").supported());
+    Assertions.assertFalse(JdbcConnectorUtils.existingQuotedTableName("native.table").supported());
+  }
+
+  @Test
+  void testQuotedIdentifiersPreservePunctuation() {
+    Assertions.assertEquals(
+        "\"a\"\"b\\' ; --\"", JdbcConnectorUtils.quoteIdentifier("a\"b\\' ; --", '"'));
+    Assertions.assertEquals(
+        "`a``b\\' ; --`", JdbcConnectorUtils.quoteIdentifier("a`b\\' ; --", '`'));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> JdbcConnectorUtils.quoteIdentifier("name", '\''));
+  }
+
+  @Test
   public void testEscapeSqlLiteral() {
     String value = "owner\\'s \"comment\"; DROP TABLE marker; --";
 

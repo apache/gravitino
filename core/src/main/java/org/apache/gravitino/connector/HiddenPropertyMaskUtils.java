@@ -18,14 +18,26 @@
  */
 package org.apache.gravitino.connector;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.secret.SecretPropertyUtils;
+import org.apache.gravitino.utils.JdbcUrlUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Read/write helpers for sensitive and system-managed entity properties.
@@ -45,10 +57,10 @@ import org.apache.gravitino.secret.SecretPropertyUtils;
  *       in-use}, {@code numFiles}).
  * </ul>
  *
- * <p>Recovery via {@code getSecrets} covers secret-URN values, declared {@code hidden} keys (except
- * credential-vending keys), and sensitive-named undeclared keys. Credential property keys are
- * recovered via {@code getCredentials()} instead. See {@code
- * org.apache.gravitino.secret.SupportsSecrets}.
+ * <p>Recovery via {@code getSecrets} covers secret-URN values, declared {@code hidden} keys that
+ * are not also {@code reserved} (reserved+hidden keys such as {@code gravitino.identifier} stay
+ * omitted), and sensitive-named undeclared keys. Credential property keys are recovered via {@code
+ * getCredentials()} instead. See {@code org.apache.gravitino.secret.SupportsSecrets}.
  *
  * <p><b>Write (create / alter)</b>: reject any value equal to {@link #MASKED_VALUE} so the
  * placeholder is never persisted. Reserved / immutable rejection remains in {@code
@@ -56,8 +68,26 @@ import org.apache.gravitino.secret.SecretPropertyUtils;
  */
 public final class HiddenPropertyMaskUtils {
 
+  private static final Logger LOG = LoggerFactory.getLogger(HiddenPropertyMaskUtils.class);
+
   /** Placeholder returned instead of editable hidden / credential / secret property values. */
   public static final String MASKED_VALUE = "******";
+
+  /**
+   * Mapper for nest-JSON masking. Uses {@link JsonNode} with big-decimal floats so rewritten JSON
+   * keeps numeric fidelity better than {@code Map}/{@code List} round-trips. {@link
+   * DeserializationFeature#FAIL_ON_TRAILING_TOKENS} rejects concatenated values (for example {@code
+   * {} {"password":"secret"}}), and {@link DeserializationFeature#FAIL_ON_READING_DUP_TREE_KEY}
+   * rejects duplicate object fields (for example {@code {"config":{"password":"x"},"config":{}}}),
+   * so a dropped earlier field cannot leave a secret in the original string when the walk sees only
+   * the last value.
+   */
+  private static final ObjectMapper NEST_JSON_MAPPER =
+      JsonUtils.anyFieldMapper()
+          .copy()
+          .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+          .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+          .enable(DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY);
 
   private HiddenPropertyMaskUtils() {}
 
@@ -109,7 +139,8 @@ public final class HiddenPropertyMaskUtils {
       boolean reserved = metadata.isReservedProperty(key);
       if (hidden && reserved) {
         keysToOmit.add(key);
-      } else if (hidden
+      } else if (("jdbc-url".equalsIgnoreCase(key) && JdbcUrlUtils.containsCredentials(value))
+          || hidden
           || SecretPropertyUtils.isSecretProperty(key, value)
           || (!metadata.containsProperty(key) && SecretPropertyUtils.isSensitivePropertyKey(key))) {
         keysToMask.add(key);
@@ -175,5 +206,112 @@ public final class HiddenPropertyMaskUtils {
   public static Map<String, String> maskHiddenProperties(
       Map<String, String> properties, PropertiesMetadata metadata) {
     return maskHiddenProperties(properties, classifyHiddenProperties(properties, metadata));
+  }
+
+  /**
+   * Parses {@code value} as exactly one JSON object and masks sensitive-named keys. Used for
+   * credential JSON bags such as job {@code updater_options} / {@code spark_conf}.
+   *
+   * <p>Useful when a caller already knows a string should be a nested JSON map (for example a CLI
+   * argument following {@code --spark-conf}).
+   *
+   * @param value JSON string to mask; may be null
+   * @return masked JSON object, {@link #MASKED_VALUE} when the value is not exactly one JSON object
+   *     (parse failure, trailing tokens, duplicate fields, array, or scalar), the original value
+   *     when blank, or null when {@code value} is null
+   */
+  @Nullable
+  public static String maskSensitiveJsonValue(@Nullable String value) {
+    if (value == null) {
+      return null;
+    }
+    return maskNestedJsonValue(value);
+  }
+
+  /**
+   * Parses {@code value} as exactly one JSON object (no trailing tokens) and masks sensitive-named
+   * keys recursively through nested objects and arrays inside that object. Blank strings are
+   * returned unchanged. Anything else — malformed JSON, concatenated values such as {@code {}
+   * {"password":"secret"}}, duplicate object fields, {@code true {...}}, root arrays, or scalars —
+   * becomes {@link #MASKED_VALUE}.
+   */
+  private static String maskNestedJsonValue(String value) {
+    // Empty / whitespace-only values carry no secret (common for unresolved {{spark_conf:-}}).
+    if (StringUtils.isBlank(value)) {
+      return value;
+    }
+    try {
+      JsonNode root = NEST_JSON_MAPPER.readTree(value);
+      // Credential bags are JSON maps. Scalars/arrays/concatenated values are not mask-walked.
+      if (!root.isObject()) {
+        return MASKED_VALUE;
+      }
+      MaskedJson masked = maskJsonNode(root);
+      return masked.changed ? NEST_JSON_MAPPER.writeValueAsString(masked.value) : value;
+    } catch (Exception ignored) {
+      // Malformed / trailing-token / duplicate-key JSON — do not leave a secret blob.
+      // Fixed message only: Jackson exception text can embed the input (and credentials).
+      LOG.warn("Replacing malformed nest JSON with masked placeholder after parse failure");
+      return MASKED_VALUE;
+    }
+  }
+
+  private static MaskedJson maskJsonNode(JsonNode node) {
+    if (node.isObject()) {
+      ObjectNode out = JsonNodeFactory.instance.objectNode();
+      boolean changed = false;
+      Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
+      while (fields.hasNext()) {
+        Map.Entry<String, JsonNode> entry = fields.next();
+        String nestedKey = entry.getKey();
+        JsonNode nestedRaw = entry.getValue();
+        if (nestedRaw.isObject() || nestedRaw.isArray()) {
+          if (SecretPropertyUtils.isSensitivePropertyKey(nestedKey)) {
+            out.put(nestedKey, MASKED_VALUE);
+            changed = true;
+          } else {
+            MaskedJson child = maskJsonNode(nestedRaw);
+            out.set(nestedKey, child.value);
+            changed |= child.changed;
+          }
+        } else {
+          String nestedValue = nestedRaw.isNull() ? "" : nestedRaw.asText();
+          if (SecretPropertyUtils.isSensitivePropertyKey(nestedKey)
+              || SecretPropertyUtils.isSecretProperty(nestedKey, nestedValue)) {
+            out.put(nestedKey, MASKED_VALUE);
+            changed = true;
+          } else {
+            out.set(nestedKey, nestedRaw);
+          }
+        }
+      }
+      return new MaskedJson(out, changed);
+    }
+    if (node.isArray()) {
+      ArrayNode out = JsonNodeFactory.instance.arrayNode();
+      boolean changed = false;
+      for (JsonNode item : node) {
+        if (item.isObject() || item.isArray()) {
+          MaskedJson child = maskJsonNode(item);
+          out.add(child.value);
+          changed |= child.changed;
+        } else {
+          out.add(item);
+        }
+      }
+      return new MaskedJson(out, changed);
+    }
+    return new MaskedJson(node, false);
+  }
+
+  /** Result of walking a JSON tree for sensitive-key masking. */
+  private static final class MaskedJson {
+    private final JsonNode value;
+    private final boolean changed;
+
+    private MaskedJson(JsonNode value, boolean changed) {
+      this.value = value;
+      this.changed = changed;
+    }
   }
 }

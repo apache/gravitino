@@ -176,8 +176,8 @@ public class JDBCMetricsStore implements IcebergMetricsStore {
           getCounterResult(commitReport.commitMetrics().addedPositionalDeletes()),
           getCounterResult(commitReport.commitMetrics().removedPositionalDeletes()),
           getCounterResult(commitReport.commitMetrics().totalPositionalDeletes()),
-          getCounterResult(commitReport.commitMetrics().addedEqualityDeleteFiles()),
-          getCounterResult(commitReport.commitMetrics().removedEqualityDeleteFiles()),
+          getCounterResult(commitReport.commitMetrics().addedEqualityDeletes()),
+          getCounterResult(commitReport.commitMetrics().removedEqualityDeletes()),
           getCounterResult(commitReport.commitMetrics().totalEqualityDeletes()),
           getCounterResult(commitReport.commitMetrics().manifestsCreated()),
           getCounterResult(commitReport.commitMetrics().manifestsReplaced()),
@@ -240,7 +240,7 @@ public class JDBCMetricsStore implements IcebergMetricsStore {
 
   @VisibleForTesting
   static long getTimerResult(TimerResult result) {
-    return result != null ? result.count() : 0L;
+    return result != null ? result.totalDuration().toMillis() : 0L;
   }
 
   @VisibleForTesting

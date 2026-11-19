@@ -160,7 +160,17 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
   @Override
   public void validate() throws IllegalArgumentException {
     Entity.super.validate();
-    validatePolicy();
+    validatePolicy(true /* validateContent */);
+  }
+
+  /**
+   * Validates policy metadata and type/content class matching without calling {@link
+   * PolicyContent#validate()}. Used when renaming, commenting, or enabling a policy whose stored
+   * content may predate stricter content checks.
+   */
+  public void validateExceptContent() throws IllegalArgumentException {
+    Entity.super.validate();
+    validatePolicy(false /* validateContent */);
   }
 
   @Override
@@ -182,7 +192,7 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
     return Objects.hash(id, name, namespace, policyType, comment, enabled, content, auditInfo);
   }
 
-  private void validatePolicy() {
+  private void validatePolicy(boolean validateContent) {
     Preconditions.checkArgument(StringUtils.isNotBlank(name()), "Policy name cannot be blank");
 
     Preconditions.checkArgument(content() != null, "Policy content cannot be null");
@@ -198,7 +208,9 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
         policyType.contentClass().getSimpleName(),
         policyType.name(),
         content().getClass().getName());
-    content().validate();
+    if (validateContent) {
+      content().validate();
+    }
   }
 
   public static class Builder {
@@ -252,6 +264,24 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
     }
 
     public PolicyEntity build() {
+      PolicyEntity policyEntity = newEntity();
+      policyEntity.validate();
+      return policyEntity;
+    }
+
+    /**
+     * Builds a policy entity without invoking {@link PolicyContent#validate()}. Prefer {@link
+     * #build()} for create and content-update paths.
+     *
+     * @return policy entity with metadata validated only
+     */
+    public PolicyEntity buildSkippingContentValidation() {
+      PolicyEntity policyEntity = newEntity();
+      policyEntity.validateExceptContent();
+      return policyEntity;
+    }
+
+    private PolicyEntity newEntity() {
       PolicyEntity policyEntity = new PolicyEntity();
       policyEntity.id = id;
       policyEntity.name = name;
@@ -261,8 +291,6 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
       policyEntity.enabled = enabled;
       policyEntity.content = content;
       policyEntity.auditInfo = auditInfo;
-      policyEntity.validate();
-
       return policyEntity;
     }
   }

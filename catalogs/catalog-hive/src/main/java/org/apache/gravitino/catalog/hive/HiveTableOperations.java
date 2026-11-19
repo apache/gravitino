@@ -186,6 +186,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
 
   @Override
   public void close() throws IOException {
-    tableHandle.close();
+    // Intentional no-op: the client pool is shared by every table of the catalog and is closed by
+    // HiveCatalogOperations.close().
   }
 }

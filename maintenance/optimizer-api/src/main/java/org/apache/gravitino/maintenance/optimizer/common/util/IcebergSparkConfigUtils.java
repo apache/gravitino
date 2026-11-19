@@ -25,10 +25,12 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 
 /** Shared utilities for Iceberg Spark template configs and config validation. */
@@ -37,6 +39,7 @@ public final class IcebergSparkConfigUtils {
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   private static final String SPARK_SQL_EXTENSIONS_KEY = "spark.sql.extensions";
+  private static final String SPARK_SQL_DEFAULT_CATALOG_KEY = "spark.sql.defaultCatalog";
   private static final String SPARK_SQL_CATALOG_PREFIX = "spark.sql.catalog.";
   private static final String CATALOG_TYPE_REST = "rest";
   private static final String CATALOG_TYPE_HIVE = "hive";
@@ -50,7 +53,9 @@ public final class IcebergSparkConfigUtils {
   /** Build default Spark template configs for Iceberg jobs. */
   public static Map<String, String> buildTemplateSparkConfigs() {
     Map<String, String> configs = new HashMap<>();
-    configs.put("spark.master", "{{spark_master:-local[*]}}");
+    // An empty value leaves the Spark configuration unset: spark-submit then runs the job with
+    // its default master, local[*], and the k8s job executor lets the operator decide it.
+    configs.put("spark.master", "{{spark_master:-}}");
     configs.put("spark.executor.instances", "{{spark_executor_instances:-1}}");
     configs.put("spark.executor.cores", "{{spark_executor_cores:-1}}");
     configs.put("spark.executor.memory", "{{spark_executor_memory:-1g}}");
@@ -61,8 +66,58 @@ public final class IcebergSparkConfigUtils {
     configs.put(SPARK_SQL_CATALOG_PREFIX + "{{catalog_name}}.type", "{{catalog_type}}");
     configs.put(SPARK_SQL_CATALOG_PREFIX + "{{catalog_name}}.uri", "{{catalog_uri}}");
     configs.put(SPARK_SQL_CATALOG_PREFIX + "{{catalog_name}}.warehouse", "{{warehouse_location}}");
+    // Bare years()/months()/days() in rewrite where clauses resolve via the current catalog's
+    // FunctionCatalog. Keep the session catalog on the target Iceberg catalog, not spark_catalog.
+    configs.put(SPARK_SQL_DEFAULT_CATALOG_KEY, "{{catalog_name}}");
     configs.put(SPARK_SQL_EXTENSIONS_KEY, ICEBERG_SPARK_EXTENSIONS);
     return Collections.unmodifiableMap(configs);
+  }
+
+  /**
+   * Fills missing Iceberg SparkCatalog impl and extensions when nested catalog connection keys are
+   * present, and sets {@code spark.sql.defaultCatalog} from the job's {@code catalogName}.
+   *
+   * <p>TMS {@code spark_conf} may only carry {@code .type}/{@code .uri}/{@code .warehouse}. Without
+   * {@code spark.sql.defaultCatalog}, {@code CALL catalog.system.rewrite_data_files(...)} still
+   * finds the procedure, but bare {@code years(ts)} in {@code where} resolves against {@code
+   * spark_catalog} and fails. Callers must not put {@code spark.sql.defaultCatalog} in {@code
+   * spark_conf}; the job owns that key via {@code catalog_name}. Template configs may still set
+   * {@code {{catalog_name}}} separately from the {@code spark_conf} JSON overlay.
+   *
+   * @param sparkConfigs mutable Spark configs from {@code spark_conf} applied to the session
+   *     builder
+   * @param catalogName Iceberg catalog for this job ({@code catalog_name} / {@code --catalog})
+   */
+  public static void ensureIcebergCatalogConfigs(
+      Map<String, String> sparkConfigs, String catalogName) {
+    Preconditions.checkNotNull(sparkConfigs, "sparkConfigs");
+    Preconditions.checkArgument(StringUtils.isNotBlank(catalogName), "catalogName is blank");
+    Preconditions.checkArgument(
+        !sparkConfigs.containsKey(SPARK_SQL_DEFAULT_CATALOG_KEY),
+        "Do not set spark.sql.defaultCatalog in spark_conf; the job sets it from catalog_name (%s)",
+        catalogName);
+
+    Set<String> catalogs = new HashSet<>();
+    for (String key : sparkConfigs.keySet()) {
+      if (!key.startsWith(SPARK_SQL_CATALOG_PREFIX)) {
+        continue;
+      }
+      String rest = key.substring(SPARK_SQL_CATALOG_PREFIX.length());
+      int dot = rest.indexOf('.');
+      if (dot <= 0) {
+        continue;
+      }
+      String prop = rest.substring(dot + 1);
+      if ("type".equals(prop) || "uri".equals(prop) || "warehouse".equals(prop)) {
+        catalogs.add(rest.substring(0, dot));
+      }
+    }
+    for (String catalog : catalogs) {
+      sparkConfigs.putIfAbsent(
+          SPARK_SQL_CATALOG_PREFIX + catalog, "org.apache.iceberg.spark.SparkCatalog");
+    }
+    sparkConfigs.put(SPARK_SQL_DEFAULT_CATALOG_KEY, catalogName);
+    sparkConfigs.putIfAbsent(SPARK_SQL_EXTENSIONS_KEY, ICEBERG_SPARK_EXTENSIONS);
   }
 
   /**

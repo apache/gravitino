@@ -20,10 +20,14 @@ package org.apache.gravitino.authorization;
 
 import static org.apache.gravitino.Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_RETENTION_SECS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
@@ -61,11 +65,13 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.TreeLockTestSupport;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.lock.LockManager;
@@ -127,6 +133,10 @@ public class TestOwnerManager {
     Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_BATCH_SIZE))
         .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
@@ -392,6 +402,53 @@ public class TestOwnerManager {
       TreeLockTestSupport.assertRunsConcurrentlyWith(
           metalakeWriter, () -> ownerManager.getOwner(METALAKE, catalogObject));
     }
+  }
+
+  @Test
+  @Order(8)
+  public void testSetOwnerReportsObjectDroppedDuringAssignment() throws IOException {
+    EntityStore store = storeFailingOwnerInsert();
+    Mockito.when(store.exists(AuthorizationUtils.ofUser(METALAKE, USER), Entity.EntityType.USER))
+        .thenReturn(true);
+    MetadataObject table = MetadataObjects.parse("c.s.t", MetadataObject.Type.TABLE);
+
+    Assertions.assertThrows(
+        NoSuchMetadataObjectException.class,
+        () -> new OwnerManager(store).setOwner(METALAKE, table, USER, Owner.Type.USER));
+  }
+
+  @Test
+  @Order(9)
+  public void testSetOwnerKeepsGenericNotFoundForMissingOwner() throws IOException {
+    EntityStore store = storeFailingOwnerInsert();
+    Mockito.when(store.exists(AuthorizationUtils.ofUser(METALAKE, USER), Entity.EntityType.USER))
+        .thenReturn(false);
+    MetadataObject table = MetadataObjects.parse("c.s.t", MetadataObject.Type.TABLE);
+
+    NotFoundException thrown =
+        Assertions.assertThrows(
+            NotFoundException.class,
+            () -> new OwnerManager(store).setOwner(METALAKE, table, USER, Owner.Type.USER));
+    Assertions.assertFalse(thrown instanceof NoSuchMetadataObjectException);
+  }
+
+  private static EntityStore storeFailingOwnerInsert() throws IOException {
+    EntityStore store =
+        Mockito.mock(
+            EntityStore.class,
+            Mockito.withSettings().extraInterfaces(SupportsRelationOperations.class));
+    SupportsRelationOperations relations = (SupportsRelationOperations) store;
+    Mockito.when(store.relationOperations()).thenReturn(relations);
+    Mockito.doThrow(new NoSuchEntityException("The entity is gone"))
+        .when(relations)
+        .insertRelation(
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.anyBoolean());
+    return store;
   }
 
   private static MetadataObject createCatalog(String catalogName) throws IOException {

@@ -53,7 +53,11 @@ public interface SemanticModelMetaMapper {
         @Result(property = "version", column = "version"),
         @Result(property = "semanticModelName", column = "version_semantic_model_name"),
         @Result(property = "semanticModelComment", column = "semantic_model_comment"),
-        @Result(property = "semanticModelDefinition", column = "semantic_model_definition"),
+        @Result(property = "datasets", column = "datasets"),
+        @Result(property = "relationships", column = "relationships"),
+        @Result(property = "metrics", column = "metrics"),
+        @Result(property = "aiContext", column = "ai_context"),
+        @Result(property = "customExtensions", column = "custom_extensions"),
         @Result(property = "properties", column = "properties"),
         @Result(property = "auditInfo", column = "version_audit_info"),
         @Result(property = "deletedAt", column = "version_deleted_at")
@@ -80,7 +84,8 @@ public interface SemanticModelMetaMapper {
             column =
                 "{id,version_metalake_id,version_catalog_id,version_schema_id,"
                     + "version_semantic_model_id,version,version_semantic_model_name,"
-                    + "semantic_model_comment,semantic_model_definition,properties,"
+                    + "semantic_model_comment,datasets,relationships,metrics,ai_context,"
+                    + "custom_extensions,properties,"
                     + "version_audit_info,version_deleted_at}",
             one = @One(resultMap = "mapToSemanticModelVersionInfoPO"))
       })

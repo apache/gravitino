@@ -132,6 +132,39 @@ class TestIndexSerdes(unittest.TestCase):
         serialized_dict = json.loads(mock_data_class.to_json())
         self.assertDictEqual(json_dict, serialized_dict)
 
+    def test_text_index_properties_round_trip(self):
+        index_json = {
+            "indexType": "DATA_SKIPPING_TEXT",
+            "name": "idx_text",
+            "fieldNames": [["body"]],
+            "properties": {"tokenizer": "ngrams", "ngram_size": "3"},
+        }
+
+        index = IndexSerdes.deserialize(index_json)
+        self.assertIs(index.type(), Index.IndexType.DATA_SKIPPING_TEXT)
+        self.assertEqual(index.properties(), index_json["properties"])
+        self.assertEqual(IndexSerdes.serialize(index), index_json)
+
+    def test_legacy_index_without_properties(self):
+        class LegacyIndex(Index):
+            def type(self):
+                return Index.IndexType.PRIMARY_KEY
+
+            def name(self):
+                return "PRIMARY"
+
+            def field_names(self):
+                return [["id"]]
+
+        self.assertEqual(
+            IndexSerdes.serialize(LegacyIndex()),
+            {
+                "indexType": "PRIMARY_KEY",
+                "name": "PRIMARY",
+                "fieldNames": [["id"]],
+            },
+        )
+
     def test_index_serdes_legacy_clickhouse_metadata(self):
         annoy_properties = {
             "annoy_trees": "100",
@@ -176,6 +209,24 @@ class TestIndexSerdes(unittest.TestCase):
         self.assertEqual(annoy_properties, round_tripped[0].properties())
         self.assertEqual(Index.IndexType.DATA_SKIPPING_USEARCH, round_tripped[1].type())
         self.assertEqual(usearch_properties, round_tripped[1].properties())
+
+    def test_index_serdes_bitmap_inverted_vector(self):
+        for index_type in (
+            Index.IndexType.BITMAP,
+            Index.IndexType.INVERTED,
+            Index.IndexType.VECTOR,
+        ):
+            index = IndexSerdes.deserialize(
+                {
+                    "indexType": index_type.value,
+                    "name": "idx",
+                    "fieldNames": [["col"]],
+                }
+            )
+            self.assertEqual(index_type, index.type())
+            self.assertEqual(
+                index_type.value, IndexSerdes.serialize(index)["indexType"]
+            )
 
     def test_vector_similarity_index_properties_round_trip(self):
         json_string = """

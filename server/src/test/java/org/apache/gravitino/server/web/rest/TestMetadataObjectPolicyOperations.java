@@ -42,8 +42,13 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.dto.responses.ErrorConstants;
+import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.MetadataObjectPolicyListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
+import org.apache.gravitino.dto.responses.PolicyNameListResponse;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.Policy;
@@ -60,6 +65,8 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
@@ -115,6 +122,42 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
     return resourceConfig;
   }
 
+  /**
+   * Hidden tag path objects return the same error as missing tags in both response formats.
+   *
+   * @param verbose Whether to request detailed policy metadata.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testTagPathObjectVisibility(boolean verbose) {
+    MetadataObject hidden = MetadataObjects.parse("GRAVITINO_HIDDEN_123", MetadataObject.Type.TAG);
+    MetadataObject missing = MetadataObjects.parse("missing_tag", MetadataObject.Type.TAG);
+    when(policyManager.listPolicyInfosForMetadataObject(metalake, hidden))
+        .thenReturn(new PolicyEntity[0]);
+    when(policyManager.listPolicyInfosForMetadataObject(metalake, missing))
+        .thenThrow(new NoSuchMetadataObjectException("Tag does not exist"));
+
+    for (MetadataObject object : new MetadataObject[] {hidden, missing}) {
+      try (Response response =
+          target(basePath(metalake))
+              .path("tag")
+              .path(object.fullName())
+              .path("policies")
+              .queryParam("details", verbose)
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .accept("application/vnd.gravitino.v1+json")
+              .get()) {
+        Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+        ErrorResponse error = response.readEntity(ErrorResponse.class);
+        Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, error.getCode());
+        Assertions.assertEquals(
+            NoSuchMetadataObjectException.class.getSimpleName(), error.getType());
+      }
+    }
+    Mockito.verify(policyManager, Mockito.never())
+        .listPolicyInfosForMetadataObject(metalake, hidden);
+  }
+
   @Test
   public void testListPoliciesForObject() {
     MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
@@ -150,8 +193,10 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
 
-    PolicyListResponse policyListResponse = response.readEntity(PolicyListResponse.class);
+    MetadataObjectPolicyListResponse policyListResponse =
+        response.readEntity(MetadataObjectPolicyListResponse.class);
     Assertions.assertEquals(0, policyListResponse.getCode());
+    Assertions.assertFalse(policyListResponse.hasInaccessiblePolicies());
     Assertions.assertEquals(catalogPolicyInfos.length, policyListResponse.getPolicies().length);
 
     Map<String, Policy> resultPolicies =
@@ -172,8 +217,9 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response1.getStatus());
 
-    NameListResponse nameListResponse = response1.readEntity(NameListResponse.class);
+    PolicyNameListResponse nameListResponse = response1.readEntity(PolicyNameListResponse.class);
     Assertions.assertEquals(0, nameListResponse.getCode());
+    Assertions.assertFalse(nameListResponse.hasInaccessiblePolicies());
     Assertions.assertEquals(catalogPolicyInfos.length, nameListResponse.getNames().length);
     Assertions.assertArrayEquals(
         Arrays.stream(catalogPolicyInfos).map(PolicyEntity::name).toArray(String[]::new),
@@ -390,14 +436,18 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
           operations.listPoliciesForMetadataObject(
               metalake, table.type().toString(), table.fullName(), true);
       Assertions.assertEquals(Response.Status.OK.getStatusCode(), detailsResponse.getStatus());
-      Assertions.assertEquals(
-          0, ((PolicyListResponse) detailsResponse.getEntity()).getPolicies().length);
+      MetadataObjectPolicyListResponse details =
+          (MetadataObjectPolicyListResponse) detailsResponse.getEntity();
+      Assertions.assertEquals(0, details.getPolicies().length);
+      Assertions.assertTrue(details.hasInaccessiblePolicies());
 
       Response namesResponse =
           operations.listPoliciesForMetadataObject(
               metalake, table.type().toString(), table.fullName(), false);
       Assertions.assertEquals(Response.Status.OK.getStatusCode(), namesResponse.getStatus());
-      Assertions.assertEquals(0, ((NameListResponse) namesResponse.getEntity()).getNames().length);
+      PolicyNameListResponse names = (PolicyNameListResponse) namesResponse.getEntity();
+      Assertions.assertEquals(0, names.getNames().length);
+      Assertions.assertTrue(names.hasInaccessiblePolicies());
     }
     Mockito.verify(policyManager, Mockito.never())
         .listPolicyInfosForMetadataObject(metalake, schema);

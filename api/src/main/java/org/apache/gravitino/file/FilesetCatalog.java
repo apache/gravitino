@@ -215,10 +215,11 @@ public interface FilesetCatalog {
    * @param changes The changes to apply to the fileset.
    * @return The altered fileset metadata.
    * @throws NoSuchFilesetException If the fileset does not exist.
+   * @throws FilesetAlreadyExistsException If the new name is already used by another fileset.
    * @throws IllegalArgumentException If the change is rejected by the implementation.
    */
   Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
-      throws NoSuchFilesetException, IllegalArgumentException;
+      throws NoSuchFilesetException, FilesetAlreadyExistsException, IllegalArgumentException;
 
   /**
    * Drop a fileset from the catalog.

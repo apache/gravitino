@@ -141,6 +141,22 @@ public class TableColumnBaseSQLProvider {
         + " ORDER BY c.table_version DESC, c.id DESC LIMIT 1";
   }
 
+  /** Returns the SQL for a batched active-column lookup. */
+  public String selectColumnIdsByTableIdAndNames(Long tableId, List<String> columnNames) {
+    return "<script>SELECT c.column_id AS columnId, c.column_name AS columnName FROM "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " c JOIN (SELECT column_id, MAX(table_version) AS max_version FROM "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " WHERE table_id = #{tableId} AND deleted_at = 0 GROUP BY column_id) latest"
+        + " ON c.column_id = latest.column_id AND c.table_version = latest.max_version"
+        + " WHERE c.table_id = #{tableId} AND c.column_name IN "
+        + "<foreach collection='columnNames' item='name' open='(' separator=',' close=')'>"
+        + "#{name}</foreach>"
+        + " AND c.deleted_at = 0 AND c.column_op_type &lt;&gt; "
+        + ColumnPO.ColumnOpType.DELETE.value()
+        + "</script>";
+  }
+
   public String selectColumnPOById(@Param("columnId") Long columnId) {
     return "SELECT column_id AS columnId, column_name AS columnName,"
         + " column_position AS columnPosition, metalake_id AS metalakeId, catalog_id AS catalogId,"

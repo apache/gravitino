@@ -85,6 +85,7 @@ class TestIcebergAsyncPurge {
   @Test
   void testAsyncDropEnqueuesJob() {
     CatalogWrapperForREST wrapper = mock(CatalogWrapperForREST.class);
+    when(wrapper.supportsAsyncPurge()).thenReturn(true);
     IcebergCleanupManager cleanup = mock(IcebergCleanupManager.class);
     TableMetadata metadata = mock(TableMetadata.class);
     when(metadata.metadataFileLocation()).thenReturn("s3://b/db/t/metadata/0.json");
@@ -124,11 +125,27 @@ class TestIcebergAsyncPurge {
   @Test
   void testFallbackToSyncWhenDisabled() {
     CatalogWrapperForREST wrapper = mock(CatalogWrapperForREST.class);
+    when(wrapper.supportsAsyncPurge()).thenReturn(true);
 
     tableExecutor(wrapper, Optional.empty()).dropTable(context(true), TABLE, true);
 
     verify(wrapper).purgeTable(TABLE);
     verify(wrapper, never()).loadTableMetadata(any());
+  }
+
+  @Test
+  void testAsyncPurgeIsForwardedForRestCatalog() {
+    // A remote REST catalog deletes its own files, so an async purge request is forwarded to it
+    // instead of being queued for this server to delete the files.
+    CatalogWrapperForREST wrapper = mock(CatalogWrapperForREST.class);
+    IcebergCleanupManager cleanup = mock(IcebergCleanupManager.class);
+    when(wrapper.supportsAsyncPurge()).thenReturn(false);
+
+    tableExecutor(wrapper, Optional.of(cleanup)).dropTable(context(true), TABLE, true);
+
+    verify(wrapper).purgeTable(TABLE);
+    verify(wrapper, never()).loadTableMetadata(any());
+    verify(cleanup, never()).addJob(any());
   }
 
   @Test

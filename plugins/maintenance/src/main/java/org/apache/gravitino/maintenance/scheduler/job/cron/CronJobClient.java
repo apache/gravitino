@@ -1,0 +1,97 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.maintenance.scheduler.job.cron;
+
+import com.github.kagkarlsson.scheduler.SchedulerClient;
+import com.github.kagkarlsson.scheduler.serializer.JacksonSerializer;
+import com.google.common.base.Preconditions;
+import java.time.Instant;
+import java.util.List;
+import javax.sql.DataSource;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.maintenance.model.TableCandidate;
+import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceSchedulerPools;
+import org.apache.gravitino.meta.PolicyEntity;
+
+/**
+ * Submits one-shot {@code cron-job} rows to db-scheduler. Schedule planning is {@link
+ * CronJobPlanner}.
+ *
+ * <p>One instance is held by the expand path for the life of the scheduler pools.
+ */
+public class CronJobClient {
+
+  private final SchedulerClient scheduler;
+  private final CronJobPlanner planner;
+
+  /**
+   * @param dataSource relational JDBC pool shared with the entity store
+   * @param gravitinoConfig server config for jobConf overlay
+   */
+  public CronJobClient(DataSource dataSource, Config gravitinoConfig) {
+    Preconditions.checkNotNull(dataSource);
+    this.planner = new CronJobPlanner(Preconditions.checkNotNull(gravitinoConfig), dataSource);
+    this.scheduler = schedulerClient(dataSource);
+  }
+
+  /**
+   * Plans and submits due-now cron jobs for the given table candidates.
+   *
+   * @param policy effective maintenance policy (expand context)
+   * @param candidates schedulable tables with their policies
+   * @param batchCapacity max candidates considered for non-snapshot types
+   * @return number of newly inserted cron-job rows
+   */
+  public int scheduleNow(PolicyEntity policy, List<TableCandidate> candidates, int batchCapacity) {
+    return planner.plan(scheduler, policy, candidates, batchCapacity, Instant.now());
+  }
+
+  /**
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @return true when a queued cron-job already covers the table
+   */
+  public boolean isTableAlreadyQueued(long tableId, long policyId) {
+    return planner.isTableAlreadyQueued(scheduler, tableId, policyId);
+  }
+
+  /**
+   * @param dataSource entity-store pool
+   * @return client bound to the cron-job table with JDBC autocommit forced on
+   */
+  public static SchedulerClient schedulerClient(DataSource dataSource) {
+    return schedulerClientOn(AutocommitDataSources.wrap(dataSource));
+  }
+
+  /**
+   * Builds a cron-job client on {@code dataSource} without wrapping. Used when the caller supplies
+   * a transactional or session-joined data source.
+   *
+   * @param dataSource already-configured JDBC data source
+   * @return client bound to the cron-job table
+   */
+  public static SchedulerClient schedulerClientOn(DataSource dataSource) {
+    return SchedulerClient.Builder.create(dataSource, MaintenanceSchedulerPools.cronJobTask())
+        .serializer(new JacksonSerializer(JsonUtils.anyFieldMapper()))
+        .tableName(MaintenanceSchedulerPools.CRON_TASKS_TABLE)
+        .build();
+  }
+}

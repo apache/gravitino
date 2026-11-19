@@ -34,8 +34,8 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * Enforces built-in IdP management API access rules without server interception.
  *
  * <p>Callers listed in {@link Configs#SERVICE_ADMINS} may perform all IdP management operations.
- * Authenticated non-admin users may {@code GET} or {@code PUT} {@code /idp/users/{user}} only for
- * their own username (read profile / change password). Other IdP management APIs remain
+ * Authenticated non-admin users may {@code GET} {@code /idp/users/{user}} or {@code PUT} {@code
+ * /idp/users/{user}/password} only for their own username. Other IdP management APIs remain
  * service-admin only.
  *
  * <p>This filter runs as a Jersey request filter after the servlet {@code AuthenticationFilter} has
@@ -82,22 +82,26 @@ public class IdpAuthorizationFilter implements ContainerRequestFilter {
   }
 
   /**
-   * Returns whether the request is a GET or PUT to {@code /idp/users/{currentUser}}.
-   *
-   * <p>The resource method still rejects non-admin updates that change {@code enabled}.
+   * Returns whether the request is a self-service user access: {@code GET /idp/users/{currentUser}}
+   * or {@code PUT /idp/users/{currentUser}/password}.
    */
   static boolean isSelfUserAccess(ContainerRequestContext requestContext, String currentUser) {
     if (currentUser == null) {
       return false;
     }
-    String method = requestContext.getMethod();
-    if (!"GET".equalsIgnoreCase(method) && !"PUT".equalsIgnoreCase(method)) {
+    List<PathSegment> segments = requestContext.getUriInfo().getPathSegments();
+    if (segments.size() < 3
+        || !"idp".equals(segments.get(0).getPath())
+        || !"users".equals(segments.get(1).getPath())
+        || !currentUser.equals(segments.get(2).getPath())) {
       return false;
     }
-    List<PathSegment> segments = requestContext.getUriInfo().getPathSegments();
-    return segments.size() == 3
-        && "idp".equals(segments.get(0).getPath())
-        && "users".equals(segments.get(1).getPath())
-        && currentUser.equals(segments.get(2).getPath());
+    String method = requestContext.getMethod();
+    if ("GET".equalsIgnoreCase(method) && segments.size() == 3) {
+      return true;
+    }
+    return "PUT".equalsIgnoreCase(method)
+        && segments.size() == 4
+        && "password".equals(segments.get(3).getPath());
   }
 }

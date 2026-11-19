@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.lakehouse.iceberg.utils;
 
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTable.DEFAULT_ICEBERG_PROVIDER;
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.CURRENT_SNAPSHOT_ID;
+import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.DEFAULT_SPEC_ID;
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.FORMAT;
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.FORMAT_VERSION;
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.IDENTIFIER_FIELDS;
@@ -54,6 +55,7 @@ public class IcebergTablePropertiesUtil {
             ? String.valueOf(table.currentSnapshot().snapshotId())
             : "none";
     properties.put(CURRENT_SNAPSHOT_ID, currentSnapshotId);
+    properties.put(DEFAULT_SPEC_ID, Integer.toString(table.defaultSpecId()));
     properties.put(LOCATION, table.location());
 
     properties.put(FORMAT_VERSION, String.valueOf(table.formatVersion()));

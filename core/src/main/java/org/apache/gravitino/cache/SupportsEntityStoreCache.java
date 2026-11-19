@@ -89,6 +89,12 @@ public interface SupportsEntityStoreCache {
    * <p>For example, inserting a {@code ModelVersion} may require invalidating the corresponding
    * {@code Model} entry in the cache to maintain consistency.
    *
+   * <p>Callers may run {@link #put(Entity)}, and therefore this method, while holding the inserted
+   * entity's own cache lock (see {@link EntityCache#withCacheLock(EntityCacheKey,
+   * EntityCache.ThrowingRunnable)}); the relational entity store publishes reads and inserts that
+   * way. Implementations must therefore not acquire another entity's cache lock here, since nesting
+   * two entity locks can deadlock.
+   *
    * @param entity The entity being inserted
    * @param <E> The type of the entity
    */

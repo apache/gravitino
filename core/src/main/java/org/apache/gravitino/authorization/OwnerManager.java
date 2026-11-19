@@ -111,6 +111,13 @@ public class OwnerManager implements OwnerDispatcher {
               authorizationPlugin.onOwnerSet(metadataObject, originOwner.orElse(null), newOwner));
       notifyOwnerChange(originOwner.orElse(null), metalake, metadataObject);
     } catch (NoSuchEntityException nse) {
+      // The object existed when getOwner ran, so it can have been dropped since then. This
+      // owner-exists check is a heuristic: if the owner is also removed between the failure and
+      // this check, keep the generic NotFoundException; table creation can still fail in that race.
+      if (ownerExists(metalake, ownerName, ownerType)) {
+        throw new NoSuchMetadataObjectException(
+            nse, "The metadata object of %s isn't found", metadataObject.fullName());
+      }
       LOG.warn(
           "Metadata object {} or owner {} is not found", metadataObject.fullName(), ownerName, nse);
       throw new NotFoundException(
@@ -319,6 +326,17 @@ public class OwnerManager implements OwnerDispatcher {
     } catch (IOException ioe) {
       LOG.info("Failed to get the owner of entity {}", metadataObject.fullName(), ioe);
       throw new RuntimeException(ioe);
+    }
+  }
+
+  private boolean ownerExists(String metalake, String ownerName, Owner.Type ownerType) {
+    try {
+      return ownerType == Owner.Type.USER
+          ? store.exists(AuthorizationUtils.ofUser(metalake, ownerName), Entity.EntityType.USER)
+          : store.exists(AuthorizationUtils.ofGroup(metalake, ownerName), Entity.EntityType.GROUP);
+    } catch (IOException ioe) {
+      LOG.warn("Failed to check whether owner {} exists", ownerName, ioe);
+      return false;
     }
   }
 

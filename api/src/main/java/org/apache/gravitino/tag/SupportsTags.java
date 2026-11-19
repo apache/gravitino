@@ -38,11 +38,37 @@ public interface SupportsTags {
   String[] listTags();
 
   /**
+   * List the visible tag names and whether authorization filtering omitted other tags.
+   *
+   * <p>The default implementation preserves compatibility with existing implementations but cannot
+   * detect omitted tags. Implementations that support authorization filtering should override this
+   * method.
+   *
+   * @return The visible tag names and authorization-filtering status.
+   */
+  default TagList<String> listTagsWithVisibility() {
+    return new TagList<>(listTags(), false);
+  }
+
+  /**
    * List all the tags with details for the specific object.
    *
    * @return The list of tags.
    */
   Tag[] listTagsInfo();
+
+  /**
+   * List the visible tags with details and whether authorization filtering omitted other tags.
+   *
+   * <p>The default implementation preserves compatibility with existing implementations but cannot
+   * detect omitted tags. Implementations that support authorization filtering should override this
+   * method.
+   *
+   * @return The visible tags and authorization-filtering status.
+   */
+  default TagList<Tag> listTagsInfoWithVisibility() {
+    return new TagList<>(listTagsInfo(), false);
+  }
 
   /**
    * Get a tag by its name for the specific object.

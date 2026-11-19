@@ -266,6 +266,7 @@
    This product bundles various third-party components also under the
    BSD license
 
+   ANTLR4
    ASM
    bigint
    JSR305

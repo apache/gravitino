@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -50,7 +52,9 @@ class TestTableMetaBaseSQLProvider {
 
   @Test
   void testDirectDeleteUsesVersionCas() {
-    String sql = PROVIDER.softDeleteTableMetasByTableId(null, null);
+    String sql = PROVIDER.softDeleteTableMetasByTableId(null, null, null, null, null);
+    assertTrue(sql.contains("AND schema_id = #{schemaId}"));
+    assertTrue(sql.contains("AND table_name = #{tableName}"));
 
     Assertions.assertTrue(sql.contains("AND current_version = #{currentVersion}"));
     Assertions.assertTrue(sql.endsWith("AND deleted_at = 0"));
@@ -62,5 +66,36 @@ class TestTableMetaBaseSQLProvider {
 
     Assertions.assertTrue(sql.contains("WHERE table_id = #{tableId} AND deleted_at = 0"));
     Assertions.assertTrue(sql.endsWith("FOR UPDATE"));
+  }
+
+  @Test
+  void testAggregateReadRejectsDynamicRootSql() {
+    TableMetaBaseSQLProvider dynamic =
+        new TableMetaBaseSQLProvider() {
+          @Override
+          public String selectTableMetaBySchemaIdAndName(Long schemaId, String tableName) {
+            return " <script>SELECT 1</script>";
+          }
+
+          @Override
+          public String selectTableByFullQualifiedName(
+              String metalake, String catalog, String schema, String table) {
+            return "<script>SELECT 1</script>";
+          }
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> dynamic.selectTableWithColumnsBySchemaIdAndName(1L, "table"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> dynamic.selectTableWithColumnsByFullQualifiedName("ml", "cat", "schema", "table"));
+  }
+
+  @Test
+  void testAggregateReadAcceptsStaticRootWithTrailingSemicolon() {
+    String sql = PROVIDER.selectTableWithColumnsByFullQualifiedName("ml", "cat", "schema", "table");
+    Assertions.assertTrue(sql.startsWith("SELECT t.*"));
+    Assertions.assertFalse(sql.contains(";)"));
+    Assertions.assertFalse(sql.contains("<script>"));
   }
 }

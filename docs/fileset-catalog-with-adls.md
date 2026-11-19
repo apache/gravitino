@@ -419,7 +419,7 @@ ${HADOOP_HOME}/bin/hadoop fs -put /path/to/local/file gvfs://fileset/adls_catalo
 ### GVFS Python client
 
 ```bash
-pip install apache-gravitino==${GRAVITINO_VERSION}
+pip install "apache-gravitino[azure]==${GRAVITINO_VERSION}"
 ```
 
 On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration-1), pass the Azure Data Lake Storage

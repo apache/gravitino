@@ -11,17 +11,147 @@ existing deployments. For database backup, schema scripts, and rollback commands
 
 ## Upgrading from Gravitino 1.3 to 2.0
 
+### External catalog re-registration
+
+Apply the 1.3.0-to-2.0.0 database upgrade before starting the new server. The upgrade changes
+schema, table, topic, and view primary keys to `(entity_id, deleted_at)`, allowing deleted
+registrations and a new active registration to retain the same external identifier.
+Each external identifier can have only one active registration; importing it through another
+catalog or schema is rejected.
+
+Earlier 2.0.0 snapshots with identifier-only primary keys also require these primary-key changes.
+Apply the updated 1.3.0-to-2.0.0 upgrade script using the backup and shutdown procedure below;
+the existing 2.0.0 version label does not mean the database already has composite primary keys.
+
+Table and view imports do not automatically move registrations after an external rename.
+Schema imports retain the existing same-catalog rename handling: a registration can move only
+after confirming that its old source path no longer exists. An ID active in another catalog
+cannot be moved by an import. There is no per-object metadata-only unregister API; recovery from
+unresolved identity conflicts requires catalog re-registration as described below.
+
+Dropping a catalog clears owner, privilege, tag, and statistic associations for the catalog
+and its descendants. The upgrade also soft-deletes orphaned associations for retained schema,
+table, topic, and view IDs that have no active registration. Associations for IDs with an
+active registration are preserved. Metalake-level user, role, tag, and policy definitions
+are retained.
+
+After dropping and recreating an external catalog, its objects can be imported again without
+removing their external identifiers. Their deleted governance associations are not restored;
+explicitly reapply the associations needed by the new registration. Follow the database backup
+and shutdown steps in [Upgrade Gravitino](./how-to-upgrade.md) before applying the migration.
+
+### Domains
+
+- Domains add business groupings within a metalake, backed by explicit tag bindings. Existing tags
+  and assignments are preserved; they are not automatically converted into domains.
+- Complete the standard 1.3-to-2.0 database schema upgrade before using Domain APIs. The H2, MySQL
+  and PostgreSQL upgrade scripts include the Domain metadata and hierarchy tables. Use matching
+  server and client versions; a client upgrade alone does not add server-side Domain support.
+- With authorization enabled, grant `MANAGE_DOMAIN` or `USE_DOMAIN` separately from tag and data
+  permissions. Existing tag/data privileges do not grant Domain management or discovery.
+- See [Manage domains](./manage-domains-in-gravitino.md) for the workflow and
+  [Upgrade Gravitino](./how-to-upgrade.md) for the database upgrade procedure.
+
+### Audit client address behind a reverse proxy
+
+- Gravitino 1.3 used the first `X-Forwarded-For` entry as the audit client address whenever
+  the header was present. The server now ignores `X-Forwarded-For` unless the request comes from
+  a proxy listed in `trustedProxies`.
+- If the Gravitino server, the Iceberg REST service, or the Lance REST service runs behind a load
+  balancer, ingress controller, or other reverse proxy, set
+  `gravitino.server.webserver.trustedProxies`, `gravitino.iceberg-rest.trustedProxies`, or
+  `gravitino.lance-rest.trustedProxies` to the proxy addresses. Without it, the audit log records
+  the proxy address instead of the client address.
+- IPv6 client addresses in audit events are now recorded in compressed form without brackets,
+  for example `::1` instead of `[0:0:0:0:0:0:0:1]`. Update log queries or parsers that match the
+  old form.
+- List only the proxies. Trusting a range that untrusted clients can also connect from, such as a
+  whole Kubernetes pod CIDR, lets those clients choose the recorded address again. See
+  [HTTP Server](./gravitino-server-config.md#http-server).
+
+### Kafka catalog client upgrade
+- The Kafka catalog now ships the Kafka client 3.9.2 instead of 3.4.0. The `gravitino.bypass.`
+  properties are passed to this client, so check them against the
+  [Kafka Admin Configs](https://kafka.apache.org/39/configuration/admin-configs/).
+- The Kafka catalog rejects `gravitino.bypass.config.providers` and every
+  `gravitino.bypass.config.providers.*` property (for example `.class` and `.param.*`), each on its
+  own. Kafka 3.5 added an environment variable config provider, and any provider can read the
+  Gravitino server's own environment or files. In 1.3, the file and directory providers could be
+  used through these properties. After the upgrade:
+  - Creating, testing, or altering a catalog with any of them is rejected with an error that names
+    them. This includes values from `kafka.conf` (`catalogs/kafka/conf/kafka.conf`, or
+    `<package>/conf/kafka.conf` for a catalog with a custom `package` property), so one provider
+    property in a `kafka.conf` file blocks the creation of every Kafka catalog that uses that file.
+  - An existing catalog that still has any of them fails on schema and topic operations and on
+    `testConnection` until they are removed.
+- `kafka.conf` values are copied into the properties of each catalog when it is created. Editing
+  or removing the file later does not change existing catalogs, which must be updated with
+  `alterCatalog`.
+- Before upgrading, while still on 1.3, take an inventory:
+  1. List every Kafka catalog and every `kafka.conf` file that has
+     `gravitino.bypass.config.providers` or any `gravitino.bypass.config.providers.*` property.
+     Check the default `catalogs/kafka/conf/kafka.conf` and the `<package>/conf/kafka.conf` of
+     each Kafka catalog that sets a custom `package` property. Include catalogs that have only
+     `gravitino.bypass.config.providers.*` keys: they must be removed even when nothing refers to
+     them.
+  2. Read the provider aliases from `gravitino.bypass.config.providers`. Its value is a
+     comma-separated list of aliases chosen by the operator, for example `file`, `env`, or
+     `fileProvider`. For each alias, search the property values for `${<alias>:...}` references.
+     Searching only for `${file:`, `${directory:`, or `${env:` misses custom aliases. See
+     [Kafka configuration providers](https://kafka.apache.org/39/configuration/configuration-providers/).
+  3. For each reference, record the catalog property and whether it is a credential. For a
+     non-sensitive setting, record the value it resolves to. For a credential, record the secret
+     source or its locator (the provider and its attributes) instead of the value, so that no
+     credential is copied into the inventory.
+- Before starting the 2.0 server, update each `kafka.conf` file found in step 1:
+  - Remove all provider properties.
+  - Replace every non-sensitive `${<alias>:...}` reference with the value it resolved to, for
+    example a timeout. Removing only the provider properties leaves the reference unresolved,
+    and a new catalog inherits the literal `${...}` text. A numeric option such as
+    `gravitino.bypass.request.timeout.ms` then fails to connect because the Kafka client cannot
+    parse it. A string option such as `gravitino.bypass.metrics.context.region` is kept as the
+    literal placeholder and a connection test can still succeed, so replace every reference even
+    when the connection test passes.
+  - Remove every credential-bearing setting from the file and bind it per catalog after the
+    upgrade (see below). Keep only non-sensitive defaults in this file, because its values become
+    catalog properties that can be returned by the REST API.
+- After upgrading to 2.0, update each affected catalog with one `alterCatalog` call that removes
+  all of its provider properties and replaces every reference. An `alterCatalog` call that leaves
+  any provider property in place is rejected, including a comment-only change. Until this update,
+  the catalog cannot run Kafka operations, so apply it right after the upgrade.
+  - Set a non-sensitive value, such as a timeout, as a literal value.
+  - Do not set a credential as a literal value. Bypass properties can be returned in plaintext by
+    the REST API: Gravitino masks only keys that match the
+    [sensitive key keywords](./gravitino-server-config.md#sensitive-property-key-matching). With
+    the default keywords, a password inside `gravitino.bypass.sasl.jaas.config` is returned
+    unchanged, while `gravitino.bypass.ssl.truststore.password` is masked. Changing
+    `gravitino.secret.sensitiveKeyKeywords` replaces the default list, so check the server
+    configuration. With a Gravitino secret provider configured, bind the whole property in the same
+    call. Use `CatalogChange.setSecretBinding` (REST update type `setSecretBinding`) with a provider
+    that supports versioned writes. With a provider that only builds external references, that call
+    fails and leaves the catalog unable to run Kafka operations, so use
+    `CatalogChange.setSecretReference` (REST update type `setSecretReference`) with an external
+    secret that holds the whole property value. Use the locator recorded during the inventory.
+    Neither `setSecretBinding` nor `setSecretReference` is available in the 1.3 client or REST API.
+- The Kafka 3.9 client rejects `com.sun.security.auth.module.LdapLoginModule` in JAAS
+  configurations by default. `JndiLoginModule` was already rejected by the 3.4 client. Check both
+  the `sasl.jaas.config` of each Kafka catalog and the `KafkaClient` entry in the file named by the
+  Gravitino JVM property `java.security.auth.login.config`, because a catalog without
+  `sasl.jaas.config` falls back to that entry. Catalogs that use `LdapLoginModule` fail to connect
+  after the upgrade, so switch them to another login module. Do not override the
+  `org.apache.kafka.disallowed.login.modules` JVM property to re-enable it: the override replaces
+  the default blocklist for every Kafka catalog in the Gravitino JVM, and everyone who can supply
+  Kafka JAAS settings could then select the module.
 ### Policies are selected through tags
 
-- Direct policy associations with metadata objects are no longer read or written. The upgrade
-  does not convert existing direct associations. Before upgrading, export each policy's directly
-  associated objects from `GET /api/metalakes/{metalake}/policies/{policy}/objects`. Save the
-  policy name, object type, and full name, including direct associations on ancestor objects.
-  Back up the metadata database before the schema upgrade.
-- To preserve the old scope, create one dedicated tag per policy, associate the policy with that
-  tag using the `ALL_VALUES` selector, and assign the tag to every object that had a direct
-  policy association. A tag on a catalog or schema reaches its descendants. If a policy was
-  directly associated with both a parent and a child, assign the tag to both.
+- Direct policy associations with metadata objects are no longer read or written at runtime.
+  Use the offline migration command below to convert existing bindings to `object → hidden tag → policy`.
+  It uses the existing tables and requires no additional schema changes.
+- The tool assigns each policy's hidden tag to the objects with historical direct bindings.
+  It preserves assignments on both parents and children, so descendant inheritance and direct-match
+  flags remain unchanged. Hidden tag names use `gravitino_hidden_{policyId}` and survive policy renames.
+- Hidden tags have no assignment values and select the policy by tag presence. REST APIs hide
+  these tags and prevent users from modifying them. Use visible business tags for future scope changes.
 - Object policy lookup at `GET /api/metalakes/{metalake}/objects/{type}/{fullName}/policies`
   remains available, but now returns enabled policies matching the object's effective tags.
   A policy matching through multiple tags appears once. With `details=true`, `inherited` is
@@ -65,17 +195,17 @@ policy-to-tag association changes.
   inherited values, and a nearer ancestor overrides a farther one. For example,
   `data_domain=risk` on a schema overrides `data_domain=finance` on its catalog for every table
   in that schema, so a `TAG_VALUE("finance")` association no longer matches those tables. A
-  dedicated migration tag with `ALL_VALUES` avoids this interaction.
+  hidden migration tag matching presence avoids this interaction.
 
 See [Manage Tags](./manage-tags-in-gravitino.md#create-a-tag-with-a-value-constraint)
 for tag creation and value assignment examples.
 
 ### Authorization, UI, and consumers
 
-- Creating a migration tag requires `CREATE_TAG` on the metalake or ownership. Associating
-  a policy with a tag requires access to both: `APPLY_POLICY` on the policy and `APPLY_TAG`
-  on the tag, or the corresponding ownership. Assigning a tag also requires access to the
-  target metadata object.
+- The offline tool uses the metadata database credentials from the server configuration.
+  Run it only while every server using that database is stopped. It does not start the server,
+  run schema upgrades, or expose a direct-binding REST or client API. Normal policy-to-tag
+  operations retain their existing authorization requirements.
 - Read-only inspection requires `VIEW_TAG` or `APPLY_TAG` for tags and `VIEW_POLICY` or
   `APPLY_POLICY` for policies. Object policy results include only policies visible to the caller;
   use an account with the same policy visibility when comparing results before and after migration.
@@ -84,25 +214,51 @@ for tag creation and value assignment examples.
 - Update TMS and other policy consumers to read the resolved object policy list. Confirm the
   expected policy appears on representative tables before resuming maintenance jobs.
 
-### Migration checklist
+### Offline policy binding migration
 
-1. On the old runtime, back up the database. Export direct policy associations for **each
-   metalake**, inventory disabled policies, and record policy results on representative
-   descendants. Re-enable disabled policies that consumers must continue to receive. The old
-   `/policies/{policy}/objects` endpoint is unavailable after the upgrade.
-2. Map each direct relation to a tag assignment. A dedicated tag per policy with
-   `ALL_VALUES` preserves the original scope; review existing tag values and child overrides
-   before choosing `TAG_VALUE`.
-3. Stop direct policy writes and pause consumers that require complete policy results. Upgrade
-   the server and schema using [Upgrade Gravitino](./how-to-upgrade.md).
-4. Create the tags, add policy-to-tag associations, and assign tags to every object from the
-   exported direct-relation inventory.
-5. Compare resolved policy names and `inherited` values for every inventoried object and
-   representative descendants. Check enabled and disabled policies, direct child assignments,
-   and value selectors. Use the same policy visibility for before and after comparisons.
-6. Resume consumers after verification. Keep the inventory and database backup until the
-   deployment is stable. If rollback is needed, stop the new server and follow the
-   [database rollback procedure](./how-to-upgrade.md#rollback-if-upgrade-fails).
+The distribution includes `bin/migrate-policy-bindings.sh`. It reads `gravitino.conf` from
+`GRAVITINO_CONF_DIR` (default: `$GRAVITINO_HOME/conf`) and connects to the configured metadata
+store. H2, MySQL, and PostgreSQL are supported; use the same JDBC driver as the server.
 
-There is no automatic converter or verification command for direct policy relations. Do not
-edit relation tables directly as part of this migration.
+1. Record representative policy results, stop all servers sharing the metadata database, pause
+   policy consumers, and back up the database.
+2. Run the command from the new distribution:
+
+   ```shell
+   bin/migrate-policy-bindings.sh
+   ```
+
+   Each policy migrates in one transaction: create or reuse its hidden tag, copy its direct object
+   assignments with their audit information, verify the replacements, then soft-delete the legacy
+   rows. A missing or incorrect policy-to-tag relation fails verification and leaves the legacy
+   bindings active. No tables, columns, or indexes are added.
+   Bindings whose policy, metalake, or target object is missing or deleted are logged and left
+   active. Other valid bindings still migrate. The final summary reports migrated bindings,
+   skipped owners and bindings, missing-object bindings, failed policies, and unprocessed policies.
+   Skipped bindings alone do not cause a nonzero exit code. A final WARN reports their counts:
+   the new server reads tag-based associations and does not read these retained legacy rows.
+   Review the logged IDs before completing the upgrade; a successful exit does not mean all
+   legacy bindings were migrated.
+3. If a policy fails, its changes roll back and other policies are still attempted. Any failed
+   policy makes the command exit unsuccessfully after printing the summary. If rollback itself
+   fails, processing stops and the summary reports how many policies were not attempted.
+   Keep all servers and policy consumers stopped on failure or interruption. Fix the reported cause
+   and rerun the same command: completed policies remain committed, while unfinished policies are
+   retried from their active legacy rows. A partially migrated
+   database is only an offline intermediate state, not a deployment to start serving requests.
+   Restore the backup only when abandoning or rolling back the upgrade.
+   A `Hidden tag name collision` error identifies the policy and tag and rolls back that policy. If an
+   existing user tag occupies `gravitino_hidden_{policyId}`, restore the pre-upgrade backup, run
+   the old server version, and rename that user tag to a name outside `gravitino_hidden_` through
+   the tag API. Stop the old servers, take a fresh backup, and repeat the upgrade and migration.
+   Renaming preserves the tag's assignments. If the conflicting tag is a damaged server-managed
+   tag, restore a known-good backup and investigate the corruption before retrying. Do not delete
+   legacy bindings or overwrite the conflicting tag to force migration to finish.
+4. Start the server and compare resolved policy names and `inherited` values on representative
+   objects and descendants. Check disabled policies and existing business tag associations before
+   resuming consumers.
+
+Migrated policies retain their normal lifecycle: disabling a policy suspends its effect, and
+removing it cleans up its hidden tag and assignments. Keep the database backup until the deployment
+is stable. For rollback, stop the new server and restore the complete pre-upgrade backup using
+[Upgrade Gravitino](./how-to-upgrade.md#rollback-if-upgrade-fails).

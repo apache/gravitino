@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.secret;
 
+import static org.apache.gravitino.StringIdentifier.ID_KEY;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.List;
@@ -47,15 +49,16 @@ public class TestSecretPropertyUtils {
           Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
       Map<String, String> entityProps =
           SecretPropertyUtils.copyEntityProperties(properties, bindings, Map.of());
-      List<SecretMaterial> writes =
-          sm.assembleSecretMaterials(properties, entityProps, "catalog", 42L, bindings, Map.of());
-      sm.writeSecrets(writes);
+      Map<String, String> plaintexts =
+          sm.assembleSecretPlaintexts(properties, entityProps, "catalog", 42L, bindings, Map.of());
+      sm.stageSecrets(null, entityProps, "catalog", 42L, plaintexts);
 
       Assertions.assertEquals("root", entityProps.get("jdbc-user"));
       Assertions.assertTrue(
           SecretPropertyUtils.isSecretProperty("jdbc-password", entityProps.get("jdbc-password")));
-      Assertions.assertEquals(1, writes.size());
-      Assertions.assertEquals("s3cr3t", sm.readSecret(writes.get(0).urn()));
+      Assertions.assertEquals(Map.of("jdbc-password", "s3cr3t"), plaintexts);
+      Assertions.assertEquals(
+          "s3cr3t", sm.readSecret(SecretUrn.parse(entityProps.get("jdbc-password"))));
     }
   }
 
@@ -81,10 +84,9 @@ public class TestSecretPropertyUtils {
   void testEmptySecretsNoOp() {
     try (SecretManager sm = memorySecretManager()) {
       Map<String, String> entityProps = new HashMap<>(Map.of("jdbc-user", "root"));
-      List<SecretMaterial> writes =
-          sm.assembleSecretMaterials(entityProps, entityProps, "schema", 1L, Map.of(), Map.of());
-      sm.writeSecrets(writes);
-      Assertions.assertTrue(writes.isEmpty());
+      Map<String, String> plaintexts =
+          sm.assembleSecretPlaintexts(entityProps, entityProps, "schema", 1L, Map.of(), Map.of());
+      Assertions.assertTrue(plaintexts.isEmpty());
       Assertions.assertEquals("root", entityProps.get("jdbc-user"));
     }
   }
@@ -103,15 +105,15 @@ public class TestSecretPropertyUtils {
               new SecretBinding("memory", "custom-value"),
               "s3-secret-access-key",
               new SecretBinding("memory", "s3-secret-value"));
-      List<SecretMaterial> writes =
-          sm.assembleSecretMaterials(
+      Map<String, String> plaintexts =
+          sm.assembleSecretPlaintexts(
               Map.of("jdbc-url", "jdbc:mysql://localhost/db", "jdbc-user", "root"),
               entityProps,
               "catalog",
               42L,
               bindings,
               Map.of());
-      sm.writeSecrets(writes);
+      sm.stageSecrets(null, entityProps, "catalog", 42L, plaintexts);
 
       entityProps.put("s3-access-key-id", "AKIA");
       entityProps.put("visible", "ok");
@@ -189,9 +191,9 @@ public class TestSecretPropertyUtils {
       entityProps.put("jdbc-password", "inline-secret");
       Map<String, SecretBinding> bindings =
           Map.of("custom-secret", new SecretBinding("memory", "custom-value"));
-      List<SecretMaterial> writes =
-          sm.assembleSecretMaterials(Map.of(), entityProps, "catalog", 42L, bindings, Map.of());
-      sm.writeSecrets(writes);
+      Map<String, String> plaintexts =
+          sm.assembleSecretPlaintexts(Map.of(), entityProps, "catalog", 42L, bindings, Map.of());
+      sm.stageSecrets(null, entityProps, "catalog", 42L, plaintexts);
 
       Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps, null);
       Assertions.assertEquals("custom-value", secrets.get("custom-secret"));
@@ -255,6 +257,36 @@ public class TestSecretPropertyUtils {
   }
 
   @Test
+  void testBuildSecretsOmitsReservedHiddenProperties() {
+    try (SecretManager sm = memorySecretManager()) {
+      PropertiesMetadata metadata =
+          new PropertiesMetadata() {
+            @Override
+            public Map<String, PropertyEntry<?>> propertyEntries() {
+              return ImmutableMap.of(
+                  ID_KEY,
+                  PropertyEntry.stringReservedPropertyEntry(
+                      ID_KEY, "internal entity identifier", true),
+                  "jdbc-password",
+                  PropertyEntry.stringOptionalPropertyEntry(
+                      "jdbc-password", "password", false, null, true));
+            }
+          };
+      Map<String, String> entityProps =
+          Map.of(ID_KEY, "gravitino.v1.uid123", "jdbc-password", "s3cr3t");
+      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps, metadata);
+      Assertions.assertEquals("s3cr3t", secrets.get("jdbc-password"));
+      Assertions.assertFalse(
+          secrets.containsKey(ID_KEY),
+          "reserved+hidden gravitino.identifier must not appear in getSecrets");
+      Assertions.assertFalse(
+          SecretPropertyUtils.shouldRecoverSensitiveNamedSecret(ID_KEY, metadata));
+      Assertions.assertTrue(
+          SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("jdbc-password", metadata));
+    }
+  }
+
+  @Test
   void testMergeProperties() {
     Map<String, String> merged =
         SecretPropertyUtils.mergeProperties(Map.of("a", "1"), Map.of("b", "2", "a", "override"));
@@ -266,9 +298,9 @@ public class TestSecretPropertyUtils {
   @Test
   void testAssembleWithNullTargetWhenNoSecrets() {
     try (SecretManager sm = memorySecretManager()) {
-      List<SecretMaterial> writes =
-          sm.assembleSecretMaterials(null, null, "schema", 1L, null, null);
-      Assertions.assertTrue(writes.isEmpty());
+      Map<String, String> plaintexts =
+          sm.assembleSecretPlaintexts(null, null, "schema", 1L, null, null);
+      Assertions.assertTrue(plaintexts.isEmpty());
     }
   }
 

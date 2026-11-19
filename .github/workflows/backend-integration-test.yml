@@ -2,13 +2,31 @@ name: Backend Integration Test
 
 # Controls when the workflow will run
 on:
-  push:
-    branches: [ "main", "branch-*" ]
-  pull_request:
-    branches: [ "main", "branch-*" ]
+  workflow_call:
+    inputs:
+      base-ref:
+        type: string
+        required: false
+        default: ''
+      base-sha:
+        type: string
+        required: false
+        default: ''
+      head-repository:
+        type: string
+        required: false
+        default: ''
+      head-sha:
+        type: string
+        required: false
+        default: ''
+      sync:
+        type: string
+        required: false
+        default: ''
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: fork-ci-backend-${{ inputs.head-sha || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -17,12 +35,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          persist-credentials: false
           fetch-depth: 0
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
+        id: checkout
       - name: Disable Git automatic maintenance
         run: git config --local maintenance.auto false
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d
         id: filter
         with:
+          base: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.base-sha || steps.checkout.outputs.base-ref }}
+          ref: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.head-sha || github.ref }}
           filters: |
             source_changes:
               - .github/**
@@ -53,9 +82,9 @@ jobs:
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
-  BackendIT-on-push:
+  BackendIT:
     needs: changes
-    if: (github.event_name == 'push' && needs.changes.outputs.source_changes == 'true')
+    if: needs.changes.outputs.source_changes == 'true'
     strategy:
       matrix:
         architecture: [linux/amd64]
@@ -71,29 +100,11 @@ jobs:
             backend: 'h2'
     uses: ./.github/workflows/backend-integration-test-action.yml
     with:
-      architecture: ${{ matrix.architecture }}
-      java-version: ${{ matrix.java-version }}
-      backend: ${{ matrix.backend }}
-      test-mode: ${{ matrix.test-mode }}
-
-  BackendIT-on-pr:
-    needs: changes
-    if: (github.event_name == 'pull_request' && needs.changes.outputs.source_changes == 'true')
-    strategy:
-      matrix:
-        architecture: [ linux/amd64 ]
-        java-version: [ 17 ]
-        backend: [ h2, mysql, postgresql ]
-        test-mode: [ embedded, deploy ]
-        exclude:
-          - test-mode: 'embedded'
-            backend: 'mysql'
-          - test-mode: 'embedded'
-            backend: 'postgresql'
-          - test-mode: 'deploy'
-            backend: 'h2'
-    uses: ./.github/workflows/backend-integration-test-action.yml
-    with:
+      base-ref: ${{ inputs.base-ref }}
+      base-sha: ${{ inputs.base-sha }}
+      head-repository: ${{ inputs.head-repository }}
+      head-sha: ${{ inputs.head-sha }}
+      sync: ${{ inputs.sync }}
       architecture: ${{ matrix.architecture }}
       java-version: ${{ matrix.java-version }}
       backend: ${{ matrix.backend }}

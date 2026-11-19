@@ -19,10 +19,14 @@
 package org.apache.gravtitino.catalog.model;
 
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_RETENTION_SECS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
@@ -59,6 +63,7 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
@@ -138,6 +143,10 @@ public class TestModelCatalogOperations {
     when(config.get(ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
     when(config.get(ENTITY_CHANGE_LOG_POLL_BATCH_SIZE))
         .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
+    when(config.get(ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS);
+    when(config.get(ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES);
     when(config.get(ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     when(config.get(ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     // Fix cache config for test
@@ -951,6 +960,35 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(newModelName, alteredModel.name());
     Assertions.assertEquals(comment, alteredModel.comment());
     Assertions.assertEquals(properties, alteredModel.properties());
+  }
+
+  @Test
+  void testRenameModelToExistingName() {
+    String schemaName = randomSchemaName();
+    createSchema(schemaName);
+    NameIdentifier source =
+        NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, schemaName, "source");
+    NameIdentifier target = NameIdentifier.of(source.namespace(), "target");
+    ops.registerModel(
+        source, "source comment", StringIdentifier.newPropertiesWithId(newStringId(), null));
+    ops.registerModel(
+        target, "target comment", StringIdentifier.newPropertiesWithId(newStringId(), null));
+
+    for (ModelChange[] changes :
+        new ModelChange[][] {
+          {ModelChange.rename("target")},
+          {ModelChange.rename("intermediate"), ModelChange.rename("target")}
+        }) {
+      ModelAlreadyExistsException exception =
+          Assertions.assertThrows(
+              ModelAlreadyExistsException.class, () -> ops.alterModel(source, changes));
+      Assertions.assertEquals("Model " + target + " already exists", exception.getMessage());
+      Assertions.assertInstanceOf(EntityAlreadyExistsException.class, exception.getCause());
+      Assertions.assertEquals("source comment", ops.getModel(source).comment());
+      Assertions.assertEquals("target comment", ops.getModel(target).comment());
+      Assertions.assertFalse(
+          ops.modelExists(NameIdentifier.of(source.namespace(), "intermediate")));
+    }
   }
 
   @Test

@@ -3,6 +3,26 @@ name: Python Client Integration Test Action
 on:
   workflow_call:
     inputs:
+      base-ref:
+        type: string
+        required: false
+        default: ''
+      base-sha:
+        type: string
+        required: false
+        default: ''
+      head-repository:
+        type: string
+        required: false
+        default: ''
+      head-sha:
+        type: string
+        required: false
+        default: ''
+      sync:
+        type: string
+        required: false
+        default: ''
       architecture:
         required: true
         description: 'Architecture of the platform'
@@ -21,6 +41,15 @@ jobs:
       PLATFORM: ${{ inputs.architecture }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
 
       - uses: actions/setup-java@v4
         with:
@@ -29,7 +58,7 @@ jobs:
           cache: 'gradle'
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
 
       - name: Free up disk space
         run: |
@@ -46,6 +75,21 @@ jobs:
             ./gradlew -PpythonVersion=${pythonVersion} -PskipDockerTests=false -PskipWeb=true :clients:client-python:test
             rm -rf ./distribution/package/data
           done
+
+      - name: Installed core SDK compatibility
+        run: |
+          ./gradlew -PpythonVersion=3.12 -PskipWeb=true :clients:client-python:coreCompatibilityTest
+
+      - name: Upload core compatibility evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: core-compatibility-${{ inputs.java-version }}
+          path: |
+            clients/client-python/build/core-compatibility/**/*.log
+            clients/client-python/build/core-compatibility/results.json
+            clients/client-python/build/core-compatibility/**/resolved-requirements.txt
+            distribution/package/logs/gravitino-server.log
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v7

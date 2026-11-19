@@ -259,17 +259,24 @@ class IntegrationTestEnv(unittest.TestCase):
                 "project root directory."
             )
 
+        env_vars = os.environ.copy()
+        env_vars["HADOOP_USER_NAME"] = "anonymous"
+        # Stop the server before removing data so it cannot recreate files during cleanup.
+        subprocess.run(
+            [gravitino_startup_script, "stop"],
+            env=env_vars,
+            check=True,
+        )
+
         # remove data dir under gravitino_home
         data_dir = os.path.join(gravitino_home, "data")
         if os.path.exists(data_dir):
             logger.info("Remove Gravitino data directory: %s", data_dir)
             shutil.rmtree(data_dir)
 
-        # Restart Gravitino Server
-        env_vars = os.environ.copy()
-        env_vars["HADOOP_USER_NAME"] = "anonymous"
+        # Start Gravitino Server
         result = subprocess.run(
-            [gravitino_startup_script, "restart"],
+            [gravitino_startup_script, "start"],
             env=env_vars,
             capture_output=True,
             text=True,
@@ -279,6 +286,7 @@ class IntegrationTestEnv(unittest.TestCase):
             logger.info("stdout: %s", result.stdout)
         if result.stderr:
             logger.info("stderr: %s", result.stderr)
+        result.check_returncode()
 
         success = check_gravitino_server_status()
         if success:

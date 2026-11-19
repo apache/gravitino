@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.spark.connector.iceberg;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.auth.AuthProperties;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
+import org.apache.gravitino.spark.connector.plugin.GravitinoDriverPlugin;
 import org.apache.spark.SparkConf;
 
 /**
@@ -45,6 +47,9 @@ class IcebergRestOAuthConfig {
   static final String CREDENTIAL = "credential";
   static final String OAUTH2_SERVER_URI = "oauth2-server-uri";
   static final String SCOPE = "scope";
+  static final String AUTH_TYPE_BASIC = "basic";
+  static final String BASIC_USERNAME = "rest.auth.basic.username";
+  static final String BASIC_PASSWORD = "rest.auth.basic.password";
 
   // Properties whose presence alone implies the user is explicitly configuring legacy OAuth2
   // (triggering validation), as opposed to optional extras that ride along with it. TOKEN is not
@@ -76,12 +81,28 @@ class IcebergRestOAuthConfig {
 
     String authType =
         sparkConf.get(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.SIMPLE_AUTH_TYPE);
+    if (AuthProperties.isBasic(authType)) {
+      return applyBasicCredentials(sparkConf, result);
+    }
+    boolean hasExplicitLegacyOAuth2 =
+        AUTH_TYPE_OAUTH2.equalsIgnoreCase(explicitAuthType)
+            || result.keySet().stream().anyMatch(OAUTH2_TRIGGER_PROPERTIES::contains);
+    // An explicit legacy OAuth2 configuration already decides how IRC is authenticated.
+    if (!hasExplicitLegacyOAuth2) {
+      if (AuthProperties.isToken(authType)) {
+        return applyBearerToken(sparkConf, result);
+      }
+      // The Iceberg REST client has no SPNEGO support, so Kerberos can't be carried over.
+      Preconditions.checkArgument(
+          !AuthProperties.isKerberos(authType),
+          "Iceberg REST service can't be accessed with %s=kerberos; set"
+              + " spark.sql.gravitino.iceberg.rest.* to configure its authentication explicitly",
+          GravitinoSparkConfig.GRAVITINO_AUTH_TYPE);
+    }
+
     boolean reuseOAuth2 =
         sparkConf.getBoolean(GravitinoSparkConfig.GRAVITINO_ICEBERG_REUSE_OAUTH2, true)
             && AuthProperties.isOAuth2(authType);
-    boolean hasExplicitLegacyOAuth2 =
-        StringUtils.equalsIgnoreCase(explicitAuthType, AUTH_TYPE_OAUTH2)
-            || result.keySet().stream().anyMatch(OAUTH2_TRIGGER_PROPERTIES::contains);
     if (!reuseOAuth2 && !hasExplicitLegacyOAuth2) {
       return result;
     }
@@ -107,6 +128,34 @@ class IcebergRestOAuthConfig {
     return result;
   }
 
+  // Reuses Gravitino's Basic credentials unless the caller already chose an auth type.
+  private static Map<String, String> applyBasicCredentials(
+      SparkConf sparkConf, Map<String, String> config) {
+    if (StringUtils.isNotBlank(config.get(AUTH_TYPE))) {
+      return config;
+    }
+
+    String username = sparkConf.get(GravitinoSparkConfig.GRAVITINO_BASIC_USERNAME, null);
+    String password = sparkConf.get(GravitinoSparkConfig.GRAVITINO_BASIC_PASSWORD, null);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(username) && StringUtils.isNotBlank(password),
+        "Incomplete Iceberg REST Basic configuration; %s and %s are required",
+        GravitinoSparkConfig.GRAVITINO_BASIC_USERNAME,
+        GravitinoSparkConfig.GRAVITINO_BASIC_PASSWORD);
+    config.put(AUTH_TYPE, AUTH_TYPE_BASIC);
+    config.put(BASIC_USERNAME, username);
+    config.put(BASIC_PASSWORD, password);
+    return config;
+  }
+
+  // Reuses the bearer token of the Gravitino client. The token is captured when the catalog is
+  // initialized, so it isn't refreshed when the token source changes afterwards.
+  private static Map<String, String> applyBearerToken(
+      SparkConf sparkConf, Map<String, String> config) {
+    config.put(TOKEN, GravitinoDriverPlugin.resolveToken(sparkConf));
+    return config;
+  }
+
   private static void putIfConfigured(Map<String, String> config, String key, String value) {
     if (!config.containsKey(key) && StringUtils.isNotBlank(value)) {
       config.put(key, value);
@@ -129,7 +178,14 @@ class IcebergRestOAuthConfig {
     }
   }
 
+  // Hand-rolled rather than StringUtils.removeEnd/removeStart: commons-lang3 deprecates both in
+  // 3.19.0, which the Spark 4.1 build resolves, and -Werror makes that a compile error. Their
+  // replacement, Strings.CS, does not exist in the 3.12.0 the Spark 3.5 build resolves, so no
+  // named helper compiles on every supported line.
   private static String joinUri(String serverUri, String tokenPath) {
-    return StringUtils.removeEnd(serverUri, "/") + "/" + StringUtils.removeStart(tokenPath, "/");
+    String base =
+        serverUri.endsWith("/") ? serverUri.substring(0, serverUri.length() - 1) : serverUri;
+    String path = tokenPath.startsWith("/") ? tokenPath.substring(1) : tokenPath;
+    return base + "/" + path;
   }
 }

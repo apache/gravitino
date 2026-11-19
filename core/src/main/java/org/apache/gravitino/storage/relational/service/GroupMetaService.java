@@ -43,7 +43,6 @@ import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
-import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.ExtendedGroupPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
@@ -66,10 +65,18 @@ public class GroupMetaService {
   private GroupMetaService() {}
 
   private GroupPO getGroupPOByMetalakeIdAndName(Long metalakeId, String groupName) {
+    return getGroupPOByMetalakeIdAndName(metalakeId, groupName, false);
+  }
+
+  private GroupPO getGroupPOByMetalakeIdAndName(
+      Long metalakeId, String groupName, boolean withRoles) {
     GroupPO GroupPO =
         SessionUtils.getWithoutCommit(
             GroupMetaMapper.class,
-            mapper -> mapper.selectGroupMetaByMetalakeIdAndName(metalakeId, groupName));
+            mapper ->
+                withRoles
+                    ? mapper.selectGroupWithRolesByMetalakeIdAndName(metalakeId, groupName)
+                    : mapper.selectGroupMetaByMetalakeIdAndName(metalakeId, groupName));
 
     if (GroupPO == null) {
       throw new NoSuchEntityException(
@@ -106,8 +113,8 @@ public class GroupMetaService {
 
     NameIdentifier metalakeIdent = NameIdentifier.of(NameIdentifierUtil.getMetalake(identifier));
     long metalakeId = EntityIdService.getEntityId(metalakeIdent, Entity.EntityType.METALAKE);
-    GroupPO groupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name());
-    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByGroupId(groupPO.getGroupId());
+    GroupPO groupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name(), true);
+    List<RolePO> rolePOs = groupPO.requireRolePOs();
 
     return POConverters.fromGroupPO(groupPO, rolePOs, identifier.namespace());
   }
@@ -175,15 +182,7 @@ public class GroupMetaService {
       NameIdentifier metalakeIdent =
           NameIdentifier.of(NameIdentifierUtil.getMetalake(groupEntity.nameIdentifier()));
       MetalakePO metalakePO =
-          SessionUtils.getWithoutCommit(
-              MetalakeMetaMapper.class,
-              mapper -> mapper.selectMetalakeMetaByName(metalakeIdent.name()));
-      if (metalakePO == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.METALAKE.name().toLowerCase(),
-            metalakeIdent.name());
-      }
+          MetalakeMetaService.getInstance().requireMetalakeByName(metalakeIdent.name());
 
       GroupPO.Builder builder = GroupPO.builder().withMetalakeId(metalakePO.getMetalakeId());
       GroupPO groupPO = POConverters.initializeGroupPOWithVersion(groupEntity, builder);
@@ -280,9 +279,8 @@ public class GroupMetaService {
     NameIdentifier metalakeIdent = NameIdentifier.of(NameIdentifierUtil.getMetalake(identifier));
     Long metalakeId = EntityIdService.getEntityId(metalakeIdent, Entity.EntityType.METALAKE);
 
-    GroupPO oldGroupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name());
-    List<RolePO> rolePOs =
-        RoleMetaService.getInstance().listRolesByGroupId(oldGroupPO.getGroupId());
+    GroupPO oldGroupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name(), true);
+    List<RolePO> rolePOs = oldGroupPO.requireRolePOs();
     GroupEntity oldGroupEntity =
         POConverters.fromGroupPO(oldGroupPO, rolePOs, identifier.namespace());
 

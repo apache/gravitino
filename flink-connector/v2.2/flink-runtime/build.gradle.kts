@@ -1,0 +1,105 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
+plugins {
+  `maven-publish`
+  id("java")
+  id("idea")
+  alias(libs.plugins.shadow)
+}
+
+repositories {
+  mavenCentral()
+}
+
+val flinkVersion: String = libs.versions.flink22.get()
+val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
+// Flink 2.x removed the Scala APIs entirely, so unlike the 1.x modules there is no scala suffix.
+val artifactName = "gravitino-${project.name}"
+val baseName = "${rootProject.name}-flink-connector-runtime-$flinkMajorVersion"
+
+configurations.all {
+  resolutionStrategy.eachDependency {
+    if (requested.group == "org.apache.logging.log4j") {
+      throw GradleException("Dependency 'org.apache.logging.log4j' is not allowed.")
+    }
+  }
+}
+
+// Everything packaged into the shaded runtime jar. Declaring these as `implementation` would make
+// Gradle publish them as `runtime` scoped POM dependencies and list them in the Gradle module
+// metadata, so resolving the connector coordinate would download the modules and third-party
+// libraries the jar already contains. See https://github.com/apache/gravitino/issues/13171
+val shadedDependencies by configurations.creating {
+  isCanBeConsumed = false
+  isCanBeResolved = true
+}
+
+dependencies {
+  shadedDependencies(project(":clients:client-java-runtime", configuration = "shadow"))
+  shadedDependencies(project(":flink-connector:flink-2.2"))
+  // flink-2.2's own openlineageSqlJava constraint only applies to that module's compileOnly and
+  // testImplementation configurations, so it never reaches this module's shaded dependencies (which
+  // shadowJar packages). Depend on it directly here so the shaded runtime jar ships the patched
+  // 1.52.0 release instead of the vulnerable 1.32.0 pulled transitively by flink-connector-jdbc.
+  shadedDependencies(libs.openlineageSqlJava)
+
+  testImplementation(libs.junit.jupiter.api)
+  testRuntimeOnly(libs.junit.jupiter.engine)
+}
+
+val shadowJarTask = tasks.named<ShadowJar>("shadowJar")
+
+shadowJarTask.configure {
+  isZip64 = true
+  configurations = listOf(shadedDependencies)
+  archiveFileName.set("$baseName-$version.jar")
+  archiveClassifier.set("")
+  mergeServiceFiles()
+
+  exclude("org/slf4j/**")
+  exclude("META-INF/maven/org.slf4j/**")
+
+  relocate("com.google", "org.apache.gravitino.shaded.com.google")
+  relocate("google", "org.apache.gravitino.shaded.google")
+  relocate("org.apache.hc", "org.apache.gravitino.shaded.org.apache.hc")
+}
+
+tasks.test {
+  useJUnitPlatform()
+  dependsOn(shadowJarTask)
+  inputs.file(shadowJarTask.flatMap { it.archiveFile })
+  doFirst {
+    systemProperty("shadowJarPath", shadowJarTask.get().archiveFile.get().asFile.absolutePath)
+  }
+}
+
+publishing {
+  publications {
+    withType<MavenPublication>().configureEach {
+      artifactId = baseName
+    }
+  }
+}
+
+tasks.jar {
+  dependsOn(tasks.named("shadowJar"))
+  archiveClassifier.set("empty")
+}

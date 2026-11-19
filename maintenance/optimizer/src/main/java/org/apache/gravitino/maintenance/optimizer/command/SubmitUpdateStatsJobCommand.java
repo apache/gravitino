@@ -21,6 +21,7 @@ package org.apache.gravitino.maintenance.optimizer.command;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -31,11 +32,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoClientUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 
 /**
  * Handles CLI command {@code submit-update-stats-job} for submitting built-in Iceberg update stats
@@ -47,7 +50,6 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
   private static final String DEFAULT_UPDATE_MODE = "all";
   private static final String OPTION_UPDATER_OPTIONS = "updater-options";
   private static final String OPTION_SPARK_CONF = "spark-conf";
-  private static final String DEFAULT_SPARK_MASTER = "local[*]";
   private static final String DEFAULT_SPARK_EXECUTOR_INSTANCES = "1";
   private static final String DEFAULT_SPARK_EXECUTOR_CORES = "1";
   private static final String DEFAULT_SPARK_EXECUTOR_MEMORY = "1g";
@@ -75,11 +77,6 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
   public void execute(OptimizerCommandContext context) throws Exception {
     Map<String, String> submitterConfigs = context.optimizerEnv().config().jobSubmitterConfigs();
 
-    List<TableTarget> tableTargets =
-        parseTableTargets(
-            context.identifiers(),
-            context.optimizerEnv().config().get(OptimizerConfig.GRAVITINO_DEFAULT_CATALOG_CONFIG));
-
     String updateMode =
         parseUpdateMode(
             resolveScalarOption(context.updateMode(), submitterConfigs.get("update_mode")));
@@ -91,18 +88,45 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
 
     Map<String, String> updaterOptions =
         IcebergSparkConfigUtils.parseFlatJsonMap(updaterOptionsJson, OPTION_UPDATER_OPTIONS);
+    validateUpdaterOptions(updateMode, updaterOptions);
+    // Resolve separator before parsing identifiers so Spark-physical catalog.a.b.t can be mapped.
+    String schemaSeparator =
+        GravitinoClientUtils.fetchSchemaSeparator(updaterOptions.get("gravitino_uri"));
+
+    List<TableTarget> tableTargets =
+        parseTableTargets(
+            context.identifiers(),
+            context.optimizerEnv().config().get(OptimizerConfig.GRAVITINO_DEFAULT_CATALOG_CONFIG),
+            schemaSeparator);
+
     Map<String, String> sparkConfigs =
         normalizeSparkConfigs(
             tableTargets,
             IcebergSparkConfigUtils.parseFlatJsonMap(sparkConfJson, OPTION_SPARK_CONF));
 
-    validateUpdaterOptions(updateMode, updaterOptions);
     validateSparkConfigs(tableTargets, sparkConfigs);
+    // The job ignores the master of spark_conf, as spark-submit decides it, so say where it goes.
+    if (StringUtils.isNotBlank(sparkConfigs.get(SPARK_MASTER_KEY))) {
+      context
+          .output()
+          .printf(
+              "WARN: %s=%s in the Spark configurations is ignored by the job. Set %sspark_master"
+                  + " instead.%n",
+              SPARK_MASTER_KEY,
+              sparkConfigs.get(SPARK_MASTER_KEY),
+              OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX);
+    }
 
     if (context.dryRun()) {
       for (TableTarget tableTarget : tableTargets) {
         Map<String, String> jobConfig =
-            buildJobConfig(tableTarget, updateMode, updaterOptions, sparkConfigs, submitterConfigs);
+            buildJobConfig(
+                tableTarget,
+                updateMode,
+                updaterOptions,
+                sparkConfigs,
+                submitterConfigs,
+                schemaSeparator);
         context
             .output()
             .printf(
@@ -120,7 +144,13 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
       int submitted = 0;
       for (TableTarget tableTarget : tableTargets) {
         Map<String, String> jobConfig =
-            buildJobConfig(tableTarget, updateMode, updaterOptions, sparkConfigs, submitterConfigs);
+            buildJobConfig(
+                tableTarget,
+                updateMode,
+                updaterOptions,
+                sparkConfigs,
+                submitterConfigs,
+                schemaSeparator);
         JobHandle jobHandle = client.runJob(JOB_TEMPLATE_NAME, jobConfig);
         submitted++;
         context
@@ -145,12 +175,18 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
       String updateMode,
       Map<String, String> updaterOptions,
       Map<String, String> sparkConfigs,
-      Map<String, String> submitterConfigs) {
+      Map<String, String> submitterConfigs,
+      String schemaSeparator) {
     Map<String, String> jobConfig = new LinkedHashMap<>();
     jobConfig.put("catalog_name", tableTarget.catalogName);
     jobConfig.putAll(
         resolveTemplateSparkPlaceholders(tableTarget.catalogName, sparkConfigs, submitterConfigs));
-    jobConfig.put("table_identifier", tableTarget.schemaAndTable);
+    jobConfig.put(
+        "table_identifier",
+        IdentifierUtils.toSparkTableIdentifier(
+            NameIdentifier.of(
+                tableTarget.catalogName, tableTarget.schemaName, tableTarget.tableName),
+            schemaSeparator));
     jobConfig.put("update_mode", updateMode);
     jobConfig.put("updater_options", toCanonicalJson(updaterOptions));
     jobConfig.put("spark_conf", toCanonicalJson(sparkConfigs));
@@ -226,22 +262,45 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     return normalized;
   }
 
-  private static List<TableTarget> parseTableTargets(String[] identifiers, String defaultCatalog) {
+  /**
+   * Parses {@code --identifiers} into catalog/schema/table targets.
+   *
+   * <ul>
+   *   <li>{@code schema.table} (2 levels) with default catalog — schema may contain the external
+   *       separator (e.g. {@code a|b.events})
+   *   <li>{@code catalog.schema.table} (3 levels) — Gravitino form; schema may contain the
+   *       separator
+   *   <li>{@code catalog.ns1.ns2....table} (4+ levels) — Spark-physical form; intermediate levels
+   *       are joined with {@code schemaSeparator} into the Gravitino schema name
+   * </ul>
+   *
+   * @param identifiers raw CLI identifiers
+   * @param defaultCatalog default catalog for {@code schema.table} form
+   * @param schemaSeparator server {@code gravitino.schema.separator}
+   * @return parsed targets
+   */
+  @VisibleForTesting
+  static List<TableTarget> parseTableTargets(
+      String[] identifiers, String defaultCatalog, String schemaSeparator) {
     Preconditions.checkArgument(
         identifiers != null && identifiers.length > 0,
         "Missing required option --identifiers for command 'submit-update-stats-job'");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(schemaSeparator), "schemaSeparator must not be blank");
 
     List<TableTarget> tableTargets = new ArrayList<>();
     for (String rawIdentifier : identifiers) {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(rawIdentifier), "--identifiers contains blank identifier");
-      String[] levels = rawIdentifier.trim().split("\\.");
+      String trimmed = rawIdentifier.trim();
+      String[] levels = trimmed.split("\\.", -1);
       if (levels.length == 3) {
         tableTargets.add(
             new TableTarget(
-                rawIdentifier.trim(),
+                trimmed,
                 requireNonBlank(levels[0], "catalog"),
-                requireNonBlank(levels[1], "schema") + "." + requireNonBlank(levels[2], "table")));
+                requireNonBlank(levels[1], "schema"),
+                requireNonBlank(levels[2], "table")));
       } else if (levels.length == 2) {
         Preconditions.checkArgument(
             StringUtils.isNotBlank(defaultCatalog),
@@ -250,14 +309,25 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
             OptimizerConfig.GRAVITINO_DEFAULT_CATALOG);
         tableTargets.add(
             new TableTarget(
-                defaultCatalog + "." + rawIdentifier.trim(),
+                defaultCatalog.trim() + "." + trimmed,
                 defaultCatalog.trim(),
-                requireNonBlank(levels[0], "schema") + "." + requireNonBlank(levels[1], "table")));
+                requireNonBlank(levels[0], "schema"),
+                requireNonBlank(levels[1], "table")));
+      } else if (levels.length > 3) {
+        // Spark-physical catalog.a.b....table → Gravitino catalog / a|b|... / table
+        String catalog = requireNonBlank(levels[0], "catalog");
+        NameIdentifier gravitino =
+            IdentifierUtils.fromSparkTableIdentifier(
+                catalog, trimmed.substring(catalog.length() + 1), schemaSeparator);
+        tableTargets.add(
+            new TableTarget(
+                gravitino.toString(), catalog, gravitino.namespace().level(1), gravitino.name()));
       } else {
         throw new IllegalArgumentException(
             String.format(
                 Locale.ROOT,
-                "Identifier '%s' is invalid. Use catalog.schema.table or schema.table",
+                "Identifier '%s' is invalid. Use catalog.schema.table, schema.table, or"
+                    + " Spark-physical catalog.ns...table",
                 rawIdentifier));
       }
     }
@@ -272,17 +342,17 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
 
   private static void validateUpdaterOptions(
       String updateMode, Map<String, String> updaterOptions) {
-    if (!"stats".equals(updateMode) && !"all".equals(updateMode)) {
-      return;
-    }
     String gravitinoUri = StringUtils.trimToNull(updaterOptions.get("gravitino_uri"));
-    String metalake = StringUtils.trimToNull(updaterOptions.get("metalake"));
     Preconditions.checkArgument(
         StringUtils.isNotBlank(gravitinoUri),
         "Option --updater-options (or config key "
             + OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX
             + "updater_options) "
-            + "must contain 'gravitino_uri' when update_mode is stats or all");
+            + "must contain 'gravitino_uri'");
+    if (!"stats".equals(updateMode) && !"all".equals(updateMode)) {
+      return;
+    }
+    String metalake = StringUtils.trimToNull(updaterOptions.get("metalake"));
     Preconditions.checkArgument(
         StringUtils.isNotBlank(metalake),
         "Option --updater-options (or config key "
@@ -333,12 +403,10 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     Map<String, String> placeholders = new LinkedHashMap<>();
     String catalogPrefix = SPARK_SQL_CATALOG_PREFIX + catalogName;
 
-    placeholders.put(
-        "spark_master",
-        firstNonBlank(
-            submitterConfigs.get("spark_master"),
-            sparkConfigs.get(SPARK_MASTER_KEY),
-            DEFAULT_SPARK_MASTER));
+    // An empty master leaves it to the job executor: spark-submit defaults to local[*], and the
+    // k8s job executor lets the operator decide it. spark.master in spark_conf isn't used, as the
+    // job ignores it there too.
+    placeholders.put("spark_master", firstNonBlank(submitterConfigs.get("spark_master")));
     placeholders.put(
         "spark_executor_instances",
         firstNonBlank(
@@ -389,15 +457,18 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     return "";
   }
 
-  private static final class TableTarget {
-    private final String fullIdentifier;
-    private final String catalogName;
-    private final String schemaAndTable;
+  @VisibleForTesting
+  static final class TableTarget {
+    final String fullIdentifier;
+    final String catalogName;
+    final String schemaName;
+    final String tableName;
 
-    private TableTarget(String fullIdentifier, String catalogName, String schemaAndTable) {
+    TableTarget(String fullIdentifier, String catalogName, String schemaName, String tableName) {
       this.fullIdentifier = fullIdentifier;
       this.catalogName = catalogName;
-      this.schemaAndTable = schemaAndTable;
+      this.schemaName = schemaName;
+      this.tableName = tableName;
     }
   }
 }

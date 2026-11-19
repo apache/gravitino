@@ -156,6 +156,8 @@ public class RoleOperations {
           httpRequest,
           () -> {
             request.validate();
+            NameIdentifierUtil.checkMetadataObjectName(
+                NameIdentifierUtil.ofRole(metalake, request.getName()), Entity.EntityType.ROLE);
             MetalakeManager.checkMetalakeInUse(metalake);
             Set<MetadataObject> metadataObjects = Sets.newHashSet();
             for (SecurableObjectDTO object : request.getSecurableObjects()) {
@@ -176,6 +178,7 @@ public class RoleOperations {
                 for (Privilege privilege : object.privileges()) {
                   AuthorizationUtils.checkPrivilege((PrivilegeDTO) privilege, object, metalake);
                 }
+                TagOperations.checkVisibleTag(metalake, object);
                 MetadataObjectUtil.checkMetadataObject(metalake, object);
               } catch (NoSuchMetadataObjectException nsm) {
                 throw new IllegalMetadataObjectException(nsm);

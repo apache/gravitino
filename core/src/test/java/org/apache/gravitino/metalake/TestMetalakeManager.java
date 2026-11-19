@@ -388,6 +388,9 @@ public class TestMetalakeManager {
       Assertions.assertFalse(
           MetalakeManager.metalakeInUse(entityStore, ident),
           "failed force drop must keep the user-disabled metalake disabled");
+      Assertions.assertTrue(entityStore.exists(ident, EntityType.METALAKE));
+      Assertions.assertTrue(
+          entityStore.exists(NameIdentifier.of(ident.name(), "catalog1"), EntityType.CATALOG));
     } finally {
       FieldUtils.writeField(
           GravitinoEnv.getInstance(), "catalogManager", originalEnvCatalogManager, true);

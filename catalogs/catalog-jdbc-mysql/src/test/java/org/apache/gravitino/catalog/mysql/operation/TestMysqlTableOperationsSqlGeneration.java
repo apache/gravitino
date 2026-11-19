@@ -19,10 +19,14 @@
 package org.apache.gravitino.catalog.mysql.operation;
 
 import java.util.Collections;
+import java.util.Map;
+import java.util.stream.Stream;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
-import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
+import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
+import org.apache.gravitino.catalog.jdbc.utils.ConnectionCountingDataSource;
+import org.apache.gravitino.catalog.mysql.converter.MysqlColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
@@ -34,14 +38,24 @@ import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 public class TestMysqlTableOperationsSqlGeneration {
 
   private static class TestableMysqlTableOperations extends MysqlTableOperations {
+    private JdbcColumn[] columns = new JdbcColumn[0];
+
     public TestableMysqlTableOperations() {
       super.exceptionMapper = new JdbcExceptionConverter();
       super.typeConverter = new MysqlTypeConverter();
-      super.columnDefaultValueConverter = new JdbcColumnDefaultValueConverter();
+      super.columnDefaultValueConverter = new MysqlColumnDefaultValueConverter();
+    }
+
+    private TestableMysqlTableOperations(ConnectionCountingDataSource connections) {
+      this();
+      dataSource = connections.dataSource();
     }
 
     public String createTableSql(String tableName, JdbcColumn[] columns) {
@@ -66,8 +80,97 @@ public class TestMysqlTableOperationsSqlGeneration {
     @Override
     protected JdbcTable getOrCreateTable(
         String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
-      return JdbcTable.builder().withName(tableName).build();
+      return JdbcTable.builder().withName(tableName).withColumns(columns).build();
     }
+  }
+
+  @Test
+  void testAlterColumnCommentPreservesLoadedZeroDateDefault() {
+    TestableMysqlTableOperations ops = new TestableMysqlTableOperations();
+    ops.columns =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("legacy_date")
+              .withType(Types.DateType.get())
+              .withDefaultValue(
+                  new MysqlColumnDefaultValueConverter()
+                      .toGravitino(
+                          new JdbcTypeConverter.JdbcTypeBean("DATE"), "0000-00-00", false, true))
+              .build()
+        };
+
+    String sql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.updateColumnComment(new String[] {"legacy_date"}, "legacy default"));
+    Assertions.assertTrue(sql.contains("DEFAULT '0000-00-00' COMMENT 'legacy default'"), sql);
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidTableOptions")
+  void testInvalidOptionsAreRejectedBeforeCreateAndAlterSql(String key, String value) {
+    ConnectionCountingDataSource connections = new ConnectionCountingDataSource();
+    TestableMysqlTableOperations ops = new TestableMysqlTableOperations(connections);
+    JdbcColumn column =
+        JdbcColumn.builder().withName("col1").withType(Types.IntegerType.get()).build();
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.create(
+                "database",
+                "test_table",
+                new JdbcColumn[] {column},
+                "comment",
+                Collections.singletonMap(key, value),
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                Indexes.EMPTY_INDEXES));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> ops.alterTable("database", "test_table", TableChange.setProperty(key, value)));
+    Assertions.assertTrue(connections.executedSql().isEmpty());
+    Assertions.assertEquals(0, connections.borrowed());
+    Assertions.assertEquals(0, connections.peakBorrowed());
+  }
+
+  @Test
+  void testUnsupportedSqlOptionNamesSupportedOptions() {
+    TestableMysqlTableOperations ops = new TestableMysqlTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder().withName("col1").withType(Types.IntegerType.get()).build();
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.generateCreateTableSql(
+                    "test_table",
+                    new JdbcColumn[] {column},
+                    null,
+                    Map.of("ROW_FORMAT", "DYNAMIC"),
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    Indexes.EMPTY_INDEXES));
+    Assertions.assertTrue(
+        error.getMessage().contains("Supported options: AUTO_INCREMENT, ENGINE"),
+        error.getMessage());
+  }
+
+  @Test
+  void testSupportedSqlOptionsAreNormalized() {
+    TestableMysqlTableOperations ops = new TestableMysqlTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder().withName("col1").withType(Types.IntegerType.get()).build();
+    String sql =
+        ops.generateCreateTableSql(
+            "test_table",
+            new JdbcColumn[] {column},
+            null,
+            Map.of("ENGINE", "InNoDB", "AUTO_INCREMENT", "+0042"),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            Indexes.EMPTY_INDEXES);
+    Assertions.assertTrue(sql.contains("ENGINE = InnoDB"), sql);
+    Assertions.assertTrue(sql.contains("AUTO_INCREMENT = 42"), sql);
   }
 
   @Test
@@ -83,7 +186,7 @@ public class TestMysqlTableOperationsSqlGeneration {
             .build();
 
     String sql = ops.createTableSql(tableName, new JdbcColumn[] {col1});
-    JdbcColumnDefaultValueConverter converter = new JdbcColumnDefaultValueConverter();
+    MysqlColumnDefaultValueConverter converter = new MysqlColumnDefaultValueConverter();
     Assertions.assertTrue(
         sql.contains("DEFAULT " + converter.fromGravitino(col1.defaultValue())),
         "Should contain DEFAULT '' but was: " + sql);
@@ -102,7 +205,7 @@ public class TestMysqlTableOperationsSqlGeneration {
             .build();
 
     String sql = ops.createTableSql(tableName, new JdbcColumn[] {col1});
-    JdbcColumnDefaultValueConverter converter = new JdbcColumnDefaultValueConverter();
+    MysqlColumnDefaultValueConverter converter = new MysqlColumnDefaultValueConverter();
     Assertions.assertTrue(
         sql.contains("DEFAULT " + converter.fromGravitino(col1.defaultValue())),
         "Should contain DEFAULT value but was: " + sql);
@@ -198,6 +301,15 @@ public class TestMysqlTableOperationsSqlGeneration {
   }
 
   @Test
+  public void testClearTableCommentWithNull() {
+    TestableMysqlTableOperations ops = new TestableMysqlTableOperations();
+
+    Assertions.assertEquals(
+        "ALTER TABLE `test_table`\nCOMMENT '';",
+        ops.alterTableSql("test_table", TableChange.updateComment(null)));
+  }
+
+  @Test
   public void testEscapeAddColumnCommentInGeneratedSql() {
     TestableMysqlTableOperations ops = new TestableMysqlTableOperations();
     String comment = "owner\\'s \"comment\"; --";
@@ -209,5 +321,15 @@ public class TestMysqlTableOperationsSqlGeneration {
 
     Assertions.assertTrue(alterSql.contains("ADD COLUMN `col2`"), alterSql);
     Assertions.assertTrue(alterSql.contains("COMMENT 'owner\\\\''s \"comment\"; --'"), alterSql);
+  }
+
+  private static Stream<Arguments> invalidTableOptions() {
+    return Stream.of(
+        Arguments.of("ENGINE", "ABC"),
+        Arguments.of("ENGINE", "InnoDB, ROW_FORMAT=DYNAMIC"),
+        Arguments.of("AUTO_INCREMENT", "1; DROP TABLE t"),
+        Arguments.of("ROW_FORMAT", "DYNAMIC"),
+        Arguments.of("ENGINE; DROP TABLE t", "MEMORY"),
+        Arguments.of("AUTO_INCREMENT", null));
   }
 }

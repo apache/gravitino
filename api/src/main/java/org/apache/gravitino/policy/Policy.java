@@ -62,6 +62,9 @@ public interface Policy extends Auditable {
     /** Built-in policy type for masking columns of tagged tables or tagged columns. */
     COLUMN_MASK(BUILT_IN_TYPE_PREFIX + "column_mask", ColumnMaskContent.class),
 
+    /** Built-in policy type for access conferred by a tag. */
+    ACCESS_CONTROL(BUILT_IN_TYPE_PREFIX + "access_control", AccessControlContent.class),
+
     /** Non-built-in policies use the fixed wire value {@code custom}. */
     CUSTOM("custom", PolicyContents.CustomContent.class);
 
@@ -75,6 +78,9 @@ public interface Policy extends Auditable {
 
     /**
      * Get the built-in policy type from the policy type string.
+     *
+     * <p>Matching is case-insensitive. Callers should persist and return {@link #policyType()} so
+     * responses use the canonical lowercase wire value.
      *
      * @param policyType the policy type string
      * @return the matched built-in policy type

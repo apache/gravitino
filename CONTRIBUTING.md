@@ -92,7 +92,57 @@ Contributors who participate actively and constructively may be invited to becom
 
 ## 🧪 Continuous Integration
 
-All PRs are automatically tested using GitHub Actions. Please check test results and fix failures before requesting a review.
+Pull request tests run with GitHub Actions in your fork, not in `apache/gravitino`:
+
+1. Enable GitHub Actions in your fork (the **Actions** tab of your fork).
+2. Push your branch to your fork. **Fork CI** resolves one upstream base commit and every suite tests the same merge of that base and your pushed commit.
+3. Open the pull request. Its **Fork CI** check verifies the suite jobs and the exact tested head, base branch and base SHA. A pre-PR run is accepted only if its inferred base matches the PR. After retargeting a PR, push again or ask a committer for a trusted run. The separate **ASF Allowlist Check** scans the PR's workflow YAML using reviewed upstream code.
+4. Keep your branch up to date before merging. Strict branch protection requires an up-to-date branch. If the base changes, update your branch and run CI again. The **Fork CI** check can stay green after the base branch moves on; strict branch protection, not the check, blocks the merge until the branch is updated.
+
+### Running Fork CI again
+
+`apache/gravitino` cannot start or cancel runs in your fork, so you control Fork CI from your fork. To run CI again without changing code, use any of these:
+
+* **Run workflow:** In your fork, open **Actions → Fork CI → Run workflow**, select your PR branch and leave the PR number empty. This starts a new run for the branch's current commit against the latest base branch, and cancels a run of that branch that is still in progress. It also works when an old run can no longer be re-run. If **Run workflow** is missing, use **Sync fork** on your fork's default branch first.
+* **Re-run the run:** Open the run for your PR's current commit and choose **Re-run all jobs**, which also tests the latest base branch, or **Re-run jobs → Re-run failed jobs** to retry only failed and cancelled jobs against the same base. A run can be re-run only after it has finished; Fork CI cancels the rest of a run as soon as a job fails. See [GitHub's rerun instructions](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs).
+* **Push a commit:** Any push to the PR branch starts a new run and cancels the previous one. An empty commit (`git commit --allow-empty -m "Trigger Fork CI"`) is enough.
+
+The **Fork CI** status on the PR links to the exact run attempt it reports, where you can re-run it. The **Update Fork CI Status** workflow only refreshes the reported result; it does not run tests.
+
+Partial reruns retain successful jobs from earlier attempts and use each job's newest result. Once the exact **Required CI** job and all required suites pass, the PR status becomes successful even if GitHub still marks the run cancelled because the fail-fast watcher or an obsolete **Required CI** job remains cancelled. A failed, cancelled or unfinished test still prevents success. Overriding an unsuccessful aggregate after a rerun requires the matching **Required CI** success from that attempt. If only the watcher was rerun and the gate is older, rerun **Required CI** too; the publisher cannot safely distinguish that snapshot from delayed downstream results. Nonmatching **Required CI** records are ignored only when their attempt is provably older than the exact matching result. If jobs reveal a newer attempt than the run listing, or required results are incomplete, the publisher reports **Fork CI needs attention** and checks again automatically within its normal polling budget; an unchanged run ID and attempt do not stop these retries. Unsuccessful jobs retained from an older attempt remain retryable until current results arrive. An unsuccessful aggregate without a corresponding unsuccessful job also stays retryable, including the first attempt, because the job that explains the aggregate may not be visible yet. CI-definition verification does not replace an execution failure or an incomplete result. The publisher validates the base actually tested even when CI definitions changed. For a completed fork run with consistent attempt metadata, a current eligibility failure is reported even if Required CI has not expanded its context. Trusted runs must first identify the PR head and base before their job failures can be attributed to this PR. A newer trusted run with missing context stays retryable instead of falling back to an older fork success. If its current summaries explicitly identify another head, retained exact gates from previous attempts do not make it relevant to the current PR. Detailed reasons and recovery instructions are recorded in the **Update Fork CI Status** workflow logs with the PR number; the commit status shows a short description. The status link also records the PR base branch and SHA, so a missed retarget signal invalidates a settled result on the next sweep; legacy links are refreshed once.
+
+| Action                                                 | Fork CI                                                   | PR status                                                 |
+| ------------------------------------------------------ | --------------------------------------------------------- | --------------------------------------------------------- |
+| Push to the PR branch, or **Run workflow** in the fork | Cancels the branch's running run and starts a new one     | Tracks the new run                                        |
+| Close the PR                                           | The running fork run cancels itself within about a minute | Synchronization stops while the PR is closed              |
+| Reopen the PR                                          | Starts nothing                                            | Shows the latest fork run's result; run CI again as above |
+
+If no fork run starts, enable Actions in your fork, update your branch from the latest base branch, and push again. A branch created before Fork CI was introduced does not contain `.github/workflows/fork-ci.yml`, so pushing it runs no CI; the **Fork CI** status then asks you to merge or rebase onto the latest base branch. Please fix failures before requesting a review.
+
+If **Fork CI** requests trusted verification for CI-definition changes, a committer must dispatch the trusted upstream **Fork CI** run described below; running CI in the fork does not satisfy that requirement.
+
+### CI status synchronization
+
+Status synchronization marks the pending status of a previous commit as an error once its fork run, among the fork branch's ten most recent runs, is confirmed cancelled.
+
+Fork runs cannot notify `apache/gravitino` when they finish, so a sweep polls recently updated PRs every minute for 11 minutes and then starts the next sweep, which keeps polling continuous; the five-minute schedule restarts the chain if it breaks. PR events are processed in order in a separate queue of up to 100 runs, so they never wait behind a sweep. Each publisher reads the current status just before writing it and never replaces a newer run attempt, or a finished result with a running one, within the same recorded base context; the next pass repairs any remaining interleaving. GitHub cancels excess runs when the queue is full; later sweeps recover Fork CI updates, and committers can manually dispatch either publisher for a specific PR.
+
+The publishers report **Fork CI** and **ASF Allowlist Check** only as commit statuses, each listed once on the PR and linking to the corresponding run; the **Fork CI** link names the run attempt, which also records what the status reports. Commit statuses do not appear on the PR's **Checks** tab. Queued and running CI both have a pending status, with the description distinguishing whether jobs have started; this also applies to PRs that edit CI definitions. Failed tests report failure. Cancellation reports error unless only the fail-fast watcher or obsolete **Required CI** jobs remain unsuccessful after the required suites pass. Failure and error statuses suggest a re-run in the fork when the description has room. A successful fork run with changed CI definitions stays pending as **Fork CI passed; trusted verification required** until a trusted run verifies the PR. The job that stops a run on the first failure only observes the other jobs: its own errors never fail the run.
+
+The status publisher checks required suites against the upstream commit the run tested: the base-branch commit merged into the head for fork runs, or the dispatch commit for trusted runs. Adding a suite on the default branch does not invalidate earlier successful runs. A later run that tests a base commit with the new suite needs it, so merge the latest base branch and push if the status reports a missing suite.
+
+Known limitations of Fork CI:
+
+* New/edited PR notifications wake a default-branch publisher. Fork run completions and reruns, including reruns of successful runs, are polled on a five-minute schedule, subject to GitHub scheduling delays and a bounded API budget. All open PRs, including settled successes, remain watched. The starting PR rotates on each scheduled interval; large queues can take longer. Committers can force-refresh a particular PR using **Update Fork CI Status** with its PR number.
+* A pull request last pushed before this migration needs an update and another push. Old runs without the tested-context metadata cannot satisfy the new check.
+* Coverage comments remain available for release branches. For PRs to `main`, inspect the fork run's `build / coverage` log and `coverage-report` artifact.
+* Release branches (`branch-*`) keep their own upstream CI until this change is backported.
+* CI workflow, action, helper-script or `.asf.yaml` changes cannot approve themselves. After reviewing those changes, a committer runs **Fork CI** in `apache/gravitino`, from the current PR target branch (the default branch or a `branch-X.Y` release branch), and supplies the PR number. This explicit exception uses upstream runner resources, reviewed target-branch workflow definitions, a read-only token and no repository secrets; it tests the exact contributor head against the current base. The run resolves the branch's current SHA even when the PR retains an older base snapshot. Dispatch from the target branch's current tip; another branch, a tag, or an older workflow run is rejected. Release branches need this trusted-dispatch support backported before it can be used. A later contributor push requires a new run; an existing trusted success remains valid while its tested base stays on the same base branch, with branch protection controlling freshness.
+* The independent allowlist scanner downloads bounded YAML data outside its trusted checkout and never executes PR code. It reports the **ASF Allowlist Check** on every PR, including PRs that do not change `.github/`. A committer can re-run **Trusted ASF Allowlist** with the PR number.
+
+**Fork CI** and **ASF Allowlist Check** are not required status checks, so a trusted run stuck in the shared runner queue does not block an urgent merge. Branch protection still requires an up-to-date branch and an approving review. Release-branch protection is unchanged.
+
+The trusted publishers use `workflow_run` and `schedule`, rather than `pull_request_target`. `actions/*`, `github/*` and `apache/*` actions are exempt from ASF's external-action SHA requirement; external third-party actions still require an approved SHA.
 
 ## 🆘 Need Help?
 
@@ -149,13 +199,15 @@ Reviewing and triaging helps maintain the project. You can:
 * Add labels to categorize
 * Suggest improvements on PRs
 * Review code and give feedback
+* Review changes under `.github/` and `.asf.yaml` carefully, then dispatch a trusted upstream **Fork CI** run for those changes. Check the displayed tested base SHA and all caller suite results before merging.
+* Merge only after **Fork CI** and **ASF Allowlist Check** pass. They are not enforced by branch protection; if you must merge without them, for example while a trusted run is queued, comment on the PR with what you verified instead.
 * Please add Copilot before you review. That is recommended, not required. Do not wait on Copilot if you are ready to review.
 
 ## 🔃 Creating Pull Requests
 
 * Use feature branches
 * Write clear commit messages and PR descriptions
-* Link to issues (e.g., `Fixes #123`)
+* Link to issues in the PR description using a [GitHub closing keyword](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue#linking-a-pull-request-to-an-issue-using-a-keyword) (e.g., `Fixes #123` or `Fix: #123`; for multiple issues, repeat the keyword for each issue, e.g., `Fixes #123, fixes #456`). Do not replace the keyword with the issue type (e.g., `Improvement: #123`), as that prevents GitHub from automatically closing the issue.
 * Respond to reviewer feedback
 * Please add Copilot on the PR. Automatic review runs once when the PR is marked ready; later pushes do not re-review, so add Copilot again after you push. Treat Copilot comments as hints: implement the suggestion, or reply with why you are not taking it. Human reviewers remain responsible for the merge decision. Project-specific Copilot guidance lives in [`.github/copilot-instructions.md`](.github/copilot-instructions.md).
 
@@ -177,6 +229,19 @@ You can also build manually with:
 ## 🧰 Setting Up Your IDE (Optional)
 
 Import Gravitino into IntelliJ IDEA or Eclipse as a Gradle project.
+
+The SQL policy parser's ANTLR runtime is relocated into the packaged core JAR.
+Core's unrelocated module class output uses a `compileOnly` ANTLR dependency, so
+launching the server directly with IDE module outputs requires adding the ANTLR
+runtime version declared in `gradle/libs.versions.toml` to the launch classpath.
+Without it, SQL policy parsing can fail with `NoClassDefFoundError` for
+`org.antlr.v4.runtime` classes. Building the shaded JAR alone does not change the
+IDE's module classpath.
+
+To debug with the packaged runtime, build the distribution, enable
+`GRAVITINO_DEBUG_OPTS` in `conf/gravitino-env.sh`, start it with
+`bin/gravitino.sh start`, and attach an IDE remote JVM debugger as described in
+[the installation guide](docs/how-to-install.md).
 
 ## 💡 Tips for WSL Users
 
@@ -224,6 +289,7 @@ Add or update tests in your PR. Test open PRs locally to help maintainers.
 * Avoid unnecessary dependencies
 * Prefer well-maintained libraries
 * Discuss major additions on dev@
+* Known vulnerabilities in shipped artifacts are scanned weekly with Trivy; see [.github/trivy/README.md](.github/trivy/README.md) for how to run the scan locally and how to add an exemption
 
 ## 🛡️ Performing Compliance and Legal Checks
 

@@ -166,6 +166,48 @@ public final class GravitinoAuthSettings {
     return normalizedType();
   }
 
+  /**
+   * @return simple/basic username, or null when unset
+   */
+  public String username() {
+    return username;
+  }
+
+  /**
+   * @return basic password, or null when unset
+   */
+  public String password() {
+    return password;
+  }
+
+  /**
+   * @return OAuth token server URI, or null when unset
+   */
+  public String oauthServerUri() {
+    return oauthServerUri;
+  }
+
+  /**
+   * @return OAuth token path, or null when unset
+   */
+  public String oauthPath() {
+    return oauthPath;
+  }
+
+  /**
+   * @return OAuth client credential ({@code client_id:secret} or secret), or null when unset
+   */
+  public String oauthCredential() {
+    return oauthCredential;
+  }
+
+  /**
+   * @return OAuth scope, or null when unset
+   */
+  public String oauthScope() {
+    return oauthScope;
+  }
+
   private String normalizedType() {
     if (StringUtils.isBlank(authType)) {
       return TYPE_NONE;

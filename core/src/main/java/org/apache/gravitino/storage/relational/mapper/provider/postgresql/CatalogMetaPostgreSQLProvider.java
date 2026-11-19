@@ -50,7 +50,11 @@ public class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseSQLProvider {
         + TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
-        + " WHERE deleted_at = 0 AND "
+        + " WHERE deleted_at = 0 AND catalog_id IN "
+        + "<foreach collection='catalogMetas' item='item' separator=',' open='(' close=')'>"
+        + "#{item.catalogId}"
+        + "</foreach>"
+        + " AND "
         + "<foreach collection='catalogMetas' item='item' separator=' OR ' open='(' close=')'>"
         + "(catalog_id = #{item.catalogId} AND current_version = #{item.currentVersion})"
         + "</foreach>"

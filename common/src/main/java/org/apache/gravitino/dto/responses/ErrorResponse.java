@@ -30,6 +30,7 @@ import lombok.Getter;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.RESTException;
+import org.apache.gravitino.exceptions.ServiceUnavailableException;
 
 /** Represents an error response. */
 @Getter
@@ -157,6 +158,31 @@ public class ErrorResponse extends BaseResponse {
     return new ErrorResponse(
         ErrorConstants.CONNECTION_FAILED_CODE,
         ConnectionFailedException.class.getSimpleName(),
+        message,
+        getStackTrace(throwable));
+  }
+
+  /**
+   * Create a new service unavailable error instance of {@link ErrorResponse}.
+   *
+   * @param message The message of the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse serviceUnavailable(String message) {
+    return serviceUnavailable(message, null);
+  }
+
+  /**
+   * Create a new service unavailable error instance of {@link ErrorResponse}.
+   *
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse serviceUnavailable(String message, Throwable throwable) {
+    return new ErrorResponse(
+        ErrorConstants.SERVICE_UNAVAILABLE_CODE,
+        ServiceUnavailableException.class.getSimpleName(),
         message,
         getStackTrace(throwable));
   }

@@ -40,10 +40,9 @@ public class TrinoIcebergRESTAuthorizationIT extends TrinoIcebergRESTAuthorizati
 
   private static final String ROLE = "trino_role";
 
-  // Substring of the message Gravitino's IRC authorization filter returns in the Iceberg REST 403
-  // response (see BaseMetadataAuthorizationMethodInterceptor). Trino surfaces it verbatim for write
-  // operations (e.g. CREATE TABLE).
-  private static final String NOT_AUTHORIZED_MESSAGE = "is not authorized to perform operation";
+  // Trino preserves the Iceberg REST exception type for denied write operations (e.g. CREATE
+  // TABLE). Match the Forbidden marker independently of each authorization handler's message.
+  private static final String NOT_AUTHORIZED_MESSAGE = "Forbidden:";
 
   // On the read path Trino masks the REST 403 body and only reports that it could not load the
   // table/view, so a denied SELECT shows up as this instead of the message above.

@@ -27,6 +27,8 @@ import org.apache.gravitino.rel.SQLRepresentation;
 /**
  * A DTO mirroring {@link org.apache.gravitino.rel.Representation}. Representation DTOs are
  * serialized with a {@code type} discriminator so Jackson can deserialize into the correct subtype.
+ *
+ * <p>Request validation must call {@link #validate()} to reject missing or invalid types.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonTypeInfo(

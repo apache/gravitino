@@ -18,44 +18,126 @@
  */
 package org.apache.gravitino.policy;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 
-/**
- * Placeholder built-in policy content for Iceberg manifest rewrite.
- *
- * <p>Configurable thresholds will be added when the rewrite-manifests policy lands; this class
- * registers the built-in type for TMS task mapping.
- */
-public class IcebergRewriteManifestsContent implements PolicyContent {
+/** Typed thresholds and target options for Iceberg manifest rewriting. */
+public class IcebergRewriteManifestsContent extends AbstractExecutablePolicyContent {
   /** Property key for strategy type. */
   public static final String STRATEGY_TYPE_KEY = "strategy.type";
   /** Property key for the job template. */
   public static final String JOB_TEMPLATE_NAME_KEY = "job.template-name";
   /** Rule key for the trigger expression. */
   public static final String TRIGGER_EXPR_KEY = "trigger-expr";
-  /** Rule key for the score expression. */
-  public static final String SCORE_EXPR_KEY = "score-expr";
-  /** Strategy type for manifest rewrite. */
+  /** Strategy type for manifest rewriting. */
   public static final String STRATEGY_TYPE_VALUE = "iceberg-rewrite-manifests";
-  /** Built-in job template name for rewrite manifests. */
+  /** Built-in rewrite job template. */
   public static final String JOB_TEMPLATE_NAME_VALUE = "builtin-iceberg-rewrite-manifests";
+  /**
+   * Rule key for the inclusive manifest-count trigger. Aligns with Iceberg's {@code
+   * commit.manifest.min-count-to-merge} default.
+   */
+  public static final String MANIFEST_COUNT_THRESHOLD = "manifest_count_threshold";
+  /** Default inclusive manifest-count trigger ({@code commit.manifest.min-count-to-merge}). */
+  public static final long DEFAULT_MANIFEST_COUNT_THRESHOLD = 100L;
+  /** S0 metric: total manifest count (TMS / in-job gate). */
+  public static final String MANIFEST_NUMBER_METRIC = "custom-manifest-number";
+  /** S0 metric: average manifest size in bytes (collected for observability). */
+  public static final String AVG_MANIFEST_SIZE_METRIC = "custom-avg-manifest-size";
+  /** S1 metric: manifests rewritten by the procedure. */
+  public static final String REWRITTEN_MANIFEST_NUMBER_METRIC = "custom-rewritten-manifest-number";
+  /**
+   * Observability field: Iceberg partition-spec id used for before/after metrics. Omitted when the
+   * resolved spec is unpartitioned.
+   */
+  public static final String MANIFEST_SPEC_ID_METRIC = "custom-manifest-spec-id";
+  /**
+   * Observability field: human-readable partition-spec summary for the resolved id. Omitted when
+   * the resolved spec is unpartitioned.
+   */
+  public static final String MANIFEST_PARTITION_SPEC_METRIC = "custom-manifest-partition-spec";
+  /** Rule key for the requested partition spec ID; omission selects Iceberg's current default. */
+  public static final String SPEC_ID = "spec_id";
+  /** Rule key for caching option, or null for the Iceberg default. */
+  public static final String USE_CACHING = "use_caching";
 
-  private static final Set<MetadataObject.Type> SUPPORTED_OBJECT_TYPES =
-      ImmutableSet.of(
-          MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA, MetadataObject.Type.TABLE);
+  /**
+   * Default in-job / enqueue trigger: manifest count at or above Iceberg's {@code
+   * commit.manifest.min-count-to-merge} default.
+   */
+  private static final String TRIGGER_EXPR =
+      MANIFEST_NUMBER_METRIC + " >= " + MANIFEST_COUNT_THRESHOLD;
 
-  /** Default constructor for Jackson deserialization only. */
-  public IcebergRewriteManifestsContent() {}
+  private final Long manifestCountThreshold;
+  private final Integer specId;
+  private final Boolean useCaching;
+
+  /** Creates default thresholds targeting Iceberg's current default partition spec. */
+  public IcebergRewriteManifestsContent() {
+    this(null, null, null, PolicyExecutionSpec.empty());
+  }
+
+  IcebergRewriteManifestsContent(
+      @Nullable Long manifestCountThreshold,
+      @Nullable Integer specId,
+      @Nullable Boolean useCaching) {
+    this(manifestCountThreshold, specId, useCaching, PolicyExecutionSpec.empty());
+  }
+
+  IcebergRewriteManifestsContent(
+      @Nullable Long manifestCountThreshold,
+      @Nullable Integer specId,
+      @Nullable Boolean useCaching,
+      @Nullable PolicyExecutionSpec executionSpec) {
+    super(executionSpec);
+    this.manifestCountThreshold =
+        manifestCountThreshold == null ? DEFAULT_MANIFEST_COUNT_THRESHOLD : manifestCountThreshold;
+    this.specId = specId;
+    this.useCaching = useCaching;
+  }
+
+  /**
+   * Returns the inclusive manifest-count trigger threshold.
+   *
+   * @return inclusive manifest-count threshold
+   */
+  public Long manifestCountThreshold() {
+    return manifestCountThreshold;
+  }
+
+  /**
+   * Returns the requested partition spec ID. When absent, the recommender resolves Iceberg's
+   * current default from table metadata and retains it through job submission.
+   *
+   * @return requested partition spec ID, or null to use Iceberg's current default
+   */
+  @Nullable
+  public Integer specId() {
+    return specId;
+  }
+
+  /**
+   * Returns the caching option, or null for the Iceberg default.
+   *
+   * @return caching option, or null for the Iceberg default
+   */
+  @Nullable
+  public Boolean useCaching() {
+    return useCaching;
+  }
 
   @Override
   public Set<MetadataObject.Type> supportedObjectTypes() {
-    return SUPPORTED_OBJECT_TYPES;
+    return ImmutableSet.of(
+        MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA, MetadataObject.Type.TABLE);
   }
 
   @Override
@@ -67,24 +149,53 @@ public class IcebergRewriteManifestsContent implements PolicyContent {
   @Override
   public Map<String, Object> rules() {
     Map<String, Object> rules = new LinkedHashMap<>();
-    // Placeholders must not auto-trigger until real thresholds land in a follow-up.
-    rules.put(TRIGGER_EXPR_KEY, "false");
-    rules.put(SCORE_EXPR_KEY, "1");
+    rules.put(MANIFEST_COUNT_THRESHOLD, manifestCountThreshold);
+    rules.put(TRIGGER_EXPR_KEY, TRIGGER_EXPR);
+    if (specId != null) {
+      rules.put(SPEC_ID, specId);
+    }
+    if (useCaching != null) {
+      rules.put(USE_CACHING, useCaching);
+    }
     return Collections.unmodifiableMap(rules);
   }
 
   @Override
+  public void validate() {
+    super.validate();
+    Preconditions.checkArgument(manifestCountThreshold > 0, "manifest_count_threshold must be > 0");
+    Preconditions.checkArgument(specId == null || specId >= 0, "spec_id must be >= 0");
+  }
+
+  @Override
   public boolean equals(Object other) {
-    return other instanceof IcebergRewriteManifestsContent;
+    if (!(other instanceof IcebergRewriteManifestsContent)) {
+      return false;
+    }
+    IcebergRewriteManifestsContent that = (IcebergRewriteManifestsContent) other;
+    return executionFieldsEqual(that)
+        && Objects.equals(manifestCountThreshold, that.manifestCountThreshold)
+        && Objects.equals(specId, that.specId)
+        && Objects.equals(useCaching, that.useCaching);
   }
 
   @Override
   public int hashCode() {
-    return IcebergRewriteManifestsContent.class.hashCode();
+    return Objects.hash(executionFieldsHashCode(), manifestCountThreshold, specId, useCaching);
   }
 
   @Override
   public String toString() {
-    return "IcebergRewriteManifestsContent{}";
+    StringBuilder sb = new StringBuilder("IcebergRewriteManifestsContent{");
+    sb.append("manifestCountThreshold=")
+        .append(manifestCountThreshold)
+        .append(", specId=")
+        .append(specId)
+        .append(", useCaching=")
+        .append(useCaching)
+        .append(", ");
+    appendExecutionFields(sb);
+    sb.append('}');
+    return sb.toString();
   }
 }

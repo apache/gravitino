@@ -130,6 +130,20 @@ public class Utils {
         .build();
   }
 
+  public static Response serviceUnavailable(String message) {
+    return Response.status(Response.Status.SERVICE_UNAVAILABLE)
+        .entity(ErrorResponse.serviceUnavailable(message))
+        .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
+
+  public static Response serviceUnavailable(String message, Throwable throwable) {
+    return Response.status(Response.Status.SERVICE_UNAVAILABLE)
+        .entity(ErrorResponse.serviceUnavailable(message, throwable))
+        .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
+
   public static Response internalError(String message) {
     return internalError(message, null);
   }
