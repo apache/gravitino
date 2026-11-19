@@ -148,15 +148,23 @@ build_args="${build_args} --build-arg IMAGE_NAME=${image_name} --build-arg TAG_N
 # from. Callers may set OCI_IMAGE_VERSION, OCI_IMAGE_REVISION, and
 # OCI_IMAGE_SOURCE. When unset, version is the image tag, revision is this
 # checkout, and source is apache/gravitino.
+#
+# Keep these as a Bash array and expand with "${oci_labels[@]}" so values that
+# contain whitespace (for example OCI_IMAGE_VERSION='2.0 custom') stay one
+# --label argument instead of splitting into extra buildx positionals.
 oci_version="${OCI_IMAGE_VERSION:-${tag_name:-}}"
 oci_revision="${OCI_IMAGE_REVISION:-}"
 if [ -z "${oci_revision}" ]; then
   oci_revision="$(git -C "${script_dir}" rev-parse HEAD 2>/dev/null || true)"
 fi
 oci_source="${OCI_IMAGE_SOURCE:-https://github.com/apache/gravitino}"
-oci_labels=""
+oci_labels=()
 if [ -n "${oci_version}" ] && [ -n "${oci_revision}" ]; then
-  oci_labels="--label org.opencontainers.image.version=${oci_version} --label org.opencontainers.image.revision=${oci_revision} --label org.opencontainers.image.source=${oci_source}"
+  oci_labels=(
+    --label "org.opencontainers.image.version=${oci_version}"
+    --label "org.opencontainers.image.revision=${oci_revision}"
+    --label "org.opencontainers.image.source=${oci_source}"
+  )
   echo "INFO : OCI labels version=${oci_version} revision=${oci_revision} source=${oci_source}"
 fi
 
@@ -173,14 +181,14 @@ fi
 cd ${script_dir}/${component_type}
 if [[ "${platform_type}" == "all" ]]; then
   if [ ${build_latest} -eq 1 ]; then
-    docker buildx build --builder ${BUILDER_NAME} --no-cache --pull --platform=linux/amd64,linux/arm64 ${build_args} ${oci_labels} --push --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
+    docker buildx build --builder ${BUILDER_NAME} --no-cache --pull --platform=linux/amd64,linux/arm64 ${build_args} "${oci_labels[@]}" --push --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
   else
-    docker buildx build --builder ${BUILDER_NAME} --no-cache --pull --platform=linux/amd64,linux/arm64 ${build_args} ${oci_labels} --push --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
+    docker buildx build --builder ${BUILDER_NAME} --no-cache --pull --platform=linux/amd64,linux/arm64 ${build_args} "${oci_labels[@]}" --push --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
   fi
 else
   if [ ${build_latest} -eq 1 ]; then
-    docker buildx build --builder ${BUILDER_NAME} --no-cache --pull --platform=${platform_type} ${build_args} ${oci_labels} --output type=docker --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
+    docker buildx build --builder ${BUILDER_NAME} --no-cache --pull --platform=${platform_type} ${build_args} "${oci_labels[@]}" --output type=docker --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
   else
-    docker buildx build --builder ${BUILDER_NAME} --no-cache --pull --platform=${platform_type} ${build_args} ${oci_labels} --output type=docker --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
+    docker buildx build --builder ${BUILDER_NAME} --no-cache --pull --platform=${platform_type} ${build_args} "${oci_labels[@]}" --output type=docker --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
   fi
 fi
