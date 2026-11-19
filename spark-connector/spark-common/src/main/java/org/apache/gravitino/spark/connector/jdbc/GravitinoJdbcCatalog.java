@@ -138,6 +138,12 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
   }
 
   @Override
+  protected Catalog initialGravitinoCatalog(String name) {
+    // A new session must not inherit the previous session's cached connection settings.
+    return refreshGravitinoCatalog();
+  }
+
+  @Override
   protected Map<String, String> initializationProperties(Catalog catalog) {
     // Bind the creation time to the same metadata snapshot that supplied the JDBC URL.
     catalogCreateTime = catalogCreateTime(catalog);

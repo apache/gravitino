@@ -163,6 +163,33 @@ class TestJdbcCatalogRefresh {
   }
 
   @Test
+  void newSessionUsesCurrentSettingsEvenWhenTheManagerHasAnOlderCatalog() throws Exception {
+    Catalog previous = source(mock(TableCatalog.class));
+    when(previous.properties()).thenReturn(properties("jdbc:h2:mem:previous"));
+    Catalog current = source(mock(TableCatalog.class));
+    GravitinoClient client = mock(GravitinoClient.class);
+    when(client.loadCatalog("jdbc_refresh")).thenReturn(previous, current);
+    GravitinoCatalogManager manager =
+        GravitinoCatalogManager.create(new SparkConf(false), "user", identity -> client);
+    try (Connection connection = DriverManager.getConnection(URL, "SA", "");
+        Statement statement = connection.createStatement()) {
+      statement.execute("CREATE TABLE IF NOT EXISTS PUBLIC.FRESH (ID INT)");
+      manager.getGravitinoCatalogInfo("jdbc_refresh");
+      GravitinoJdbcCatalog catalog = new GravitinoJdbcCatalog();
+      catalog.initialize("jdbc_refresh", new CaseInsensitiveStringMap(Collections.emptyMap()));
+      assertEquals(
+          "ID",
+          catalog
+              .loadSparkTable(Identifier.of(new String[] {"PUBLIC"}, "FRESH"))
+              .schema()
+              .fields()[0]
+              .name());
+    } finally {
+      manager.close();
+    }
+  }
+
+  @Test
   void rejectsRotationOfMixedCaseBypassPassword() {
     Catalog source = source(mock(TableCatalog.class));
     Map<String, String> properties = new HashMap<>(properties(URL));

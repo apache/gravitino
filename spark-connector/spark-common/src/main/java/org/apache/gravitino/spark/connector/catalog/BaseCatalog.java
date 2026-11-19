@@ -200,7 +200,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   public void initialize(String name, CaseInsensitiveStringMap options) {
     this.catalogName = name;
     this.identity = gravitinoCatalogManager.currentIdentity();
-    Catalog gravitinoCatalog = gravitinoCatalogManager.getGravitinoCatalogInfo(name);
+    Catalog gravitinoCatalog = initialGravitinoCatalog(name);
     String provider = gravitinoCatalog.provider();
     Preconditions.checkArgument(
         StringUtils.isNotBlank(provider), name + " catalog provider is empty");
@@ -210,6 +210,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     this.sparkTransformConverter = getSparkTransformConverter();
     this.sparkTypeConverter = getSparkTypeConverter();
     this.sparkTableChangeConverter = getSparkTableChangeConverter(sparkTypeConverter);
+  }
+
+  /** Returns the catalog metadata used to initialize this Spark session's catalog. */
+  protected Catalog initialGravitinoCatalog(String name) {
+    return gravitinoCatalogManager.getGravitinoCatalogInfo(name);
   }
 
   @Override
