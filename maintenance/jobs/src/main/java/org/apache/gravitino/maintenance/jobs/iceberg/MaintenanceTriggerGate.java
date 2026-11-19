@@ -29,8 +29,8 @@ import java.util.Map.Entry;
 import javax.annotation.Nullable;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergMaintenanceJob.MaintenanceType;
-import org.apache.gravitino.maintenance.optimizer.recommender.util.ExpressionEvaluator;
-import org.apache.gravitino.maintenance.optimizer.recommender.util.QLExpressionEvaluator;
+import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionTriggerEvaluator;
+import org.apache.gravitino.maintenance.optimizer.recommender.handler.manifest.ManifestRewriteTriggerEvaluator;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
@@ -43,12 +43,12 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Evaluates enqueue-time policy rules locally with the same QL stack as the optimizer. Does not
  * call Gravitino. Snapshot expiry always maintains (optimizer-only scheduling for that type).
- * Compaction and manifest rewrite evaluate {@code trigger-expr} against S0 metrics.
+ * Compaction uses {@code CompactionTriggerEvaluator}; manifest rewrite uses {@code
+ * ManifestRewriteTriggerEvaluator}.
  */
 final class MaintenanceTriggerGate {
 
   private static final Logger LOG = LoggerFactory.getLogger(MaintenanceTriggerGate.class);
-  private static final ExpressionEvaluator EVALUATOR = new QLExpressionEvaluator();
 
   /** Spark job argument key: JSON map of wire maintenance type → policy {@code rules()} object. */
   static final String RULES_ARG = "rules";
@@ -78,47 +78,25 @@ final class MaintenanceTriggerGate {
     }
     if (type == MaintenanceType.REWRITE_MANIFESTS
         && (metrics.isEmpty()
-            || !metrics.containsKey(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC)
-            || !metrics.containsKey(IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC))) {
+            || !metrics.containsKey(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC))) {
       LOG.warn("Manifest rewrite recommend skip: metrics JSON missing manifest fields");
       return false;
     }
 
-    boolean maintain = evaluateTrigger(rules, metrics);
+    boolean maintain =
+        type == MaintenanceType.REWRITE_MANIFESTS
+            ? ManifestRewriteTriggerEvaluator.shouldMaintain(rules, metrics)
+            : CompactionTriggerEvaluator.shouldMaintain(rules, metrics);
+    String triggerExprKey =
+        type == MaintenanceType.REWRITE_MANIFESTS
+            ? IcebergRewriteManifestsContent.TRIGGER_EXPR_KEY
+            : IcebergDataCompactionContent.TRIGGER_EXPR_KEY;
     LOG.info(
         "In-Spark recommend type={} expr={} -> {}",
         type.wireName(),
-        rules.get(IcebergDataCompactionContent.TRIGGER_EXPR_KEY),
+        rules.get(triggerExprKey),
         maintain ? "MAINTAIN" : "SKIP");
     return maintain;
-  }
-
-  /**
-   * Same binding rules as {@code CompactionTriggerEvaluator}: numeric policy rules become QL
-   * bindings, then metric values overlay them, then {@code trigger-expr} is evaluated.
-   */
-  private static boolean evaluateTrigger(
-      Map<String, Object> rules, Map<String, Object> metricValues) {
-    Map<String, Object> context = new HashMap<>();
-    rules.forEach(
-        (key, value) -> {
-          if (value == null) {
-            return;
-          }
-          try {
-            context.put(key, Long.parseLong(value.toString()));
-          } catch (NumberFormatException ignored) {
-            // Non-numeric rule values (expressions, strings) are not QL bindings.
-          }
-        });
-    context.putAll(metricValues);
-
-    Object trigger = rules.get(IcebergDataCompactionContent.TRIGGER_EXPR_KEY);
-    String expression =
-        trigger == null || trigger.toString().trim().isEmpty()
-            ? "false"
-            : trigger.toString().trim();
-    return EVALUATOR.evaluateBool(expression, context);
   }
 
   private static Map<String, Object> rulesForType(

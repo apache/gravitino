@@ -725,9 +725,7 @@ public class DTOConverters {
     if (policyContent instanceof IcebergRewriteManifestsContent) {
       IcebergRewriteManifestsContent content = (IcebergRewriteManifestsContent) policyContent;
       return PolicyContentDTO.IcebergRewriteManifestsContentDTO.builder()
-          .withManifestCountCritical(content.manifestCountCritical())
-          .withManifestCountWarning(content.manifestCountWarning())
-          .withAvgManifestSizeThresholdBytes(content.avgManifestSizeThresholdBytes())
+          .withManifestCountThreshold(content.manifestCountThreshold())
           .withSpecId(content.specId())
           .withUseCaching(content.useCaching())
           .withExecutionSpec(executionSpec)

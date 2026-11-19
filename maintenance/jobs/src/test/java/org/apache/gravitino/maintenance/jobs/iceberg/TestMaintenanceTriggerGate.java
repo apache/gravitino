@@ -68,46 +68,23 @@ public class TestMaintenanceTriggerGate {
 
   @Test
   public void testManifestRewriteUsesDefaultThresholds() {
-    // Defaults: critical=500, warning=100, avg threshold=8MiB.
-    String belowWarning =
-        "{\""
-            + IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC
-            + "\":50,\""
-            + IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC
-            + "\":1000}";
+    // Default threshold=100 (Iceberg commit.manifest.min-count-to-merge).
+    String belowThreshold =
+        "{\"" + IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC + "\":99}";
     assertFalse(
         MaintenanceTriggerGate.shouldMaintain(
-            MaintenanceType.REWRITE_MANIFESTS, new HashMap<>(), belowWarning));
+            MaintenanceType.REWRITE_MANIFESTS, new HashMap<>(), belowThreshold));
 
-    String warningAndSmall =
-        "{\""
-            + IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC
-            + "\":120,\""
-            + IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC
-            + "\":1000}";
+    String atThreshold = "{\"" + IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC + "\":100}";
     assertTrue(
         MaintenanceTriggerGate.shouldMaintain(
-            MaintenanceType.REWRITE_MANIFESTS, new HashMap<>(), warningAndSmall));
+            MaintenanceType.REWRITE_MANIFESTS, new HashMap<>(), atThreshold));
 
-    String critical =
-        "{\""
-            + IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC
-            + "\":500,\""
-            + IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC
-            + "\":9000000}";
+    String aboveThreshold =
+        "{\"" + IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC + "\":500}";
     assertTrue(
         MaintenanceTriggerGate.shouldMaintain(
-            MaintenanceType.REWRITE_MANIFESTS, new HashMap<>(), critical));
-
-    String warningButLarge =
-        "{\""
-            + IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC
-            + "\":120,\""
-            + IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC
-            + "\":9000000}";
-    assertFalse(
-        MaintenanceTriggerGate.shouldMaintain(
-            MaintenanceType.REWRITE_MANIFESTS, new HashMap<>(), warningButLarge));
+            MaintenanceType.REWRITE_MANIFESTS, new HashMap<>(), aboveThreshold));
   }
 
   @Test
@@ -116,24 +93,14 @@ public class TestMaintenanceTriggerGate {
     args.put(
         MaintenanceTriggerGate.RULES_ARG,
         "{\"rewrite_manifests\":{"
-            + "\"trigger-expr\":\"custom-manifest-number >= manifest_count_critical\","
-            + "\"manifest_count_critical\":10}}");
+            + "\"trigger-expr\":\"custom-manifest-number >= manifest_count_threshold\","
+            + "\"manifest_count_threshold\":10}}");
 
-    String below =
-        "{\""
-            + IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC
-            + "\":5,\""
-            + IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC
-            + "\":1}";
+    String below = "{\"" + IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC + "\":5}";
     assertFalse(
         MaintenanceTriggerGate.shouldMaintain(MaintenanceType.REWRITE_MANIFESTS, args, below));
 
-    String above =
-        "{\""
-            + IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC
-            + "\":10,\""
-            + IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC
-            + "\":1}";
+    String above = "{\"" + IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC + "\":10}";
     assertTrue(
         MaintenanceTriggerGate.shouldMaintain(MaintenanceType.REWRITE_MANIFESTS, args, above));
   }

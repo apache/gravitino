@@ -244,7 +244,10 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
 
   @Override
   public TableSnapshotMetrics collectBeforeMetrics(
-      SparkSession spark, String catalogName, String tableIdentifier) {
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      Map<String, String> argsByName) {
     throw new IllegalStateException("Orphan cleanup must not sample before-metrics");
   }
 
