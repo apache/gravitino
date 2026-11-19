@@ -204,7 +204,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     String provider = gravitinoCatalog.provider();
     Preconditions.checkArgument(
         StringUtils.isNotBlank(provider), name + " catalog provider is empty");
-    Map<String, String> catalogProperties = propsWithSecrets(gravitinoCatalog);
+    Map<String, String> catalogProperties = initializationProperties(gravitinoCatalog);
     this.sparkCatalog = createAndInitSparkCatalog(name, options, catalogProperties);
     this.propertiesConverter = getPropertiesConverter();
     this.sparkTransformConverter = getSparkTransformConverter();
@@ -270,6 +270,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       Identifier ident, StructType schema, Transform[] transforms, Map<String, String> properties)
       throws TableAlreadyExistsException, NoSuchNamespaceException {
     try {
+      validateBeforeTableMutation();
       org.apache.gravitino.rel.Table gravitinoTable =
           createGravitinoTable(ident, schema, transforms, properties);
       org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
@@ -371,6 +372,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       return loadTable(ident);
     }
     try {
+      validateBeforeTableMutation();
       Supplier<Column[]> columns =
           Suppliers.memoize(
                   () -> {
@@ -821,24 +823,9 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     }
   }
 
-  /**
-   * Returns catalog properties enriched with secrets and non-expiring credential information.
-   *
-   * @param catalog the Gravitino catalog to resolve properties for
-   * @return catalog properties enriched with available secrets and credentials
-   */
-  protected static Map<String, String> propsWithSecrets(Catalog catalog) {
-    Map<String, String> props =
-        new HashMap<>(catalog.properties() == null ? Collections.emptyMap() : catalog.properties());
-    try {
-      Map<String, String> secrets = catalog.supportsSecrets().getSecrets();
-      if (secrets != null) {
-        props.putAll(secrets);
-      }
-    } catch (UnsupportedOperationException | NotFoundException e) {
-      // Stubs may not implement SupportsSecrets; older servers lack /secrets.
-      LOG.debug("Skipping getSecrets while resolving Spark catalog properties: {}", e.toString());
-    }
+  /** Returns the properties used to initialize the underlying Spark catalog. */
+  protected Map<String, String> initializationProperties(Catalog catalog) {
+    Map<String, String> props = propertiesWithSecrets(catalog);
     try {
       Credential[] credentials = catalog.supportsCredentials().getCredentials();
       props.putAll(CredentialInfos.nonExpiringCredentialInfo(credentials));
@@ -854,6 +841,25 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     }
     return props;
   }
+
+  /** Returns a mutable copy of the catalog properties with available secrets resolved. */
+  protected static Map<String, String> propertiesWithSecrets(Catalog catalog) {
+    Map<String, String> props =
+        new HashMap<>(catalog.properties() == null ? Collections.emptyMap() : catalog.properties());
+    try {
+      Map<String, String> secrets = catalog.supportsSecrets().getSecrets();
+      if (secrets != null) {
+        props.putAll(secrets);
+      }
+    } catch (UnsupportedOperationException | NotFoundException e) {
+      // Stubs may not implement SupportsSecrets; older servers lack /secrets.
+      LOG.debug("Skipping getSecrets while resolving Spark catalog properties: {}", e.toString());
+    }
+    return props;
+  }
+
+  /** Checks whether the initialized Spark catalog can return the result of a table mutation. */
+  protected void validateBeforeTableMutation() {}
 
   @Override
   public void invalidateTable(Identifier ident) {

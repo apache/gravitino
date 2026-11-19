@@ -63,6 +63,18 @@ SELECT * FROM employee WHERE date(hire_date) = '2021-01-01';
 
 ```
 
+## Changes during a Spark session
+
+Spark keeps a JDBC catalog's connection settings for the lifetime of the session. The connector
+checks the effective URL, user, password, and catalog creation time when resolving a JDBC table,
+before creating or altering a table, and when building a scan or write or accessing table indexes.
+If the settings change or the catalog is recreated, restart the Spark session before retrying.
+
+A DataFrame resolved before the change is checked when Spark builds its scan. A physical plan or
+writer already built can continue using the original connection. Finish in-flight jobs before
+rotating credentials or switching databases. The metadata check and the JDBC operation are separate
+requests, so a concurrent catalog change can also occur between them.
+
 ## Catalog Properties
 
 Gravitino spark connector will transform below property names which are defined in catalog properties to Spark JDBC connector configuration.

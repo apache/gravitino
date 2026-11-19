@@ -56,63 +56,6 @@ import org.mockito.MockedStatic;
 /** Unit tests for JDBC catalog credentials and timestamp option handling. */
 public class TestGravitinoJdbcCatalog {
 
-  /**
-   * Minimal Catalog stub — returns nothing, used to verify the instanceof check for
-   * SupportsCredentials.
-   */
-  private static class PlainCatalogStub implements Catalog {
-    @Override
-    public String name() {
-      return "stub";
-    }
-
-    @Override
-    public Type type() {
-      return Type.RELATIONAL;
-    }
-
-    @Override
-    public String provider() {
-      return "jdbc-mysql";
-    }
-
-    @Override
-    public String comment() {
-      return null;
-    }
-
-    @Override
-    public Map<String, String> properties() {
-      return Collections.emptyMap();
-    }
-
-    @Override
-    public Audit auditInfo() {
-      return null;
-    }
-  }
-
-  /** Catalog that also implements SupportsCredentials — simulates the upgraded server. */
-  private static class CredentialCatalogStub extends PlainCatalogStub
-      implements SupportsCredentials {
-
-    private final Credential[] credentials;
-
-    CredentialCatalogStub(Credential... credentials) {
-      this.credentials = credentials;
-    }
-
-    @Override
-    public Credential[] getCredentials() {
-      return credentials;
-    }
-
-    @Override
-    public SupportsCredentials supportsCredentials() {
-      return this;
-    }
-  }
-
   @ParameterizedTest
   @ValueSource(
       strings = {
@@ -396,9 +339,8 @@ public class TestGravitinoJdbcCatalog {
     props.put(JdbcPropertiesConstants.SPARK_JDBC_USER, "prop-user");
     props.put(JdbcPropertiesConstants.SPARK_JDBC_PASSWORD, "prop-password");
 
-    Catalog catalog =
-        new CredentialCatalogStub(new JdbcCredential("vended-user", "vended-password"));
-    GravitinoJdbcCatalog.applyJdbcCredential(catalog, props);
+    GravitinoJdbcCatalog.applyJdbcCredential(
+        new Credential[] {new JdbcCredential("vended-user", "vended-password")}, props);
 
     Assertions.assertEquals("vended-user", props.get(JdbcPropertiesConstants.SPARK_JDBC_USER));
     Assertions.assertEquals(
@@ -411,20 +353,7 @@ public class TestGravitinoJdbcCatalog {
     props.put(JdbcPropertiesConstants.SPARK_JDBC_USER, "prop-user");
     props.put(JdbcPropertiesConstants.SPARK_JDBC_PASSWORD, "prop-password");
 
-    GravitinoJdbcCatalog.applyJdbcCredential(new CredentialCatalogStub(), props);
-
-    Assertions.assertEquals("prop-user", props.get(JdbcPropertiesConstants.SPARK_JDBC_USER));
-    Assertions.assertEquals(
-        "prop-password", props.get(JdbcPropertiesConstants.SPARK_JDBC_PASSWORD));
-  }
-
-  @Test
-  void testFallsBackToPropertiesWhenCatalogDoesNotSupportCredentials() {
-    Map<String, String> props = new HashMap<>();
-    props.put(JdbcPropertiesConstants.SPARK_JDBC_USER, "prop-user");
-    props.put(JdbcPropertiesConstants.SPARK_JDBC_PASSWORD, "prop-password");
-
-    GravitinoJdbcCatalog.applyJdbcCredential(new PlainCatalogStub(), props);
+    GravitinoJdbcCatalog.applyJdbcCredential(new Credential[0], props);
 
     Assertions.assertEquals("prop-user", props.get(JdbcPropertiesConstants.SPARK_JDBC_USER));
     Assertions.assertEquals(

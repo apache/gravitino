@@ -36,6 +36,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialInfos;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
@@ -85,9 +86,8 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
     JDBCTableCatalog jdbcTableCatalog = new JDBCTableCatalog();
     sparkCatalogOptions = new HashMap<>(options.asCaseSensitiveMap());
-    Map<String, String> all =
-        getPropertiesConverter().toSparkCatalogProperties(options, properties);
-    applyJdbcCredential(gravitinoCatalog(), all);
+    Catalog initialCatalog = gravitinoCatalog();
+    Map<String, String> all = jdbcOptions(initialCatalog, options, properties);
     useTimestampNtz = false;
     if (supportsPreferTimestampNtz()) {
       String value = preferTimestampNtz(options, properties);
@@ -108,7 +108,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
     jdbcTableCatalog.initialize(name, new CaseInsensitiveStringMap(all));
     jdbcOptions = new HashMap<>(all);
     jdbcConnectionOptions = jdbcConnectionOptions(all);
-    catalogCreateTime = catalogCreateTime(gravitinoCatalog());
+    catalogCreateTime = catalogCreateTime(initialCatalog);
     return jdbcTableCatalog;
   }
 
@@ -139,20 +139,30 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
     }
   }
 
+  @Override
+  protected Map<String, String> initializationProperties(Catalog catalog) {
+    return propertiesWithSecrets(catalog);
+  }
+
+  @Override
+  protected void validateBeforeTableMutation() {
+    verifyJdbcConnectionUnchanged();
+  }
+
   private void verifyJdbcConnectionUnchanged() {
     Catalog currentCatalog = refreshGravitinoCatalog();
     Map<String, String> currentOptions =
-        getPropertiesConverter()
-            .toSparkCatalogProperties(
-                new CaseInsensitiveStringMap(sparkCatalogOptions),
-                propsWithSecrets(currentCatalog));
-    applyJdbcCredential(currentCatalog, currentOptions);
+        jdbcOptions(
+            currentCatalog,
+            new CaseInsensitiveStringMap(sparkCatalogOptions),
+            propertiesWithSecrets(currentCatalog));
     boolean connectionChanged =
         !jdbcConnectionOptions.equals(jdbcConnectionOptions(currentOptions));
+    Instant currentCreateTime = catalogCreateTime(currentCatalog);
     boolean catalogRecreated =
         catalogCreateTime != null
-            && catalogCreateTime(currentCatalog) != null
-            && !catalogCreateTime.equals(catalogCreateTime(currentCatalog));
+            && currentCreateTime != null
+            && !catalogCreateTime.equals(currentCreateTime);
     if (connectionChanged || catalogRecreated) {
       throw new IllegalStateException(
           String.format(
@@ -235,22 +245,25 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
     return result;
   }
 
-  /**
-   * Overwrites the Spark JDBC user and password in {@code sparkProperties} with credentials
-   * obtained from the server via credential vending, if available.
-   *
-   * @param catalog the Gravitino catalog client
-   * @param sparkProperties the mutable Spark properties map to update
-   */
-  @VisibleForTesting
-  static void applyJdbcCredential(Catalog catalog, Map<String, String> sparkProperties) {
+  private Map<String, String> jdbcOptions(
+      Catalog catalog, CaseInsensitiveStringMap options, Map<String, String> properties) {
     Credential[] credentials;
     try {
       credentials = catalog.supportsCredentials().getCredentials();
     } catch (UnsupportedOperationException e) {
-      LOG.debug("Catalog {} does not support credential vending, skipping.", catalog.name(), e);
-      return;
+      LOG.debug("Catalog {} does not support credential vending", catalog.name(), e);
+      credentials = new Credential[0];
     }
+    Map<String, String> enriched = new HashMap<>(properties);
+    enriched.putAll(CredentialInfos.nonExpiringCredentialInfo(credentials));
+    Map<String, String> result =
+        getPropertiesConverter().toSparkCatalogProperties(options, enriched);
+    applyJdbcCredential(credentials, result);
+    return result;
+  }
+
+  @VisibleForTesting
+  static void applyJdbcCredential(Credential[] credentials, Map<String, String> sparkProperties) {
     for (Credential credential : credentials) {
       if (credential instanceof JdbcCredential) {
         JdbcCredential jdbcCredential = (JdbcCredential) credential;
@@ -275,10 +288,10 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
         identifier,
         gravitinoTable,
         (JDBCTable) sparkTable,
-        (JDBCTableCatalog) sparkCatalog,
         propertiesConverter,
         sparkTransformConverter,
-        sparkTypeConverter);
+        sparkTypeConverter,
+        this::verifyJdbcConnectionUnchanged);
   }
 
   @Override

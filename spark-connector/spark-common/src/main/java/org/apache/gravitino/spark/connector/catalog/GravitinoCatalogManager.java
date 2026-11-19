@@ -346,7 +346,7 @@ public class GravitinoCatalogManager {
     Catalog catalog = client.loadCatalog(catalogName);
     Preconditions.checkArgument(
         Catalog.Type.RELATIONAL.equals(catalog.type()), "Only support relational catalog");
-    LOG.info("Load catalog {} from Gravitino successfully for {}.", catalogName, identity);
+    LOG.debug("Load catalog {} from Gravitino successfully for {}.", catalogName, identity);
     return catalog;
   }
 
