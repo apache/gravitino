@@ -16,11 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.optimizer.recommender.util;
+package org.apache.gravitino.maintenance.optimizer.recommender.handler;
 
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.gravitino.maintenance.optimizer.recommender.util.ExpressionEvaluator;
+import org.apache.gravitino.maintenance.optimizer.recommender.util.QLExpressionEvaluator;
 
 /**
  * Shared QL evaluation of policy {@code trigger-expr} against sampled metrics.

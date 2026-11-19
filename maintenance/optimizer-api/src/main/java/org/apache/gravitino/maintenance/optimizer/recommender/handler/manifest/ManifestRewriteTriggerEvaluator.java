@@ -20,7 +20,7 @@ package org.apache.gravitino.maintenance.optimizer.recommender.handler.manifest;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
-import org.apache.gravitino.maintenance.optimizer.recommender.util.TriggerExprEvaluator;
+import org.apache.gravitino.maintenance.optimizer.recommender.handler.TriggerExprEvaluator;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 
 /**
