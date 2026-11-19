@@ -261,6 +261,11 @@ PostgreSQL search_path / currentSchema for init-postgresql (PGOPTIONS).
 
 Prefer postgresql.init.currentSchema; otherwise currentSchema from entity.jdbcUrl.
 Empty means libpq default (typically public).
+
+Only simple (unquoted-style) identifiers are accepted. Fold to lowercase so
+lookup (pg_namespace.nspname), CREATE SCHEMA, and PGOPTIONS search_path all use
+the same name — matching PostgreSQL unquoted-identifier / JDBC currentSchema
+folding (e.g. currentSchema=App → app).
 */}}
 {{- define "gravitino.postgresqlInitCurrentSchema" -}}
 {{- $schema := "" -}}
@@ -273,7 +278,7 @@ Empty means libpq default (typically public).
 {{- if not (regexMatch "^[A-Za-z_][A-Za-z0-9_]*$" $schema) -}}
 {{- fail (printf "postgresql.init.currentSchema / entity.jdbcUrl currentSchema %q must be a simple PostgreSQL identifier (letters, digits, underscore); set postgresql.init.currentSchema explicitly if needed" $schema) -}}
 {{- end -}}
-{{- $schema -}}
+{{- $schema | lower -}}
 {{- end -}}
 {{- end -}}
 

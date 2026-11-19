@@ -666,6 +666,69 @@ tests:
             value: "-c search_path=custom_schema"
           any: true
 
+  - it: folds mixed-case currentSchema to lowercase for lookup create and search_path
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: false
+        init:
+          enabled: true
+          existingSecret: gravitino-pg-secret
+          currentSchema: App
+      entity:
+        jdbcUrl: jdbc:postgresql://pg.example.ci.local:5432/gravitino_meta?currentSchema=OtherSchema
+        jdbcDriver: org.postgresql.Driver
+        jdbcUser: gravitino_app
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: PG_CURRENT_SCHEMA
+            value: app
+          any: true
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: PGOPTIONS
+            value: "-c search_path=app"
+          any: true
+      - matchRegex:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].command[2]
+          pattern: "pg_namespace WHERE nspname"
+      - matchRegex:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].command[2]
+          pattern: 'CREATE SCHEMA.*PG_CURRENT_SCHEMA'
+
+  - it: folds mixed-case currentSchema from entity.jdbcUrl to lowercase
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: false
+        init:
+          enabled: true
+          existingSecret: gravitino-pg-secret
+      entity:
+        jdbcUrl: jdbc:postgresql://pg.example.ci.local:5432/gravitino_meta?currentSchema=App&sslmode=require
+        jdbcDriver: org.postgresql.Driver
+        jdbcUser: gravitino_app
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: PG_CURRENT_SCHEMA
+            value: app
+          any: true
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: PGOPTIONS
+            value: "-c search_path=app"
+          any: true
+
   - it: fails when sslmode is verify-full without postgresql.init.ssl.existingSecret
     template: deployment.yaml
     release:
