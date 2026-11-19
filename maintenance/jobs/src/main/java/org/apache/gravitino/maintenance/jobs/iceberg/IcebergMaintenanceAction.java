@@ -46,10 +46,14 @@ public interface IcebergMaintenanceAction {
    * @param spark active Spark session
    * @param catalogName Iceberg catalog name
    * @param tableIdentifier fully qualified table name
+   * @param argsByName unresolved job arguments (placeholders already present as raw values)
    * @return before-metrics sample
    */
   TableSnapshotMetrics collectBeforeMetrics(
-      SparkSession spark, String catalogName, String tableIdentifier);
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      Map<String, String> argsByName);
 
   /**
    * Whether a changed HEAD snapshot after S0 should skip the procedure. Compaction and manifest

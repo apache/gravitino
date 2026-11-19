@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -29,7 +31,11 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Schema;
+import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.file.FilesetCatalog;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -117,5 +123,44 @@ public class TestFilesetMetadataCache {
     }
     // The failed load is not cached, so the second call loads the catalog again.
     verify(client, times(2)).loadCatalog("catalog");
+  }
+
+  @Test
+  public void testCacheReusesCatalogSchemaAndFileset() throws IOException {
+    GravitinoClient client = mock(GravitinoClient.class);
+    Catalog catalog = mock(Catalog.class);
+    FilesetCatalog filesetCatalog = mock(FilesetCatalog.class);
+    SupportsSchemas schemas = mock(SupportsSchemas.class);
+    Schema schema = mock(Schema.class);
+    Fileset fileset = mock(Fileset.class);
+
+    when(client.loadCatalog("catalog")).thenReturn(catalog);
+    when(catalog.asFilesetCatalog()).thenReturn(filesetCatalog);
+    when(catalog.asSchemas()).thenReturn(schemas);
+    when(schemas.loadSchema("schema")).thenReturn(schema);
+    when(filesetCatalog.loadFileset(NameIdentifier.of("schema", "fs"))).thenReturn(fileset);
+
+    NameIdentifier catalogIdent = NameIdentifier.of("ml", "catalog");
+    NameIdentifier schemaIdent = NameIdentifier.of("ml", "catalog", "schema");
+    NameIdentifier filesetIdent = NameIdentifier.of("ml", "catalog", "schema", "fs");
+
+    try (FilesetMetadataCache cache = new FilesetMetadataCache(client)) {
+      assertSame(catalog, cache.getCatalog(catalogIdent));
+      assertSame(filesetCatalog, cache.getFilesetCatalog(catalogIdent));
+      assertSame(schema, cache.getSchema(schemaIdent));
+      assertSame(fileset, cache.getFileset(filesetIdent));
+
+      // Second round should all hit caches.
+      assertSame(catalog, cache.getCatalog(catalogIdent));
+      assertSame(filesetCatalog, cache.getFilesetCatalog(catalogIdent));
+      assertSame(schema, cache.getSchema(schemaIdent));
+      clearInvocations(catalog);
+      assertSame(fileset, cache.getFileset(filesetIdent));
+      verify(catalog, never()).asFilesetCatalog();
+    }
+
+    verify(client, times(1)).loadCatalog("catalog");
+    verify(schemas, times(1)).loadSchema("schema");
+    verify(filesetCatalog, times(1)).loadFileset(NameIdentifier.of("schema", "fs"));
   }
 }

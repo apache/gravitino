@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.spark.connector.catalog;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.Sets;
@@ -200,16 +201,21 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   public void initialize(String name, CaseInsensitiveStringMap options) {
     this.catalogName = name;
     this.identity = gravitinoCatalogManager.currentIdentity();
-    Catalog gravitinoCatalog = gravitinoCatalogManager.getGravitinoCatalogInfo(name);
+    Catalog gravitinoCatalog = initialGravitinoCatalog(name);
     String provider = gravitinoCatalog.provider();
     Preconditions.checkArgument(
         StringUtils.isNotBlank(provider), name + " catalog provider is empty");
-    Map<String, String> catalogProperties = propsWithSecrets(gravitinoCatalog);
+    Map<String, String> catalogProperties = initializationProperties(gravitinoCatalog);
     this.sparkCatalog = createAndInitSparkCatalog(name, options, catalogProperties);
     this.propertiesConverter = getPropertiesConverter();
     this.sparkTransformConverter = getSparkTransformConverter();
     this.sparkTypeConverter = getSparkTypeConverter();
     this.sparkTableChangeConverter = getSparkTableChangeConverter(sparkTypeConverter);
+  }
+
+  /** Returns the catalog metadata used to initialize this Spark session's catalog. */
+  protected Catalog initialGravitinoCatalog(String name) {
+    return gravitinoCatalogManager.getGravitinoCatalogInfo(name);
   }
 
   @Override
@@ -231,6 +237,18 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
    */
   protected Catalog gravitinoCatalog() {
     return gravitinoCatalogManager.getGravitinoCatalogInfo(identity, catalogName);
+  }
+
+  /**
+   * Loads the current catalog metadata, bypassing the catalog metadata cache.
+   *
+   * <p>Source catalogs that retain connection settings after initialization use this before an IO
+   * operation to prevent an altered Gravitino catalog from silently accessing the old source.
+   *
+   * @return the current Gravitino catalog for this Spark catalog's name and identity
+   */
+  protected Catalog refreshGravitinoCatalog() {
+    return gravitinoCatalogManager.refreshGravitinoCatalogInfo(identity, catalogName);
   }
 
   @Override
@@ -258,6 +276,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       Identifier ident, StructType schema, Transform[] transforms, Map<String, String> properties)
       throws TableAlreadyExistsException, NoSuchNamespaceException {
     try {
+      validateBeforeTableMutation();
       org.apache.gravitino.rel.Table gravitinoTable =
           createGravitinoTable(ident, schema, transforms, properties);
       org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
@@ -322,6 +341,10 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     try {
       gravitinoTable = loadGravitinoTable(ident);
     } catch (NoSuchTableException e) {
+      if (looksLikeDataSourceReference(ident)) {
+        // Let Spark's analyzer resolve the path as a DataSource relation.
+        throw e;
+      }
       // Not a table in Gravitino; try as a view.
       return loadViewAsTable(ident);
     } catch (ForbiddenException e) {
@@ -351,6 +374,25 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     return loadTableForWriting(ident);
   }
 
+  /**
+   * Returns whether an identifier has DataSource path syntax that the Gravitino table API may
+   * reject. A real table lookup is always attempted first; this check is used only after that
+   * lookup fails, so a table named {@code db."a/b"} keeps precedence over file resolution.
+   *
+   * <p>Dots are included because relative filenames such as {@code data.parquet} have no path
+   * separator. The Gravitino server splits the full name on dots and rejects the resulting name;
+   * translating that failure to {@link NoSuchTableException} lets Spark's analyzer fall back to its
+   * SQL-on-file resolver.
+   */
+  @VisibleForTesting
+  static boolean looksLikeDataSourceReference(Identifier ident) {
+    if (ident.namespace().length != 1) {
+      return false;
+    }
+    String name = ident.name();
+    return name.indexOf('.') >= 0 || name.indexOf('/') >= 0 || name.indexOf('\\') >= 0;
+  }
+
   @Override
   public Table alterTable(Identifier ident, TableChange... changes) throws NoSuchTableException {
     if (changes == null || changes.length == 0) {
@@ -359,6 +401,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       return loadTable(ident);
     }
     try {
+      validateBeforeTableMutation();
       Supplier<Column[]> columns =
           Suppliers.memoize(
                   () -> {
@@ -431,6 +474,9 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       loadGravitinoTable(ident);
       return true;
     } catch (NoSuchTableException e) {
+      if (looksLikeDataSourceReference(ident)) {
+        return false;
+      }
       // fall through to view check
     } catch (ForbiddenException e) {
       // User lacks LOAD_TABLE privilege, return false to allow CREATE TABLE IF NOT EXISTS
@@ -608,6 +654,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
               Sets.newHashSet(Privilege.Name.SELECT_TABLE));
     } catch (org.apache.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
+    } catch (IllegalArgumentException e) {
+      if (looksLikeDataSourceReference(ident)) {
+        throw new NoSuchTableException(ident);
+      }
+      throw e;
     }
   }
 
@@ -622,6 +673,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
               Sets.newHashSet(Privilege.Name.MODIFY_TABLE));
     } catch (org.apache.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
+    } catch (IllegalArgumentException e) {
+      if (looksLikeDataSourceReference(ident)) {
+        throw new NoSuchTableException(ident);
+      }
+      throw e;
     }
   }
 
@@ -809,18 +865,9 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     }
   }
 
-  private static Map<String, String> propsWithSecrets(Catalog catalog) {
-    Map<String, String> props =
-        new HashMap<>(catalog.properties() == null ? Collections.emptyMap() : catalog.properties());
-    try {
-      Map<String, String> secrets = catalog.supportsSecrets().getSecrets();
-      if (secrets != null) {
-        props.putAll(secrets);
-      }
-    } catch (UnsupportedOperationException | NotFoundException e) {
-      // Stubs may not implement SupportsSecrets; older servers lack /secrets.
-      LOG.debug("Skipping getSecrets while resolving Spark catalog properties: {}", e.toString());
-    }
+  /** Returns the properties used to initialize the underlying Spark catalog. */
+  protected Map<String, String> initializationProperties(Catalog catalog) {
+    Map<String, String> props = propertiesWithSecrets(catalog);
     try {
       Credential[] credentials = catalog.supportsCredentials().getCredentials();
       props.putAll(CredentialInfos.nonExpiringCredentialInfo(credentials));
@@ -836,6 +883,25 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     }
     return props;
   }
+
+  /** Returns a mutable copy of the catalog properties with available secrets resolved. */
+  protected static Map<String, String> propertiesWithSecrets(Catalog catalog) {
+    Map<String, String> props =
+        new HashMap<>(catalog.properties() == null ? Collections.emptyMap() : catalog.properties());
+    try {
+      Map<String, String> secrets = catalog.supportsSecrets().getSecrets();
+      if (secrets != null) {
+        props.putAll(secrets);
+      }
+    } catch (UnsupportedOperationException | NotFoundException e) {
+      // Stubs may not implement SupportsSecrets; older servers lack /secrets.
+      LOG.debug("Skipping getSecrets while resolving Spark catalog properties: {}", e.toString());
+    }
+    return props;
+  }
+
+  /** Checks whether the initialized Spark catalog can return the result of a table mutation. */
+  protected void validateBeforeTableMutation() {}
 
   @Override
   public void invalidateTable(Identifier ident) {
