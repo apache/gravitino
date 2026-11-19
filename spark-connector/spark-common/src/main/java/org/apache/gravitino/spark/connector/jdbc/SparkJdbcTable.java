@@ -62,9 +62,6 @@ public class SparkJdbcTable extends JDBCTable {
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter,
       SparkTypeConverter sparkTypeConverter) {
-<<<<<<< HEAD
-    super(identifier, jdbcTable.schema(), jdbcTable.jdbcOptions());
-=======
     this(
         identifier,
         gravitinoTable,
@@ -83,9 +80,8 @@ public class SparkJdbcTable extends JDBCTable {
       SparkTransformConverter sparkTransformConverter,
       SparkTypeConverter sparkTypeConverter,
       Runnable validateConnection) {
-    super(identifier, jdbcTable);
+    super(identifier, jdbcTable.schema(), jdbcTable.jdbcOptions());
     this.validateConnection = validateConnection;
->>>>>>> 98c65decb ([#14837] fix(spark): Reject stale JDBC catalog settings (#15006))
     this.gravitinoTable = gravitinoTable;
     this.gravitinoTableInfoHelper =
         new GravitinoTableInfoHelper(
