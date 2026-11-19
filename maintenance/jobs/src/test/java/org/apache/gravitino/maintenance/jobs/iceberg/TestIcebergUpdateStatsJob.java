@@ -30,6 +30,7 @@ import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoClientUtils;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergUpdateStatsJob {
@@ -42,7 +43,7 @@ public class TestIcebergUpdateStatsJob {
     assertNotNull(template);
     assertEquals("builtin-iceberg-update-stats", template.name());
     assertTrue(template.name().matches(JobTemplateProvider.BUILTIN_NAME_PATTERN));
-    assertEquals("v3", template.customFields().get(JobTemplateProvider.PROPERTY_VERSION_KEY));
+    assertEquals("v5", template.customFields().get(JobTemplateProvider.PROPERTY_VERSION_KEY));
   }
 
   @Test
@@ -197,7 +198,7 @@ public class TestIcebergUpdateStatsJob {
     options.put("metalake", "ml");
     options.put("gravitino.optimizer.jdbcMetrics.jdbcUrl", "jdbc:mysql://localhost:3306/metrics");
     Map<String, String> optimizerProperties =
-        IcebergUpdateStatsAndMetricsJob.buildOptimizerProperties(options);
+        GravitinoClientUtils.normalizeUpdaterConnectionOptions(options);
 
     assertEquals("http://localhost:8090", optimizerProperties.get(OptimizerConfig.GRAVITINO_URI));
     assertEquals("ml", optimizerProperties.get(OptimizerConfig.GRAVITINO_METALAKE));
@@ -215,11 +216,22 @@ public class TestIcebergUpdateStatsJob {
     options.put("username", "admin");
     options.put("password", "YourSecureGravitinoPassword");
     Map<String, String> optimizerProperties =
-        IcebergUpdateStatsAndMetricsJob.buildOptimizerProperties(options);
+        GravitinoClientUtils.normalizeUpdaterConnectionOptions(options);
     assertEquals("basic", optimizerProperties.get(OptimizerConfig.AUTH_TYPE));
     assertEquals("admin", optimizerProperties.get(OptimizerConfig.AUTH_USERNAME));
     assertEquals(
         "YourSecureGravitinoPassword", optimizerProperties.get(OptimizerConfig.AUTH_PASSWORD));
+  }
+
+  @Test
+  public void testRequireGravitinoUri() {
+    Map<String, String> withUri = new HashMap<>();
+    withUri.put(OptimizerConfig.GRAVITINO_URI, "http://localhost:8090");
+    GravitinoClientUtils.requireGravitinoUri(withUri);
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> GravitinoClientUtils.requireGravitinoUri(Collections.emptyMap()));
   }
 
   @Test
@@ -230,6 +242,12 @@ public class TestIcebergUpdateStatsJob {
     assertEquals(
         optimizerProperties,
         IcebergUpdateStatsAndMetricsJob.requireGravitinoConfig(optimizerProperties));
+
+    Map<String, String> uriOnly = new HashMap<>();
+    uriOnly.put(OptimizerConfig.GRAVITINO_URI, "http://localhost:8090");
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> IcebergUpdateStatsAndMetricsJob.requireGravitinoConfig(uriOnly));
 
     assertThrows(
         IllegalArgumentException.class,
