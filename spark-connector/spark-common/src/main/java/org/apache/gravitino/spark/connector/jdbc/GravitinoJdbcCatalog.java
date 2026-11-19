@@ -91,8 +91,6 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
   @Override
   protected TableCatalog createAndInitSparkCatalog(
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
-    JDBCTableCatalog jdbcTableCatalog = new JDBCTableCatalog();
-    sparkCatalogOptions = new HashMap<>(options.asCaseSensitiveMap());
     Map<String, String> all = jdbcOptions(gravitinoCatalog(), options, properties);
     useTimestampNtz = false;
     if (supportsPreferTimestampNtz()) {
@@ -111,7 +109,15 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
     // for catalogs that do not support the option, including when Spark's session timestamp type
     // defaults to NTZ.
     setPreferTimestampNtz(all, useTimestampNtz);
+    return initializeJdbcTableCatalog(name, options, all);
+  }
+
+  /** Initializes the physical catalog and records the exact connection settings it receives. */
+  protected final TableCatalog initializeJdbcTableCatalog(
+      String name, CaseInsensitiveStringMap options, Map<String, String> all) {
+    JDBCTableCatalog jdbcTableCatalog = new JDBCTableCatalog();
     jdbcTableCatalog.initialize(name, new CaseInsensitiveStringMap(all));
+    sparkCatalogOptions = new HashMap<>(options.asCaseSensitiveMap());
     jdbcOptions = new HashMap<>(all);
     jdbcConnectionOptions = jdbcConnectionOptions(all);
     return jdbcTableCatalog;
@@ -128,6 +134,13 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
   @Override
   protected Table loadSparkTable(Identifier ident) {
     verifyJdbcConnectionUnchanged();
+    return loadJdbcTable(ident);
+  }
+
+  /**
+   * Loads the physical table after connection validation, preserving provider-specific diagnostics.
+   */
+  protected Table loadJdbcTable(Identifier ident) {
     try {
       return sparkCatalog.loadTable(ident);
     } catch (NoSuchTableException e) {
@@ -254,7 +267,8 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
     return result;
   }
 
-  private Map<String, String> jdbcOptions(
+  /** Resolves the effective Spark JDBC options for initialization and subsequent validation. */
+  protected Map<String, String> jdbcOptions(
       Catalog catalog, CaseInsensitiveStringMap options, Map<String, String> properties) {
     Credential[] credentials;
     try {

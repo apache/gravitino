@@ -174,12 +174,19 @@ class TestJdbcCatalogRefresh {
     when(client.loadCatalog("jdbc_refresh")).thenReturn(previous, current);
     GravitinoCatalogManager manager =
         GravitinoCatalogManager.create(new SparkConf(false), "user", identity -> client);
-    try (Connection connection = DriverManager.getConnection(URL, "SA", "");
+    try (SparkSession spark =
+            SparkSession.builder()
+                .master("local[1]")
+                .appName("fresh-jdbc-catalog")
+                .config("spark.ui.enabled", "false")
+                .config("spark.sql.catalog.jdbc_refresh", GravitinoJdbcCatalog.class.getName())
+                .getOrCreate();
+        Connection connection = DriverManager.getConnection(URL, "SA", "");
         Statement statement = connection.createStatement()) {
       statement.execute("CREATE TABLE IF NOT EXISTS PUBLIC.FRESH (ID INT)");
       manager.getGravitinoCatalogInfo("jdbc_refresh");
-      GravitinoJdbcCatalog catalog = new GravitinoJdbcCatalog();
-      catalog.initialize("jdbc_refresh", new CaseInsensitiveStringMap(Collections.emptyMap()));
+      GravitinoJdbcCatalog catalog =
+          (GravitinoJdbcCatalog) spark.sessionState().catalogManager().catalog("jdbc_refresh");
       assertEquals(
           "ID",
           catalog

@@ -162,6 +162,34 @@ public class TestGravitinoDorisCatalogSpark35 {
   }
 
   @Test
+  void testChangedCredentialsRejectLoadBeforeOpeningConnection() throws Exception {
+    Driver driver = mock(Driver.class);
+    DorisTestDriver.setDelegate(driver);
+    TableCatalog tables = mock(TableCatalog.class);
+    when(tables.loadTable(NameIdentifier.of("db", "table"), Set.of(Privilege.Name.SELECT_TABLE)))
+        .thenReturn(mock(Table.class));
+    GravitinoDorisCatalogSpark35 catalog =
+        initializeCatalog(
+            tables,
+            Map.of(
+                "jdbc-url",
+                "jdbc:doris-validator-test://host/db",
+                "jdbc-driver",
+                DorisTestDriver.class.getName()),
+            Map.of());
+    SupportsCredentials credentials = client.loadCatalog("doris").supportsCredentials();
+    when(credentials.getCredentials())
+        .thenReturn(new Credential[] {new JdbcCredential("vended-user", "rotated")});
+
+    IllegalStateException failure =
+        assertThrows(
+            IllegalStateException.class,
+            () -> catalog.loadTable(Identifier.of(new String[] {"db"}, "table")));
+    assertTrue(failure.getMessage().contains("Restart the Spark session"));
+    verifyNoInteractions(driver);
+  }
+
+  @Test
   void testPhysicalLoadOmitsDriverCauseAndSuppressedDetails() throws Exception {
     String jdbcUrl = "jdbc:doris-validator-test://host/db?password=test-url-secret";
     Driver driver = mock(Driver.class);
