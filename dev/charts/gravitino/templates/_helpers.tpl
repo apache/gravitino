@@ -110,6 +110,69 @@ Return the proper Postgresql image name for the init-postgresql initContainer
 {{- end -}}
 
 {{/*
+Bitnami MySQL subchart resource name (Service / StatefulSet / default Secret).
+Matches common.names.fullname: when the release name already contains the chart
+name ("mysql"), Bitnami uses the release name alone — not Release.Name-mysql.
+*/}}
+{{- define "gravitino.mysql.fullname" -}}
+{{- $mysql := .Values.mysql | default dict -}}
+{{- if $mysql.fullnameOverride -}}
+{{- $mysql.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- $name := default "mysql" $mysql.nameOverride -}}
+{{- if contains $name .Release.Name -}}
+{{- .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Bitnami MySQL auth Secret name (existingSecret or chart-managed fullname).
+*/}}
+{{- define "gravitino.mysql.secretName" -}}
+{{- $mysql := .Values.mysql | default dict -}}
+{{- $auth := $mysql.auth | default dict -}}
+{{- if $auth.existingSecret -}}
+{{- tpl ($auth.existingSecret | toString) . -}}
+{{- else -}}
+{{- include "gravitino.mysql.fullname" . -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Bitnami PostgreSQL subchart resource name (Service / StatefulSet / default Secret).
+Matches common.names.fullname collapse when the release name contains "postgresql".
+*/}}
+{{- define "gravitino.postgresql.fullname" -}}
+{{- $postgresql := .Values.postgresql | default dict -}}
+{{- if $postgresql.fullnameOverride -}}
+{{- $postgresql.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- $name := default "postgresql" $postgresql.nameOverride -}}
+{{- if contains $name .Release.Name -}}
+{{- .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Bitnami PostgreSQL auth Secret name (existingSecret or chart-managed fullname).
+*/}}
+{{- define "gravitino.postgresql.secretName" -}}
+{{- $postgresql := .Values.postgresql | default dict -}}
+{{- $auth := $postgresql.auth | default dict -}}
+{{- if $auth.existingSecret -}}
+{{- tpl ($auth.existingSecret | toString) . -}}
+{{- else -}}
+{{- include "gravitino.postgresql.fullname" . -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 True when per-pod init-mysql should apply schema SQL (in-chart Bitnami only).
 Skipped when schema.migrate.enabled runs the shared Job instead.
 */}}
@@ -376,9 +439,9 @@ Host for schema-migrate Job.
 {{- if $host -}}
 {{- $host -}}
 {{- else if .Values.mysql.enabled -}}
-{{- printf "%s-mysql" .Release.Name -}}
+{{- include "gravitino.mysql.fullname" . -}}
 {{- else if .Values.postgresql.enabled -}}
-{{- printf "%s-postgresql" .Release.Name -}}
+{{- include "gravitino.postgresql.fullname" . -}}
 {{- else if eq (include "gravitino.entityUsesExternalMysql" . | trim) "true" -}}
 {{- $auth := include "gravitino.entityJdbcMysqlAuthorityFromUrl" . | trim -}}
 {{- if contains ":" $auth -}}

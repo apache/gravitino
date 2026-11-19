@@ -248,8 +248,9 @@ jobs:
           kubectl create namespace "$NS"
           dump_schema_migrate() {
             echo "::group::schema-migrate diagnostics (${NS})"
-            kubectl get pods,jobs -n "$NS" -o wide || true
+            kubectl get pods,jobs,secrets -n "$NS" -o wide || true
             kubectl describe pods -n "$NS" || true
+            kubectl get events -n "$NS" --sort-by=.lastTimestamp || true
             kubectl logs -n "$NS" -l app.kubernetes.io/component=schema-migrate --all-containers --tail=200 || true
             kubectl logs -n "$NS" -l "release=${RELEASE}" --all-containers --tail=200 || true
             echo "::endgroup::"
@@ -294,8 +295,9 @@ jobs:
           kubectl create namespace "$NS"
           dump_schema_migrate() {
             echo "::group::schema-migrate diagnostics (${NS})"
-            kubectl get pods,jobs -n "$NS" -o wide || true
+            kubectl get pods,jobs,secrets -n "$NS" -o wide || true
             kubectl describe pods -n "$NS" || true
+            kubectl get events -n "$NS" --sort-by=.lastTimestamp || true
             kubectl logs -n "$NS" -l app.kubernetes.io/component=schema-migrate --all-containers --tail=200 || true
             kubectl logs -n "$NS" -l "release=${RELEASE}" --all-containers --tail=200 || true
             echo "::endgroup::"

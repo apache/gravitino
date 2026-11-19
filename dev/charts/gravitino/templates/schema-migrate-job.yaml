@@ -108,7 +108,7 @@ spec:
             - name: MYSQL_PWD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-mysql
+                  name: {{ include "gravitino.mysql.secretName" . }}
                   key: mysql-root-password
             {{- else }}
             - name: MYSQL_USER
@@ -126,11 +126,7 @@ spec:
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.postgresql.auth.existingSecret }}
-                  name: {{ tpl (.Values.postgresql.auth.existingSecret | toString) . }}
-                  {{- else }}
-                  name: {{ .Release.Name }}-postgresql
-                  {{- end }}
+                  name: {{ include "gravitino.postgresql.secretName" . }}
                   key: password
               {{- else }}
               value: {{ .Values.entity.jdbcUser | quote }}

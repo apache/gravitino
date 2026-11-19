@@ -159,6 +159,75 @@ tests:
           path: spec.template.spec.initContainers[1].command[2]
           pattern: "upgrade-.*-to-.*-mysql"
 
+  - it: collapses Bitnami MySQL host and Secret when release name contains mysql
+    release:
+      name: gravitino-sm-mysql
+    set:
+      schema:
+        migrate:
+          enabled: true
+      mysql:
+        enabled: true
+    asserts:
+      - template: schema-migrate-job.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DB_HOST
+            value: gravitino-sm-mysql
+      - template: schema-migrate-job.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MYSQL_PWD
+            valueFrom:
+              secretKeyRef:
+                name: gravitino-sm-mysql
+                key: mysql-root-password
+      - template: deployment.yaml
+        matchRegex:
+          path: spec.template.spec.initContainers[1].command[2]
+          pattern: "mysql -h gravitino-sm-mysql "
+      - template: deployment.yaml
+        contains:
+          path: spec.template.spec.initContainers[1].env
+          content:
+            name: MYSQL_PWD
+            valueFrom:
+              secretKeyRef:
+                name: gravitino-sm-mysql
+                key: mysql-root-password
+      - template: configmap.yaml
+        matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "jdbc:mysql://gravitino-sm-mysql:3306/"
+
+  - it: keeps Release-Name-mysql when release name does not contain mysql
+    release:
+      name: gravitino
+    set:
+      schema:
+        migrate:
+          enabled: true
+      mysql:
+        enabled: true
+    asserts:
+      - template: schema-migrate-job.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DB_HOST
+            value: gravitino-mysql
+      - template: schema-migrate-job.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MYSQL_PWD
+            valueFrom:
+              secretKeyRef:
+                name: gravitino-mysql
+                key: mysql-root-password
+
   - it: external PostgreSQL migrate Job uses operator Secret and Deployment wait
     release:
       name: gravitino
