@@ -190,7 +190,7 @@ public class CatalogConnectorContext {
    * @return the metadata adapter
    */
   public CatalogConnectorMetadataAdapter getMetadataAdapter() {
-    return adapter.getMetadataAdapter();
+    return adapter.getMetadataAdapter(catalog);
   }
 
   /** Builder class for creating CatalogConnectorContext instances. */

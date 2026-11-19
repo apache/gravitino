@@ -94,8 +94,7 @@ public class TestJcasbinChangePoller {
         JcasbinChangeListener.metadataObjectFromChangeLog(
             "ml1", "ml1", MetadataObject.Type.METALAKE);
     Assertions.assertEquals(
-        key("ml1", "METALAKE", ""),
-        JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", metalake));
+        key("ml1", ""), JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", metalake));
   }
 
   @Test
@@ -134,13 +133,31 @@ public class TestJcasbinChangePoller {
   }
 
   @Test
+  void testMetalakeDropInvalidatesEveryKeyOfTheMetalake() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+
+    JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+    poller.onEntityChange(
+        List.of(
+            change(1L, MetadataObject.Type.CATALOG, "ml1.cat1"),
+            change(2L, MetadataObject.Type.METALAKE, "ml1"),
+            change(3L, MetadataObject.Type.VIEW, "ml1.cat1.sch1.view1")));
+
+    // The metalake scope prefix subsumes the catalog prefix and the view key.
+    Assertions.assertEquals(List.of(key("ml1", "")), metadataIdCache.invalidatedPrefixes);
+    Assertions.assertEquals(List.of(), metadataIdCache.invalidatedKeys);
+  }
+
+  @Test
   void testVirtualNamespaceTypesInvalidateLookupKeys() {
     RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
     RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
 
     JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
 
-    // TAG/POLICY/JOB/JOB_TEMPLATE live in a virtual namespace (<metalake>.system.<kind>.<name>).
+    // TAG/POLICY/JOB/JOB_TEMPLATE/DOMAIN live in a virtual namespace
+    // (<metalake>.system.<kind>.<name>).
     // Authorization caches their ids by leaf name, so a peer must drop exactly that key.
     poller.onEntityChange(
         List.of(
@@ -148,7 +165,12 @@ public class TestJcasbinChangePoller {
             change(2L, MetadataObject.Type.POLICY, "ml1.system.policy.retention"),
             change(3L, MetadataObject.Type.JOB, "ml1.system.job.job1"),
             change(4L, MetadataObject.Type.JOB_TEMPLATE, "ml1.system.job_template.tpl1"),
-            change(5L, MetadataObject.Type.TABLE, "ml1.cat1.sch1.tbl1")));
+            change(5L, MetadataObject.Type.TABLE, "ml1.cat1.sch1.tbl1"),
+            change(
+                6L,
+                MetadataObject.Type.DOMAIN,
+                EntityChangeLogNameIdentifierCodec.encode(
+                    NameIdentifier.of("ml1", "system", "domain", "Trading_v1")))));
 
     Assertions.assertEquals(
         List.of(key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "TABLE", "tbl1", "")),
@@ -158,7 +180,8 @@ public class TestJcasbinChangePoller {
             lookupKey("pii", MetadataObject.Type.TAG),
             lookupKey("retention", MetadataObject.Type.POLICY),
             lookupKey("job1", MetadataObject.Type.JOB),
-            lookupKey("tpl1", MetadataObject.Type.JOB_TEMPLATE)),
+            lookupKey("tpl1", MetadataObject.Type.JOB_TEMPLATE),
+            lookupKey("Trading_v1", MetadataObject.Type.DOMAIN)),
         metadataIdCache.invalidatedKeys);
   }
 

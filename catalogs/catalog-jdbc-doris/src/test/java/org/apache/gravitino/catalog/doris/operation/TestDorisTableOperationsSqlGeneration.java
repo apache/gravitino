@@ -157,16 +157,18 @@ public class TestDorisTableOperationsSqlGeneration {
     }
   }
 
-  /** Verifies a nullable column cannot be changed to not null. */
+  /** Verifies a nullable column cannot be changed to not null, without querying server version. */
   @Test
   public void testUpdateColumnNullabilityRejectsNullableToNotNull() {
     TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    DataSource versionDataSource = Mockito.mock(DataSource.class);
+    ops.setDataSource(versionDataSource);
     JdbcColumn column =
         JdbcColumn.builder()
             .withName("col1")
-            .withType(Types.IntegerType.get())
+            .withType(Types.VarCharType.of(64))
             .withNullable(true)
-            .withDefaultValue(Literals.NULL)
+            .withDefaultValue(Literals.varcharLiteral(64, "owner's \"value\"\\path"))
             .build();
     ops.setTableForAlter(
         JdbcTable.builder().withName("test_table").withColumns(new JdbcColumn[] {column}).build());
@@ -180,6 +182,7 @@ public class TestDorisTableOperationsSqlGeneration {
                     TableChange.updateColumnNullability(new String[] {"col1"}, false)));
     Assertions.assertEquals(
         "Doris does not support changing nullable column col1 to not null", exception.getMessage());
+    Mockito.verifyNoInteractions(versionDataSource);
   }
 
   /** Verifies string defaults and unchanged column attributes are preserved. */
@@ -1733,6 +1736,74 @@ public class TestDorisTableOperationsSqlGeneration {
 
     Assertions.assertTrue(sql.contains("DEFAULT 'plain' "), sql);
     Mockito.verifyNoInteractions(versionDataSource);
+  }
+
+  @Test
+  public void testCreateTableWithAutoIncrementAndStringDefaultSharesVersionLookupAndValidatesFirst()
+      throws Exception {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    DataSource versionDataSource = mockVersionDataSource("doris-3.0.6.2-rc01-910c4249c5");
+    ops.setDataSource(versionDataSource);
+    JdbcColumn[] columns = {
+      JdbcColumn.builder()
+          .withName("id")
+          .withType(Types.LongType.get())
+          .withNullable(false)
+          .withAutoIncrement(true)
+          .build(),
+      JdbcColumn.builder()
+          .withName("owner")
+          .withType(Types.VarCharType.of(64))
+          .withDefaultValue(Literals.varcharLiteral(64, "O'Brien \\ \"x\""))
+          .build()
+    };
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.generateCreateTableSql(
+                "test_table",
+                columns,
+                null,
+                Collections.singletonMap(REPLICATION_FACTOR, "1"),
+                Transforms.EMPTY_TRANSFORM,
+                null,
+                Indexes.EMPTY_INDEXES));
+    Mockito.verifyNoInteractions(versionDataSource);
+
+    Index[] primaryKey = {
+      Indexes.of(Index.IndexType.PRIMARY_KEY, "PRIMARY", new String[][] {{"id"}})
+    };
+    IllegalArgumentException missingDistributionException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.generateCreateTableSql(
+                    "test_table",
+                    columns,
+                    null,
+                    Collections.singletonMap(REPLICATION_FACTOR, "1"),
+                    Transforms.EMPTY_TRANSFORM,
+                    null,
+                    primaryKey));
+    Assertions.assertTrue(
+        missingDistributionException.getMessage().contains("Doris must set distribution"),
+        missingDistributionException.getMessage());
+    Mockito.verifyNoInteractions(versionDataSource);
+
+    String sql =
+        ops.generateCreateTableSql(
+            "test_table",
+            columns,
+            null,
+            Collections.singletonMap(REPLICATION_FACTOR, "1"),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.hash(1, NamedReference.field("id")),
+            primaryKey);
+
+    Assertions.assertTrue(sql.contains("AUTO_INCREMENT"), sql);
+    Assertions.assertTrue(sql.contains("DEFAULT \"O'Brien \\\\ \\\"x\\\"\" "), sql);
+    Mockito.verify(versionDataSource, Mockito.times(1)).getConnection();
   }
 
   private static DataSource mockVersionDataSource(String dorisVersion) throws Exception {

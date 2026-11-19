@@ -76,6 +76,12 @@ public class IcebergDataCompactionContent extends AbstractExecutablePolicyConten
   public static final String DATA_FILE_MSE_METRIC = "custom-data-file-mse";
   /** Metric name for delete file number. */
   public static final String DELETE_FILE_NUMBER_METRIC = "custom-delete-file-number";
+  /** TMS S0/S1 metric: average data file size in bytes. */
+  public static final String AVG_FILE_SIZE_METRIC = "custom-avg-file-size";
+  /** TMS S0/S1 metric: total data+delete file size in bytes. */
+  public static final String TOTAL_FILE_SIZE_METRIC = "custom-total-file-size";
+  /** TMS S0/S1 metric: total file count. */
+  public static final String FILE_NUMBER_METRIC = "custom-file-number";
   /** Default minimum threshold for data file MSE metric, equals (128 MiB * 0.15)^2. */
   public static final long DEFAULT_MIN_DATA_FILE_MSE = 405323966463344L;
   /** Default minimum threshold for delete file number metric. */

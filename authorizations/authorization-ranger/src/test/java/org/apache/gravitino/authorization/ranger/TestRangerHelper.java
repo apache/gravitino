@@ -104,13 +104,11 @@ public class TestRangerHelper {
   private RangerPolicy createLegacyCatalogOwnerPolicy() {
     RangerPolicy policy = new RangerPolicy();
     RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
-    policyItem
-        .getAccesses()
-        .add(
-            new RangerPolicy.RangerPolicyItemAccess(
-                RangerPrivileges.RangerHadoopSQLPrivilege.SELECT.getName()));
-    policyItem.getRoles().add(RangerHelper.GRAVITINO_CATALOG_OWNER_ROLE);
-    policy.getPolicyItems().add(policyItem);
+    policyItem.addAccess(
+        new RangerPolicy.RangerPolicyItemAccess(
+            RangerPrivileges.RangerHadoopSQLPrivilege.SELECT.getName()));
+    policyItem.addRole(RangerHelper.GRAVITINO_CATALOG_OWNER_ROLE);
+    policy.addPolicyItem(policyItem);
     return policy;
   }
 }

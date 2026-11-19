@@ -224,6 +224,23 @@ setting in the following order of precedence:
 2. Schema properties
 3. Catalog properties
 
+### How fileset locations are resolved
+
+Gravitino merges locations by name. At the catalog and schema levels, `location` supplies the
+reserved name `unknown`, and `location-{name}` supplies a named location. For example, the
+`landing` catalog below gives `unknown` and `eu` the same URI. Its `raw` schema overrides only `eu`.
+
+| Level | Property | Value |
+| --- | --- | --- |
+| Catalog `landing` | `location` | `s3a://example-bucket/landing` |
+| Catalog `landing` | `location-eu` | `s3a://example-bucket/landing` |
+| Schema `raw` | `location-eu` | `s3a://example-eu/landing/raw` |
+
+For each name, a fileset location overrides the schema location, which overrides the catalog
+location. A partial create request inherits the names it omits. For example, a fileset named
+`raw_events` that supplies only `unknown` and `us` inherits `s3a://example-eu/landing/raw/raw_events`
+as `eu`. See the [create request and resolved locations](./manage-fileset-metadata-using-gravitino.md#create-a-fileset-with-several-locations).
+
 ### Fileset Operations
 
 Refer to [Fileset operations](./manage-fileset-metadata-using-gravitino.md#fileset-operations) for more details.

@@ -21,6 +21,8 @@ package org.apache.gravitino.flink.connector.store;
 
 import static org.apache.gravitino.flink.connector.utils.FactoryUtils.isGravitinoManagedCatalogType;
 
+import com.google.common.collect.ImmutableSet;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -45,8 +47,14 @@ import org.apache.flink.util.Preconditions;
  *       stored in the session-scoped in-memory store only and are not persisted to Gravitino.
  * </ul>
  *
- * <p>When retrieving, listing, or removing catalogs, entries in the in-memory store take precedence
- * over entries in the Gravitino-backed store.
+ * <p>When retrieving or removing catalogs, entries in the in-memory store take precedence over
+ * entries in the Gravitino-backed store.
+ *
+ * <p>Catalog names in the excluded set are never resolved against the Gravitino-backed store: every
+ * lookup, existence check, listing, and removal for these names consults the in-memory store only.
+ * This allows a session catalog to use the same name as an existing Gravitino catalog without
+ * loading, modifying, or dropping the Gravitino catalog. Gravitino-managed catalog types cannot be
+ * created under an excluded name because they would be persisted to Gravitino.
  *
  * <p>This store is intended to be used per Flink session, keeping transient catalogs in memory
  * while delegating persistent catalogs to Apache Gravitino.
@@ -54,13 +62,37 @@ import org.apache.flink.util.Preconditions;
 public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
   private final GenericInMemoryCatalogStore memoryCatalogStore;
   private final GravitinoCatalogStore gravitinoCatalogStore;
+  private final Set<String> excludedCatalogs;
 
+  /**
+   * Creates a session catalog store without excluded catalog names.
+   *
+   * @param gravitinoCatalogStore the Gravitino-backed catalog store
+   * @param memoryCatalogStore the session-scoped in-memory catalog store
+   */
   public GravitinoSessionCatalogStore(
       GravitinoCatalogStore gravitinoCatalogStore, GenericInMemoryCatalogStore memoryCatalogStore) {
+    this(gravitinoCatalogStore, memoryCatalogStore, Collections.emptySet());
+  }
+
+  /**
+   * Creates a session catalog store.
+   *
+   * @param gravitinoCatalogStore the Gravitino-backed catalog store
+   * @param memoryCatalogStore the session-scoped in-memory catalog store
+   * @param excludedCatalogs catalog names that are never resolved against the Gravitino-backed
+   *     store
+   */
+  public GravitinoSessionCatalogStore(
+      GravitinoCatalogStore gravitinoCatalogStore,
+      GenericInMemoryCatalogStore memoryCatalogStore,
+      Set<String> excludedCatalogs) {
     Preconditions.checkArgument(gravitinoCatalogStore != null, "CatalogStore cannot be null");
     Preconditions.checkArgument(memoryCatalogStore != null, "MemoryCatalogStore cannot be null");
+    Preconditions.checkArgument(excludedCatalogs != null, "ExcludedCatalogs cannot be null");
     this.gravitinoCatalogStore = gravitinoCatalogStore;
     this.memoryCatalogStore = memoryCatalogStore;
+    this.excludedCatalogs = ImmutableSet.copyOf(excludedCatalogs);
   }
 
   @Override
@@ -75,6 +107,15 @@ public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
               catalogName, CommonCatalogOptions.CATALOG_TYPE.key()));
     }
     if (isGravitinoManagedCatalogType(catalogType)) {
+      if (isExcluded(catalogName)) {
+        throw new CatalogException(
+            String.format(
+                "Cannot create Gravitino-managed catalog '%s' of type '%s': the catalog name is "
+                    + "excluded from Gravitino by '%s', so only session catalogs can use it.",
+                catalogName,
+                catalogType,
+                GravitinoCatalogStoreFactoryOptions.GRAVITINO_EXCLUDED_CATALOGS.key()));
+      }
       gravitinoCatalogStore.storeCatalog(catalogName, descriptor);
     } else {
       memoryCatalogStore.storeCatalog(catalogName, descriptor);
@@ -82,7 +123,8 @@ public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
   }
 
   /**
-   * Removes the specified catalog.
+   * Removes the specified catalog. Excluded catalog names are only removed from the in-memory
+   * store, so the Gravitino catalog with the same name is never dropped.
    *
    * @param catalogName name of the catalog to remove
    * @param ignoreIfNotExists if true, ignore when the catalog does not exist
@@ -90,7 +132,7 @@ public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
    */
   @Override
   public void removeCatalog(String catalogName, boolean ignoreIfNotExists) throws CatalogException {
-    if (memoryCatalogStore.contains(catalogName)) {
+    if (isExcluded(catalogName) || memoryCatalogStore.contains(catalogName)) {
       memoryCatalogStore.removeCatalog(catalogName, ignoreIfNotExists);
     } else {
       gravitinoCatalogStore.removeCatalog(catalogName, ignoreIfNotExists);
@@ -98,7 +140,7 @@ public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
   }
 
   /**
-   * Get a catalog by name.
+   * Get a catalog by name. Excluded catalog names are only looked up in the in-memory store.
    *
    * @param catalogName name of the catalog to retrieve
    * @return the requested catalog or empty if the catalog does not exist
@@ -107,25 +149,55 @@ public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
   @Override
   public Optional<CatalogDescriptor> getCatalog(String catalogName) throws CatalogException {
     Optional<CatalogDescriptor> descriptor = memoryCatalogStore.getCatalog(catalogName);
-    return descriptor.isPresent() ? descriptor : gravitinoCatalogStore.getCatalog(catalogName);
+    if (descriptor.isPresent() || isExcluded(catalogName)) {
+      return descriptor;
+    }
+    return gravitinoCatalogStore.getCatalog(catalogName);
   }
 
+  /**
+   * Lists the catalogs of both stores. Gravitino catalogs whose names are excluded are omitted.
+   *
+   * @return the names of all catalogs visible in this session
+   * @throws CatalogException if the catalogs cannot be listed
+   */
   @Override
   public Set<String> listCatalogs() throws CatalogException {
     Set<String> catalogs = new HashSet<>();
     catalogs.addAll(memoryCatalogStore.listCatalogs());
+    Set<String> gravitinoCatalogs;
     try {
-      catalogs.addAll(gravitinoCatalogStore.listCatalogs());
+      gravitinoCatalogs = gravitinoCatalogStore.listCatalogs();
     } catch (CatalogException e) {
       throw new CatalogException("Failed to list catalog.", e);
     } catch (RuntimeException e) {
       throw new CatalogException("Failed to list catalog.", e);
     }
+    for (String catalogName : gravitinoCatalogs) {
+      if (!isExcluded(catalogName)) {
+        catalogs.add(catalogName);
+      }
+    }
     return catalogs;
   }
 
+  /**
+   * Checks whether a catalog exists. Excluded catalog names are only checked in the in-memory
+   * store.
+   *
+   * @param catalogName name of the catalog to check
+   * @return true if the catalog exists in this session
+   * @throws CatalogException if the existence cannot be checked
+   */
   @Override
   public boolean contains(String catalogName) throws CatalogException {
-    return memoryCatalogStore.contains(catalogName) || gravitinoCatalogStore.contains(catalogName);
+    if (memoryCatalogStore.contains(catalogName)) {
+      return true;
+    }
+    return !isExcluded(catalogName) && gravitinoCatalogStore.contains(catalogName);
+  }
+
+  private boolean isExcluded(String catalogName) {
+    return excludedCatalogs.contains(catalogName);
   }
 }

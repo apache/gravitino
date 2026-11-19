@@ -61,8 +61,9 @@ public class GravitinoTable {
     this.tableName = tableName;
 
     ImmutableList.Builder<GravitinoColumn> tableColumns = ImmutableList.builder();
-    for (int i = 0; i < tableMetadata.columns().length; i++) {
-      tableColumns.add(new GravitinoColumn(tableMetadata.columns()[i], i));
+    Column[] sourceColumns = tableMetadata.columns();
+    for (int i = 0; i < sourceColumns.length; i++) {
+      tableColumns.add(new GravitinoColumn(sourceColumns[i], i));
     }
     this.columns = tableColumns.build();
     this.comment = tableMetadata.comment();

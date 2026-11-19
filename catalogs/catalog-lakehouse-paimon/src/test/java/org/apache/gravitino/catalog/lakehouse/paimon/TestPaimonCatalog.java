@@ -37,6 +37,7 @@ import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonCatalogOps;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.DlfSecretKeyCredential;
@@ -129,6 +130,8 @@ public class TestPaimonCatalog {
     conf.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, tempDir);
     PaimonCatalog paimonCatalog =
         new PaimonCatalog().withCatalogConf(conf).withCatalogEntity(entity);
+    Assertions.assertTrue(
+        paimonCatalog.newCapability().caseSensitiveOnName(Capability.Scope.SCHEMA).supported());
     CatalogOperations catalogOperations = paimonCatalog.ops();
     Assertions.assertInstanceOf(PaimonCatalogOperations.class, catalogOperations);
 
@@ -147,6 +150,48 @@ public class TestPaimonCatalog {
                 "paimon",
                 "comment",
                 ImmutableMap.of()));
+  }
+
+  @Test
+  void testNonFilesystemBackendRequiresUriBeforeCreate() {
+    PaimonCatalog catalog = new PaimonCatalog();
+    for (String backend : new String[] {"hive", "jdbc"}) {
+      IllegalArgumentException error =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  catalog.validateConfiguration(
+                      ImmutableMap.of(
+                          PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND,
+                          backend,
+                          PaimonCatalogPropertiesMetadata.WAREHOUSE,
+                          "s3://bucket/paimon/")),
+              backend);
+      Assertions.assertTrue(error.getMessage().contains("URI"), error.getMessage());
+    }
+  }
+
+  @Test
+  void testValidBackendConfigurationsAreAccepted() {
+    PaimonCatalog catalog = new PaimonCatalog();
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog.validateConfiguration(
+                ImmutableMap.of(
+                    PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND,
+                    "filesystem",
+                    PaimonCatalogPropertiesMetadata.WAREHOUSE,
+                    "/tmp/paimon")));
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog.validateConfiguration(
+                ImmutableMap.of(
+                    PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND,
+                    "hive",
+                    PaimonCatalogPropertiesMetadata.WAREHOUSE,
+                    "s3://bucket/paimon/",
+                    PaimonCatalogPropertiesMetadata.URI,
+                    "thrift://127.0.0.1:9083")));
   }
 
   @Test

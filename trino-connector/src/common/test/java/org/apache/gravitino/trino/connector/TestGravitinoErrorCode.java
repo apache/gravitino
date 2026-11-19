@@ -31,6 +31,7 @@ import java.util.concurrent.ExecutionException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
+import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.RESTException;
 import org.junit.jupiter.api.Test;
 
@@ -59,6 +60,16 @@ public class TestGravitinoErrorCode {
             new MetalakeNotInUseException("Metalake m is not in use"));
     assertEquals(CATALOG_UNAVAILABLE.toErrorCode(), e.getErrorCode());
     assertEquals("Metalake m is not in use", e.getMessage());
+  }
+
+  @Test
+  public void testNonEmptySchemaIsSchemaNotEmptyAndKeepsFirstLine() {
+    TrinoException e =
+        GravitinoErrorCode.toTrinoException(
+            new NonEmptySchemaException(
+                "Schema db is not empty\n\tat org.apache.gravitino.Server"));
+    assertEquals(GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EMPTY.toErrorCode(), e.getErrorCode());
+    assertEquals("Schema db is not empty", e.getMessage());
   }
 
   @Test

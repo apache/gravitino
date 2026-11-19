@@ -17,20 +17,37 @@
  * under the License.
  */
 
+import io.freefair.gradle.plugins.aspectj.WeavingSourceSet
+
 plugins {
   `maven-publish`
   id("java")
   id("idea")
+  alias(libs.plugins.aspectj.post.compile.weaving)
+}
+
+// Weave MethodMonitorAspect from core so @Monitored methods in this plugin record metrics. The
+// `aspect` configuration is not used because it would also put the aspect jar on the runtime
+// classpath, where core already provides the aspect.
+val monitoredAspect by configurations.creating {
+  isCanBeConsumed = false
+}
+
+sourceSets.main {
+  WeavingSourceSet.getAspectPath(this).from(monitoredAspect)
 }
 
 dependencies {
   annotationProcessor(libs.lombok)
+
+  monitoredAspect(project(":core", "aspects"))
 
   implementation(project(":api"))
   implementation(project(":server-common"))
   implementation(project(":common"))
   implementation(project(":core"))
 
+  implementation(libs.aspectj.aspectjrt)
   implementation(libs.bundles.jersey)
   implementation(libs.commons.lang3)
   implementation(libs.guava)

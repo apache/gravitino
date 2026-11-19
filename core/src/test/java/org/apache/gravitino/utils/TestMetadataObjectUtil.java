@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
@@ -121,6 +122,19 @@ public class TestMetadataObjectUtil {
   }
 
   @Test
+  public void testMetadataObjectEntityTypes() {
+    Set<Entity.EntityType> entityTypes = MetadataObjectUtil.metadataObjectEntityTypes();
+    for (MetadataObject.Type type : MetadataObject.Type.values()) {
+      Assertions.assertTrue(entityTypes.contains(MetadataObjectUtil.toEntityType(type)));
+    }
+    Assertions.assertEquals(MetadataObject.Type.values().length, entityTypes.size());
+    Assertions.assertEquals(
+        Entity.EntityType.DOMAIN, MetadataObjectUtil.toEntityType(MetadataObject.Type.DOMAIN));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> entityTypes.add(Entity.EntityType.USER));
+  }
+
+  @Test
   public void testToEntityIdent() {
     Assertions.assertThrows(
         IllegalArgumentException.class,
@@ -185,6 +199,17 @@ public class TestMetadataObjectUtil {
         NameIdentifier.of("metalake", "catalog", "schema", "view"),
         MetadataObjectUtil.toEntityIdent(
             "metalake", MetadataObjects.of("catalog.schema", "view", MetadataObject.Type.VIEW)));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            MetadataObjectUtil.toEntityIdent(
+                "metalake", MetadataObjects.parse("bad.name", MetadataObject.Type.DOMAIN)));
+
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofDomain("metalake", "Finance_Trading"),
+        MetadataObjectUtil.toEntityIdent(
+            "metalake", MetadataObjects.of(null, "Finance_Trading", MetadataObject.Type.DOMAIN)));
 
     Assertions.assertEquals(
         NameIdentifier.of("metalake", "catalog", "schema", "function"),

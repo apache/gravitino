@@ -19,12 +19,16 @@
 package org.apache.gravitino.trino.connector.catalog;
 
 import static io.trino.spi.StandardErrorCode.CATALOG_UNAVAILABLE;
+import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.trino.spi.StandardErrorCode.PERMISSION_DENIED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.trino.spi.TrinoException;
@@ -38,6 +42,7 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
@@ -50,6 +55,18 @@ public class TestCatalogConnectorMetadataErrors {
 
   private static final String DENIED_MESSAGE =
       "User joel is not authorized to perform operation loadTable on metadata m.c.s.t";
+
+  /** Checks schema rename reports an unsupported operation without source mutation. */
+  @Test
+  public void testSchemaRenameIsExplicitlyUnsupported() {
+    TableCatalog catalog = mock(TableCatalog.class);
+    CatalogConnectorMetadata metadata = createMetadata(catalog);
+    TrinoException error =
+        assertThrows(TrinoException.class, () -> metadata.renameSchema("before", "after"));
+    assertEquals(NOT_SUPPORTED.toErrorCode(), error.getErrorCode());
+    assertTrue(error.getMessage().contains("renaming schemas"));
+    verifyNoInteractions(catalog);
+  }
 
   @Test
   public void testLoadCatalogDeniedIsPermissionDenied() {
@@ -209,6 +226,44 @@ public class TestCatalogConnectorMetadataErrors {
         assertThrows(
             TrinoException.class, () -> metadata.createSchema(mock(GravitinoSchema.class)));
     assertEquals(GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS.toErrorCode(), e.getErrorCode());
+  }
+
+  @Test
+  public void testDropNonEmptySchemaKeepsServerReason() {
+    String reason = "Table db.orders depends on a table in this schema";
+    SupportsSchemas schemas = mock(SupportsSchemas.class);
+    when(schemas.dropSchema(anyString(), anyBoolean()))
+        .thenThrow(new NonEmptySchemaException(reason));
+    CatalogConnectorMetadata metadata = createMetadata(schemas, mock(TableCatalog.class));
+
+    TrinoException e = assertThrows(TrinoException.class, () -> metadata.dropSchema("s", true));
+    assertEquals(GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EMPTY.toErrorCode(), e.getErrorCode());
+    assertEquals(reason, e.getMessage());
+  }
+
+  @Test
+  public void testDropNonEmptySchemaDropsServerStackTrace() {
+    // The REST client appends the server stack trace to the message of a refusal, on cascade and
+    // non-cascade drops alike. Only the first line is the reason.
+    String reason = "Schema db is not empty";
+    String messageWithStack =
+        reason
+            + "\n"
+            + "org.apache.gravitino.exceptions.NonEmptySchemaException: "
+            + reason
+            + "\n"
+            + "\tat org.apache.gravitino.server.web.rest.SchemaOperations.dropSchema(SchemaOperations.java:1)";
+    SupportsSchemas schemas = mock(SupportsSchemas.class);
+    when(schemas.dropSchema(anyString(), anyBoolean()))
+        .thenThrow(new NonEmptySchemaException(messageWithStack));
+    CatalogConnectorMetadata metadata = createMetadata(schemas, mock(TableCatalog.class));
+
+    for (boolean cascade : new boolean[] {false, true}) {
+      TrinoException e =
+          assertThrows(TrinoException.class, () -> metadata.dropSchema("s", cascade));
+      assertEquals(GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EMPTY.toErrorCode(), e.getErrorCode());
+      assertEquals(reason, e.getMessage());
+    }
   }
 
   private static CatalogConnectorMetadata createMetadata(TableCatalog tableCatalog) {

@@ -31,6 +31,12 @@ class TestIcebergRewriteManifestsContent {
     Assertions.assertEquals(8388608L, content.avgManifestSizeThresholdBytes());
     Assertions.assertNull(content.specId());
     Assertions.assertNull(content.useCaching());
+    Assertions.assertTrue(
+        content
+            .rules()
+            .get(IcebergRewriteManifestsContent.TRIGGER_EXPR_KEY)
+            .toString()
+            .contains(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC));
     Assertions.assertEquals(content, PolicyContents.icebergRewriteManifests());
     Assertions.assertEquals(
         content.hashCode(), PolicyContents.icebergRewriteManifests().hashCode());

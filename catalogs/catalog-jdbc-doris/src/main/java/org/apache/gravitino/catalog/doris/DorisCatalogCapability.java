@@ -18,10 +18,23 @@
  */
 package org.apache.gravitino.catalog.doris;
 
+import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 
 public class DorisCatalogCapability implements Capability {
   // Doris best practice mention that the name should be in lowercase, separated by underscores
   // https://doris.apache.org/docs/2.0/table-design/best-practice/
   // We can use the more general DEFAULT_NAME_PATTERN for Doris and update as needed in the future
+  /** {@inheritDoc} */
+  @Override
+  public CapabilityResult specificationOnExistingName(Scope scope, String name) {
+    if (scope == Scope.TABLE) {
+      return JdbcConnectorUtils.existingQuotedTableName(name);
+    }
+    if (scope == Scope.COLUMN) {
+      return JdbcConnectorUtils.existingQuotedColumnName(name);
+    }
+    return specificationOnName(scope, name);
+  }
 }

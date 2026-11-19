@@ -272,8 +272,7 @@ public class IcebergCatalogUtil {
     Map<String, String> properties = Maps.newHashMap(icebergConfig.getIcebergCatalogProperties());
     applyDefaultResolvingFileIO(properties);
 
-    // REST catalog must use forward access token from the user request
-    properties.put(AuthProperties.AUTH_TYPE, UserPrincipalForwardingAuthManager.class.getName());
+    applyRestBackendAuthProperties(icebergConfig, properties);
     applyRestCatalogHttpTimeoutProperties(icebergConfig, properties);
 
     properties.forEach(hdfsConfiguration::set);
@@ -371,6 +370,59 @@ public class IcebergCatalogUtil {
     } catch (IOException e) {
       throw new UncheckedIOException(
           "Failed to load GCS service account file: " + serviceAccountFile, e);
+    }
+  }
+
+  /**
+   * Configures how the REST catalog backend authenticates to the remote catalog.
+   *
+   * <p>With {@code rest-backend-auth-type=user-token} (the default), the calling user's access
+   * token is forwarded on every request. With {@code service-account}, the configured static token
+   * ({@code rest-backend-token}) or OAuth2 client credential ({@code rest-backend-credential}, with
+   * optional {@code rest-backend-oauth2-server-uri} and {@code rest-backend-scope}) is passed to
+   * Iceberg's OAuth2 auth manager, so every request reaches the remote catalog as the service
+   * account. The Gravitino-named settings are removed from the client properties in both modes.
+   *
+   * @param icebergConfig the catalog configuration
+   * @param properties the Iceberg REST client properties to update
+   */
+  @VisibleForTesting
+  static void applyRestBackendAuthProperties(
+      IcebergConfig icebergConfig, Map<String, String> properties) {
+    String token = properties.remove(IcebergConstants.REST_BACKEND_TOKEN);
+    String credential = properties.remove(IcebergConstants.REST_BACKEND_CREDENTIAL);
+    String oauth2ServerUri = properties.remove(IcebergConstants.REST_BACKEND_OAUTH2_SERVER_URI);
+    String scope = properties.remove(IcebergConstants.REST_BACKEND_SCOPE);
+    properties.remove(IcebergConstants.REST_BACKEND_AUTH_TYPE);
+
+    if (!icebergConfig.isRestBackendServiceAccount()) {
+      properties.put(AuthProperties.AUTH_TYPE, UserPrincipalForwardingAuthManager.class.getName());
+      return;
+    }
+
+    boolean hasToken = StringUtils.isNotBlank(token);
+    boolean hasCredential = StringUtils.isNotBlank(credential);
+    if (hasToken == hasCredential) {
+      throw new IllegalArgumentException(
+          String.format(
+              "%s=%s requires exactly one of %s or %s",
+              IcebergConstants.REST_BACKEND_AUTH_TYPE,
+              IcebergConstants.REST_BACKEND_AUTH_TYPE_SERVICE_ACCOUNT,
+              IcebergConstants.REST_BACKEND_TOKEN,
+              IcebergConstants.REST_BACKEND_CREDENTIAL));
+    }
+
+    properties.put(AuthProperties.AUTH_TYPE, AuthProperties.AUTH_TYPE_OAUTH2);
+    if (hasToken) {
+      properties.put(IcebergConstants.ICEBERG_REST_TOKEN, token);
+    } else {
+      properties.put(IcebergConstants.ICEBERG_REST_CREDENTIAL, credential);
+      if (StringUtils.isNotBlank(oauth2ServerUri)) {
+        properties.put(IcebergConstants.ICEBERG_REST_OAUTH2_SERVER_URI, oauth2ServerUri);
+      }
+      if (StringUtils.isNotBlank(scope)) {
+        properties.put(IcebergConstants.ICEBERG_REST_SCOPE, scope);
+      }
     }
   }
 
