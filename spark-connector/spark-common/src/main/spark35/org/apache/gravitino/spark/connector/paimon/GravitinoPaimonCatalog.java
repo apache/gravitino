@@ -54,6 +54,7 @@ import org.apache.paimon.spark.SparkProcedures;
 import org.apache.paimon.spark.SparkTable;
 import org.apache.paimon.spark.analysis.NoSuchProcedureException;
 import org.apache.paimon.spark.catalog.ProcedureCatalog;
+import org.apache.paimon.spark.catalog.WithPaimonCatalog;
 import org.apache.paimon.spark.procedure.Procedure;
 import org.apache.paimon.spark.procedure.ProcedureBuilder;
 import org.apache.spark.sql.connector.catalog.Identifier;
@@ -69,7 +70,8 @@ import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
-public class GravitinoPaimonCatalog extends BaseCatalog implements ProcedureCatalog {
+public class GravitinoPaimonCatalog extends BaseCatalog
+    implements ProcedureCatalog, WithPaimonCatalog {
 
   // Whether the Paimon catalog uses the Hive backend, the only Paimon backend that can create
   // format tables.
@@ -240,6 +242,25 @@ public class GravitinoPaimonCatalog extends BaseCatalog implements ProcedureCata
     return gravitinoCatalog()
         .asTableCatalog()
         .purgeTable(NameIdentifier.of(getDatabase(ident), ident.name()));
+  }
+
+  /**
+   * Exposes the underlying Paimon catalog. Paimon procedures that work on the catalog rather than
+   * on a single loaded table, such as {@code remove_orphan_files}, {@code repair} or {@code
+   * compact_database}, cast the catalog they are called on to {@link WithPaimonCatalog}.
+   */
+  @Override
+  public Catalog paimonCatalog() {
+    return ((WithPaimonCatalog) sparkCatalog).paimonCatalog();
+  }
+
+  /**
+   * The name of the underlying Paimon catalog. Newer Paimon versions declare this method in {@link
+   * WithPaimonCatalog} and use it when building Paimon identifiers; it is the catalog name the
+   * underlying Paimon catalog was initialized with.
+   */
+  public String paimonCatalogName() {
+    return sparkCatalog.name();
   }
 
   /**

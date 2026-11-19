@@ -99,6 +99,19 @@ public class TableMaintenanceRESTFeature implements Feature {
           "Table maintenance requires gravitino.entity.store = relational");
     }
 
+    boolean authorizationEnabled = config.get(Configs.ENABLE_AUTHORIZATION);
+    String jobSubmitter = null;
+    if (authorizationEnabled) {
+      jobSubmitter = config.get(TableMaintenanceConfig.JOB_SUBMITTER).orElse("").trim();
+      if (jobSubmitter.isEmpty()) {
+        throw new IllegalArgumentException(
+            TableMaintenanceConfig.JOB_SUBMITTER.getKey()
+                + " is required when "
+                + Configs.ENABLE_AUTHORIZATION.getKey()
+                + "=true");
+      }
+    }
+
     TableMaintenanceConfig maintenanceConfig = TableMaintenanceConfig.from(config);
     PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
     MetalakeMetaService metalakeMetaService = MetalakeMetaService.getInstance();
@@ -118,7 +131,8 @@ public class TableMaintenanceRESTFeature implements Feature {
         dataSource,
         maintenanceConfig,
         config,
-        MaintenanceJobManager.getInstance(),
+        MaintenanceJobManager.getInstance(
+            env.jobOperationDispatcher(), authorizationEnabled, jobSubmitter),
         MaintenanceActionManager.getInstance(),
         TableMaintenanceActionMetaService.getInstance(),
         tableEnumerator,

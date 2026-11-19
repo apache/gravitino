@@ -30,7 +30,6 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.secret.SecretConstants;
 import org.apache.gravitino.secret.SecretManager;
-import org.apache.gravitino.secret.SecretMaterial;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
@@ -124,7 +123,10 @@ public class TestBaseCatalogCredentialSecrets {
                   "1",
                   SecretConstants.ATTR_PROPERTY_KEY,
                   "jdbc-password"));
-      secretManager.writeSecrets(java.util.List.of(new SecretMaterial(urn, "plain-jdbc-pass")));
+      secretManager
+          .getRegistry()
+          .getProvider(urn.providerName())
+          .writeSecretVersion(urn, "plain-jdbc-pass");
 
       Map<String, String> entityProps =
           Map.of(

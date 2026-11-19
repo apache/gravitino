@@ -28,8 +28,10 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.Closeable;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -43,7 +45,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * SecretManager owns write-through / external-reference secret lifecycle against configured
- * providers, and rolls back write-through secrets when entity create fails.
+ * providers. For an entity create or alter, it stages the write-through secret versions for the
+ * caller to commit or roll back.
  */
 public class SecretManager implements Closeable {
 
@@ -123,10 +126,12 @@ public class SecretManager implements Closeable {
    * Checks secret keys and puts reference / write-through URN strings into {@code
    * targetProperties}.
    *
-   * <p>Callers typically validate {@code targetProperties}, then call {@link #writeSecrets} with
-   * the returned secret materials, and {@link #rollbackSecrets} on failure. {@code properties} is
-   * used only for key uniqueness checks (e.g. the original request map); {@code targetProperties}
-   * is the mutable map that will be stored (may already contain merged catalog conf).
+   * <p>Callers typically invoke {@link #validateProposedSecrets} on {@code targetProperties} and
+   * the returned plaintexts, then {@link #stageSecrets}, and call {@link #commitSecrets} after the
+   * entity is created or {@link #rollbackSecrets(SecretVersionChanges)} on failure. {@code
+   * properties} is used only for key uniqueness checks (e.g. the original request map); {@code
+   * targetProperties} is the mutable map that will be stored (may already contain merged catalog
+   * conf).
    *
    * @param properties properties used for key uniqueness checks (may be null)
    * @param targetProperties mutable properties that receive URN values (may be null only when both
@@ -135,10 +140,10 @@ public class SecretManager implements Closeable {
    * @param entityId stable numeric entity id
    * @param secretBindings property key → write-through binding (may be null)
    * @param secretReferences property key → secret locator (may be null)
-   * @return write-through secret materials for {@link #writeSecrets} / {@link #rollbackSecrets}
+   * @return property key → plaintext of each write-through binding, for {@link #stageSecrets}
    *     (empty when there are no bindings)
    */
-  public List<SecretMaterial> assembleSecretMaterials(
+  public Map<String, String> assembleSecretPlaintexts(
       @Nullable Map<String, String> properties,
       @Nullable Map<String, String> targetProperties,
       String entityType,
@@ -147,7 +152,7 @@ public class SecretManager implements Closeable {
       @Nullable Map<String, SecretReference> secretReferences) {
     checkSecretKeys(properties, secretBindings, secretReferences);
     if (!SecretPropertyUtils.hasSecretMaps(secretBindings, secretReferences)) {
-      return List.of();
+      return Map.of();
     }
     Preconditions.checkArgument(
         targetProperties != null, "targetProperties must not be null when secrets are present");
@@ -157,15 +162,14 @@ public class SecretManager implements Closeable {
     SecretPropertyUtils.putSecretUrns(targetProperties, buildSecretReferenceUrns(references));
     List<SecretUrn> bindingUrns = buildSecretBindingUrns(entityType, entityId, bindings);
     SecretPropertyUtils.putSecretUrns(targetProperties, bindingUrns);
-    return toSecretMaterials(bindingUrns, bindings);
+    return toPlaintexts(bindingUrns, bindings);
   }
 
   /**
    * Builds external-reference URNs from {@code secretReferences} without writing secret material.
    *
    * <p>Callers must put the returned URN strings into properties themselves (e.g. via {@link
-   * SecretPropertyUtils#putSecretUrns}). External-ref URNs are owned outside Gravitino and must not
-   * be passed to {@link #rollbackSecrets}.
+   * SecretPropertyUtils#putSecretUrns}).
    *
    * @param secretReferences property key → secret locator (empty returns an empty list; must not be
    *     null)
@@ -230,8 +234,8 @@ public class SecretManager implements Closeable {
   /**
    * Builds write-through URNs from {@code secretBindings} without writing secret material.
    *
-   * <p>Callers typically pass the returned URNs to {@link #writeSecrets} via {@link
-   * #assembleSecretMaterials}, or put URN strings into properties themselves (e.g. via {@link
+   * <p>Callers typically use {@link #assembleSecretPlaintexts}, which puts these URNs into the
+   * properties, or put URN strings into properties themselves (e.g. via {@link
    * SecretPropertyUtils#putSecretUrns}).
    *
    * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
@@ -257,83 +261,16 @@ public class SecretManager implements Closeable {
   }
 
   /**
-   * Writes plaintext secrets into the write-through providers for each {@link SecretMaterial} (e.g.
-   * Vault).
+   * Makes the staged versions current and deletes the versions they replaced.
    *
-   * <p>{@code secretMaterials} must come from {@link #assembleSecretMaterials}. On failure,
-   * already-written URNs are rolled back. When using {@link #assembleSecretMaterials}, URN strings
-   * are already in properties; otherwise callers must put them themselves (e.g. via {@link
-   * SecretPropertyUtils#putSecretUrns}).
+   * <p>Call only after the entity create or alter committed. Failures are logged and do not fail
+   * the committed create or alter. If making a written version current fails and the provider then
+   * reports it as current, the previous version is deleted; otherwise the written version is
+   * deleted. If the current version cannot be looked up, both versions are kept. Running the same
+   * change again writes a new version and makes it current.
    *
-   * @param secretMaterials write-through secret materials (empty is a no-op; must not be null)
-   */
-  public void writeSecrets(List<SecretMaterial> secretMaterials) {
-    Preconditions.checkArgument(secretMaterials != null, "secretMaterials must not be null");
-    if (secretMaterials.isEmpty()) {
-      return;
-    }
-
-    List<SecretUrn> written = new ArrayList<>(secretMaterials.size());
-    try {
-      for (SecretMaterial material : secretMaterials) {
-        SecretUrn urn = material.urn();
-        List<String> segments = urn.identifierSegments();
-        Preconditions.checkArgument(
-            segments.size() == 3,
-            "Write-through secret URN must have entityType, entityId, propertyKey segments: %s",
-            urn);
-        String entityType = segments.get(0);
-        String entityId = segments.get(1);
-        String propertyKey = urn.propertyKey();
-        Map<String, String> attributes =
-            ImmutableMap.of(
-                ATTR_ENTITY_TYPE, entityType,
-                ATTR_ENTITY_ID, entityId,
-                ATTR_PROPERTY_KEY, propertyKey);
-        SecretUrn writtenUrn =
-            registry.getProvider(urn.providerName()).writeSecret(material.plaintext(), attributes);
-        if (!urn.equals(writtenUrn)) {
-          throw new IllegalArgumentException(
-              "Provider returned unexpected URN: expected " + urn + ", got " + writtenUrn);
-        }
-        written.add(writtenUrn);
-      }
-    } catch (RuntimeException e) {
-      deleteSecrets(written);
-      throw e;
-    }
-  }
-
-  /**
-   * Best-effort delete of write-through secret materials after a failed create.
-   *
-   * <p>Only secrets that were persisted by {@link #writeSecrets} may be passed. Do not roll back
-   * external reference URNs from {@link #buildSecretReferenceUrns}.
-   *
-   * @param secretMaterials write-through secret materials (must not be null)
-   */
-  public void rollbackSecrets(List<SecretMaterial> secretMaterials) {
-    Preconditions.checkArgument(secretMaterials != null, "secretMaterials must not be null");
-    if (secretMaterials.isEmpty()) {
-      return;
-    }
-    List<SecretUrn> urns = new ArrayList<>(secretMaterials.size());
-    for (SecretMaterial material : secretMaterials) {
-      urns.add(material.urn());
-    }
-    deleteSecrets(urns);
-  }
-
-  /**
-   * Makes the versions an alter wrote current and deletes the versions it replaced.
-   *
-   * <p>Call only after the entity alter committed. Failures are logged and do not fail the
-   * committed alter. If making a written version current fails and the provider then reports it as
-   * current, the previous version is deleted; otherwise the written version is deleted. If the
-   * current version cannot be looked up, both versions are kept. Running the same change again
-   * writes a new version and makes it current.
-   *
-   * @param changes changes returned by a {@code SecretAlterChanges.prepare*Changes} method
+   * @param changes changes returned by {@link #stageSecrets} or a {@code
+   *     SecretAlterChanges.prepare*Changes} method
    */
   public void commitSecrets(SecretVersionChanges changes) {
     Preconditions.checkArgument(changes != null, "changes must not be null");
@@ -405,13 +342,14 @@ public class SecretManager implements Closeable {
   }
 
   /**
-   * Best-effort delete of the versions an alter wrote, after the entity alter failed.
+   * Best-effort delete of the staged versions, after the entity create or alter failed.
    *
-   * <p>The versions that were current before the alter are kept, so the entity's own write-through
+   * <p>The versions that were current before an alter are kept, so the entity's own write-through
    * secrets keep the values it still references. A secret that {@link #alterSetProperty} rewrote
    * right away is not restored.
    *
-   * @param changes changes returned by a {@code SecretAlterChanges.prepare*Changes} method
+   * @param changes changes returned by {@link #stageSecrets} or a {@code
+   *     SecretAlterChanges.prepare*Changes} method
    */
   public void rollbackSecrets(SecretVersionChanges changes) {
     Preconditions.checkArgument(changes != null, "changes must not be null");
@@ -423,15 +361,49 @@ public class SecretManager implements Closeable {
   }
 
   /**
-   * Stages an alter batch: writes its plaintexts as new versions and finds the versions it
-   * releases.
+   * Validates the proposed secret property view for a create or alter batch.
+   *
+   * <p>Checks each write-through plaintext (non-blank, not the masked placeholder), then overlays
+   * {@code plaintexts} onto a copy of {@code finalProperties} and resolves that view with {@link
+   * #toPlaintextProperties(Map)}. New bindings are therefore checked as plaintext (same idea as
+   * {@link SecretAlterChanges#prepareCatalogChangesForTest}) while references and any other secret
+   * URNs are read through their providers. Callers should invoke this before {@link #stageSecrets}
+   * so a blank binding or missing reference fails without writing secret versions.
+   *
+   * @param finalProperties entity properties after the create or alter (URNs for secrets; may be
+   *     null when there are no secrets)
+   * @param plaintexts property key → plaintext that {@link #stageSecrets} will write
+   * @throws IllegalArgumentException if a plaintext is blank or masked, or a secret cannot be read
+   */
+  public void validateProposedSecrets(
+      @Nullable Map<String, String> finalProperties, Map<String, String> plaintexts) {
+    Preconditions.checkArgument(plaintexts != null, "plaintexts must not be null");
+    if ((finalProperties == null || finalProperties.isEmpty()) && plaintexts.isEmpty()) {
+      return;
+    }
+    Preconditions.checkArgument(
+        finalProperties != null, "finalProperties must not be null when secrets are present");
+    for (String plaintext : plaintexts.values()) {
+      SecretPropertyUtils.validateAlterSecretBindingPlaintext(plaintext);
+    }
+    Map<String, String> view = new HashMap<>(finalProperties);
+    view.putAll(plaintexts);
+    toPlaintextProperties(view);
+  }
+
+  /**
+   * Stages an entity create or alter batch: writes its plaintexts as new versions and finds the
+   * versions it releases.
    *
    * <p>Works from the properties before and after the whole batch, so a batch that changes one key
    * several times is treated by its net effect. A URN that has a current version keeps it readable
    * until {@link #commitSecrets}. If a write fails, the versions already written are deleted.
    *
-   * @param startProperties entity properties before the alter (may be null)
-   * @param finalProperties entity properties after the alter
+   * <p>Callers must invoke {@link #validateProposedSecrets} first. This method only writes and
+   * records versions.
+   *
+   * @param startProperties entity properties before the alter, or {@code null} for a create
+   * @param finalProperties entity properties after the create or alter
    * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
    * @param entityId stable numeric entity id
    * @param plaintexts property key → plaintext to write; each key holds a write-through URN of this
@@ -440,7 +412,7 @@ public class SecretManager implements Closeable {
    * @throws UnsupportedOperationException if a provider of a written or released secret does not
    *     support secret versions
    */
-  SecretVersionChanges stageSecrets(
+  public SecretVersionChanges stageSecrets(
       @Nullable Map<String, String> startProperties,
       Map<String, String> finalProperties,
       String entityType,
@@ -513,8 +485,8 @@ public class SecretManager implements Closeable {
       SecretUrn urn, UnsupportedOperationException cause) {
     return new UnsupportedOperationException(
         String.format(
-            "Secret provider \"%s\" does not support secret versions, which altering the"
-                + " write-through secret of property \"%s\" requires",
+            "Secret provider \"%s\" does not support secret versions, which the write-through"
+                + " secret of property \"%s\" requires",
             urn.providerName(), urn.propertyKey()),
         cause);
   }
@@ -737,6 +709,10 @@ public class SecretManager implements Closeable {
     return resolvePlaintextProperties(properties, false);
   }
 
+  /**
+   * Replaces secret URN values with plaintext, or with {@link HiddenPropertyMaskUtils#MASKED_VALUE}
+   * when {@code failOnMissing} is false and a secret cannot be read.
+   */
   private Map<String, String> resolvePlaintextProperties(
       @Nullable Map<String, String> properties, boolean failOnMissing) {
     if (properties == null || properties.isEmpty()) {
@@ -772,9 +748,9 @@ public class SecretManager implements Closeable {
     registry.close();
   }
 
-  private static List<SecretMaterial> toSecretMaterials(
+  private static Map<String, String> toPlaintexts(
       List<SecretUrn> bindingUrns, Map<String, SecretBinding> bindings) {
-    List<SecretMaterial> secretMaterials = new ArrayList<>(bindingUrns.size());
+    Map<String, String> plaintexts = new LinkedHashMap<>();
     for (SecretUrn urn : bindingUrns) {
       String propertyKey = urn.propertyKey();
       SecretBinding binding = bindings.get(propertyKey);
@@ -788,9 +764,9 @@ public class SecretManager implements Closeable {
                 "Property '%s' cannot be set to the masked placeholder value '%s'",
                 propertyKey, HiddenPropertyMaskUtils.MASKED_VALUE));
       }
-      secretMaterials.add(new SecretMaterial(urn, plaintext));
+      plaintexts.put(propertyKey, plaintext);
     }
-    return List.copyOf(secretMaterials);
+    return Collections.unmodifiableMap(plaintexts);
   }
 
   private static SecretUrn buildWriteThroughUrn(

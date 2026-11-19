@@ -26,6 +26,26 @@ import org.junit.jupiter.api.Test;
 public class TestIcebergCatalogCapability {
 
   @Test
+  void testExistingLongNamespacesRemainAddressableWithoutRelaxingCreate() {
+    IcebergCatalogCapability capability = new IcebergCatalogCapability(":");
+    for (int length : new int[] {65, 100}) {
+      String name = "n".repeat(length);
+      Assertions.assertTrue(
+          capability.specificationOnExistingName(Capability.Scope.SCHEMA, name).supported());
+      Assertions.assertTrue(
+          capability
+              .specificationOnExistingName(Capability.Scope.SCHEMA, "parent:" + name)
+              .supported());
+      Assertions.assertFalse(
+          capability.specificationOnName(Capability.Scope.SCHEMA, name).supported());
+      Assertions.assertFalse(
+          capability.specificationOnExistingName(Capability.Scope.TABLE, name).supported());
+    }
+    Assertions.assertFalse(
+        capability.specificationOnExistingName(Capability.Scope.SCHEMA, "a::b").supported());
+  }
+
+  @Test
   public void testSchemaNameSupportsConfiguredSeparator() {
     IcebergCatalogCapability capability = new IcebergCatalogCapability(":");
 
