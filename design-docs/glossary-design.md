@@ -1441,8 +1441,9 @@ also need `-PskipDockerTests=false` and a running Docker.
 
 When wiring glossary terms into the shared authorizer, test owner reads on the writing node and
 a second node across create, rename, drop and same-name recreation with a different creator.
-Invalidate cached name-to-ID and owner mappings after the outer transaction commits. A rolled-back
-create or drop must preserve the last committed authorization result.
+Glossary ownership decisions read the current term ID and owner from the store on each request.
+If another shared-authorizer consumer caches these mappings, invalidate them after the outer
+transaction commits. A rolled-back create or drop must preserve the last committed result.
 
 The users for these cases:
 

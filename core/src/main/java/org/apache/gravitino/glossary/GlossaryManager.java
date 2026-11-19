@@ -72,7 +72,11 @@ public final class GlossaryManager {
     }
   }
 
-  /** Loads a definition by normalized name. */
+  /**
+   * Loads a definition by normalized name.
+   *
+   * @throws NoSuchTermException if the term or its parent metalake does not exist
+   */
   public GlossaryTermEntity getTerm(String metalake, String name) {
     NameIdentifier ident = NameIdentifier.of(NamespaceUtil.ofGlossaryTerm(metalake), name);
     try {
@@ -88,6 +92,7 @@ public final class GlossaryManager {
    *
    * @throws NoSuchMetalakeException if the metalake does not exist
    * @throws NoSuchEntityException if the required creator is missing
+   * @throws TermAlreadyExistsException if the term name or source reference is already in use
    */
   public GlossaryTermEntity createTerm(String metalake, TermSpec spec) {
     Namespace ns = NamespaceUtil.ofGlossaryTerm(metalake);
@@ -121,12 +126,22 @@ public final class GlossaryManager {
         });
   }
 
-  /** Applies all changes atomically to the current definition. */
+  /**
+   * Applies all changes atomically to the current definition.
+   *
+   * @throws NoSuchTermException if the term or its parent metalake does not exist
+   */
   public GlossaryTermEntity alterTerm(String metalake, String name, TermChange... changes) {
     return alter(metalake, name, false, null, changes);
   }
 
-  /** Applies all changes only if the locked identity and revision match the supplied token. */
+  /**
+   * Applies all changes only if the locked identity and revision match the supplied token.
+   *
+   * @throws NoSuchTermException if the term or its parent metalake does not exist
+   * @throws TermVersionConflictException if a valid token does not match the current term
+   * @throws IllegalArgumentException if the supplied token is malformed
+   */
   public GlossaryTermEntity alterTerm(
       String metalake, String name, String expectedRevision, TermChange... changes) {
     return alter(metalake, name, true, expectedRevision, changes);
