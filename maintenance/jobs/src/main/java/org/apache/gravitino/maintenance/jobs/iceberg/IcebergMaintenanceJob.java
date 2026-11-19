@@ -205,7 +205,8 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     if (sparkConfJson != null && !sparkConfJson.isEmpty()) {
       Map<String, String> sparkConfigs =
           new HashMap<>(IcebergJobUtils.parseCustomSparkConfigs(sparkConfJson));
-      ensureIcebergCatalogImpl(sparkConfigs);
+      // Session defaultCatalog follows the first target table's catalog (single-catalog TMS path).
+      IcebergSparkConfigUtils.ensureIcebergCatalogConfigs(sparkConfigs, tables.get(0).catalogName);
       sparkConfigs.forEach(sparkBuilder::config);
     }
 
@@ -262,49 +263,63 @@ public class IcebergMaintenanceJob implements BuiltInJob {
       long actionId,
       Map<String, String> argsByName)
       throws Exception {
-    IcebergMaintenanceAction action = type.action();
-    TableSnapshotMetrics before = null;
-    if (action.hasBeforeMetrics()) {
-      before = action.collectBeforeMetrics(spark, table.catalogName, table.tableIdentifier);
-      if (!reportBeforeMetricsOrStop(client, actionId, table.tableId, policyId, before)) {
-        LOG.info(
-            "TMS type {} stopped for action_id {} table {} policy {}: before-metrics failed"
-                + " (abandoned or unbound)",
-            type.wireName,
-            actionId,
-            table.tableId,
-            policyId);
-        return;
+    // Rewrite-manifests may temporarily pin spec-id after S0; restore so the next table/type
+    // does not inherit that resolution.
+    String priorSpecId = argsByName.get("spec-id");
+    try {
+      IcebergMaintenanceAction action = type.action();
+      TableSnapshotMetrics before = null;
+      if (action.hasBeforeMetrics()) {
+        before =
+            action.collectBeforeMetrics(
+                spark, table.catalogName, table.tableIdentifier, argsByName);
+        if (!reportBeforeMetricsOrStop(client, actionId, table.tableId, policyId, before)) {
+          LOG.info(
+              "TMS type {} stopped for action_id {} table {} policy {}: before-metrics failed"
+                  + " (abandoned or unbound)",
+              type.wireName,
+              actionId,
+              table.tableId,
+              policyId);
+          return;
+        }
+        long headSnapshotId =
+            IcebergJobUtils.requireCurrentSnapshotId(
+                spark, table.catalogName, table.tableIdentifier);
+        if (action.shouldCheckSnapshotDrift() && before.snapshotId() != headSnapshotId) {
+          LOG.info(
+              "TMS type {} skipped for action_id {} table {} policy {}: snapshot drifted"
+                  + " (sampled={} head={})",
+              type.wireName,
+              actionId,
+              table.tableId,
+              policyId,
+              before.snapshotId(),
+              headSnapshotId);
+          return;
+        }
+        if (!MaintenanceTriggerGate.shouldMaintain(type, argsByName, before.metricsJson())) {
+          LOG.info(
+              "TMS type {} skipped for action_id {} table {} policy {}: trigger-expr skip",
+              type.wireName,
+              actionId,
+              table.tableId,
+              policyId);
+          return;
+        }
       }
-      long headSnapshotId =
-          IcebergJobUtils.requireCurrentSnapshotId(spark, table.catalogName, table.tableIdentifier);
-      if (action.shouldCheckSnapshotDrift() && before.snapshotId() != headSnapshotId) {
-        LOG.info(
-            "TMS type {} skipped for action_id {} table {} policy {}: snapshot drifted"
-                + " (sampled={} head={})",
-            type.wireName,
-            actionId,
-            table.tableId,
-            policyId,
-            before.snapshotId(),
-            headSnapshotId);
-        return;
-      }
-      if (!MaintenanceTriggerGate.shouldMaintain(type, argsByName, before.metricsJson())) {
-        LOG.info(
-            "TMS type {} skipped for action_id {} table {} policy {}: trigger-expr skip",
-            type.wireName,
-            actionId,
-            table.tableId,
-            policyId);
-        return;
+
+      TableSnapshotMetrics after =
+          action.executeAndCollectAfter(
+              spark, table.catalogName, table.tableIdentifier, argsByName, before);
+      reportAfterMetrics(client, actionId, table.tableId, policyId, after);
+    } finally {
+      if (priorSpecId == null) {
+        argsByName.remove("spec-id");
+      } else {
+        argsByName.put("spec-id", priorSpecId);
       }
     }
-
-    TableSnapshotMetrics after =
-        action.executeAndCollectAfter(
-            spark, table.catalogName, table.tableIdentifier, argsByName, before);
-    reportAfterMetrics(client, actionId, table.tableId, policyId, after);
   }
 
   /**
@@ -496,36 +511,6 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     } catch (JsonProcessingException e) {
       throw new IllegalArgumentException("Invalid updater-options JSON: " + e.getMessage(), e);
     }
-  }
-
-  /**
-   * Ensures {@code spark.sql.catalog.<name>} points at Iceberg {@code SparkCatalog} whenever nested
-   * catalog connection keys are present. Needed because TMS schedule {@code spark_conf} may only
-   * carry {@code .type}/{@code .uri}/{@code .warehouse}.
-   */
-  private static void ensureIcebergCatalogImpl(Map<String, String> sparkConfigs) {
-    String prefix = "spark.sql.catalog.";
-    Set<String> catalogs = new HashSet<>();
-    for (String key : sparkConfigs.keySet()) {
-      if (!key.startsWith(prefix)) {
-        continue;
-      }
-      String rest = key.substring(prefix.length());
-      int dot = rest.indexOf('.');
-      if (dot <= 0) {
-        continue;
-      }
-      String prop = rest.substring(dot + 1);
-      if ("type".equals(prop) || "uri".equals(prop) || "warehouse".equals(prop)) {
-        catalogs.add(rest.substring(0, dot));
-      }
-    }
-    for (String catalog : catalogs) {
-      sparkConfigs.putIfAbsent(prefix + catalog, "org.apache.iceberg.spark.SparkCatalog");
-      sparkConfigs.putIfAbsent("spark.sql.defaultCatalog", catalog);
-    }
-    sparkConfigs.putIfAbsent(
-        "spark.sql.extensions", IcebergSparkConfigUtils.ICEBERG_SPARK_EXTENSIONS);
   }
 
   private static List<String> templateArguments() {

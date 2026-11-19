@@ -24,9 +24,9 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier
 
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
@@ -48,11 +48,10 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.secret.SecretAlterChanges;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
-import org.apache.gravitino.secret.SecretMaterial;
-import org.apache.gravitino.secret.SecretMaterialsHolder;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.secret.SecretVersionChanges;
+import org.apache.gravitino.secret.SecretVersionChangesHolder;
 import org.apache.gravitino.storage.IdGenerator;
 
 public class FilesetOperationDispatcher extends OperationDispatcher implements FilesetDispatcher {
@@ -181,8 +180,8 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
     long uid = idGenerator.nextId();
     Map<String, String> entityProperties =
         SecretPropertyUtils.copyEntityProperties(properties, secretBindings, secretReferences);
-    List<SecretMaterial> secretMaterials =
-        secretManager.assembleSecretMaterials(
+    Map<String, String> secretPlaintexts =
+        secretManager.assembleSecretPlaintexts(
             properties, entityProperties, "fileset", uid, secretBindings, secretReferences);
     doWithCatalog(
         catalogIdent,
@@ -201,11 +200,15 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
         StringIdentifier.newPropertiesWithId(stringId, entityProperties);
 
     // Write secrets before create: paths that resolve URNs (e.g. mergeUpLevelConfigurations for FS
-    // mkdir, catalog createBaseCatalog) require secrets to exist first. Roll back on any create
-    // failure (same pattern as CatalogManager / SchemaOperationDispatcher).
-    secretManager.writeSecrets(secretMaterials);
+    // mkdir, catalog createBaseCatalog) require secrets to exist first. Roll back only if the
+    // catalog create fails; once it returns, the fileset references these secrets.
+    secretManager.validateProposedSecrets(entityProperties, secretPlaintexts);
+    SecretVersionChanges stagedSecrets =
+        secretManager.stageSecrets(null, entityProperties, "fileset", uid, secretPlaintexts);
+    AtomicBoolean createdInCatalog = new AtomicBoolean();
+    Fileset createdFileset;
     try {
-      Fileset createdFileset =
+      createdFileset =
           TreeLockUtils.doWithTreeLock(
               // Lock at fileset level (not schema level) to allow concurrent fileset creation.
               // Trade-off: listFilesets() may temporarily miss in-progress creations until
@@ -217,21 +220,28 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                       catalogIdent,
                       c ->
                           c.doWithFilesetOps(
-                              f ->
-                                  f.createMultipleLocationFileset(
-                                      ident, comment, type, storageLocations, updatedProperties)),
+                              f -> {
+                                Fileset created =
+                                    f.createMultipleLocationFileset(
+                                        ident, comment, type, storageLocations, updatedProperties);
+                                createdInCatalog.set(true);
+                                return created;
+                              }),
                       NoSuchSchemaException.class,
                       FilesetAlreadyExistsException.class));
-      return EntityCombinedFileset.of(createdFileset)
-          .withHiddenProperties(
-              getMaskAndOmitKeys(
-                  catalogIdent,
-                  HasPropertyMetadata::filesetPropertiesMetadata,
-                  createdFileset.properties()));
     } catch (RuntimeException e) {
-      secretManager.rollbackSecrets(secretMaterials);
+      if (!createdInCatalog.get()) {
+        secretManager.rollbackSecrets(stagedSecrets);
+      }
       throw e;
     }
+    secretManager.commitSecrets(stagedSecrets);
+    return EntityCombinedFileset.of(createdFileset)
+        .withHiddenProperties(
+            getMaskAndOmitKeys(
+                catalogIdent,
+                HasPropertyMetadata::filesetPropertiesMetadata,
+                createdFileset.properties()));
   }
 
   /**
@@ -323,13 +333,13 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
       filesetId = null;
     }
 
-    SecretMaterialsHolder writtenSecretMaterials = new SecretMaterialsHolder();
+    SecretVersionChangesHolder stagedSecrets = new SecretVersionChangesHolder();
     boolean alterCommitted = false;
     try {
       Pair<FilesetChange[], SecretVersionChanges> secretResult =
           SecretAlterChanges.prepareFilesetChanges(
               secretManager, currentProperties, filesetId, changes);
-      writtenSecretMaterials.set(secretResult.getRight());
+      stagedSecrets.set(secretResult.getRight());
       FilesetChange[] effectiveChanges = secretResult.getLeft();
 
       Fileset altered =
@@ -339,11 +349,11 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
               NoSuchFilesetException.class,
               IllegalArgumentException.class);
       alterCommitted = true;
-      secretManager.commitSecrets(writtenSecretMaterials.get());
+      secretManager.commitSecrets(stagedSecrets.get());
       return altered;
     } finally {
       if (!alterCommitted) {
-        secretManager.rollbackSecrets(writtenSecretMaterials.get());
+        secretManager.rollbackSecrets(stagedSecrets.get());
       }
     }
   }

@@ -298,6 +298,12 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
   }
 
   @Override
+  public boolean canDropFailedNewTable(ConnectorTableMetadata tableMetadata) {
+    // Dropping a Glue table deletes only its metadata.
+    return true;
+  }
+
+  @Override
   protected List<String> toTrinoPartitionKeys(Transform[] partitioning) {
     return ExpressionUtil.expressionToPartitionFiled(partitioning);
   }

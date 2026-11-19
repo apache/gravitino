@@ -42,7 +42,7 @@ directory. Use `--conf-path` only when you need a custom config file.
 | `--range-seconds`      | Time window (seconds) for monitor evaluation. Default is `86400` (24h).                              | `monitor-metrics`                                 |
 | `--partition-path`     | Partition path JSON array, for example `'[{"dt":"2026-01-01"}]'`. Requires exactly one identifier.   | `monitor-metrics`, `list-table-metrics`           |
 | `--update-mode`        | Controls what built-in update job updates: `stats`, `metrics`, or `all` (default).                   | `submit-update-stats-job`                         |
-| `--updater-options`    | Flat JSON map passed to updater logic. For `stats`/`all`, include `gravitino_uri` and `metalake`.    | `submit-update-stats-job`                         |
+| `--updater-options`    | Flat JSON map passed to updater logic. Always include `gravitino_uri` (loads `gravitino.schema.separator` from `GET /configs`). For `stats`/`all`, also include `metalake`. | `submit-update-stats-job`                         |
 | `--spark-conf`         | Flat JSON map of Spark and Iceberg catalog configs used by the job.                                  | `submit-update-stats-job`                         |
 
 Global option:
@@ -84,6 +84,12 @@ job scopes with multiple metric/statistic fields:
   `submit-update-stats-job`
 - `append-metrics` accepts both table and job identifiers, so it does not apply the default catalog
 - Job records: parsed as a regular Gravitino `NameIdentifier`
+- For `submit-update-stats-job` with [hierarchical schemas](../lakehouse-iceberg-catalog.md#hierarchical-schema):
+  - Gravitino form: `catalog.a|b.events` (schema may contain `gravitino.schema.separator`, default `:`)
+  - Spark-physical form: `catalog.a.b.events` (4+ dotted levels; the CLI joins intermediate levels with
+    the separator from `GET /configs`)
+  - With a default catalog, prefer Gravitino `a|b.events` (2 levels), or include the catalog in the
+    Spark-physical form (`catalog.a.b.events`)
 
 ## CLI Workflow Examples
 
@@ -177,9 +183,14 @@ Submit built-in Iceberg update stats/metrics Spark jobs directly.
 
 Notes:
 
-- `--identifiers` supports `catalog.schema.table` or `schema.table` (when default catalog is configured).
+- `--identifiers` supports `catalog.schema.table`, `schema.table` (when default catalog is configured),
+  and for hierarchical schemas also Spark-physical `catalog.ns...table` (see
+  [Identifier Rules](#identifier-rules)).
 - `--update-mode` supports `stats|metrics|all` (default `all`).
-- For `stats` or `all`, `--updater-options` must include `gravitino_uri` and `metalake`.
+- `--updater-options` must always include `gravitino_uri`. The CLI and the Spark job both load
+  `gravitino.schema.separator` from that server's unauthenticated `GET /configs` endpoint (including
+  `--dry-run`, which does not submit a job but still needs a reachable URI). For `stats` or `all`,
+  also include `metalake`.
 - If `--updater-options` includes external JDBC metrics settings
   (`gravitino.optimizer.jdbcMetrics.*`), ensure the JDBC driver JAR is available to Spark
   runtime classpath of the driver: with the k8s job executor, for example via `spark.jars` in
@@ -298,6 +309,11 @@ such as the namespace, the image, the service account, Secrets, and volumes: who
 
 `builtin-iceberg-update-stats` reads a table and writes back the statistics and metrics that policies evaluate. Compaction policies read `custom-data-file-mse` and `custom-delete-file-number`, so nothing else will fire until this job has run at least once.
 
+`updater_options` must include `gravitino_uri` for every `update_mode` (including `metrics`): the job
+loads `gravitino.schema.separator` from that server's `GET /configs` and maps Spark
+`table_identifier` values (such as `a.b.events`) back to Gravitino hierarchical names (such as
+`a|b.events`).
+
 Its `jobConf` is documented in [Configuration](./optimizer-configuration.md#job-submission-configuration).
 
 ## Update Manifest Statistics
@@ -324,7 +340,8 @@ Snapshot IDs identify measurements; they are not monotonically increasing versio
 The template accepts `catalog_name`, `table_identifier`, `updater_options`, and optional
 `coordination_directory` and `spark_conf`, alongside the standard Spark template settings. There is no `spec_id` filter:
 collection always replaces the complete maps for the table.
-`updater_options` is a JSON string containing `gravitino_uri` and `metalake`; it can also select
+`updater_options` is a JSON string that must include `gravitino_uri` (the job loads
+`gravitino.schema.separator` from that server's `GET /configs`) and `metalake`; it can also select
 a `statistics_updater` implementing the existing table statistics update operation.
 For example:
 

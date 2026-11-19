@@ -26,7 +26,6 @@ from gravitino.api.auditable import Auditable
 from gravitino.api.domain.domain_member import DomainMember
 from gravitino.api.domain.domain_member_filter import DomainMemberFilter
 from gravitino.api.domain.domain_relation import DomainRelation
-from gravitino.api.tag.tag_value import TagValue
 
 
 class Domain(Auditable):
@@ -71,8 +70,12 @@ class Domain(Auditable):
         raise NotImplementedError
 
     @abstractmethod
-    def backing_tag(self) -> Optional[TagValue]:
-        """Return the backing tag, or None when removed or deleted."""
+    def backing_tag(self) -> Optional[str]:
+        """Return the backing tag name, or None when removed or deleted.
+
+        Objects that carry the tag, with or without values, are members; any
+        value on an assignment is ignored. A tag backs at most one domain.
+        """
         raise NotImplementedError
 
     @abstractmethod
@@ -106,8 +109,8 @@ class Domain(Auditable):
         raise NotImplementedError
 
     @abstractmethod
-    def update_backing_tag(self, backing_tag: Optional[TagValue]) -> Domain:
-        """Bind an existing tag, or remove with None, returning a new snapshot."""
+    def update_backing_tag(self, backing_tag: Optional[str]) -> Domain:
+        """Bind an existing tag by name, or remove with None, returning a new snapshot."""
         raise NotImplementedError
 
     @abstractmethod
@@ -116,10 +119,10 @@ class Domain(Auditable):
         name: str,
         comment: Optional[str],
         properties: Optional[dict[str, str]],
-        backing_tag: TagValue,
+        backing_tag: str,
         create_backing_tag: bool,
     ) -> Domain:
-        """Create a draft subdomain with an explicit backing tag."""
+        """Create a draft subdomain with an explicit backing tag name."""
         raise NotImplementedError
 
     @abstractmethod

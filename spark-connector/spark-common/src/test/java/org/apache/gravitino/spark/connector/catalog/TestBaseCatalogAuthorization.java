@@ -184,7 +184,7 @@ public class TestBaseCatalogAuthorization {
               () ->
                   catalog.alterTable(
                       identifier,
-                      TableChange.updateColumnDefaultValue(
+                      updateColumnDefaultValue(
                           new String[] {"ts"}, "TIMESTAMP_LTZ '2026-11-04 12:34:56.123456'")));
           return null;
         });
@@ -209,7 +209,7 @@ public class TestBaseCatalogAuthorization {
             () ->
                 catalog.alterTable(
                     identifier,
-                    TableChange.updateColumnDefaultValue(new String[] {"ts"}, sql),
+                    updateColumnDefaultValue(new String[] {"ts"}, sql),
                     TableChange.updateColumnType(new String[] {"ts"}, DataTypes.TimestampNTZType)));
     Assertions.assertTrue(error.getMessage().contains("cannot be combined"));
     Mockito.verifyNoInteractions(gravitinoTableCatalog, sparkCatalog);
@@ -229,7 +229,7 @@ public class TestBaseCatalogAuthorization {
             ForbiddenException.class,
             () ->
                 catalog.alterTable(
-                    identifier, TableChange.updateColumnDefaultValue(new String[] {"ts"}, sql))));
+                    identifier, updateColumnDefaultValue(new String[] {"ts"}, sql))));
     verify(gravitinoTableCatalog).loadTable(gravitinoIdentifier);
     Mockito.verifyNoMoreInteractions(gravitinoTableCatalog);
     Mockito.verifyNoInteractions(sparkCatalog);
@@ -252,8 +252,7 @@ public class TestBaseCatalogAuthorization {
               () ->
                   catalog.alterTable(
                       identifier,
-                      TableChange.updateColumnDefaultValue(
-                          new String[] {"ts"}, "DATE '2026-11-04'")));
+                      updateColumnDefaultValue(new String[] {"ts"}, "DATE '2026-11-04'")));
           return null;
         });
     ArgumentCaptor<org.apache.gravitino.rel.TableChange> change =
@@ -281,8 +280,7 @@ public class TestBaseCatalogAuthorization {
             () ->
                 catalog.alterTable(
                     identifier,
-                    TableChange.updateColumnDefaultValue(
-                        new String[] {"ts"}, "'2026-11-04 12:34:56.123456'")));
+                    updateColumnDefaultValue(new String[] {"ts"}, "'2026-11-04 12:34:56.123456'")));
     Assertions.assertTrue(error.getMessage().contains("TIMESTAMP_LTZ or TIMESTAMP_NTZ"));
     verify(gravitinoTableCatalog).loadTable(gravitinoIdentifier);
     Mockito.verifyNoMoreInteractions(gravitinoTableCatalog);
@@ -293,7 +291,7 @@ public class TestBaseCatalogAuthorization {
   void testNumericDefaultDoesNotReadSchema() throws Exception {
     Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
     NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
-    catalog.alterTable(identifier, TableChange.updateColumnDefaultValue(new String[] {"ts"}, "42"));
+    catalog.alterTable(identifier, updateColumnDefaultValue(new String[] {"ts"}, "42"));
     verify(gravitinoTableCatalog, Mockito.never()).loadTable(gravitinoIdentifier);
   }
 
@@ -311,12 +309,10 @@ public class TestBaseCatalogAuthorization {
             });
     catalog.alterTable(
         identifier,
-        TableChange.updateColumnDefaultValue(
-            new String[] {"ts"}, "TIMESTAMP_NTZ '2026-11-04 12:34:00'"),
-        TableChange.updateColumnDefaultValue(
-            new String[] {"ts"}, "TIMESTAMP_NTZ '2026-11-04 00:00:00'"),
-        TableChange.updateColumnDefaultValue(new String[] {"ts"}, "DATE '2026-11-04'"),
-        TableChange.updateColumnDefaultValue(new String[] {"label"}, "'label'"));
+        updateColumnDefaultValue(new String[] {"ts"}, "TIMESTAMP_NTZ '2026-11-04 12:34:00'"),
+        updateColumnDefaultValue(new String[] {"ts"}, "TIMESTAMP_NTZ '2026-11-04 00:00:00'"),
+        updateColumnDefaultValue(new String[] {"ts"}, "DATE '2026-11-04'"),
+        updateColumnDefaultValue(new String[] {"label"}, "'label'"));
     verify(gravitinoTableCatalog).loadTable(gravitinoIdentifier);
     verify(table).columns();
   }
@@ -368,5 +364,13 @@ public class TestBaseCatalogAuthorization {
     protected SparkTransformConverter getSparkTransformConverter() {
       return mock(SparkTransformConverter.class);
     }
+  }
+
+  // Spark 4.1 deprecates the String form of updateColumnDefaultValue; the DefaultValue form that
+  // replaces it does not exist on Spark 3.5 or 4.0. Scoped to this helper so the rest of the class
+  // keeps the -Werror deprecation gate.
+  @SuppressWarnings("deprecation")
+  private static TableChange updateColumnDefaultValue(String[] fieldNames, String sql) {
+    return TableChange.updateColumnDefaultValue(fieldNames, sql);
   }
 }

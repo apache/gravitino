@@ -26,10 +26,8 @@ from gravitino.api.domain import (
     DomainMemberFilter,
     DomainRelation,
 )
-from gravitino.api.tag import TagValue
 from gravitino.exceptions.base import (
     ForbiddenException,
-    IllegalArgumentException,
     NoSuchDomainException,
     NoSuchTagException,
     TagAlreadyExistsException,
@@ -44,7 +42,7 @@ class DomainApiEdgesMixin:
             self.skipTest("Requires an authorization-enabled server")
         parent = self._domain("matrix-parent").publish()
         child = parent.create_subdomain(
-            "matrix-child", None, {}, TagValue("matrix-child-tag"), True
+            "matrix-child", None, {}, "matrix-child-tag", True
         ).publish()
         target = self._domain("matrix-target").publish()
 
@@ -98,13 +96,11 @@ class DomainApiEdgesMixin:
                 ),
                 "subdomain": lambda client=reader: client.get_domain(
                     creation_parent.name()
-                ).create_subdomain(
-                    "denied-subdomain", None, {}, TagValue("denied-tag"), True
-                ),
+                ).create_subdomain("denied-subdomain", None, {}, "denied-tag", True),
             }
             if user == "matrix_reader":
                 writes["create"] = lambda client=reader: client.create_domain(
-                    "denied-domain", None, {}, TagValue("denied-create-tag"), True
+                    "denied-domain", None, {}, "denied-create-tag", True
                 )
             for endpoint, operation in writes.items():
                 with self.subTest(user=user, endpoint=endpoint):
@@ -132,7 +128,7 @@ class DomainApiEdgesMixin:
         parent = self._domain("allowed-parent").publish()
         target = self._domain("allowed-target").publish()
         child = parent.create_subdomain(
-            "allowed-child", None, {}, TagValue("allowed-child-tag"), True
+            "allowed-child", None, {}, "allowed-child-tag", True
         ).publish()
         creation_parent = self._domain("allowed-creation-parent").publish()
         manager = self._client("allowed_manager")
@@ -167,17 +163,17 @@ class DomainApiEdgesMixin:
         )
         self.assertIsNone(managed.detach_from_parent().parent())
         self.assertEqual(
-            TagValue("manager-binding-tag"),
-            managed.update_backing_tag(TagValue("manager-binding-tag")).backing_tag(),
+            "manager-binding-tag",
+            managed.update_backing_tag("manager-binding-tag").backing_tag(),
         )
         self.assertIsNone(managed.update_backing_tag(None).backing_tag())
 
         # These legal requests match the denied creation requests with management now allowed.
         created = manager.create_domain(
-            "denied-domain", None, {}, TagValue("denied-create-tag"), True
+            "denied-domain", None, {}, "denied-create-tag", True
         )
         subdomain = manager.get_domain(creation_parent.name()).create_subdomain(
-            "denied-subdomain", None, {}, TagValue("denied-tag"), True
+            "denied-subdomain", None, {}, "denied-tag", True
         )
         self.assertEqual(creation_parent.name(), subdomain.parent())
         self.assertEqual(created.name(), manager.get_domain(created.name()).name())
@@ -185,46 +181,36 @@ class DomainApiEdgesMixin:
         with self.assertRaises(NoSuchDomainException):
             self.lake.get_domain(child.name())
 
-    def test_backing_tag_value_length_boundaries(self):
+    def test_unicode_assignment_values_are_ignored(self):
         _, table = self._relational_table()
         for index, value in enumerate(("x" * 256, "😀" * 128)):
             with self.subTest(index=index):
                 tag_name = f"unicode-boundary-{index}"
                 self.lake.create_tag(tag_name, None, {})
                 name = "F" * 63 + str(index)
-                binding = TagValue(tag_name, value)
                 domain = self.lake.create_domain(
-                    name, "Unicode comment 中文😀", {"region": "亚洲😀"}, binding, False
+                    name,
+                    "Unicode comment 中文😀",
+                    {"region": "亚洲😀"},
+                    tag_name,
+                    False,
                 )
                 loaded = self.lake.get_domain(name)
                 self.assertEqual(name, loaded.name())
-                self.assertEqual(binding, loaded.backing_tag())
+                self.assertEqual(tag_name, loaded.backing_tag())
                 self.assertEqual({"region": "亚洲😀"}, loaded.properties())
 
-                # Boundary values survive serialization, storage and membership resolution.
+                # A boundary value on the assignment does not affect membership.
                 table.supports_tags().assign_tags([{"name": tag_name, "value": value}])
                 direct = {(DomainRelation.Type.DIRECT, None, None)}
                 self._assert_table_relations(domain, table, direct)
                 renamed = f"Tax-{index}"
                 changed = self.lake.alter_domain(name, DomainChange.rename(renamed))
                 self.assertEqual(renamed, self.lake.get_domain(renamed).name())
-                self.assertEqual(binding, changed.backing_tag())
+                self.assertEqual(tag_name, changed.backing_tag())
                 self._assert_table_relations(changed, table, direct)
                 with self.assertRaises(NoSuchDomainException):
                     self.lake.get_domain(name)
-
-                # The Python client must enforce Java's UTF-16-unit limit before HTTP.
-                with self.assertRaises(IllegalArgumentException):
-                    changed.update_backing_tag(TagValue(tag_name, value + "x"))
-                self.assertEqual(binding, self.lake.get_domain(renamed).backing_tag())
-                rejected_name = f"rejected-boundary-{index}"
-                with self.assertRaises(IllegalArgumentException):
-                    self.lake.create_domain(
-                        rejected_name, None, {}, TagValue(tag_name, value + "x"), False
-                    )
-                with self.assertRaises(NoSuchDomainException):
-                    self.lake.get_domain(rejected_name)
-                self._assert_table_relations(changed, table, direct)
 
     def test_real_response_value_equality_and_snapshot_protection(self):
         _, table = self._relational_table()
@@ -232,7 +218,7 @@ class DomainApiEdgesMixin:
             "value-contract",
             "original",
             {"key": "value"},
-            TagValue("value-contract-tag"),
+            "value-contract-tag",
             True,
         )
         loaded = self.lake.get_domain(created.name())
@@ -304,7 +290,7 @@ class DomainApiEdgesMixin:
             "subdomains_info": removed.list_subdomains_info,
             "members": lambda: removed.list_members(DomainMemberFilter(expand=True)),
             "create_subdomain": lambda: removed.create_subdomain(
-                "orphan", None, {}, TagValue("orphan-tag"), True
+                "orphan", None, {}, "orphan-tag", True
             ),
         }
         for endpoint, operation in operations.items():
@@ -321,21 +307,15 @@ class DomainApiEdgesMixin:
             domain.attach_to_parent("missing-parent")
         self.assertIsNone(self.lake.get_domain(domain.name()).parent())
         with self.assertRaises(NoSuchTagException):
-            domain.update_backing_tag(TagValue("absent-tag"))
+            domain.update_backing_tag("absent-tag")
         self.assertEqual(
             domain.backing_tag(), self.lake.get_domain(domain.name()).backing_tag()
         )
 
         # A rejected creation must not adopt an existing tag or leave an orphan domain.
         invalid = [
-            ("missing-binding", TagValue("absent-tag"), False, NoSuchTagException),
+            ("missing-binding", "absent-tag", False, NoSuchTagException),
             ("existing-binding", domain.backing_tag(), True, TagAlreadyExistsException),
-            (
-                "valued-new-tag",
-                TagValue("invalid-new-tag", "value"),
-                True,
-                IllegalArgumentException,
-            ),
         ]
         for name, tag, create_tag, error in invalid:
             with self.subTest(name=name):
@@ -343,6 +323,4 @@ class DomainApiEdgesMixin:
                     self.lake.create_domain(name, None, {}, tag, create_tag)
                 with self.assertRaises(NoSuchDomainException):
                     self.lake.get_domain(name)
-        with self.assertRaises(NoSuchTagException):
-            self.lake.get_tag("invalid-new-tag")
-        self.assertIsNotNone(self.lake.get_tag(domain.backing_tag().name()))
+        self.assertIsNotNone(self.lake.get_tag(domain.backing_tag()))

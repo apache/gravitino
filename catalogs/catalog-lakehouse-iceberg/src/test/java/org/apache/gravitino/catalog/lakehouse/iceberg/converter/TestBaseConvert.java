@@ -177,14 +177,16 @@ public class TestBaseConvert {
     if (sortOrderExpression instanceof NamedReference.FieldReference) {
       NamedReference.FieldReference fieldReference =
           (NamedReference.FieldReference) sortOrderExpression;
-      return String.format("identity(%s)", fieldReference.fieldName()[0]);
+      return String.format("identity(%s)", String.join(".", fieldReference.fieldName()));
     } else if (sortOrderExpression instanceof FunctionExpression) {
       FunctionExpression functionExpression = (FunctionExpression) sortOrderExpression;
       String functionName = functionExpression.functionName();
       Expression[] arguments = functionExpression.arguments();
       if (arguments.length == 1) {
         return String.format(
-            "%s(%s)", functionName, ((NamedReference.FieldReference) arguments[0]).fieldName()[0]);
+            "%s(%s)",
+            functionName,
+            String.join(".", ((NamedReference.FieldReference) arguments[0]).fieldName()));
       } else if (arguments.length == 2) {
         Expression firstArg = arguments[0];
         Preconditions.checkArgument(
@@ -196,7 +198,7 @@ public class TestBaseConvert {
             "%s(%s, %s)",
             functionName,
             Integer.parseInt(String.valueOf(((Literal<?>) firstArg).value())),
-            ((NamedReference.FieldReference) arguments[1]).fieldName()[0]);
+            String.join(".", ((NamedReference.FieldReference) arguments[1]).fieldName()));
       } else {
         throw new IllegalArgumentException(
             String.format(

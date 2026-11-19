@@ -152,6 +152,34 @@ on the URI scheme:
 - To override the default, explicitly configure `io-impl`.
 - Ensure that the corresponding storage bundle is available in the Iceberg catalog classpath.
 
+Catalogs with a remote warehouse reject client-supplied local filesystem locations, including
+`file:` URIs and paths without a scheme, with HTTP 400. This applies to table and view creation
+(including staged table creation), registration, location updates, namespace locations, and the
+`write.metadata.path` and `write.data.path` properties. An existing local namespace location is
+also rejected when a create request inherits it. ResolvingFileIO still permits locations on
+different remote storage systems, such as S3 and GCS, in the same catalog. Catalogs whose warehouse
+is a local path or `file:` URI retain local filesystem support for development and testing.
+
+With Iceberg REST authorization enabled, an explicit table location on create (including staged
+create), registration, or a `set-location` commit requires load access to every existing table
+whose location overlaps it. Equal, parent, and child directories overlap; names such as `table`
+and `table2` do not. Destination create and overwrite privileges are checked first, and denied
+source checks return 403 without disclosing the source table's name. A default-location create
+does not add a source scan. Filesystem dot segments and repeated separators are normalized for
+comparison; object-store keys retain their literal path segments.
+
+For JDBC backends, source discovery uses a single query of current metadata pointers and infers
+locations from the standard `<table-location>/metadata/<file>` layout. This lookup does not read
+other tables' metadata files and does not use a cross-request cache. Custom metadata layouts,
+including arbitrary `write.metadata.path` values, are outside this lookup's supported layout.
+Registration also preserves exact current metadata-pointer matching, including pointers outside
+the standard layout. This identity check does not provide complete overlap detection for custom
+layouts. Source discovery compares storage locations and metadata pointers rather than table
+UUIDs; register-overwrite still preserves the destination table UUID. Backends without bulk
+pointer lookup retain namespace discovery. Metadata read failures on that fallback path are
+propagated; only tables proven to have disappeared are skipped. Database lookup failures are
+also propagated, and destination authorization remains required.
+
 Supports using static access-key-id and secret-access-key to access S3 data.
 
 | Configuration item     | Description                                                                                                                                                                                                         | Default value                           | Required |

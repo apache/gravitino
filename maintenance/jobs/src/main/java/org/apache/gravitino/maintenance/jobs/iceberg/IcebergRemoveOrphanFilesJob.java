@@ -175,7 +175,7 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
       @Nullable String location,
       boolean dryRun)
       throws IOException {
-    requireEscapedStringLiteralsDisabled(spark);
+    IcebergJobUtils.requireEscapedStringLiteralsDisabled(spark);
     String normalizedLocation =
         resolveAndValidateLocation(spark, catalogName, tableIdentifier, location);
     return callRemoveOrphanFiles(
@@ -194,7 +194,7 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
       @Nullable String location,
       boolean dryRun)
       throws IOException {
-    requireEscapedStringLiteralsDisabled(spark);
+    IcebergJobUtils.requireEscapedStringLiteralsDisabled(spark);
     Table table = IcebergJobUtils.loadIcebergTable(spark, catalogName, tableIdentifier);
     String normalizedLocation = resolveAndValidateLocation(spark, table, location);
     List<Row> listed =
@@ -244,7 +244,10 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
 
   @Override
   public TableSnapshotMetrics collectBeforeMetrics(
-      SparkSession spark, String catalogName, String tableIdentifier) {
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      Map<String, String> argsByName) {
     throw new IllegalStateException("Orphan cleanup must not sample before-metrics");
   }
 
@@ -283,11 +286,8 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
       @Nullable String location,
       boolean dryRun) {
     // Render string literals using Spark so quotes and backslashes round-trip correctly.
-    StringBuilder sql =
-        new StringBuilder("CALL ")
-            .append(IcebergJobUtils.escapeSqlIdentifier(catalog))
-            .append(".system.remove_orphan_files(table => ")
-            .append(lit(table).expr().sql());
+    StringBuilder sql = IcebergJobUtils.beginSystemProcedureCall(catalog, "remove_orphan_files");
+    sql.append("table => ").append(lit(table).expr().sql());
     if (olderThan != null && !olderThan.isEmpty()) {
       sql.append(", older_than => TIMESTAMP ").append(lit(olderThan).expr().sql());
     }
@@ -316,13 +316,6 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
       LOG.warn("Failed to measure orphan file size for {}: {}", location, e.toString());
       return 0L;
     }
-  }
-
-  private static void requireEscapedStringLiteralsDisabled(SparkSession spark) {
-    // Backslash escapes in string literals must retain Spark's default interpretation.
-    Preconditions.checkArgument(
-        !Boolean.parseBoolean(spark.conf().get("spark.sql.parser.escapedStringLiterals", "false")),
-        "spark.sql.parser.escapedStringLiterals must be false");
   }
 
   private static String resolveAndValidateLocation(

@@ -45,7 +45,7 @@ import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
-public class SparkJdbcTable extends JDBCTable {
+public class SparkJdbcTable extends SparkJdbcTableBase {
 
   private final GravitinoTableInfoHelper gravitinoTableInfoHelper;
   private final Table gravitinoTable;
@@ -80,7 +80,7 @@ public class SparkJdbcTable extends JDBCTable {
       SparkTransformConverter sparkTransformConverter,
       SparkTypeConverter sparkTypeConverter,
       Runnable validateConnection) {
-    super(identifier, jdbcTable.schema(), jdbcTable.jdbcOptions());
+    super(identifier, jdbcTable);
     this.validateConnection = validateConnection;
     this.gravitinoTable = gravitinoTable;
     this.gravitinoTableInfoHelper =

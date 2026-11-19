@@ -46,7 +46,6 @@ import org.apache.gravitino.flink.connector.catalog.BaseCatalogFactory;
 import org.apache.gravitino.flink.connector.catalog.GravitinoCatalogManager;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
-import org.apache.gravitino.secret.SecretMaterial;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.secret.SupportsSecrets;
@@ -237,15 +236,15 @@ public class TestGravitinoCatalogStore {
     try (SecretManager sm = memorySecretManager()) {
       Map<String, String> entityProps = new HashMap<>();
       entityProps.put("custom-token", "placeholder");
-      java.util.List<SecretMaterial> writes =
-          sm.assembleSecretMaterials(
+      Map<String, String> plaintexts =
+          sm.assembleSecretPlaintexts(
               Map.of(),
               entityProps,
               "catalog",
               2L,
               Map.of("custom-token", new SecretBinding("memory", "mem-tok")),
               Map.of());
-      sm.writeSecrets(writes);
+      sm.stageSecrets(null, entityProps, "catalog", 2L, plaintexts);
       Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
 
       Catalog catalog = mock(Catalog.class);
