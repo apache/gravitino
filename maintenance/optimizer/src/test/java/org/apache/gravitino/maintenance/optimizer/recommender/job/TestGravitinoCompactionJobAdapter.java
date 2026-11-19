@@ -26,6 +26,7 @@ import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionJobContext;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -46,7 +47,8 @@ public class TestGravitinoCompactionJobAdapter {
             "sort_order", "",
             "strategy", "binpack",
             "options", "{\"target_file_size_bytes\":\"1073741824\"}"),
-        jobAdapter.jobConfig(mockCompactionJobContext("binpack", "")));
+        jobAdapter.jobConfig(
+            mockCompactionJobContext("binpack", ""), IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR));
   }
 
   @Test
@@ -59,7 +61,9 @@ public class TestGravitinoCompactionJobAdapter {
             "sort_order", "zorder(c1,c2)",
             "strategy", "sort",
             "options", "{\"target_file_size_bytes\":\"1073741824\"}"),
-        jobAdapter.jobConfig(mockCompactionJobContext("sort", "zorder(c1,c2)")));
+        jobAdapter.jobConfig(
+            mockCompactionJobContext("sort", "zorder(c1,c2)"),
+            IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR));
   }
 
   @Test
@@ -87,7 +91,8 @@ public class TestGravitinoCompactionJobAdapter {
                     "",
                     columns,
                     partitioning,
-                    partitions));
+                    partitions),
+                IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
 
     Assertions.assertEquals(
         "(`catalog`.system.days(`ts`) = DATE '2026-01-01')", conf.get("where_clause"));
@@ -121,7 +126,11 @@ public class TestGravitinoCompactionJobAdapter {
             Map.of(OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX + "catalog_name", "ice"));
 
     Map<String, String> conf =
-        GravitinoJobSubmitter.buildJobConfig(config, context, new GravitinoCompactionJobAdapter());
+        GravitinoJobSubmitter.buildJobConfig(
+            config,
+            context,
+            new GravitinoCompactionJobAdapter(),
+            IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
 
     Assertions.assertEquals("ice", conf.get("catalog_name"));
     Assertions.assertEquals(
@@ -159,9 +168,30 @@ public class TestGravitinoCompactionJobAdapter {
                     "",
                     columns,
                     partitioning,
-                    partitions));
+                    partitions),
+                IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
 
     Assertions.assertEquals("(`event`.`meta`.`user-id` = 7)", conf.get("where_clause"));
+  }
+
+  /** #15048: hierarchical Gravitino schemas become Spark-physical table identifiers for CALL. */
+  @Test
+  public void testHierarchicalSchemaTableIdentifierIsSparkPhysical() {
+    Map<String, String> conf =
+        new GravitinoCompactionJobAdapter()
+            .jobConfig(
+                new CompactionJobContext(
+                    NameIdentifier.of("catalog", "a:b:c", "events"),
+                    Map.of("target_file_size_bytes", "1073741824"),
+                    "compaction-job-template",
+                    "binpack",
+                    "",
+                    new Column[0],
+                    new Transform[0],
+                    List.of()),
+                IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
+
+    Assertions.assertEquals("a.b.c.events", conf.get("table_identifier"));
   }
 
   private CompactionJobContext mockCompactionJobContext(String rewriteStrategy, String sortOrder) {

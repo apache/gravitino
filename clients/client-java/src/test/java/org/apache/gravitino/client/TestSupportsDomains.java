@@ -42,7 +42,6 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.semantic.SemanticModel;
-import org.apache.gravitino.tag.TagValue;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -101,7 +100,7 @@ public class TestSupportsDomains extends TestBase {
             Collections.emptyMap(),
             Domain.Status.PUBLISHED,
             null,
-            TagValue.of("dept", "finance"),
+            "dept",
             AuditDTO.builder()
                 .withCreator("test")
                 .withCreateTime(Instant.parse("2026-01-01T00:00:00Z"))
@@ -127,7 +126,7 @@ public class TestSupportsDomains extends TestBase {
           200);
       Domain domain = operations[i].listDomainsInfo()[0];
       Assertions.assertEquals(dto.getName(), domain.name());
-      Assertions.assertEquals(TagValue.of("dept", "finance"), domain.backingTag().get());
+      Assertions.assertEquals("dept", domain.backingTag().get());
       Assertions.assertArrayEquals(relations, domain.relations());
       domain.relations()[0] = null;
       Assertions.assertArrayEquals(relations, domain.relations());

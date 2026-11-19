@@ -20,52 +20,32 @@ package org.apache.gravitino.dto.domain;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import javax.annotation.Nullable;
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.tag.TagValue;
 
-/** A backing tag name and optional exact assignment value. */
+/** The name of the tag that backs a domain. */
 @Getter
 public class DomainBackingTagDTO {
 
   @JsonProperty("name")
   private final String name;
 
-  @JsonProperty("value")
-  @Nullable
-  private final String value;
-
   /** Creates a backing tag for Jackson deserialization. */
   public DomainBackingTagDTO() {
-    this(null, null);
+    this(null);
   }
 
   /**
    * Creates a backing tag representation.
    *
    * @param name The tag name.
-   * @param value The optional value; null matches any assignment.
    */
-  public DomainBackingTagDTO(String name, @Nullable String value) {
+  public DomainBackingTagDTO(String name) {
     this.name = name;
-    this.value = value;
   }
 
-  /** Validates the name and optional value. */
+  /** Validates the name. */
   public void validate() {
     Preconditions.checkArgument(StringUtils.isNotBlank(name), "backingTag.name must not be blank");
-    Preconditions.checkArgument(
-        value == null || StringUtils.isNotBlank(value), "backingTag.value must not be blank");
-    Preconditions.checkArgument(
-        value == null || value.length() <= 256, "backingTag.value must not exceed 256 characters");
-  }
-
-  /**
-   * @return The corresponding tag value.
-   */
-  public TagValue tagValue() {
-    validate();
-    return value == null ? TagValue.noValue(name) : TagValue.of(name, value);
   }
 }

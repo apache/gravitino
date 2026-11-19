@@ -23,6 +23,7 @@ import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants.DE
 
 import com.google.common.base.Preconditions;
 import java.math.BigInteger;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -34,6 +35,7 @@ import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyEvalua
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyHandler;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyHandlerContext;
 import org.apache.gravitino.maintenance.optimizer.common.IcebergManifestStatistics;
+import org.apache.gravitino.maintenance.optimizer.recommender.handler.manifest.ManifestRewriteTriggerEvaluator;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.stats.StatisticValue;
@@ -71,7 +73,11 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
         "Unexpected manifest rewrite job template");
     Map<String, Object> rules = context.strategy().rules();
     Integer requestedSpec = requestedSpec(rules);
-    Integer resolvedSpec = requestedSpec == null ? defaultSpec(context) : requestedSpec;
+    Integer resolvedSpec =
+        requestedSpec != null
+            ? requestedSpec
+            : parseDefaultSpecId(
+                context.tableMetadata().map(table -> table.properties()).orElse(null));
     if (resolvedSpec == null) {
       LOG.warn(
           "Skipping manifest rewrite policy {} for {}: cannot resolve Iceberg {} from table metadata",
@@ -82,9 +88,7 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
     }
     IcebergRewriteManifestsContent content =
         PolicyContents.icebergRewriteManifests(
-            longRule(rules, IcebergRewriteManifestsContent.MANIFEST_COUNT_CRITICAL),
-            longRule(rules, IcebergRewriteManifestsContent.MANIFEST_COUNT_WARNING),
-            longRule(rules, IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_THRESHOLD_BYTES),
+            longRule(rules, IcebergRewriteManifestsContent.MANIFEST_COUNT_THRESHOLD),
             requestedSpec,
             booleanRule(rules, IcebergRewriteManifestsContent.USE_CACHING));
     content.validate();
@@ -111,9 +115,14 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
       return;
     }
     IcebergManifestStatistics values = measurement.get();
-    if (values.count() >= content.manifestCountCritical()
-        || (values.count() >= content.manifestCountWarning()
-            && values.averageSize() < content.avgManifestSizeThresholdBytes())) {
+    // Default rules from typed content, then overlay strategy rules so a custom trigger-expr
+    // matches the TMS in-Spark gate (ManifestRewriteTriggerEvaluator / MaintenanceTriggerGate).
+    Map<String, Object> evalRules = new LinkedHashMap<>(content.rules());
+    evalRules.putAll(rules);
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC, values.count());
+    metrics.put(IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC, values.averageSize());
+    if (ManifestRewriteTriggerEvaluator.shouldMaintain(evalRules, metrics)) {
       evaluation =
           new StrategyEvaluationImpl(
               values.count(),
@@ -149,9 +158,21 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
   }
 
   @Nullable
-  private static Integer defaultSpec(StrategyHandlerContext context) {
-    String value =
-        context.tableMetadata().map(table -> table.properties().get(DEFAULT_SPEC_ID)).orElse(null);
+  private static Integer requestedSpec(Map<String, Object> rules) {
+    Long value = longRule(rules, IcebergRewriteManifestsContent.SPEC_ID);
+    Preconditions.checkArgument(
+        value == null || (value >= 0 && value <= Integer.MAX_VALUE),
+        "spec_id must be a non-negative 32-bit integer");
+    return value == null ? null : value.intValue();
+  }
+
+  /** Parses Iceberg {@code default-spec-id} from table properties. */
+  @Nullable
+  private static Integer parseDefaultSpecId(@Nullable Map<String, String> properties) {
+    if (properties == null) {
+      return null;
+    }
+    String value = properties.get(DEFAULT_SPEC_ID);
     if (value == null || !value.matches("[0-9]+")) {
       return null;
     }
@@ -160,15 +181,6 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
     } catch (NumberFormatException e) {
       return null;
     }
-  }
-
-  @Nullable
-  private static Integer requestedSpec(Map<String, Object> rules) {
-    Long value = longRule(rules, IcebergRewriteManifestsContent.SPEC_ID);
-    Preconditions.checkArgument(
-        value == null || (value >= 0 && value <= Integer.MAX_VALUE),
-        "spec_id must be a non-negative 32-bit integer");
-    return value == null ? null : value.intValue();
   }
 
   @Nullable
