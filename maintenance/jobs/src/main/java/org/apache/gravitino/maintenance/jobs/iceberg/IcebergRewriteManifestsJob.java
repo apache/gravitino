@@ -173,11 +173,8 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
       String tableIdentifier,
       @Nullable String useCaching,
       @Nullable String specId) {
-    StringBuilder sql = new StringBuilder();
-    sql.append("CALL ")
-        .append(IcebergJobUtils.escapeSqlIdentifier(catalogName))
-        .append(".system.rewrite_manifests(");
-    sql.append("table => '").append(IcebergJobUtils.escapeSqlString(tableIdentifier)).append("'");
+    StringBuilder sql = IcebergJobUtils.beginSystemProcedureCall(catalogName, "rewrite_manifests");
+    IcebergJobUtils.appendSqlStringTableArg(sql, tableIdentifier);
 
     if (useCaching != null && !useCaching.isEmpty()) {
       sql.append(", use_caching => ").append(Boolean.parseBoolean(useCaching));

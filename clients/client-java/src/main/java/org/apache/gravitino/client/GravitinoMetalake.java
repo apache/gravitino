@@ -152,7 +152,6 @@ import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagOperations;
-import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.tag.TagValueConstraint;
 
 /**
@@ -1084,7 +1083,7 @@ public class GravitinoMetalake extends MetalakeDTO
       String name,
       @Nullable String comment,
       @Nullable Map<String, String> properties,
-      TagValue backingTag,
+      String backingTag,
       boolean createBackingTag) {
     Preconditions.checkArgument(backingTag != null, "backingTag must not be null");
     DomainCreateRequest request =
@@ -1093,8 +1092,7 @@ public class GravitinoMetalake extends MetalakeDTO
             comment,
             properties,
             null,
-            new DomainCreateRequest.BackingTag(
-                backingTag.name(), backingTag.value().orElse(null), createBackingTag));
+            new DomainCreateRequest.BackingTag(backingTag, createBackingTag));
     request.validate();
     DomainResponse response =
         restClient.post(

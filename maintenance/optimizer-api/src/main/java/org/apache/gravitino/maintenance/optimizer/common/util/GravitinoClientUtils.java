@@ -19,20 +19,143 @@
 
 package org.apache.gravitino.maintenance.optimizer.common.util;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.GravitinoClientConfiguration;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 
 /** Utility methods for creating Gravitino clients from optimizer configuration. */
 public final class GravitinoClientUtils {
 
+  private static final String SCHEMA_SEPARATOR_CONFIG_KEY = "gravitino.schema.separator";
+
   private GravitinoClientUtils() {}
+
+  /**
+   * Loads {@code gravitino.schema.separator} from the unauthenticated {@code GET /configs}
+   * endpoint. Does not invent a default when the URI is missing or the key is absent.
+   *
+   * @param gravitinoUri Gravitino server base URI (required)
+   * @return configured external hierarchical schema separator
+   */
+  public static String fetchSchemaSeparator(String gravitinoUri) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(gravitinoUri),
+        "gravitino_uri is required to load gravitino.schema.separator from GET /configs");
+    String base = gravitinoUri.trim();
+    while (base.endsWith("/")) {
+      base = base.substring(0, base.length() - 1);
+    }
+    String url = base + "/configs";
+    HttpURLConnection connection = null;
+    try {
+      connection = (HttpURLConnection) URI.create(url).toURL().openConnection();
+      connection.setRequestMethod("GET");
+      connection.setConnectTimeout(30_000);
+      connection.setReadTimeout(30_000);
+      connection.setRequestProperty("Accept", "application/json");
+      int status = connection.getResponseCode();
+      InputStream stream =
+          status >= 200 && status < 300 ? connection.getInputStream() : connection.getErrorStream();
+      String body = readUtf8(stream);
+      if (status < 200 || status >= 300) {
+        throw new IllegalStateException(
+            "GET "
+                + url
+                + " returned HTTP "
+                + status
+                + (StringUtils.isBlank(body) ? "" : ": " + body));
+      }
+      Map<String, Object> configs =
+          JsonUtils.objectMapper().readValue(body, new TypeReference<Map<String, Object>>() {});
+      Object value = configs.get(SCHEMA_SEPARATOR_CONFIG_KEY);
+      Preconditions.checkArgument(
+          value != null && StringUtils.isNotBlank(String.valueOf(value)),
+          "GET %s did not return %s",
+          url,
+          SCHEMA_SEPARATOR_CONFIG_KEY);
+      return String.valueOf(value).trim();
+    } catch (IOException e) {
+      throw new IllegalStateException("Failed to load gravitino.schema.separator from " + url, e);
+    } finally {
+      if (connection != null) {
+        connection.disconnect();
+      }
+    }
+  }
+
+  private static String readUtf8(@Nullable InputStream stream) throws IOException {
+    if (stream == null) {
+      return "";
+    }
+    try (InputStream in = stream) {
+      byte[] buffer = new byte[4096];
+      StringBuilder out = new StringBuilder();
+      int read;
+      while ((read = in.read(buffer)) >= 0) {
+        out.append(new String(buffer, 0, read, StandardCharsets.UTF_8));
+      }
+      return out.toString();
+    }
+  }
+
+  /**
+   * Promotes short updater-option aliases onto canonical {@link OptimizerConfig} keys and copies
+   * auth aliases. Does not invent defaults or validate required fields.
+   *
+   * @param options raw {@code updater-options} map
+   * @return a new map with connection aliases normalized
+   */
+  public static Map<String, String> normalizeUpdaterConnectionOptions(Map<String, String> options) {
+    Preconditions.checkArgument(options != null, "options must not be null");
+    Map<String, String> properties = new HashMap<>(options);
+    firstNonEmpty(
+            options.get("gravitino_uri"),
+            options.get("gravitino-uri"),
+            options.get(OptimizerConfig.GRAVITINO_URI))
+        .ifPresent(uri -> properties.put(OptimizerConfig.GRAVITINO_URI, uri));
+    firstNonEmpty(options.get("metalake"), options.get(OptimizerConfig.GRAVITINO_METALAKE))
+        .ifPresent(value -> properties.put(OptimizerConfig.GRAVITINO_METALAKE, value));
+    GravitinoAuthSettings.copyAliases(properties);
+    return properties;
+  }
+
+  /**
+   * Requires a non-blank {@link OptimizerConfig#GRAVITINO_URI} after alias normalization, so jobs
+   * can load {@code gravitino.schema.separator} from {@code GET /configs}.
+   *
+   * @param optimizerProperties normalized updater options
+   */
+  public static void requireGravitinoUri(Map<String, String> optimizerProperties) {
+    Preconditions.checkArgument(
+        optimizerProperties != null, "optimizerProperties must not be null");
+    String gravitinoUri = optimizerProperties.get(OptimizerConfig.GRAVITINO_URI);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(gravitinoUri), "updater_options must contain 'gravitino_uri'");
+  }
+
+  private static Optional<String> firstNonEmpty(String... candidates) {
+    for (String candidate : candidates) {
+      if (StringUtils.isNotBlank(candidate)) {
+        return Optional.of(candidate.trim());
+      }
+    }
+    return Optional.empty();
+  }
 
   /**
    * Creates a {@link GravitinoClient} using optimizer configuration.
