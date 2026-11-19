@@ -261,6 +261,39 @@ class TestGlossaryRelations extends TestJDBCBackend {
         () -> manager.listRelations(LAKE, "left", BROADER, true, GlossaryTerm.Status.APPROVED));
   }
 
+  @TestTemplate
+  void testInvisibleRelationRootUsesRequestedName() throws Exception {
+    createAndInsertMakeLake(LAKE);
+    String alias = "dRaFt";
+    String missing =
+        assertThrows(
+                NoSuchTermException.class,
+                () -> manager.listRelations(LAKE, alias, BROADER, true, null))
+            .getMessage();
+    create("Draft", "Peer");
+    edit("Draft", TermChange.setStatus(GlossaryTerm.Status.DRAFT));
+    GlossaryManager filtered = manager.withTermVisibility(term -> !term.name().equals("Draft"));
+    assertEquals(
+        missing,
+        assertThrows(
+                NoSuchTermException.class,
+                () -> filtered.listRelations(LAKE, alias, BROADER, true, null))
+            .getMessage());
+    assertEquals(
+        missing,
+        assertThrows(
+                NoSuchTermException.class,
+                () ->
+                    manager.listRelations(LAKE, alias, BROADER, true, GlossaryTerm.Status.APPROVED))
+            .getMessage());
+    assertEquals(
+        missing,
+        assertThrows(
+                NoSuchTermException.class,
+                () -> filtered.alterTerm(LAKE, alias, "invalid", TermChange.addRelated("Peer")))
+            .getMessage());
+  }
+
   /** Covers T5.10 and T5.17. */
   @TestTemplate
   void testCleanupRevisionsAndRollback() throws Exception {

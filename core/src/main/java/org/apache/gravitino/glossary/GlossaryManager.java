@@ -125,11 +125,12 @@ public final class GlossaryManager {
         direction != Direction.RELATED || !transitive, "RELATED is not transitive");
     return SqlSessions.readSnapshot(
         () -> {
-          GlossaryTermEntity root = getTerm(metalake, name);
+          NameIdentifier ident = NameIdentifier.of(NamespaceUtil.ofGlossaryTerm(metalake), name);
+          GlossaryTermEntity root = relationRoot(ident);
           Predicate<GlossaryTermEntity> visible =
               term -> (status == null || status == term.status()) && readable.test(term);
           if (!visible.test(root)) {
-            throw new NoSuchTermException("Term %s does not exist", name);
+            throw missingRelationRoot(ident);
           }
           long lake = terms.getIds(root.nameIdentifier()).namespaceIds()[0];
           List<GlossaryTermEntity> result = new ArrayList<>();
@@ -326,18 +327,23 @@ public final class GlossaryManager {
       return terms.withHierarchyLock(
           ident.namespace(),
           lake -> {
-            GlossaryTermEntity root = getTerm(metalake, name);
+            GlossaryTermEntity root = relationRoot(ident);
             return withRelationPlan(
                 lake,
                 root,
                 edits,
                 false,
-                locked -> checkRevision(ident, locked, conditional, token),
+                locked -> {
+                  if (!readable.test(locked)) {
+                    throw missingRelationRoot(ident);
+                  }
+                  checkRevision(ident, locked, conditional, token);
+                },
                 (locked, plan) ->
                     applyChanges(ident, locked, content.toArray(new TermChange[0]), plan));
           },
           missing -> {
-            throw new NoSuchTermException(missing, "Term %s does not exist", ident);
+            throw missingRelationRoot(ident);
           });
     }
     return terms.withLockedTerm(
@@ -422,6 +428,19 @@ public final class GlossaryManager {
     }
   }
 
+  private GlossaryTermEntity relationRoot(NameIdentifier requested) {
+    try {
+      return terms.get(requested);
+    } catch (NoSuchEntityException missing) {
+      throw missingRelationRoot(requested);
+    }
+  }
+
+  // A relation caller must receive the same error for missing and unreadable roots.
+  private static NoSuchTermException missingRelationRoot(NameIdentifier requested) {
+    return new NoSuchTermException("Term %s does not exist", requested);
+  }
+
   private <T> T withRelationPlan(
       long lake,
       GlossaryTermEntity root,
@@ -449,9 +468,6 @@ public final class GlossaryManager {
         locks,
         () -> {
           GlossaryTermEntity locked = creating ? root : terms.get(root.nameIdentifier());
-          if (!creating && !readable.test(locked)) {
-            throw new NoSuchTermException("Term %s does not exist", root.name());
-          }
           checkRoot.accept(locked);
           Set<Long> visibleIds = new HashSet<>();
           for (GlossaryTermEntity endpoint : terms.getByIds(root.namespace(), lake, endpoints)) {
