@@ -27,6 +27,7 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Supplier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermRelMapper;
@@ -196,7 +197,7 @@ public final class GlossaryTermRelService {
     return readEdges(metalakeId, termIds, RelationType.BROADER, true);
   }
 
-  /** Reads both orientations of RELATED edges touching a frontier in bounded batches. */
+  /** Reads each live RELATED pair touching the frontier once, in canonical endpoint order. */
   public List<GlossaryTermRelPO> listRelatedEdges(long metalakeId, Set<Long> ids) {
     return readEdges(metalakeId, ids, RelationType.RELATED, false);
   }
@@ -277,14 +278,15 @@ public final class GlossaryTermRelService {
           if (ids.size() <= FRONTIER_BATCH_SIZE) {
             return mapper.listEdges(metalakeId, ids, type.name(), reverse);
           }
-          List<GlossaryTermRelPO> edges = new ArrayList<>();
+          // A symmetric pair can match one endpoint in each of two batches.
+          Set<GlossaryTermRelPO> edges =
+              new TreeSet<>(
+                  Comparator.comparing(GlossaryTermRelPO::getFromTermId)
+                      .thenComparing(GlossaryTermRelPO::getToTermId));
           for (List<Long> batch : Lists.partition(List.copyOf(ids), FRONTIER_BATCH_SIZE)) {
             edges.addAll(mapper.listEdges(metalakeId, batch, type.name(), reverse));
           }
-          edges.sort(
-              Comparator.comparing(GlossaryTermRelPO::getFromTermId)
-                  .thenComparing(GlossaryTermRelPO::getToTermId));
-          return edges;
+          return new ArrayList<>(edges);
         });
   }
 

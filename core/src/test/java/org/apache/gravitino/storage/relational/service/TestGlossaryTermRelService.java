@@ -97,6 +97,26 @@ public class TestGlossaryTermRelService extends TestJDBCBackend {
     Assertions.assertTrue(service.listBroader(100, 104).isEmpty());
   }
 
+  /** A RELATED edge touched by two frontier batches is returned exactly once. */
+  @TestTemplate
+  public void testRelatedEdgesAcrossFrontierBatches() throws Exception {
+    setupTerms(4);
+    service.add(100, 101, 102, RelationType.RELATED);
+    service.add(100, 103, 101, RelationType.RELATED);
+    service.add(100, 104, 102, RelationType.RELATED);
+    Set<Long> frontier = new LinkedHashSet<>();
+    frontier.add(102L);
+    for (long unused = 1000; unused < 1499; unused++) {
+      frontier.add(unused);
+    }
+    frontier.add(101L);
+    List<GlossaryTermRelPO> edges = service.listRelatedEdges(100, frontier);
+    Assertions.assertEquals(
+        List.of(101L, 101L, 102L), edges.stream().map(GlossaryTermRelPO::getFromTermId).toList());
+    Assertions.assertEquals(
+        List.of(102L, 103L, 104L), edges.stream().map(GlossaryTermRelPO::getToTermId).toList());
+  }
+
   /** T3.1: rejects invalid input and missing or cross-metalake endpoints without writes. */
   @TestTemplate
   public void testRejectInvalidEndpoints() throws Exception {
