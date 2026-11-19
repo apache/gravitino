@@ -214,7 +214,10 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenance
 
   @Override
   public TableSnapshotMetrics collectBeforeMetrics(
-      SparkSession spark, String catalogName, String tableIdentifier) {
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      Map<String, String> argsByName) {
     long snapshotId = IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier);
     preExpireData = collectTableData(spark, catalogName, tableIdentifier);
     Map<String, Object> metrics = new HashMap<>();
@@ -282,11 +285,8 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenance
       String retainLast,
       boolean streamResults) {
 
-    StringBuilder sql = new StringBuilder();
-    sql.append("CALL ")
-        .append(IcebergJobUtils.escapeSqlIdentifier(catalogName))
-        .append(".system.expire_snapshots(");
-    sql.append("table => '").append(IcebergJobUtils.escapeSqlString(tableIdentifier)).append("'");
+    StringBuilder sql = IcebergJobUtils.beginSystemProcedureCall(catalogName, "expire_snapshots");
+    IcebergJobUtils.appendSqlStringTableArg(sql, tableIdentifier);
 
     if (olderThan != null && !olderThan.isEmpty()) {
       sql.append(", older_than => TIMESTAMP '")
@@ -494,19 +494,8 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenance
    */
   @VisibleForTesting
   static String buildReachableContentFilesSql(String catalogName, String tableIdentifier) {
-    String[] levels = tableIdentifier.split("\\.");
-    if (levels.length != 2) {
-      throw new IllegalArgumentException(
-          "table_identifier must use schema.table format, but got: " + tableIdentifier);
-    }
     String metadataTable =
-        IcebergJobUtils.escapeSqlIdentifier(catalogName)
-            + "."
-            + IcebergJobUtils.escapeSqlIdentifier(levels[0])
-            + "."
-            + IcebergJobUtils.escapeSqlIdentifier(levels[1])
-            + "."
-            + IcebergJobUtils.escapeSqlIdentifier("all_files");
+        IcebergJobUtils.qualifyCatalogMetadataTableSql(catalogName, tableIdentifier, "all_files");
     return "SELECT file_path AS `file-path`, MAX(file_size_in_bytes) AS `file-size` FROM "
         + metadataTable
         + " GROUP BY file_path";

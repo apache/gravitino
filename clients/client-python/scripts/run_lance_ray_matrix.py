@@ -53,6 +53,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import os
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -187,11 +188,11 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--ray-spec",
-        default="ray==2.55.1",
+        default=None,
         help="Pip spec for ray. Pinned by default so the matrix is "
         "reproducible across runs and does not drift with PyPI. Override "
         "(e.g. 'ray') to let pip pick a compatible version per lance-ray. "
-        "Default: %(default)s",
+        "The default follows the selected lance-ray version.",
     )
     p.add_argument(
         "--lance-namespace-spec",
@@ -225,6 +226,11 @@ def ensure_venv(python: str, venv_dir: Path) -> Path:
         if rc != 0:
             raise RuntimeError(f"Failed to create venv at {venv_dir}")
     return venv_python
+
+
+def ray_dependency_spec(version: str, override: str | None) -> str:
+    """Choose the Ray default for each lance-ray version, unless overridden."""
+    return override or ("ray==2.59.0" if version == "0.5.0" else "ray==2.55.1")
 
 
 def _deps_sentinel(
@@ -331,9 +337,24 @@ def run_unittest(venv_python: Path, gravitino_home: Path) -> int:
         "tests.integration.test_lance_ray",
     ]
     print(f"[matrix] $ PYTHONPATH=... GRAVITINO_HOME=... {' '.join(cmd)}")
-    return subprocess.run(
-        cmd, cwd=str(PYTHON_CLIENT_DIR), env=env, check=False
-    ).returncode
+    result = subprocess.run(
+        cmd,
+        cwd=str(PYTHON_CLIENT_DIR),
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    print(result.stdout, end="")
+    print(result.stderr, end="", file=sys.stderr)
+    if re.search(
+        r"^Ran 0 tests\b|^OK \([^\n]*\bskipped=\d+", result.stderr, re.MULTILINE
+    ):
+        print(
+            "[matrix] Lance REST tests were skipped or not collected", file=sys.stderr
+        )
+        return 1
+    return result.returncode
 
 
 def count_lance_rest_binding(conf_path: Path) -> int:
@@ -426,7 +447,7 @@ def main() -> int:
                     venv_python,
                     venv_dir,
                     version,
-                    args.ray_spec,
+                    ray_dependency_spec(version, args.ray_spec),
                     spec.lance_namespace_spec,
                 )
                 generate_version_ini(venv_python)

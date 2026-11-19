@@ -185,7 +185,8 @@ public class IcebergTableOperations {
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
-      CreateTableRequest createTableRequest,
+      @IcebergAuthorizationMetadata(type = IcebergAuthorizationMetadata.RequestType.CREATE_TABLE)
+          CreateTableRequest createTableRequest,
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation,
       @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
       @Context UriInfo uriInfo) {

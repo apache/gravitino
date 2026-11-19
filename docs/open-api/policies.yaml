@@ -303,6 +303,48 @@ paths:
 
 
 components:
+  # YAML-only merge source for TMS execution peers. Not a public schema: each maintenance
+  # content object inlines these properties so additionalProperties: false still accepts them.
+  x-gravitino-policy-execution-peer-properties: &policy-execution-peer-properties
+    timeTrigger:
+      type: string
+      nullable: true
+      description: >
+        Optional six-field Quartz cron (`second minute hour day-of-month month day-of-week`).
+        When due, PolicyExpand schedules cron maintenance for matching tables.
+    commitTrigger:
+      type: boolean
+      nullable: true
+      description: >
+        When true, a successful Iceberg REST table update can enqueue commit-triggered
+        maintenance.
+    minIntervalMs:
+      type: integer
+      format: int64
+      minimum: 0
+      nullable: true
+      description: >
+        Optional cooldown in milliseconds after a finished run of this policy on a table.
+        When omitted, the server uses the per-type default.
+    jobOptions:
+      type: object
+      nullable: true
+      additionalProperties:
+        type: string
+        minLength: 1
+        pattern: '[\s\S]*\S[\s\S]*'
+      description: Optional Spark/job option bag. Keys and values must be non-blank.
+    updaterOptions:
+      type: object
+      nullable: true
+      additionalProperties:
+        type: string
+        minLength: 1
+        pattern: '[\s\S]*\S[\s\S]*'
+      description: >
+        Optional updater option bag (for example `gravitino_uri`). Keys and values must be
+        non-blank.
+
   parameters:
     details:
       name: details
@@ -358,8 +400,13 @@ components:
 
     IcebergCompactionContent:
       type: object
-      description: Built-in Iceberg compaction thresholds, scoring weights, and rewrite options.
+      description: >
+        Built-in Iceberg compaction thresholds, scoring weights, rewrite options, and TMS
+        execution peers such as `timeTrigger` and `jobOptions`. On updateContent, newContent
+        fully replaces the previous content; omitting a peer clears it.
+      additionalProperties: false
       properties:
+        <<: *policy-execution-peer-properties
         minDataFileMse:
           type: integer
           format: int64
@@ -427,8 +474,21 @@ components:
 
     IcebergOrphanFileRemovalContent:
       type: object
-      description: Table-level orphan cleanup options. Scheduling is configured separately.
+      description: >
+        Table-level orphan cleanup options with TMS execution peers such as `timeTrigger`.
+        `commitTrigger=true` is rejected for this policy type. On updateContent, newContent
+        fully replaces the previous content; omitting a peer clears it.
+      additionalProperties: false
       properties:
+        <<: *policy-execution-peer-properties
+        # Explicit key wins over the YAML merge: orphan cleanup never accepts commitTrigger=true.
+        # Put null in enum (same as domains.yaml parent): OAS 3.0 nullable does not extend enum.
+        commitTrigger:
+          type: boolean
+          nullable: true
+          enum: [false, null]
+          description: >
+            Must be false, null, or omitted. Orphan file removal rejects commit-triggered runs.
         olderThanDays:
           type: integer
           format: int64
@@ -470,33 +530,25 @@ components:
 
     IcebergRewriteManifestsContent:
       type: object
-      description: Thresholds for one resolved Iceberg partition spec. Supports catalog, schema, and table policies.
+      description: >
+        Thresholds for one resolved Iceberg partition spec. Supports catalog, schema, and table
+        policies, plus TMS execution peers such as `timeTrigger` and `jobOptions`. On
+        updateContent, newContent fully replaces the previous content; omitting a peer clears it.
       additionalProperties: false
       properties:
-        manifest_count_critical:
-          type: integer
-          format: int64
-          minimum: 1
-          default: 500
-          description: Inclusive count trigger, regardless of size. Must be at least manifest_count_warning.
-        manifest_count_warning:
+        <<: *policy-execution-peer-properties
+        manifest_count_threshold:
           type: integer
           format: int64
           minimum: 1
           default: 100
-          description: Inclusive minimum count for the average-size trigger.
-        avg_manifest_size_threshold_bytes:
-          type: integer
-          format: int64
-          minimum: 1
-          default: 8388608
-          description: Exclusive average manifest size threshold in bytes.
+          description: Inclusive manifest count trigger. Aligns with Iceberg commit.manifest.min-count-to-merge.
         spec_id:
           type: integer
           format: int32
           minimum: 0
           nullable: true
-          description: Existing partition spec. Omission resolves Iceberg's current default spec from table metadata. If it cannot be resolved, the table is skipped. The evaluated ID is retained through job submission.
+          description: Existing partition spec. Omission uses Iceberg's current default at evaluation (optimizer retains the resolved ID through submit) or at TMS job runtime.
         use_caching:
           type: boolean
           nullable: true
@@ -528,12 +580,14 @@ components:
     IcebergSnapshotExpirationContent:
       type: object
       description: >
-        Snapshot expiration options for system_iceberg_snapshot_expiration. Scheduling is
-        configured separately. On updateContent, newContent fully replaces the previous content;
-        omitted fields use these defaults rather than merging with stored values. Integer fields
-        must be JSON integers (not strings or floats); streamResults must be a JSON boolean.
+        Snapshot expiration options for system_iceberg_snapshot_expiration, including TMS
+        execution peers such as `timeTrigger` and `jobOptions`. On updateContent, newContent
+        fully replaces the previous content; omitted fields use these defaults rather than
+        merging with stored values (omitting a peer clears it). Integer fields must be JSON
+        integers (not strings or floats); streamResults must be a JSON boolean.
       additionalProperties: false
       properties:
+        <<: *policy-execution-peer-properties
         olderThanDays:
           type: integer
           format: int64
