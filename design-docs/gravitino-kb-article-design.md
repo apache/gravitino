@@ -233,8 +233,10 @@ upgrade scripts; use the existing owner and audit storage.
   filters and reverse lookups. There are no database foreign keys; services validate and fence
   endpoints in the transaction.
 - `live_version` points to the effective snapshot. All creates set it; all content versions have
-  `version_status=APPROVED`, even when the article's own status is `DRAFT`. The private column may
-  be nullable for extensions, but this implementation never writes a null live pointer.
+  `version_status=APPROVED`, even when the article's own status is `DRAFT`. The column follows the
+  `semantic_model_version_info` convention and is reserved for extensions; this delivery never
+  writes another value. The private `live_version` column may be nullable for extensions, but this
+  implementation never writes a null live pointer.
 - Add the tables to `schema-2.0.0-*.sql` and `upgrade-1.3.0-to-2.0.0-*.sql` while 2.0.0 is
   unreleased. If it is released before implementation lands, use the next version's scripts.
   Table creation uses `IF NOT EXISTS`; that does not make the whole upgrade script re-runnable.
@@ -341,9 +343,11 @@ parent lifecycle. Removing a user does not delete their articles; MANAGE can rea
 
 ### Access control
 
-Use the Glossary definition privileges on the metalake. `MANAGE_DEFINITIONS` implies CREATE,
-and CREATE implies VIEW. Expand those implications and apply explicit Deny rules to every
-required capability. Every operation requires effective VIEW; ownership never bypasses Deny.
+Use the Glossary definition privileges on the metalake: `VIEW_DEFINITION`, `CREATE_DEFINITION`
+and `MANAGE_DEFINITIONS`, abbreviated VIEW, CREATE and MANAGE in this section.
+`MANAGE_DEFINITIONS` implies CREATE, and CREATE implies VIEW. Expand those implications and
+apply explicit Deny rules to every required capability. Every operation requires effective VIEW;
+ownership never bypasses Deny.
 
 | Operation                         | Required definition privilege                                  |
 | --------------------------------- | -------------------------------------------------------------- |
