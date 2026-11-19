@@ -93,11 +93,29 @@ it.each([true, false])('respects readOnly=%s while retaining policy navigation',
   if (readOnly) expect(defHttp.post).not.toHaveBeenCalled()
 })
 
-const renderTagPolicies = async () => {
+it.each(['table', 'schema', 'catalog'])('keeps policy associations read-only on %s', async metadataObjectType => {
+  defHttp.get.mockResolvedValue({ policies: [{ name: 'access', enabled: true, policyType: 'system_access_control' }] })
+  const store = configureStore({ reducer: { metalakes, policies } })
+  await act(async () =>
+    root.render(
+      <Provider store={store}>
+        <PolicyTag metadataObjectType={metadataObjectType} metadataObjectFullName='sales.mart.orders' />
+      </Provider>
+    )
+  )
+
+  expect(container.textContent).toContain('access')
+  expect(container.textContent).not.toContain('Associate Policy')
+  expect(container.querySelector('.ant-tag-close-icon')).toBeNull()
+  expect(defHttp.post).not.toHaveBeenCalled()
+  expect(defHttp.delete).not.toHaveBeenCalled()
+})
+
+const renderTagPolicies = async (options = [{ name: 'masking', enabled: true }]) => {
   const store = configureStore({
     reducer: { metalakes, policies },
     preloadedState: {
-      policies: { policiesData: [{ name: 'masking', enabled: true }], policiesLoading: false, error: null }
+      policies: { policiesData: options, policiesLoading: false, error: null }
     }
   })
   await act(async () =>
@@ -193,4 +211,19 @@ it('handles a rejected tag policy removal request', async () => {
   await act(async () => close.click())
   expect(defHttp.delete).toHaveBeenCalledExactlyOnceWith({ url: `${tagPoliciesUrl}/masking` })
   expect(container.textContent).toContain('masking')
+})
+
+it('offers access-control policies for tag association', async () => {
+  defHttp.get.mockResolvedValue({ associations: [] })
+  defHttp.post.mockResolvedValue({})
+  await renderTagPolicies([{ name: 'access', enabled: true, policyType: 'system_access_control' }])
+  await act(async () =>
+    [...container.querySelectorAll('.ant-tag')].find(tag => tag.textContent === 'Associate Policy').click()
+  )
+  await selectPolicy('access')
+
+  expect(defHttp.post).toHaveBeenCalledExactlyOnceWith({
+    url: `${tagPoliciesUrl}/access`,
+    data: { selector: { type: 'ALL_VALUES' } }
+  })
 })

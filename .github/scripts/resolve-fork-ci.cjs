@@ -32,13 +32,15 @@ async function resolve({ github, context, core }) {
     const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: Number(number) });
     if (pr.state !== 'open' || !pr.head.repo) throw new Error('The pull request must be open with an existing head repository.');
     baseRef = pr.base.ref;
-    if (baseRef !== context.payload.repository.default_branch || context.ref !== `refs/heads/${baseRef}`) {
-      throw new Error('Dispatch the trusted workflow from the current default branch; release branches use their own CI.');
+    // Use only reviewed upstream default/release branch workflows, never a PR or feature ref.
+    const supportedTarget = baseRef === context.payload.repository.default_branch || /^branch-\d+\.\d+$/.test(baseRef);
+    if (!supportedTarget || context.ref !== `refs/heads/${baseRef}`) {
+      throw new Error(`Dispatch trusted Fork CI from the current upstream PR target branch (${baseRef}); only the default branch and branch-X.Y releases are supported.`);
     }
     // Pull requests retain an older base.sha after the base branch advances.
     const { data: base } = await github.rest.repos.getBranch({ ...context.repo, branch: baseRef });
     if (context.sha !== base.commit.sha) {
-      throw new Error('Dispatch the trusted workflow from the current default branch; release branches use their own CI.');
+      throw new Error(`Dispatch trusted Fork CI from the current upstream PR target branch (${baseRef}); only the default branch and branch-X.Y releases are supported.`);
     }
     headSha = pr.head.sha;
     headRepository = pr.head.repo.full_name;
@@ -65,13 +67,21 @@ async function resolve({ github, context, core }) {
         const releases = branches.map(b => b.name).filter(n => /^branch-\d+\.\d+$/.test(n))
           .sort((a, b) => a.localeCompare(b, 'en', { numeric: true })).slice(-3);
         const candidates = [...new Set([upstream.default_branch, ...releases])];
-        let fewest = Infinity;
+        let fewestAhead = Infinity;
+        let fewestBehind = Infinity;
         for (const candidate of candidates) {
           const { data: comparison } = await github.rest.repos.compareCommitsWithBasehead({
             owner: 'apache', repo: 'gravitino',
             basehead: `${candidate}...${context.repo.owner}:${headSha}`, per_page: 1
           });
-          if (comparison.ahead_by < fewest) { fewest = comparison.ahead_by; baseRef = candidate; }
+          // Branches sharing a fork point can have the same head-only commits.
+          // Prefer the candidate with fewer commits since that fork point.
+          if (comparison.ahead_by < fewestAhead ||
+              (comparison.ahead_by === fewestAhead && comparison.behind_by < fewestBehind)) {
+            fewestAhead = comparison.ahead_by;
+            fewestBehind = comparison.behind_by;
+            baseRef = candidate;
+          }
         }
         core.notice(`No open PR: testing against ${baseRef}; results require a matching PR base.`);
       }

@@ -28,6 +28,7 @@ The following table outlines the tested compatibility between Gravitino versions
 
 :::note
 - These version entries show which versions are expected to work together.
+- The `lance-ray` 0.5.0 matrix entry uses Ray 2.59.0 by default.
 - For Gravitino 1.3.0, the explicitly verified release versions are
   `lance-spark` (0.2.0, 0.4.0, 0.5.1) and `lance-ray` (0.3.0, 0.4.2). `lance-ray`
   0.2.0 is conditionally supported only with the conditions described below.

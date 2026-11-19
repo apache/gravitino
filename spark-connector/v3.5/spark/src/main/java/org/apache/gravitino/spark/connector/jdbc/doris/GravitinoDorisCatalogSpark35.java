@@ -50,7 +50,7 @@ public class GravitinoDorisCatalogSpark35 extends GravitinoJdbcCatalogSpark35 {
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
     Map<String, String> all =
         DorisPropertiesConverter35.getInstance().toSparkCatalogProperties(options, properties);
-    JdbcCredential credential = requiredJdbcCredential(gravitinoCatalogClient);
+    JdbcCredential credential = requiredJdbcCredential(gravitinoCatalog());
     requireProperty(all, "url");
     requireProperty(all, "driver");
     all.put("user", credential.jdbcUser());

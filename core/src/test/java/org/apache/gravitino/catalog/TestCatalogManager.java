@@ -102,7 +102,6 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretConstants;
 import org.apache.gravitino.secret.SecretManager;
-import org.apache.gravitino.secret.SecretMaterial;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretProvider;
 import org.apache.gravitino.secret.SecretProviderRegistry;
@@ -179,6 +178,19 @@ public class TestCatalogManager {
 
     @Override
     public void close() {}
+  }
+
+  /** Reference provider that can build URNs but always fails on read (missing secret). */
+  public static class TestUnreadableReferenceSecretsProvider extends TestReferenceSecretsProvider {
+    @Override
+    public String type() {
+      return "test-unreadable-reference";
+    }
+
+    @Override
+    public String readSecret(SecretUrn urn) {
+      throw new IllegalArgumentException("Secret not found for URN: " + urn);
+    }
   }
 
   private static CatalogManager catalogManager;
@@ -2643,7 +2655,7 @@ public class TestCatalogManager {
       NameIdentifier ident = NameIdentifier.of("metalake", "legacy_secret_providers");
       long id = new RandomIdGenerator().nextId();
       SecretUrn urn = writeThroughUrn("catalog", id, CredentialConstants.CREDENTIAL_PROVIDERS);
-      secrets.writeSecrets(List.of(new SecretMaterial(urn, "gcs-token")));
+      secrets.getRegistry().getProvider(urn.providerName()).writeSecretVersion(urn, "gcs-token");
       Map<String, String> props = new HashMap<>(catalogProps());
       props.put(CredentialConstants.CREDENTIAL_PROVIDERS, urn.toString());
       entityStore.put(
@@ -2801,6 +2813,76 @@ public class TestCatalogManager {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testFailureAfterCatalogIsStoredKeepsSecretsUntilEntityIsRemoved(boolean deleteFails)
+      throws Exception {
+    InMemoryEntityStore store = Mockito.spy(new InMemoryEntityStore());
+    store.initialize(config);
+    store.put(metalakeEntity, true);
+    IOException deleteFailure = new IOException("catalog delete failed");
+    if (deleteFails) {
+      Mockito.doThrow(deleteFailure).when(store).delete(any(), eq(EntityType.CATALOG), eq(true));
+    }
+    IllegalStateException failure = new IllegalStateException("injected lease release failure");
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            Mockito.spy(
+                new CatalogManager(
+                    config, store, new AtomicLong(4545L)::getAndIncrement, secrets))) {
+      // The lease is released after store.put stored the catalog, and a failure there still runs
+      // the create rollback.
+      Mockito.doAnswer(
+              invocation -> {
+                CatalogManager.CatalogWrapper wrapper =
+                    Mockito.spy((CatalogManager.CatalogWrapper) invocation.callRealMethod());
+                Mockito.doAnswer(
+                        release -> {
+                          release.callRealMethod();
+                          throw failure;
+                        })
+                    .when(wrapper)
+                    .release();
+                return wrapper;
+              })
+          .when(manager)
+          .createCatalogWrapper(any(CatalogEntity.class), Mockito.anyMap());
+      NameIdentifier ident = NameIdentifier.of(metalake, "failed_after_store");
+      SecretUrn urn = writeThroughUrn("catalog", 4545L, PROPERTY_KEY4);
+
+      RuntimeException error =
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () ->
+                  manager.createCatalog(
+                      ident,
+                      Catalog.Type.RELATIONAL,
+                      provider,
+                      "comment",
+                      catalogProps(),
+                      Map.of(PROPERTY_KEY4, new SecretBinding("memory", "x")),
+                      Map.of()));
+      if (deleteFails) {
+        // The catalog row is still there, so it keeps the secret it references, and the error
+        // says the catalog was left behind.
+        Assertions.assertInstanceOf(GravitinoRuntimeException.class, error);
+        Assertions.assertTrue(
+            error.getMessage().contains("failed to remove the catalog entity"), error.getMessage());
+        Assertions.assertSame(failure, error.getCause());
+        Assertions.assertArrayEquals(new Throwable[] {deleteFailure}, error.getSuppressed());
+        Assertions.assertTrue(store.exists(ident, EntityType.CATALOG));
+        Assertions.assertEquals("x", secrets.readSecret(urn));
+      } else {
+        Assertions.assertSame(failure, error);
+        Assertions.assertEquals(0, error.getSuppressed().length);
+        Assertions.assertFalse(store.exists(ident, EntityType.CATALOG));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+      }
+    } finally {
+      store.close();
+    }
+  }
+
   @Test
   void testSecretNoMetalake() throws Exception {
     try (SecretManager secrets = memorySecretManager();
@@ -2845,6 +2927,36 @@ public class TestCatalogManager {
                           new SecretBinding("memory", HiddenPropertyMaskUtils.MASKED_VALUE)),
                       Map.of()));
       Assertions.assertTrue(ex.getMessage().contains("masked placeholder"));
+      Assertions.assertFalse(manager.catalogExists(ident));
+    }
+  }
+
+  @Test
+  void testCreateRejectsEmptySecretBindingPlaintext() {
+    Assertions.assertThrows(IllegalArgumentException.class, () -> new SecretBinding("memory", ""));
+  }
+
+  @Test
+  void testCreateRejectsUnreadableSecretReference() throws Exception {
+    try (SecretManager secrets = unreadableReferenceSecretManager();
+        CatalogManager manager =
+            new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets)) {
+      NameIdentifier ident = NameIdentifier.of("metalake", "secret_missing_ref");
+      IllegalArgumentException ex =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  manager.createCatalog(
+                      ident,
+                      Catalog.Type.RELATIONAL,
+                      provider,
+                      "comment",
+                      catalogProps(),
+                      Map.of(),
+                      Map.of(
+                          PROPERTY_KEY4,
+                          new SecretReference("unreadable", Map.of("path", "does-not-exist")))));
+      Assertions.assertTrue(ex.getMessage().contains("Secret not found"), ex.getMessage());
       Assertions.assertFalse(manager.catalogExists(ident));
     }
   }
@@ -3002,6 +3114,24 @@ public class TestCatalogManager {
             + "reference."
             + SecretProviderRegistry.CLASS_NAME,
         TestReferenceSecretsProvider.class.getName());
+    c.loadFromProperties(p);
+    return new SecretManager(c);
+  }
+
+  private static SecretManager unreadableReferenceSecretManager() {
+    Config c = new Config(false) {};
+    Properties p = new Properties();
+    p.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory,unreadable");
+    p.setProperty(
+        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
+            + "memory."
+            + SecretProviderRegistry.CLASS_NAME,
+        InMemorySecretsProvider.class.getName());
+    p.setProperty(
+        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
+            + "unreadable."
+            + SecretProviderRegistry.CLASS_NAME,
+        TestUnreadableReferenceSecretsProvider.class.getName());
     c.loadFromProperties(p);
     return new SecretManager(c);
   }

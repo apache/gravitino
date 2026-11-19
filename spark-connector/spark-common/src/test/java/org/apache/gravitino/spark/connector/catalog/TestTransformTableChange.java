@@ -72,8 +72,7 @@ public class TestTransformTableChange {
     String[] fieldNames = new String[] {"col"};
     String defaultValue = "'col_default_value'";
     TableChange.UpdateColumnDefaultValue sparkChange =
-        (TableChange.UpdateColumnDefaultValue)
-            TableChange.updateColumnDefaultValue(fieldNames, defaultValue);
+        (TableChange.UpdateColumnDefaultValue) updateColumnDefaultValue(fieldNames, defaultValue);
 
     org.apache.gravitino.rel.TableChange gravitinoChange =
         sparkTableChangeConverter.toGravitinoTableChange(
@@ -102,7 +101,7 @@ public class TestTransformTableChange {
             UnsupportedOperationException.class,
             () ->
                 sparkTableChangeConverter.toGravitinoTableChange(
-                    TableChange.updateColumnDefaultValue(new String[] {"col"}, "")));
+                    updateColumnDefaultValue(new String[] {"col"}, "")));
     Assertions.assertEquals("DROP DEFAULT is not supported by Gravitino", exception.getMessage());
     for (String expression :
         new String[] {
@@ -119,7 +118,7 @@ public class TestTransformTableChange {
           IllegalArgumentException.class,
           () ->
               sparkTableChangeConverter.toGravitinoTableChange(
-                  TableChange.updateColumnDefaultValue(new String[] {"col"}, expression)));
+                  updateColumnDefaultValue(new String[] {"col"}, expression)));
     }
   }
 
@@ -310,7 +309,7 @@ public class TestTransformTableChange {
                 IllegalArgumentException.class,
                 () ->
                     sparkTableChangeConverter.toGravitinoTableChange(
-                        TableChange.updateColumnDefaultValue(new String[] {"col"}, sql),
+                        updateColumnDefaultValue(new String[] {"col"}, sql),
                         () -> new Column[] {Column.of("col", target, null)}));
         Assertions.assertTrue(error.getMessage().contains("col"));
         Assertions.assertTrue(error.getMessage().contains("TIMESTAMP_LTZ or TIMESTAMP_NTZ"));
@@ -336,7 +335,7 @@ public class TestTransformTableChange {
     org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue converted =
         (org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue)
             sparkTableChangeConverter.toGravitinoTableChange(
-                TableChange.updateColumnDefaultValue(
+                updateColumnDefaultValue(
                     new String[] {"parent", "ts"}, "TIMESTAMP_NTZ '2026-11-04 12:34:00'"),
                 () -> columns);
     Assertions.assertEquals(
@@ -347,7 +346,7 @@ public class TestTransformTableChange {
           IllegalArgumentException.class,
           () ->
               sparkTableChangeConverter.toGravitinoTableChange(
-                  TableChange.updateColumnDefaultValue(path, "TIMESTAMP_NTZ '2026-11-04 12:34:00'"),
+                  updateColumnDefaultValue(path, "TIMESTAMP_NTZ '2026-11-04 12:34:00'"),
                   () -> columns));
     }
   }
@@ -359,7 +358,7 @@ public class TestTransformTableChange {
         IllegalArgumentException.class,
         () ->
             sparkTableChangeConverter.toGravitinoTableChange(
-                TableChange.updateColumnDefaultValue(new String[] {"col"}, sql)));
+                updateColumnDefaultValue(new String[] {"col"}, sql)));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> assertDefault("TIMESTAMP '2026-11-04 12:34:56'", Literals.stringLiteral("unused")));
@@ -615,7 +614,7 @@ public class TestTransformTableChange {
     org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue converted =
         (org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue)
             sparkTableChangeConverter.toGravitinoTableChange(
-                TableChange.updateColumnDefaultValue(new String[] {"col"}, sql),
+                updateColumnDefaultValue(new String[] {"col"}, sql),
                 () -> new Column[] {Column.of("col", ((Literal<?>) expected).dataType(), null)});
     Assertions.assertEquals(expected, converted.getNewDefaultValue());
     return converted.getNewDefaultValue();
@@ -631,5 +630,13 @@ public class TestTransformTableChange {
           assertions.run();
           return null;
         });
+  }
+
+  // Spark 4.1 deprecates the String form of updateColumnDefaultValue; the DefaultValue form that
+  // replaces it does not exist on Spark 3.5 or 4.0. Scoped to this helper so the rest of the class
+  // keeps the -Werror deprecation gate.
+  @SuppressWarnings("deprecation")
+  private static TableChange updateColumnDefaultValue(String[] fieldNames, String sql) {
+    return TableChange.updateColumnDefaultValue(fieldNames, sql);
   }
 }
