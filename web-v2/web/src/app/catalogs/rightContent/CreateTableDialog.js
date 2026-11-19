@@ -47,6 +47,7 @@ import { TreeRefContext } from '../page'
 import Icons from '@/components/Icons'
 import { useResetFormOnCloseModal } from '@/lib/hooks/use-reset'
 import ColumnTypeComponent from '@/components/ColumnTypeComponent'
+import PartitionPanel from '@/components/PartitionPanel'
 import RenderPropertiesFormItem from '@/components/EntityPropertiesFormItem'
 import { validateMessages, mismatchName } from '@/config'
 import {
@@ -435,10 +436,29 @@ export default function CreateTableDialog({ ...props }) {
             let idxPartiton = 0
             if (table.partitioning?.length) {
               table.partitioning.forEach(item => {
-                const fields = item.fieldName || item.fieldNames.map(f => f[0])
+                const fieldName = item.fieldName?.[0] ?? item.fieldNames?.[0]?.[0] ?? ''
                 form.setFieldValue(['partitions', idxPartiton, 'strategy'], item.strategy)
-                form.setFieldValue(['partitions', idxPartiton, 'fieldName'], fields)
+                form.setFieldValue(['partitions', idxPartiton, 'fieldName'], fieldName)
                 form.setFieldValue(['partitions', idxPartiton, 'number'], item.numBuckets || item.width || item.number)
+                if (item.strategy === 'range' && item.assignments?.length) {
+                  form.setFieldValue(
+                    ['partitions', idxPartiton, 'assignments'],
+                    item.assignments.map(a => ({
+                      name: a.name,
+                      upper: a.upper?.value ?? '',
+                      lower: a.lower?.value ?? ''
+                    }))
+                  )
+                }
+                if (item.strategy === 'list' && item.assignments?.length) {
+                  form.setFieldValue(
+                    ['partitions', idxPartiton, 'listAssignments'],
+                    item.assignments.map(a => ({
+                      name: a.name,
+                      listGroups: a.lists?.map(list => list.map(l => l.value ?? '').join(', ')) || ['']
+                    }))
+                  )
+                }
                 idxPartiton++
               })
             }
@@ -668,14 +688,80 @@ export default function CreateTableDialog({ ...props }) {
           if (partitioningInfo) {
             submitData['partitioning'] = values.partitions?.map(p => {
               const field = {}
+
+              // Shared column type -> literal dataType mapping for range and list partitions
+              const columnType =
+                values.columns?.find(c => c?.name === p.fieldName)?.typeObj?.type?.split('(')[0] || 'string'
+
+              const dataType =
+                {
+                  integer: 'integer',
+                  long: 'long',
+                  short: 'short',
+                  float: 'float',
+                  double: 'double',
+                  decimal: 'decimal',
+                  date: 'date',
+                  time: 'time',
+                  timestamp: 'timestamp',
+                  timestamp_tz: 'timestamp_tz',
+                  string: 'varchar',
+                  varchar: 'varchar',
+                  char: 'char',
+                  boolean: 'boolean'
+                }[columnType] || 'varchar'
+
               if (p.strategy === 'list') {
+                // fieldNames is String[][] (each inner array is one column name); fieldName is String[]
                 field['fieldNames'] = [[p.fieldName]]
+                if (p.listAssignments?.length) {
+                  // Number of partition columns (fieldNames is String[][], each inner array is one column name)
+                  const numPartitionCols = field['fieldNames']?.length || 1
+                  field['assignments'] = p.listAssignments.map(a => {
+                    // listGroups: array of comma-separated value strings
+                    // Each group becomes one or more rows in LiteralDTO[][] (one IN tuple per row)
+                    // For single-column partition: 'v1, v2, v3' -> [[{v1}], [{v2}], [{v3}]]
+                    // For multi-column partition: 'v1, v2' -> [[{v1}, {v2}]]
+                    const lists = (a.listGroups || [])
+                      .filter(g => g && g.trim() !== '')
+                      .flatMap(group => {
+                        const vals = group
+                          .split(',')
+                          .map(v => v.trim())
+                          .filter(v => v !== '')
+                        if (numPartitionCols === 1) {
+                          return vals.map(v => [{ type: 'literal', dataType, value: v }])
+                        } else {
+                          return [vals.map(v => ({ type: 'literal', dataType, value: v }))]
+                        }
+                      })
+
+                    return { type: 'list', name: a.name, lists, properties: null }
+                  })
+                }
               } else if (p.strategy === 'bucket') {
                 field['numBuckets'] = p.number
                 field['fieldNames'] = [[p.fieldName]]
               } else if (p.strategy === 'truncate') {
                 field['width'] = p.number
                 field['fieldName'] = [p.fieldName]
+              } else if (p.strategy === 'range') {
+                // fieldName is String[] for range (not fieldNames)
+                field['fieldName'] = [p.fieldName]
+                if (p.assignments?.length) {
+                  field['assignments'] = p.assignments.map(a => {
+                    const assignment = { type: 'range', name: a.name }
+                    assignment.upper = a.upper
+                      ? { type: 'literal', dataType, value: a.upper }
+                      : { type: 'literal', dataType: 'null', value: 'NULL' }
+                    assignment.lower = a.lower
+                      ? { type: 'literal', dataType, value: a.lower }
+                      : { type: 'literal', dataType: 'null', value: 'NULL' }
+                    assignment.properties = null
+
+                    return assignment
+                  })
+                }
               } else {
                 field['fieldName'] = [p.fieldName]
               }
@@ -1040,95 +1126,6 @@ export default function CreateTableDialog({ ...props }) {
     )
   }
 
-  const renderTablePartitions = (fields, subOpt) => {
-    return (
-      <div className='flex flex-col divide-y divide-solid border-b border-solid'>
-        <div className='grid grid-cols-5 divide-x divide-solid'>
-          <div className='col-span-2 bg-gray-100 p-1 text-center'>Field</div>
-          <div className='col-span-2 bg-gray-100 p-1 text-center'>Strategy</div>
-          <div className='col-span-1 bg-gray-100 p-1 text-center'>Action</div>
-        </div>
-        {fields.map(subField => (
-          <div key={subField.name}>
-            <div className='grid grid-cols-5'>
-              <div className='col-span-2 px-2 py-1'>
-                <Form.Item noStyle name={[subField.name, 'fieldName']} label='Field'>
-                  <Select size='small' className='w-full' placeholder='Field' disabled={!!editTable}>
-                    {form
-                      .getFieldValue('columns')
-                      ?.filter(col => col?.name)
-                      ?.map(col => (
-                        <Select.Option key={col?.name} value={col?.name}>
-                          <Flex justify='space-between'>
-                            <span>{col?.name}</span>
-                            <span>{col?.typeObj?.type}</span>
-                          </Flex>
-                        </Select.Option>
-                      ))}
-                  </Select>
-                </Form.Item>
-              </div>
-              <div className='col-span-2 flex gap-2 px-2 py-1'>
-                <Form.Item noStyle name={[subField.name, 'strategy']} label='Strategy'>
-                  <Select size='small' className='w-full' placeholder='Strategy' disabled={!!editTable}>
-                    {partitioningInfo
-                      ?.filter(s => {
-                        const field = form.getFieldValue(['partitions', subField.name, 'fieldName'])
-                        const column = form.getFieldValue('columns').find(c => c?.name === field)
-                        const type = column?.typeObj?.type?.split('(')[0]
-
-                        return transformsLimitMap[s]?.includes(type) || !transformsLimitMap[s]
-                      })
-                      .map(s => (
-                        <Select.Option key={s} value={s}>
-                          {capitalizeFirstLetter(s)}
-                        </Select.Option>
-                      ))}
-                  </Select>
-                </Form.Item>
-                {['truncate', 'bucket'].includes(form.getFieldValue(['partitions', subField.name, 'strategy'])) && (
-                  <Form.Item noStyle name={[subField.name, 'number']} label='Number' rules={[{ required: true }]}>
-                    <InputNumber
-                      size='small'
-                      min={0}
-                      placeholder={
-                        form.getFieldValue(['partitions', subField.name, 'strategy']) === 'bucket' ? 'Number' : 'Width'
-                      }
-                      disabled={!!editTable}
-                    />
-                  </Form.Item>
-                )}
-              </div>
-              <div className='px-2 py-1'>
-                <Icons.Minus
-                  className={cn('size-4 cursor-pointer text-gray-400 hover:text-defaultPrimary', {
-                    'text-gray-100 hover:text-gray-200 cursor-not-allowed': !!editTable
-                  })}
-                  onClick={() => {
-                    if (!!editTable) return
-                    subOpt.remove(subField.name)
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        ))}
-        <div className='text-center'>
-          <Button
-            type='link'
-            icon={<PlusOutlined />}
-            disabled={!!editTable}
-            onClick={() => {
-              subOpt.add()
-            }}
-          >
-            Add Partition
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
   const renderTableSortOrders = (fields, subOpt) => {
     return (
       <div className='flex flex-col divide-y divide-solid border-b border-solid'>
@@ -1439,9 +1436,9 @@ export default function CreateTableDialog({ ...props }) {
                   <Form.List name='columns'>{(fields, subOpt) => renderTableColumns(fields, subOpt)}</Form.List>
                 </Form.Item>
                 {partitioningInfo && (
-                  <Form.Item className={tabKey !== 'partitions' ? 'hidden' : ''} label='' name='partitions'>
-                    <Form.List name='partitions'>{(fields, subOpt) => renderTablePartitions(fields, subOpt)}</Form.List>
-                  </Form.Item>
+                  <div className={tabKey !== 'partitions' ? 'hidden' : ''}>
+                    <PartitionPanel form={form} editTable={editTable} provider={provider} />
+                  </div>
                 )}
                 {sortOredsInfo && (
                   <Form.Item className={tabKey !== 'sortOrders' ? 'hidden' : ''} label='' name='sortOrders'>
