@@ -21,7 +21,6 @@ package org.apache.gravitino.authorization;
 
 import static org.apache.gravitino.authorization.TagPolicyTestUtils.customPolicy;
 import static org.apache.gravitino.authorization.TagPolicyTestUtils.policy;
-import static org.apache.gravitino.authorization.TagPolicyTestUtils.tag;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -29,88 +28,46 @@ import java.util.List;
 import java.util.Set;
 import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.meta.PolicyEntity;
-import org.apache.gravitino.meta.TagEntity;
-import org.apache.gravitino.policy.AllValuesSelector;
-import org.apache.gravitino.policy.PolicyAssociationSelector;
-import org.apache.gravitino.policy.TagValueSelector;
-import org.apache.gravitino.tag.TagAssignment;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-/** Tests privilege, active-role, and selector matching without storage. */
+/** Tests privilege and active-role matching without storage. */
 class TestTagPolicyMatcher {
   @Test
-  void testAnyActiveRoleCanMatchEveryListedPrivilegeAndReturnsProvenance() {
-    ResolvedTagPolicy binding = binding(true, TagAssignment.noValue(), AllValuesSelector.get());
+  void testAnyActiveRoleCanMatchEveryListedPrivilege() {
+    PolicyEntity matchedPolicy = accessPolicy(true);
     for (Privilege.Name privilege :
         Arrays.asList(Privilege.Name.SELECT_TABLE, Privilege.Name.MODIFY_TABLE)) {
       for (String role : Arrays.asList("analyst", "engineer")) {
-        ResolvedTagPolicy match =
-            TagPolicyMatcher.match(privilege, Set.of("unrelated", role), List.of(binding))
+        PolicyEntity match =
+            TagPolicyMatcher.match(privilege, Set.of("unrelated", role), List.of(matchedPolicy))
                 .orElseThrow();
-        Assertions.assertSame(binding, match);
-        Assertions.assertEquals(1L, match.tag().id());
-        Assertions.assertEquals(10L, match.policy().id());
+        Assertions.assertSame(matchedPolicy, match);
+        Assertions.assertEquals(10L, match.id());
       }
     }
   }
 
   @Test
   void testInactiveAndNoActiveRolesDoNotMatch() {
-    List<ResolvedTagPolicy> bindings =
-        List.of(binding(true, TagAssignment.noValue(), AllValuesSelector.get()));
+    List<PolicyEntity> policies = List.of(accessPolicy(true));
     Assertions.assertFalse(
-        TagPolicyMatcher.match(Privilege.Name.SELECT_TABLE, Set.of("unrelated"), bindings)
+        TagPolicyMatcher.match(Privilege.Name.SELECT_TABLE, Set.of("unrelated"), policies)
             .isPresent());
     Assertions.assertFalse(
         TagPolicyMatcher.match(
-                Privilege.Name.SELECT_TABLE, ActiveRoles.none().roleNames(), bindings)
+                Privilege.Name.SELECT_TABLE, ActiveRoles.none().roleNames(), policies)
             .isPresent());
   }
 
   @Test
   void testUnlistedAndNonConferrablePrivilegesDoNotMatch() {
-    List<ResolvedTagPolicy> bindings =
-        List.of(binding(true, TagAssignment.noValue(), AllValuesSelector.get()));
+    List<PolicyEntity> policies = List.of(accessPolicy(true));
     for (Privilege.Name privilege :
         Arrays.asList(
             Privilege.Name.READ_FILESET, Privilege.Name.USE_SCHEMA, Privilege.Name.MANAGE_GRANTS)) {
       Assertions.assertFalse(
-          TagPolicyMatcher.match(privilege, Set.of("analyst"), bindings).isPresent());
-    }
-  }
-
-  @Test
-  void testValueSelectorMatchesAnyExactAssignmentValue() {
-    ResolvedTagPolicy binding =
-        binding(true, TagAssignment.ofValues("silver", "gold"), TagValueSelector.of("gold"));
-    Assertions.assertTrue(
-        TagPolicyMatcher.match(Privilege.Name.SELECT_TABLE, Set.of("analyst"), List.of(binding))
-            .isPresent());
-    for (TagAssignment assignment :
-        Arrays.asList(
-            TagAssignment.noValue(),
-            TagAssignment.ofValues("Gold"),
-            TagAssignment.ofValues("golden"))) {
-      Assertions.assertFalse(
-          TagPolicyMatcher.match(
-                  Privilege.Name.SELECT_TABLE,
-                  Set.of("analyst"),
-                  List.of(binding(true, assignment, TagValueSelector.of("gold"))))
-              .isPresent());
-    }
-  }
-
-  @Test
-  void testPresenceSelectorAcceptsValuedAndValuelessAssignments() {
-    for (TagAssignment assignment :
-        Arrays.asList(TagAssignment.noValue(), TagAssignment.ofValues("bronze"))) {
-      Assertions.assertTrue(
-          TagPolicyMatcher.match(
-                  Privilege.Name.SELECT_TABLE,
-                  Set.of("analyst"),
-                  List.of(binding(true, assignment, AllValuesSelector.get())))
-              .isPresent());
+          TagPolicyMatcher.match(privilege, Set.of("analyst"), policies).isPresent());
     }
   }
 
@@ -118,9 +75,7 @@ class TestTagPolicyMatcher {
   void testDisabledPoliciesAndAbsentBindingsDoNotMatch() {
     Assertions.assertFalse(
         TagPolicyMatcher.match(
-                Privilege.Name.SELECT_TABLE,
-                Set.of("analyst"),
-                List.of(binding(false, TagAssignment.noValue(), AllValuesSelector.get())))
+                Privilege.Name.SELECT_TABLE, Set.of("analyst"), List.of(accessPolicy(false)))
             .isPresent());
     Assertions.assertFalse(
         TagPolicyMatcher.match(
@@ -130,49 +85,33 @@ class TestTagPolicyMatcher {
 
   @Test
   void testNonmatchingPolicyDoesNotHideLaterMatch() {
-    ResolvedTagPolicy nonmatch =
-        binding(true, TagAssignment.ofValues("bronze"), TagValueSelector.of("gold"));
-    ResolvedTagPolicy match =
-        binding(true, TagAssignment.ofValues("bronze"), AllValuesSelector.get());
-    List<ResolvedTagPolicy> bindings = List.of(nonmatch, match);
+    PolicyEntity nonmatch =
+        policy(9L, true, List.of(Privilege.Name.SELECT_TABLE), List.of("unrelated"));
+    PolicyEntity match = accessPolicy(true);
+    List<PolicyEntity> policies = List.of(nonmatch, match);
     Set<String> roles = Set.of("analyst");
     Assertions.assertSame(
-        match, TagPolicyMatcher.match(Privilege.Name.SELECT_TABLE, roles, bindings).orElseThrow());
+        match, TagPolicyMatcher.match(Privilege.Name.SELECT_TABLE, roles, policies).orElseThrow());
     Assertions.assertSame(
-        match, TagPolicyMatcher.match(Privilege.Name.SELECT_TABLE, roles, bindings).orElseThrow());
-    Assertions.assertEquals(List.of(nonmatch, match), bindings);
+        match, TagPolicyMatcher.match(Privilege.Name.SELECT_TABLE, roles, policies).orElseThrow());
+    Assertions.assertEquals(List.of(nonmatch, match), policies);
     Assertions.assertEquals(Set.of("analyst"), roles);
   }
 
   @Test
-  void testUnknownSelectorFailsClosed() {
-    ResolvedTagPolicy binding = binding(true, TagAssignment.noValue(), () -> "FUTURE_SELECTOR");
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            TagPolicyMatcher.match(
-                Privilege.Name.SELECT_TABLE, Set.of("analyst"), List.of(binding)));
-  }
-
-  @Test
   void testGovernancePolicyCannotConferAccess() {
-    ResolvedTagPolicy binding =
-        new ResolvedTagPolicy(
-            tag(1L, "certified", TagAssignment.noValue()), customPolicy(), AllValuesSelector.get());
+    PolicyEntity matchedPolicy = customPolicy();
     Assertions.assertFalse(
-        TagPolicyMatcher.match(Privilege.Name.SELECT_TABLE, Set.of("analyst"), List.of(binding))
+        TagPolicyMatcher.match(
+                Privilege.Name.SELECT_TABLE, Set.of("analyst"), List.of(matchedPolicy))
             .isPresent());
   }
 
-  private static ResolvedTagPolicy binding(
-      boolean enabled, TagAssignment assignment, PolicyAssociationSelector selector) {
-    TagEntity tag = tag(1L, "certified", assignment);
-    PolicyEntity policy =
-        policy(
-            10L,
-            enabled,
-            List.of(Privilege.Name.SELECT_TABLE, Privilege.Name.MODIFY_TABLE),
-            List.of("analyst", "engineer"));
-    return new ResolvedTagPolicy(tag, policy, selector);
+  private static PolicyEntity accessPolicy(boolean enabled) {
+    return policy(
+        10L,
+        enabled,
+        List.of(Privilege.Name.SELECT_TABLE, Privilege.Name.MODIFY_TABLE),
+        List.of("analyst", "engineer"));
   }
 }

@@ -42,6 +42,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
@@ -98,13 +99,19 @@ public class AuthorizationRequestContext {
   /** Per-request metadataId→owner cache. Deduplicates isOwner within a single request. */
   private final Map<Long, Optional<OwnerInfo>> ownerCache = new ConcurrentHashMap<>();
 
-  /** Resolved bindings and read failures are retained only for the exact target in this request. */
-  private final Map<TagPolicyKey, CachedTagData<ResolvedTagPolicy>> tagPolicyCache =
+  /** Matched policies and read failures are retained only for the exact target in this request. */
+  private final Map<TagPolicyKey, CachedTagData<PolicyEntity>> tagPolicyCache =
       new ConcurrentHashMap<>();
 
   /** Direct assignments and read failures shared by targets with common ancestors. */
   private final Map<TagPolicyKey, CachedTagData<TagEntity>> directTagCache =
       new ConcurrentHashMap<>();
+
+  /** Caches whether each metalake has an enabled access-control policy during this HTTP request. */
+  private final Map<String, Boolean> enabledAccessPolicies = new ConcurrentHashMap<>();
+
+  /** Caches policy-existence lookup failures by metalake during this HTTP request. */
+  private final Map<String, RuntimeException> accessPolicyFailures = new ConcurrentHashMap<>();
 
   /**
    * Per-request roleId → {@link RoleUpdatedAt} map populated by the fat-JOIN prefetch on the
@@ -351,11 +358,11 @@ public class AuthorizationRequestContext {
    * @param metalake the containing metalake
    * @param target the original canonical target, not an ancestor visited by the RBAC walk
    * @param loader the resolver, returning a complete non-null list or throwing
-   * @return the immutable resolved bindings
+   * @return the immutable matched policies
    * @throws RuntimeException if resolution fails
    */
-  public List<ResolvedTagPolicy> computeTagPoliciesIfAbsent(
-      String metalake, MetadataObject target, Supplier<List<ResolvedTagPolicy>> loader) {
+  public List<PolicyEntity> computeTagPoliciesIfAbsent(
+      String metalake, MetadataObject target, Supplier<List<PolicyEntity>> loader) {
     return tagPolicyCache
         .computeIfAbsent(new TagPolicyKey(metalake, target), ignored -> new CachedTagData<>())
         .get(loader);
@@ -379,6 +386,31 @@ public class AuthorizationRequestContext {
 
   public String getOriginalAuthorizationExpression() {
     return originalAuthorizationExpression;
+  }
+
+  /**
+   * Checks once per metalake and request whether any enabled access-control policy exists.
+   *
+   * <p>Privilege checks and list workers share the result, including {@code false}. A failed lookup
+   * is rethrown on subsequent calls; it is never treated as an absence of policies. A new request
+   * creates a new context and may retry the lookup.
+   *
+   * @param metalake the containing metalake
+   * @param loader the current policy-existence query
+   * @return whether the metalake contains an enabled access-control policy
+   * @throws RuntimeException if the query failed, including on subsequent calls in this request
+   */
+  public synchronized boolean hasEnabledAccessPolicies(String metalake, Supplier<Boolean> loader) {
+    if (accessPolicyFailures.containsKey(metalake)) {
+      throw accessPolicyFailures.get(metalake);
+    }
+    try {
+      return enabledAccessPolicies.computeIfAbsent(
+          metalake, ignored -> Objects.requireNonNull(loader.get()));
+    } catch (RuntimeException e) {
+      accessPolicyFailures.put(metalake, e);
+      throw e;
+    }
   }
 
   public void setOriginalAuthorizationExpression(String originalAuthorizationExpression) {
