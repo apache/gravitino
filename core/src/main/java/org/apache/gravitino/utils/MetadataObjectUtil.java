@@ -69,6 +69,7 @@ public class MetadataObjectUtil {
           .put(MetadataObject.Type.SEMANTIC_MODEL, Entity.EntityType.SEMANTIC_MODEL)
           .put(MetadataObject.Type.FUNCTION, Entity.EntityType.FUNCTION)
           .put(MetadataObject.Type.DOMAIN, Entity.EntityType.DOMAIN)
+          .put(MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE, Entity.EntityType.KNOWLEDGE_BASE_ARTICLE)
           .build();
 
   private MetadataObjectUtil() {}
