@@ -26,6 +26,7 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier
 import java.time.Instant;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -125,14 +126,20 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
       NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
       schemaDispatcher.loadSchema(schemaIdent);
 
-      // Import the topic
-      TreeLockUtils.doWithTreeLock(
-          schemaIdent,
-          LockType.WRITE,
-          () -> {
-            importTopic(ident);
-            return null;
-          });
+      try {
+        topic = TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importTopic(ident));
+      } catch (EntityAlreadyExistsException e) {
+        // A create-only import can conflict either because another Gravitino node won an HA race,
+        // or because the Kafka UUID is actively registered under another Gravitino path.
+        LOG.info(
+            "Topic {} import conflicted with existing metadata; reloading from store: {}",
+            ident,
+            e.getMessage());
+        topic = TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTopic(ident));
+        if (!topic.imported()) {
+          throw retainedExternalIdentifierConflictException(ident, TOPIC);
+        }
+      }
     }
 
     return topic;
@@ -284,12 +291,12 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
         });
   }
 
-  private void importTopic(NameIdentifier identifier) {
+  private EntityCombinedTopic importTopic(NameIdentifier identifier) {
 
     EntityCombinedTopic topic = internalLoadTopic(identifier);
 
     if (topic.imported()) {
-      return;
+      return topic;
     }
 
     StringIdentifier stringId = null;
@@ -329,7 +336,9 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
             .build();
 
     try {
-      store.put(topicEntity, true);
+      store.put(topicEntity, false);
+    } catch (EntityAlreadyExistsException e) {
+      throw e;
     } catch (OptimisticLockException e) {
       // A conflict with a concurrent writer, such as a lock wait timeout; the load can be retried.
       throw e;
@@ -337,6 +346,13 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Failed to import topic entity to the store", e);
     }
+
+    return EntityCombinedTopic.of(topic, topicEntity)
+        .withHiddenProperties(
+            getMaskAndOmitKeys(
+                getCatalogIdentifier(identifier),
+                HasPropertyMetadata::topicPropertiesMetadata,
+                topic.properties()));
   }
 
   private EntityCombinedTopic internalLoadTopic(NameIdentifier ident) {

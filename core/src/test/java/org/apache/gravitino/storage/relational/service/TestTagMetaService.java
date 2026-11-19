@@ -101,6 +101,94 @@ public class TestTagMetaService extends TestJDBCBackend {
 
   private final Map<String, String> props = ImmutableMap.of("k1", "v1");
 
+  /** Verifies membership lookups against live stored tags and object lifecycles. */
+  @TestTemplate
+  public void testMetadataObjectLookupByStableTagId() throws IOException {
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
+    backend.insert(metalake, false);
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(METALAKE_NAME),
+            "catalog",
+            AUDIT_INFO);
+    backend.insert(catalog, false);
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("dept")
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
+            .withProperties(ImmutableMap.of())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    backend.insert(tag, false);
+    TagMetaService service = TagMetaService.getInstance();
+    service.associateTagValuesWithMetadataObject(
+        catalog.nameIdentifier(),
+        Entity.EntityType.CATALOG,
+        new TagValue[] {TagValue.of("dept", "Finance"), TagValue.of("dept", "finance")},
+        new TagValue[0]);
+    assertEquals(
+        1, service.listAssociatedMetadataObjectsForTagId(METALAKE_NAME, tag.id(), null).size());
+    assertEquals(
+        1,
+        service.listAssociatedMetadataObjectsForTagId(METALAKE_NAME, tag.id(), "Finance").size());
+    assertEquals(
+        1,
+        service.listAssociatedMetadataObjectsForTagId(METALAKE_NAME, tag.id(), "finance").size());
+    assertTrue(
+        service
+            .listAssociatedMetadataObjectsForTagId(METALAKE_NAME, tag.id(), "FINANCE")
+            .isEmpty());
+    assertTrue(service.listAssociatedMetadataObjectsForTagId("other", tag.id(), null).isEmpty());
+    List<GenericEntity> objects =
+        backend.listEntitiesByRelation(RelationQuery.forTagId(METALAKE_NAME, tag.id(), null));
+    assertEquals(catalog.id(), objects.get(0).id());
+    // Put the live ID in the second batch alongside IDs that no longer resolve.
+    List<Long> ids = new ArrayList<>();
+    for (long missing = -500; missing < 0; missing++) {
+      ids.add(missing);
+    }
+    ids.add(catalog.id());
+    List<TagEntity> directTags =
+        backend
+            .listDirectTagsByObjectIds(METALAKE_NAME, MetadataObject.Type.CATALOG, ids)
+            .get(catalog.id());
+    assertEquals(1, directTags.size());
+    assertEquals(tag.id(), directTags.get(0).id());
+    assertEquals(
+        Set.of("Finance", "finance"), Set.of(directTags.get(0).assignment().get().values()));
+    assertTrue(
+        backend.listDirectTagsByObjectIds("other", MetadataObject.Type.CATALOG, ids).isEmpty());
+    assertTrue(
+        backend.listDirectTagsByObjectIds(METALAKE_NAME, MetadataObject.Type.TABLE, ids).isEmpty());
+    backend.delete(tag.nameIdentifier(), Entity.EntityType.TAG, false);
+    TagEntity recreated =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("dept")
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
+            .withProperties(ImmutableMap.of())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    backend.insert(recreated, false);
+    service.associateTagValuesWithMetadataObject(
+        catalog.nameIdentifier(),
+        Entity.EntityType.CATALOG,
+        new TagValue[] {TagValue.of("dept", "finance")},
+        new TagValue[0]);
+    assertTrue(
+        service.listAssociatedMetadataObjectsForTagId(METALAKE_NAME, tag.id(), null).isEmpty());
+    assertTrue(
+        service
+            .listAssociatedMetadataObjectsForTagId(METALAKE_NAME, tag.id(), "finance")
+            .isEmpty());
+    assertEquals(
+        1,
+        service.listAssociatedMetadataObjectsForTagId(METALAKE_NAME, recreated.id(), null).size());
+  }
+
   /** Legacy dotted object names remain readable by single and batch relation queries. */
   @TestTemplate
   public void testReadTagsForLegacyDottedNames() throws IOException {

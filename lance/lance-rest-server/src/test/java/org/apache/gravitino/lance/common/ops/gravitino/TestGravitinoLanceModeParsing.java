@@ -186,6 +186,37 @@ class TestGravitinoLanceModeParsing {
   }
 
   @Test
+  void testClientPropertyCannotOverrideAuthorizedMode() {
+    // The REST interceptor authorizes an overwrite from the request mode alone. A caller-supplied
+    // lance.creation-mode table property must therefore never reach the catalog in place of that
+    // mode, or CREATE_TABLE plus a property would be enough to replace an existing table.
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Table table = Mockito.mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(LANCE_LOCATION, "/tmp/table"));
+    when(tableCatalog.createTable(
+            any(NameIdentifier.class), any(Column[].class), isNull(), anyMap()))
+        .thenReturn(table);
+    GravitinoLanceTableOperations operations = newTableOperations(tableCatalog);
+    Map<String, String> smuggled = Map.of(LANCE_CREATION_MODE, "OVERWRITE");
+
+    operations.createTable("catalog.schema.table", "create", ".", null, smuggled, null);
+    operations.declareTable("catalog.schema.table", ".", null, smuggled);
+    operations.registerTable(
+        "catalog.schema.table",
+        "create",
+        ".",
+        Map.of(LANCE_LOCATION, "/tmp/table", LANCE_CREATION_MODE, "OVERWRITE"));
+
+    ArgumentCaptor<Map<String, String>> propertiesCaptor = propertiesCaptor();
+    Mockito.verify(tableCatalog, Mockito.times(3))
+        .createTable(
+            any(NameIdentifier.class), any(Column[].class), isNull(), propertiesCaptor.capture());
+    for (Map<String, String> properties : propertiesCaptor.getAllValues()) {
+      Assertions.assertEquals("CREATE", properties.get(LANCE_CREATION_MODE));
+    }
+  }
+
+  @Test
   void testCreateTableReturnsPropertiesAndStorageOptions() {
     TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
     Table table = Mockito.mock(Table.class);

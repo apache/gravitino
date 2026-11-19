@@ -20,8 +20,9 @@ package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
-import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
+import static org.apache.gravitino.catalog.CapabilityHelpers.withCapability;
 
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -32,6 +33,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
@@ -122,12 +124,14 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
 
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    return dispatcher.dropSchema(normalizeNameIdentifier(ident), cascade);
+    return dispatcher.dropSchema(normalizeExistingNameIdentifier(ident), cascade);
   }
 
   private boolean supportsHierarchicalSchema(Namespace namespace) {
-    Capability capabilities = getCapability(NameIdentifier.of(namespace.levels()), catalogManager);
-    return capabilities.supportsHierarchicalSchema().supported();
+    return withCapability(
+        NameIdentifier.of(namespace.levels()),
+        catalogManager,
+        capabilities -> capabilities.supportsHierarchicalSchema().supported());
   }
 
   private static void checkCommentLength(@Nullable String comment) {
@@ -136,12 +140,30 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier schemaIdent) {
-    Capability capabilities = getCapability(schemaIdent, catalogManager);
-    return applyCapabilities(schemaIdent, Capability.Scope.SCHEMA, capabilities);
+    return withCapability(
+        schemaIdent,
+        catalogManager,
+        capabilities -> applyCapabilities(schemaIdent, Capability.Scope.SCHEMA, capabilities));
   }
 
   private NameIdentifier normalizeCaseSensitive(NameIdentifier schemaIdent) {
-    Capability capabilities = getCapability(schemaIdent, catalogManager);
-    return applyCaseSensitive(schemaIdent, Capability.Scope.SCHEMA, capabilities);
+    return withCapability(
+        schemaIdent,
+        catalogManager,
+        capabilities -> applyCaseSensitive(schemaIdent, Capability.Scope.SCHEMA, capabilities));
+  }
+
+  private NameIdentifier normalizeExistingNameIdentifier(NameIdentifier schemaIdent) {
+    return withCapability(
+        schemaIdent,
+        catalogManager,
+        capabilities -> {
+          CapabilityResult result =
+              capabilities.specificationOnExistingName(Capability.Scope.SCHEMA, schemaIdent.name());
+          Preconditions.checkArgument(
+              result.supported(),
+              result.unsupportedMessage() + " Illegal name: " + schemaIdent.name());
+          return applyCaseSensitive(schemaIdent, Capability.Scope.SCHEMA, capabilities);
+        });
   }
 }

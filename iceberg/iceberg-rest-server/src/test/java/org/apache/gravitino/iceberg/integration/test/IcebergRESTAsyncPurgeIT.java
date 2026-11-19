@@ -32,6 +32,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.service.cleanup.FileCleanupAssertions;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
@@ -183,12 +184,7 @@ public class IcebergRESTAsyncPurgeIT extends BaseIT {
     Awaitility.await()
         .atMost(60, TimeUnit.SECONDS)
         .pollInterval(500, TimeUnit.MILLISECONDS)
-        .untilAsserted(
-            () ->
-                Assertions.assertEquals(
-                    0L,
-                    countRegularFiles(tableDir),
-                    "Background cleanup worker should have deleted all table files"));
+        .untilAsserted(() -> FileCleanupAssertions.assertNoRegularFiles(tableDir));
   }
 
   private void initMetalakeAndCatalog() {

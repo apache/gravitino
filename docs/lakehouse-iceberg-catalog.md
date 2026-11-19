@@ -57,6 +57,27 @@ If you are using the Gravitino with Trino, you can pass the Trino Iceberg connec
 
 If you are using the Gravitino with Spark, you can pass the Spark Iceberg connector configuration using prefix `spark.bypass.`. For example, using `spark.bypass.io-impl` to pass the `io-impl` to the Spark Iceberg connector in Spark runtime.
 
+#### Identifier Case Behavior
+
+For `catalog-backend=hive`, schema, table, and view identifiers are case-insensitive; you can use any casing.
+
+For `catalog-backend=rest`, always use the same identifier casing that was used when the object was first registered. Loading the same object with different casing is rejected.
+
+:::caution
+After upgrading, if loading an existing mixed-case object reports a retained identifier conflict,
+Gravitino does not support metadata-only unregister of an individual external object. Use this
+catalog-wide recovery procedure:
+
+1. Have an administrator [force-drop the Gravitino catalog](./manage-catalogs-and-schemas.md#drop-a-catalog).
+   This deletes every Gravitino registration and its privileges, tags, and other relationships in
+   the catalog. It does not drop the Iceberg namespaces, tables, views, or physical data.
+2. Recreate the Gravitino catalog and load the objects again. Keep the existing
+   `gravitino.identifier` properties; deleted registrations do not block new imports.
+3. Reapply any privileges, tags, or other governance relationships that the new registrations need.
+
+A source identifier can have only one active Gravitino registration. Coordinate with other
+Gravitino catalogs that share the external source before resetting a catalog.
+:::
 
 #### JDBC Backend
 
@@ -130,6 +151,34 @@ on the URI scheme:
 - ADLS: `abfs`, `abfss`, `wasb`, or `wasbs`
 - To override the default, explicitly configure `io-impl`.
 - Ensure that the corresponding storage bundle is available in the Iceberg catalog classpath.
+
+Catalogs with a remote warehouse reject client-supplied local filesystem locations, including
+`file:` URIs and paths without a scheme, with HTTP 400. This applies to table and view creation
+(including staged table creation), registration, location updates, namespace locations, and the
+`write.metadata.path` and `write.data.path` properties. An existing local namespace location is
+also rejected when a create request inherits it. ResolvingFileIO still permits locations on
+different remote storage systems, such as S3 and GCS, in the same catalog. Catalogs whose warehouse
+is a local path or `file:` URI retain local filesystem support for development and testing.
+
+With Iceberg REST authorization enabled, an explicit table location on create (including staged
+create), registration, or a `set-location` commit requires load access to every existing table
+whose location overlaps it. Equal, parent, and child directories overlap; names such as `table`
+and `table2` do not. Destination create and overwrite privileges are checked first, and denied
+source checks return 403 without disclosing the source table's name. A default-location create
+does not add a source scan. Filesystem dot segments and repeated separators are normalized for
+comparison; object-store keys retain their literal path segments.
+
+For JDBC backends, source discovery uses a single query of current metadata pointers and infers
+locations from the standard `<table-location>/metadata/<file>` layout. This lookup does not read
+other tables' metadata files and does not use a cross-request cache. Custom metadata layouts,
+including arbitrary `write.metadata.path` values, are outside this lookup's supported layout.
+Registration also preserves exact current metadata-pointer matching, including pointers outside
+the standard layout. This identity check does not provide complete overlap detection for custom
+layouts. Source discovery compares storage locations and metadata pointers rather than table
+UUIDs; register-overwrite still preserves the destination table UUID. Backends without bulk
+pointer lookup retain namespace discovery. Metadata read failures on that fallback path are
+propagated; only tables proven to have disappeared are skipped. Database lookup failures are
+also propagated, and destination authorization remains required.
 
 Supports using static access-key-id and secret-access-key to access S3 data.
 

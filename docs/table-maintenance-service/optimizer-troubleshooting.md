@@ -32,6 +32,11 @@ These come back from the CLI immediately and name the problem.
 
 **`Specified optimizer config file does not exist`** — check the `--conf-path` value and the file's permissions.
 
+**`submit-update-stats-job` fails on dry-run with `gravitino_uri` / `GET /configs` errors** — dry-run still
+loads `gravitino.schema.separator` from the Gravitino server named by `updater-options.gravitino_uri`.
+The URI must be reachable even when no Spark job is submitted. Missing `gravitino_uri`, an
+unreachable host, or a `/configs` response without `gravitino.schema.separator` all fail the command.
+
 **`No StrategyHandler class configured for strategy type ...`** — the strategy handler mapping is missing from the CLI configuration:
 
 ```properties
@@ -120,12 +125,28 @@ layouts. A **direct** `builtin-iceberg-rewrite-data-files` submit with an empty 
 rewrites the whole table and succeeds on `PARTITIONED BY (p, days(ts))` (and similar). You may
 still see `Rewritten data files: 0` when files are not rewrite-eligible (`min-input-files`).
 
-The failure mode
-`Cannot translate Spark expression ... day(...) ... to data source filter` still happens when
-the submit uses a **partition `where_clause` that applies time/bucket transforms** — the form
-the compaction adapter builds via `PartitionUtils` (for example `p = "a" AND day(ts) = 19723`).
-That is a strategy-generated filter path, not a limitation of empty-`where_clause` direct
-submits. Confirm in job run status and `error.log` under `builtin-iceberg-rewrite-data-files`.
+Strategy-generated partition filters use Iceberg Spark system functions (for example
+`catalog.system.days(ts) = DATE '2024-01-01'`, `catalog.system.years(ts) = 54`,
+`catalog.system.bucket(16, id) = 3`), not Spark builtins such
+as `day()`. The `days()` UDF returns `DATE`, so the strategy emits a date literal (not the raw
+epoch-day int). Identity `DATE`/`TIMESTAMP`/`TIME` partitions use the same single-quoted typed
+literals (`dt = DATE '2024-01-01'`): the job embeds them in `CALL ... where => '...'` via Spark
+`\'` escaping. With Iceberg Spark runtime 1.4+ these forms are translated by `SparkV2Filters`.
+If `Cannot translate Spark expression ...` still appears, confirm the job classpath uses a
+matching Iceberg Spark runtime and that the predicate resolved as an Iceberg function (not Spark
+`day()`/`year()`). Empty-`where_clause` direct submits remain the whole-table fallback. Confirm
+in job run status and `error.log` under `builtin-iceberg-rewrite-data-files`.
+
+**`Day partition value must be an ISO date`** — day-transform stats must be ISO `yyyy-MM-dd`.
+Epoch-day (`19723`) and compact (`20260101`) fail while building `where_clause` (no migration or
+guessing). `update-stats` alone is not enough if an imported non-ISO row remains: it adds an
+ISO-keyed row but leaves the old one selectable, so the next recommendation can still abort. List
+partition statistics, drop the non-ISO partition's statistic names
+([Drop partition statistics](../manage-statistics-in-gravitino.md#drop-partition-statistics)),
+re-run `update-stats`, then resubmit.
+
+**`spark.sql.parser.escapedStringLiterals must be false`** — built-in Iceberg jobs require
+Spark's default. Remove the key from `spark_conf` or set it to `false`.
 
 ## Related
 

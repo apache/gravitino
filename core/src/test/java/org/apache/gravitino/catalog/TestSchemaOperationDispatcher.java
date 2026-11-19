@@ -33,6 +33,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
@@ -42,6 +43,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -496,6 +498,22 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     Schema loadedSchema = Assertions.assertDoesNotThrow(() -> dispatcher.loadSchema(schemaIdent));
     Assertions.assertEquals(schemaIdent.name(), loadedSchema.name());
     Assertions.assertEquals("comment", loadedSchema.comment());
+    verify(entityStore).put(any(SchemaEntity.class), eq(false));
+  }
+
+  @Test
+  void testImportSchemaAfterRegistrationDeletionReusesIdentifier() throws IOException {
+    NameIdentifier schemaIdent =
+        NameIdentifier.of(metalake, catalog, "schema_soft_deleted_identifier");
+    dispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    SchemaEntity schemaEntity = entityStore.get(schemaIdent, SCHEMA, SchemaEntity.class);
+    entityStore.delete(schemaIdent, SCHEMA);
+
+    reset(entityStore);
+    Assertions.assertDoesNotThrow(() -> dispatcher.loadSchema(schemaIdent));
+    Assertions.assertEquals(
+        schemaEntity.id(), entityStore.get(schemaIdent, SCHEMA, SchemaEntity.class).id());
+    verify(entityStore).put(any(SchemaEntity.class), eq(false));
   }
 
   @Test
@@ -534,7 +552,13 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     UnsupportedOperationException exception =
         Assertions.assertThrows(
             UnsupportedOperationException.class, () -> dispatcher.loadSchema(schemaIdent));
-    Assertions.assertTrue(exception.getMessage().contains("Schema managed by multiple catalogs"));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "does not automatically reconcile conflicting external schema registrations"));
+    Assertions.assertTrue(exception.getMessage().contains("catalog-specific recovery guidance"));
+    verify(entityStore).put(any(SchemaEntity.class), eq(false));
   }
 
   @Test
@@ -734,6 +758,137 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
       Assertions.assertTrue(d.dropSchema(ident, true));
       Assertions.assertFalse(entityStore.exists(ident, SCHEMA));
       Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+    }
+  }
+
+  @Test
+  public void testSecretAlterWhenSchemaEntityUpdateFails() throws Exception {
+    reset(entityStore);
+    try (SecretManager secrets = memorySecretManager()) {
+      SchemaOperationDispatcher d =
+          new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secrets);
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_secret_remove");
+      d.createSchema(
+          ident,
+          "comment",
+          ImmutableMap.of("k1", "v1"),
+          Map.of("k2", new SecretBinding("memory", "old")),
+          Map.of());
+      SecretUrn urn =
+          SecretUrn.parse(
+              entityStore.get(ident, SCHEMA, SchemaEntity.class).properties().get("k2"));
+
+      // The catalog applies the remove, but the schema entity update fails and is only logged,
+      // so the entity still references the secret.
+      doThrow(new IOException()).when(entityStore).update(any(), any(), any(), any());
+      try {
+        d.alterSchema(ident, SchemaChange.removeProperty("k2"));
+        Assertions.assertEquals(
+            urn.toString(),
+            entityStore.get(ident, SCHEMA, SchemaEntity.class).properties().get("k2"));
+        Assertions.assertEquals("old", secrets.readSecret(urn));
+
+        // The catalog has applied a rotation, so its new version is made current anyway.
+        d.alterSchema(
+            ident, SchemaChange.setSecretBinding("k2", new SecretBinding("memory", "new")));
+        Assertions.assertEquals(
+            urn.toString(),
+            entityStore.get(ident, SCHEMA, SchemaEntity.class).properties().get("k2"));
+        Assertions.assertEquals("new", secrets.readSecret(urn));
+        reset(entityStore);
+        Assertions.assertTrue(d.dropSchema(ident, false));
+      } finally {
+        reset(entityStore);
+        d.dropSchema(ident, false);
+      }
+    }
+  }
+
+  @Test
+  void testAlterOfSchemaWithoutEntityCommitsSecrets() throws Exception {
+    reset(entityStore);
+    try (SecretManager secrets = memorySecretManager()) {
+      SchemaOperationDispatcher d =
+          new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secrets);
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_secret_no_entity");
+      doThrow(new IOException("store unavailable"))
+          .when(entityStore)
+          .put(any(SchemaEntity.class), eq(true));
+      try {
+        GravitinoRuntimeException error =
+            Assertions.assertThrows(
+                GravitinoRuntimeException.class,
+                () ->
+                    d.createSchema(
+                        ident,
+                        "comment",
+                        ImmutableMap.of("k1", "v1"),
+                        Map.of("k2", new SecretBinding("memory", "old")),
+                        Map.of()));
+        Assertions.assertEquals("store unavailable", Throwables.getRootCause(error).getMessage());
+        reset(entityStore);
+        Assertions.assertFalse(entityStore.exists(ident, SCHEMA));
+        SecretUrn urn =
+            SecretUrn.parse(
+                catalogManager
+                    .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
+                    .doWithSchemaOps(ops -> ops.loadSchema(ident))
+                    .properties()
+                    .get("k2"));
+
+        Assertions.assertEquals("old", secrets.readSecret(urn));
+        d.alterSchema(
+            ident, SchemaChange.setSecretBinding("k2", new SecretBinding("memory", "new")));
+        Assertions.assertEquals("new", secrets.readSecret(urn));
+        d.alterSchema(ident, SchemaChange.removeProperty("k2"));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+      } finally {
+        reset(entityStore);
+        // Skip if create never reached the catalog.
+        if (catalogManager
+            .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
+            .doWithSchemaOps(ops -> ops.schemaExists(ident))) {
+          d.dropSchema(ident, false);
+        }
+      }
+    }
+  }
+
+  @Test
+  void testAlterOfNeverImportedSchemaRejectsSecretBinding() throws Exception {
+    reset(entityStore);
+    try (SecretManager secrets = memorySecretManager()) {
+      SchemaOperationDispatcher d =
+          new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secrets);
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_never_imported");
+      // Created in the catalog only: no gravitino.identifier property and no SchemaEntity.
+      catalogManager.doWithCatalogWrapper(
+          NameIdentifier.of(metalake, catalog),
+          c -> c.doWithSchemaOps(ops -> ops.createSchema(ident, "comment", Map.of("k1", "v1"))));
+      try {
+        SchemaChange bind = SchemaChange.setSecretBinding("k2", new SecretBinding("memory", "s"));
+        IllegalArgumentException error =
+            Assertions.assertThrows(
+                IllegalArgumentException.class, () -> d.alterSchema(ident, bind));
+        Assertions.assertTrue(error.getMessage().contains("load the schema to import it first"));
+        Assertions.assertThrows(
+            NoSuchSchemaException.class,
+            () -> d.alterSchema(NameIdentifier.of(metalake, catalog, "schema_missing"), bind));
+
+        d.alterSchema(ident, SchemaChange.setProperty("k1", "v2"));
+        Assertions.assertFalse(entityStore.exists(ident, SCHEMA));
+
+        // Loading the schema imports it, which gives it an id.
+        d.loadSchema(ident);
+        d.alterSchema(ident, bind);
+        SecretUrn urn =
+            SecretUrn.parse(
+                entityStore.get(ident, SCHEMA, SchemaEntity.class).properties().get("k2"));
+        Assertions.assertEquals("s", secrets.readSecret(urn));
+      } finally {
+        reset(entityStore);
+        d.dropSchema(ident, false);
+      }
     }
   }
 
@@ -969,8 +1124,10 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   @Test
   public void testSecrets() throws Exception {
     try (SecretManager secrets = memorySecretManager()) {
+      AtomicLong nextId = new AtomicLong(idGenerator.nextId());
       SchemaOperationDispatcher d =
-          new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secrets);
+          new SchemaOperationDispatcher(
+              catalogManager, entityStore, nextId::getAndIncrement, secrets);
       NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_secret");
       Map<String, SecretBinding> bindings = Map.of("k2", new SecretBinding("memory", "s3cr3t"));
       Schema schema =
@@ -996,9 +1153,20 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
       Assertions.assertFalse(
           entityStore.get(ident, SCHEMA, SchemaEntity.class).properties().containsKey("k2"));
       Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+      long retryId = nextId.get();
       Assertions.assertThrows(
           SchemaAlreadyExistsException.class,
           () -> d.createSchema(ident, "comment", ImmutableMap.of("k1", "v1"), bindings, Map.of()));
+      // The schema was not created in the catalog, so the failed create deletes its version.
+      SecretUrn retryUrn =
+          SecretUrn.buildWriteThrough(
+              "memory",
+              Map.of(
+                  SecretConstants.ATTR_ENTITY_TYPE, "schema",
+                  SecretConstants.ATTR_ENTITY_ID, String.valueOf(retryId),
+                  SecretConstants.ATTR_PROPERTY_KEY, "k2"));
+      Assertions.assertNull(
+          secrets.getRegistry().getProvider("memory").currentSecretVersion(retryUrn));
       Assertions.assertTrue(d.dropSchema(ident, false));
       Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
     }

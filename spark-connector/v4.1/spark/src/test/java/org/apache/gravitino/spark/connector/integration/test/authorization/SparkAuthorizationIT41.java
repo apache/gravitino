@@ -16,27 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.secret;
+package org.apache.gravitino.spark.connector.integration.test.authorization;
 
-import java.util.List;
-
-/**
- * Mutable holder so {@code store.update} lambdas can record written secrets for rollback.
- *
- * <p>Used by catalog, schema, and fileset alter paths that prepare secrets inside {@code
- * store.update} and roll back on failure.
- */
-public final class SecretMaterialsHolder {
-
-  private List<SecretMaterial> materials = List.of();
-
-  /** Returns written secret materials. */
-  public List<SecretMaterial> get() {
-    return materials;
-  }
-
-  /** Records written secret materials. */
-  public void set(List<SecretMaterial> materials) {
-    this.materials = materials;
-  }
-}
+/** Spark 4.1 authorization integration tests. */
+public class SparkAuthorizationIT41 extends SparkAuthorizationIT {}

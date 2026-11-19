@@ -44,7 +44,7 @@ class MetadataObjectSecretOperations implements SupportsSecrets {
             "api/metalakes/%s/objects/%s/%s/secrets",
             RESTUtils.encodeString(metalakeName),
             metadataObject.type().name().toLowerCase(Locale.ROOT),
-            RESTUtils.encodeString(metadataObject.fullName()));
+            RESTUtils.encodeMetadataObjectName(metadataObject));
   }
 
   @Override

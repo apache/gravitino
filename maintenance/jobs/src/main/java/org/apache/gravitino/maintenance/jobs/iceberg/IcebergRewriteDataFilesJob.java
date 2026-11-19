@@ -153,10 +153,11 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
     // Apply custom Spark configurations if provided
     if (sparkConfJson != null && !sparkConfJson.isEmpty()) {
       try {
-        Map<String, String> customConfigs = IcebergJobUtils.parseCustomSparkConfigs(sparkConfJson);
-        for (Map.Entry<String, String> entry : customConfigs.entrySet()) {
-          sparkBuilder.config(entry.getKey(), entry.getValue());
-        }
+        Map<String, String> customConfigs =
+            new HashMap<>(IcebergJobUtils.parseCustomSparkConfigs(sparkConfJson));
+        // Stock spark_conf may omit defaultCatalog; bare years()/months() need the Iceberg catalog.
+        IcebergSparkConfigUtils.ensureIcebergCatalogConfigs(customConfigs, catalogName);
+        customConfigs.forEach(sparkBuilder::config);
       } catch (IllegalArgumentException e) {
         System.err.println("Error: " + e.getMessage());
         printUsage();
@@ -226,24 +227,25 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
       String whereClause,
       String optionsJson) {
 
-    StringBuilder sql = new StringBuilder();
-    sql.append("CALL ")
-        .append(IcebergJobUtils.escapeSqlIdentifier(catalogName))
-        .append(".system.rewrite_data_files(");
-    sql.append("table => '").append(IcebergJobUtils.escapeSqlString(tableIdentifier)).append("'");
+    StringBuilder sql = IcebergJobUtils.beginSystemProcedureCall(catalogName, "rewrite_data_files");
+    IcebergJobUtils.appendSparkCallStringTableArg(sql, tableIdentifier);
 
     if (strategy != null && !strategy.isEmpty()) {
-      sql.append(", strategy => '").append(IcebergJobUtils.escapeSqlString(strategy)).append("'");
+      sql.append(", strategy => '")
+          .append(IcebergJobUtils.escapeSparkCallStringArg(strategy))
+          .append("'");
     }
 
     if (sortOrder != null && !sortOrder.isEmpty()) {
       sql.append(", sort_order => '")
-          .append(IcebergJobUtils.escapeSqlString(sortOrder))
+          .append(IcebergJobUtils.escapeSparkCallStringArg(sortOrder))
           .append("'");
     }
 
     if (whereClause != null && !whereClause.isEmpty()) {
-      sql.append(", where => '").append(IcebergJobUtils.escapeSqlString(whereClause)).append("'");
+      sql.append(", where => '")
+          .append(IcebergJobUtils.escapeSparkCallStringArg(whereClause))
+          .append("'");
     }
 
     if (optionsJson != null && !optionsJson.isEmpty()) {
@@ -256,6 +258,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
           if (!first) {
             sql.append(", ");
           }
+          // map('k','v') are expression literals (not CALL arg => '...'); SQL '' escaping is fine.
           sql.append("'")
               .append(IcebergJobUtils.escapeSqlString(entry.getKey()))
               .append("', '")
