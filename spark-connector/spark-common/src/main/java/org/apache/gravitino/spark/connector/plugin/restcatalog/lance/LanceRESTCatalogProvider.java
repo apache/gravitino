@@ -167,8 +167,8 @@ public class LanceRESTCatalogProvider implements LakehouseRESTCatalogProvider {
     return new String[] {SPARK_EXTENSIONS};
   }
 
-  // Not StringUtils.startsWithIgnoreCase: newer commons-lang3 versions deprecate it, which fails
-  // the build against Spark versions that bring them.
+  // Avoid StringUtils.startsWithIgnoreCase: deprecated in the commons-lang3 version used by
+  // Spark 4.1, and the connector compiles with -Werror.
   private static boolean isHeaderProperty(@Nullable String key) {
     return key != null && key.regionMatches(true, 0, HEADER_PREFIX, 0, HEADER_PREFIX.length());
   }
