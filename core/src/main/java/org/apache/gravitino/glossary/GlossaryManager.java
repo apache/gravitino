@@ -88,7 +88,8 @@ public final class GlossaryManager {
 
   /**
    * Creates a live definition. When authorization is enabled the creator must be a registered user
-   * in the metalake. The definition and creator ownership commit or roll back together.
+   * in the metalake. The definition and creator ownership share a transaction. Callers that open an
+   * enclosing transaction must roll it back if creation fails.
    *
    * @throws NoSuchMetalakeException if the metalake does not exist
    * @throws NoSuchEntityException if the required creator is missing
@@ -130,6 +131,8 @@ public final class GlossaryManager {
    * Applies all changes atomically to the current definition.
    *
    * @throws NoSuchTermException if the term or its parent metalake does not exist
+   * @throws TermAlreadyExistsException if the new name or source reference is already in use
+   * @throws IllegalArgumentException if the requested edits are invalid
    */
   public GlossaryTermEntity alterTerm(String metalake, String name, TermChange... changes) {
     return alter(metalake, name, false, null, changes);
@@ -140,7 +143,8 @@ public final class GlossaryManager {
    *
    * @throws NoSuchTermException if the term or its parent metalake does not exist
    * @throws TermVersionConflictException if a valid token does not match the current term
-   * @throws IllegalArgumentException if the supplied token is malformed
+   * @throws TermAlreadyExistsException if the new name or source reference is already in use
+   * @throws IllegalArgumentException if the supplied token or requested edits are invalid
    */
   public GlossaryTermEntity alterTerm(
       String metalake, String name, String expectedRevision, TermChange... changes) {
