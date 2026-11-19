@@ -41,6 +41,7 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyExecutionSpec;
 
@@ -390,6 +391,16 @@ public final class MaintenanceJobConfBuilder {
       }
       if (!compaction.rewriteOptions().isEmpty()) {
         jobConf.put("options", writeJson(new TreeMap<>(compaction.rewriteOptions()), "options"));
+      }
+      return;
+    }
+    if (content instanceof IcebergRewriteManifestsContent) {
+      IcebergRewriteManifestsContent rewrite = (IcebergRewriteManifestsContent) content;
+      if (rewrite.specId() != null) {
+        jobConf.put("spec_id", Integer.toString(rewrite.specId()));
+      }
+      if (rewrite.useCaching() != null) {
+        jobConf.put("use_caching", Boolean.toString(rewrite.useCaching()));
       }
       return;
     }
