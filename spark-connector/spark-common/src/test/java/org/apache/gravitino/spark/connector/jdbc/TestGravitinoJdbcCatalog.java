@@ -24,6 +24,7 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -37,6 +38,7 @@ import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
+import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions;
 import org.apache.spark.sql.internal.SQLConf;
@@ -53,63 +55,6 @@ import org.mockito.MockedStatic;
 
 /** Unit tests for JDBC catalog credentials and timestamp option handling. */
 public class TestGravitinoJdbcCatalog {
-
-  /**
-   * Minimal Catalog stub — returns nothing, used to verify the instanceof check for
-   * SupportsCredentials.
-   */
-  private static class PlainCatalogStub implements Catalog {
-    @Override
-    public String name() {
-      return "stub";
-    }
-
-    @Override
-    public Type type() {
-      return Type.RELATIONAL;
-    }
-
-    @Override
-    public String provider() {
-      return "jdbc-mysql";
-    }
-
-    @Override
-    public String comment() {
-      return null;
-    }
-
-    @Override
-    public Map<String, String> properties() {
-      return Collections.emptyMap();
-    }
-
-    @Override
-    public Audit auditInfo() {
-      return null;
-    }
-  }
-
-  /** Catalog that also implements SupportsCredentials — simulates the upgraded server. */
-  private static class CredentialCatalogStub extends PlainCatalogStub
-      implements SupportsCredentials {
-
-    private final Credential[] credentials;
-
-    CredentialCatalogStub(Credential... credentials) {
-      this.credentials = credentials;
-    }
-
-    @Override
-    public Credential[] getCredentials() {
-      return credentials;
-    }
-
-    @Override
-    public SupportsCredentials supportsCredentials() {
-      return this;
-    }
-  }
 
   @ParameterizedTest
   @ValueSource(
@@ -196,6 +141,50 @@ public class TestGravitinoJdbcCatalog {
       } else {
         conf.setConfString("spark.sql.timestampType", previous);
       }
+    }
+  }
+
+  @Test
+  void testRejectsConnectionSettingChangeInOpenSession() {
+    try (MockedStatic<GravitinoCatalogManager> global = mockStatic(GravitinoCatalogManager.class)) {
+      global.when(GravitinoCatalogManager::get).thenReturn(mock(GravitinoCatalogManager.class));
+      RefreshingCatalog catalog = new RefreshingCatalog();
+      catalog.initialCatalog = jdbcCatalog("jdbc:mysql://localhost/first", null);
+      catalog.refreshedCatalog = jdbcCatalog("jdbc:mysql://localhost/second", null);
+      catalog.createAndInitSparkCatalog(
+          "test",
+          new CaseInsensitiveStringMap(Collections.emptyMap()),
+          catalog.initializationProperties(catalog.initialCatalog));
+
+      IllegalStateException exception =
+          Assertions.assertThrows(
+              IllegalStateException.class,
+              () -> catalog.loadSparkTable(Identifier.of(new String[] {"db"}, "table")));
+
+      Assertions.assertTrue(exception.getMessage().contains("Restart the Spark session"));
+    }
+  }
+
+  @Test
+  void testRejectsRecreatedCatalogInOpenSession() {
+    try (MockedStatic<GravitinoCatalogManager> global = mockStatic(GravitinoCatalogManager.class)) {
+      global.when(GravitinoCatalogManager::get).thenReturn(mock(GravitinoCatalogManager.class));
+      RefreshingCatalog catalog = new RefreshingCatalog();
+      catalog.initialCatalog =
+          jdbcCatalog("jdbc:mysql://localhost/db", Instant.parse("2026-01-01T00:00:00Z"));
+      catalog.refreshedCatalog =
+          jdbcCatalog("jdbc:mysql://localhost/db", Instant.parse("2026-01-02T00:00:00Z"));
+      catalog.createAndInitSparkCatalog(
+          "test",
+          new CaseInsensitiveStringMap(Collections.emptyMap()),
+          catalog.initializationProperties(catalog.initialCatalog));
+
+      IllegalStateException exception =
+          Assertions.assertThrows(
+              IllegalStateException.class,
+              () -> catalog.loadSparkTable(Identifier.of(new String[] {"db"}, "table")));
+
+      Assertions.assertTrue(exception.getMessage().contains("Restart the Spark session"));
     }
   }
 
@@ -350,9 +339,8 @@ public class TestGravitinoJdbcCatalog {
     props.put(JdbcPropertiesConstants.SPARK_JDBC_USER, "prop-user");
     props.put(JdbcPropertiesConstants.SPARK_JDBC_PASSWORD, "prop-password");
 
-    Catalog catalog =
-        new CredentialCatalogStub(new JdbcCredential("vended-user", "vended-password"));
-    GravitinoJdbcCatalog.applyJdbcCredential(catalog, props);
+    GravitinoJdbcCatalog.applyJdbcCredential(
+        new Credential[] {new JdbcCredential("vended-user", "vended-password")}, props);
 
     Assertions.assertEquals("vended-user", props.get(JdbcPropertiesConstants.SPARK_JDBC_USER));
     Assertions.assertEquals(
@@ -365,20 +353,7 @@ public class TestGravitinoJdbcCatalog {
     props.put(JdbcPropertiesConstants.SPARK_JDBC_USER, "prop-user");
     props.put(JdbcPropertiesConstants.SPARK_JDBC_PASSWORD, "prop-password");
 
-    GravitinoJdbcCatalog.applyJdbcCredential(new CredentialCatalogStub(), props);
-
-    Assertions.assertEquals("prop-user", props.get(JdbcPropertiesConstants.SPARK_JDBC_USER));
-    Assertions.assertEquals(
-        "prop-password", props.get(JdbcPropertiesConstants.SPARK_JDBC_PASSWORD));
-  }
-
-  @Test
-  void testFallsBackToPropertiesWhenCatalogDoesNotSupportCredentials() {
-    Map<String, String> props = new HashMap<>();
-    props.put(JdbcPropertiesConstants.SPARK_JDBC_USER, "prop-user");
-    props.put(JdbcPropertiesConstants.SPARK_JDBC_PASSWORD, "prop-password");
-
-    GravitinoJdbcCatalog.applyJdbcCredential(new PlainCatalogStub(), props);
+    GravitinoJdbcCatalog.applyJdbcCredential(new Credential[0], props);
 
     Assertions.assertEquals("prop-user", props.get(JdbcPropertiesConstants.SPARK_JDBC_USER));
     Assertions.assertEquals(
@@ -414,6 +389,42 @@ public class TestGravitinoJdbcCatalog {
           }
         };
     return catalog;
+  }
+
+  private static Catalog jdbcCatalog(String url, Instant createTime) {
+    Catalog catalog = mock(Catalog.class);
+    when(catalog.properties())
+        .thenReturn(
+            Map.of(
+                "jdbc-url", url,
+                "jdbc-user", "user",
+                "jdbc-password", "password",
+                "jdbc-driver", "com.mysql.cj.jdbc.Driver"));
+    when(catalog.supportsSecrets()).thenThrow(new UnsupportedOperationException());
+    SupportsCredentials credentials = mock(SupportsCredentials.class);
+    when(credentials.getCredentials()).thenReturn(new Credential[0]);
+    when(catalog.supportsCredentials()).thenReturn(credentials);
+    if (createTime != null) {
+      Audit audit = mock(Audit.class);
+      when(audit.createTime()).thenReturn(createTime);
+      when(catalog.auditInfo()).thenReturn(audit);
+    }
+    return catalog;
+  }
+
+  private static class RefreshingCatalog extends GravitinoJdbcCatalog {
+    private Catalog initialCatalog;
+    private Catalog refreshedCatalog;
+
+    @Override
+    protected Catalog gravitinoCatalog() {
+      return initialCatalog;
+    }
+
+    @Override
+    protected Catalog refreshGravitinoCatalog() {
+      return refreshedCatalog;
+    }
   }
 
   private static JDBCOptions initialize(
