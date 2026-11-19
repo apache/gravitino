@@ -92,7 +92,7 @@ public class DomainCreateRequest implements RESTRequest {
     backingTag.validate();
   }
 
-  /** A tag to create without a value, or an existing tag to bind. */
+  /** A tag to create without values, or an existing tag to bind. */
   @Getter
   public static class BackingTag extends DomainBackingTagDTO {
 
@@ -101,27 +101,18 @@ public class DomainCreateRequest implements RESTRequest {
 
     /** Creates a backing tag request for Jackson deserialization. */
     public BackingTag() {
-      this(null, null, false);
+      this(null, false);
     }
 
     /**
      * Creates a backing tag request.
      *
      * @param name The tag name.
-     * @param value The optional existing assignment value.
      * @param create Whether to create a new tag without values.
      */
-    public BackingTag(String name, @Nullable String value, boolean create) {
-      super(name, value);
+    public BackingTag(String name, boolean create) {
+      super(name);
       this.create = create;
-    }
-
-    /** Validates the tag and prohibits creating a tag with a value. */
-    @Override
-    public void validate() {
-      super.validate();
-      Preconditions.checkArgument(
-          !create || getValue() == null, "A new backing tag cannot have a value");
     }
   }
 }

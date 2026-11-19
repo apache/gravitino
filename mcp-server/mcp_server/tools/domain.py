@@ -88,10 +88,10 @@ def load_domain_tools(mcp: FastMCP):
         """List domain members and all applicable relations.
 
         By default, lists objects directly assigned the backing tag of the domain
-        or a visible subdomain. A tagged catalog or schema appears once. A nearer
-        assignment of the same tag can override the inherited value and exclude a
-        descendant. Set expand=true to list accessible recorded leaves whose
-        effective tags match, with INHERITED relations where applicable.
+        or a visible subdomain. A tagged catalog or schema appears once. Any value
+        on an assignment of the backing tag is ignored. Set expand=true to list
+        accessible recorded leaves whose effective tags match, with INHERITED
+        relations where applicable.
         types filters object types (for example TABLE, TOPIC, CATALOG or SCHEMA;
         CATALOG and SCHEMA are not allowed with expand=true).
         domains filters source domain names. name_contains matches a case-insensitive
