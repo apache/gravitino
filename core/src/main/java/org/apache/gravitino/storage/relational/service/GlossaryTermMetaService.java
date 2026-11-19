@@ -264,7 +264,10 @@ public final class GlossaryTermMetaService {
     return transaction(namespace, true, (mapper, metalakeId) -> work.get());
   }
 
-  /** Locks the parent, optional hierarchy mutex, and current term before invoking the operation. */
+  /**
+   * Locks the parent, optional hierarchy mutex, and current term before invoking the operation.
+   * Supplies an empty term if either the term or its parent is absent.
+   */
   public <T> T withLockedTerm(
       NameIdentifier ident,
       boolean hierarchyLock,
@@ -272,6 +275,7 @@ public final class GlossaryTermMetaService {
     return transaction(
         ident.namespace(),
         hierarchyLock,
+        missing -> operation.apply(Optional.empty()),
         (mapper, metalakeId) -> {
           GlossaryTermPO row = mapper.getForUpdate(metalakeId, GlossaryTermNames.key(ident.name()));
           return operation.apply(
@@ -318,11 +322,30 @@ public final class GlossaryTermMetaService {
 
   private <T> T transaction(
       Namespace ns, boolean hierarchyLock, BiFunction<GlossaryTermMetaMapper, Long, T> work) {
+    return transaction(
+        ns,
+        hierarchyLock,
+        missing -> {
+          throw missing;
+        },
+        work);
+  }
+
+  private <T> T transaction(
+      Namespace ns,
+      boolean hierarchyLock,
+      Function<NoSuchEntityException, T> missingParent,
+      BiFunction<GlossaryTermMetaMapper, Long, T> work) {
     validateNamespace(ns);
     return SessionUtils.doWithCommitAndFetchResult(
         GlossaryTermMetaMapper.class,
         mapper -> {
-          MetalakePO observed = metalake(ns);
+          MetalakePO observed;
+          try {
+            observed = metalake(ns);
+          } catch (NoSuchEntityException e) {
+            return missingParent.apply(e);
+          }
           // Fence metalake deletion; definition row locks keep the root and synonyms consistent.
           // MySQL/PostgreSQL share the parent lock across terms. H2 uses an exclusive parent
           // lock instead, serializing operations within a metalake. This is not the glossary
@@ -333,8 +356,10 @@ public final class GlossaryTermMetaService {
               SessionUtils.getWithoutCommit(
                   MetalakeMetaMapper.class,
                   m -> m.selectMetalakeMetaByIdForShare(observed.getMetalakeId()));
-          if (locked == null || !Objects.equals(locked.getMetalakeName(), ns.level(0)))
-            throw new NoSuchEntityException("Metalake %s no longer exists", ns.level(0));
+          if (locked == null || !Objects.equals(locked.getMetalakeName(), ns.level(0))) {
+            return missingParent.apply(
+                new NoSuchEntityException("Metalake %s no longer exists", ns.level(0)));
+          }
           if (hierarchyLock) {
             // Term deletion must exclude new edges before locking the term itself.
             GlossaryTermRelService.getInstance().lockHierarchy(locked.getMetalakeId());

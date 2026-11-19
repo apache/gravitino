@@ -62,6 +62,17 @@ class TestGlossaryManager extends TestJDBCBackend {
   private final GlossaryManager manager = new GlossaryManager(ids::incrementAndGet, false);
 
   @TestTemplate
+  void testMissingParentMakesTermAbsent() {
+    TermChange change = TermChange.updateDefinition("new");
+    Assertions.assertThrows(NoSuchTermException.class, () -> manager.getTerm(LAKE, "term"));
+    Assertions.assertThrows(
+        NoSuchTermException.class, () -> manager.alterTerm(LAKE, "term", change));
+    Assertions.assertThrows(
+        NoSuchTermException.class, () -> manager.alterTerm(LAKE, "term", "bad", change));
+    Assertions.assertFalse(manager.dropTerm(LAKE, "term"));
+  }
+
+  @TestTemplate
   void testListDistinguishesMissingAndEmptyMetalake() throws IOException {
     NoSuchMetalakeException missing =
         Assertions.assertThrows(NoSuchMetalakeException.class, () -> manager.listTerms(LAKE));
