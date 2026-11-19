@@ -105,6 +105,7 @@ class TestGlossaryRelations extends TestJDBCBackend {
           List.of("Parent"), names(manager.listRelations(LAKE, "Root", BROADER, false, null)));
       assertEquals(
           List.of("Peer"), names(manager.listRelations(LAKE, "Root", RELATED, false, null)));
+      assertEquals(List.of(2), lookupSizes, "Relation reads must reuse the root snapshot IDs");
       lookupSizes.clear();
       List<TermChange> edits = new ArrayList<>();
       edits.add(TermChange.removeBroader("Parent"));

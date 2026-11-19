@@ -47,6 +47,7 @@ import org.apache.gravitino.meta.GlossaryTermNames;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.po.GlossaryTermRelPO;
 import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
+import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService.ScopedTerm;
 import org.apache.gravitino.storage.relational.service.GlossaryTermRelService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermRelService.RelationType;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
@@ -126,13 +127,14 @@ public final class GlossaryManager {
     return SqlSessions.readSnapshot(
         () -> {
           NameIdentifier ident = NameIdentifier.of(NamespaceUtil.ofGlossaryTerm(metalake), name);
-          GlossaryTermEntity root = relationRoot(ident);
+          ScopedTerm snapshot = relationRoot(ident);
+          GlossaryTermEntity root = snapshot.term();
           Predicate<GlossaryTermEntity> visible =
               term -> (status == null || status == term.status()) && readable.test(term);
           if (!visible.test(root)) {
             throw missingRelationRoot(ident);
           }
-          long lake = terms.getIds(root.nameIdentifier()).namespaceIds()[0];
+          long lake = snapshot.metalakeId();
           List<GlossaryTermEntity> result = new ArrayList<>();
           Set<Long> seen = new HashSet<>(Set.of(root.id()));
           Set<Long> frontier = Set.of(root.id());
@@ -327,7 +329,7 @@ public final class GlossaryManager {
       return terms.withHierarchyLock(
           ident.namespace(),
           lake -> {
-            GlossaryTermEntity root = relationRoot(ident);
+            GlossaryTermEntity root = relationRoot(ident).term();
             return withRelationPlan(
                 lake,
                 root,
@@ -428,9 +430,9 @@ public final class GlossaryManager {
     }
   }
 
-  private GlossaryTermEntity relationRoot(NameIdentifier requested) {
+  private ScopedTerm relationRoot(NameIdentifier requested) {
     try {
-      return terms.get(requested);
+      return terms.getWithMetalakeId(requested);
     } catch (NoSuchEntityException missing) {
       throw missingRelationRoot(requested);
     }

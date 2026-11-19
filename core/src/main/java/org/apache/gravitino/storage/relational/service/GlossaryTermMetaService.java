@@ -129,11 +129,25 @@ public final class GlossaryTermMetaService {
 
   /** Loads a definition and its synonyms from one statement snapshot without row locks. */
   public GlossaryTermEntity get(NameIdentifier ident) {
-    List<GlossaryTermEntity> terms = read(ident.namespace(), GlossaryTermNames.key(ident.name()));
+    return getWithMetalakeId(ident).term();
+  }
+
+  /** A live term and its parent identity from the same definition snapshot. */
+  public record ScopedTerm(long metalakeId, GlossaryTermEntity term) {}
+
+  /**
+   * Loads the term and metalake identity used to scope subsequent relation queries.
+   *
+   * @throws NoSuchEntityException if the term or its parent metalake does not exist
+   */
+  public ScopedTerm getWithMetalakeId(NameIdentifier ident) {
+    Namespace ns = ident.namespace();
+    List<GlossaryTermSnapshotPO> rows = readRows(ns, GlossaryTermNames.key(ident.name()));
+    List<GlossaryTermEntity> terms = definitions(ns, rows);
     if (terms.isEmpty()) {
       throw new NoSuchEntityException("Glossary term %s does not exist", ident);
     }
-    return terms.get(0);
+    return new ScopedTerm(rows.get(0).getMetalakeId(), terms.get(0));
   }
 
   /** Resolves term and metalake identities without row locks. */
@@ -155,7 +169,7 @@ public final class GlossaryTermMetaService {
 
   /** Lists definitions and synonyms from one statement snapshot without row locks. */
   public List<GlossaryTermEntity> list(Namespace ns) {
-    return read(ns, null);
+    return definitions(ns, readRows(ns, null));
   }
 
   /**
@@ -391,15 +405,11 @@ public final class GlossaryTermMetaService {
         });
   }
 
-  private List<GlossaryTermEntity> read(Namespace ns, @Nullable String key) {
+  private List<GlossaryTermSnapshotPO> readRows(Namespace ns, @Nullable String key) {
     validateNamespace(ns);
     return SessionUtils.getWithoutCommit(
         GlossaryTermMetaMapper.class,
-        mapper -> {
-          List<GlossaryTermSnapshotPO> rows =
-              mapper.snapshot(metalake(ns).getMetalakeId(), ns.level(0), key);
-          return definitions(ns, rows);
-        });
+        mapper -> mapper.snapshot(metalake(ns).getMetalakeId(), ns.level(0), key));
   }
 
   /**
