@@ -54,13 +54,18 @@ public class IcebergRewriteManifestsContent extends AbstractExecutablePolicyCont
   public static final String AVG_MANIFEST_SIZE_METRIC = "custom-avg-manifest-size";
   /** S1 metric: manifests rewritten by the procedure. */
   public static final String REWRITTEN_MANIFEST_NUMBER_METRIC = "custom-rewritten-manifest-number";
+  /**
+   * Observability field: Iceberg partition-spec id used for before/after metrics. Omitted when the
+   * resolved spec is unpartitioned.
+   */
+  public static final String MANIFEST_SPEC_ID_METRIC = "custom-manifest-spec-id";
+  /**
+   * Observability field: human-readable partition-spec summary for the resolved id. Omitted when
+   * the resolved spec is unpartitioned.
+   */
+  public static final String MANIFEST_PARTITION_SPEC_METRIC = "custom-manifest-partition-spec";
   /** Rule key for the requested partition spec ID; omission selects Iceberg's current default. */
   public static final String SPEC_ID = "spec_id";
-  /**
-   * Iceberg / Gravitino table property for the current default partition spec id ({@code
-   * default-spec-id}).
-   */
-  public static final String DEFAULT_SPEC_ID_PROPERTY = "default-spec-id";
   /** Rule key for caching option, or null for the Iceberg default. */
   public static final String USE_CACHING = "use_caching";
 
@@ -160,41 +165,6 @@ public class IcebergRewriteManifestsContent extends AbstractExecutablePolicyCont
     super.validate();
     Preconditions.checkArgument(manifestCountThreshold > 0, "manifest_count_threshold must be > 0");
     Preconditions.checkArgument(specId == null || specId >= 0, "spec_id must be >= 0");
-  }
-
-  /**
-   * Parses {@link #DEFAULT_SPEC_ID_PROPERTY} from table properties.
-   *
-   * @param properties table properties; may be {@code null}
-   * @return non-negative spec id, or {@code null} when missing / unparseable
-   */
-  @Nullable
-  public static Integer parseDefaultSpecId(@Nullable Map<String, String> properties) {
-    if (properties == null) {
-      return null;
-    }
-    String value = properties.get(DEFAULT_SPEC_ID_PROPERTY);
-    if (value == null || !value.matches("[0-9]+")) {
-      return null;
-    }
-    try {
-      return Integer.valueOf(value);
-    } catch (NumberFormatException e) {
-      return null;
-    }
-  }
-
-  /**
-   * Prefers an explicit policy {@code spec_id}; otherwise uses {@link #parseDefaultSpecId}.
-   *
-   * @param requestedSpecId explicit spec from policy content; may be {@code null}
-   * @param properties table properties used when {@code requestedSpecId} is null
-   * @return resolved spec id, or {@code null} when neither source yields one
-   */
-  @Nullable
-  public static Integer resolveSpecId(
-      @Nullable Integer requestedSpecId, @Nullable Map<String, String> properties) {
-    return requestedSpecId != null ? requestedSpecId : parseDefaultSpecId(properties);
   }
 
   @Override

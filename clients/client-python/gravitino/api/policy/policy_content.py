@@ -924,6 +924,9 @@ class IcebergRewriteManifestsContent(AbstractExecutablePolicyContent):
     USE_CACHING: ClassVar[str] = "use_caching"
     MANIFEST_NUMBER_METRIC: ClassVar[str] = "custom-manifest-number"
     AVG_MANIFEST_SIZE_METRIC: ClassVar[str] = "custom-avg-manifest-size"
+    REWRITTEN_MANIFEST_NUMBER_METRIC: ClassVar[str] = "custom-rewritten-manifest-number"
+    MANIFEST_SPEC_ID_METRIC: ClassVar[str] = "custom-manifest-spec-id"
+    MANIFEST_PARTITION_SPEC_METRIC: ClassVar[str] = "custom-manifest-partition-spec"
 
     DEFAULT_MANIFEST_COUNT_THRESHOLD: ClassVar[int] = 100
 

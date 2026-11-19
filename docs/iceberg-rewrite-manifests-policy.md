@@ -80,11 +80,12 @@ Recollect statistics after a successful rewrite before evaluating again.
 
 ## Selecting a partition spec
 
-When `spec_id` is omitted, the recommender and TMS schedule paths resolve Iceberg's current
-`default-spec-id` from table metadata and retain that value through job submission. Empty
-policy content therefore evaluates the current default spec with the default thresholds. Set
-`spec_id` explicitly to target another existing spec, such as an older spec after partition
-evolution.
+When `spec_id` is omitted, the recommender resolves Iceberg's current `default-spec-id` from
+table metadata and retains that value through job submission. TMS leaves an omitted
+`spec_id` unset at schedule time and resolves the table's current default when the Spark job
+runs. Empty policy content therefore targets the current default spec with the default
+thresholds. Set `spec_id` explicitly to target another existing spec, such as an older spec
+after partition evolution.
 
 The Iceberg catalog projects `TableMetadata.defaultSpecId()` as the reserved, read-only table
 property `default-spec-id`. This is metadata, not an operator setting; it cannot be set or

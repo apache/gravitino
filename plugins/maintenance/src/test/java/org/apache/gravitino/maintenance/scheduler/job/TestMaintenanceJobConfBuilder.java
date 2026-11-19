@@ -190,6 +190,29 @@ class TestMaintenanceJobConfBuilder {
   }
 
   @Test
+  void testRewriteManifestsOmitsSpecIdWhenPolicyOmitsIt() {
+    PolicyEntity policy =
+        PolicyEntity.builder()
+            .withId(POLICY_ID)
+            .withName("m-default-spec")
+            .withNamespace(NamespaceUtil.ofPolicy("ml"))
+            .withPolicyType(Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS)
+            .withEnabled(true)
+            .withContent(PolicyContents.icebergRewriteManifests())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("t").withCreateTime(Instant.now()).build())
+            .build();
+
+    Map<String, String> conf =
+        new MaintenanceJobConfBuilder(configWithUri(), Clock.fixed(FIXED, ZoneOffset.UTC))
+            .build(policy, "iceberg");
+
+    Assertions.assertEquals("rewrite_manifests", conf.get("maintenance_types"));
+    Assertions.assertFalse(conf.containsKey("spec_id"));
+    Assertions.assertFalse(conf.containsKey("use_caching"));
+  }
+
+  @Test
   void testOrphanMapsRetentionCutoff() {
     PolicyEntity policy =
         PolicyEntity.builder()

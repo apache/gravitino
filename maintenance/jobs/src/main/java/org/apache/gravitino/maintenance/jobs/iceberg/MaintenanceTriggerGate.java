@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergMaintenanceJob.MaintenanceType;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionTriggerEvaluator;
+import org.apache.gravitino.maintenance.optimizer.recommender.handler.manifest.ManifestRewriteTriggerEvaluator;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
@@ -42,7 +43,8 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Evaluates enqueue-time policy rules locally with the same QL stack as the optimizer. Does not
  * call Gravitino. Snapshot expiry always maintains (optimizer-only scheduling for that type).
- * Compaction and manifest rewrite evaluate {@code trigger-expr} against S0 metrics.
+ * Compaction uses {@code CompactionTriggerEvaluator}; manifest rewrite uses {@code
+ * ManifestRewriteTriggerEvaluator}.
  */
 final class MaintenanceTriggerGate {
 
@@ -81,11 +83,18 @@ final class MaintenanceTriggerGate {
       return false;
     }
 
-    boolean maintain = CompactionTriggerEvaluator.shouldMaintain(rules, metrics);
+    boolean maintain =
+        type == MaintenanceType.REWRITE_MANIFESTS
+            ? ManifestRewriteTriggerEvaluator.shouldMaintain(rules, metrics)
+            : CompactionTriggerEvaluator.shouldMaintain(rules, metrics);
+    String triggerExprKey =
+        type == MaintenanceType.REWRITE_MANIFESTS
+            ? IcebergRewriteManifestsContent.TRIGGER_EXPR_KEY
+            : IcebergDataCompactionContent.TRIGGER_EXPR_KEY;
     LOG.info(
         "In-Spark recommend type={} expr={} -> {}",
         type.wireName(),
-        rules.get(IcebergDataCompactionContent.TRIGGER_EXPR_KEY),
+        rules.get(triggerExprKey),
         maintain ? "MAINTAIN" : "SKIP");
     return maintain;
   }

@@ -33,7 +33,6 @@ import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
-import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -137,24 +136,6 @@ class TestMaintenanceJobSpecFactory {
   }
 
   @Test
-  void testForCronPinsRewriteManifestSpecIdFromTableDefault() {
-    MaintenanceJobSpecFactory factory = new MaintenanceJobSpecFactory(configWithUri());
-    PolicyEntity rewrite = rewriteManifests(301L, null);
-    MaintenanceJobSpec pinned =
-        factory.forCron(List.of(new TableCandidate(10L, "iceberg", "db.t1", List.of(rewrite), 7)));
-    Assertions.assertEquals("7", pinned.getTasks().get(0).getParameters().get("spec_id"));
-
-    PolicyEntity explicit = rewriteManifests(302L, 3);
-    MaintenanceJobSpec kept =
-        factory.forCron(List.of(new TableCandidate(11L, "iceberg", "db.t2", List.of(explicit), 7)));
-    Assertions.assertEquals("3", kept.getTasks().get(0).getParameters().get("spec_id"));
-
-    MaintenanceJobSpec unpinned =
-        factory.forCron(List.of(candidate(12L, "iceberg", "db.t3", rewrite)));
-    Assertions.assertFalse(unpinned.getTasks().get(0).getParameters().containsKey("spec_id"));
-  }
-
-  @Test
   void testMergeResourceKeysTakesMaxIncludingMemoryUnits() {
     Map<String, String> into =
         linkedMap(
@@ -216,28 +197,6 @@ class TestMaintenanceJobSpecFactory {
                 "binpack",
                 "",
                 Map.of(),
-                null,
-                true,
-                null,
-                Map.of("spark_executor_memory", "4g"),
-                Map.of()))
-        .withAuditInfo(
-            AuditInfo.builder().withCreator("test").withCreateTime(Instant.EPOCH).build())
-        .build();
-  }
-
-  private static PolicyEntity rewriteManifests(long id, Integer specId) {
-    return PolicyEntity.builder()
-        .withId(id)
-        .withName("rewrite-" + id)
-        .withNamespace(NamespaceUtil.ofPolicy("ml"))
-        .withPolicyType(Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS)
-        .withEnabled(true)
-        .withContent(
-            PolicyContents.icebergRewriteManifests(
-                IcebergRewriteManifestsContent.DEFAULT_MANIFEST_COUNT_THRESHOLD,
-                specId,
-                null,
                 null,
                 true,
                 null,

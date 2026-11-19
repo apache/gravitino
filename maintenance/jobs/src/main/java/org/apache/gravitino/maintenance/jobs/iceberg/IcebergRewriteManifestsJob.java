@@ -20,6 +20,7 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -33,6 +34,8 @@ import org.apache.gravitino.maintenance.jobs.BuiltInJob;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.iceberg.ManifestFile;
+import org.apache.iceberg.PartitionField;
+import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.spark.sql.Row;
@@ -264,12 +267,10 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
       String tableIdentifier,
       Map<String, String> argsByName) {
     long snapshotId = IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier);
-    String specId =
-        pinSpecIdIfAbsent(
-            spark,
-            catalogName,
-            tableIdentifier,
-            IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("spec-id")));
+    String requestedSpecId = IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("spec-id"));
+    String specId = resolveSpecIdArg(spark, catalogName, tableIdentifier, requestedSpecId);
+    // Write the resolved id back so executeAndCollectAfter reuses the same value.
+    argsByName.put("spec-id", specId);
     Map<String, Object> metrics =
         collectManifestBeforeMetrics(spark, catalogName, tableIdentifier, specId);
     return TableSnapshotMetrics.of(snapshotId, metrics);
@@ -287,8 +288,9 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
       String tableIdentifier,
       Map<String, String> argsByName,
       @Nullable TableSnapshotMetrics before) {
+    // Prefer the id written by collectBeforeMetrics; fall back to resolve if S0 was skipped.
     String specId =
-        pinSpecIdIfAbsent(
+        resolveSpecIdArg(
             spark,
             catalogName,
             tableIdentifier,
@@ -309,8 +311,11 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
           rewritten,
           ((Number) result.get(1)).longValue());
     }
+    Table table = IcebergJobUtils.loadIcebergTable(spark, catalogName, tableIdentifier);
+    int resolvedSpec = Integer.parseInt(specId);
     Map<String, Object> metrics = new HashMap<>();
     metrics.put(IcebergRewriteManifestsContent.REWRITTEN_MANIFEST_NUMBER_METRIC, rewritten);
+    putPartitionSpecContext(metrics, table, resolvedSpec);
     return TableSnapshotMetrics.of(
         IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier), metrics);
   }
@@ -390,15 +395,16 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
     metrics.put(
         IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC,
         count == 0L ? 0D : (double) totalSize / count);
+    putPartitionSpecContext(metrics, table, resolvedSpec);
     return metrics;
   }
 
   /**
-   * Retains an explicit {@code spec-id}; otherwise pins the table's current default so S0 and the
-   * procedure target the same spec within one job run when schedule-time pin was unavailable.
+   * Resolves the job {@code spec-id} argument: keep an explicit value, otherwise use the table's
+   * current default partition spec id.
    */
   @VisibleForTesting
-  static String pinSpecIdIfAbsent(
+  static String resolveSpecIdArg(
       SparkSession spark, String catalogName, String tableIdentifier, @Nullable String specId) {
     if (specId != null && !specId.trim().isEmpty()) {
       validateSpecId(specId);
@@ -407,5 +413,41 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
     int resolved =
         IcebergJobUtils.loadIcebergTable(spark, catalogName, tableIdentifier).spec().specId();
     return Integer.toString(resolved);
+  }
+
+  /**
+   * Adds partition-spec observability fields for partitioned specs only. Unpartitioned resolved
+   * specs omit both keys.
+   */
+  @VisibleForTesting
+  static void putPartitionSpecContext(
+      Map<String, Object> metrics, Table table, int resolvedSpecId) {
+    PartitionSpec spec = table.specs().get(resolvedSpecId);
+    if (spec == null || spec.isUnpartitioned()) {
+      return;
+    }
+    metrics.put(IcebergRewriteManifestsContent.MANIFEST_SPEC_ID_METRIC, resolvedSpecId);
+    metrics.put(
+        IcebergRewriteManifestsContent.MANIFEST_PARTITION_SPEC_METRIC, formatPartitionSpec(spec));
+  }
+
+  /**
+   * Formats a partitioned Iceberg {@link PartitionSpec} for metrics display, e.g. {@code
+   * day(event_time)} or {@code identity(id), bucket[8](user_id)}.
+   */
+  @VisibleForTesting
+  static String formatPartitionSpec(PartitionSpec spec) {
+    List<String> parts = new ArrayList<>();
+    for (PartitionField field : spec.fields()) {
+      if (field.transform().isVoid()) {
+        continue;
+      }
+      String source = spec.schema().findColumnName(field.sourceId());
+      if (source == null || source.isEmpty()) {
+        source = field.name();
+      }
+      parts.add(field.transform() + "(" + source + ")");
+    }
+    return String.join(", ", parts);
   }
 }

@@ -19,6 +19,7 @@
 package org.apache.gravitino.maintenance.optimizer.recommender.handler;
 
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants.CURRENT_SNAPSHOT_ID;
+import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants.DEFAULT_SPEC_ID;
 
 import com.google.common.base.Preconditions;
 import java.math.BigInteger;
@@ -34,7 +35,7 @@ import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyEvalua
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyHandler;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyHandlerContext;
 import org.apache.gravitino.maintenance.optimizer.common.IcebergManifestStatistics;
-import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionTriggerEvaluator;
+import org.apache.gravitino.maintenance.optimizer.recommender.handler.manifest.ManifestRewriteTriggerEvaluator;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.stats.StatisticValue;
@@ -73,14 +74,16 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
     Map<String, Object> rules = context.strategy().rules();
     Integer requestedSpec = requestedSpec(rules);
     Integer resolvedSpec =
-        IcebergRewriteManifestsContent.resolveSpecId(
-            requestedSpec, context.tableMetadata().map(table -> table.properties()).orElse(null));
+        requestedSpec != null
+            ? requestedSpec
+            : parseDefaultSpecId(
+                context.tableMetadata().map(table -> table.properties()).orElse(null));
     if (resolvedSpec == null) {
       LOG.warn(
           "Skipping manifest rewrite policy {} for {}: cannot resolve Iceberg {} from table metadata",
           context.strategy().name(),
           context.nameIdentifier(),
-          IcebergRewriteManifestsContent.DEFAULT_SPEC_ID_PROPERTY);
+          DEFAULT_SPEC_ID);
       return;
     }
     IcebergRewriteManifestsContent content =
@@ -113,13 +116,13 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
     }
     IcebergManifestStatistics values = measurement.get();
     // Default rules from typed content, then overlay strategy rules so a custom trigger-expr
-    // matches the TMS in-Spark gate (CompactionTriggerEvaluator / MaintenanceTriggerGate).
+    // matches the TMS in-Spark gate (ManifestRewriteTriggerEvaluator / MaintenanceTriggerGate).
     Map<String, Object> evalRules = new LinkedHashMap<>(content.rules());
     evalRules.putAll(rules);
     Map<String, Object> metrics = new HashMap<>();
     metrics.put(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC, values.count());
     metrics.put(IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC, values.averageSize());
-    if (CompactionTriggerEvaluator.shouldMaintain(evalRules, metrics)) {
+    if (ManifestRewriteTriggerEvaluator.shouldMaintain(evalRules, metrics)) {
       evaluation =
           new StrategyEvaluationImpl(
               values.count(),
@@ -161,6 +164,23 @@ public final class ManifestRewriteStrategyHandler implements StrategyHandler {
         value == null || (value >= 0 && value <= Integer.MAX_VALUE),
         "spec_id must be a non-negative 32-bit integer");
     return value == null ? null : value.intValue();
+  }
+
+  /** Parses Iceberg {@code default-spec-id} from table properties. */
+  @Nullable
+  private static Integer parseDefaultSpecId(@Nullable Map<String, String> properties) {
+    if (properties == null) {
+      return null;
+    }
+    String value = properties.get(DEFAULT_SPEC_ID);
+    if (value == null || !value.matches("[0-9]+")) {
+      return null;
+    }
+    try {
+      return Integer.valueOf(value);
+    } catch (NumberFormatException e) {
+      return null;
+    }
   }
 
   @Nullable

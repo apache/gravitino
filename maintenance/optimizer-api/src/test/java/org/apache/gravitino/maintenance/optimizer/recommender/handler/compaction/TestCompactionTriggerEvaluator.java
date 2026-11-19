@@ -21,7 +21,6 @@ package org.apache.gravitino.maintenance.optimizer.recommender.handler.compactio
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
-import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -31,7 +30,8 @@ public class TestCompactionTriggerEvaluator {
 
   @Test
   public void testCompactionContentDefaultExpr() {
-    IcebergDataCompactionContent content = PolicyContents.icebergDataCompaction();
+    IcebergDataCompactionContent content =
+        (IcebergDataCompactionContent) PolicyContents.icebergDataCompaction();
     Map<String, Object> below = new HashMap<>();
     below.put(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC, 0L);
     below.put(IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC, 0L);
@@ -46,34 +46,25 @@ public class TestCompactionTriggerEvaluator {
   }
 
   @Test
-  public void testManifestRulesDefaultExpr() {
-    Map<String, Object> rules = PolicyContents.icebergRewriteManifests().rules();
-    Map<String, Object> below = new HashMap<>();
-    below.put(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC, 99L);
-    Assertions.assertFalse(CompactionTriggerEvaluator.shouldMaintain(rules, below));
-
-    Map<String, Object> atThreshold = new HashMap<>();
-    atThreshold.put(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC, 100L);
-    Assertions.assertTrue(CompactionTriggerEvaluator.shouldMaintain(rules, atThreshold));
-  }
-
-  @Test
   public void testCustomTriggerExprAndNumericRuleBinding() {
     Map<String, Object> rules = new HashMap<>();
-    rules.put(IcebergDataCompactionContent.TRIGGER_EXPR_KEY, "custom-manifest-number >= bound");
-    rules.put("bound", 10);
+    rules.put(
+        IcebergDataCompactionContent.TRIGGER_EXPR_KEY, "custom-data-file-mse >= minDataFileMse");
+    rules.put(IcebergDataCompactionContent.MIN_DATA_FILE_MSE_KEY, 10);
     Map<String, Object> metrics = new HashMap<>();
-    metrics.put(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC, 10L);
+    metrics.put(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC, 10L);
+    metrics.put(IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC, 0L);
     Assertions.assertTrue(CompactionTriggerEvaluator.shouldMaintain(rules, metrics));
 
-    metrics.put(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC, 9L);
+    metrics.put(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC, 9L);
     Assertions.assertFalse(CompactionTriggerEvaluator.shouldMaintain(rules, metrics));
   }
 
   @Test
   public void testMissingOrBlankTriggerExprIsFalse() {
     Map<String, Object> metrics = new HashMap<>();
-    metrics.put(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC, 500L);
+    metrics.put(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC, 500L);
+    metrics.put(IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC, 0L);
     Assertions.assertFalse(CompactionTriggerEvaluator.shouldMaintain(Map.of(), metrics));
 
     Map<String, Object> blank = new HashMap<>();
@@ -85,13 +76,13 @@ public class TestCompactionTriggerEvaluator {
   public void testMetricValuesOverlayNumericRules() {
     Map<String, Object> rules = new HashMap<>();
     rules.put(
-        IcebergDataCompactionContent.TRIGGER_EXPR_KEY,
-        "custom-manifest-number >= manifest_count_threshold");
-    rules.put(IcebergRewriteManifestsContent.MANIFEST_COUNT_THRESHOLD, 100);
+        IcebergDataCompactionContent.TRIGGER_EXPR_KEY, "custom-data-file-mse >= minDataFileMse");
+    rules.put(IcebergDataCompactionContent.MIN_DATA_FILE_MSE_KEY, 100);
     // Metric uses the same name as a rule key; metric overlay wins.
-    rules.put(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC, 0L);
+    rules.put(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC, 0L);
     Map<String, Object> metrics = new HashMap<>();
-    metrics.put(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC, 100L);
+    metrics.put(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC, 100L);
+    metrics.put(IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC, 0L);
     Assertions.assertTrue(CompactionTriggerEvaluator.shouldMaintain(rules, metrics));
   }
 }

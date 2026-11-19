@@ -548,7 +548,7 @@ components:
           format: int32
           minimum: 0
           nullable: true
-          description: Existing partition spec. Omission resolves Iceberg's current default spec from table metadata. If it cannot be resolved, the table is skipped. The evaluated ID is retained through job submission.
+          description: Existing partition spec. Omission uses Iceberg's current default at evaluation (optimizer retains the resolved ID through submit) or at TMS job runtime.
         use_caching:
           type: boolean
           nullable: true

@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.policy;
 
-import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -66,20 +65,5 @@ class TestIcebergRewriteManifestsContent {
         PolicyContents.icebergRewriteManifests(null, Integer.MAX_VALUE, (Boolean) null);
     largestSpec.validate();
     Assertions.assertEquals(Integer.MAX_VALUE, largestSpec.specId());
-  }
-
-  @Test
-  void testParseAndResolveDefaultSpecId() {
-    Assertions.assertNull(IcebergRewriteManifestsContent.parseDefaultSpecId(null));
-    Assertions.assertNull(IcebergRewriteManifestsContent.parseDefaultSpecId(Map.of()));
-    Assertions.assertNull(
-        IcebergRewriteManifestsContent.parseDefaultSpecId(Map.of("default-spec-id", "x")));
-    Assertions.assertEquals(
-        7, IcebergRewriteManifestsContent.parseDefaultSpecId(Map.of("default-spec-id", "7")));
-    Assertions.assertEquals(
-        3, IcebergRewriteManifestsContent.resolveSpecId(3, Map.of("default-spec-id", "7")));
-    Assertions.assertEquals(
-        7, IcebergRewriteManifestsContent.resolveSpecId(null, Map.of("default-spec-id", "7")));
-    Assertions.assertNull(IcebergRewriteManifestsContent.resolveSpecId(null, Map.of()));
   }
 }

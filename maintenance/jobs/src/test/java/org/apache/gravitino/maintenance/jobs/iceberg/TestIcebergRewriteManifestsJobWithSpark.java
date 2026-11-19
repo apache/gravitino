@@ -128,6 +128,10 @@ public class TestIcebergRewriteManifestsJobWithSpark {
         3L,
         ((Number) defaultSpec.get(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC))
             .longValue());
+    assertEquals(1, defaultSpec.get(IcebergRewriteManifestsContent.MANIFEST_SPEC_ID_METRIC));
+    assertEquals(
+        "hour(event_time)",
+        defaultSpec.get(IcebergRewriteManifestsContent.MANIFEST_PARTITION_SPEC_METRIC));
 
     Map<String, Object> oldSpec =
         IcebergRewriteManifestsJob.collectManifestBeforeMetrics(
@@ -135,6 +139,10 @@ public class TestIcebergRewriteManifestsJobWithSpark {
     assertEquals(
         3L,
         ((Number) oldSpec.get(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC)).longValue());
+    assertEquals(0, oldSpec.get(IcebergRewriteManifestsContent.MANIFEST_SPEC_ID_METRIC));
+    assertEquals(
+        "day(event_time)",
+        oldSpec.get(IcebergRewriteManifestsContent.MANIFEST_PARTITION_SPEC_METRIC));
 
     Map<String, String> args = new HashMap<>();
     args.put("spec-id", "0");
@@ -145,6 +153,12 @@ public class TestIcebergRewriteManifestsJobWithSpark {
     assertTrue(
         before.metricsJson().contains(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC));
     assertTrue(before.metricsJson().contains(":3"));
+    assertTrue(
+        before.metricsJson().contains(IcebergRewriteManifestsContent.MANIFEST_SPEC_ID_METRIC));
+    assertTrue(
+        before
+            .metricsJson()
+            .contains(IcebergRewriteManifestsContent.MANIFEST_PARTITION_SPEC_METRIC));
   }
 
   /** An explicit old spec is rewritten without migrating it or changing the current spec. */

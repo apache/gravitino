@@ -24,14 +24,12 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import javax.annotation.Nullable;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.maintenance.MaintenanceActionManager;
 import org.apache.gravitino.maintenance.model.TableCandidate;
@@ -46,10 +44,8 @@ import org.apache.gravitino.maintenance.scheduler.policy.NearestMaintenancePolic
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
-import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
-import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -76,7 +72,6 @@ public class CommitJobPlanner {
   private final TableMetaService tableMetaService;
   private final PolicyMetaService policyMetaService;
   private final EntityStore entityStore;
-  @Nullable private final TableDispatcher tableDispatcher;
 
   /**
    * @param gravitinoConfig server config for auth overlay and minInterval fallbacks
@@ -91,31 +86,12 @@ public class CommitJobPlanner {
       TableMetaService tableMetaService,
       PolicyMetaService policyMetaService,
       EntityStore entityStore) {
-    this(gravitinoConfig, actionManager, tableMetaService, policyMetaService, entityStore, null);
-  }
-
-  /**
-   * @param gravitinoConfig server config for auth overlay and minInterval fallbacks
-   * @param actionManager occupancy / cooldown gate
-   * @param tableMetaService table lookup
-   * @param policyMetaService policy lookup
-   * @param entityStore store used by nearest-policy resolution
-   * @param tableDispatcher optional live catalog load for {@code default-spec-id} pin
-   */
-  public CommitJobPlanner(
-      Config gravitinoConfig,
-      MaintenanceActionManager actionManager,
-      TableMetaService tableMetaService,
-      PolicyMetaService policyMetaService,
-      EntityStore entityStore,
-      @Nullable TableDispatcher tableDispatcher) {
     this.gravitinoConfig = Preconditions.checkNotNull(gravitinoConfig);
     this.actionManager = Preconditions.checkNotNull(actionManager);
     this.specFactory = new MaintenanceJobSpecFactory(gravitinoConfig);
     this.tableMetaService = Preconditions.checkNotNull(tableMetaService);
     this.policyMetaService = Preconditions.checkNotNull(policyMetaService);
     this.entityStore = Preconditions.checkNotNull(entityStore);
-    this.tableDispatcher = tableDispatcher;
   }
 
   /**
@@ -214,8 +190,6 @@ public class CommitJobPlanner {
       }
 
       MaintenanceAuthConsistency.requireSameAuth(due, gravitinoConfig);
-      Integer defaultPartitionSpecId =
-          needsDefaultPartitionSpecPin(due) ? loadDefaultPartitionSpecId(identifier) : null;
       return Optional.of(
           specFactory.forCommit(
               List.of(
@@ -223,8 +197,7 @@ public class CommitJobPlanner {
                       tableId,
                       MaintenanceJobSpecFactory.catalogName(identifier),
                       MaintenanceJobSpecFactory.sparkTableIdentifier(identifier),
-                      due,
-                      defaultPartitionSpecId))));
+                      due))));
     } catch (NoSuchEntityException e) {
       LOG.debug("No Gravitino table for IRC update {}: {}", identifier, e.getMessage());
       return Optional.empty();
@@ -234,38 +207,6 @@ public class CommitJobPlanner {
     } catch (RuntimeException e) {
       LOG.warn("Failed to plan commit-job for IRC update {}: {}", identifier, e.toString());
       return Optional.empty();
-    }
-  }
-
-  private static boolean needsDefaultPartitionSpecPin(List<PolicyEntity> policies) {
-    for (PolicyEntity policy : policies) {
-      if (policy.policyType() != Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS) {
-        continue;
-      }
-      PolicyContent content = policy.content();
-      if (content instanceof IcebergRewriteManifestsContent
-          && ((IcebergRewriteManifestsContent) content).specId() == null) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  @Nullable
-  private Integer loadDefaultPartitionSpecId(NameIdentifier identifier) {
-    if (tableDispatcher == null) {
-      return null;
-    }
-    try {
-      Table table = tableDispatcher.loadTable(identifier);
-      return IcebergRewriteManifestsContent.parseDefaultSpecId(table.properties());
-    } catch (RuntimeException e) {
-      LOG.debug(
-          "Could not resolve {} for {}: {}",
-          IcebergRewriteManifestsContent.DEFAULT_SPEC_ID_PROPERTY,
-          identifier,
-          e.toString());
-      return null;
     }
   }
 }
