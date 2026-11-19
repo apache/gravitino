@@ -268,7 +268,7 @@ public class ObjectPolicyResolver {
    * @return whether the selector matches
    * @throws IllegalArgumentException if the selector type is unsupported
    */
-  public static boolean matches(PolicyAssociationSelector selector, TagAssignment assignment) {
+  private static boolean matches(PolicyAssociationSelector selector, TagAssignment assignment) {
     if (selector instanceof AllValuesSelector) {
       return true;
     }

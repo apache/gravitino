@@ -328,7 +328,6 @@
    Google auth HTTP
    Javolution
    JLine
-   JSch
    JSR305
    LevelDB JNI
    Protobuf

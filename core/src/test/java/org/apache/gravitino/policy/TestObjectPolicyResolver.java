@@ -40,6 +40,8 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -107,6 +109,39 @@ public class TestObjectPolicyResolver {
     ObjectPolicyResolver.Match[] matches = resolver.resolveMatches(METALAKE, OBJECT);
     Assertions.assertEquals(1, matches.length);
     Assertions.assertEquals(List.of(OBJECT, CATALOG), matches[0].sources());
+  }
+
+  @Test
+  void testRequestResolutionCachesOnlyMatchedAccessPolicies() throws Exception {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    TagEntity domain = tag(1L, "domain", TagAssignment.ofValues("finance"));
+    PolicyEntity access =
+        PolicyEntity.builder()
+            .withId(11L)
+            .withName("read_finance")
+            .withNamespace(NamespaceUtil.ofPolicy(METALAKE))
+            .withPolicyType(Policy.BuiltInType.ACCESS_CONTROL)
+            .withEnabled(true)
+            .withContent(
+                PolicyContents.accessControl(
+                    List.of(Privilege.Name.SELECT_TABLE), List.of("analyst")))
+            .withAuditInfo(audit())
+            .build();
+    when(effectiveTagResolver.resolveWithSources(METALAKE, OBJECT, context))
+        .thenReturn(new ResolvedTag[] {new ResolvedTag(domain, OBJECT)});
+    when(relationOperations.batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            List.of(domain.nameIdentifier()),
+            Entity.EntityType.TAG))
+        .thenReturn(
+            List.of(
+                relation(domain, policy(10L, "custom", true), AllValuesSelector.get()),
+                relation(domain, access, TagValueSelector.of("finance"))));
+
+    List<PolicyEntity> policies = resolver.resolve(METALAKE, OBJECT, context);
+    Assertions.assertEquals(List.of(access), policies);
+    Assertions.assertSame(policies, resolver.resolve(METALAKE, OBJECT, context));
+    verify(effectiveTagResolver).resolveWithSources(METALAKE, OBJECT, context);
   }
 
   @Test

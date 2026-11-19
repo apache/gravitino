@@ -37,6 +37,7 @@ import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.meta.AuditInfo;
@@ -52,6 +53,9 @@ import org.apache.gravitino.storage.IdGenerator;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mockito;
 
 public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
   static FilesetOperationDispatcher filesetOperationDispatcher;
@@ -397,12 +401,95 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
               .properties()
               .containsKey("k2"));
       Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+      long retryId = nextId.get();
       Assertions.assertThrows(
           FilesetAlreadyExistsException.class,
           () ->
               filesets.createMultipleLocationFileset(
                   ident, "comment", Fileset.Type.MANAGED, locations, props, bindings, Map.of()));
+      // The failed create deletes the version it staged under its own id.
+      SecretUrn retryUrn =
+          SecretUrn.buildWriteThrough(
+              "memory",
+              Map.of(
+                  SecretConstants.ATTR_ENTITY_TYPE, "fileset",
+                  SecretConstants.ATTR_ENTITY_ID, String.valueOf(retryId),
+                  SecretConstants.ATTR_PROPERTY_KEY, "k2"));
+      Assertions.assertNull(
+          secrets.getRegistry().getProvider("memory").currentSecretVersion(retryUrn));
       Assertions.assertTrue(filesets.dropFileset(ident));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testCreateKeepsSecretsOnceFilesetIsCreated(boolean failInCatalogCall)
+      throws Exception {
+    try (SecretManager secrets = memorySecretManager()) {
+      AtomicLong nextId = new AtomicLong(failInCatalogCall ? 9200L : 9100L);
+      IdGenerator ids = nextId::getAndIncrement;
+      String schemaName = "schema_secret_created" + (failInCatalogCall ? "_call" : "_mask");
+      new SchemaOperationDispatcher(catalogManager, entityStore, ids, secrets)
+          .createSchema(
+              NameIdentifier.of(metalake, catalog, schemaName),
+              "comment",
+              ImmutableMap.of("k1", "v1"));
+      FilesetOperationDispatcher filesets =
+          Mockito.spy(new FilesetOperationDispatcher(catalogManager, entityStore, ids, secrets));
+      if (failInCatalogCall) {
+        // doWithCatalog throws after the catalog created the fileset, as a failed detach or lease
+        // release would.
+        Mockito.doAnswer(
+                invocation -> {
+                  invocation.callRealMethod();
+                  throw new IllegalStateException("injected failure after the catalog create");
+                })
+            .when(filesets)
+            .doWithCatalog(
+                Mockito.any(NameIdentifier.class),
+                Mockito.any(),
+                Mockito.eq(NoSuchSchemaException.class),
+                Mockito.eq(FilesetAlreadyExistsException.class));
+      } else {
+        // Masking reloads the catalog after the create, which fails once the manager is closed.
+        Mockito.doThrow(new IllegalStateException("CatalogManager is already closed"))
+            .when(filesets)
+            .getMaskAndOmitKeys(Mockito.any(NameIdentifier.class), Mockito.any(), Mockito.any());
+      }
+
+      NameIdentifier ident =
+          NameIdentifier.of(metalake, catalog, schemaName, "fileset_secret_created");
+      long entityId = nextId.get();
+      Assertions.assertThrows(
+          IllegalStateException.class,
+          () ->
+              filesets.createMultipleLocationFileset(
+                  ident,
+                  "comment",
+                  Fileset.Type.MANAGED,
+                  Map.of(Fileset.LOCATION_NAME_UNKNOWN, "loc"),
+                  ImmutableMap.of("k1", "v1"),
+                  Map.of("k2", new SecretBinding("memory", "s3cr3t")),
+                  Map.of()));
+
+      SecretUrn urn =
+          SecretUrn.buildWriteThrough(
+              "memory",
+              Map.of(
+                  SecretConstants.ATTR_ENTITY_TYPE, "fileset",
+                  SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
+                  SecretConstants.ATTR_PROPERTY_KEY, "k2"));
+      Fileset stored =
+          catalogManager
+              .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
+              .doWithFilesetOps(ops -> ops.loadFileset(ident));
+      Assertions.assertEquals(urn.toString(), stored.properties().get("k2"));
+      Assertions.assertEquals("s3cr3t", secrets.readSecret(urn));
+
+      Assertions.assertTrue(
+          new FilesetOperationDispatcher(catalogManager, entityStore, ids, secrets)
+              .dropFileset(ident));
       Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
     }
   }
