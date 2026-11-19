@@ -63,6 +63,12 @@ SELECT * FROM employee WHERE date(hire_date) = '2021-01-01';
 
 ```
 
+Connection option names after `spark.bypass.` are case-insensitive. If both `spark.bypass.URL`
+and `jdbc-url` are configured, `jdbc-url` takes precedence. Earlier connector versions could
+select the bypass value when the names differed in case. Check for conflicting settings before
+upgrading. Explicit Spark catalog options take precedence over catalog properties, and vended
+JDBC credentials take precedence over configured user names and passwords.
+
 ## Changes during a Spark session
 
 Spark keeps a JDBC catalog's connection settings for the lifetime of the session. The connector

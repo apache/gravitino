@@ -167,6 +167,9 @@ class TestJdbcCatalogRefresh {
     Catalog previous = source(mock(TableCatalog.class));
     when(previous.properties()).thenReturn(properties("jdbc:h2:mem:previous"));
     Catalog current = source(mock(TableCatalog.class));
+    Map<String, String> currentProperties = new HashMap<>(properties(URL));
+    currentProperties.put("spark.bypass.URL", "jdbc:h2:mem:shadow");
+    when(current.properties()).thenReturn(currentProperties);
     GravitinoClient client = mock(GravitinoClient.class);
     when(client.loadCatalog("jdbc_refresh")).thenReturn(previous, current);
     GravitinoCatalogManager manager =
@@ -181,8 +184,7 @@ class TestJdbcCatalogRefresh {
           "ID",
           catalog
               .loadSparkTable(Identifier.of(new String[] {"PUBLIC"}, "FRESH"))
-              .schema()
-              .fields()[0]
+              .columns()[0]
               .name());
     } finally {
       manager.close();

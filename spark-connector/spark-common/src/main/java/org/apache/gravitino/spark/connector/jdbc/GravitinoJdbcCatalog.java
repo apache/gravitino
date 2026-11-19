@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -65,6 +66,12 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoJdbcCatalog.class);
 
   private static final String PREFER_TIMESTAMP_NTZ = "preferTimestampNTZ";
+
+  private static final List<String> CONNECTION_KEYS =
+      Arrays.asList(
+          JdbcPropertiesConstants.SPARK_JDBC_URL,
+          JdbcPropertiesConstants.SPARK_JDBC_USER,
+          JdbcPropertiesConstants.SPARK_JDBC_PASSWORD);
 
   private boolean useTimestampNtz;
 
@@ -180,11 +187,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
 
   private static Map<String, String> jdbcConnectionOptions(Map<String, String> options) {
     Map<String, String> connectionOptions = new HashMap<>();
-    for (String key :
-        Arrays.asList(
-            JdbcPropertiesConstants.SPARK_JDBC_URL,
-            JdbcPropertiesConstants.SPARK_JDBC_USER,
-            JdbcPropertiesConstants.SPARK_JDBC_PASSWORD)) {
+    for (String key : CONNECTION_KEYS) {
       if (options.containsKey(key)) {
         connectionOptions.put(key, options.get(key));
       }
@@ -264,7 +267,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
     enriched.putAll(CredentialInfos.nonExpiringCredentialInfo(credentials));
     // Spark treats option names case-insensitively. Fold JDBC bypass aliases before the
     // converter applies catalog properties, session options, and finally vended credentials.
-    for (String key : Arrays.asList("url", "user", "password")) {
+    for (String key : CONNECTION_KEYS) {
       String canonical = PropertiesConverter.SPARK_PROPERTY_PREFIX + key;
       for (String property : properties.keySet()) {
         if (property.startsWith(PropertiesConverter.SPARK_PROPERTY_PREFIX)
