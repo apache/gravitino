@@ -417,7 +417,7 @@ class TestGlossaryManager extends TestJDBCBackend {
                 TermChange.updateDefinition(definition + "a"),
                 TermChange.updateDefinition(definition)));
     Assertions.assertThrows(
-        IllegalArgumentException.class,
+        NoSuchTermException.class,
         () ->
             manager.alterTerm(
                 LAKE, name, TermChange.setProperty("x", "y"), TermChange.addBroader("someTerm")));

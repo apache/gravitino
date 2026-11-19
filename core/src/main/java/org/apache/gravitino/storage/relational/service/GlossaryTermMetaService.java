@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -291,6 +293,12 @@ public final class GlossaryTermMetaService {
         });
   }
 
+  /** Runs a graph operation under the live parent fence and hierarchy mutex. */
+  public <T> T withHierarchyLock(
+      Namespace ns, Function<Long, T> operation, Function<NoSuchEntityException, T> missingParent) {
+    return transaction(ns, true, missingParent, (mapper, lake) -> operation.apply(lake));
+  }
+
   /** Checks indexed name/synonym conflicts inside the caller's hierarchy transaction. */
   public void checkTermNames(GlossaryTermEntity term) {
     String name = GlossaryTermNames.key(term.name());
@@ -384,27 +392,43 @@ public final class GlossaryTermMetaService {
         mapper -> {
           List<GlossaryTermSnapshotPO> rows =
               mapper.snapshot(metalake(ns).getMetalakeId(), ns.level(0), key);
-          if (rows.isEmpty()) {
-            throw new NoSuchEntityException("Metalake %s no longer exists", ns.level(0));
-          }
-          // A live parent with no matching terms contributes one outer-join row.
-          if (rows.get(0).getTermId() == null) {
-            return new ArrayList<>();
-          }
-          Map<Long, GlossaryTermPO> definitions = new LinkedHashMap<>();
-          Map<Long, List<String>> synonyms = new LinkedHashMap<>();
-          for (GlossaryTermSnapshotPO row : rows) {
-            definitions.putIfAbsent(row.getTermId(), row);
-            List<String> values =
-                synonyms.computeIfAbsent(row.getTermId(), ignored -> new ArrayList<>());
-            if (row.getSynonym() != null) {
-              values.add(row.getSynonym());
-            }
-          }
-          List<GlossaryTermEntity> result = new ArrayList<>();
-          definitions.forEach((id, row) -> result.add(fromPO(row, synonyms.get(id), ns)));
-          return result;
+          return definitions(ns, rows);
         });
+  }
+
+  /** Loads live terms in bounded batches from the named metalake and its observed identity. */
+  public List<GlossaryTermEntity> getByIds(Namespace ns, long lake, Set<Long> ids) {
+    validateNamespace(ns);
+    List<GlossaryTermEntity> result = new ArrayList<>();
+    for (List<Long> batch : Lists.partition(List.copyOf(ids), 500)) {
+      result.addAll(
+          SessionUtils.getWithoutCommit(
+              GlossaryTermMetaMapper.class,
+              mapper -> definitions(ns, mapper.snapshotByIds(lake, ns.level(0), batch))));
+    }
+    return result;
+  }
+
+  private List<GlossaryTermEntity> definitions(Namespace ns, List<GlossaryTermSnapshotPO> rows) {
+    if (rows.isEmpty()) {
+      throw new NoSuchEntityException("Metalake %s no longer exists", ns.level(0));
+    }
+    // A live parent with no matching terms contributes one outer-join row.
+    if (rows.get(0).getTermId() == null) {
+      return new ArrayList<>();
+    }
+    Map<Long, GlossaryTermPO> definitions = new LinkedHashMap<>();
+    Map<Long, List<String>> synonyms = new LinkedHashMap<>();
+    for (GlossaryTermSnapshotPO row : rows) {
+      definitions.putIfAbsent(row.getTermId(), row);
+      List<String> values = synonyms.computeIfAbsent(row.getTermId(), ignored -> new ArrayList<>());
+      if (row.getSynonym() != null) {
+        values.add(row.getSynonym());
+      }
+    }
+    List<GlossaryTermEntity> result = new ArrayList<>();
+    definitions.forEach((id, row) -> result.add(fromPO(row, synonyms.get(id), ns)));
+    return result;
   }
 
   private MetalakePO metalake(Namespace ns) {

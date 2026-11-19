@@ -109,16 +109,19 @@ public final class GlossaryTermSQLProvider {
   public static String snapshot(Map<String, Object> params) {
     // Validate the parent name in this snapshot too: it can be renamed after ID resolution.
     // A single statement avoids mixed revisions at READ_COMMITTED without locking readers.
-    return "SELECT t.term_id AS termId, t.name AS name, t.name_key AS nameKey, "
+    return "<script>SELECT t.term_id AS termId, t.name AS name, t.name_key AS nameKey, "
         + "m.metalake_id AS metalakeId, t.definition AS definition, t.status AS status, "
         + "t.links AS links, t.source_ref AS sourceRef, t.properties AS properties, "
         + "t.audit_info AS auditInfo, t.current_version AS currentVersion, "
         + "t.deleted_at AS deletedAt, s.synonym AS synonym FROM metalake_meta m "
         + "LEFT JOIN glossary_term_meta t ON t.metalake_id=m.metalake_id AND t.deleted_at=0 "
-        + (params.get("key") == null ? "" : "AND t.name_key=#{key} ")
+        + (params.containsKey("key") && params.get("key") != null ? "AND t.name_key=#{key} " : "")
+        + (params.containsKey("ids")
+            ? "AND t.term_id IN <foreach item='id' collection='ids' open='(' close=')' separator=','>#{id}</foreach> "
+            : "")
         + "LEFT JOIN glossary_term_synonym s ON s.term_id=t.term_id "
         + "AND s.metalake_id=t.metalake_id AND s.deleted_at=0 "
         + "WHERE m.metalake_id=#{metalakeId} AND m.metalake_name=#{metalakeName} AND m.deleted_at=0"
-        + " ORDER BY t.term_id,s.synonym_key";
+        + " ORDER BY t.term_id,s.synonym_key</script>";
   }
 }

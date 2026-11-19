@@ -196,6 +196,11 @@ public final class GlossaryTermRelService {
     return readEdges(metalakeId, termIds, RelationType.BROADER, true);
   }
 
+  /** Reads both orientations of RELATED edges touching a frontier in bounded batches. */
+  public List<GlossaryTermRelPO> listRelatedEdges(long metalakeId, Set<Long> ids) {
+    return readEdges(metalakeId, ids, RelationType.RELATED, false);
+  }
+
   /**
    * Walks all live ancestors in bounded batches at each level, including the terminal frontier. IDs
    * are visited once, even for diamonds or malformed cycles; the root is excluded.
