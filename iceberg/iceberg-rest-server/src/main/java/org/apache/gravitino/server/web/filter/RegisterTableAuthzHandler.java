@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.server.web.filter;
 
-import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION;
 
 import java.lang.reflect.Parameter;
@@ -31,6 +30,7 @@ import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.iceberg.common.ops.RegisterTableRequestWithMetadata;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.dispatcher.RegisterTableSourceResolver;
@@ -131,7 +131,7 @@ public class RegisterTableAuthzHandler implements AuthorizationHandler {
         EntityType.TABLE, NameIdentifierUtil.ofTable(metalakeName, catalog, schema, tableName));
 
     requireCanAccessDestination(nameIdentifierMap, request.overwrite());
-    authorizeMetadataSources(metalakeName, catalog, schema, tableName, request);
+    authorizeMetadataSources(nameIdentifierMap, catalog, schema, tableName, request);
   }
 
   @Override
@@ -166,7 +166,7 @@ public class RegisterTableAuthzHandler implements AuthorizationHandler {
   }
 
   private void authorizeMetadataSources(
-      String metalakeName,
+      Map<EntityType, NameIdentifier> identifiers,
       String catalog,
       String schema,
       String tableName,
@@ -181,33 +181,13 @@ public class RegisterTableAuthzHandler implements AuthorizationHandler {
         RegisterTableSourceResolver.findSourceTables(
             catalogWrapper, target, request.metadataLocation(), metadata);
     for (TableIdentifier source : sources) {
-      requireCanLoadTable(metalakeName, catalog, source);
+      IcebergTableLocationAuthzHelper.requireCanLoadTable(identifiers, source);
     }
-  }
-
-  private static void requireCanLoadTable(
-      String metalake, String catalogName, TableIdentifier source) {
-    String sourceSchema =
-        String.join(HierarchicalSchemaUtil.schemaSeparator(), source.namespace().levels());
-    Map<EntityType, NameIdentifier> identifiers = new HashMap<>();
-    identifiers.put(EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
-    identifiers.put(EntityType.CATALOG, NameIdentifierUtil.ofCatalog(metalake, catalogName));
-    identifiers.put(
-        EntityType.SCHEMA, NameIdentifierUtil.ofSchema(metalake, catalogName, sourceSchema));
-    identifiers.put(
-        EntityType.TABLE,
-        NameIdentifierUtil.ofTable(metalake, catalogName, sourceSchema, source.name()));
-    boolean authorized =
-        new AuthorizationExpressionEvaluator(LOAD_TABLE_AUTHORIZATION_EXPRESSION)
-            .evaluate(
-                identifiers,
-                new HashMap<>(),
-                new AuthorizationRequestContext(),
-                Optional.of(EntityType.TABLE.name()));
-    if (!authorized) {
-      throw new ForbiddenException(
-          "User '%s' is not authorized to register metadata from table '%s'",
-          PrincipalUtils.getCurrentUserName(), source);
+    for (int i = 0; i < args.length; i++) {
+      if (args[i] == request) {
+        args[i] = new RegisterTableRequestWithMetadata(request, metadata);
+        break;
+      }
     }
   }
 

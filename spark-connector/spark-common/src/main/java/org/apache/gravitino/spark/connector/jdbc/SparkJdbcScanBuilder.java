@@ -35,12 +35,12 @@ import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCScanBuilder;
  * different semantics. Other predicates, aggregates, Top-N, limits, and offsets are pushed as
  * usual.
  */
-public class SparkJdbcScanBuilder extends JDBCScanBuilder {
+public class SparkJdbcScanBuilder extends SparkJdbcScanBuilderBase {
 
   private final transient SparkJdbcPushDownPolicy policy;
 
   SparkJdbcScanBuilder(JDBCScanBuilder delegate, SparkJdbcPushDownPolicy policy) {
-    super(delegate.session(), delegate.schema(), delegate.jdbcOptions());
+    super(delegate);
     this.policy = policy;
   }
 

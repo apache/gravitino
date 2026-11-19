@@ -31,11 +31,16 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
+import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionJobContext;
+import org.apache.gravitino.maintenance.optimizer.recommender.job.GravitinoCompactionJobAdapter;
 import org.apache.gravitino.maintenance.optimizer.recommender.job.PartitionUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -941,6 +946,46 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
     } finally {
       spark.sql("DROP TABLE IF EXISTS " + table);
       spark.conf().set("spark.sql.defaultCatalog", catalogName);
+    }
+  }
+
+  /**
+   * #15048: adapter-produced hierarchical {@code table_identifier} ({@code a:b:c} → {@code
+   * a.b.c.events}) must resolve in a real Spark CALL.
+   */
+  @Test
+  public void testAdapterHierarchicalSchemaTableIdentifierThroughSparkCall() {
+    String sparkTableId = "a.b.c.hier_events";
+    String table = catalogName + "." + sparkTableId;
+    try {
+      spark.sql("CREATE NAMESPACE IF NOT EXISTS " + catalogName + ".a");
+      spark.sql("CREATE NAMESPACE IF NOT EXISTS " + catalogName + ".a.b");
+      spark.sql("CREATE NAMESPACE IF NOT EXISTS " + catalogName + ".a.b.c");
+      spark.sql("DROP TABLE IF EXISTS " + table);
+      spark.sql("CREATE TABLE " + table + " (id INT, data STRING) USING iceberg");
+      spark.sql("INSERT INTO " + table + " SELECT id, 'x' FROM range(0, 20)");
+
+      Map<String, String> conf =
+          new GravitinoCompactionJobAdapter()
+              .jobConfig(
+                  new CompactionJobContext(
+                      NameIdentifier.of(catalogName, "a:b:c", "hier_events"),
+                      Map.of("target_file_size_bytes", "1073741824"),
+                      "compaction-job-template",
+                      "binpack",
+                      "",
+                      new Column[0],
+                      new Transform[0],
+                      List.of()),
+                  IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
+      assertEquals(sparkTableId, conf.get("table_identifier"));
+
+      String sql =
+          IcebergRewriteDataFilesJob.buildProcedureCall(
+              catalogName, conf.get("table_identifier"), "binpack", null, null, null);
+      assertDoesNotThrow(() -> spark.sql(sql).collect());
+    } finally {
+      spark.sql("DROP TABLE IF EXISTS " + table);
     }
   }
 

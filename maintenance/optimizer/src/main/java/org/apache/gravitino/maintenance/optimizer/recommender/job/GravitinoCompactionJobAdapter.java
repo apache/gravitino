@@ -37,11 +37,6 @@ public class GravitinoCompactionJobAdapter implements GravitinoJobAdapter {
   private static final ObjectMapper MAPPER =
       new ObjectMapper().configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
 
-  @Override
-  public Map<String, String> jobConfig(JobExecutionContext jobExecutionContext) {
-    return jobConfig(jobExecutionContext, Map.of());
-  }
-
   /**
    * Builds compaction jobConf. {@code where_clause} qualifies Iceberg system functions with the
    * same Spark {@code catalog_name} the CALL uses (submitter config), not the Gravitino catalog
@@ -49,7 +44,9 @@ public class GravitinoCompactionJobAdapter implements GravitinoJobAdapter {
    */
   @Override
   public Map<String, String> jobConfig(
-      JobExecutionContext jobExecutionContext, Map<String, String> submitterConfigs) {
+      JobExecutionContext jobExecutionContext,
+      Map<String, String> submitterConfigs,
+      String schemaSeparator) {
     Preconditions.checkArgument(
         jobExecutionContext instanceof CompactionJobContext,
         "jobExecutionContext must be CompactionJobExecutionContext");
@@ -63,15 +60,16 @@ public class GravitinoCompactionJobAdapter implements GravitinoJobAdapter {
             ? IcebergDataCompactionContent.DEFAULT_SORT_ORDER
             : jobContext.getSortOrder();
     return ImmutableMap.of(
-        "table_identifier", getTableName(jobContext),
-        "where_clause", getWhereClause(jobContext, submitterConfigs),
-        "sort_order", sortOrder,
-        "strategy", rewriteStrategy,
-        "options", getOptions(jobContext));
-  }
-
-  private String getTableName(CompactionJobContext jobContext) {
-    return IdentifierUtils.removeCatalogFromIdentifier(jobContext.nameIdentifier()).toString();
+        "table_identifier",
+        IdentifierUtils.toSparkTableIdentifier(jobContext.nameIdentifier(), schemaSeparator),
+        "where_clause",
+        getWhereClause(jobContext, submitterConfigs),
+        "sort_order",
+        sortOrder,
+        "strategy",
+        rewriteStrategy,
+        "options",
+        getOptions(jobContext));
   }
 
   private String getWhereClause(
@@ -95,18 +93,10 @@ public class GravitinoCompactionJobAdapter implements GravitinoJobAdapter {
   }
 
   private String getOptions(JobExecutionContext jobExecutionContext) {
-    Map<String, String> map = jobExecutionContext.jobOptions();
-    return convertMapToJson(map);
-  }
-
-  private static String convertMapToJson(Map<String, ?> map) {
-    if (map == null || map.isEmpty()) {
-      return "{}";
-    }
     try {
-      return MAPPER.writeValueAsString(new TreeMap<>(map));
+      return MAPPER.writeValueAsString(new TreeMap<>(jobExecutionContext.jobOptions()));
     } catch (JsonProcessingException e) {
-      throw new IllegalStateException("Failed to serialize options to JSON", e);
+      throw new IllegalArgumentException("Failed to serialize job options", e);
     }
   }
 }

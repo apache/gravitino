@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.iceberg.common.ops.RegisterTableRequestWithMetadata;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
@@ -151,10 +152,16 @@ public class IcebergNamespaceOperationExecutor implements IcebergNamespaceOperat
     CatalogWrapperForREST catalogWrapper =
         icebergCatalogWrapperManager.getCatalogWrapper(context.catalogName());
     TableMetadata metadata =
-        catalogWrapper.loadTableMetadataFromLocation(registerTableRequest.metadataLocation());
+        registerTableRequest instanceof RegisterTableRequestWithMetadata
+            ? ((RegisterTableRequestWithMetadata) registerTableRequest).tableMetadata()
+            : catalogWrapper.loadTableMetadataFromLocation(registerTableRequest.metadataLocation());
     IcebergColumnFieldValidator.validateSchema(metadata.schema());
+    RegisterTableRequest loadedRequest =
+        registerTableRequest instanceof RegisterTableRequestWithMetadata
+            ? registerTableRequest
+            : new RegisterTableRequestWithMetadata(registerTableRequest, metadata);
     return catalogWrapper.registerTable(
-        namespace, registerTableRequest, context.requestCredentialVending());
+        namespace, loadedRequest, context.requestCredentialVending());
   }
 
   @Override

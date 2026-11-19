@@ -676,11 +676,14 @@ public abstract class BaseGVFSOperations implements Closeable {
     // If the server-side filesystem ops are disabled, the fileset directory may not exist. In such
     // case the operations like create, open, list files under this directory will fail. So we
     // need to check the existence of the fileset directory beforehand.
+    Catalog filesetCatalog = (Catalog) getFilesetCatalog(catalogIdent);
+    Map<String, String> catalogProperties =
+        filesetCatalog != null ? filesetCatalog.properties() : null;
     boolean fsOpsDisabled =
-        ((Catalog) getFilesetCatalog(catalogIdent))
-            .properties()
-            .getOrDefault("disable-filesystem-ops", "false")
-            .equalsIgnoreCase("true");
+        catalogProperties != null
+            && catalogProperties
+                .getOrDefault("disable-filesystem-ops", "false")
+                .equalsIgnoreCase("true");
     if (fsOpsDisabled) {
       try {
         if (!fs.exists(filesetPath)) {
@@ -797,14 +800,14 @@ public abstract class BaseGVFSOperations implements Closeable {
    * @return the schema.
    */
   protected Schema getSchema(NameIdentifier schemaIdent) {
-    return filesetMetadataCache
+    return getFilesetMetadataCache()
         .map(cache -> cache.getSchema(schemaIdent))
         .orElseGet(
             () -> {
               NameIdentifier catalogIdent =
                   NameIdentifier.of(
                       schemaIdent.namespace().level(0), schemaIdent.namespace().level(1));
-              Catalog c = gravitinoClient.loadCatalog(catalogIdent.name());
+              Catalog c = loadCatalog(catalogIdent);
               return c.asSchemas().loadSchema(schemaIdent.name());
             });
   }

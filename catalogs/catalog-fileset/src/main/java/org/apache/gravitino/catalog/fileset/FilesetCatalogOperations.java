@@ -121,8 +121,8 @@ import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.FilesetCatalogMetricsSource;
 import org.apache.gravitino.secret.SecretAlterChanges;
 import org.apache.gravitino.secret.SecretManager;
-import org.apache.gravitino.secret.SecretMaterialsHolder;
 import org.apache.gravitino.secret.SecretVersionChanges;
+import org.apache.gravitino.secret.SecretVersionChangesHolder;
 import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.gravitino.utils.FilesetUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -746,7 +746,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       throw ExceptionMessages.wrap("Failed to load fileset " + ident, ioe);
     }
 
-    SecretMaterialsHolder writtenSecretMaterials = new SecretMaterialsHolder();
+    SecretVersionChangesHolder stagedSecrets = new SecretVersionChangesHolder();
     boolean alterCommitted = false;
     try {
       FilesetEntity updatedFilesetEntity =
@@ -762,11 +762,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 Pair<FilesetChange[], SecretVersionChanges> secretResult =
                     SecretAlterChanges.prepareFilesetChanges(
                         secretManager, currentProperties, existing.id(), changes);
-                writtenSecretMaterials.set(secretResult.getRight());
+                stagedSecrets.set(secretResult.getRight());
                 return updateFilesetEntity(ident, existing, secretResult.getLeft());
               });
       alterCommitted = true;
-      secretManager.commitSecrets(writtenSecretMaterials.get());
+      secretManager.commitSecrets(stagedSecrets.get());
       return FilesetImpl.builder()
           .withName(updatedFilesetEntity.name())
           .withComment(updatedFilesetEntity.comment())
@@ -790,7 +790,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           e, "Fileset %s already exists", NameIdentifier.of(ident.namespace(), newName));
     } finally {
       if (!alterCommitted) {
-        secretManager.rollbackSecrets(writtenSecretMaterials.get());
+        secretManager.rollbackSecrets(stagedSecrets.get());
       }
     }
   }

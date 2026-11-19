@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.spark.connector.catalog;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.Sets;
@@ -322,6 +323,10 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     try {
       gravitinoTable = loadGravitinoTable(ident);
     } catch (NoSuchTableException e) {
+      if (looksLikeDataSourceReference(ident)) {
+        // Let Spark's analyzer resolve the path as a DataSource relation.
+        throw e;
+      }
       // Not a table in Gravitino; try as a view.
       return loadViewAsTable(ident);
     } catch (ForbiddenException e) {
@@ -349,6 +354,25 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   public Table loadTable(Identifier ident, Set<TableWritePrivilege> writePrivileges)
       throws NoSuchTableException {
     return loadTableForWriting(ident);
+  }
+
+  /**
+   * Returns whether an identifier has DataSource path syntax that the Gravitino table API may
+   * reject. A real table lookup is always attempted first; this check is used only after that
+   * lookup fails, so a table named {@code db."a/b"} keeps precedence over file resolution.
+   *
+   * <p>Dots are included because relative filenames such as {@code data.parquet} have no path
+   * separator. The Gravitino server splits the full name on dots and rejects the resulting name;
+   * translating that failure to {@link NoSuchTableException} lets Spark's analyzer fall back to its
+   * SQL-on-file resolver.
+   */
+  @VisibleForTesting
+  static boolean looksLikeDataSourceReference(Identifier ident) {
+    if (ident.namespace().length != 1) {
+      return false;
+    }
+    String name = ident.name();
+    return name.indexOf('.') >= 0 || name.indexOf('/') >= 0 || name.indexOf('\\') >= 0;
   }
 
   @Override
@@ -431,6 +455,9 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       loadGravitinoTable(ident);
       return true;
     } catch (NoSuchTableException e) {
+      if (looksLikeDataSourceReference(ident)) {
+        return false;
+      }
       // fall through to view check
     } catch (ForbiddenException e) {
       // User lacks LOAD_TABLE privilege, return false to allow CREATE TABLE IF NOT EXISTS
@@ -608,6 +635,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
               Sets.newHashSet(Privilege.Name.SELECT_TABLE));
     } catch (org.apache.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
+    } catch (IllegalArgumentException e) {
+      if (looksLikeDataSourceReference(ident)) {
+        throw new NoSuchTableException(ident);
+      }
+      throw e;
     }
   }
 
@@ -622,6 +654,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
               Sets.newHashSet(Privilege.Name.MODIFY_TABLE));
     } catch (org.apache.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
+    } catch (IllegalArgumentException e) {
+      if (looksLikeDataSourceReference(ident)) {
+        throw new NoSuchTableException(ident);
+      }
+      throw e;
     }
   }
 

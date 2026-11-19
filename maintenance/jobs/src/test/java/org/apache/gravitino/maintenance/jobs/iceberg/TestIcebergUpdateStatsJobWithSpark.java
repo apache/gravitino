@@ -23,7 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.sun.net.httpserver.HttpServer;
 import java.io.File;
+import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -59,6 +61,8 @@ import org.apache.gravitino.maintenance.optimizer.api.updater.StatisticsUpdater;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoClientUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.GravitinoMetricsUpdater;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.jdbc.GenericJdbcMetricsRepository;
 import org.apache.gravitino.rel.Table;
@@ -263,6 +267,50 @@ public class TestIcebergUpdateStatsJobWithSpark {
     }
   }
 
+  /**
+   * Same production chain as manifest stats: {@code GET /configs} → {@link
+   * GravitinoClientUtils#fetchSchemaSeparator(String)} → {@code updateStatistics} → updater
+   * receives {@code a|b}, not {@code a:b}.
+   */
+  @Test
+  public void testUpdaterReceivesConfiguredHierarchicalSchemaSeparator() throws Exception {
+    spark.sql("CREATE NAMESPACE IF NOT EXISTS " + catalogName + ".a");
+    spark.sql("CREATE NAMESPACE IF NOT EXISTS " + catalogName + ".a.b");
+    spark.sql("CREATE TABLE IF NOT EXISTS " + catalogName + ".a.b.events (id INT) USING iceberg");
+    spark.sql("INSERT INTO " + catalogName + ".a.b.events VALUES (1)");
+    HttpServer configs = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    configs.createContext(
+        "/configs",
+        exchange -> {
+          byte[] body = "{\"gravitino.schema.separator\":\"|\"}".getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          exchange.getResponseBody().write(body);
+          exchange.close();
+        });
+    configs.start();
+    try {
+      String gravitinoUri = "http://127.0.0.1:" + configs.getAddress().getPort();
+      String schemaSeparator = GravitinoClientUtils.fetchSchemaSeparator(gravitinoUri);
+      RecordingStatisticsUpdater updater = new RecordingStatisticsUpdater();
+      IcebergUpdateStatsAndMetricsJob.updateStatistics(
+          spark,
+          updater,
+          null,
+          IcebergUpdateStatsAndMetricsJob.UpdateMode.STATS,
+          catalogName,
+          "a.b.events",
+          schemaSeparator);
+      assertEquals("|", schemaSeparator);
+      assertEquals(NameIdentifier.of(catalogName, "a|b", "events"), updater.tableIdentifier);
+      assertNotNull(updater.tableStatistics);
+      assertFalse(updater.tableStatistics.isEmpty());
+    } finally {
+      configs.stop(0);
+      spark.sql("DROP TABLE IF EXISTS " + catalogName + ".a.b.events");
+    }
+  }
+
   @Test
   public void testUpdateNonPartitionedTableStatistics() {
     RecordingStatisticsUpdater updater = new RecordingStatisticsUpdater();
@@ -273,7 +321,8 @@ public class TestIcebergUpdateStatsJobWithSpark {
         null,
         IcebergUpdateStatsAndMetricsJob.UpdateMode.STATS,
         catalogName,
-        "db.non_partitioned");
+        "db.non_partitioned",
+        IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
 
     assertEquals(NameIdentifier.of(catalogName, "db", "non_partitioned"), updater.tableIdentifier);
     assertNotNull(updater.tableStatistics);
@@ -300,7 +349,8 @@ public class TestIcebergUpdateStatsJobWithSpark {
         null,
         IcebergUpdateStatsAndMetricsJob.UpdateMode.STATS,
         catalogName,
-        "db.partitioned");
+        "db.partitioned",
+        IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
 
     assertEquals(NameIdentifier.of(catalogName, "db", "partitioned"), updater.tableIdentifier);
     assertTrue(updater.tableStatistics.isEmpty());
@@ -331,7 +381,8 @@ public class TestIcebergUpdateStatsJobWithSpark {
         metricsUpdater,
         IcebergUpdateStatsAndMetricsJob.UpdateMode.ALL,
         catalogName,
-        "db.partitioned");
+        "db.partitioned",
+        IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
 
     assertEquals(
         NameIdentifier.of(catalogName, "db", "partitioned"), statisticsUpdater.tableIdentifier);
@@ -361,7 +412,8 @@ public class TestIcebergUpdateStatsJobWithSpark {
         metricsUpdater,
         IcebergUpdateStatsAndMetricsJob.UpdateMode.METRICS,
         catalogName,
-        "db.partitioned");
+        "db.partitioned",
+        IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
 
     assertEquals(18, metricsUpdater.tableMetrics.size());
     assertTrue(
@@ -380,7 +432,8 @@ public class TestIcebergUpdateStatsJobWithSpark {
         metricsUpdater,
         IcebergUpdateStatsAndMetricsJob.UpdateMode.METRICS,
         catalogName,
-        "db.non_partitioned");
+        "db.non_partitioned",
+        IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
 
     assertEquals(9, metricsUpdater.tableMetrics.size());
     assertTrue(
@@ -403,7 +456,8 @@ public class TestIcebergUpdateStatsJobWithSpark {
         metricsUpdater,
         IcebergUpdateStatsAndMetricsJob.UpdateMode.ALL,
         catalogName,
-        "db.non_partitioned");
+        "db.non_partitioned",
+        IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
 
     assertEquals(
         NameIdentifier.of(catalogName, "db", "non_partitioned"), statisticsUpdater.tableIdentifier);
@@ -442,7 +496,8 @@ public class TestIcebergUpdateStatsJobWithSpark {
             metricsUpdater,
             IcebergUpdateStatsAndMetricsJob.UpdateMode.METRICS,
             catalogName,
-            "db.partitioned");
+            "db.partitioned",
+            IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
       } finally {
         metricsUpdater.close();
       }
@@ -499,7 +554,8 @@ public class TestIcebergUpdateStatsJobWithSpark {
         null,
         IcebergUpdateStatsAndMetricsJob.UpdateMode.STATS,
         catalogName,
-        "db.multi_partitioned");
+        "db.multi_partitioned",
+        IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
 
     assertEquals(
         NameIdentifier.of(catalogName, "db", "multi_partitioned"), updater.tableIdentifier);
@@ -647,7 +703,9 @@ public class TestIcebergUpdateStatsJobWithSpark {
   }
 
   private static String buildUpdaterOptionsForMetricsUpdaterOnly(MySQLContainer<?> mysql) {
-    return "{\"metrics_updater\":\"gravitino-metrics-updater\","
+    return "{\"gravitino_uri\":\""
+        + SERVER_URI
+        + "\",\"metrics_updater\":\"gravitino-metrics-updater\","
         + "\"gravitino.optimizer.jdbcMetrics.jdbcUrl\":\""
         + mysql.getJdbcUrl()
         + "\","
