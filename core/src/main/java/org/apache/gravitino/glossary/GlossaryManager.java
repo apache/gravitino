@@ -23,12 +23,10 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiFunction;
@@ -434,26 +432,15 @@ public final class GlossaryManager {
     if (edits.isEmpty()) {
       return work.apply(root, null);
     }
-    Map<String, Optional<Long>> targets = new HashMap<>();
-    Set<Long> locks = new HashSet<>();
+    String rootKey = GlossaryTermNames.key(root.name());
+    Set<String> keys = new LinkedHashSet<>();
     for (TermRelations.Edit edit : edits) {
-      String key = GlossaryTermNames.key(edit.target());
-      if (!targets.containsKey(key)) {
-        if (key.equals(GlossaryTermNames.key(root.name()))) {
-          targets.put(key, Optional.of(root.id()));
-        } else {
-          try {
-            long id = terms.getIds(NameIdentifier.of(root.namespace(), edit.target())).entityId();
-            locks.add(id);
-            targets.put(key, Optional.of(id));
-          } catch (NoSuchEntityException missing) {
-            // Defer validation until the root revision has been checked under its row lock.
-            targets.put(key, Optional.empty());
-          }
-        }
-      }
+      keys.add(GlossaryTermNames.key(edit.target()));
     }
-    Set<Long> endpoints = Set.copyOf(locks);
+    keys.remove(rootKey);
+    Map<String, Long> targets = terms.getIdsByKeys(lake, keys);
+    Set<Long> endpoints = Set.copyOf(targets.values());
+    Set<Long> locks = new HashSet<>(endpoints);
     if (!creating) {
       locks.add(root.id());
     }
@@ -474,12 +461,9 @@ public final class GlossaryManager {
           }
           TermRelations plan = new TermRelations(lake, root.id(), creating);
           for (TermRelations.Edit edit : edits) {
-            long id =
-                targets
-                    .get(GlossaryTermNames.key(edit.target()))
-                    .orElseThrow(
-                        () -> new NoSuchTermException("Term %s does not exist", edit.target()));
-            if (id != root.id() && !visibleIds.contains(id)) {
+            String key = GlossaryTermNames.key(edit.target());
+            Long id = key.equals(rootKey) ? root.id() : targets.get(key);
+            if (id == null || (!id.equals(root.id()) && !visibleIds.contains(id))) {
               throw new NoSuchTermException("Term %s does not exist", edit.target());
             }
             plan.edit(edit, id);

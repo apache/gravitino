@@ -80,6 +80,7 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
  * snapshot for definitions, synonyms and the live parent name without taking row locks.
  */
 public final class GlossaryTermMetaService {
+  private static final int LOOKUP_BATCH_SIZE = 500;
   private static final GlossaryTermMetaService INSTANCE = new GlossaryTermMetaService();
 
   private GlossaryTermMetaService() {}
@@ -401,11 +402,27 @@ public final class GlossaryTermMetaService {
         });
   }
 
+  /**
+   * Resolves normalized names in the fenced metalake before a relation writer locks term rows.
+   * Missing names are omitted so the writer can check the root revision before reporting them.
+   */
+  public Map<String, Long> getIdsByKeys(long metalakeId, Set<String> keys) {
+    Map<String, Long> result = new LinkedHashMap<>();
+    for (List<String> batch : Lists.partition(List.copyOf(keys), LOOKUP_BATCH_SIZE)) {
+      for (GlossaryTermPO row :
+          SessionUtils.getWithoutCommit(
+              GlossaryTermMetaMapper.class, mapper -> mapper.idsByKeys(metalakeId, batch))) {
+        result.put(row.getNameKey(), row.getTermId());
+      }
+    }
+    return result;
+  }
+
   /** Loads live terms in bounded batches from the named metalake and its observed identity. */
   public List<GlossaryTermEntity> getByIds(Namespace ns, long lake, Set<Long> ids) {
     validateNamespace(ns);
     List<GlossaryTermEntity> result = new ArrayList<>();
-    for (List<Long> batch : Lists.partition(List.copyOf(ids), 500)) {
+    for (List<Long> batch : Lists.partition(List.copyOf(ids), LOOKUP_BATCH_SIZE)) {
       result.addAll(
           SessionUtils.getWithoutCommit(
               GlossaryTermMetaMapper.class,

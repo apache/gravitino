@@ -47,10 +47,15 @@ import org.apache.gravitino.exceptions.TermAlreadyExistsException;
 import org.apache.gravitino.exceptions.TermVersionConflictException;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
 import org.apache.gravitino.storage.relational.service.GlossaryInvariants;
 import org.apache.gravitino.storage.relational.service.GlossaryTermRelService.RelationType;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.TestTemplate;
+import org.mockito.AdditionalAnswers;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 class TestGlossaryRelations extends TestJDBCBackend {
   private static final String LAKE = "relations";
@@ -61,6 +66,58 @@ class TestGlossaryRelations extends TestJDBCBackend {
   void verifyStorageInvariants() throws Exception {
     GlossaryInvariants.assertDefinitions();
     GlossaryInvariants.assertRelations();
+  }
+
+  /** Resolves referenced names in bounded batches before taking the ordered term locks. */
+  @TestTemplate
+  void testBatchRelationTargetLookup() throws Exception {
+    createAndInsertMakeLake(LAKE);
+    create("Root", "Parent", "Peer");
+    List<Integer> lookupSizes = new ArrayList<>();
+    try (MockedStatic<SqlSessions> sessions =
+        Mockito.mockStatic(
+            SqlSessions.class,
+            call -> {
+              Object result = call.callRealMethod();
+              if (!call.getMethod().getName().equals("getMapper")
+                  || call.getArgument(0) != GlossaryTermMetaMapper.class) {
+                return result;
+              }
+              return Mockito.mock(
+                  GlossaryTermMetaMapper.class,
+                  query -> {
+                    switch (query.getMethod().getName()) {
+                      case "idsByKeys" -> lookupSizes.add(
+                          query.<List<String>>getArgument(1).size());
+                      case "getIds" -> lookupSizes.add(1);
+                      default -> {}
+                    }
+                    return AdditionalAnswers.delegatesTo(result).answer(query);
+                  });
+            })) {
+      edit(
+          "Root",
+          TermChange.addBroader("parent"),
+          TermChange.addBroader(" PARENT "),
+          TermChange.addRelated("peer"));
+      assertEquals(List.of(2), lookupSizes);
+      assertEquals(
+          List.of("Parent"), names(manager.listRelations(LAKE, "Root", BROADER, false, null)));
+      assertEquals(
+          List.of("Peer"), names(manager.listRelations(LAKE, "Root", RELATED, false, null)));
+      lookupSizes.clear();
+      List<TermChange> edits = new ArrayList<>();
+      edits.add(TermChange.removeBroader("Parent"));
+      for (int i = 0; i < 500; i++) {
+        edits.add(TermChange.addRelated("missing" + i));
+      }
+      String token = get("Root").revisionToken();
+      assertThrows(NoSuchTermException.class, () -> edit("Root", edits.toArray(new TermChange[0])));
+      assertEquals(List.of(500, 1), lookupSizes);
+      assertEquals(token, get("Root").revisionToken());
+      assertEquals(
+          List.of("Parent"), names(manager.listRelations(LAKE, "Root", BROADER, false, null)));
+    }
   }
 
   /** Covers T5.1, T5.2 and T5.3. */
