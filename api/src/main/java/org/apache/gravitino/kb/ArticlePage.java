@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.kb;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.List;
@@ -34,6 +35,7 @@ public class ArticlePage {
 
   private final List<ArticleSummary> articles;
   private final int total;
+  private final boolean hasMore;
 
   /**
    * Creates an article page.
@@ -43,7 +45,8 @@ public class ArticlePage {
    * @return the page
    */
   public static ArticlePage of(ArticleSummary[] articles, int total) {
-    return new ArticlePage(articles == null ? ImmutableList.of() : Arrays.asList(articles), total);
+    return new ArticlePage(
+        articles == null ? ImmutableList.of() : Arrays.asList(articles), total, 0);
   }
 
   /**
@@ -54,12 +57,34 @@ public class ArticlePage {
    * @return the page
    */
   public static ArticlePage of(List<ArticleSummary> articles, int total) {
-    return new ArticlePage(articles, total);
+    return new ArticlePage(articles, total, 0);
   }
 
-  private ArticlePage(List<ArticleSummary> articles, int total) {
-    this.articles = ImmutableList.copyOf(articles);
+  /**
+   * Creates a page for a zero-based offset in the visible results.
+   *
+   * @param articles summaries in this window
+   * @param total total visible matches
+   * @param offset number of preceding visible matches requested
+   * @return the page
+   */
+  public static ArticlePage of(List<ArticleSummary> articles, int total, int offset) {
+    return new ArticlePage(articles, total, offset);
+  }
+
+  /**
+   * @return whether more visible matches follow the requested window
+   */
+  public boolean hasMore() {
+    return hasMore;
+  }
+
+  private ArticlePage(List<ArticleSummary> articles, int total, int offset) {
+    this.articles = articles == null ? ImmutableList.of() : ImmutableList.copyOf(articles);
+    Preconditions.checkArgument(total >= 0, "total must not be negative");
+    Preconditions.checkArgument(offset >= 0, "offset must not be negative");
     this.total = total;
+    this.hasMore = (long) offset + this.articles.size() < total;
   }
 
   /**

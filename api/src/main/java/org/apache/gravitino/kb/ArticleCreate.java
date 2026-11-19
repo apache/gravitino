@@ -57,11 +57,10 @@ public class ArticleCreate {
   }
 
   private ArticleCreate(Builder builder) {
-    this.name =
-        ArticleValidation.length(builder.name, KnowledgeBaseArticle.NAME_MAX_LENGTH, "Name");
+    this.name = ArticleValidation.name(builder.name);
     this.title = ArticleValidation.title(builder.title);
     this.body = builder.body;
-    this.domains = builder.domains.build();
+    this.domains = ArticleValidation.domainNames(builder.domains.build());
     this.status = builder.status;
     this.comment =
         ArticleValidation.length(
@@ -166,7 +165,8 @@ public class ArticleCreate {
     private Builder() {}
 
     /**
-     * Sets the explicit name; when omitted the server derives the name from the title.
+     * Sets the explicit name; when omitted the server derives the name from the title. The server
+     * validates the name's allowed characters.
      *
      * @param name the article name
      * @return this builder

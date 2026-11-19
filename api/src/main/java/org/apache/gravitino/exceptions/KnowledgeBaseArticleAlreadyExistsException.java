@@ -22,7 +22,10 @@ package org.apache.gravitino.exceptions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
-/** Exception thrown when a Knowledge Base Article with the specified name already exists. */
+/**
+ * Exception thrown when a Knowledge Base Article with the specified name already exists, or when
+ * the article's title is already claimed by another non-deprecated article.
+ */
 public class KnowledgeBaseArticleAlreadyExistsException extends AlreadyExistsException {
 
   /**

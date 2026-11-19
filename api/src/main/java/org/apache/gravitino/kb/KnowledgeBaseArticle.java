@@ -53,10 +53,16 @@ public interface KnowledgeBaseArticle extends Auditable {
   /** Maximum length of the source reference. */
   int SOURCE_REFERENCE_MAX_LENGTH = 1024;
 
-  /** The default maximum body size in UTF-8 bytes (1 MiB). */
+  /**
+   * The default maximum body size in UTF-8 bytes (1 MiB). The size is enforced by the server at
+   * write time; this API does not check the body size.
+   */
   long DEFAULT_MAX_BODY_BYTES = 1L << 20;
 
-  /** The configurable maximum body size, the MySQL {@code MEDIUMTEXT} capacity. */
+  /**
+   * The configurable maximum body size, the MySQL {@code MEDIUMTEXT} capacity. The size is enforced
+   * by the server at write time; this API does not check the body size.
+   */
   long MAX_BODY_BYTES_LIMIT = 16_777_215L;
 
   /**
@@ -110,6 +116,21 @@ public interface KnowledgeBaseArticle extends Auditable {
    * @return the current content version, starting at one
    */
   int version();
+
+  /**
+   * @return the opaque identity and store revision token for conditional writes
+   */
+  String revisionToken();
+
+  /**
+   * @return the visible asset bindings in the requested preview window
+   */
+  ArticleObjectIdentifier[] objects();
+
+  /**
+   * @return whether more visible assets follow the preview
+   */
+  boolean objectsHasMore();
 
   /**
    * @return the audit information

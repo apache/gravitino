@@ -141,6 +141,8 @@ public class MetadataObjectUtil {
         return NameIdentifierUtil.ofJob(metalakeName, metadataObject.name());
       case JOB_TEMPLATE:
         return NameIdentifierUtil.ofJobTemplate(metalakeName, metadataObject.name());
+      case KNOWLEDGE_BASE_ARTICLE:
+        return NameIdentifier.of(metalakeName, metadataObject.name());
       case DOMAIN:
         String domainName = metadataObject.fullName();
         NameValidationUtils.validateName("domain", domainName);

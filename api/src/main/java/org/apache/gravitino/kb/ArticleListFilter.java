@@ -34,6 +34,9 @@ public class ArticleListFilter {
   /** Default page size used when no {@code limit} is supplied. */
   public static final int DEFAULT_LIMIT = 100;
 
+  /** Maximum number of articles that can be requested in one page. */
+  public static final int MAX_LIMIT = 10_000;
+
   private final String query;
   private final String domain;
   private final ArticleStatus status;
@@ -162,7 +165,7 @@ public class ArticleListFilter {
     /**
      * Sets the page size.
      *
-     * @param limit the page size, at least 1
+     * @param limit the page size, from 1 through {@value ArticleListFilter#MAX_LIMIT}
      * @return this builder
      */
     public Builder withLimit(int limit) {
@@ -187,7 +190,8 @@ public class ArticleListFilter {
      * @return the filter
      */
     public ArticleListFilter build() {
-      Preconditions.checkArgument(limit > 0, "limit must be positive");
+      Preconditions.checkArgument(
+          limit > 0 && limit <= MAX_LIMIT, "limit must be between 1 and %s", MAX_LIMIT);
       Preconditions.checkArgument(offset >= 0, "offset must not be negative");
       return new ArticleListFilter(this);
     }

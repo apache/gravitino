@@ -22,7 +22,7 @@ package org.apache.gravitino.exceptions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
-/** Exception thrown when an article write conflicts with a claimed title or a concurrent update. */
+/** Exception thrown when an article write loses a concurrent update to the same article. */
 public class KnowledgeBaseArticleVersionConflictException extends OptimisticLockException {
 
   /**

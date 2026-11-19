@@ -27,9 +27,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
+import java.util.List;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.authorization.Owner;
 import org.junit.jupiter.api.Test;
 
 public class TestKnowledgeBaseArticleContract {
@@ -44,6 +47,8 @@ public class TestKnowledgeBaseArticleContract {
     assertThrows(IllegalArgumentException.class, () -> ArticleBody.of(null, "x"));
     assertThrows(
         IllegalArgumentException.class, () -> ArticleBody.of(ArticleBody.Format.HTML, null));
+    assertThrows(
+        IllegalArgumentException.class, () -> ArticleBody.of(ArticleBody.Format.MARKDOWN, ""));
   }
 
   @Test
@@ -122,6 +127,11 @@ public class TestKnowledgeBaseArticleContract {
     assertEquals(20, filter.offset());
 
     assertEquals(ArticleListFilter.DEFAULT_LIMIT, ArticleListFilter.builder().build().limit());
+    assertEquals(1, ArticleListFilter.builder().withLimit(1).build().limit());
+    assertEquals(10_000, ArticleListFilter.builder().withLimit(10_000).build().limit());
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ArticleListFilter.builder().withLimit(10_001).build());
     assertThrows(
         IllegalArgumentException.class, () -> ArticleListFilter.builder().withLimit(0).build());
     assertThrows(
@@ -230,5 +240,236 @@ public class TestKnowledgeBaseArticleContract {
     assertEquals(1024, KnowledgeBaseArticle.SOURCE_REFERENCE_MAX_LENGTH);
     assertEquals(1L << 20, KnowledgeBaseArticle.DEFAULT_MAX_BODY_BYTES);
     assertEquals(16_777_215L, KnowledgeBaseArticle.MAX_BODY_BYTES_LIMIT);
+  }
+
+  @Test
+  public void testFieldLimitsAcceptAtLimit() {
+    assertEquals(
+        StringUtils.repeat("x", 128),
+        ArticleCreate.builder()
+            .withName(StringUtils.repeat("x", 128))
+            .withTitle(StringUtils.repeat("t", 512))
+            .withBody(ArticleBody.of(ArticleBody.Format.HTML, "text"))
+            .addSynonym(StringUtils.repeat("s", 128))
+            .withComment(StringUtils.repeat("c", 256))
+            .withSourceReference(StringUtils.repeat("r", 1024))
+            .build()
+            .name());
+    assertEquals(
+        StringUtils.repeat("t", 512),
+        ((KnowledgeBaseArticleChange.UpdateTitle)
+                KnowledgeBaseArticleChange.updateTitle(StringUtils.repeat("t", 512)))
+            .getNewTitle());
+    assertEquals(
+        StringUtils.repeat("s", 128),
+        ((KnowledgeBaseArticleChange.UpdateSynonyms)
+                KnowledgeBaseArticleChange.updateSynonyms(
+                    new String[] {StringUtils.repeat("s", 128)}))
+            .getNewSynonyms()[0]);
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ArticleCreate.builder()
+                .withName(StringUtils.repeat("x", 129))
+                .withTitle("t")
+                .withBody(ArticleBody.of(ArticleBody.Format.HTML, "text"))
+                .build());
+  }
+
+  @Test
+  public void testExplicitArticleNames() {
+    ArticleCreate.Builder builder =
+        ArticleCreate.builder()
+            .withTitle("Guide")
+            .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "text"));
+    assertEquals(null, builder.build().name());
+    String valid = "收入-e\u0301_2";
+    assertEquals(valid, builder.withName(valid).build().name());
+    for (String invalid : Arrays.asList("", "a/b", "a b", "_-", "a.b", "\u0301")) {
+      assertThrows(IllegalArgumentException.class, () -> builder.withName(invalid).build());
+    }
+  }
+
+  @Test
+  public void testUnicodeTitleWhitespace() {
+    assertThrows(
+        IllegalArgumentException.class, () -> KnowledgeBaseArticleChange.updateTitle("\u3000"));
+    assertEquals(
+        KnowledgeBaseArticleChange.updateTitle("Guide"),
+        KnowledgeBaseArticleChange.updateTitle("\u3000Guide\u3000"));
+  }
+
+  @Test
+  public void testBindingAndArticlePageContinuation() {
+    ArticleObjectIdentifier asset =
+        ArticleObjectIdentifier.of(MetadataObject.Type.CATALOG, ImmutableList.of(), "catalog");
+    AssetBindingPage bindings = new AssetBindingPage(ImmutableList.of(asset), true, "next-token");
+    assertEquals(ImmutableList.of(asset), bindings.objects());
+    assertTrue(bindings.hasMore());
+    assertEquals("next-token", bindings.revisionToken());
+    ArticleSummary summary =
+        new ArticleSummary() {
+          public String name() {
+            return "guide";
+          }
+
+          public String title() {
+            return "Guide";
+          }
+
+          public ArticleStatus status() {
+            return ArticleStatus.APPROVED;
+          }
+
+          public String[] domains() {
+            return new String[0];
+          }
+
+          public Owner owner() {
+            return null;
+          }
+
+          public int version() {
+            return 1;
+          }
+
+          public Audit auditInfo() {
+            return null;
+          }
+        };
+    assertTrue(ArticlePage.of(ImmutableList.of(summary), 101, 99).hasMore());
+    assertFalse(ArticlePage.of(ImmutableList.of(summary), 101, 100).hasMore());
+    assertFalse(ArticlePage.of(ImmutableList.of(), 101, Integer.MAX_VALUE).hasMore());
+  }
+
+  @Test
+  public void testSynonymCountLimit() {
+    ArticleCreate.Builder builder =
+        ArticleCreate.builder()
+            .withTitle("Title")
+            .withBody(ArticleBody.of(ArticleBody.Format.HTML, "text"));
+    for (int i = 0; i < KnowledgeBaseArticle.SYNONYMS_MAX_COUNT; i++) {
+      builder.addSynonym("synonym-" + i);
+    }
+    assertEquals(KnowledgeBaseArticle.SYNONYMS_MAX_COUNT, builder.build().synonyms().size());
+
+    String[] twentyOne = new String[KnowledgeBaseArticle.SYNONYMS_MAX_COUNT + 1];
+    for (int i = 0; i < twentyOne.length; i++) {
+      twentyOne[i] = "synonym-" + i;
+    }
+    assertThrows(
+        IllegalArgumentException.class, () -> KnowledgeBaseArticleChange.updateSynonyms(twentyOne));
+
+    // A case-insensitive duplicate counts once toward the limit: 21 entries, 20 distinct.
+    twentyOne[KnowledgeBaseArticle.SYNONYMS_MAX_COUNT] = "SYNONYM-0";
+    assertEquals(
+        KnowledgeBaseArticle.SYNONYMS_MAX_COUNT,
+        ((KnowledgeBaseArticleChange.UpdateSynonyms)
+                KnowledgeBaseArticleChange.updateSynonyms(twentyOne))
+            .getNewSynonyms()
+            .length);
+  }
+
+  @Test
+  public void testRejectsBlankAndNullCollectionEntries() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ArticleCreate.builder()
+                .withTitle("Title")
+                .withBody(ArticleBody.of(ArticleBody.Format.HTML, "text"))
+                .addSynonym("  ")
+                .build());
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> KnowledgeBaseArticleChange.updateSynonyms(new String[] {null}));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> KnowledgeBaseArticleChange.updateDomains(new String[] {" "}));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> KnowledgeBaseArticleChange.updateDomains(new String[] {null}));
+    assertThrows(NullPointerException.class, () -> KnowledgeBaseArticleChange.updateDomains(null));
+    assertThrows(NullPointerException.class, () -> KnowledgeBaseArticleChange.updateSynonyms(null));
+  }
+
+  @Test
+  public void testIdentifierDepthPerType() {
+    assertEquals(
+        0,
+        ArticleObjectIdentifier.of(MetadataObject.Type.CATALOG, ImmutableList.of(), "c")
+            .namespace()
+            .size());
+    assertEquals(
+        1,
+        ArticleObjectIdentifier.of(MetadataObject.Type.SCHEMA, ImmutableList.of("c"), "s")
+            .namespace()
+            .size());
+    for (MetadataObject.Type type :
+        ImmutableList.of(
+            MetadataObject.Type.TABLE,
+            MetadataObject.Type.VIEW,
+            MetadataObject.Type.FILESET,
+            MetadataObject.Type.TOPIC,
+            MetadataObject.Type.MODEL,
+            MetadataObject.Type.SEMANTIC_MODEL)) {
+      assertEquals(
+          2, ArticleObjectIdentifier.of(type, ImmutableList.of("c", "s"), "o").namespace().size());
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> ArticleObjectIdentifier.of(type, ImmutableList.of("c"), "o"));
+    }
+    assertEquals(
+        3,
+        ArticleObjectIdentifier.of(MetadataObject.Type.COLUMN, ImmutableList.of("c", "s", "t"), "x")
+            .namespace()
+            .size());
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ArticleObjectIdentifier.of(
+                MetadataObject.Type.COLUMN, ImmutableList.of("c", "s"), "x"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ArticleObjectIdentifier.of(
+                MetadataObject.Type.COLUMN, ImmutableList.of("c", "s", "t", "u"), "x"));
+  }
+
+  @Test
+  public void testLimitsCountUnicodeCodePoints() {
+    // One astral letter is two UTF-16 chars; limits count code points.
+    assertEquals(
+        StringUtils.repeat("𝕏", 512),
+        ((KnowledgeBaseArticleChange.UpdateTitle)
+                KnowledgeBaseArticleChange.updateTitle(StringUtils.repeat("𝕏", 512)))
+            .getNewTitle());
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> KnowledgeBaseArticleChange.updateTitle(StringUtils.repeat("𝕏", 513)));
+  }
+
+  @Test
+  public void testPageAndHashCodes() {
+    ArticlePage page = ArticlePage.of((ArticleSummary[]) null, 0);
+    assertTrue(page.articles().isEmpty());
+    assertEquals(0, page.total());
+    assertTrue(ArticlePage.of((List<ArticleSummary>) null, 0).articles().isEmpty());
+    assertThrows(IllegalArgumentException.class, () -> ArticlePage.of(ImmutableList.of(), -1));
+
+    ArticleBody body = ArticleBody.of(ArticleBody.Format.MARKDOWN, "# Revenue");
+    assertEquals(
+        body.hashCode(), ArticleBody.of(ArticleBody.Format.MARKDOWN, "# Revenue").hashCode());
+    assertEquals(
+        KnowledgeBaseArticleChange.updateTitle("New").hashCode(),
+        KnowledgeBaseArticleChange.updateTitle("New").hashCode());
+    ArticleObjectIdentifier column =
+        ArticleObjectIdentifier.of(
+            MetadataObject.Type.COLUMN, ImmutableList.of("c", "s", "t"), "total.amount");
+    assertEquals(
+        column.hashCode(),
+        ArticleObjectIdentifier.of(
+                MetadataObject.Type.COLUMN, new String[] {"c", "s", "t"}, "total.amount")
+            .hashCode());
   }
 }

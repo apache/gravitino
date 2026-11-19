@@ -46,7 +46,7 @@ public final class ArticleBody {
    * Creates an article body.
    *
    * @param format the markup format
-   * @param content the body text
+   * @param content the non-empty body text
    * @return the article body
    */
   public static ArticleBody of(Format format, String content) {
@@ -55,7 +55,8 @@ public final class ArticleBody {
 
   private ArticleBody(Format format, String content) {
     Preconditions.checkArgument(format != null, "Article body format must not be null");
-    Preconditions.checkArgument(content != null, "Article body content must not be null");
+    Preconditions.checkArgument(
+        content != null && !content.isEmpty(), "Article body content must not be null or empty");
     this.format = format;
     this.content = content;
   }

@@ -74,9 +74,9 @@ public interface KnowledgeBaseArticleChange {
   }
 
   /**
-   * Creates a change to replace the comment.
+   * Creates a change to replace the comment. A {@code null} comment clears the field.
    *
-   * @param newComment the new comment
+   * @param newComment the new comment, or {@code null} to clear it
    * @return the change
    */
   static KnowledgeBaseArticleChange updateComment(String newComment) {
@@ -94,9 +94,9 @@ public interface KnowledgeBaseArticleChange {
   }
 
   /**
-   * Creates a change to replace the source reference.
+   * Creates a change to replace the source reference. A {@code null} reference clears the field.
    *
-   * @param newSourceReference the new source reference
+   * @param newSourceReference the new source reference, or {@code null} to clear it
    * @return the change
    */
   static KnowledgeBaseArticleChange updateSourceReference(String newSourceReference) {
@@ -205,7 +205,9 @@ public interface KnowledgeBaseArticleChange {
     private final String[] newDomains;
 
     private UpdateDomains(String[] newDomains) {
-      this.newDomains = newDomains.clone();
+      Preconditions.checkNotNull(newDomains, "newDomains");
+      this.newDomains =
+          ArticleValidation.domainNames(Arrays.asList(newDomains)).toArray(new String[0]);
     }
 
     /**
@@ -320,6 +322,7 @@ public interface KnowledgeBaseArticleChange {
     private final String[] newSynonyms;
 
     private UpdateSynonyms(String[] newSynonyms) {
+      Preconditions.checkNotNull(newSynonyms, "newSynonyms");
       this.newSynonyms =
           ArticleValidation.synonyms(Arrays.asList(newSynonyms)).toArray(new String[0]);
     }
