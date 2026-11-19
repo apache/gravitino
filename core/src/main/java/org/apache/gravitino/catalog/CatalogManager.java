@@ -888,6 +888,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             checkOpen();
             checkMetalake(metalakeIdent, store);
             // Initialization resolves secret URNs, but must not publish the entity yet.
+            secretManager.validateProposedSecrets(mergedConfig, secretPlaintexts);
             SecretVersionChanges stagedSecrets =
                 secretManager.stageSecrets(null, mergedConfig, "catalog", uid, secretPlaintexts);
             AtomicBoolean entityStored = new AtomicBoolean(false);
