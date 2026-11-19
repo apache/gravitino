@@ -67,7 +67,7 @@ export const createMcpGatewayApi = (gatewayUri, getAccessToken = () => oauthProv
   })
 
   const data = request => request.then(res => res.data)
-  const server = serviceId => `/api/admin/mcp/${encodeURIComponent(serviceId)}`
+  const server = serviceId => `/api/v1/admin/mcp/${encodeURIComponent(serviceId)}`
 
   return {
     // Where MCP clients connect to a server.
@@ -78,41 +78,42 @@ export const createMcpGatewayApi = (gatewayUri, getAccessToken = () => oauthProv
     connectUrl: (serviceId, returnTo) =>
       `${baseUrl}/portal/connect/${encodeURIComponent(serviceId)}?${new URLSearchParams({ return_to: returnTo })}`,
     disconnect: serviceId => data(http.post(`/portal/disconnect/${encodeURIComponent(serviceId)}`)),
-    getMe: () => data(http.get('/api/users/me')),
-    getCatalog: () => data(http.get('/api/catalog/mcps')),
-    getMyPermissions: () => data(http.get('/api/mcp-access/my-permissions')),
-    getMyRequests: () => data(http.get('/api/mcp-access/my-requests')),
+    getMe: () => data(http.get('/api/v1/users/me')),
+    getCatalog: () => data(http.get('/api/v1/catalog/mcps')),
+    getMyPermissions: () => data(http.get('/api/v1/mcp-access/my-permissions')),
+    getMyRequests: () => data(http.get('/api/v1/mcp-access/my-requests')),
     requestAccess: (mcpId, justification) =>
-      data(http.post('/api/mcp-access/request', { mcp_id: mcpId, justification })),
-    getServers: () => data(http.get('/api/admin/mcp/', { params: { include_inactive: true } })),
-    createServer: fields => data(http.post('/api/admin/mcp/', fields)),
+      data(http.post('/api/v1/mcp-access/request', { mcp_id: mcpId, justification })),
+    getServers: () => data(http.get('/api/v1/admin/mcp/', { params: { include_inactive: true } })),
+    createServer: fields => data(http.post('/api/v1/admin/mcp/', fields)),
     updateServer: (serviceId, changes) => data(http.patch(server(serviceId), changes)),
     deleteServer: serviceId => data(http.delete(server(serviceId))),
     getPendingRequests: (page, pageSize) =>
-      data(http.get('/api/mcp-access/admin/pending', { params: { page, page_size: pageSize } })),
+      data(http.get('/api/v1/mcp-access/admin/pending', { params: { page, page_size: pageSize } })),
     getAllRequests: (page, pageSize) =>
-      data(http.get('/api/mcp-access/admin/all', { params: { page, page_size: pageSize } })),
+      data(http.get('/api/v1/mcp-access/admin/all', { params: { page, page_size: pageSize } })),
     reviewRequest: (requestId, review) =>
-      data(http.post(`/api/mcp-access/admin/review/${encodeURIComponent(requestId)}`, review)),
+      data(http.post(`/api/v1/mcp-access/admin/review/${encodeURIComponent(requestId)}`, review)),
     getPermissions: (page, pageSize) =>
-      data(http.get('/api/mcp-access/admin/permissions', { params: { page, page_size: pageSize } })),
+      data(http.get('/api/v1/mcp-access/admin/permissions', { params: { page, page_size: pageSize } })),
     revokePermission: permissionId =>
-      data(http.delete(`/api/mcp-access/admin/permissions/${encodeURIComponent(permissionId)}`)),
+      data(http.delete(`/api/v1/mcp-access/admin/permissions/${encodeURIComponent(permissionId)}`)),
 
     // The audit log: everyone's calls for admins, and their own for everyone else.
-    getAuditLogs: params => data(http.get('/api/audit/logs', { params })),
-    getAuditLog: logId => data(http.get(`/api/audit/logs/${encodeURIComponent(logId)}`)),
-    getAuditSummary: params => data(http.get('/api/audit/analytics/summary', { params })),
+    getAuditLogs: params => data(http.get('/api/v1/audit/logs', { params })),
+    getAuditLog: logId => data(http.get(`/api/v1/audit/logs/${encodeURIComponent(logId)}`)),
+    getAuditSummary: params => data(http.get('/api/v1/audit/analytics/summary', { params })),
     exportAuditLogs: params =>
-      data(http.get('/api/audit/logs/export/csv', { params, responseType: 'blob' })).catch(async error => {
+      data(http.get('/api/v1/audit/logs/export/csv', { params, responseType: 'blob' })).catch(async error => {
         throw await readBlobError(error)
       }),
 
-    getServiceAccounts: () => data(http.get('/api/admin/service-accounts')),
-    createServiceAccount: fields => data(http.post('/api/admin/service-accounts', fields)),
+    getServiceAccounts: () => data(http.get('/api/v1/admin/service-accounts')),
+    createServiceAccount: fields => data(http.post('/api/v1/admin/service-accounts', fields)),
     updateServiceAccount: (accountId, changes) =>
-      data(http.patch(`/api/admin/service-accounts/${encodeURIComponent(accountId)}`, changes)),
-    deleteServiceAccount: accountId => data(http.delete(`/api/admin/service-accounts/${encodeURIComponent(accountId)}`))
+      data(http.patch(`/api/v1/admin/service-accounts/${encodeURIComponent(accountId)}`, changes)),
+    deleteServiceAccount: accountId =>
+      data(http.delete(`/api/v1/admin/service-accounts/${encodeURIComponent(accountId)}`))
   }
 }
 

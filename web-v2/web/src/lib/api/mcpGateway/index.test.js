@@ -50,7 +50,7 @@ describe('createMcpGatewayApi', () => {
 
     const [request] = requests
     expect(request.baseURL).toBe('https://gateway.example.com')
-    expect(request.url).toBe('/api/catalog/mcps')
+    expect(request.url).toBe('/api/v1/catalog/mcps')
     expect(request.headers.Authorization).toBe('Bearer user-token')
   })
 
@@ -76,7 +76,7 @@ describe('createMcpGatewayApi', () => {
 
     await api.updateServer('a/b', { is_active: false })
 
-    expect(requests[0].url).toBe('/api/admin/mcp/a%2Fb')
+    expect(requests[0].url).toBe('/api/v1/admin/mcp/a%2Fb')
     expect(requests[0].method).toBe('patch')
   })
 
@@ -93,7 +93,7 @@ describe('createMcpGatewayApi', () => {
 
     await api.getPendingRequests(2, 20)
 
-    expect(requests[0].url).toBe('/api/mcp-access/admin/pending')
+    expect(requests[0].url).toBe('/api/v1/mcp-access/admin/pending')
     expect(requests[0].params).toEqual({ page: 2, page_size: 20 })
   })
 
@@ -122,10 +122,10 @@ describe('createMcpGatewayApi', () => {
     await api.getPermissions(3, 25)
     await api.revokePermission(12)
 
-    expect(requests[0].url).toBe('/api/mcp-access/admin/permissions')
+    expect(requests[0].url).toBe('/api/v1/mcp-access/admin/permissions')
     expect(requests[0].params).toEqual({ page: 3, page_size: 25 })
     expect(requests[1].method).toBe('delete')
-    expect(requests[1].url).toBe('/api/mcp-access/admin/permissions/12')
+    expect(requests[1].url).toBe('/api/v1/mcp-access/admin/permissions/12')
   })
 
   it('reads the audit log, one entry, and its summary', async () => {
@@ -135,10 +135,10 @@ describe('createMcpGatewayApi', () => {
     await api.getAuditLog(9)
     await api.getAuditSummary({ days: 7 })
 
-    expect(requests[0].url).toBe('/api/audit/logs')
+    expect(requests[0].url).toBe('/api/v1/audit/logs')
     expect(requests[0].params).toEqual({ service: 'gravitino', limit: 25, offset: 50 })
-    expect(requests[1].url).toBe('/api/audit/logs/9')
-    expect(requests[2].url).toBe('/api/audit/analytics/summary')
+    expect(requests[1].url).toBe('/api/v1/audit/logs/9')
+    expect(requests[2].url).toBe('/api/v1/audit/analytics/summary')
     expect(requests[2].params).toEqual({ days: 7 })
   })
 
@@ -147,7 +147,7 @@ describe('createMcpGatewayApi', () => {
 
     await api.exportAuditLogs({ days: 30 })
 
-    expect(requests[0].url).toBe('/api/audit/logs/export/csv')
+    expect(requests[0].url).toBe('/api/v1/audit/logs/export/csv')
     expect(requests[0].params).toEqual({ days: 30 })
     expect(requests[0].responseType).toBe('blob')
     expect(requests[0].headers.Authorization).toBe('Bearer user-token')
@@ -178,10 +178,10 @@ describe('createMcpGatewayApi', () => {
     await api.deleteServiceAccount(4)
 
     expect(requests.map(request => [request.method, request.url])).toEqual([
-      ['get', '/api/admin/service-accounts'],
-      ['post', '/api/admin/service-accounts'],
-      ['patch', '/api/admin/service-accounts/4'],
-      ['delete', '/api/admin/service-accounts/4']
+      ['get', '/api/v1/admin/service-accounts'],
+      ['post', '/api/v1/admin/service-accounts'],
+      ['patch', '/api/v1/admin/service-accounts/4'],
+      ['delete', '/api/v1/admin/service-accounts/4']
     ])
     expect(JSON.parse(requests[1].data)).toEqual(account)
     expect(JSON.parse(requests[2].data)).toEqual({ allowed_services: ['gravitino'] })
