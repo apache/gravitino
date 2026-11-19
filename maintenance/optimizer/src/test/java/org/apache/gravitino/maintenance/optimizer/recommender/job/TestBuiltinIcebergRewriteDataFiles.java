@@ -37,6 +37,7 @@ import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionJobContext;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -986,7 +987,8 @@ public class TestBuiltinIcebergRewriteDataFiles {
             partitioning,
             partitions);
     GravitinoCompactionJobAdapter adapter = new GravitinoCompactionJobAdapter();
-    return GravitinoJobSubmitter.buildJobConfig(optimizerConfig, jobContext, adapter);
+    return GravitinoJobSubmitter.buildJobConfig(
+        optimizerConfig, jobContext, adapter, IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
   }
 
   private static long countDataFiles(SparkSession spark, String fullTableName) {

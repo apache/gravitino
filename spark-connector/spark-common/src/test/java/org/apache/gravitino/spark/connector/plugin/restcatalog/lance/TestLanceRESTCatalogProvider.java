@@ -108,7 +108,7 @@ public class TestLanceRESTCatalogProvider {
   }
 
   @Test
-  void testNormalizesOnlyHeaderProperties() {
+  void testNormalizesOnlyHeaderPropertiesCaseInsensitively() {
     Map<String, String> properties = new LinkedHashMap<>();
     properties.put(null, "untouched");
     properties.put("headers", "ordinary property");

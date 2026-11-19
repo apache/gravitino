@@ -167,15 +167,17 @@ public class LanceRESTCatalogProvider implements LakehouseRESTCatalogProvider {
     return new String[] {SPARK_EXTENSIONS};
   }
 
+  // Avoid StringUtils.startsWithIgnoreCase: deprecated in the commons-lang3 version used by
+  // Spark 4.1, and the connector compiles with -Werror.
+  private static boolean isHeaderProperty(@Nullable String key) {
+    return key != null && key.regionMatches(true, 0, HEADER_PREFIX, 0, HEADER_PREFIX.length());
+  }
+
   /**
    * The Lance client uses the raw response body as the exception message, which is empty for most
    * error responses, so fall back to the reason phrase and finally to an explicit placeholder
    * instead of reporting a bare {@code ApiException}.
    */
-  private static boolean isHeaderProperty(@Nullable String key) {
-    return key != null && key.regionMatches(true, 0, HEADER_PREFIX, 0, HEADER_PREFIX.length());
-  }
-
   private static String describeResponse(ApiException e) {
     if (StringUtils.isNotBlank(e.getResponseBody())) {
       return e.getResponseBody();

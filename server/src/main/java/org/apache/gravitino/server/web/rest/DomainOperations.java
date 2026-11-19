@@ -62,6 +62,7 @@ import org.apache.gravitino.server.authorization.DomainAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.tag.TagValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -170,7 +171,7 @@ public class DomainOperations {
                       request.getName(),
                       request.getComment(),
                       request.getProperties(),
-                      tag.tagValue(),
+                      TagValue.noValue(tag.getName()),
                       tag.isCreate())
                   : checked.createSubdomain(
                       metalake,
@@ -178,7 +179,7 @@ public class DomainOperations {
                       request.getName(),
                       request.getComment(),
                       request.getProperties(),
-                      tag.tagValue(),
+                      TagValue.noValue(tag.getName()),
                       tag.isCreate());
           return domainResponse(created);
         });
@@ -422,7 +423,9 @@ public class DomainOperations {
                   .updateBackingTag(
                       metalake,
                       domain,
-                      request.getBackingTag() == null ? null : request.getBackingTag().tagValue()));
+                      request.getBackingTag() == null
+                          ? null
+                          : TagValue.noValue(request.getBackingTag().getName())));
         });
   }
 
@@ -476,7 +479,7 @@ public class DomainOperations {
         domain.properties(),
         domain.status(),
         domain.parent().orElse(null),
-        domain.backingTag().orElse(null),
+        domain.backingTag().map(TagValue::name).orElse(null),
         DTOConverters.toDTO(domain.auditInfo()),
         domain.relations());
   }

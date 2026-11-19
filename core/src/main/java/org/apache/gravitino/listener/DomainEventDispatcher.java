@@ -164,7 +164,8 @@ public final class DomainEventDispatcher implements DomainDispatcher {
       boolean createBackingTag) {
     String user = PrincipalUtils.getCurrentUserName();
     DomainInfo requested =
-        new DomainInfo(name, comment, properties, Domain.Status.DRAFT, null, backingTag, null);
+        new DomainInfo(
+            name, comment, properties, Domain.Status.DRAFT, null, tagName(backingTag), null);
     eventBus.dispatchEvent(
         new CreateDomainPreEvent(user, metalake, name, requested, createBackingTag));
     try {
@@ -193,7 +194,8 @@ public final class DomainEventDispatcher implements DomainDispatcher {
       boolean createBackingTag) {
     String user = PrincipalUtils.getCurrentUserName();
     DomainInfo requested =
-        new DomainInfo(name, comment, properties, Domain.Status.DRAFT, parent, backingTag, null);
+        new DomainInfo(
+            name, comment, properties, Domain.Status.DRAFT, parent, tagName(backingTag), null);
     eventBus.dispatchEvent(
         new CreateDomainPreEvent(user, metalake, name, requested, createBackingTag));
     try {
@@ -307,15 +309,17 @@ public final class DomainEventDispatcher implements DomainDispatcher {
   public DomainEntity updateBackingTag(
       String metalake, String name, @Nullable TagValue backingTag) {
     String user = PrincipalUtils.getCurrentUserName();
-    eventBus.dispatchEvent(new UpdateDomainBackingTagPreEvent(user, metalake, name, backingTag));
+    eventBus.dispatchEvent(
+        new UpdateDomainBackingTagPreEvent(user, metalake, name, tagName(backingTag)));
     try {
       DomainEntity result = dispatcher.updateBackingTag(metalake, name, backingTag);
       eventBus.dispatchEvent(
-          new UpdateDomainBackingTagEvent(user, metalake, name, backingTag, domainInfo(result)));
+          new UpdateDomainBackingTagEvent(
+              user, metalake, name, tagName(backingTag), domainInfo(result)));
       return result;
     } catch (Exception e) {
       eventBus.dispatchEvent(
-          new UpdateDomainBackingTagFailureEvent(user, metalake, name, backingTag, e));
+          new UpdateDomainBackingTagFailureEvent(user, metalake, name, tagName(backingTag), e));
       throw e;
     }
   }
@@ -413,7 +417,12 @@ public final class DomainEventDispatcher implements DomainDispatcher {
         domain.properties(),
         domain.status(),
         domain.parent().orElse(null),
-        domain.backingTag().orElse(null),
+        domain.backingTag().map(TagValue::name).orElse(null),
         domain.auditInfo());
+  }
+
+  @Nullable
+  private static String tagName(@Nullable TagValue backingTag) {
+    return backingTag == null ? null : backingTag.name();
   }
 }
