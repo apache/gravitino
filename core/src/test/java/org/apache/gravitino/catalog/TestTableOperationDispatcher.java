@@ -25,6 +25,7 @@ import static org.apache.gravitino.Entity.EntityType.SCHEMA;
 import static org.apache.gravitino.Entity.EntityType.TABLE;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
+import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
@@ -39,6 +40,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.withSettings;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -95,6 +97,7 @@ import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.SupportsTableIdentifier;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -122,6 +125,85 @@ import org.junit.jupiter.params.provider.ValueSource;
 public class TestTableOperationDispatcher extends TestOperationDispatcher {
   static TableOperationDispatcher tableOperationDispatcher;
   static SchemaOperationDispatcher schemaOperationDispatcher;
+
+  /**
+   * Existence checks keep live-source validation and import fallbacks without refreshing columns.
+   *
+   * @param scenario the source identity or failure to exercise
+   */
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "unchanged",
+        "no-id",
+        "missing",
+        "missing-schema",
+        "malformed",
+        "changed",
+        "cold",
+        "failure"
+      })
+  public void testImportedTableExistenceUsesSourceIdentifier(String scenario) throws Exception {
+    NameIdentifier schema =
+        NameIdentifier.of(metalake, catalog, "table_existence_probe_" + scenario);
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(schema, "comment", props);
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, schema.name(), "t");
+    createTable(ident);
+    TestCatalog base =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    Object original = base.ops();
+    TestCatalogOperations source =
+        mock(
+            TestCatalogOperations.class,
+            withSettings()
+                .extraInterfaces(SupportsTableIdentifier.class)
+                .defaultAnswer(delegatesTo(original)));
+    Table table = ((TestCatalogOperations) original).loadTable(ident);
+    doReturn(table).when(source).loadTable(ident);
+    doReturn(table.properties().get(ID_KEY))
+        .when((SupportsTableIdentifier) source)
+        .loadTableIdentifier(ident);
+    SupportsTableIdentifier probe = (SupportsTableIdentifier) source;
+    if ("no-id".equals(scenario)) {
+      doReturn(null).when(probe).loadTableIdentifier(ident);
+    } else if ("missing".equals(scenario)) {
+      doThrow(new NoSuchTableException("missing")).when(probe).loadTableIdentifier(ident);
+    } else if ("missing-schema".equals(scenario)) {
+      doThrow(new NoSuchSchemaException("missing schema")).when(probe).loadTableIdentifier(ident);
+    } else if ("malformed".equals(scenario)) {
+      doReturn("malformed").when(probe).loadTableIdentifier(ident);
+    } else if ("changed".equals(scenario)) {
+      doReturn(StringIdentifier.fromId(Long.MAX_VALUE).toString())
+          .when(probe)
+          .loadTableIdentifier(ident);
+    } else if ("cold".equals(scenario)) {
+      entityStore.delete(ident, TABLE);
+    } else if ("failure".equals(scenario)) {
+      doThrow(new IllegalStateException("metastore unavailable"))
+          .when(probe)
+          .loadTableIdentifier(ident);
+    }
+    FieldUtils.writeField(base, "ops", source, true);
+    try {
+      if ("failure".equals(scenario)) {
+        Assertions.assertThrows(
+            IllegalStateException.class, () -> tableOperationDispatcher.tableExists(ident));
+      } else {
+        Assertions.assertEquals(
+            !scenario.startsWith("missing"), tableOperationDispatcher.tableExists(ident));
+      }
+      boolean fullLoad = List.of("cold", "malformed", "changed").contains(scenario);
+      verify(source, times(fullLoad ? 1 : 0)).loadTable(ident);
+      verify(probe, times("cold".equals(scenario) ? 0 : 1)).loadTableIdentifier(ident);
+      if (!scenario.startsWith("missing") && !"failure".equals(scenario)) {
+        Assertions.assertNotNull(entityStore.get(ident, TABLE, TableEntity.class));
+      }
+    } finally {
+      FieldUtils.writeField(base, "ops", original, true);
+    }
+  }
 
   @BeforeAll
   public static void initialize() throws IOException, IllegalAccessException {
