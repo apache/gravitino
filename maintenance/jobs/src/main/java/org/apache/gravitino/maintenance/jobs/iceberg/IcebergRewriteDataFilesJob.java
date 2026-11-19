@@ -396,7 +396,10 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
 
   @Override
   public TableSnapshotMetrics collectBeforeMetrics(
-      SparkSession spark, String catalogName, String tableIdentifier) {
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      Map<String, String> argsByName) {
     long snapshotId = IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier);
     Map<String, Object> metrics = collectCompactionMetrics(spark, catalogName, tableIdentifier);
     return TableSnapshotMetrics.of(snapshotId, metrics);

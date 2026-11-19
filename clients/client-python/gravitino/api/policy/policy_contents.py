@@ -177,9 +177,7 @@ class PolicyContents:
 
     @staticmethod
     def iceberg_rewrite_manifests(
-        manifest_count_critical: int | None = None,
-        manifest_count_warning: int | None = None,
-        avg_manifest_size_threshold_bytes: int | None = None,
+        manifest_count_threshold: int | None = None,
         spec_id: int | None = None,
         use_caching: bool | None = None,
         time_trigger: str | None = None,
@@ -191,9 +189,7 @@ class PolicyContents:
         """Creates the content of an Iceberg rewrite-manifests policy; unset
         arguments take the content class's documented defaults."""
         return IcebergRewriteManifestsContent(
-            manifest_count_critical,
-            manifest_count_warning,
-            avg_manifest_size_threshold_bytes,
+            manifest_count_threshold,
             spec_id,
             use_caching,
             PolicyExecutionSpec.of(

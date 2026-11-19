@@ -76,7 +76,7 @@ class TestPolicyDTOConverters(unittest.TestCase):
                 older_than_days=7, location="s3://b/t", dry_run=True
             ),
             PolicyContents.iceberg_rewrite_manifests(
-                manifest_count_critical=900, spec_id=1, use_caching=False
+                manifest_count_threshold=900, spec_id=1, use_caching=False
             ),
             PolicyContents.iceberg_snapshot_expiration(
                 older_than_days=30, retain_last=3, stream_results=True
