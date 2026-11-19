@@ -26,7 +26,6 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.meta.AuditInfo;
@@ -80,8 +79,8 @@ final class TermEdits {
     TermLink[] links = current.links();
     String sourceRef = current.sourceRef();
     Map<String, String> properties = new LinkedHashMap<>(current.properties());
-    Map<String, String> synonyms = synonymsByKey(current.synonyms());
-    Set<String> originalSynonyms = Set.copyOf(synonyms.keySet());
+    Map<String, String> originalSynonyms = synonymsByKey(current.synonyms());
+    Map<String, String> synonyms = new LinkedHashMap<>(originalSynonyms);
     for (TermChange change : changes) {
       if (change instanceof TermChange.RenameTerm) {
         name = termName(((TermChange.RenameTerm) change).getNewName());
@@ -118,9 +117,11 @@ final class TermEdits {
         && Arrays.equals(links, current.links())
         && Objects.equals(sourceRef, current.sourceRef())
         && properties.equals(current.properties())
-        && originalSynonyms.equals(synonyms.keySet())) {
+        && originalSynonyms.keySet().equals(synonyms.keySet())) {
       return current;
     }
+    // Removing and re-adding the same key preserves its spelling even if another field changed.
+    originalSynonyms.forEach(synonyms::replace);
     return GlossaryTermEntity.builder()
         .withNamespace(current.namespace())
         .withId(current.id())

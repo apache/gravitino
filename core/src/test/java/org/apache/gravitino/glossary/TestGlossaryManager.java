@@ -195,6 +195,36 @@ class TestGlossaryManager extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testCancelledSynonymEditPreservesSpelling() throws IOException {
+    createAndInsertMakeLake(LAKE);
+    String name = "Account";
+    String alias = "Active   Customer";
+    GlossaryTermEntity created =
+        manager.createTerm(LAKE, TermSpec.builder(name).withSynonyms(alias, "Former").build());
+    TermChange remove = TermChange.removeSynonym("active customer");
+    TermChange restore = TermChange.addSynonym("ACTIVE CUSTOMER");
+
+    GlossaryTermEntity unchanged = manager.alterTerm(LAKE, name, remove, restore);
+    Assertions.assertEquals(created.revisionToken(), unchanged.revisionToken());
+    Assertions.assertEquals(Set.of(alias, "Former"), Set.of(unchanged.synonyms()));
+
+    GlossaryTermEntity changed =
+        manager.alterTerm(
+            LAKE,
+            name,
+            remove,
+            restore,
+            TermChange.removeSynonym("former"),
+            TermChange.addSynonym("New Alias"),
+            TermChange.updateDefinition("Updated"));
+    Assertions.assertEquals(created.version() + 1, changed.version());
+    Assertions.assertEquals(Set.of(alias, "New Alias"), Set.of(changed.synonyms()));
+    GlossaryTermEntity loaded = manager.getTerm(LAKE, name);
+    Assertions.assertEquals("Updated", loaded.definition());
+    Assertions.assertEquals(Set.of(alias, "New Alias"), Set.of(loaded.synonyms()));
+  }
+
+  @TestTemplate
   void testConditionalEditAndNameReuse() throws IOException {
     createAndInsertMakeLake(LAKE);
     createAndInsertMakeLake("other");
