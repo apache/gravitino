@@ -44,6 +44,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
@@ -110,10 +112,12 @@ public class TestJdbcDatabaseOperations {
         "Schema commented: catalog does not support schema comments", exception.getMessage());
   }
 
-  @Test
-  public void testExistBindsDatabaseNameAsParameter() throws SQLException {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testExistBindsDatabaseNameAsParameter(boolean databaseExists) throws SQLException {
     String databaseName = "o'reilly\\db";
     ResultSet resultSet = Mockito.mock(ResultSet.class);
+    Mockito.when(resultSet.next()).thenReturn(databaseExists);
     PreparedStatement statement = Mockito.mock(PreparedStatement.class);
     Connection connection = Mockito.mock(Connection.class);
     DataSource dataSource = Mockito.mock(DataSource.class);
@@ -123,7 +127,7 @@ public class TestJdbcDatabaseOperations {
     JdbcDatabaseOperations operations = new MinimalDatabaseOperations();
     operations.initialize(dataSource, EXCEPTION_MAPPER, Collections.emptyMap());
 
-    Assertions.assertFalse(operations.exist(databaseName));
+    Assertions.assertEquals(databaseExists, operations.exist(databaseName));
 
     ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
     Mockito.verify(connection).prepareStatement(sql.capture());
