@@ -85,12 +85,16 @@ class TestGlossaryManager extends TestJDBCBackend {
 
   @TestTemplate
   void testCreateRequiresExistingMetalake() {
-    NoSuchMetalakeException missing =
-        Assertions.assertThrows(
-            NoSuchMetalakeException.class,
-            () -> manager.createTerm(LAKE, TermSpec.builder("term").build()));
-    Assertions.assertTrue(missing.getMessage().contains(LAKE));
-    Assertions.assertInstanceOf(NoSuchEntityException.class, missing.getCause());
+    for (TermSpec spec :
+        List.of(
+            TermSpec.builder("term").build(),
+            TermSpec.builder("term").withBroader("parent").withRelated("peer").build())) {
+      NoSuchMetalakeException missing =
+          Assertions.assertThrows(
+              NoSuchMetalakeException.class, () -> manager.createTerm(LAKE, spec));
+      Assertions.assertTrue(missing.getMessage().contains(LAKE));
+      Assertions.assertInstanceOf(NoSuchEntityException.class, missing.getCause());
+    }
   }
 
   @TestTemplate

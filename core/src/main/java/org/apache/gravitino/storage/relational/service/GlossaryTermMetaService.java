@@ -264,6 +264,11 @@ public final class GlossaryTermMetaService {
 
   /** Runs a create request with the live parent and hierarchy locked through commit. */
   public <T> T withHierarchyLock(Namespace namespace, Supplier<T> work) {
+    return withHierarchyLock(namespace, lake -> work.get());
+  }
+
+  /** Runs creation with the locked metalake ID and preserves the missing-metalake error. */
+  public <T> T withHierarchyLock(Namespace namespace, Function<Long, T> work) {
     return transaction(
         namespace,
         true,
@@ -271,7 +276,7 @@ public final class GlossaryTermMetaService {
           throw new NoSuchMetalakeException(
               missing, "Metalake %s does not exist", namespace.level(0));
         },
-        (mapper, metalakeId) -> work.get());
+        (mapper, metalakeId) -> work.apply(metalakeId));
   }
 
   /**

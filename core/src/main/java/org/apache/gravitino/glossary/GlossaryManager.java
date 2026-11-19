@@ -111,6 +111,10 @@ public final class GlossaryManager {
   /**
    * Lists visible neighbors; broader and narrower walks may optionally expand transitively. Both
    * visibility and the optional status filter apply before expanding each frontier.
+   *
+   * @throws NoSuchTermException if the root is missing, hidden, or excluded by the status filter
+   * @throws IllegalArgumentException if a transitive RELATED walk is requested
+   * @throws IllegalStateException if the calling thread already owns a SQL session
    */
   public List<GlossaryTermEntity> listRelations(
       String metalake,
@@ -197,6 +201,8 @@ public final class GlossaryManager {
    * enclosing transaction must roll it back if creation fails.
    *
    * @throws NoSuchMetalakeException if the metalake does not exist
+   * @throws NoSuchTermException if a referenced term is missing or hidden
+   * @throws IllegalArgumentException if the proposed hierarchy or related terms are invalid
    * @throws NoSuchEntityException if the required creator is missing
    * @throws TermAlreadyExistsException if the term name or source reference is already in use
    */
@@ -223,10 +229,7 @@ public final class GlossaryManager {
                   terms.checkTermNames(term);
                   handler.handle(null, term, () -> persistNewTerm(metalake, term, plan));
                   return term;
-                }),
-        missing -> {
-          throw missing;
-        });
+                }));
   }
 
   /**
