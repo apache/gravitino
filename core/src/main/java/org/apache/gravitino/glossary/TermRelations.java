@@ -169,6 +169,8 @@ final class TermRelations {
   }
 
   private void persist(RelationType type, Set<Long> before, Set<Long> after) {
+    // Each add or remove reacquires locks already held by this transaction. For large batches,
+    // the extra database round trips can keep other writers waiting on the hierarchy mutex longer.
     for (long id : before) {
       if (!after.contains(id)) {
         EDGES.remove(lake, root, id, type);
