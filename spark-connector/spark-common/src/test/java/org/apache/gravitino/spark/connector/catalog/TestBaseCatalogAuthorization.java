@@ -37,8 +37,11 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.rel.View;
+import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
@@ -128,6 +131,80 @@ public class TestBaseCatalogAuthorization {
     AuthorizationTable deniedTable = (AuthorizationTable) result;
     assertEquals("null.schema.table_a", deniedTable.tableIdentifier());
     assertEquals(ImmutableSet.of(Privilege.Name.SELECT_TABLE), deniedTable.requiredPrivileges());
+  }
+
+  /**
+   * The view fallback of the same loadTable path must not mask an authorization failure as "table
+   * or view not found": a user denied SELECT_VIEW on an existing view gets the deny placeholder,
+   * exactly like a denied table, so RequiredPrivilegesCheck can report the denial. On the unfixed
+   * tree the ForbiddenException was swallowed into NoSuchTableException.
+   */
+  @Test
+  void testDeniedViewSurfacesAuthorizationPlaceholder() throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "view_a");
+    NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "view_a");
+    when(gravitinoTableCatalog.loadTable(
+            eq(gravitinoIdentifier), eq(ImmutableSet.of(Privilege.Name.SELECT_TABLE))))
+        .thenThrow(new org.apache.gravitino.exceptions.NoSuchTableException("not a table"));
+    ViewCatalog viewCatalog = mock(ViewCatalog.class);
+    when(gravitinoCatalog.asViewCatalog()).thenReturn(viewCatalog);
+    when(viewCatalog.loadView(gravitinoIdentifier))
+        .thenThrow(new ForbiddenException("denied view"));
+
+    Table result = catalog.loadTable(identifier);
+
+    assertTrue(result instanceof AuthorizationTable);
+    AuthorizationTable deniedView = (AuthorizationTable) result;
+    assertEquals("null.schema.view_a", deniedView.tableIdentifier());
+    assertEquals(ImmutableSet.of(Privilege.Name.SELECT_VIEW), deniedView.requiredPrivileges());
+  }
+
+  /** A name that is neither a table nor a view still raises NoSuchTableException. */
+  @Test
+  void testMissingViewStillThrowsNoSuchTable() throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "view_a");
+    NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "view_a");
+    when(gravitinoTableCatalog.loadTable(
+            eq(gravitinoIdentifier), eq(ImmutableSet.of(Privilege.Name.SELECT_TABLE))))
+        .thenThrow(new org.apache.gravitino.exceptions.NoSuchTableException("not a table"));
+    ViewCatalog viewCatalog = mock(ViewCatalog.class);
+    when(gravitinoCatalog.asViewCatalog()).thenReturn(viewCatalog);
+    when(viewCatalog.loadView(gravitinoIdentifier))
+        .thenThrow(new NoSuchViewException("no such view"));
+
+    assertThrows(
+        org.apache.spark.sql.catalyst.analysis.NoSuchTableException.class,
+        () -> catalog.loadTable(identifier));
+  }
+
+  /**
+   * A permitted view still loads through the fallback with its catalog-specific wrapper: the deny
+   * branch must not swallow the success path.
+   */
+  @Test
+  void testPermittedViewLoadsThroughFallback() throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "view_a");
+    NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "view_a");
+    when(gravitinoTableCatalog.loadTable(
+            eq(gravitinoIdentifier), eq(ImmutableSet.of(Privilege.Name.SELECT_TABLE))))
+        .thenThrow(new org.apache.gravitino.exceptions.NoSuchTableException("not a table"));
+    ViewCatalog viewCatalog = mock(ViewCatalog.class);
+    when(gravitinoCatalog.asViewCatalog()).thenReturn(viewCatalog);
+    when(viewCatalog.loadView(gravitinoIdentifier)).thenReturn(mock(View.class));
+    when(sparkCatalog.loadTable(identifier)).thenReturn(mock(Table.class));
+
+    Table viewWrapper = mock(Table.class);
+    TestCatalog viewCatalogUnderTest =
+        new TestCatalog(gravitinoCatalog, sparkCatalog) {
+          @Override
+          protected Table createSparkView(
+              Identifier ident, View gravitinoView, Table underlyingSparkTable) {
+            return viewWrapper;
+          }
+        };
+
+    assertSame(viewWrapper, viewCatalogUnderTest.loadTable(identifier));
+    verify(sparkCatalog).loadTable(identifier);
   }
 
   @Test

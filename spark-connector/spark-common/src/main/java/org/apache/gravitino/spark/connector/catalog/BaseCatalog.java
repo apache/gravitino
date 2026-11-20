@@ -606,7 +606,9 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   /**
    * Loads a Gravitino view as a Spark Table when {@link #loadTable(Identifier)} fails because the
-   * object is a view. Subclasses can override {@link #createSparkView} to enable view support.
+   * object is a view. Subclasses can override {@link #createSparkView} to enable view support. A
+   * view the caller is denied from loading returns the authorization placeholder instead, mirroring
+   * denied tables.
    *
    * @param ident the identifier to load
    * @return Spark Table wrapping the view
@@ -619,7 +621,16 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
           gravitinoCatalog()
               .asViewCatalog()
               .loadView(NameIdentifier.of(getDatabase(ident), ident.name()));
-    } catch (NoSuchViewException | UnsupportedOperationException | ForbiddenException e) {
+    } catch (ForbiddenException e) {
+      // Mirror the table branch of loadTable: a denied view must surface the authorization
+      // failure through the placeholder for RequiredPrivilegesCheck to report during analysis,
+      // not mask it as "table or view not found".
+      return AuthorizationTable.deny(
+          ident.name(),
+          String.format("%s.%s.%s", catalogName, getDatabase(ident), ident.name()),
+          Sets.newHashSet(Privilege.Name.SELECT_VIEW),
+          e);
+    } catch (NoSuchViewException | UnsupportedOperationException e) {
       throw new NoSuchTableException(ident);
     }
     // Call sparkCatalog.loadTable directly to surface NoSuchTableException as checked,
