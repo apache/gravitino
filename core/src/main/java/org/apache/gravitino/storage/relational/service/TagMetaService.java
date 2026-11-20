@@ -60,8 +60,10 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
@@ -77,6 +79,7 @@ import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.tag.TagAssignment;
+import org.apache.gravitino.tag.TagAssignmentAuthorization;
 import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -593,9 +596,22 @@ public class TagMetaService {
               : observedEndpoint.namespaceIds()[0];
       LiveEndpointService.lockLiveEndpoint(
           metalakeIdent, Entity.EntityType.METALAKE, new NamespacedEntityId(metalakeId));
+      for (Map.Entry<NameIdentifier, Optional<NamespacedEntityId>> ancestor :
+          TagAssignmentAuthorization.checkedSchemaAncestors().entrySet()) {
+        if (ancestor.getValue().isPresent()) {
+          try {
+            LiveEndpointService.lockLiveEndpoint(
+                ancestor.getKey(), Entity.EntityType.SCHEMA, ancestor.getValue().get());
+          } catch (NoSuchEntityException changed) {
+            throw ExceptionUtils.concurrentModification(
+                Entity.EntityType.SCHEMA, ancestor.getKey());
+          }
+        }
+      }
       if (objectType != Entity.EntityType.POLICY) {
         LiveEndpointService.lockLiveEndpoint(objectIdent, objectType, observedEndpoint);
       }
+      TagAssignmentAuthorization.checkTarget(objectIdent, objectType, observedEndpoint);
 
       List<String> tagNamesToUpdate = tagNamesToUpdate(tagValuesToAdd, tagValuesToRemove);
       List<TagPO> tagPOsToUpdate =
@@ -603,6 +619,7 @@ public class TagMetaService {
               ? Collections.emptyList()
               : getTagPOsByMetalakeAndNames(metalake, tagNamesToUpdate);
       tagPOsToUpdate = lockTagsForAssignment(tagPOsToUpdate);
+      checkAuthorizedTagClassification(metalake, tagNamesToUpdate, tagPOsToUpdate);
       if (objectType == Entity.EntityType.POLICY) {
         LiveEndpointService.lockLiveEndpoint(objectIdent, objectType, observedEndpoint);
       }
@@ -1187,6 +1204,38 @@ public class TagMetaService {
           List<TagPO> tagPOs = mapper.batchSelectTagByIdentifier(metalakeName, tagNames);
           return POConverters.fromTagPOs(tagPOs, firstIdent.namespace());
         });
+  }
+
+  private void checkAuthorizedTagClassification(
+      String metalake, List<String> requestedTags, List<TagPO> tags) {
+    Map<String, TagPO> currentTags = tagPOsByName(tags);
+    for (String name : requestedTags) {
+      NameIdentifier identifier = NameIdentifierUtil.ofTag(metalake, name);
+      Long checkedId = TagAssignmentAuthorization.checkedIdentity(identifier);
+      TagPO current = currentTags.get(name);
+      if (current == null && checkedId != null) {
+        current = currentTags.get(TagAssignmentAuthorization.checkedTagName(identifier));
+      }
+      if (checkedId != null && (current == null || !checkedId.equals(current.getTagId()))) {
+        throw ExceptionUtils.concurrentModification(Entity.EntityType.TAG, identifier);
+      }
+    }
+    List<NameIdentifier> descriptive =
+        tags.stream()
+            .map(tag -> NameIdentifierUtil.ofTag(metalake, tag.getTagName()))
+            .filter(TagAssignmentAuthorization::requiresDescriptive)
+            .collect(Collectors.toList());
+    if (descriptive.isEmpty()) {
+      return;
+    }
+    SessionUtils.clearSessionCache();
+    for (RelationalEntity<?> relation :
+        PolicyTagRelService.getInstance().listRelations(descriptive, Entity.EntityType.TAG)) {
+      if (((PolicyEntity) relation.targetEntity()).policyType()
+          == Policy.BuiltInType.ACCESS_CONTROL) {
+        throw ExceptionUtils.concurrentModification(Entity.EntityType.TAG, relation.source());
+      }
+    }
   }
 
   private List<GenericEntity> metadataObjectsForRelations(
