@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import static org.apache.gravitino.authorization.Privileges.allow;
+import static org.apache.gravitino.authorization.Privileges.deny;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -75,7 +76,10 @@ public class RevokePrivilegesFromRole extends MetadataCommand {
         if (!Privileges.isValid(privilege)) {
           exitWithError(ErrorMessages.UNKNOWN_PRIVILEGE + " " + privilege);
         }
-        privilegesSet.add(allow(Privileges.toName(privilege)));
+        // The CLI identifies privileges by name. The server removes exact (name, condition) pairs.
+        Privilege.Name name = Privileges.toName(privilege);
+        privilegesSet.add(allow(name));
+        privilegesSet.add(deny(name));
       }
 
       MetadataObject metadataObject = constructMetadataObject(entity, client);

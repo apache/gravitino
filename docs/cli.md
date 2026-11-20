@@ -803,6 +803,7 @@ gcli.sh role revoke --metalake metalake_demo --name catalog_postgres --role admi
 #### Glossary Privileges on a Metalake
 
 Supply the metalake and omit `--name` to grant or revoke a metalake privilege.
+The CLI revokes by name, removing any explicit ALLOW or DENY for that privilege on the target.
 These commands grant and then revoke permission to create definitions for the `editor` role.
 
 ```bash

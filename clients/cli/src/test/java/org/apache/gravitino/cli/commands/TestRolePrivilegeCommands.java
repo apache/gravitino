@@ -25,6 +25,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.cli.CommandLine;
 import org.apache.gravitino.MetadataObject;
@@ -64,6 +65,8 @@ class TestRolePrivilegeCommands {
             Privileges.allow("CREATE_DEFINITION"),
             Privileges.allow("MANAGE_DEFINITIONS"));
     verify(client).grantPrivilegesToRole("editor", metalake, privileges);
-    verify(client).revokePrivilegesFromRole("editor", metalake, privileges);
+    Set<Privilege> revoked = new HashSet<>(privileges);
+    privileges.forEach(privilege -> revoked.add(Privileges.deny(privilege.name())));
+    verify(client).revokePrivilegesFromRole("editor", metalake, revoked);
   }
 }
