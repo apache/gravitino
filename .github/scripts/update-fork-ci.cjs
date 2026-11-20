@@ -14,7 +14,7 @@
  */
 'use strict';
 const { createService } = require('./fork-ci-status.cjs');
-const { NEEDS_ATTENTION, latestStatus, parseRunUrl, publishStatus, runUrl, statusCompleted, statusState } = require('./publish-ci-status.cjs');
+const { NEEDS_ATTENTION, LEGACY_TRUSTED_REQUIRED, latestStatus, parseRunUrl, publishStatus, runUrl, statusCompleted, statusState } = require('./publish-ci-status.cjs');
 const { retireCancelled } = require('./retire-fork-ci.cjs');
 
 const RECENT_MS = 6 * 60 * 60 * 1000;
@@ -197,7 +197,8 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
           // Legacy links have no context proof and are refreshed once. The rewritten
           // link restores cheap probing, including after a missed retarget signal.
           const sameBase = shown?.base_sha === pr.base.sha && shown?.base_ref === pr.base.ref;
-          if (settled && (!shown || sameBase)) return;
+          // Refresh the old trust hint once so existing pending PRs receive actionable instructions.
+          if (settled && (!shown || sameBase) && latest.description !== LEGACY_TRUSTED_REQUIRED) return;
         }
         await refresh(pr);
       });

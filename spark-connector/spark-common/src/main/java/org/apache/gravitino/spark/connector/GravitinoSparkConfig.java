@@ -26,6 +26,10 @@ public class GravitinoSparkConfig {
   private static final String GRAVITINO_PREFIX = "spark.sql.gravitino.";
   public static final String GRAVITINO_URI = GRAVITINO_PREFIX + "uri";
   public static final String GRAVITINO_METALAKE = GRAVITINO_PREFIX + "metalake";
+
+  /** Whether configuration, client creation or catalog discovery failures abort Spark startup. */
+  public static final String GRAVITINO_FAIL_FAST = GRAVITINO_PREFIX + "failFast";
+
   public static final String GRAVITINO_ENABLE_ICEBERG_SUPPORT =
       GRAVITINO_PREFIX + "enableIcebergSupport";
   public static final String GRAVITINO_ENABLE_PAIMON_SUPPORT =

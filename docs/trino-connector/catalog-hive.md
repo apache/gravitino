@@ -58,6 +58,10 @@ allowing null values, and adding comments. The Gravitino Trino connector support
 `CREATE OR REPLACE TABLE AS SELECT` is not supported. Use `DROP TABLE` followed by `CREATE TABLE AS SELECT` as an alternative.
 :::
 
+:::note
+If a `CREATE TABLE AS SELECT` fails after it has created a managed table (the default table type), the connector keeps the table, because dropping a managed table deletes its location, which may hold files that the statement did not write. `DROP TABLE` deletes that location too, so move any files you want to keep out of it before you drop the table and run the statement again.
+:::
+
 The following example shows how to create a table in the Hive catalog:
 
 ```shell

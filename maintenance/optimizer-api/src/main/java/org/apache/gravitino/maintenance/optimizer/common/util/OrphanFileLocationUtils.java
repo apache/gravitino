@@ -29,8 +29,9 @@ public final class OrphanFileLocationUtils {
   private OrphanFileLocationUtils() {}
 
   /**
-   * Validates that a scan is within the table root. Filesystem symlink validation must also run in
-   * the job, using its storage credentials and filesystem view.
+   * Validates that a scan is within the table root using lexical URI containment. Iceberg does not
+   * model POSIX symlinks for orphan cleanup; callers should not require Hadoop FileSystem
+   * acquisition for this check.
    *
    * @param tableLocation table storage root
    * @param location requested scan location

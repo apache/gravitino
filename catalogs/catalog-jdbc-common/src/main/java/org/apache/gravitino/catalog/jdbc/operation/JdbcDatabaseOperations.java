@@ -22,6 +22,7 @@ package org.apache.gravitino.catalog.jdbc.operation;
 import com.google.common.collect.ImmutableMap;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -114,21 +115,25 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
 
   @Override
   public boolean exist(String databaseName) {
-    try (final Connection connection = this.dataSource.getConnection()) {
-      String query = generateDatabaseExistSql(databaseName);
-      try (Statement statement = connection.createStatement()) {
-        try (ResultSet resultSet = statement.executeQuery(query)) {
-          return resultSet.next();
-        }
+    try (final Connection connection = this.dataSource.getConnection();
+        PreparedStatement statement = connection.prepareStatement(generateDatabaseExistSql())) {
+      statement.setString(1, databaseName);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        return resultSet.next();
       }
     } catch (SQLException sqlException) {
       throw this.exceptionMapper.toGravitinoException(sqlException);
     }
   }
 
-  protected String generateDatabaseExistSql(String databaseName) {
-    return String.format(
-        "SELECT * FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '%s'", databaseName);
+  /**
+   * Returns the query that checks whether a database exists. The query takes the database name as
+   * its only bind parameter. The default implementation is based on MySQL syntax.
+   *
+   * @return the parameterized database existence query.
+   */
+  protected String generateDatabaseExistSql() {
+    return "SELECT * FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?";
   }
 
   protected void dropDatabase(String databaseName, boolean cascade) {

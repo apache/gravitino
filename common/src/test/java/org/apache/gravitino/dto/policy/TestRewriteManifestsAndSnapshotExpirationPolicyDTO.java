@@ -52,8 +52,6 @@ class TestRewriteManifestsAndSnapshotExpirationPolicyDTO {
             null,
             null,
             null,
-            null,
-            null,
             "0 30 1 * * ?",
             true,
             900_000L,
