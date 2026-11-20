@@ -20,6 +20,8 @@
 antlr = "4.13.2"
 db-scheduler = "16.12.0"
 awssdk = "2.54.17"
+# AWS SDK v1 is only needed to compile and test against Hadoop 3.3 (hadoop-aws 3.3.x is built on it).
+awssdk-v1 = "1.12.367"
 azure-identity = "1.13.1"
 azure-storage-file-datalake = "12.20.0"
 reactor-netty-http = "1.2.1"
@@ -58,6 +60,8 @@ hadoop3-abs = "3.3.6"
 hadoop3-aliyun = "3.3.6"
 hadoop-cos = "3.3.0-8.3.23"
 hadoop3-thirdparty = "1.1.1"
+# Oldest Hadoop line supported by the thin bundles (for example the one shipped with Spark 3.5).
+hadoop33 = "3.3.6"
 hadoop-minikdc = "3.3.6"
 re2j = "1.7"
 httpclient = "4.4.1"
@@ -222,6 +226,7 @@ aws-policy = { group = "software.amazon.awssdk", name = "iam-policy-builder", ve
 aws-s3 = { group = "software.amazon.awssdk", name = "s3", version.ref = "awssdk" }
 aws-sts = { group = "software.amazon.awssdk", name = "sts", version.ref = "awssdk" }
 aws-kms = { group = "software.amazon.awssdk", name = "kms", version.ref = "awssdk" }
+aws-v1-core = { group = "com.amazonaws", name = "aws-java-sdk-core", version.ref = "awssdk-v1" }
 azure-identity = { group = "com.azure", name = "azure-identity", version.ref = "azure-identity"}
 azure-storage-file-datalake = { group = "com.azure", name = "azure-storage-file-datalake", version.ref = "azure-storage-file-datalake"}
 reactor-netty-http = {group = "io.projectreactor.netty", name = "reactor-netty-http", version.ref = "reactor-netty-http"}
