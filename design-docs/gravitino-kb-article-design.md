@@ -115,7 +115,8 @@ extensions without reserving history-specific columns.
    the owner; the default status is `PUBLISHED`, and its current content takes effect immediately.
 3. The reader searches for a word from the body and loads the article. Its bindings lead to
    the current term and table; each target still requires its own read privilege.
-4. The analyst saves a new body and another binding through one alter request.
+4. The analyst saves a new body and another binding through one alter request containing
+   `updateBody` and `addObjects`.
    Current content and changed relations take effect atomically; the response shows that state.
 5. An agent acting as the reader calls `search_kb_articles`, then `get_kb_article`. It receives
    the stored body with its format and only the bound objects it can read.
@@ -261,7 +262,10 @@ existing Owner and audit storage.
 - `kb_article_relation_meta.metalake_id` is non-NULL and comes from the owning Article.
   Metalake cleanup uses `(metalake_id, deleted_at)` without joining Article rows. Reverse lookup
   selects live bindings through `(target_id, target_type, deleted_at)`.
-- Use `VARCHAR(128)` for the name, `VARCHAR(512)` for title, `VARCHAR(256)` for comment,
+- Names use `VARCHAR(128)` on MySQL/PostgreSQL and `VARCHAR(256)` on H2 to accommodate
+  supplementary-plane characters stored as two UTF-16 code units. All APIs still enforce
+  1–128 Unicode code points after NFC normalization. Use `VARCHAR(512)` for title,
+  `VARCHAR(256)` for comment,
   `VARCHAR(1024)` for source reference, `VARCHAR(32)` for status/format, and `VARCHAR(64)` for
   target/member types. Body, properties and audit JSON use MySQL `MEDIUMTEXT`; synonyms use
   `TEXT`. Other databases use their native equivalents.
@@ -336,7 +340,10 @@ move an article.
   current names on read. A rename changes neither membership nor stable identity. An unknown
   Domain returns `404`.
 - Follow the Domain model's two levels and shared metalake namespace. A Domain filter includes
-  the Domain and its subdomains. Domain membership is optional at creation and may change later.
+  the visible requested Domain and only its subdomains readable by the caller. Resolve that
+  visible ID set before selecting Article candidates, pagination and `hasMore`; an Article
+  belonging only to hidden subdomains is excluded even if the Article itself is readable.
+  Domain membership is optional at creation and may change later.
 - Article definition privileges remain metalake-scoped. Each added or removed Domain also
   requires its ordinary access check, including `USE_DOMAIN` and draft-Domain visibility.
   Filter every returned Domain list by that check, without names or counts for hidden Domains.
@@ -590,15 +597,28 @@ follows the standard AuditInfo DTO. These responses expose current content only.
 
 Alter follows the existing `updates` convention. Supported changes are `updateTitle`,
 `updateBody`, `updateDomains`, `updateStatus`, `updateComment`, `updateSynonyms`,
-`updateSourceReference`, `setProperty` and `removeProperty`. Domain and synonym updates replace
-their complete sets. Rename is unsupported. A mixed request updates all affected fields and relations in one transaction and advances
-revision once when it makes an effective change.
+`updateSourceReference`, `setProperty`, `removeProperty`, `addTerms`, `removeTerms`, `addObjects`
+and `removeObjects`. Domain and synonym updates replace their complete sets. Term changes carry
+a `terms` array of names; object changes carry an `objects` array of `ArticleObjectIdentifier`.
+Binding deltas use the same target validation, permissions and add/remove semantics as the
+standalone binding endpoints, which remain available. Rename is unsupported. Apply a mixed
+request to the full stored state and validate all requested changes before persisting them in
+one transaction. An effective change advances revision once. Any validation, authorization or
+storage failure leaves the body, bindings, other fields and revision unchanged.
 
 ```json
 {
   "updates": [
-    { "@type": "updateTitle", "newTitle": "Revenue Calculation and Refunds" },
-    { "@type": "updateDomains", "newDomains": ["Finance", "Tax"] }
+    {
+      "@type": "updateBody",
+      "newBody": { "format": "MARKDOWN", "content": "# Revenue\nIncludes refunds." }
+    },
+    {
+      "@type": "addObjects",
+      "objects": [
+        { "type": "TABLE", "namespace": ["iceberg", "sales"], "name": "refunds" }
+      ]
+    }
   ]
 }
 ```
@@ -656,9 +676,11 @@ View columns and individual metrics are outside the supported set.
   remains a literal character in the bound parameter. Use the explicit escape clause rather than
   default backslash escaping. Case matching follows the database's `LOWER()` behavior; test and
   document non-ASCII differences under the configured database locale.
-- `domain` resolves the visible Domain and includes its subdomains. It combines with all other
-  filters. `status` accepts one article status; the unfiltered list includes deprecated articles
-  and those drafts the caller may read.
+- `domain` resolves the visible Domain and only its caller-readable subdomains to candidate
+  membership IDs before SQL filtering, pagination and continuation. Hidden subdomains cannot
+  contribute matching Articles or affect `hasMore`. It combines with all other filters.
+- `status` accepts one article status; the unfiltered list includes deprecated articles and those
+  drafts the caller may read.
 - `owner` is `user:<name>` or `group:<name>`, matching the direct owner. Group members are not
   expanded. A missing or invalid prefix is `400`.
 - Sort by title, then immutable name. This breaks ties across Domains and when a deprecated
@@ -718,7 +740,8 @@ KnowledgeBaseArticleOperations
 limit/offset directly.
 
 Python exposes the equivalent snake_case methods. Both clients follow the same ordinary alter
-semantics as REST and surface validation, authorization and store-conflict errors. Clients do
+semantics as REST, including body changes mixed with `addTerms`, `removeTerms`, `addObjects`
+and `removeObjects`, and surface validation, authorization and store-conflict errors. Clients do
 not automatically retry a failed mutation after a store CAS conflict.
 
 Both clients expose current Article content; content history is outside this API.

@@ -72,6 +72,9 @@ Every storage mutation test checks the design's
   Explicit names reject slashes, backslash, whitespace and controls while accepting Unicode names.
   Canonically equivalent composed/decomposed explicit and generated names resolve to the same
   NFC spelling; validate lengths after normalization and preserve Chinese and existing case rules.
+  Round-trip an explicit name of 128 U+20000 (`𠀀`) letters through create/load on H2, MySQL and
+  PostgreSQL. Verify H2 name capacity is 256 UTF-16 code units, while all APIs accept at most
+  128 normalized code points and reject 129.
   Race two creates for the same generated candidate: the loser retries a new suffix after full
   rollback. Cover random fallback collisions, five-retry exhaustion with `409`, immediate explicit
   conflicts and no retry for title conflicts or other errors; failed attempts leave no partial rows.
@@ -113,7 +116,10 @@ Every storage mutation test checks the design's
   authorization, filtering, locks or nonempty checks. First/last-Domain transitions atomically
   remove/add the default row; hidden real memberships do not trigger a default row.
 - **T5.2**: hidden/draft Domains are filtered; body-only edits preserve them, while unauthorized
-  membership removal fails atomically.
+  membership removal fails atomically. Given visible Finance, hidden draft child Tax and an
+  otherwise readable published Article belonging only to Tax, a Finance filter excludes that
+  Article from the page and `hasMore`, both with and without `q`. A readable child membership
+  can match; hiding only the Domain in response DTOs is insufficient.
 - **T5.3**: a Domain containing only Articles, only Terms, or both blocks drop through the shared
   membership check without exposing members. Removing one type leaves the other's guard intact;
   drop succeeds only after all memberships and other Domain lifecycle constraints are cleared.
@@ -153,8 +159,12 @@ Every storage mutation test checks the design's
   each effective save updates the current row, and the last successful save is current.
   Status/property and binding deltas preserve independent changes. Domain-set replacements run
   sequentially with the later set winning.
-- **T7.5**: create, alter and binding writes apply current fields/relations atomically; structured reverse
-  lookup preserves literal dots. Equivalent Unicode spellings address the same Article through
+- **T7.5**: create, alter and binding writes apply current fields/relations atomically. Round-trip
+  all four binding change types through alter. Mix `updateBody` with Term and asset adds/removals:
+  success saves all changes with one revision increment; an unreadable/missing target, unapproved
+  new Term or injected relation-write failure leaves body, fields, bindings and revision unchanged
+  on reload, with no success event. Structured reverse lookup preserves literal dots.
+  Equivalent Unicode spellings address the same Article through
   load, alter, delete, binding and generic metadata APIs, returning its NFC name.
 
 ### T8: Lists and search
@@ -163,6 +173,8 @@ Every storage mutation test checks the design's
   does not read bodies for matching. Cover case, non-ASCII locale behavior, stored HTML and literal
   `%`, `_`, `\` and `!` on all databases with `ESCAPE '!'`. Searches preserve source body/format.
 - **T8.2**: combined Domain/status/typed-owner filters; invalid owner prefix rejected.
+  Parent-Domain expansion uses only caller-readable children; repeat the T5.2 hidden-child case
+  at page boundaries to verify filtering precedes pagination and continuation.
 - **T8.3**: summaries omit bodies and batch nested lookups. Pages return `hasMore` without `total`;
   SQL visibility/filter predicates apply before paging, and continuation depends on an additional
   readable result. Cover empty pages, a full final page, a following readable result and hidden
@@ -183,7 +195,8 @@ Every storage mutation test checks the design's
 - **T10.1**: Java CRUD, current content, bindings, reverse reads, filters and full error
   mapping against REST; preserve limit/offset, page/preview flags and mutation-page responses;
   no public history-read operation.
-- **T10.2**: body replacement, mixed alters, no-op/revision behavior and store-conflict mapping;
+- **T10.2**: body replacement mixed with all four Term/asset binding change types,
+  atomic success/failure, no-op/revision behavior and store-conflict mapping;
   structured dotted-column identifiers; Chinese and mixed-language Article names survive every
   name-addressed operation without double encoding.
 
