@@ -300,8 +300,7 @@ public class RelationalEntityStore
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     // Own the SQL commit: run update SQL without the cache lock (it may wait on row locks),
-    // then briefly: delete cache -> commit -> bump epoch, so peers cannot hit or refill the old
-    // row after the new value is visible.
+    // then drop the cache and commit under the key lock.
     SessionUtils.beginTransaction();
     boolean committed = false;
     try {
@@ -311,13 +310,7 @@ public class RelationalEntityStore
       } catch (RuntimeException re) {
         throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
       }
-      cache.withCacheLock(
-          EntityCacheKey.of(ident, entityType),
-          () -> {
-            invalidateCache(ident, entityType);
-            SessionUtils.commitTransaction();
-            cacheInvalidationEpoch.incrementAndGet();
-          });
+      invalidateCacheAndCommit(ident, entityType);
       committed = true;
       return updatedEntity;
     } finally {
@@ -325,6 +318,22 @@ public class RelationalEntityStore
         SessionUtils.rollbackTransaction();
       }
     }
+  }
+
+  /**
+   * Drops {@code ident} from the cache and commits the current SQL session under the key lock.
+   *
+   * <p>Order is delete cache → commit → bump epoch, so peers cannot hit the old row after the new
+   * value is visible, and a concurrent miss cannot put the pre-commit row back.
+   */
+  private void invalidateCacheAndCommit(NameIdentifier ident, Entity.EntityType entityType) {
+    cache.withCacheLock(
+        EntityCacheKey.of(ident, entityType),
+        () -> {
+          invalidateCache(ident, entityType);
+          SessionUtils.commitTransaction();
+          cacheInvalidationEpoch.incrementAndGet();
+        });
   }
 
   @Override
