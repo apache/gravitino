@@ -138,15 +138,6 @@ public class SqlSessionFactoryHelper {
     }
   }
 
-  /**
-   * Returns whether {@link #init(Config)} has completed and {@link #close()} has not cleared it.
-   *
-   * @return {@code true} when a session factory is available
-   */
-  public boolean isInitialized() {
-    return sqlSessionFactory != null;
-  }
-
   public SqlSessionFactory getSqlSessionFactory() {
     Preconditions.checkState(sqlSessionFactory != null, "SqlSessionFactory is not initialized.");
     return sqlSessionFactory;

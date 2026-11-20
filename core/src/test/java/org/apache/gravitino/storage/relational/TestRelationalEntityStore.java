@@ -51,7 +51,6 @@ import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
-import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
@@ -99,28 +98,6 @@ public class TestRelationalEntityStore {
   }
 
   @Test
-  void testUpdateInvalidatesCacheAfterBackendUpdate()
-      throws IOException, NoSuchEntityException, EntityAlreadyExistsException,
-          IllegalAccessException {
-    NameIdentifier ident = NameIdentifier.of("metalake", "catalog");
-    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
-
-    Mockito.doAnswer(
-            invocation -> {
-              Mockito.verify(cache, Mockito.never()).invalidate(ident, Entity.EntityType.CATALOG);
-              return null;
-            })
-        .when(backend)
-        .update(eq(ident), eq(Entity.EntityType.CATALOG), any(Function.class));
-
-    store.update(ident, null, Entity.EntityType.CATALOG, entity -> entity);
-
-    InOrder inOrder = Mockito.inOrder(backend, cache);
-    inOrder.verify(backend).update(eq(ident), eq(Entity.EntityType.CATALOG), any(Function.class));
-    inOrder.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
-  }
-
-  @Test
   void testUpdateDropsCacheBeforeSqlCommit()
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException,
           IllegalAccessException {
@@ -128,12 +105,7 @@ public class TestRelationalEntityStore {
     NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
     AtomicBoolean invalidatedBeforeCommit = new AtomicBoolean(false);
 
-    SqlSessionFactoryHelper factoryHelper = Mockito.mock(SqlSessionFactoryHelper.class);
-    Mockito.when(factoryHelper.isInitialized()).thenReturn(true);
-
-    try (MockedStatic<SqlSessionFactoryHelper> factory = mockStatic(SqlSessionFactoryHelper.class);
-        MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
-      factory.when(SqlSessionFactoryHelper::getInstance).thenReturn(factoryHelper);
+    try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
       sessions.when(SessionUtils::isInTransaction).thenReturn(true);
       sessions.when(SessionUtils::beginTransaction).thenAnswer(invocation -> null);
       sessions

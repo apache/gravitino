@@ -72,7 +72,6 @@ import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
-import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.tag.TagValue;
@@ -300,18 +299,16 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    // No JDBC factory (unit tests): backend finishes first, then drop the cache.
-    if (!SqlSessionFactoryHelper.getInstance().isInitialized()) {
-      E updatedEntity = updateInBackend(ident, entityType, updater);
-      invalidateCache(ident, entityType);
-      return updatedEntity;
-    }
-
     // update sql -> delete cache -> commit. Hold the key lock so peers cannot refill.
     SessionUtils.beginTransaction();
     boolean committed = false;
     try {
-      E updatedEntity = updateInBackend(ident, entityType, updater);
+      E updatedEntity;
+      try {
+        updatedEntity = backend.update(ident, entityType, updater);
+      } catch (RuntimeException re) {
+        throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
+      }
       cache.withCacheLock(
           EntityCacheKey.of(ident, entityType),
           () -> {
@@ -325,16 +322,6 @@ public class RelationalEntityStore
       if (!committed && SessionUtils.isInTransaction()) {
         SessionUtils.rollbackTransaction();
       }
-    }
-  }
-
-  private <E extends Entity & HasIdentifier> E updateInBackend(
-      NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
-      throws IOException {
-    try {
-      return backend.update(ident, entityType, updater);
-    } catch (RuntimeException re) {
-      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
     }
   }
 
