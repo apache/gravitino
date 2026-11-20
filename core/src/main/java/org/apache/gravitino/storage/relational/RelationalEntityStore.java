@@ -299,7 +299,9 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    // update sql -> delete cache -> commit. Hold the key lock so peers cannot refill.
+    // Own the SQL commit: run update SQL without the cache lock (it may wait on row locks),
+    // then briefly: delete cache -> commit -> bump epoch, so peers cannot hit or refill the old
+    // row after the new value is visible.
     SessionUtils.beginTransaction();
     boolean committed = false;
     try {
