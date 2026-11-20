@@ -25,10 +25,8 @@ import java.util.List;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
-import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContents;
-import org.apache.gravitino.tag.TagAssignment;
 import org.apache.gravitino.utils.NamespaceUtil;
 
 /** Shared tag-policy entities for authorization tests. */
@@ -36,17 +34,6 @@ final class TagPolicyTestUtils {
   static final String METALAKE = "metalake";
 
   private TagPolicyTestUtils() {}
-
-  static TagEntity tag(long id, String name, TagAssignment assignment) {
-    return TagEntity.builder()
-        .withId(id)
-        .withName(name)
-        .withNamespace(NamespaceUtil.ofTag(METALAKE))
-        .withProperties(Collections.emptyMap())
-        .withAuditInfo(audit())
-        .withAssignment(assignment)
-        .build();
-  }
 
   static PolicyEntity policy(
       long id, boolean enabled, List<Privilege.Name> privileges, List<String> roles) {
