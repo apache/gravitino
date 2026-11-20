@@ -30,7 +30,6 @@ import lombok.NoArgsConstructor;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.domain.DomainRelation;
 import org.apache.gravitino.dto.AuditDTO;
-import org.apache.gravitino.tag.TagValue;
 
 /**
  * A domain snapshot; relations are present only in a metadata object's domain lookup. Jackson uses
@@ -76,7 +75,7 @@ public class DomainDTO {
    * @param properties The properties.
    * @param status The status.
    * @param parent The optional parent name.
-   * @param backingTag The optional backing tag.
+   * @param backingTag The name of the backing tag, or null if the domain has none.
    * @param audit The audit information.
    * @param relations The object's relations to this domain.
    */
@@ -86,7 +85,7 @@ public class DomainDTO {
       Map<String, String> properties,
       Domain.Status status,
       @Nullable String parent,
-      @Nullable TagValue backingTag,
+      @Nullable String backingTag,
       AuditDTO audit,
       DomainRelation[] relations) {
     this.name = name;
@@ -94,10 +93,7 @@ public class DomainDTO {
     this.properties = ImmutableMap.copyOf(properties);
     this.status = status;
     this.parent = parent;
-    this.backingTag =
-        backingTag == null
-            ? null
-            : new DomainBackingTagDTO(backingTag.name(), backingTag.value().orElse(null));
+    this.backingTag = backingTag == null ? null : new DomainBackingTagDTO(backingTag);
     this.audit = audit;
     this.relations =
         Arrays.stream(relations).map(DomainRelationDTO::from).toArray(DomainRelationDTO[]::new);

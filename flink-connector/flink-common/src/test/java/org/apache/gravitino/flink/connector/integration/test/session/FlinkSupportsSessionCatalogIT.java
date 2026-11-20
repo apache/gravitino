@@ -34,6 +34,7 @@ import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.catalog.CatalogDescriptor;
+import org.apache.flink.table.catalog.CatalogManager;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
 import org.apache.flink.table.catalog.GenericInMemoryCatalog;
 import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
@@ -43,6 +44,7 @@ import org.apache.gravitino.flink.connector.integration.test.FlinkEnvIT;
 import org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -62,6 +64,8 @@ import org.slf4j.LoggerFactory;
  *   <li>Both stores contribute to the catalog list returned by {@code SHOW CATALOGS}.
  *   <li>Names listed in {@code gravitino.excludedCatalogs} are never resolved against Gravitino, so
  *       a session catalog can reuse the name of an existing Gravitino catalog without changing it.
+ *   <li>With {@code gravitino.enableSessionCatalogShadowing}, a session catalog can shadow a
+ *       Gravitino catalog that the session has not accessed, without changing it.
  * </ul>
  *
  * <p>Requires a running Hive Docker container for the Gravitino-managed catalog tests. Concrete
@@ -455,6 +459,166 @@ public abstract class FlinkSupportsSessionCatalogIT extends FlinkEnvIT {
     }
   }
 
+  /**
+   * With {@code gravitino.enableSessionCatalogShadowing}, a session catalog can use the name of a
+   * Gravitino catalog without listing the name in advance. The Gravitino catalog is never modified
+   * or dropped while it is shadowed, other sessions keep seeing it, and it is visible again in the
+   * session once the session catalog is dropped.
+   */
+  @Test
+  public void testShadowingAllowsSessionCatalogWithGravitinoCatalogName() {
+    tableEnv.useCatalog(DEFAULT_CATALOG);
+    String catalogName = "session_it_shadowed_hive";
+    String sessionDatabase = "session_it_shadowing_db";
+    createGravitinoHiveCatalog(catalogName);
+    try {
+      Map<String, String> propertiesBefore = metalake.loadCatalog(catalogName).properties();
+      TableEnvironment shadowingEnv = createTableEnvWithShadowing();
+      Assertions.assertTrue(Arrays.asList(shadowingEnv.listCatalogs()).contains(catalogName));
+
+      shadowingEnv.executeSql(
+          String.format("CREATE CATALOG %s WITH ('type'='generic_in_memory')", catalogName));
+      Optional<Catalog> sessionCatalog = shadowingEnv.getCatalog(catalogName);
+      Assertions.assertTrue(sessionCatalog.isPresent());
+      Assertions.assertInstanceOf(GenericInMemoryCatalog.class, sessionCatalog.get());
+      Assertions.assertEquals(
+          1, Arrays.stream(shadowingEnv.listCatalogs()).filter(catalogName::equals).count());
+      Assertions.assertThrows(
+          Exception.class,
+          () ->
+              shadowingEnv.executeSql(
+                  String.format(
+                      "CREATE CATALOG %s WITH ('type'='generic_in_memory')", catalogName)));
+
+      shadowingEnv.useCatalog(catalogName);
+      shadowingEnv.executeSql("CREATE DATABASE " + sessionDatabase);
+      Assertions.assertTrue(Arrays.asList(shadowingEnv.listDatabases()).contains(sessionDatabase));
+      shadowingEnv.useCatalog(DEFAULT_CATALOG);
+
+      // The Gravitino catalog is untouched, and other sessions keep resolving it.
+      org.apache.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
+      Assertions.assertFalse(gravitinoCatalog.asSchemas().schemaExists(sessionDatabase));
+      Assertions.assertEquals(propertiesBefore, gravitinoCatalog.properties());
+      Assertions.assertFalse(
+          tableEnv.getCatalog(catalogName).get() instanceof GenericInMemoryCatalog);
+
+      // Dropping the session catalog never drops the Gravitino catalog, which becomes visible
+      // again in the session.
+      shadowingEnv.executeSql("DROP CATALOG " + catalogName);
+      Assertions.assertTrue(metalake.catalogExists(catalogName));
+      Assertions.assertEquals(propertiesBefore, metalake.loadCatalog(catalogName).properties());
+      Optional<Catalog> gravitinoCatalogInSession = shadowingEnv.getCatalog(catalogName);
+      Assertions.assertTrue(gravitinoCatalogInSession.isPresent());
+      Assertions.assertFalse(gravitinoCatalogInSession.get() instanceof GenericInMemoryCatalog);
+
+      // The session has now accessed the Gravitino catalog, so it keeps the existing behavior.
+      shadowingEnv.executeSql("DROP CATALOG " + catalogName);
+      Assertions.assertFalse(metalake.catalogExists(catalogName));
+    } finally {
+      tableEnv.useCatalog(DEFAULT_CATALOG);
+      tableEnv.executeSql("DROP CATALOG IF EXISTS " + catalogName);
+      Assertions.assertFalse(metalake.catalogExists(catalogName));
+    }
+  }
+
+  /**
+   * With shadowing, a Gravitino-managed catalog type cannot be created under the name of an
+   * existing Gravitino catalog, and a Gravitino catalog that the session has not accessed is never
+   * dropped by Flink SQL. The existing Gravitino catalog must be left unchanged.
+   */
+  @Test
+  public void testShadowingNeverModifiesUnaccessedGravitinoCatalog() {
+    tableEnv.useCatalog(DEFAULT_CATALOG);
+    String catalogName = "session_it_shadowing_managed_hive";
+    createGravitinoHiveCatalog(catalogName);
+    try {
+      Map<String, String> propertiesBefore = metalake.loadCatalog(catalogName).properties();
+      TableEnvironment shadowingEnv = createTableEnvWithShadowing();
+
+      Exception exception =
+          Assertions.assertThrows(
+              Exception.class,
+              () ->
+                  shadowingEnv.executeSql(
+                      String.format(
+                          "CREATE CATALOG %s WITH ("
+                              + "'type'='%s',"
+                              + "'hive-conf-dir'='%s',"
+                              + "'hive.metastore.uris'='%s'"
+                              + ")",
+                          catalogName,
+                          GravitinoHiveCatalogFactoryOptions.IDENTIFIER,
+                          hiveConfDir,
+                          hiveMetastoreUri)));
+      Assertions.assertTrue(
+          containsMessage(exception, "already exists in Gravitino"), collectMessages(exception));
+      Assertions.assertEquals(
+          1, Arrays.stream(shadowingEnv.listCatalogs()).filter(catalogName::equals).count());
+
+      Assertions.assertThrows(
+          Exception.class, () -> shadowingEnv.executeSql("DROP CATALOG " + catalogName));
+      shadowingEnv.executeSql("DROP CATALOG IF EXISTS " + catalogName);
+      Assertions.assertTrue(metalake.catalogExists(catalogName));
+      Assertions.assertEquals(propertiesBefore, metalake.loadCatalog(catalogName).properties());
+
+      // The Gravitino catalog can still be used in the session.
+      shadowingEnv.useCatalog(catalogName);
+      shadowingEnv.listDatabases();
+      shadowingEnv.useCatalog(DEFAULT_CATALOG);
+    } finally {
+      tableEnv.useCatalog(DEFAULT_CATALOG);
+      tableEnv.executeSql("DROP CATALOG IF EXISTS " + catalogName);
+      Assertions.assertFalse(metalake.catalogExists(catalogName));
+    }
+  }
+
+  /**
+   * With shadowing, a session catalog that shadows a Gravitino catalog cannot be altered into a
+   * Gravitino-managed catalog type. The session catalog and the Gravitino catalog must be left
+   * unchanged. {@code ALTER CATALOG} is available since Flink 1.20.
+   */
+  @Test
+  public void testShadowingRejectsAlteringSessionCatalogToGravitinoManagedType() {
+    Assumptions.assumeTrue(
+        Arrays.stream(CatalogManager.class.getMethods())
+            .anyMatch(method -> method.getName().equals("alterCatalog")),
+        "ALTER CATALOG requires Flink 1.20 or later");
+    tableEnv.useCatalog(DEFAULT_CATALOG);
+    String catalogName = "session_it_shadowing_alter_hive";
+    createGravitinoHiveCatalog(catalogName);
+    try {
+      Map<String, String> propertiesBefore = metalake.loadCatalog(catalogName).properties();
+      TableEnvironment shadowingEnv = createTableEnvWithShadowing();
+      shadowingEnv.executeSql(
+          String.format("CREATE CATALOG %s WITH ('type'='generic_in_memory')", catalogName));
+
+      Exception exception =
+          Assertions.assertThrows(
+              Exception.class,
+              () ->
+                  shadowingEnv.executeSql(
+                      String.format(
+                          "ALTER CATALOG %s SET ("
+                              + "'type'='%s',"
+                              + "'hive-conf-dir'='%s',"
+                              + "'hive.metastore.uris'='%s'"
+                              + ")",
+                          catalogName,
+                          GravitinoHiveCatalogFactoryOptions.IDENTIFIER,
+                          hiveConfDir,
+                          hiveMetastoreUri)));
+      Assertions.assertTrue(
+          containsMessage(exception, "already exists in Gravitino"), collectMessages(exception));
+      Assertions.assertInstanceOf(
+          GenericInMemoryCatalog.class, shadowingEnv.getCatalog(catalogName).get());
+      Assertions.assertEquals(propertiesBefore, metalake.loadCatalog(catalogName).properties());
+    } finally {
+      tableEnv.useCatalog(DEFAULT_CATALOG);
+      tableEnv.executeSql("DROP CATALOG IF EXISTS " + catalogName);
+      Assertions.assertFalse(metalake.catalogExists(catalogName));
+    }
+  }
+
   private static boolean containsMessage(Throwable throwable, String expectedMessage) {
     for (Throwable current = throwable; current != null; current = current.getCause()) {
       if (current.getMessage() != null && current.getMessage().contains(expectedMessage)) {
@@ -494,6 +658,26 @@ public abstract class FlinkSupportsSessionCatalogIT extends FlinkEnvIT {
    * {@code tableEnv}.
    */
   private TableEnvironment createTableEnvExcluding(String... catalogNames) {
+    Configuration configuration = sessionCatalogConfiguration();
+    configuration.setString(
+        "table.catalog-store.gravitino.gravitino.excludedCatalogs", String.join(";", catalogNames));
+    return TableEnvironment.create(
+        EnvironmentSettings.newInstance().withConfiguration(configuration).inBatchMode().build());
+  }
+
+  /**
+   * Creates a separate Flink session with session catalog shadowing enabled. The session is not
+   * closed, for the same reason as {@link #createTableEnvExcluding(String...)}.
+   */
+  private TableEnvironment createTableEnvWithShadowing() {
+    Configuration configuration = sessionCatalogConfiguration();
+    configuration.setString(
+        "table.catalog-store.gravitino.gravitino.enableSessionCatalogShadowing", "true");
+    return TableEnvironment.create(
+        EnvironmentSettings.newInstance().withConfiguration(configuration).inBatchMode().build());
+  }
+
+  private Configuration sessionCatalogConfiguration() {
     Configuration configuration = new Configuration();
     configuration.setString(
         "table.catalog-store.kind", GravitinoCatalogStoreFactoryOptions.GRAVITINO);
@@ -501,10 +685,7 @@ public abstract class FlinkSupportsSessionCatalogIT extends FlinkEnvIT {
     configuration.setString("table.catalog-store.gravitino.gravitino.uri", gravitinoUri);
     configuration.setString(
         "table.catalog-store.gravitino.gravitino.enableSessionCatalogSupport", "true");
-    configuration.setString(
-        "table.catalog-store.gravitino.gravitino.excludedCatalogs", String.join(";", catalogNames));
-    return TableEnvironment.create(
-        EnvironmentSettings.newInstance().withConfiguration(configuration).inBatchMode().build());
+    return configuration;
   }
 
   private static void initHiveConfDir() {

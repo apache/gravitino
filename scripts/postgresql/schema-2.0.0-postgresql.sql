@@ -160,9 +160,9 @@ CREATE TABLE IF NOT EXISTS table_column_version_info (
     PRIMARY KEY (id),
     UNIQUE (table_id, table_version, column_id, deleted_at)
 );
-CREATE INDEX table_column_version_info_idx_mid ON table_column_version_info (metalake_id);
-CREATE INDEX table_column_version_info_idx_cid ON table_column_version_info (catalog_id);
-CREATE INDEX table_column_version_info_idx_sid ON table_column_version_info (schema_id);
+CREATE INDEX IF NOT EXISTS table_column_version_info_idx_mid ON table_column_version_info (metalake_id);
+CREATE INDEX IF NOT EXISTS table_column_version_info_idx_cid ON table_column_version_info (catalog_id);
+CREATE INDEX IF NOT EXISTS table_column_version_info_idx_sid ON table_column_version_info (schema_id);
 COMMENT ON TABLE table_column_version_info IS 'table column version information';
 
 COMMENT ON COLUMN table_column_version_info.id IS 'auto increment id';
@@ -909,8 +909,8 @@ CREATE TABLE IF NOT EXISTS function_meta (
     PRIMARY KEY (function_id),
     UNIQUE (schema_id, function_name, deleted_at)
 );
-CREATE INDEX idx_function_meta_metalake_id ON function_meta (metalake_id);
-CREATE INDEX idx_function_meta_catalog_id ON function_meta (catalog_id);
+CREATE INDEX IF NOT EXISTS idx_function_meta_metalake_id ON function_meta (metalake_id);
+CREATE INDEX IF NOT EXISTS idx_function_meta_catalog_id ON function_meta (catalog_id);
 
 COMMENT ON TABLE function_meta IS 'function metadata';
 COMMENT ON COLUMN function_meta.function_id IS 'function id';
@@ -938,9 +938,9 @@ CREATE TABLE IF NOT EXISTS function_version_info (
     PRIMARY KEY (id),
     UNIQUE (function_id, version, deleted_at)
 );
-CREATE INDEX idx_function_version_metalake_id ON function_version_info (metalake_id);
-CREATE INDEX idx_function_version_catalog_id ON function_version_info (catalog_id);
-CREATE INDEX idx_function_version_schema_id ON function_version_info (schema_id);
+CREATE INDEX IF NOT EXISTS idx_function_version_metalake_id ON function_version_info (metalake_id);
+CREATE INDEX IF NOT EXISTS idx_function_version_catalog_id ON function_version_info (catalog_id);
+CREATE INDEX IF NOT EXISTS idx_function_version_schema_id ON function_version_info (schema_id);
 
 COMMENT ON TABLE function_version_info IS 'function version info';
 COMMENT ON COLUMN function_version_info.id IS 'auto increment id';

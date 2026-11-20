@@ -30,7 +30,12 @@ export const ROUTES = {
   Users: '/access/users',
   UserGroups: '/access/userGroups',
   Roles: '/access/roles',
-  Metalakes: '/metalakes'
+  Metalakes: '/metalakes',
+  Mcp: '/mcp',
+  McpServers: '/mcp/servers',
+  McpAccessRequests: '/mcp/accessRequests',
+  McpAudit: '/mcp/audit',
+  McpServiceAccounts: '/mcp/serviceAccounts'
 }
 
 export const routeValues = Object.values(ROUTES)

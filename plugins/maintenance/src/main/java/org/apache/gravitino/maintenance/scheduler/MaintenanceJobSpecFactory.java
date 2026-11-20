@@ -21,14 +21,13 @@ package org.apache.gravitino.maintenance.scheduler;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -53,29 +52,6 @@ public final class MaintenanceJobSpecFactory {
   private static final Pattern RESOURCE_NUMBER = Pattern.compile("^(\\d+)");
   private static final Pattern MEMORY_VALUE =
       Pattern.compile("^(\\d+(?:\\.\\d+)?)\\s*([kmgt]?i?b?)$", Pattern.CASE_INSENSITIVE);
-
-  /**
-   * Keys that belong on the shared {@code task_data} fields or are re-derived at submit — not
-   * stored in per-task {@code parameters}.
-   */
-  private static final Set<String> NON_PARAMETER_KEYS =
-      ImmutableSet.of(
-          MaintenanceJobTemplates.UPDATER_OPTIONS_JOB_CONF_KEY,
-          "spark_conf",
-          MaintenanceJobTemplates.MAINTENANCE_TYPES_KEY,
-          MaintenanceJobTemplates.POLICY_IDS_KEY,
-          MaintenanceJobTemplates.ACTION_IDS_KEY,
-          "tables",
-          "table_id",
-          "spark_master",
-          "spark_executor_instances",
-          "spark_executor_cores",
-          "spark_executor_memory",
-          "spark_driver_memory",
-          "catalog_type",
-          "catalog_uri",
-          "warehouse_location",
-          "gravitino_job_id");
 
   private final MaintenanceJobConfBuilder jobConfBuilder;
 
@@ -131,26 +107,37 @@ public final class MaintenanceJobSpecFactory {
     boolean firstPolicy = true;
     for (TableCandidate table : tables) {
       for (PolicyEntity policy : table.policies()) {
-        Optional<String> wire = MaintenanceJobTemplates.maintenanceType(policy.policyType());
         Preconditions.checkArgument(
-            wire.isPresent(), "unsupported policy type %s", policy.policyType());
-        Map<String, String> built = jobConfBuilder.build(policy, catalogName);
-        MaintenanceJobConfBuilder.foldPlaceholdersIntoSparkConf(built, catalogName);
-        JobConfParts parts = splitJobConfParts(built);
+            MaintenanceJobTemplates.isIcebergMaintenance(policy.policyType()),
+            "unsupported policy type %s",
+            policy.policyType());
+        MaintenanceJobConfBuilder.ScheduleConf built = jobConfBuilder.build(policy, catalogName);
         if (firstPolicy) {
-          updaterOptions = parts.updaterOptions;
-          if (parts.sparkConf != null && !parts.sparkConf.isBlank()) {
+          updaterOptions = built.updaterOptions();
+          if (built.sparkConf() != null && !built.sparkConf().isBlank()) {
             sparkConf.putAll(
-                IcebergSparkConfigUtils.parseFlatJsonMap(parts.sparkConf, "spark_conf"));
+                IcebergSparkConfigUtils.parseFlatJsonMap(built.sparkConf(), "spark_conf"));
           }
           firstPolicy = false;
         } else {
-          mergeSparkConfMaps(sparkConf, parts.sparkConf);
+          mergeSparkConfMaps(sparkConf, built.sparkConf());
         }
-        Map<String, String> parameters = new LinkedHashMap<>(parts.parameters);
+        Map<String, String> parameters = new LinkedHashMap<>(built.parameters());
         parameters.put("catalog_name", table.catalogName());
         parameters.put("table_identifier", table.tableIdentifier());
-        tasks.add(new Task(table.tableId(), policy.id(), wire.get(), null, parameters));
+        Task task =
+            new Task(
+                table.tableId(), policy.id(), policy.policyType().policyType(), null, parameters);
+        Preconditions.checkArgument(
+            tasks.stream()
+                .noneMatch(
+                    existing ->
+                        existing.getTableId() == task.getTableId()
+                            && existing.getPolicyId() == task.getPolicyId()),
+            "duplicate tableId=%s policyId=%s in schedule tasks (soft-slot acquire is 1:1)",
+            task.getTableId(),
+            task.getPolicyId());
+        tasks.add(task);
       }
     }
     String sparkConfJson = sparkConf.isEmpty() ? null : writeJson(sparkConf, "spark_conf");
@@ -210,73 +197,101 @@ public final class MaintenanceJobSpecFactory {
   }
 
   /**
-   * Assembles the flat {@code runJob} map for one cron task: task {@code parameters} + shared
-   * {@code updater_options}/{@code spark_conf} + TMS wire keys + one-element {@code tables} JSON.
+   * Assembles the Spark {@code runJob} map for every task in {@code spec} (cron single-table, cron
+   * snapshot-expiry batch, or commit chain): shared {@code updater_options}/{@code spark_conf} plus
+   * a {@link MaintenanceJobTemplates#TASKS_KEY} JSON array. Each task keeps its own {@code params}
+   * and {@code rules}; procedure arguments are not flattened across tasks.
    *
-   * @param spec schedule spec
-   * @param task task to submit
-   * @return mutable jobConf (caller resolves secrets / injects {@code action_ids})
-   */
-  public static Map<String, String> jobConfForTask(MaintenanceJobSpec spec, Task task) {
-    Preconditions.checkNotNull(spec, "spec");
-    Preconditions.checkNotNull(task, "task");
-    String catalogName = task.catalogName();
-    String tableIdentifier = task.tableIdentifier();
-    Preconditions.checkArgument(
-        catalogName != null && tableIdentifier != null,
-        "task tableId=%s is missing catalog_name/table_identifier in parameters",
-        task.getTableId());
-
-    Map<String, String> jobConf = new LinkedHashMap<>(task.getParameters());
-    putSharedJobConfFields(jobConf, spec);
-    jobConf.put(MaintenanceJobTemplates.MAINTENANCE_TYPES_KEY, task.getMaintenanceType());
-    jobConf.put(MaintenanceJobTemplates.POLICY_IDS_KEY, Long.toString(task.getPolicyId()));
-    jobConf.put("tables", toTablesJson(task.getTableId(), catalogName, tableIdentifier));
-    jobConf.remove("table_identifier");
-    jobConf.remove("table_id");
-    MaintenanceJobConfBuilder.applySparkConfPlaceholders(jobConf, catalogName);
-    return jobConf;
-  }
-
-  /**
-   * Assembles one chained commit {@code runJob} map from all tasks (merged parameters + shared
-   * {@code updater_options}/{@code spark_conf}).
+   * <p>{@code action_id} is not set here; {@link
+   * MaintenanceJobConfBuilder#applyActionIdsFromClaims} stamps soft-slot claim ids onto {@code
+   * tasks[]} immediately before {@code runJob}. Commit chains must not list the same policy twice;
+   * batch acquire dedupes policy ids and would otherwise shrink the claim list.
    *
-   * @param spec commit-chain spec
-   * @return mutable jobConf
+   * @param spec schedule spec (non-empty tasks)
+   * @return mutable jobConf (caller resolves secrets)
    */
-  public static Map<String, String> jobConfForCommitChain(MaintenanceJobSpec spec) {
+  public static Map<String, String> jobConfForSpec(MaintenanceJobSpec spec) {
     Preconditions.checkNotNull(spec, "spec");
-    Preconditions.checkArgument(
-        spec.getTasks() != null && !spec.getTasks().isEmpty(), "tasks must not be empty");
-    Task first = spec.getTasks().get(0);
+    List<Task> tasks = spec.getTasks();
+    Preconditions.checkArgument(tasks != null && !tasks.isEmpty(), "tasks must not be empty");
+
+    HashSet<String> seen = new HashSet<>();
+    List<Map<String, Object>> wireTasks = new ArrayList<>(tasks.size());
+    for (int i = 0; i < tasks.size(); i++) {
+      Task task = tasks.get(i);
+      Preconditions.checkNotNull(task, "tasks[%s] must not be null", i);
+      Preconditions.checkArgument(
+          seen.add(task.getTableId() + ":" + task.getPolicyId()),
+          "duplicate tableId=%s policyId=%s; batch acquire dedupes policy ids so claims cannot"
+              + " align 1:1",
+          task.getTableId(),
+          task.getPolicyId());
+      String catalogName = task.catalogName();
+      String tableIdentifier = task.tableIdentifier();
+      Preconditions.checkArgument(
+          catalogName != null && tableIdentifier != null,
+          "task tableId=%s is missing catalog_name/table_identifier in parameters",
+          task.getTableId());
+
+      // Identity first so wire JSON keeps a stable params prefix for readers/tests.
+      Map<String, String> params = new LinkedHashMap<>();
+      params.put("catalog_name", catalogName);
+      params.put("table_identifier", tableIdentifier);
+      Map<String, String> parameters = task.getParameters();
+      if (parameters != null) {
+        for (Map.Entry<String, String> entry : parameters.entrySet()) {
+          String key = entry.getKey();
+          String value = entry.getValue();
+          // rules stay on the wire task object, not inside params.
+          if (key == null
+              || "catalog_name".equals(key)
+              || "table_identifier".equals(key)
+              || MaintenanceJobTemplates.RULES_KEY.equals(key)
+              || value == null
+              || value.isBlank()) {
+            continue;
+          }
+          params.put(key, value);
+        }
+      }
+
+      Map<String, Object> rules = Map.of();
+      if (parameters != null && task.getPolicyType() != null) {
+        String raw = parameters.get(MaintenanceJobTemplates.RULES_KEY);
+        if (raw != null && !raw.trim().isEmpty()) {
+          Map<String, Object> typed = parseRulesByType(raw).get(task.getPolicyType());
+          if (typed != null && !typed.isEmpty()) {
+            rules = new LinkedHashMap<>(typed);
+          }
+        }
+      }
+
+      Map<String, Object> wire = new LinkedHashMap<>();
+      wire.put(MaintenanceJobTemplates.TABLE_ID_KEY, task.getTableId());
+      wire.put(MaintenanceJobTemplates.POLICY_TYPE_KEY, task.getPolicyType());
+      wire.put(MaintenanceJobTemplates.POLICY_ID_KEY, task.getPolicyId());
+      wire.put(MaintenanceJobTemplates.PARAMS_KEY, params);
+      wire.put(MaintenanceJobTemplates.RULES_KEY, rules);
+      wireTasks.add(wire);
+    }
+
+    Task first = tasks.get(0);
     String catalogName = first.catalogName();
-    String tableIdentifier = first.tableIdentifier();
     Preconditions.checkArgument(
-        catalogName != null && tableIdentifier != null,
-        "commit task tableId=%s is missing catalog_name/table_identifier",
+        catalogName != null && !catalogName.isBlank(),
+        "task tableId=%s is missing catalog_name",
         first.getTableId());
 
-    Map<String, String> jobConf = new LinkedHashMap<>(first.getParameters());
-    for (int i = 1; i < spec.getTasks().size(); i++) {
-      Map<String, String> later = spec.getTasks().get(i).getParameters();
-      mergeTaskParameters(jobConf, later);
-      mergePolicyRulesByType(jobConf, later);
+    Map<String, String> jobConf = new LinkedHashMap<>();
+    // catalog_name lives only under tasks[].params; Spark settings live in spark_conf only.
+    if (spec.getUpdaterOptions() != null && !spec.getUpdaterOptions().isBlank()) {
+      jobConf.put(MaintenanceJobTemplates.UPDATER_OPTIONS_JOB_CONF_KEY, spec.getUpdaterOptions());
     }
-    putSharedJobConfFields(jobConf, spec);
-
-    List<String> types = new ArrayList<>(spec.getTasks().size());
-    List<String> policyIds = new ArrayList<>(spec.getTasks().size());
-    for (Task task : spec.getTasks()) {
-      types.add(task.getMaintenanceType());
-      policyIds.add(Long.toString(task.getPolicyId()));
+    if (spec.getSparkConf() != null && !spec.getSparkConf().isBlank()) {
+      jobConf.put("spark_conf", spec.getSparkConf());
     }
-    jobConf.put(MaintenanceJobTemplates.MAINTENANCE_TYPES_KEY, String.join(",", types));
-    jobConf.put(MaintenanceJobTemplates.POLICY_IDS_KEY, String.join(",", policyIds));
-    jobConf.put("tables", toTablesJson(first.getTableId(), catalogName, tableIdentifier));
-    jobConf.remove("table_identifier");
-    jobConf.remove("table_id");
-    MaintenanceJobConfBuilder.applySparkConfPlaceholders(jobConf, catalogName);
+    jobConf.put(
+        MaintenanceJobTemplates.TASKS_KEY, writeJson(wireTasks, MaintenanceJobTemplates.TASKS_KEY));
     return jobConf;
   }
 
@@ -286,49 +301,6 @@ public final class MaintenanceJobSpecFactory {
     } catch (JsonProcessingException e) {
       throw new IllegalStateException("Failed to serialize " + field, e);
     }
-  }
-
-  private static void putSharedJobConfFields(Map<String, String> jobConf, MaintenanceJobSpec spec) {
-    if (spec.getUpdaterOptions() != null && !spec.getUpdaterOptions().isBlank()) {
-      jobConf.put(MaintenanceJobTemplates.UPDATER_OPTIONS_JOB_CONF_KEY, spec.getUpdaterOptions());
-    }
-    if (spec.getSparkConf() != null && !spec.getSparkConf().isBlank()) {
-      jobConf.put("spark_conf", spec.getSparkConf());
-    }
-  }
-
-  /**
-   * Splits a {@link MaintenanceJobConfBuilder#build} map into per-task {@code parameters} plus
-   * shared {@code updater_options} / {@code spark_conf}.
-   */
-  private static JobConfParts splitJobConfParts(Map<String, String> built) {
-    Preconditions.checkNotNull(built, "built");
-    Map<String, String> parameters = new LinkedHashMap<>();
-    String updaterOptions = null;
-    String sparkConf = null;
-    for (Map.Entry<String, String> entry : built.entrySet()) {
-      String key = entry.getKey();
-      String value = entry.getValue();
-      if (key == null || value == null) {
-        continue;
-      }
-      if (MaintenanceJobTemplates.UPDATER_OPTIONS_JOB_CONF_KEY.equals(key)) {
-        updaterOptions = value;
-        continue;
-      }
-      if ("spark_conf".equals(key)) {
-        sparkConf = value;
-        continue;
-      }
-      if (NON_PARAMETER_KEYS.contains(key)) {
-        continue;
-      }
-      parameters.put(key, value);
-    }
-    Preconditions.checkArgument(
-        updaterOptions != null && !updaterOptions.isBlank(),
-        "updater_options is required on schedule jobConf");
-    return new JobConfParts(parameters, updaterOptions, sparkConf);
   }
 
   /**
@@ -462,7 +434,7 @@ public final class MaintenanceJobSpecFactory {
   private static String toTablesJson(long tableId, String catalogName, String tableIdentifier) {
     List<Map<String, Object>> payload = new ArrayList<>(1);
     Map<String, Object> entry = new LinkedHashMap<>();
-    entry.put("table_id", tableId);
+    entry.put(MaintenanceJobTemplates.TABLE_ID_KEY, tableId);
     entry.put("catalog_name", catalogName);
     entry.put("table_identifier", tableIdentifier);
     payload.add(entry);
@@ -548,23 +520,6 @@ public final class MaintenanceJobSpecFactory {
       return Optional.of(Long.parseLong(matcher.group(1)));
     } catch (NumberFormatException e) {
       return Optional.empty();
-    }
-  }
-
-  /**
-   * Result of splitting {@link MaintenanceJobConfBuilder#build} into per-task parameters and shared
-   * jobConf fields.
-   */
-  private static final class JobConfParts {
-    private final Map<String, String> parameters;
-    private final String updaterOptions;
-    @Nullable private final String sparkConf;
-
-    private JobConfParts(
-        Map<String, String> parameters, String updaterOptions, @Nullable String sparkConf) {
-      this.parameters = parameters;
-      this.updaterOptions = updaterOptions;
-      this.sparkConf = sparkConf;
     }
   }
 }
