@@ -141,6 +141,11 @@ postgresql:
     ## @param init.currentSchema PostgreSQL schema for search_path (PGOPTIONS). For external PostgreSQL, defaults to
     ## currentSchema from entity.jdbcUrl. In-chart Bitnami does not inherit entity.jdbcUrl currentSchema.
     ## Aligns psql CREATE TABLE with Gravitino's JDBC currentSchema (docs: jdbc:postgresql://host:5432/db?currentSchema=schema).
+<<<<<<< HEAD
+=======
+    ## Simple identifiers only; mixed case is folded to lowercase for lookup, CREATE SCHEMA, and search_path
+    ## (unquoted PostgreSQL identifier / JDBC currentSchema semantics, e.g. App → app).
+>>>>>>> 795c0fa78 ([#11696] improvement(helm): Configurable init-postgresql for external PostgreSQL (#14941))
     ## When set, the init container creates the schema only if it is missing (pg_namespace check),
     ## so application roles without database-level CREATE can still run when an admin pre-created the schema.
     ##
