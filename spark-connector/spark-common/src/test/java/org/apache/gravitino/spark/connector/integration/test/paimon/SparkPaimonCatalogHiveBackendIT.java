@@ -64,14 +64,14 @@ public abstract class SparkPaimonCatalogHiveBackendIT extends SparkPaimonCatalog
   protected void testCreateAndLoadSchema() {
     // Same as the common test, except that the schema comment is not checked: Gravitino's Paimon
     // catalog does not store the comment of a new schema yet (#5719).
-    String testDatabaseName = "t_create1";
+    String testDatabaseName = suiteDatabaseName("t_create1");
     dropDatabaseIfExists(testDatabaseName);
     sql("CREATE DATABASE " + testDatabaseName + " WITH DBPROPERTIES (ID=001);");
     Map<String, String> databaseMeta = getDatabaseMetadata(testDatabaseName);
     Assertions.assertTrue(databaseMeta.containsKey("Location"));
     Assertions.assertTrue(databaseMeta.get("Properties").contains("(ID,001)"));
 
-    testDatabaseName = "t_create2";
+    testDatabaseName = suiteDatabaseName("t_create2");
     dropDatabaseIfExists(testDatabaseName);
     String testDatabaseLocation = "/tmp/" + testDatabaseName;
     sql(
@@ -86,7 +86,7 @@ public abstract class SparkPaimonCatalogHiveBackendIT extends SparkPaimonCatalog
   @Test
   @Override
   protected void testAlterSchema() {
-    String testDatabaseName = "t_alter";
+    String testDatabaseName = suiteDatabaseName("t_alter");
     dropDatabaseIfExists(testDatabaseName);
     sql("CREATE DATABASE " + testDatabaseName + " WITH DBPROPERTIES (ID=001);");
     Map<String, String> databaseMeta = getDatabaseMetadata(testDatabaseName);
