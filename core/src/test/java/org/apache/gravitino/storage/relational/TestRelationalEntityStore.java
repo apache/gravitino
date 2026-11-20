@@ -20,12 +20,13 @@ package org.apache.gravitino.storage.relational;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mockStatic;
 
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -42,6 +43,7 @@ import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.BaseEntityCache;
 import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
+import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -51,13 +53,11 @@ import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
-import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
-import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestRelationalEntityStore {
@@ -98,37 +98,53 @@ public class TestRelationalEntityStore {
   }
 
   @Test
-  void testUpdateDropsCacheBeforeSqlCommit()
+  void testUpdateDropsCacheBeforeBackendUpdate()
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException,
           IllegalAccessException {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog");
+    EntityCacheKey key = EntityCacheKey.of(ident, Entity.EntityType.CATALOG);
     NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
-    AtomicBoolean invalidatedBeforeCommit = new AtomicBoolean(false);
+    @SuppressWarnings("unchecked")
+    Map<EntityCacheKey, AtomicInteger> pendingWrites =
+        (Map<EntityCacheKey, AtomicInteger>) FieldUtils.readField(store, "pendingWrites", true);
+    AtomicBoolean invalidatedBeforeBackend = new AtomicBoolean(false);
+    AtomicBoolean pendingDuringBackend = new AtomicBoolean(false);
 
-    try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
-      sessions.when(SessionUtils::isInTransaction).thenReturn(true);
-      sessions.when(SessionUtils::beginTransaction).thenAnswer(invocation -> null);
-      sessions
-          .when(SessionUtils::commitTransaction)
-          .thenAnswer(
-              invocation -> {
-                Mockito.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
-                invalidatedBeforeCommit.set(true);
-                return null;
-              });
+    Mockito.doAnswer(
+            invocation -> {
+              Mockito.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
+              invalidatedBeforeBackend.set(true);
+              AtomicInteger count = pendingWrites.get(key);
+              pendingDuringBackend.set(count != null && count.get() > 0);
+              return null;
+            })
+        .when(backend)
+        .update(eq(ident), eq(Entity.EntityType.CATALOG), any(Function.class));
 
-      Mockito.doAnswer(
-              invocation -> {
-                Mockito.verify(cache, Mockito.never()).invalidate(ident, Entity.EntityType.CATALOG);
-                return null;
-              })
-          .when(backend)
-          .update(eq(ident), eq(Entity.EntityType.CATALOG), any(Function.class));
+    store.update(ident, null, Entity.EntityType.CATALOG, entity -> entity);
 
-      store.update(ident, null, Entity.EntityType.CATALOG, entity -> entity);
-    }
+    Assertions.assertTrue(invalidatedBeforeBackend.get());
+    Assertions.assertTrue(pendingDuringBackend.get());
+    Assertions.assertFalse(pendingWrites.containsKey(key));
+  }
 
-    Assertions.assertTrue(invalidatedBeforeCommit.get());
+  @Test
+  void testGetDoesNotPublishWhileWritePending() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "topic");
+    EntityCacheKey key = EntityCacheKey.of(ident, Entity.EntityType.TOPIC);
+    TopicEntity entity = Mockito.mock(TopicEntity.class);
+    Mockito.when(entity.nameIdentifier()).thenReturn(ident);
+    Mockito.when(entity.type()).thenReturn(Entity.EntityType.TOPIC);
+    Mockito.when(backend.get(ident, Entity.EntityType.TOPIC)).thenReturn(entity);
+
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    @SuppressWarnings("unchecked")
+    Map<EntityCacheKey, AtomicInteger> pendingWrites =
+        (Map<EntityCacheKey, AtomicInteger>) FieldUtils.readField(store, "pendingWrites", true);
+    pendingWrites.put(key, new AtomicInteger(1));
+
+    Assertions.assertSame(entity, store.get(ident, Entity.EntityType.TOPIC, TopicEntity.class));
+    Mockito.verify(cache, Mockito.never()).put(entity);
   }
 
   @Test

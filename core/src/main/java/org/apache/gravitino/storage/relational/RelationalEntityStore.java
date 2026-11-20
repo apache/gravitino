@@ -31,7 +31,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -58,6 +60,7 @@ import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
 import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
+import org.apache.gravitino.cache.EntityCache.ThrowingSupplier;
 import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.domain.Domain;
@@ -73,7 +76,6 @@ import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
-import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
@@ -114,6 +116,11 @@ public class RelationalEntityStore
   // change log. A shared cache without a local change-log listener needs its own distributed
   // version check: this counter cannot detect changes made on another node.
   private final AtomicLong cacheInvalidationEpoch = new AtomicLong();
+
+  // Refcount of keys whose update is still running. Dropped from the cache before the backend
+  // runs; readers skip and do not refill the entry until the count is zero.
+  private final ConcurrentHashMap<EntityCacheKey, AtomicInteger> pendingWrites =
+      new ConcurrentHashMap<>();
 
   // Non-null only for a LOCAL_PER_NODE cache, which needs cross-node invalidation. SHARED and NONE
   // caches have no per-node copy to invalidate, so no listener is registered.
@@ -272,8 +279,7 @@ public class RelationalEntityStore
 
   @Override
   public boolean exists(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
-    boolean existsInCache = cache.contains(ident, entityType);
-    return existsInCache || backend.exists(ident, entityType);
+    return cachedContains(ident, entityType) || backend.exists(ident, entityType);
   }
 
   @Override
@@ -299,45 +305,33 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    // Own the SQL commit: run update SQL without the cache lock (it may wait on row locks),
-    // then under the key lock: drop the cache, commit, and bump the epoch.
-    SessionUtils.beginTransaction();
-    boolean committed = false;
-    try {
-      E updatedEntity;
-      try {
-        updatedEntity = backend.update(ident, entityType, updater);
-      } catch (RuntimeException re) {
-        throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
-      }
-      invalidateCacheAndCommit(ident, entityType);
-      committed = true;
-      return updatedEntity;
-    } finally {
-      if (!committed && SessionUtils.isInTransaction()) {
-        SessionUtils.rollbackTransaction();
-      }
-    }
+    return withPendingWrite(
+        ident,
+        entityType,
+        () -> {
+          try {
+            return backend.update(ident, entityType, updater);
+          } catch (RuntimeException re) {
+            throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
+          }
+        });
   }
 
   @Override
   public <E extends Entity & HasIdentifier> E get(
       NameIdentifier ident, Entity.EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException {
-    return cache.withCacheLock(
-        EntityCacheKey.of(ident, entityType),
-        () -> {
-          Optional<E> entityFromCache = cache.getIfPresent(ident, entityType);
-          if (entityFromCache.isPresent()) {
-            return entityFromCache.get();
-          }
+    EntityCacheKey key = EntityCacheKey.of(ident, entityType);
+    Optional<E> cached = cache.withCacheLock(key, () -> cachedGet(key, ident, entityType));
+    if (cached.isPresent()) {
+      return cached.get();
+    }
 
-          long epochBeforeRead = cacheInvalidationEpoch.get();
-          E entity = backend.get(ident, entityType);
-          // The SPI does not require reentrant locks. Publish under the lock already held here.
-          publishIfEpochUnchanged(entity, epochBeforeRead);
-          return entity;
-        });
+    // DB I/O stays outside the cache lock so this thread never holds both.
+    long epochBeforeRead = cacheInvalidationEpoch.get();
+    E entity = backend.get(ident, entityType);
+    cache.withCacheLock(key, () -> publishIfEpochUnchanged(entity, epochBeforeRead));
+    return entity;
   }
 
   @Override
@@ -348,7 +342,8 @@ public class RelationalEntityStore
         idents.stream()
             .filter(
                 ident -> {
-                  Optional<E> entity = cache.getIfPresent(ident, entityType);
+                  Optional<E> entity =
+                      cachedGet(EntityCacheKey.of(ident, entityType), ident, entityType);
                   entity.ifPresent(allEntities::add);
                   return entity.isEmpty();
                 })
@@ -865,13 +860,15 @@ public class RelationalEntityStore
       cache.put(entity);
       return;
     }
-    if (cacheInvalidationEpoch.get() == epoch) {
-      cache.put(entity);
-      // The key lock excludes same-key invalidation, but an ancestor can advance the epoch
-      // while put runs on another segment. Remove a raced publication before releasing it.
-      if (cacheInvalidationEpoch.get() != epoch) {
-        cache.invalidate(entity.nameIdentifier(), entity.type());
-      }
+    EntityCacheKey key = EntityCacheKey.of(entity.nameIdentifier(), entity.type());
+    if (isPendingWrite(key) || cacheInvalidationEpoch.get() != epoch) {
+      return;
+    }
+    cache.put(entity);
+    // The key lock excludes same-key invalidation, but an ancestor can advance the epoch while put
+    // runs on another segment. Drop a raced publication before releasing the lock.
+    if (isPendingWrite(key) || cacheInvalidationEpoch.get() != epoch) {
+      cache.invalidate(entity.nameIdentifier(), entity.type());
     }
   }
 
@@ -883,27 +880,53 @@ public class RelationalEntityStore
   }
 
   /**
-   * Drops {@code ident} from the cache and commits under the key lock.
-   *
-   * <p>Update SQL runs outside the lock. Under the lock: invalidate (so commit does not publish
-   * while an old row is cached), commit, then bump the epoch so a {@code batchGet} that loaded the
-   * pre-commit row cannot put it back after the lock is released. Ordinary cache {@code get} does
-   * not use {@code SELECT FOR UPDATE}, so holding the cache lock across commit does not deadlock
-   * with it under READ_COMMITTED.
+   * Invalidates {@code ident}, runs {@code action} without the cache lock, then clears the pending
+   * mark. Readers skip and do not refill the key for the whole interval, so a backend commit cannot
+   * leave an old cacheable row.
    */
-  private void invalidateCacheAndCommit(NameIdentifier ident, Entity.EntityType entityType) {
+  private <T, E extends Exception> T withPendingWrite(
+      NameIdentifier ident, Entity.EntityType entityType, ThrowingSupplier<T, E> action) throws E {
+    EntityCacheKey key = EntityCacheKey.of(ident, entityType);
     cache.withCacheLock(
-        EntityCacheKey.of(ident, entityType),
+        key,
         () -> {
           invalidateCache(ident, entityType);
-          SessionUtils.commitTransaction();
-          cacheInvalidationEpoch.incrementAndGet();
+          pendingWrites.computeIfAbsent(key, ignored -> new AtomicInteger()).incrementAndGet();
         });
+    try {
+      return action.get();
+    } finally {
+      cache.withCacheLock(
+          key,
+          () -> {
+            AtomicInteger count = pendingWrites.get(key);
+            if (count != null && count.decrementAndGet() == 0) {
+              pendingWrites.remove(key);
+            }
+            cacheInvalidationEpoch.incrementAndGet();
+          });
+    }
+  }
+
+  private boolean cachedContains(NameIdentifier ident, Entity.EntityType entityType) {
+    EntityCacheKey key = EntityCacheKey.of(ident, entityType);
+    return !isPendingWrite(key) && cache.contains(ident, entityType);
+  }
+
+  private <E extends Entity & HasIdentifier> Optional<E> cachedGet(
+      EntityCacheKey key, NameIdentifier ident, Entity.EntityType entityType) {
+    return isPendingWrite(key) ? Optional.empty() : cache.getIfPresent(ident, entityType);
+  }
+
+  private boolean isPendingWrite(EntityCacheKey key) {
+    AtomicInteger count = pendingWrites.get(key);
+    return count != null && count.get() > 0;
   }
 
   @VisibleForTesting
   void clearCache() {
     cacheInvalidationEpoch.incrementAndGet();
+    pendingWrites.clear();
     cache.clear();
   }
 }
