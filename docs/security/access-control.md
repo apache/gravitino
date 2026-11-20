@@ -140,6 +140,11 @@ A role holds objects, and for each one a list of privileges, each carrying an `A
 condition. A privilege binds only to object types it supports, so `CREATE_TABLE` binds to a metalake,
 catalog, or schema, never to a table. Whoever creates a role owns it, and can alter or delete it.
 
+A role cannot be deleted while an access control policy names it in its applicable roles. Remove
+the role from those policies, or delete them, first. The deletion fails with `InUseException`
+(HTTP 409); in a bulk delete, only that role's item fails. Deleting the metalake removes its roles
+and policies together and is not blocked.
+
 #### Ownership
 
 Ownership can be held by a group as well as a user, in which case every member of that group holds
