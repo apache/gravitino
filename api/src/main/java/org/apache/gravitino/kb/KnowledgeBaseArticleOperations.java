@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.kb;
 
-import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.KnowledgeBaseArticleAlreadyExistsException;
 import org.apache.gravitino.exceptions.KnowledgeBaseArticleVersionConflictException;
@@ -30,17 +29,14 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
  * Metalake-scoped operations on Knowledge Base Articles and their asset bindings.
  *
  * <p>Page visible results before returning them. Page sizes range from 1 through {@value
- * ArticleListFilter#MAX_LIMIT}; offsets are zero-based and nonnegative. Conditional writes compare
- * the opaque token from the last load or write against the current article identity and store
- * revision before applying even a no-op. A stale token raises {@link
- * KnowledgeBaseArticleVersionConflictException}.
+ * ArticleListFilter#MAX_LIMIT}; offsets are zero-based and nonnegative.
  */
 @Evolving
 public interface KnowledgeBaseArticleOperations {
 
   /**
-   * Lists the article summaries matching the filter. The {@link ArticlePage#total()} counts only
-   * articles the caller may read.
+   * Lists visible summaries matching the filter. Set {@link ArticlePage#hasMore()} when an
+   * additional readable match follows the requested page.
    *
    * @param filter the list filter
    * @return one page of matching articles
@@ -57,7 +53,7 @@ public interface KnowledgeBaseArticleOperations {
    *     the caller
    */
   default KnowledgeBaseArticle loadArticle(String name) throws NoSuchKnowledgeBaseArticleException {
-    return loadArticle(name, 20, 0);
+    return loadArticle(name, ArticleListFilter.DEFAULT_LIMIT, 0);
   }
 
   /**
@@ -66,51 +62,36 @@ public interface KnowledgeBaseArticleOperations {
    * @param name the article name
    * @param limit maximum preview size
    * @param offset number of visible bindings to skip
-   * @return the article with the requested preview and revision token
+   * @return the article with the requested preview
    */
   KnowledgeBaseArticle loadArticle(String name, int limit, int offset)
       throws NoSuchKnowledgeBaseArticleException;
 
   /**
-   * Creates an article together with its first version, Domains and asset bindings.
+   * Creates an article with current content, Domains and initial bindings.
    *
    * @param articleCreate the create request
    * @return the created article
    * @throws KnowledgeBaseArticleAlreadyExistsException if the explicit name is already used, or the
-   *     title is already used by another non-deprecated article
+   *     title is already claimed in the same title-uniqueness scope
    */
   KnowledgeBaseArticle createArticle(ArticleCreate articleCreate)
       throws KnowledgeBaseArticleAlreadyExistsException;
 
   /**
-   * Applies a set of changes to an article atomically. Changes to the title, body or Domains create
-   * exactly one new version.
+   * Applies a set of changes to an article atomically. A failure leaves all fields and bindings
+   * unchanged.
    *
    * @param name the article name
    * @param changes the changes to apply
    * @return the altered article
    * @throws NoSuchKnowledgeBaseArticleException if the article does not exist
-   * @throws KnowledgeBaseArticleAlreadyExistsException if the new title is already used by another
-   *     non-deprecated article
+   * @throws KnowledgeBaseArticleAlreadyExistsException if the title is already claimed in a
+   *     requested Domain or the default scope
    * @throws KnowledgeBaseArticleVersionConflictException if a concurrent update to the same article
    *     was detected
    */
-  default KnowledgeBaseArticle alterArticle(String name, KnowledgeBaseArticleChange... changes)
-      throws NoSuchKnowledgeBaseArticleException, KnowledgeBaseArticleAlreadyExistsException,
-          KnowledgeBaseArticleVersionConflictException {
-    return alterArticleIfMatch(name, null, changes);
-  }
-
-  /**
-   * Applies changes if the article still matches the supplied token.
-   *
-   * @param name the article name
-   * @param revisionToken the loaded revision token, or null for an unconditional request
-   * @param changes changes to apply atomically
-   * @return the updated article and its new token
-   */
-  KnowledgeBaseArticle alterArticleIfMatch(
-      String name, @Nullable String revisionToken, KnowledgeBaseArticleChange... changes)
+  KnowledgeBaseArticle alterArticle(String name, KnowledgeBaseArticleChange... changes)
       throws NoSuchKnowledgeBaseArticleException, KnowledgeBaseArticleAlreadyExistsException,
           KnowledgeBaseArticleVersionConflictException;
 
@@ -120,22 +101,10 @@ public interface KnowledgeBaseArticleOperations {
    * @param name the article name
    * @return true if the article was deleted, false if it did not exist
    */
-  default boolean deleteArticle(String name) {
-    return deleteArticle(name, null);
-  }
+  boolean deleteArticle(String name) throws KnowledgeBaseArticleVersionConflictException;
 
   /**
-   * Deletes the article if it still matches the supplied token.
-   *
-   * @param name the article name
-   * @param revisionToken the loaded revision token, or null for an unconditional request
-   * @return whether the article was deleted
-   */
-  boolean deleteArticle(String name, @Nullable String revisionToken)
-      throws KnowledgeBaseArticleVersionConflictException;
-
-  /**
-   * Lists the metadata objects bound to the live version.
+   * Lists the metadata objects bound to the article.
    *
    * @param name the article name
    * @return the bound objects visible to the caller
@@ -164,32 +133,14 @@ public interface KnowledgeBaseArticleOperations {
    * @param name the article name
    * @param objectsToAdd the objects to bind
    * @param objectsToRemove the objects to unbind
-   * @return the resulting live bindings
+   * @return the first page of visible bindings after the change
    * @throws NoSuchKnowledgeBaseArticleException if the article does not exist
    * @throws KnowledgeBaseArticleVersionConflictException on an optimistic-lock conflict
-   */
-  default AssetBindingPage alterAssetBindings(
-      String name,
-      ArticleObjectIdentifier[] objectsToAdd,
-      ArticleObjectIdentifier[] objectsToRemove)
-      throws NoSuchKnowledgeBaseArticleException, KnowledgeBaseArticleVersionConflictException {
-    return alterAssetBindings(name, objectsToAdd, objectsToRemove, null);
-  }
-
-  /**
-   * Changes bindings atomically if the article still matches the supplied token.
-   *
-   * @param name the article name
-   * @param objectsToAdd assets to bind
-   * @param objectsToRemove assets to unbind
-   * @param revisionToken the loaded revision token, or null for an unconditional request
-   * @return the first 100 visible bindings after the change, continuation flag and updated token
    */
   AssetBindingPage alterAssetBindings(
       String name,
       ArticleObjectIdentifier[] objectsToAdd,
-      ArticleObjectIdentifier[] objectsToRemove,
-      @Nullable String revisionToken)
+      ArticleObjectIdentifier[] objectsToRemove)
       throws NoSuchKnowledgeBaseArticleException, KnowledgeBaseArticleVersionConflictException;
 
   /**
@@ -212,7 +163,7 @@ public interface KnowledgeBaseArticleOperations {
    * @param includeDeprecated whether to include deprecated articles
    * @param limit maximum page size
    * @param offset number of visible matches to skip
-   * @return a page with the visible total and continuation flag
+   * @return a page of visible matches with its continuation flag
    */
   ArticlePage listArticlesForObject(
       ArticleObjectIdentifier object, boolean includeDeprecated, int limit, int offset);

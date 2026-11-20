@@ -20,13 +20,15 @@
 package org.apache.gravitino.kb;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
- * A change to a Knowledge Base Article. Changes to the title, the body, the Domains or the bindings
- * are versioned together: a request carrying any of them creates exactly one new version.
+ * A change to current Article content, metadata or bindings. All changes in one alter request are
+ * applied atomically.
  *
  * <p>The article name is immutable, so no rename change exists.
  */
@@ -122,6 +124,150 @@ public interface KnowledgeBaseArticleChange {
    */
   static KnowledgeBaseArticleChange removeProperty(String property) {
     return new RemoveProperty(property);
+  }
+
+  /**
+   * Creates a change to add terms to the binding set.
+   *
+   * @param terms binding targets
+   * @return the change
+   */
+  static AddTerms addTerms(String... terms) {
+    return new AddTerms(terms);
+  }
+
+  /** Binding targets to add in the same transaction as other changes. */
+  final class AddTerms implements KnowledgeBaseArticleChange {
+    private final ImmutableList<String> terms;
+
+    private AddTerms(String[] terms) {
+      this.terms = ArticleValidation.termNames(Arrays.asList(terms));
+    }
+
+    /**
+     * @return the terms to add
+     */
+    public List<String> getTerms() {
+      return terms;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      return other instanceof AddTerms && terms.equals(((AddTerms) other).terms);
+    }
+
+    @Override
+    public int hashCode() {
+      return terms.hashCode();
+    }
+  }
+
+  /**
+   * Creates a change to remove terms from the requested binding set.
+   *
+   * @param terms binding targets
+   * @return the change
+   */
+  static RemoveTerms removeTerms(String... terms) {
+    return new RemoveTerms(terms);
+  }
+
+  /** Binding targets to remove in the same transaction as other changes. */
+  final class RemoveTerms implements KnowledgeBaseArticleChange {
+    private final ImmutableList<String> terms;
+
+    private RemoveTerms(String[] terms) {
+      this.terms = ArticleValidation.termNames(Arrays.asList(terms));
+    }
+
+    /**
+     * @return the terms to remove
+     */
+    public List<String> getTerms() {
+      return terms;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      return other instanceof RemoveTerms && terms.equals(((RemoveTerms) other).terms);
+    }
+
+    @Override
+    public int hashCode() {
+      return terms.hashCode();
+    }
+  }
+
+  /**
+   * Creates a change to add objects to the binding set.
+   *
+   * @param objects binding targets
+   * @return the change
+   */
+  static AddObjects addObjects(ArticleObjectIdentifier... objects) {
+    return new AddObjects(objects);
+  }
+
+  /** Binding targets to add in the same transaction as other changes. */
+  final class AddObjects implements KnowledgeBaseArticleChange {
+    private final ImmutableList<ArticleObjectIdentifier> objects;
+
+    private AddObjects(ArticleObjectIdentifier[] objects) {
+      this.objects = ImmutableList.copyOf(objects);
+    }
+
+    /**
+     * @return the objects to add
+     */
+    public List<ArticleObjectIdentifier> getObjects() {
+      return objects;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      return other instanceof AddObjects && objects.equals(((AddObjects) other).objects);
+    }
+
+    @Override
+    public int hashCode() {
+      return objects.hashCode();
+    }
+  }
+
+  /**
+   * Creates a change to remove objects from the requested binding set.
+   *
+   * @param objects binding targets
+   * @return the change
+   */
+  static RemoveObjects removeObjects(ArticleObjectIdentifier... objects) {
+    return new RemoveObjects(objects);
+  }
+
+  /** Binding targets to remove in the same transaction as other changes. */
+  final class RemoveObjects implements KnowledgeBaseArticleChange {
+    private final ImmutableList<ArticleObjectIdentifier> objects;
+
+    private RemoveObjects(ArticleObjectIdentifier[] objects) {
+      this.objects = ImmutableList.copyOf(objects);
+    }
+
+    /**
+     * @return the objects to remove
+     */
+    public List<ArticleObjectIdentifier> getObjects() {
+      return objects;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      return other instanceof RemoveObjects && objects.equals(((RemoveObjects) other).objects);
+    }
+
+    @Override
+    public int hashCode() {
+      return objects.hashCode();
+    }
   }
 
   /** A change to replace the title. */

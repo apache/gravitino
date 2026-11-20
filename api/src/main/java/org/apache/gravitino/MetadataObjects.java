@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.kb.KnowledgeBaseArticle;
 
 /** The helper class for {@link MetadataObject}. */
 public class MetadataObjects {
@@ -233,7 +234,8 @@ public class MetadataObjects {
      */
     public MetadataObjectImpl(String parent, String name, Type type) {
       this.parent = parent;
-      this.name = name;
+      this.name =
+          type == Type.KNOWLEDGE_BASE_ARTICLE ? KnowledgeBaseArticle.normalizeName(name) : name;
       this.type = type;
     }
 

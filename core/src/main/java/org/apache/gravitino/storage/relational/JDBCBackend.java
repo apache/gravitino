@@ -596,11 +596,9 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       case JOB_TEMPLATE:
       case JOB:
       case VIEW:
+      case KNOWLEDGE_BASE_ARTICLE:
       case DOMAIN:
         // These entity types have not implemented multi-versions, so we can skip.
-        return 0;
-      case KNOWLEDGE_BASE_ARTICLE:
-        // Article content snapshots are retained until the article is deleted.
         return 0;
 
       case SEMANTIC_MODEL:

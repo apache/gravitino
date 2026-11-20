@@ -116,22 +116,21 @@ public class TestKnowledgeBaseArticleContract {
         ArticleListFilter.builder()
             .withQuery("Revenue")
             .withDomain("Finance")
-            .withStatus(ArticleStatus.APPROVED)
+            .withStatus(ArticleStatus.PUBLISHED)
             .withLimit(10)
             .withOffset(20)
             .build();
     assertEquals("Revenue", filter.query());
     assertEquals("Finance", filter.domain());
-    assertEquals(ArticleStatus.APPROVED, filter.status());
+    assertEquals(ArticleStatus.PUBLISHED, filter.status());
     assertEquals(10, filter.limit());
     assertEquals(20, filter.offset());
 
-    assertEquals(ArticleListFilter.DEFAULT_LIMIT, ArticleListFilter.builder().build().limit());
+    assertEquals(20, ArticleListFilter.builder().build().limit());
     assertEquals(1, ArticleListFilter.builder().withLimit(1).build().limit());
-    assertEquals(10_000, ArticleListFilter.builder().withLimit(10_000).build().limit());
+    assertEquals(1_000, ArticleListFilter.builder().withLimit(1_000).build().limit());
     assertThrows(
-        IllegalArgumentException.class,
-        () -> ArticleListFilter.builder().withLimit(10_001).build());
+        IllegalArgumentException.class, () -> ArticleListFilter.builder().withLimit(1_001).build());
     assertThrows(
         IllegalArgumentException.class, () -> ArticleListFilter.builder().withLimit(0).build());
     assertThrows(
@@ -284,10 +283,42 @@ public class TestKnowledgeBaseArticleContract {
             .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "text"));
     assertEquals(null, builder.build().name());
     String valid = "收入-e\u0301_2";
-    assertEquals(valid, builder.withName(valid).build().name());
+    assertEquals("收入-é_2", builder.withName(valid).build().name());
+    assertEquals(
+        "收入-é_2", MetadataObjects.parse(valid, MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE).name());
+    String maxName = StringUtils.repeat("𠀀", 128);
+    assertEquals(maxName, builder.withName(maxName).build().name());
+    assertThrows(IllegalArgumentException.class, () -> builder.withName(maxName + "𠀀").build());
     for (String invalid : Arrays.asList("", "a/b", "a b", "_-", "a.b", "\u0301")) {
       assertThrows(IllegalArgumentException.class, () -> builder.withName(invalid).build());
     }
+  }
+
+  @Test
+  public void testMixedBindingChanges() {
+    ArticleObjectIdentifier table =
+        ArticleObjectIdentifier.of(MetadataObject.Type.TABLE, ImmutableList.of("c", "s"), "t");
+    ArticleObjectIdentifier[] objects = {table};
+    String[] names = {"Revenue"};
+    KnowledgeBaseArticleChange.AddObjects add = KnowledgeBaseArticleChange.addObjects(objects);
+    KnowledgeBaseArticleChange.RemoveTerms remove = KnowledgeBaseArticleChange.removeTerms(names);
+    objects[0] = null;
+    names[0] = "other";
+    assertEquals(ImmutableList.of(table), add.getObjects());
+    assertEquals(ImmutableList.of("Revenue"), remove.getTerms());
+    assertEquals(
+        ImmutableList.of(table), KnowledgeBaseArticleChange.removeObjects(table).getObjects());
+    assertEquals(
+        ImmutableList.of("Revenue"), KnowledgeBaseArticleChange.addTerms("Revenue").getTerms());
+    assertThrows(IllegalArgumentException.class, () -> KnowledgeBaseArticleChange.addTerms(" "));
+    assertEquals(
+        ImmutableList.of("Revenue"),
+        ArticleCreate.builder()
+            .withTitle("Guide")
+            .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "text"))
+            .addTerms("Revenue")
+            .build()
+            .terms());
   }
 
   @Test
@@ -303,10 +334,9 @@ public class TestKnowledgeBaseArticleContract {
   public void testBindingAndArticlePageContinuation() {
     ArticleObjectIdentifier asset =
         ArticleObjectIdentifier.of(MetadataObject.Type.CATALOG, ImmutableList.of(), "catalog");
-    AssetBindingPage bindings = new AssetBindingPage(ImmutableList.of(asset), true, "next-token");
+    AssetBindingPage bindings = new AssetBindingPage(ImmutableList.of(asset), true);
     assertEquals(ImmutableList.of(asset), bindings.objects());
     assertTrue(bindings.hasMore());
-    assertEquals("next-token", bindings.revisionToken());
     ArticleSummary summary =
         new ArticleSummary() {
           public String name() {
@@ -318,7 +348,7 @@ public class TestKnowledgeBaseArticleContract {
           }
 
           public ArticleStatus status() {
-            return ArticleStatus.APPROVED;
+            return ArticleStatus.PUBLISHED;
           }
 
           public String[] domains() {
@@ -329,17 +359,13 @@ public class TestKnowledgeBaseArticleContract {
             return null;
           }
 
-          public int version() {
-            return 1;
-          }
-
           public Audit auditInfo() {
             return null;
           }
         };
-    assertTrue(ArticlePage.of(ImmutableList.of(summary), 101, 99).hasMore());
-    assertFalse(ArticlePage.of(ImmutableList.of(summary), 101, 100).hasMore());
-    assertFalse(ArticlePage.of(ImmutableList.of(), 101, Integer.MAX_VALUE).hasMore());
+    assertTrue(ArticlePage.of(ImmutableList.of(summary), true).hasMore());
+    assertFalse(ArticlePage.of(ImmutableList.of(summary), false).hasMore());
+    assertFalse(ArticlePage.of(ImmutableList.of(), false).hasMore());
   }
 
   @Test
@@ -451,11 +477,10 @@ public class TestKnowledgeBaseArticleContract {
 
   @Test
   public void testPageAndHashCodes() {
-    ArticlePage page = ArticlePage.of((ArticleSummary[]) null, 0);
+    ArticlePage page = ArticlePage.of((ArticleSummary[]) null, false);
     assertTrue(page.articles().isEmpty());
-    assertEquals(0, page.total());
-    assertTrue(ArticlePage.of((List<ArticleSummary>) null, 0).articles().isEmpty());
-    assertThrows(IllegalArgumentException.class, () -> ArticlePage.of(ImmutableList.of(), -1));
+    assertFalse(page.hasMore());
+    assertTrue(ArticlePage.of((List<ArticleSummary>) null, false).articles().isEmpty());
 
     ArticleBody body = ArticleBody.of(ArticleBody.Format.MARKDOWN, "# Revenue");
     assertEquals(

@@ -29,11 +29,10 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
- * The request for creating a Knowledge Base Article together with its first version and its initial
- * Domains and asset bindings, matching the single-save create form.
+ * The request for creating a Knowledge Base Article with its initial Domains and bindings, matching
+ * the single-save create form.
  *
- * <p>{@code name} is optional; when it is omitted the server derives it from the title. Term
- * bindings are added later once the Glossary API is available.
+ * <p>{@code name} is optional; when it is omitted the server derives it from the title.
  */
 @Evolving
 public class ArticleCreate {
@@ -42,6 +41,7 @@ public class ArticleCreate {
   private final String title;
   private final ArticleBody body;
   private final List<String> domains;
+  private final List<String> terms;
   private final ArticleStatus status;
   private final String comment;
   private final List<String> synonyms;
@@ -61,6 +61,7 @@ public class ArticleCreate {
     this.title = ArticleValidation.title(builder.title);
     this.body = builder.body;
     this.domains = ArticleValidation.domainNames(builder.domains.build());
+    this.terms = ArticleValidation.termNames(builder.terms.build());
     this.status = builder.status;
     this.comment =
         ArticleValidation.length(
@@ -91,7 +92,7 @@ public class ArticleCreate {
   }
 
   /**
-   * @return the body of the first version
+   * @return the initial body
    */
   public ArticleBody body() {
     return body;
@@ -105,7 +106,7 @@ public class ArticleCreate {
   }
 
   /**
-   * @return the requested initial status, or {@code null} for the default of APPROVED
+   * @return the requested initial status, or {@code null} for the default of PUBLISHED
    */
   @Nullable
   public ArticleStatus status() {
@@ -149,12 +150,20 @@ public class ArticleCreate {
     return objects;
   }
 
+  /**
+   * @return the initially bound Glossary Term names
+   */
+  public List<String> terms() {
+    return terms;
+  }
+
   /** Builder for {@link ArticleCreate}. */
   public static class Builder {
     private String name;
     private String title;
     private ArticleBody body;
     private final ImmutableList.Builder<String> domains = ImmutableList.builder();
+    private final ImmutableList.Builder<String> terms = ImmutableList.builder();
     private ArticleStatus status;
     private String comment;
     private final ImmutableList.Builder<String> synonyms = ImmutableList.builder();
@@ -163,6 +172,17 @@ public class ArticleCreate {
     private final ImmutableList.Builder<ArticleObjectIdentifier> objects = ImmutableList.builder();
 
     private Builder() {}
+
+    /**
+     * Adds initially bound Terms by name.
+     *
+     * @param names the Term names
+     * @return this builder
+     */
+    public Builder addTerms(String... names) {
+      terms.addAll(Arrays.asList(names));
+      return this;
+    }
 
     /**
      * Sets the explicit name; when omitted the server derives the name from the title. The server

@@ -27,8 +27,8 @@ public enum ArticleStatus {
   /** A draft article. Visible only to its owner with CREATE or to a MANAGE holder. */
   DRAFT,
 
-  /** The live, published version. Visible to every caller who passes the read check. */
-  APPROVED,
+  /** A published article. Visible to every caller who passes the read check. */
+  PUBLISHED,
 
   /** Outdated but still readable. Excluded from reverse lookups unless explicitly requested. */
   DEPRECATED

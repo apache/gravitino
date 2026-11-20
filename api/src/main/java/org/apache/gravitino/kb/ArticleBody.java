@@ -24,15 +24,15 @@ import java.util.Objects;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
- * The rich-text body of a Knowledge Base Article. The body is stored in the format given by the
- * editor and sanitized on the server at write time.
+ * The rich-text body of a Knowledge Base Article. The server preserves Markdown source and
+ * sanitizes HTML on write. Consumers sanitize rendered HTML before display.
  */
 @Evolving
 public final class ArticleBody {
 
   /** The markup format of an article body. */
   public enum Format {
-    /** Markdown text, which may contain raw HTML subject to the same sanitization allowlist. */
+    /** Markdown source. Render embedded HTML as escaped text. */
     MARKDOWN,
 
     /** HTML text. */

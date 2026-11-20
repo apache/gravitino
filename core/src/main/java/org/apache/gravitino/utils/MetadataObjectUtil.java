@@ -45,6 +45,7 @@ import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.kb.KnowledgeBaseArticle;
 
 public class MetadataObjectUtil {
 
@@ -142,7 +143,8 @@ public class MetadataObjectUtil {
       case JOB_TEMPLATE:
         return NameIdentifierUtil.ofJobTemplate(metalakeName, metadataObject.name());
       case KNOWLEDGE_BASE_ARTICLE:
-        return NameIdentifier.of(metalakeName, metadataObject.name());
+        return NameIdentifier.of(
+            metalakeName, KnowledgeBaseArticle.normalizeName(metadataObject.name()));
       case DOMAIN:
         String domainName = metadataObject.fullName();
         NameValidationUtils.validateName("domain", domainName);

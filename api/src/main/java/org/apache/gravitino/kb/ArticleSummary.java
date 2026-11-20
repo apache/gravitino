@@ -57,11 +57,6 @@ public interface ArticleSummary {
   Owner owner();
 
   /**
-   * @return the current content version, starting at one
-   */
-  int version();
-
-  /**
    * @return the audit information
    */
   Audit auditInfo();

@@ -22,6 +22,7 @@ package org.apache.gravitino.kb;
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import java.text.Normalizer;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -34,6 +35,7 @@ final class ArticleValidation {
   @Nullable
   static String name(@Nullable String value) {
     if (value != null) {
+      value = Normalizer.normalize(value, Normalizer.Form.NFC);
       length(value, KnowledgeBaseArticle.NAME_MAX_LENGTH, "Name");
       Preconditions.checkArgument(
           NAME.matcher(value).matches() && value.codePoints().anyMatch(Character::isLetterOrDigit),
@@ -58,6 +60,14 @@ final class ArticleValidation {
         field,
         maximum);
     return value;
+  }
+
+  static ImmutableList<String> termNames(List<String> values) {
+    for (String name : values) {
+      Preconditions.checkArgument(
+          name != null && !name.trim().isEmpty(), "Term name must not be blank");
+    }
+    return ImmutableList.copyOf(values);
   }
 
   static List<String> domainNames(List<String> values) {

@@ -32,10 +32,10 @@ import org.apache.gravitino.authorization.Owner;
 public class ArticleListFilter {
 
   /** Default page size used when no {@code limit} is supplied. */
-  public static final int DEFAULT_LIMIT = 100;
+  public static final int DEFAULT_LIMIT = 20;
 
   /** Maximum number of articles that can be requested in one page. */
-  public static final int MAX_LIMIT = 10_000;
+  public static final int MAX_LIMIT = 1_000;
 
   private final String query;
   private final String domain;
@@ -69,8 +69,8 @@ public class ArticleListFilter {
   }
 
   /**
-   * @return the Domain name filter; a parent Domain also returns its subdomains' articles, or
-   *     {@code null}
+   * @return the Domain name filter; a parent Domain also returns articles in its caller-readable
+   *     subdomains, or {@code null}
    */
   @Nullable
   public String domain() {
@@ -130,7 +130,7 @@ public class ArticleListFilter {
     }
 
     /**
-     * Sets the Domain name filter; a parent Domain also matches its subdomains.
+     * Sets the Domain name filter; a parent Domain also matches its caller-readable subdomains.
      *
      * @param domain the Domain name
      * @return this builder
