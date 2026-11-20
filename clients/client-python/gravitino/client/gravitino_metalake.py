@@ -1409,6 +1409,7 @@ class GravitinoMetalake(
             owner_type: The type of the owner (USER or GROUP).
 
         Raises:
+            ForbiddenException: If the caller lacks permission to transfer ownership.
             NoSuchMetadataObjectException: If the metadata object does not exist.
             NotFoundException: If a related resource is not found.
             MetalakeNotInUseException: If the metalake is not in use.

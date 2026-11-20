@@ -461,6 +461,7 @@ public class GravitinoClient extends GravitinoClientBase
    * @param object The metadata object.
    * @param ownerName The name of the owner
    * @param ownerType The type of the owner, The owner can be a user or a group.
+   * @throws ForbiddenException If the caller lacks permission to transfer ownership.
    * @throws NotFoundException If the metadata object isn't found or the owner doesn't exist.
    */
   public void setOwner(MetadataObject object, String ownerName, Owner.Type ownerType)
