@@ -30,6 +30,9 @@ import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.spark.sql.Row;
+import org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergRewriteDataFilesJob {
@@ -561,6 +564,45 @@ public class TestIcebergRewriteDataFilesJob {
         0L, ((Number) metrics.get(IcebergDataCompactionContent.FILE_NUMBER_METRIC)).longValue());
     assertEquals(
         0L,
+        ((Number) metrics.get(IcebergDataCompactionContent.SMALL_FILE_NUMBER_METRIC)).longValue());
+    assertFalse(metrics.containsKey(IcebergDataCompactionContent.DATA_MSE_RATIO_METRIC));
+  }
+
+  @Test
+  public void testAggregatePartitionCompactionMetricsSumsSmallFiles() {
+    StructType schema =
+        new StructType()
+            .add("data-file-mse", DataTypes.DoubleType)
+            .add("delete-file-number", DataTypes.LongType)
+            .add("avg-file-size", DataTypes.DoubleType)
+            .add("total-file-size", DataTypes.LongType)
+            .add("file-number", DataTypes.LongType)
+            .add("small-file-number", DataTypes.LongType);
+    Row[] partitions =
+        new Row[] {
+          new GenericRowWithSchema(new Object[] {10.0D, 1L, 100.0D, 200L, 2L, 2L}, schema),
+          new GenericRowWithSchema(new Object[] {30.0D, 3L, 50.0D, 150L, 3L, 1L}, schema)
+        };
+
+    Map<String, Object> metrics =
+        IcebergRewriteDataFilesJob.aggregatePartitionCompactionMetrics(partitions);
+
+    assertEquals(
+        30.0D,
+        ((Number) metrics.get(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC)).doubleValue());
+    assertEquals(
+        4L,
+        ((Number) metrics.get(IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC)).longValue());
+    assertEquals(
+        70.0D,
+        ((Number) metrics.get(IcebergDataCompactionContent.AVG_FILE_SIZE_METRIC)).doubleValue());
+    assertEquals(
+        350L,
+        ((Number) metrics.get(IcebergDataCompactionContent.TOTAL_FILE_SIZE_METRIC)).longValue());
+    assertEquals(
+        5L, ((Number) metrics.get(IcebergDataCompactionContent.FILE_NUMBER_METRIC)).longValue());
+    assertEquals(
+        3L,
         ((Number) metrics.get(IcebergDataCompactionContent.SMALL_FILE_NUMBER_METRIC)).longValue());
     assertFalse(metrics.containsKey(IcebergDataCompactionContent.DATA_MSE_RATIO_METRIC));
   }
