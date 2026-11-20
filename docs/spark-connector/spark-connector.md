@@ -68,7 +68,10 @@ for supported client configuration.
 When `spark.sql.gravitino.authType` is `token`, the connector presents the bearer token found in
 `spark.sql.gravitino.token.file`, or failing that `spark.sql.gravitino.token.value`, resolving it again on
 every request and reading the active Spark session's configuration in preference to the
-application's. The identity of the caller is taken from the JWT claim named by
+application's. Spark copies the application's `spark.sql.*` settings into every session, so a
+session value identical to the application's counts as the application's; a session that wants its
+own token must set a value different from the application's. The identity of the caller is taken
+from the JWT claim named by
 `spark.sql.gravitino.token.principalFields`, which should be set to match the server's
 `gravitino.authenticator.oauth.principalFields` so that the connector and the server agree on who
 is asking. The claim is read without verifying the signature, because validating the token remains
