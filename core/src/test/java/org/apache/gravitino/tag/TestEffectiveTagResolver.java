@@ -46,6 +46,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.connector.BaseCatalog;
@@ -174,6 +175,32 @@ public class TestEffectiveTagResolver {
     Assertions.assertArrayEquals(
         new String[] {"risk"}, effectiveTags[0].tag().assignment().orElseThrow().values());
     Assertions.assertFalse(effectiveTags[0].tag().inherited().orElseThrow());
+  }
+
+  @Test
+  void testRequestResolutionSharesAncestorTagsForMissingTarget() throws Exception {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    NameIdentifier schema = MetadataObjectUtil.toEntityIdent(METALAKE, SCHEMA);
+    when(relationOperations.listEntitiesByRelation(
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+            MetadataObjectUtil.toEntityIdent(METALAKE, TABLE),
+            Entity.EntityType.TABLE))
+        .thenThrow(new NoSuchEntityException("missing table"));
+    when(relationOperations.listEntitiesByRelation(
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+            schema,
+            Entity.EntityType.SCHEMA))
+        .thenReturn(List.of(tag(1L, "tier", TagAssignment.ofValues("gold"))));
+
+    Assertions.assertEquals(
+        SCHEMA, resolver.resolveWithSources(METALAKE, TABLE, context)[0].source());
+    Assertions.assertEquals(
+        SCHEMA, resolver.resolveWithSources(METALAKE, SCHEMA, context)[0].source());
+    verify(relationOperations)
+        .listEntitiesByRelation(
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+            schema,
+            Entity.EntityType.SCHEMA);
   }
 
   @Test
