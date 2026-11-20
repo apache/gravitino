@@ -94,7 +94,10 @@ dependencies {
   testImplementation(libs.bundles.jersey)
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.log4j)
-  testImplementation(libs.hadoop3.aws)
+  testImplementation(libs.hadoop3.aws) {
+    exclude("software.amazon.awssdk", "bundle")
+  }
+  testImplementation(libs.bundles.hadoop.aws.sdk)
   testImplementation(libs.hadoop3.common) {
     exclude("*")
   }
