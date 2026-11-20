@@ -19,90 +19,97 @@
 
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
-import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
-import org.apache.ibatis.builder.annotation.ProviderContext;
+import java.util.Collection;
+import org.apache.gravitino.storage.relational.po.GlossaryTermRelPO;
+import org.apache.ibatis.annotations.Param;
 
 /** SQL for glossary edges and the per-metalake hierarchy mutex, including MySQL 5.7. */
-public final class GlossaryTermRelSQLProvider {
+public class GlossaryTermRelBaseSQLProvider {
   private static final String COLUMNS =
       "r.metalake_id AS metalakeId, r.from_term_id AS fromTermId, "
           + "r.to_term_id AS toTermId, r.rel_type AS relType, r.deleted_at AS deletedAt";
-  private static final String KEY =
-      "metalake_id=#{metalakeId} AND from_term_id=#{fromId} AND to_term_id=#{toId} "
-          + "AND rel_type=#{type}";
-
-  private GlossaryTermRelSQLProvider() {}
 
   /** Creates the mutex row without aborting a concurrent first-use transaction. */
-  public static String ensureLock(ProviderContext context) {
-    switch (JDBCBackendType.fromString(context.getDatabaseId())) {
-      case MYSQL:
-        return "INSERT INTO glossary_hierarchy_lock (metalake_id) VALUES (#{metalakeId}) "
-            + "ON DUPLICATE KEY UPDATE metalake_id=metalake_id";
-      case POSTGRESQL:
-        return "INSERT INTO glossary_hierarchy_lock (metalake_id) VALUES (#{metalakeId}) "
-            + "ON CONFLICT (metalake_id) DO NOTHING";
-      case H2:
-        return "MERGE INTO glossary_hierarchy_lock (metalake_id) KEY (metalake_id) "
-            + "VALUES (#{metalakeId})";
-      default:
-        throw new UnsupportedOperationException(
-            "Unsupported glossary database: " + context.getDatabaseId());
-    }
+  public String ensureLock(@Param("metalakeId") long metalakeId) {
+    return "INSERT INTO glossary_hierarchy_lock (metalake_id) VALUES (#{metalakeId}) "
+        + "ON DUPLICATE KEY UPDATE metalake_id=metalake_id";
   }
 
   /** Locks the mutex until the caller transaction ends. */
-  public static String lockHierarchy() {
+  public String lockHierarchy(@Param("metalakeId") long metalakeId) {
     return "SELECT metalake_id FROM glossary_hierarchy_lock WHERE metalake_id=#{metalakeId} FOR UPDATE";
   }
 
   /** Locks one live endpoint after the metalake fence and hierarchy mutex. */
-  public static String lockTerm() {
+  public String lockTerm(@Param("metalakeId") long metalakeId, @Param("termId") long termId) {
     return "SELECT term_id FROM glossary_term_meta WHERE metalake_id=#{metalakeId} "
         + "AND term_id=#{termId} AND deleted_at=0 FOR UPDATE";
   }
 
   /** Inserts an already canonicalized edge. */
-  public static String insert() {
+  public String insert(
+      @Param("metalakeId") long metalakeId,
+      @Param("fromId") long fromId,
+      @Param("toId") long toId,
+      @Param("type") String type) {
     return "INSERT INTO glossary_term_rel (metalake_id, from_term_id, to_term_id, rel_type, deleted_at) "
         + "VALUES (#{metalakeId}, #{fromId}, #{toId}, #{type}, 0)";
   }
 
   /** Tests whether a live edge already exists under the hierarchy mutex. */
-  public static String exists() {
-    return "SELECT COUNT(*) FROM glossary_term_rel WHERE " + KEY + " AND deleted_at=0";
+  public String exists(
+      @Param("metalakeId") long metalakeId,
+      @Param("fromId") long fromId,
+      @Param("toId") long toId,
+      @Param("type") String type) {
+    return "SELECT COUNT(*) FROM glossary_term_rel WHERE "
+        + "metalake_id=#{metalakeId} AND from_term_id=#{fromId} AND to_term_id=#{toId} AND rel_type=#{type}"
+        + " AND deleted_at=0";
   }
 
   /** Retires one live edge. The caller supplies a collision-free tombstone time. */
-  public static String remove() {
+  public String remove(
+      @Param("metalakeId") long metalakeId,
+      @Param("fromId") long fromId,
+      @Param("toId") long toId,
+      @Param("type") String type,
+      @Param("deletedAt") long deletedAt) {
     return "UPDATE glossary_term_rel SET deleted_at=#{deletedAt} WHERE "
-        + KEY
+        + "metalake_id=#{metalakeId} AND from_term_id=#{fromId} AND to_term_id=#{toId} AND rel_type=#{type}"
         + " AND deleted_at=0";
   }
 
   /** Reads the latest tombstone time under the metalake's hierarchy mutex or deletion fence. */
-  public static String lastDeletedAt() {
+  public String lastDeletedAt(@Param("metalakeId") long metalakeId) {
     return "SELECT COALESCE(MAX(deleted_at), 0) FROM glossary_term_rel WHERE metalake_id=#{metalakeId}";
   }
 
   /** Retires every edge touching a term in the caller's deletion transaction. */
-  public static String removeTerm() {
+  public String removeTerm(
+      @Param("metalakeId") long metalakeId,
+      @Param("termId") long termId,
+      @Param("deletedAt") long deletedAt) {
     return "UPDATE glossary_term_rel SET deleted_at=#{deletedAt} WHERE metalake_id=#{metalakeId} "
         + "AND (from_term_id=#{termId} OR to_term_id=#{termId}) AND deleted_at=0";
   }
 
   /** Retires all live edges of a metalake under its exclusive deletion fence. */
-  public static String dropMetalake() {
+  public String dropMetalake(
+      @Param("metalakeId") long metalakeId, @Param("deletedAt") long deletedAt) {
     return "UPDATE glossary_term_rel SET deleted_at=#{deletedAt} WHERE metalake_id=#{metalakeId} AND deleted_at=0";
   }
 
   /** Removes the mutex of a deleted metalake under its exclusive deletion fence. */
-  public static String dropLock() {
+  public String dropLock(@Param("metalakeId") long metalakeId) {
     return "DELETE FROM glossary_hierarchy_lock WHERE metalake_id=#{metalakeId}";
   }
 
   /** Reads one frontier batch, excluding deleted endpoints, without recursive SQL or locks. */
-  public static String listEdges() {
+  public String listEdges(
+      @Param("metalakeId") long metalakeId,
+      @Param("ids") Collection<Long> ids,
+      @Param("type") String type,
+      @Param("reverse") boolean reverse) {
     return "<script>SELECT "
         + COLUMNS
         + " FROM glossary_term_rel r "
@@ -118,7 +125,7 @@ public final class GlossaryTermRelSQLProvider {
   }
 
   /** Selects a bounded batch of retired edges for garbage collection. */
-  public static String expired() {
+  public String expired(@Param("cutoff") long cutoff, @Param("limit") int limit) {
     return "SELECT "
         + COLUMNS
         + " FROM glossary_term_rel r WHERE r.deleted_at>0 "
@@ -126,8 +133,8 @@ public final class GlossaryTermRelSQLProvider {
   }
 
   /** Deletes only the selected retired generation, never a newly added live edge. */
-  public static String purge() {
-    return "DELETE FROM glossary_term_rel WHERE metalake_id=#{p.metalakeId} AND from_term_id=#{p.fromTermId} "
-        + "AND to_term_id=#{p.toTermId} AND rel_type=#{p.relType} AND deleted_at=#{p.deletedAt} AND deleted_at>0";
+  public String purge(@Param("relation") GlossaryTermRelPO relation) {
+    return "DELETE FROM glossary_term_rel WHERE metalake_id=#{relation.metalakeId} AND from_term_id=#{relation.fromTermId} "
+        + "AND to_term_id=#{relation.toTermId} AND rel_type=#{relation.relType} AND deleted_at=#{relation.deletedAt} AND deleted_at>0";
   }
 }

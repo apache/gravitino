@@ -172,11 +172,13 @@ public class GlossaryTermMetaSQLProviderFactory {
     public String getForUpdate(@Param("metalakeId") long metalakeId, @Param("key") String key) {
       // Relation writers lock the primary key before updating the name index. Resolve the ID
       // without locking the name index, then verify the live name on the locked row.
-      return selectForUpdate(
-          " FORCE INDEX (PRIMARY) WHERE term_id=(SELECT term_id FROM glossary_term_meta WHERE "
-              + LIVE_NAME
-              + ") AND "
-              + LIVE_NAME);
+      String liveTerm = liveTermByName(metalakeId, key);
+      return SELECT_TERM
+          + " FORCE INDEX (PRIMARY) WHERE term_id=(SELECT term_id FROM glossary_term_meta WHERE "
+          + liveTerm
+          + ") AND "
+          + liveTerm
+          + " FOR UPDATE";
     }
   }
 }

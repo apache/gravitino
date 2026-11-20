@@ -26,17 +26,30 @@ import org.apache.ibatis.annotations.Param;
 
 /** Portable SQL for glossary definitions and synonyms on H2, MySQL and PostgreSQL. */
 public class GlossaryTermMetaBaseSQLProvider {
-  private static final String LIVE_METALAKE_JOIN =
-      " JOIN metalake_meta m ON m.metalake_id=t.metalake_id "
-          + "AND m.metalake_name=#{metalakeName} AND m.deleted_at=0 ";
+  /** Selects a term definition for a locking read. */
+  protected static final String SELECT_TERM =
+      "SELECT term_id AS termId, name AS name, name_key AS nameKey, metalake_id AS "
+          + "metalakeId, definition AS definition, status AS status, links AS links, source_ref AS "
+          + "sourceRef, properties AS properties, audit_info AS auditInfo, current_version AS "
+          + "currentVersion, deleted_at AS deletedAt FROM glossary_term_meta";
 
-  /** The live term selected by the caller's metalake ID and normalized name. */
-  protected static final String LIVE_NAME =
-      "metalake_id=#{metalakeId} AND name_key=#{key} AND deleted_at=0";
+  private static final String SNAPSHOT_SELECT =
+      "<script>SELECT t.term_id AS termId, t.name AS name, t.name_key AS nameKey, "
+          + "m.metalake_id AS metalakeId, t.definition AS definition, t.status AS status, "
+          + "t.links AS links, t.source_ref AS sourceRef, t.properties AS properties, "
+          + "t.audit_info AS auditInfo, t.current_version AS currentVersion, "
+          + "t.deleted_at AS deletedAt, s.synonym AS synonym FROM metalake_meta m "
+          + "LEFT JOIN glossary_term_meta t ON t.metalake_id=m.metalake_id AND t.deleted_at=0 ";
+
+  private static final String SNAPSHOT_SYNONYM_JOIN =
+      "LEFT JOIN glossary_term_synonym s ON s.term_id=t.term_id "
+          + "AND s.metalake_id=t.metalake_id AND s.deleted_at=0 ";
+
+  private static final String SNAPSHOT_ORDER = " ORDER BY t.term_id,s.synonym_key</script>";
 
   /** Locks a definition after the caller has fenced its metalake. */
   public String getForUpdate(@Param("metalakeId") long metalakeId, @Param("key") String key) {
-    return selectForUpdate(" WHERE " + LIVE_NAME);
+    return SELECT_TERM + " WHERE " + liveTermByName(metalakeId, key) + " FOR UPDATE";
   }
 
   /** Resolves IDs only while the parent still has the requested live name. */
@@ -45,7 +58,8 @@ public class GlossaryTermMetaBaseSQLProvider {
       @Param("metalakeName") String metalakeName,
       @Param("key") String key) {
     return "SELECT t.term_id AS termId, t.metalake_id AS metalakeId FROM glossary_term_meta t"
-        + LIVE_METALAKE_JOIN
+        + " JOIN metalake_meta m ON m.metalake_id=t.metalake_id "
+        + "AND m.metalake_name=#{metalakeName} AND m.deleted_at=0 "
         + "WHERE t.metalake_id=#{metalakeId} AND t.name_key=#{key} AND t.deleted_at=0";
   }
 
@@ -138,7 +152,11 @@ public class GlossaryTermMetaBaseSQLProvider {
       @Param("metalakeId") long metalakeId,
       @Param("metalakeName") String metalakeName,
       @Param("key") @Nullable String key) {
-    return snapshotQuery(key == null ? "" : "AND t.name_key=#{key} ");
+    return SNAPSHOT_SELECT
+        + (key == null ? "" : "AND t.name_key=#{key} ")
+        + SNAPSHOT_SYNONYM_JOIN
+        + "WHERE m.metalake_id=#{metalakeId} AND m.metalake_name=#{metalakeName} AND m.deleted_at=0"
+        + SNAPSHOT_ORDER;
   }
 
   /** Reads a bounded batch of live terms by ID. */
@@ -146,8 +164,11 @@ public class GlossaryTermMetaBaseSQLProvider {
       @Param("metalakeId") long metalakeId,
       @Param("metalakeName") String metalakeName,
       @Param("ids") List<Long> ids) {
-    return snapshotQuery(
-        "AND t.term_id IN <foreach item='id' collection='ids' open='(' close=')' separator=','>#{id}</foreach> ");
+    return SNAPSHOT_SELECT
+        + "AND t.term_id IN <foreach item='id' collection='ids' open='(' close=')' separator=','>#{id}</foreach> "
+        + SNAPSHOT_SYNONYM_JOIN
+        + "WHERE m.metalake_id=#{metalakeId} AND m.metalake_name=#{metalakeName} AND m.deleted_at=0"
+        + SNAPSHOT_ORDER;
   }
 
   /** Finds a different live term whose name matches one of the proposed synonym keys. */
@@ -177,29 +198,8 @@ public class GlossaryTermMetaBaseSQLProvider {
         + "<foreach collection='keys' item='key' open='(' separator=',' close=')'>#{key}</foreach></script>";
   }
 
-  /** Builds the locking read with the backend's access path. */
-  protected String selectForUpdate(String lookup) {
-    return "SELECT term_id AS termId, name AS name, name_key AS nameKey, metalake_id AS "
-        + "metalakeId, definition AS definition, status AS status, links AS links, source_ref AS "
-        + "sourceRef, properties AS properties, audit_info AS auditInfo, current_version AS "
-        + "currentVersion, deleted_at AS deletedAt FROM glossary_term_meta"
-        + lookup
-        + " FOR UPDATE";
-  }
-
-  private String snapshotQuery(String termFilter) {
-    // Validate the parent name in this snapshot too: it can be renamed after ID resolution.
-    // A single statement avoids mixed revisions at READ_COMMITTED without locking readers.
-    return "<script>SELECT t.term_id AS termId, t.name AS name, t.name_key AS nameKey, "
-        + "m.metalake_id AS metalakeId, t.definition AS definition, t.status AS status, "
-        + "t.links AS links, t.source_ref AS sourceRef, t.properties AS properties, "
-        + "t.audit_info AS auditInfo, t.current_version AS currentVersion, "
-        + "t.deleted_at AS deletedAt, s.synonym AS synonym FROM metalake_meta m "
-        + "LEFT JOIN glossary_term_meta t ON t.metalake_id=m.metalake_id AND t.deleted_at=0 "
-        + termFilter
-        + "LEFT JOIN glossary_term_synonym s ON s.term_id=t.term_id "
-        + "AND s.metalake_id=t.metalake_id AND s.deleted_at=0 "
-        + "WHERE m.metalake_id=#{metalakeId} AND m.metalake_name=#{metalakeName} AND m.deleted_at=0"
-        + " ORDER BY t.term_id,s.synonym_key</script>";
+  /** Matches the live term under its metalake ID and normalized name. */
+  protected String liveTermByName(long metalakeId, String key) {
+    return "metalake_id=#{metalakeId} AND name_key=#{key} AND deleted_at=0";
   }
 }
