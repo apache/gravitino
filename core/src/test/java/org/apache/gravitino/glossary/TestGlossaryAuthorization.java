@@ -55,6 +55,7 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.apache.gravitino.exceptions.TermAlreadyExistsException;
 import org.apache.gravitino.meta.GlossaryTermEntity;
@@ -321,6 +322,56 @@ class TestGlossaryAuthorization extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testListChecksWritePrivilegesOnlyWhenDraftsNeedThem() throws Exception {
+    as("admin", () -> manager.createTerm(LAKE, TermSpec.builder("Published").build()));
+    GravitinoAuthorizer observed =
+        Mockito.mock(GravitinoAuthorizer.class, AdditionalAnswers.delegatesTo(nodeA));
+    env.setGravitinoAuthorizer(observed);
+    assertEquals(1, as("viewer", () -> manager.listTerms(LAKE)).size());
+    for (Privilege.Name privilege :
+        List.of(Privilege.Name.CREATE_DEFINITION, Privilege.Name.MANAGE_DEFINITIONS)) {
+      Mockito.verify(observed, Mockito.never())
+          .authorize(
+              Mockito.any(), Mockito.eq(LAKE), Mockito.any(), Mockito.eq(privilege), Mockito.any());
+    }
+
+    for (String name : List.of("Draft1", "Draft2")) {
+      as(
+          "writer",
+          () ->
+              manager.createTerm(
+                  LAKE, TermSpec.builder(name).withStatus(GlossaryTerm.Status.DRAFT).build()));
+    }
+    Mockito.clearInvocations(observed);
+    assertEquals(3, as("writer", () -> manager.listTerms(LAKE)).size());
+    for (Privilege.Name privilege :
+        List.of(Privilege.Name.CREATE_DEFINITION, Privilege.Name.MANAGE_DEFINITIONS)) {
+      Mockito.verify(observed)
+          .authorize(
+              Mockito.any(), Mockito.eq(LAKE), Mockito.any(), Mockito.eq(privilege), Mockito.any());
+    }
+    Mockito.verify(observed, Mockito.times(2))
+        .isGlossaryTermOwner(Mockito.any(), Mockito.eq(LAKE), Mockito.anyLong(), Mockito.any());
+  }
+
+  @TestTemplate
+  void testMissingWriteScopeIsReportedBeforePrivilegeLookup() throws Exception {
+    GravitinoAuthorizer observed = Mockito.mock(GravitinoAuthorizer.class);
+    env.setGravitinoAuthorizer(observed);
+    String absent = "absent";
+    assertThrows(
+        NoSuchMetalakeException.class,
+        () -> as("writer", () -> manager.createTerm(absent, TermSpec.builder("term").build())));
+    for (TermChange change :
+        List.of(TermChange.updateDefinition("updated"), TermChange.addRelated("peer"))) {
+      assertThrows(
+          NoSuchTermException.class,
+          () -> as("writer", () -> manager.alterTerm(absent, "term", change)));
+    }
+    Mockito.verifyNoInteractions(observed);
+  }
+
+  @TestTemplate
   void testListPreservesAuthorizationLookupFailure() throws Exception {
     GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
     NoSuchEntityException failure = new NoSuchEntityException("Owner lookup failed");
@@ -344,6 +395,20 @@ class TestGlossaryAuthorization extends TestJDBCBackend {
     assertThrows(
         NoSuchTermException.class,
         () -> as("viewer", () -> filtered.alterTerm(LAKE, "Root", TermChange.addRelated("Peer"))));
+    GlossaryManager scoped = filtered.withTermVisibility(term -> !term.name().equals("Peer"));
+    for (String name : List.of("Root", "Peer")) {
+      assertThrows(
+          NoSuchTermException.class,
+          () ->
+              as(
+                  "admin",
+                  () ->
+                      scoped.listRelations(
+                          LAKE, name, GlossaryManager.Direction.RELATED, false, null)));
+    }
+    assertThrows(
+        NoSuchTermException.class,
+        () -> as("admin", () -> scoped.alterTerm(LAKE, "Root", TermChange.addRelated("Peer"))));
     assertEquals(1, as("admin", () -> manager.getTerm(LAKE, "Root")).version());
   }
 

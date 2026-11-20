@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.glossary;
 
+import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
 import java.security.Principal;
 import java.util.function.LongPredicate;
 import org.apache.gravitino.GravitinoEnv;
@@ -36,10 +38,33 @@ import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /** Metalake capabilities for one glossary operation. Term ownership follows the observed ID. */
-public record GlossaryAccess(boolean view, boolean create, boolean manage, LongPredicate owns) {
+public final class GlossaryAccess {
   private static final GlossaryAccess UNRESTRICTED =
-      new GlossaryAccess(true, true, true, id -> true);
-  private static final GlossaryAccess DENIED = new GlossaryAccess(false, false, false, id -> false);
+      new GlossaryAccess(true, () -> true, () -> true, id -> true);
+  private static final GlossaryAccess DENIED =
+      new GlossaryAccess(false, () -> false, () -> false, id -> false);
+
+  private final boolean view;
+  private final Supplier<Boolean> create;
+  private final Supplier<Boolean> manage;
+  private final LongPredicate owns;
+
+  private GlossaryAccess(
+      boolean view, Supplier<Boolean> create, Supplier<Boolean> manage, LongPredicate owns) {
+    this.view = view;
+    // A list or hierarchy walk can visit many drafts. Evaluate each required privilege once.
+    this.create = Suppliers.memoize(create);
+    this.manage = Suppliers.memoize(manage);
+    this.owns = owns;
+  }
+
+  boolean view() {
+    return view;
+  }
+
+  boolean manage() {
+    return manage.get();
+  }
 
   static GlossaryAccess forRequest(String metalake, boolean enabled) {
     if (!enabled) {
@@ -86,8 +111,8 @@ public record GlossaryAccess(boolean view, boolean create, boolean manage, LongP
     }
     return new GlossaryAccess(
         true,
-        effective(authorizer, principal, metalake, lake, Name.CREATE_DEFINITION, context),
-        effective(authorizer, principal, metalake, lake, Name.MANAGE_DEFINITIONS, context),
+        () -> effective(authorizer, principal, metalake, lake, Name.CREATE_DEFINITION, context),
+        () -> effective(authorizer, principal, metalake, lake, Name.MANAGE_DEFINITIONS, context),
         id -> authorizer.isGlossaryTermOwner(principal, metalake, id, context));
   }
 
@@ -107,11 +132,11 @@ public record GlossaryAccess(boolean view, boolean create, boolean manage, LongP
   }
 
   boolean canEdit(GlossaryTermEntity term) {
-    return manage || create && owns.test(term.id());
+    return manage() || (create.get() && owns.test(term.id()));
   }
 
   void requireCreate() {
-    if (!create) {
+    if (!create.get()) {
       throw new ForbiddenException("Creating a glossary term requires CREATE_DEFINITION");
     }
   }

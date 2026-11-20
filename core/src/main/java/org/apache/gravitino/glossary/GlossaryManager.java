@@ -92,7 +92,7 @@ public final class GlossaryManager {
   /** Applies an additional visibility filter to hierarchy reads and referenced terms in writes. */
   public GlossaryManager withTermVisibility(Predicate<GlossaryTermEntity> visibility) {
     return new GlossaryManager(
-        ids, authorizationEnabled, handler, Preconditions.checkNotNull(visibility), depthLimit);
+        ids, authorizationEnabled, handler, readable.and(visibility), depthLimit);
   }
 
   /** Selects the direction of a hierarchy walk or the symmetric direct related terms. */
@@ -218,38 +218,40 @@ public final class GlossaryManager {
    */
   public GlossaryTermEntity createTerm(String metalake, TermSpec spec) {
     Namespace ns = NamespaceUtil.ofGlossaryTerm(metalake);
-    GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
-    access.requireCreate();
-    GlossaryTermEntity term = TermEdits.create(ids.nextId(), ns, spec);
-    List<TermRelations.Edit> edits = new ArrayList<>();
-    for (String name : spec.broader()) {
-      edits.add(new TermRelations.Edit(RelationType.BROADER, name, true));
-    }
-    for (String name : spec.related()) {
-      edits.add(new TermRelations.Edit(RelationType.RELATED, name, true));
-    }
     return terms.withHierarchyLock(
         ns,
-        lake ->
-            withRelationPlan(
-                lake,
-                term,
-                edits,
-                access,
-                true,
-                ignored -> {},
-                (fresh, plan) -> {
-                  terms.checkTermNames(term);
-                  handler.handle(null, term, () -> persistNewTerm(metalake, term, plan));
-                  return term;
-                }));
+        lake -> {
+          GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
+          access.requireCreate();
+          GlossaryTermEntity term = TermEdits.create(ids.nextId(), ns, spec);
+          List<TermRelations.Edit> edits = new ArrayList<>();
+          for (String name : spec.broader()) {
+            edits.add(new TermRelations.Edit(RelationType.BROADER, name, true));
+          }
+          for (String name : spec.related()) {
+            edits.add(new TermRelations.Edit(RelationType.RELATED, name, true));
+          }
+          return withRelationPlan(
+              lake,
+              term,
+              edits,
+              access,
+              true,
+              ignored -> {},
+              (fresh, plan) -> {
+                terms.checkTermNames(term);
+                handler.handle(null, term, () -> persistNewTerm(metalake, term, plan));
+                return term;
+              });
+        });
   }
 
   /**
    * Applies all changes atomically to the current definition.
    *
    * @throws ForbiddenException if the term is visible but the caller cannot edit it
-   * @throws NoSuchTermException if the term is hidden or the term or its metalake does not exist
+   * @throws NoSuchTermException if the metalake is missing, or the term being edited or a
+   *     referenced relation target is missing or hidden
    * @throws TermAlreadyExistsException if the new name or source reference is already in use
    * @throws IllegalArgumentException if the requested edits are invalid
    */
@@ -261,7 +263,8 @@ public final class GlossaryManager {
    * Applies all changes only if the locked identity and revision match the supplied token.
    *
    * @throws ForbiddenException if the term is visible but the caller cannot edit it
-   * @throws NoSuchTermException if the term is hidden or the term or its metalake does not exist
+   * @throws NoSuchTermException if the metalake is missing, or the term being edited or a
+   *     referenced relation target is missing or hidden
    * @throws TermVersionConflictException if a valid token does not match the current term
    * @throws TermAlreadyExistsException if the new name or source reference is already in use
    * @throws IllegalArgumentException if the supplied token or requested edits are invalid
@@ -348,12 +351,12 @@ public final class GlossaryManager {
         edits.add(edit);
       }
     }
-    GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
     if (!edits.isEmpty()) {
       return terms.withHierarchyLock(
           ident.namespace(),
           lake -> {
             GlossaryTermEntity root = relationRoot(ident).term();
+            GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
             return withRelationPlan(
                 lake,
                 root,
@@ -377,7 +380,8 @@ public final class GlossaryManager {
         locked -> {
           GlossaryTermEntity before =
               locked.orElseThrow(() -> new NoSuchTermException("Term %s does not exist", ident));
-          requireEdit(access, ident, before, null);
+          requireEdit(
+              GlossaryAccess.forRequest(metalake, authorizationEnabled), ident, before, null);
           Preconditions.checkArgument(request.length > 0, "At least one term change is required");
           checkRevision(ident, before, conditional, token);
           return applyChanges(ident, before, request, null);
