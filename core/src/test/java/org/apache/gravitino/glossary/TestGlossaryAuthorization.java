@@ -400,6 +400,20 @@ class TestGlossaryAuthorization extends TestJDBCBackend {
     assertThrows(
         NoSuchTermException.class,
         () -> as("viewer", () -> filtered.alterTerm(LAKE, "Root", TermChange.addRelated("Peer"))));
+    GravitinoAuthorizer observed =
+        Mockito.mock(GravitinoAuthorizer.class, AdditionalAnswers.delegatesTo(nodeA));
+    env.setGravitinoAuthorizer(observed);
+    assertThrows(
+        NoSuchTermException.class,
+        () -> as("writer", () -> filtered.alterTerm(LAKE, "Root", TermChange.addRelated("Peer"))));
+    for (Privilege.Name privilege :
+        List.of(Privilege.Name.MANAGE_DEFINITIONS, Privilege.Name.CREATE_DEFINITION)) {
+      Mockito.verify(observed, Mockito.never())
+          .authorize(
+              Mockito.any(), Mockito.eq(LAKE), Mockito.any(), Mockito.eq(privilege), Mockito.any());
+    }
+    Mockito.verify(observed, Mockito.never())
+        .isGlossaryTermOwner(Mockito.any(), Mockito.eq(LAKE), Mockito.anyLong(), Mockito.any());
     GlossaryManager scoped = filtered.withTermVisibility(term -> !term.name().equals("Peer"));
     for (String name : List.of("Root", "Peer")) {
       assertThrows(

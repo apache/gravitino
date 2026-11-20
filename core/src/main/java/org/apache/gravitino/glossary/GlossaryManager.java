@@ -393,13 +393,11 @@ public final class GlossaryManager {
       NameIdentifier ident,
       GlossaryTermEntity term,
       @Nullable Predicate<GlossaryTermEntity> relationFilter) {
-    boolean editable = access.canEdit(term);
-    if (!access.view()
-        || (term.status() == GlossaryTerm.Status.DRAFT && !editable)
-        || (relationFilter != null && !relationFilter.test(term))) {
+    if (!access.canRead(term) || (relationFilter != null && !relationFilter.test(term))) {
       throw missingRelationRoot(ident);
     }
-    if (!editable) {
+    // Draft visibility already required edit access, including any live owner lookup.
+    if (term.status() != GlossaryTerm.Status.DRAFT && !access.canEdit(term)) {
       throw new ForbiddenException(
           "Editing a glossary term requires MANAGE_DEFINITIONS or ownership with CREATE_DEFINITION");
     }

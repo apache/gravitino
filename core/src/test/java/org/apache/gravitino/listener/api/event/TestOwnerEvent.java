@@ -32,6 +32,7 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.OwnerEventManager;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.listener.DummyEventListener;
@@ -81,6 +82,38 @@ public class TestOwnerEvent {
     public Type type() {
       return type;
     }
+  }
+
+  @Test
+  void testGlossaryTransferEventsReflectPartialCompletion() {
+    String lake = "lake";
+    MetadataObject first = MetadataObjects.parse("first", MetadataObject.Type.GLOSSARY_TERM);
+    MetadataObject second = MetadataObjects.parse("second", MetadataObject.Type.GLOSSARY_TERM);
+    MetadataObject last = MetadataObjects.parse("last", MetadataObject.Type.GLOSSARY_TERM);
+    OwnerDispatcher transfers = Mockito.mock(OwnerDispatcher.class);
+    DummyEventListener listener = new DummyEventListener();
+    OwnerEventManager dispatcher =
+        new OwnerEventManager(new EventBus(List.of(listener)), transfers);
+    RuntimeException failure = new RuntimeException("transfer rejected");
+    doThrow(failure).when(transfers).setOwner(lake, second, "user", Owner.Type.USER);
+
+    Assertions.assertSame(
+        failure,
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                dispatcher.setOwners(
+                    lake, List.of(first, first, second, last), "user", Owner.Type.USER)));
+    Mockito.verify(transfers).setOwner(lake, first, "user", Owner.Type.USER);
+    Mockito.verify(transfers).setOwner(lake, second, "user", Owner.Type.USER);
+    Mockito.verifyNoMoreInteractions(transfers);
+    Assertions.assertEquals(2, listener.getPreEvents().size());
+    List<Event> events = listener.getPostEvents();
+    Assertions.assertEquals(2, events.size());
+    Assertions.assertEquals("first", events.get(0).identifier().name());
+    Assertions.assertEquals(OperationStatus.SUCCESS, events.get(0).operationStatus());
+    Assertions.assertEquals("second", events.get(1).identifier().name());
+    Assertions.assertEquals(OperationStatus.FAILURE, events.get(1).operationStatus());
   }
 
   @Test

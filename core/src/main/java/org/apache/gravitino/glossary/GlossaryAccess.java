@@ -58,10 +58,6 @@ public final class GlossaryAccess {
     this.owns = owns;
   }
 
-  boolean view() {
-    return view;
-  }
-
   boolean manage() {
     return manage.get();
   }
