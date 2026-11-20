@@ -112,19 +112,20 @@ class RoleManager {
     try {
       NameIdentifier ident = AuthorizationUtils.ofRole(metalake, role);
 
+      RoleEntity roleEntity = null;
       try {
-        RoleEntity roleEntity = store.get(ident, Entity.EntityType.ROLE, RoleEntity.class);
-        AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
-            metalake,
-            roleEntity.securableObjects(),
-            (authorizationPlugin, catalogName) ->
-                authorizationPlugin.onRoleDeleted(
-                    AuthorizationUtils.filterSecurableObjects(roleEntity, metalake, catalogName)));
+        roleEntity = store.get(ident, Entity.EntityType.ROLE, RoleEntity.class);
       } catch (NoSuchEntityException nse) {
         // ignore, because the role may have been deleted.
       }
 
-      return store.delete(ident, Entity.EntityType.ROLE);
+      // Delete before telling the plugins: the store refuses to delete a role that an access
+      // control policy names, and the plugins must not drop a role that Gravitino keeps.
+      boolean deleted = store.delete(ident, Entity.EntityType.ROLE);
+      if (deleted && roleEntity != null) {
+        notifyRoleDeleted(metalake, roleEntity);
+      }
+      return deleted;
     } catch (IOException ioe) {
       LOG.error(
           "Deleting role {} in the metalake {} failed due to storage issues", role, metalake, ioe);
@@ -171,6 +172,15 @@ class RoleManager {
           ioe);
       throw new RuntimeException(ioe);
     }
+  }
+
+  private static void notifyRoleDeleted(String metalake, RoleEntity roleEntity) {
+    AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
+        metalake,
+        roleEntity.securableObjects(),
+        (authorizationPlugin, catalogName) ->
+            authorizationPlugin.onRoleDeleted(
+                AuthorizationUtils.filterSecurableObjects(roleEntity, metalake, catalogName)));
   }
 
   private RoleEntity getRoleEntity(NameIdentifier identifier) {
