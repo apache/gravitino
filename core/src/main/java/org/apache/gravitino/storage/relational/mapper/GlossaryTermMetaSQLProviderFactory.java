@@ -174,7 +174,9 @@ public class GlossaryTermMetaSQLProviderFactory {
       // without locking the name index, then verify the live name on the locked row.
       String liveTerm = liveTermByName(metalakeId, key);
       return SELECT_TERM
-          + " FORCE INDEX (PRIMARY) WHERE term_id=(SELECT term_id FROM glossary_term_meta WHERE "
+          + " FORCE INDEX (PRIMARY) WHERE term_id=(SELECT term_id FROM "
+          + GlossaryTermMetaMapper.TABLE_NAME
+          + " WHERE "
           + liveTerm
           + ") AND "
           + liveTerm

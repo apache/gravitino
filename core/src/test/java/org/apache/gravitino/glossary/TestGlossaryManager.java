@@ -53,6 +53,7 @@ import org.apache.gravitino.storage.relational.service.GlossaryTermRelService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermRelService.RelationType;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -200,13 +201,16 @@ class TestGlossaryManager extends TestJDBCBackend {
     for (boolean authorization : List.of(false, true)) {
       GlossaryManager scoped = authorization ? managerForMetalakeOwner() : manager;
       String name = authorization ? "owned" : "unowned";
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () -> scoped.createTerm(LAKE, TermSpec.builder(" * ").build()));
       GlossaryTermEntity term = scoped.createTerm(LAKE, TermSpec.builder(name).build());
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () -> scoped.alterTerm(LAKE, name, TermChange.rename(" * ")));
+      for (String reserved : List.of(" * ", ".", " .. ")) {
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> scoped.createTerm(LAKE, TermSpec.builder(reserved).build()));
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> scoped.alterTerm(LAKE, name, TermChange.rename(reserved)));
+        Assertions.assertThrows(NoSuchTermException.class, () -> scoped.getTerm(LAKE, reserved));
+      }
       Assertions.assertEquals(term.revisionToken(), scoped.getTerm(LAKE, name).revisionToken());
       if (authorization) {
         Assertions.assertEquals(
@@ -218,7 +222,22 @@ class TestGlossaryManager extends TestJDBCBackend {
                 .name());
       }
     }
-    Assertions.assertThrows(NoSuchTermException.class, () -> manager.getTerm(LAKE, "*"));
+  }
+
+  @TestTemplate
+  void testRenameExistingDotSegmentTerm() throws IOException {
+    createAndInsertMakeLake(LAKE);
+    GlossaryTermEntity legacy =
+        GlossaryTermEntity.builder()
+            .withId(84L)
+            .withNamespace(NamespaceUtil.ofGlossaryTerm(LAKE))
+            .withName("..")
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    backend.insert(legacy, false);
+    GlossaryTermEntity renamed = manager.alterTerm(LAKE, "..", TermChange.rename("cost.net/unit"));
+    Assertions.assertEquals(legacy.id(), manager.getTerm(LAKE, renamed.name()).id());
+    Assertions.assertThrows(NoSuchTermException.class, () -> manager.getTerm(LAKE, ".."));
   }
 
   @TestTemplate

@@ -800,6 +800,27 @@ gcli.sh role grant --name catalog_postgres --role admin --privilege create_table
 gcli.sh role revoke --metalake metalake_demo --name catalog_postgres --role admin --privilege create_table modify_table
 ```
 
+#### Glossary Privileges on a Metalake
+
+Supply the metalake and omit `--name` to grant or revoke a metalake privilege.
+These commands grant and then revoke permission to create definitions for the `editor` role.
+
+```bash
+gcli.sh role grant --metalake metalake_demo --role editor --privilege create_definition
+gcli.sh role revoke --metalake metalake_demo --role editor --privilege create_definition
+```
+
+`view_definition` permits reading approved and deprecated terms. `create_definition`
+also permits creating terms and editing or viewing drafts the caller owns, including through
+a group. `manage_definitions` additionally permits editing and deleting any term in the
+metalake. An explicit deny on viewing prevents access through either higher privilege.
+The metalake owner has access to all terms.
+
+Custom implementations of `gravitino.authorization.impl` must expand allowed MANAGE and
+CREATE privileges before applying explicit denies. Implement `canAccessGlossaryTerm` for
+generic metadata endpoints and `isGlossaryTermOwner` to check current ownership by term ID
+in the caller's transaction. Both checks default to denying access.
+
 #### Revoke All Privileges
 
 ```bash

@@ -71,7 +71,8 @@ public class MetadataCommand extends Command {
     } else if (entity.hasCatalogName()) {
       metadataObject = MetadataObjects.of(null, name, MetadataObject.Type.CATALOG);
     } else if (entity.getMetalakeName() != null) {
-      metadataObject = MetadataObjects.of(null, name, MetadataObject.Type.METALAKE);
+      metadataObject =
+          MetadataObjects.of(null, entity.getMetalakeName(), MetadataObject.Type.METALAKE);
     } else {
       throw new IllegalArgumentException("Unknown entity type: " + name);
     }

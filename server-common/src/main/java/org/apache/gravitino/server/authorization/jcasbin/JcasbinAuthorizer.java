@@ -67,6 +67,7 @@ import org.apache.gravitino.cache.GravitinoCache;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.glossary.GlossaryAccess;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.server.authorization.DomainAuthzHelper;
@@ -405,6 +406,15 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         metalake,
         metadataObject);
     return result;
+  }
+
+  @Override
+  public boolean canAccessGlossaryTerm(
+      Principal principal,
+      String metalake,
+      MetadataObject object,
+      AuthorizationRequestContext context) {
+    return GlossaryAccess.canRead(this, principal, metalake, object, context);
   }
 
   @Override

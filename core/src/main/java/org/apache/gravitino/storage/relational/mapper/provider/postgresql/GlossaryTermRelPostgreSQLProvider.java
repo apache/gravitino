@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
+import org.apache.gravitino.storage.relational.mapper.GlossaryTermRelMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.base.GlossaryTermRelBaseSQLProvider;
 import org.apache.ibatis.annotations.Param;
 
@@ -26,7 +27,9 @@ import org.apache.ibatis.annotations.Param;
 public class GlossaryTermRelPostgreSQLProvider extends GlossaryTermRelBaseSQLProvider {
   @Override
   public String ensureLock(@Param("metalakeId") long metalakeId) {
-    return "INSERT INTO glossary_hierarchy_lock (metalake_id) VALUES (#{metalakeId}) "
+    return "INSERT INTO "
+        + GlossaryTermRelMapper.HIERARCHY_LOCK_TABLE_NAME
+        + " (metalake_id) VALUES (#{metalakeId}) "
         + "ON CONFLICT (metalake_id) DO NOTHING";
   }
 }

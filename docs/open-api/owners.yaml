@@ -64,7 +64,9 @@ paths:
         - access control
       summary: Get owner
       operationId: getOwner
-      description: Returns the specified owner information in the specified metalake
+      description: >-
+        Returns the owner of a visible object, or a null owner if none is assigned.
+        The default authorizer returns 403 for both a missing glossary term and one hidden from the caller.
       responses:
         "200":
           description: Returns the owner object
@@ -182,7 +184,7 @@ components:
     metadataObjectTypeOfOwner:
       name: metadataObjectType
       in: path
-      description: The type of the metadata object. DOMAIN ownership applies to the domain and its current subdomains; encode its literal name as one path segment. A GLOSSARY_TERM name is also a single segment and may contain literal dots. Names consisting solely of one or two dots cannot be addressed through this path.
+      description: The type of the metadata object. DOMAIN ownership applies to the domain and its current subdomains; encode its literal name as one path segment. A GLOSSARY_TERM name is also a single segment and may contain literal dots. New glossary term names cannot be a single or double dot. Existing terms with either name must be renamed before using this path.
       required: true
       schema:
         type: string

@@ -136,7 +136,9 @@ public class GlossaryTermRelSQLProviderFactory {
   static class GlossaryTermRelH2Provider extends GlossaryTermRelBaseSQLProvider {
     @Override
     public String ensureLock(@Param("metalakeId") long metalakeId) {
-      return "MERGE INTO glossary_hierarchy_lock (metalake_id) KEY (metalake_id) "
+      return "MERGE INTO "
+          + GlossaryTermRelMapper.HIERARCHY_LOCK_TABLE_NAME
+          + " (metalake_id) KEY (metalake_id) "
           + "VALUES (#{metalakeId})";
     }
   }

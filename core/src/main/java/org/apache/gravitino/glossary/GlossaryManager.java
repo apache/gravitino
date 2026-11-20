@@ -51,6 +51,7 @@ import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService.ScopedTerm;
 import org.apache.gravitino.storage.relational.service.GlossaryTermRelService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermRelService.RelationType;
+import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -124,7 +125,7 @@ public final class GlossaryManager {
         direction != Direction.RELATED || !transitive, "RELATED is not transitive");
     return SqlSessions.readSnapshot(
         () -> {
-          NameIdentifier ident = NameIdentifier.of(NamespaceUtil.ofGlossaryTerm(metalake), name);
+          NameIdentifier ident = NameIdentifierUtil.ofGlossaryTerm(metalake, name);
           ScopedTerm snapshot = relationRoot(ident);
           GlossaryTermEntity root = snapshot.term();
           GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
@@ -184,8 +185,18 @@ public final class GlossaryManager {
     }
     return SqlSessions.readSnapshot(
         () -> {
-          List<GlossaryTermEntity> result = loadTerms(metalake);
+          long metalakeId;
+          try {
+            metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+          } catch (NoSuchEntityException missing) {
+            throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", metalake);
+          }
           GlossaryAccess access = GlossaryAccess.forRequest(metalake, true);
+          if (!access.canView()) {
+            return new ArrayList<>();
+          }
+          List<GlossaryTermEntity> result =
+              terms.list(NamespaceUtil.ofGlossaryTerm(metalake), metalakeId);
           result.removeIf(term -> !access.canRead(term));
           return result;
         });
@@ -199,7 +210,7 @@ public final class GlossaryManager {
    *     session
    */
   public GlossaryTermEntity getTerm(String metalake, String name) {
-    NameIdentifier ident = NameIdentifier.of(NamespaceUtil.ofGlossaryTerm(metalake), name);
+    NameIdentifier ident = NameIdentifierUtil.ofGlossaryTerm(metalake, name);
     if (!authorizationEnabled) {
       return relationRoot(ident).term();
     }
@@ -289,7 +300,7 @@ public final class GlossaryManager {
    * @throws ForbiddenException if the term is visible but the caller lacks management access
    */
   public boolean dropTerm(String metalake, String name) {
-    NameIdentifier ident = NameIdentifier.of(NamespaceUtil.ofGlossaryTerm(metalake), name);
+    NameIdentifier ident = NameIdentifierUtil.ofGlossaryTerm(metalake, name);
     return terms.withHierarchyLock(
         ident.namespace(),
         lake -> {
@@ -348,7 +359,7 @@ public final class GlossaryManager {
       boolean conditional,
       @Nullable String token,
       TermChange[] changes) {
-    NameIdentifier ident = NameIdentifier.of(NamespaceUtil.ofGlossaryTerm(metalake), name);
+    NameIdentifier ident = NameIdentifierUtil.ofGlossaryTerm(metalake, name);
     TermChange[] request = changes == null ? new TermChange[0] : changes.clone();
     List<TermRelations.Edit> edits = new ArrayList<>();
     List<TermChange> content = new ArrayList<>();

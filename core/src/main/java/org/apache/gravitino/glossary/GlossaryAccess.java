@@ -26,7 +26,6 @@ import java.util.function.LongPredicate;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege.Name;
@@ -34,7 +33,7 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
-import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /** Metalake capabilities for one glossary operation. Term ownership follows the observed ID. */
@@ -56,6 +55,10 @@ public final class GlossaryAccess {
     this.create = Suppliers.memoize(create);
     this.manage = Suppliers.memoize(manage);
     this.owns = owns;
+  }
+
+  boolean canView() {
+    return view;
   }
 
   boolean manage() {
@@ -86,7 +89,7 @@ public final class GlossaryAccess {
     try {
       term =
           GlossaryTermMetaService.getInstance()
-              .get(NameIdentifier.of(NamespaceUtil.ofGlossaryTerm(metalake), object.name()));
+              .get(NameIdentifierUtil.ofGlossaryTerm(metalake, object.name()));
     } catch (NoSuchEntityException missing) {
       return false;
     }

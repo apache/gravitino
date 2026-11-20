@@ -21,6 +21,8 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.po.GlossaryTermPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -31,18 +33,24 @@ public class GlossaryTermMetaBaseSQLProvider {
       "SELECT term_id AS termId, name AS name, name_key AS nameKey, metalake_id AS "
           + "metalakeId, definition AS definition, status AS status, links AS links, source_ref AS "
           + "sourceRef, properties AS properties, audit_info AS auditInfo, current_version AS "
-          + "currentVersion, deleted_at AS deletedAt FROM glossary_term_meta";
+          + "currentVersion, deleted_at AS deletedAt FROM "
+          + GlossaryTermMetaMapper.TABLE_NAME;
 
   private static final String SNAPSHOT_SELECT =
       "<script>SELECT t.term_id AS termId, t.name AS name, t.name_key AS nameKey, "
           + "m.metalake_id AS metalakeId, t.definition AS definition, t.status AS status, "
           + "t.links AS links, t.source_ref AS sourceRef, t.properties AS properties, "
           + "t.audit_info AS auditInfo, t.current_version AS currentVersion, "
-          + "t.deleted_at AS deletedAt, s.synonym AS synonym FROM metalake_meta m "
-          + "LEFT JOIN glossary_term_meta t ON t.metalake_id=m.metalake_id AND t.deleted_at=0 ";
+          + "t.deleted_at AS deletedAt, s.synonym AS synonym FROM "
+          + MetalakeMetaMapper.TABLE_NAME
+          + " m LEFT JOIN "
+          + GlossaryTermMetaMapper.TABLE_NAME
+          + " t ON t.metalake_id=m.metalake_id AND t.deleted_at=0 ";
 
   private static final String SNAPSHOT_SYNONYM_JOIN =
-      "LEFT JOIN glossary_term_synonym s ON s.term_id=t.term_id "
+      "LEFT JOIN "
+          + GlossaryTermMetaMapper.SYNONYM_TABLE_NAME
+          + " s ON s.term_id=t.term_id "
           + "AND s.metalake_id=t.metalake_id AND s.deleted_at=0 ";
 
   private static final String SNAPSHOT_ORDER = " ORDER BY t.term_id,s.synonym_key</script>";
@@ -57,15 +65,21 @@ public class GlossaryTermMetaBaseSQLProvider {
       @Param("metalakeId") long metalakeId,
       @Param("metalakeName") String metalakeName,
       @Param("key") String key) {
-    return "SELECT t.term_id AS termId, t.metalake_id AS metalakeId FROM glossary_term_meta t"
-        + " JOIN metalake_meta m ON m.metalake_id=t.metalake_id "
+    return "SELECT t.term_id AS termId, t.metalake_id AS metalakeId FROM "
+        + GlossaryTermMetaMapper.TABLE_NAME
+        + " t"
+        + " JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " m ON m.metalake_id=t.metalake_id "
         + "AND m.metalake_name=#{metalakeName} AND m.deleted_at=0 "
         + "WHERE t.metalake_id=#{metalakeId} AND t.name_key=#{key} AND t.deleted_at=0";
   }
 
   /** Returns SQL for insert. */
   public String insert(@Param("term") GlossaryTermPO term) {
-    return "INSERT INTO glossary_term_meta (term_id, name, name_key, metalake_id, definition, "
+    return "INSERT INTO "
+        + GlossaryTermMetaMapper.TABLE_NAME
+        + " (term_id, name, name_key, metalake_id, definition, "
         + "status, links, source_ref, properties, audit_info, current_version, deleted_at) "
         + "VALUES (#{term.termId}, #{term.name}, #{term.nameKey}, #{term.metalakeId}, #{term.definition}, "
         + "#{term.status}, #{term.links}, #{term.sourceRef}, #{term.properties}, #{term.auditInfo}, "
@@ -74,7 +88,9 @@ public class GlossaryTermMetaBaseSQLProvider {
 
   /** Returns SQL for update. */
   public String update(@Param("term") GlossaryTermPO term, @Param("version") long version) {
-    return "UPDATE glossary_term_meta SET name=#{term.name}, name_key=#{term.nameKey}, "
+    return "UPDATE "
+        + GlossaryTermMetaMapper.TABLE_NAME
+        + " SET name=#{term.name}, name_key=#{term.nameKey}, "
         + "definition=#{term.definition}, status=#{term.status}, links=#{term.links}, "
         + "source_ref=#{term.sourceRef}, properties=#{term.properties}, audit_info=#{term.auditInfo}, "
         + "current_version=#{term.currentVersion} WHERE term_id=#{term.termId} AND "
@@ -83,7 +99,9 @@ public class GlossaryTermMetaBaseSQLProvider {
 
   /** Returns SQL for synonyms. */
   public String synonyms(@Param("termId") long termId) {
-    return "SELECT synonym FROM glossary_term_synonym WHERE term_id=#{termId} AND deleted_at=0 ORDER "
+    return "SELECT synonym FROM "
+        + GlossaryTermMetaMapper.SYNONYM_TABLE_NAME
+        + " WHERE term_id=#{termId} AND deleted_at=0 ORDER "
         + "BY synonym_key";
   }
 
@@ -93,13 +111,17 @@ public class GlossaryTermMetaBaseSQLProvider {
       @Param("metalakeId") long metalakeId,
       @Param("synonym") String synonym,
       @Param("key") String key) {
-    return "INSERT INTO glossary_term_synonym (term_id, metalake_id, synonym, synonym_key, "
+    return "INSERT INTO "
+        + GlossaryTermMetaMapper.SYNONYM_TABLE_NAME
+        + " (term_id, metalake_id, synonym, synonym_key, "
         + "deleted_at) VALUES (#{termId},#{metalakeId},#{synonym},#{key},0)";
   }
 
   /** Returns SQL for clearSynonyms. */
   public String clearSynonyms(@Param("termId") long termId) {
-    return "DELETE FROM glossary_term_synonym WHERE term_id=#{termId} AND deleted_at=0";
+    return "DELETE FROM "
+        + GlossaryTermMetaMapper.SYNONYM_TABLE_NAME
+        + " WHERE term_id=#{termId} AND deleted_at=0";
   }
 
   /** Returns SQL for delete. */
@@ -107,44 +129,58 @@ public class GlossaryTermMetaBaseSQLProvider {
       @Param("termId") long termId,
       @Param("version") long version,
       @Param("deletedAt") long deletedAt) {
-    return "UPDATE glossary_term_meta SET deleted_at=#{deletedAt} WHERE term_id=#{termId} AND "
+    return "UPDATE "
+        + GlossaryTermMetaMapper.TABLE_NAME
+        + " SET deleted_at=#{deletedAt} WHERE term_id=#{termId} AND "
         + "current_version=#{version} AND deleted_at=0";
   }
 
   /** Returns SQL for deleteSynonyms. */
   public String deleteSynonyms(@Param("termId") long termId, @Param("deletedAt") long deletedAt) {
-    return "UPDATE glossary_term_synonym SET deleted_at=#{deletedAt} WHERE term_id=#{termId} AND "
+    return "UPDATE "
+        + GlossaryTermMetaMapper.SYNONYM_TABLE_NAME
+        + " SET deleted_at=#{deletedAt} WHERE term_id=#{termId} AND "
         + "deleted_at=0";
   }
 
   /** Returns SQL for dropMetalake. */
   public String dropMetalake(
       @Param("metalakeId") long metalakeId, @Param("deletedAt") long deletedAt) {
-    return "UPDATE glossary_term_meta SET deleted_at=#{deletedAt} WHERE metalake_id=#{metalakeId} AND "
+    return "UPDATE "
+        + GlossaryTermMetaMapper.TABLE_NAME
+        + " SET deleted_at=#{deletedAt} WHERE metalake_id=#{metalakeId} AND "
         + "deleted_at=0";
   }
 
   /** Returns SQL for dropMetalakeSynonyms. */
   public String dropMetalakeSynonyms(
       @Param("metalakeId") long metalakeId, @Param("deletedAt") long deletedAt) {
-    return "UPDATE glossary_term_synonym SET deleted_at=#{deletedAt} WHERE metalake_id=#{metalakeId} AND "
+    return "UPDATE "
+        + GlossaryTermMetaMapper.SYNONYM_TABLE_NAME
+        + " SET deleted_at=#{deletedAt} WHERE metalake_id=#{metalakeId} AND "
         + "deleted_at=0";
   }
 
   /** Returns SQL for expired. */
   public String expired(@Param("cutoff") long cutoff, @Param("limit") int limit) {
-    return "SELECT term_id FROM glossary_term_meta WHERE deleted_at>0 AND deleted_at<#{cutoff} "
+    return "SELECT term_id FROM "
+        + GlossaryTermMetaMapper.TABLE_NAME
+        + " WHERE deleted_at>0 AND deleted_at<#{cutoff} "
         + "ORDER BY term_id LIMIT #{limit}";
   }
 
   /** Returns SQL for purgeSynonyms. */
   public String purgeSynonyms(@Param("termId") long termId) {
-    return "DELETE FROM glossary_term_synonym WHERE term_id=#{termId} AND deleted_at>0";
+    return "DELETE FROM "
+        + GlossaryTermMetaMapper.SYNONYM_TABLE_NAME
+        + " WHERE term_id=#{termId} AND deleted_at>0";
   }
 
   /** Returns SQL for purge. */
   public String purge(@Param("termId") long termId) {
-    return "DELETE FROM glossary_term_meta WHERE term_id=#{termId} AND deleted_at>0";
+    return "DELETE FROM "
+        + GlossaryTermMetaMapper.TABLE_NAME
+        + " WHERE term_id=#{termId} AND deleted_at>0";
   }
 
   /** Reads all live definitions in the metalake, or just the term with the supplied key. */
@@ -176,7 +212,9 @@ public class GlossaryTermMetaBaseSQLProvider {
       @Param("metalakeId") long metalakeId,
       @Param("excludedTermId") long excludedTermId,
       @Param("keys") List<String> keys) {
-    return "<script>SELECT term_id FROM glossary_term_meta WHERE metalake_id=#{metalakeId} "
+    return "<script>SELECT term_id FROM "
+        + GlossaryTermMetaMapper.TABLE_NAME
+        + " WHERE metalake_id=#{metalakeId} "
         + "AND term_id != #{excludedTermId} AND deleted_at=0 AND name_key IN "
         + "<foreach collection='keys' item='key' open='(' separator=',' close=')'>#{key}</foreach> "
         + "LIMIT 1</script>";
@@ -187,13 +225,17 @@ public class GlossaryTermMetaBaseSQLProvider {
       @Param("metalakeId") long metalakeId,
       @Param("excludedTermId") long excludedTermId,
       @Param("key") String key) {
-    return "SELECT term_id FROM glossary_term_synonym WHERE metalake_id=#{metalakeId}"
+    return "SELECT term_id FROM "
+        + GlossaryTermMetaMapper.SYNONYM_TABLE_NAME
+        + " WHERE metalake_id=#{metalakeId}"
         + " AND synonym_key=#{key} AND term_id<>#{excludedTermId} AND deleted_at=0 LIMIT 1";
   }
 
   /** Resolves normalized term names to the IDs of their live definitions. */
   public String idsByKeys(@Param("metalakeId") long metalakeId, @Param("keys") List<String> keys) {
-    return "<script>SELECT name_key AS nameKey, term_id AS termId FROM glossary_term_meta "
+    return "<script>SELECT name_key AS nameKey, term_id AS termId FROM "
+        + GlossaryTermMetaMapper.TABLE_NAME
+        + " "
         + "WHERE metalake_id=#{metalakeId} AND deleted_at=0 AND name_key IN "
         + "<foreach collection='keys' item='key' open='(' separator=',' close=')'>#{key}</foreach></script>";
   }

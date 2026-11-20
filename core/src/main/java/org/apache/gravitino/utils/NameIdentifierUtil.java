@@ -363,6 +363,17 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Returns the identifier of a glossary term, treating its full name as a single name component.
+   *
+   * @param metalake the metalake name
+   * @param termName the term name
+   * @return the term identifier
+   */
+  public static NameIdentifier ofGlossaryTerm(String metalake, String termName) {
+    return NameIdentifier.of(NamespaceUtil.ofGlossaryTerm(metalake), termName);
+  }
+
+  /**
    * Create the job {@link NameIdentifier} with the given metalake and job name.
    *
    * @param metalake The metalake name

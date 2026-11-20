@@ -26,7 +26,6 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.glossary.GlossaryAccess;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
@@ -78,14 +77,15 @@ public interface GravitinoAuthorizer extends Closeable {
 
   /**
    * Returns whether the caller may read this glossary term through a generic metadata endpoint.
-   * When called inside a glossary read snapshot, evaluate the term and its owner in that snapshot.
+   * Implementations must check visibility against the observed term and its current owner, using
+   * the caller's snapshot when present. The default denies access.
    */
   default boolean canAccessGlossaryTerm(
       Principal principal,
       String metalake,
       MetadataObject object,
       AuthorizationRequestContext context) {
-    return GlossaryAccess.canRead(this, principal, metalake, object, context);
+    return false;
   }
 
   boolean deny(

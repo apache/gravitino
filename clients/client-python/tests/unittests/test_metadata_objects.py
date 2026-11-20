@@ -41,8 +41,9 @@ class TestMetadataObjects(unittest.TestCase):
             "a.b%2Fc",
             encode_metadata_object_name(MetadataObjects.of("a.b/c", term_type)),
         )
-        with self.assertRaises(IllegalArgumentException):
-            encode_metadata_object_name(MetadataObjects.of("..", term_type))
+        for invalid in [".", "..", "   "]:
+            with self.subTest(name=invalid), self.assertRaises(IllegalArgumentException):
+                encode_metadata_object_name(MetadataObjectDTO(term_type, invalid))
         with self.assertRaises(IllegalArgumentException):
             MetadataObjects.of(name, term_type, "finance")
 

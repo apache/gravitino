@@ -34,6 +34,9 @@ public interface GlossaryTermMetaMapper {
   /** Table containing glossary definitions. */
   String TABLE_NAME = "glossary_term_meta";
 
+  /** Table containing glossary term synonyms. */
+  String SYNONYM_TABLE_NAME = "glossary_term_synonym";
+
   /** Looks up a live conflict on another term by normalized key. */
   @Nullable
   @SelectProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "conflictingName")

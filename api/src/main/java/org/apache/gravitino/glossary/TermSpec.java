@@ -61,7 +61,8 @@ public final class TermSpec {
 
   /**
    * Creates a builder for a term with the given name. The server removes spaces at both ends of the
-   * name and of each synonym, and keeps the case.
+   * name and of each synonym, and keeps the case. The term names {@code *}, {@code .}, and {@code
+   * ..} are reserved. Dots and slashes are allowed within a name.
    *
    * @param name The name of the term, at most 128 characters.
    * @return The builder.

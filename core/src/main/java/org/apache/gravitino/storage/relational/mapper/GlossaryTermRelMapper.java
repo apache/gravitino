@@ -33,6 +33,12 @@ import org.apache.ibatis.annotations.UpdateProvider;
 
 /** Glossary edges and hierarchy locks in the caller transaction. */
 public interface GlossaryTermRelMapper {
+  /** Table containing glossary term relations. */
+  String TABLE_NAME = "glossary_term_rel";
+
+  /** Table containing the hierarchy lock for each metalake. */
+  String HIERARCHY_LOCK_TABLE_NAME = "glossary_hierarchy_lock";
+
   /** Creates the mutex row safely on first use. */
   @InsertProvider(type = GlossaryTermRelSQLProviderFactory.class, method = "ensureLock")
   void ensureLock(@Param("metalakeId") long metalakeId);

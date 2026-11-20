@@ -281,7 +281,7 @@ public class OwnerManager implements OwnerDispatcher {
           "Unsupported owner entity class: " + entity.getClass().getName());
     } catch (NoSuchEntityException nse) {
       throw new NoSuchMetadataObjectException(
-          "The metadata object of %s isn't found", metadataObject.fullName());
+          nse, "The metadata object of %s isn't found", metadataObject.fullName());
     } catch (IOException ioe) {
       LOG.info("Failed to get the owner of entity {}", metadataObject.fullName(), ioe);
       throw new RuntimeException(ioe);

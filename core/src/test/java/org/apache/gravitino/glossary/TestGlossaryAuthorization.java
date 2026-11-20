@@ -72,6 +72,7 @@ import org.apache.gravitino.server.authorization.jcasbin.JcasbinChangeListener;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
+import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -81,6 +82,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 import org.mockito.AdditionalAnswers;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 /** Runs glossary operations against real grant, ownership and term rows. */
@@ -375,6 +377,21 @@ class TestGlossaryAuthorization extends TestJDBCBackend {
           () -> as("writer", () -> manager.alterTerm(absent, "term", change)));
     }
     Mockito.verifyNoInteractions(observed);
+  }
+
+  @TestTemplate
+  void testDeniedListChecksParentWithoutReadingDefinitions() throws Exception {
+    GlossaryTermMetaService definitions = Mockito.mock(GlossaryTermMetaService.class);
+    GlossaryManager scoped;
+    try (MockedStatic<GlossaryTermMetaService> services =
+        Mockito.mockStatic(GlossaryTermMetaService.class)) {
+      services.when(GlossaryTermMetaService::getInstance).thenReturn(definitions);
+      scoped = new GlossaryManager(() -> 7L, true);
+    }
+    assertTrue(as("denied", () -> scoped.listTerms(LAKE)).isEmpty());
+    assertThrows(
+        NoSuchMetalakeException.class, () -> as("denied", () -> scoped.listTerms("absent")));
+    Mockito.verifyNoInteractions(definitions);
   }
 
   @TestTemplate

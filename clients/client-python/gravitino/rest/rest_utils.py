@@ -22,10 +22,14 @@ from gravitino.exceptions.base import IllegalArgumentException
 
 
 def encode_domain_path_segment(name: str) -> str:
+    return _encode_literal_path_segment(name, "domain")
+
+
+def _encode_literal_path_segment(name: str, kind: str) -> str:
     if not isinstance(name, str) or not name.strip():
-        raise IllegalArgumentException("Domain name must not be blank")
+        raise IllegalArgumentException(f"{kind.capitalize()} name must not be blank")
     if name in (".", ".."):
-        raise IllegalArgumentException(f"Unsafe domain path segment: {name}")
+        raise IllegalArgumentException(f"Unsafe {kind} path segment: {name}")
 
     return encode_string(name)
 
@@ -33,13 +37,8 @@ def encode_domain_path_segment(name: str) -> str:
 def encode_metadata_object_name(obj: MetadataObject) -> str:
     if obj.type() == MetadataObject.Type.DOMAIN:
         return encode_domain_path_segment(obj.full_name())
-    if obj.type() == MetadataObject.Type.GLOSSARY_TERM and obj.full_name() in (
-        ".",
-        "..",
-    ):
-        raise IllegalArgumentException(
-            f"Unsafe glossary term path segment: {obj.full_name()}"
-        )
+    if obj.type() == MetadataObject.Type.GLOSSARY_TERM:
+        return _encode_literal_path_segment(obj.full_name(), "glossary term")
     return encode_string(obj.full_name())
 
 
