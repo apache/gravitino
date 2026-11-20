@@ -33,6 +33,13 @@ def encode_domain_path_segment(name: str) -> str:
 def encode_metadata_object_name(obj: MetadataObject) -> str:
     if obj.type() == MetadataObject.Type.DOMAIN:
         return encode_domain_path_segment(obj.full_name())
+    if obj.type() == MetadataObject.Type.GLOSSARY_TERM and obj.full_name() in (
+        ".",
+        "..",
+    ):
+        raise IllegalArgumentException(
+            f"Unsafe glossary term path segment: {obj.full_name()}"
+        )
     return encode_string(obj.full_name())
 
 
