@@ -20,11 +20,11 @@ This policy supports `CATALOG`, `SCHEMA`, and `TABLE` metadata objects.
 
 The typed content for `system_iceberg_rewrite_manifests` supports the following fields:
 
-| Field | Required | Default | Description |
-| --- | --- | --- | --- |
-| `manifest_count_threshold` | No | `100` | Trigger when manifest count is at least this value. Aligns with Iceberg `commit.manifest.min-count-to-merge`. Must be positive. |
-| `spec_id` | No | Iceberg's current default | Existing partition spec to evaluate. Omission resolves the current default from Iceberg metadata. |
-| `use_caching` | No | Omitted | Optional boolean forwarded to Iceberg; omission preserves the runtime default. JSON booleans only. |
+| Field                      | Required | Default                   | Description                                                                                                      |
+| -------------------------- | -------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `manifest_count_threshold` | No       | `100`                     | Trigger when manifest count is at least this value. Aligns with Iceberg `commit.manifest.min-count-to-merge`. Must be positive. |
+| `spec_id`                  | No       | Iceberg's current default | Existing partition spec to evaluate. Omission resolves the current default from Iceberg metadata.                |
+| `use_caching`              | No       | Omitted                   | Optional boolean forwarded to Iceberg; omission preserves the runtime default. JSON booleans only.               |
 
 Spec IDs must be non-negative 32-bit integers. Recommendations are ranked by the selected
 spec's manifest count. Average manifest size is collected for observability but does not
@@ -42,21 +42,21 @@ The policy content is converted to:
   - `trigger-expr=custom-manifest-number >= manifest_count_threshold`
   - optional `spec_id` and `use_caching` job options when set
 
-## TMS before and after metrics
+## Validation before and after metrics
 
-`builtin-iceberg-maintenance-task` reports these Validation metrics:
+`builtin-iceberg-maintenance-task` reports these metrics for Validation Before / After / Change:
 
-| Phase | Key | Source |
-| --- | --- | --- |
-| Before (S0) | `custom-manifest-number` | Manifest inventory for the resolved partition spec |
-| Before (S0) | `custom-avg-manifest-size` | Manifest inventory for the resolved partition spec |
-| Before (S0) | `custom-manifest-spec-id` | Partitioned specs only (observability) |
-| Before (S0) | `custom-manifest-partition-spec` | Partitioned specs only (observability) |
-| After (S1) | `custom-manifest-number` | Re-collected inventory after rewrite |
-| After (S1) | `custom-avg-manifest-size` | Re-collected inventory after rewrite |
-| After (S1) | `custom-rewritten-manifest-number` | Iceberg `rewrite_manifests` procedure result |
-| After (S1) | `custom-manifest-spec-id` | Partitioned specs only (observability) |
-| After (S1) | `custom-manifest-partition-spec` | Partitioned specs only (observability) |
+| Phase  | Key                                | Source                                              |
+| ------ | ---------------------------------- | --------------------------------------------------- |
+| Before | `custom-manifest-number`           | Manifest inventory for the resolved partition spec  |
+| Before | `custom-avg-manifest-size`         | Manifest inventory for the resolved partition spec  |
+| Before | `custom-manifest-spec-id`          | Partitioned specs only (observability)              |
+| Before | `custom-manifest-partition-spec`   | Partitioned specs only (observability)              |
+| After  | `custom-manifest-number`           | Re-collected inventory after rewrite                |
+| After  | `custom-avg-manifest-size`         | Re-collected inventory after rewrite                |
+| After  | `custom-rewritten-manifest-number` | Iceberg `rewrite_manifests` procedure result        |
+| After  | `custom-manifest-spec-id`          | Partitioned specs only (observability)              |
+| After  | `custom-manifest-partition-spec`   | Partitioned specs only (observability)              |
 
 After metrics re-read current manifests so Validation can show Before / After / Change for
 inventory fields, not only the rewritten count.
@@ -80,9 +80,10 @@ Invalid policy rules or malformed measurements are logged and skipped for that t
 aborting recommendations for other tables. Counts from other specs are ignored.
 
 When `spec_id` is omitted, the recommender resolves Iceberg's current `default-spec-id` from
-table metadata and retains that value through job submission. TMS leaves an omitted
-`spec_id` unset at schedule time and resolves the table's current default when the Spark job
-runs. Set `spec_id` explicitly to target another existing spec after partition evolution.
+table metadata and retains that value through job submission. The maintenance job leaves an
+omitted `spec_id` unset at schedule time and resolves the table's current default when the
+Spark job runs. Set `spec_id` explicitly to target another existing spec after partition
+evolution.
 
 Rewriting reorganizes manifests within the selected spec and does not migrate data files
 between specs. Recollect statistics after a successful rewrite before evaluating again.

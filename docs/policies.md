@@ -46,7 +46,7 @@ policy. A table with only `data_domain=risk` does not.
 | `system_access_control`              | Privileges and applicable roles            | Not enforced yet          |
 | `custom`                             | A free-form map that you define            | A system that you provide |
 
-Iceberg maintenance policy fields and TMS Validation metrics are documented in
+Iceberg maintenance policy fields and Validation before / after metrics are documented in
 [Iceberg compaction policy](./iceberg-compaction-policy.md),
 [Iceberg rewrite manifests policy](./iceberg-rewrite-manifests-policy.md),
 [Iceberg snapshot expiration policy](./iceberg-snapshot-expiration-policy.md), and

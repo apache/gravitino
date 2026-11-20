@@ -10,8 +10,9 @@ import TabItem from '@theme/TabItem';
 
 ## Overview
 
-`system_iceberg_orphan_file_removal` is a built-in policy type used by the optimizer and TMS to
-remove unreferenced Iceberg files through `builtin-iceberg-remove-orphan-files`.
+`system_iceberg_orphan_file_removal` is a built-in policy type used by the optimizer and the
+Table Maintenance Service to remove unreferenced Iceberg files through
+`builtin-iceberg-remove-orphan-files`.
 
 This policy supports `CATALOG`, `SCHEMA`, and `TABLE` metadata objects. It accepts time triggers
 only; `commitTrigger=true` is rejected.
@@ -20,11 +21,11 @@ only; `commitTrigger=true` is rejected.
 
 The typed content for `system_iceberg_orphan_file_removal` supports the following fields:
 
-| Field | Required | Default | Description |
-| --- | --- | --- | --- |
-| `olderThanDays` | No | `3` | Minimum age of orphan files eligible for removal, in days. Must be between `1` and `36500`. |
-| `location` | No | Table location | Optional absolute scan path within the table. Must be a valid absolute URI path without query, fragment, `..`, `\`, or percent-encoding. |
-| `dryRun` | No | `false` | When `true`, list candidates without deleting. JSON boolean only. |
+| Field           | Required | Default         | Description                                                                                                                              |
+| --------------- | -------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `olderThanDays` | No       | `3`             | Minimum age of orphan files eligible for removal, in days. Must be between `1` and `36500`.                                              |
+| `location`      | No       | Table location  | Optional absolute scan path within the table. Must be a valid absolute URI path without query, fragment, `..`, `\`, or percent-encoding. |
+| `dryRun`        | No       | `false`         | When `true`, list candidates without deleting. JSON boolean only.                                                                        |
 
 ## Generated Rules and Properties
 
@@ -40,18 +41,18 @@ The policy content is converted to:
   - `job.options.dryRun=<dryRun>`
   - `job.options.location=<location>` when `location` is set
 
-Eligibility for orphan cleanup is evaluated when the optimizer or TMS schedule runs; the
-in-Spark gate always maintains once a job starts.
+Eligibility for orphan cleanup is evaluated when the optimizer or maintenance schedule runs;
+the in-Spark gate always maintains once a job starts.
 
-## TMS before and after metrics
+## Validation before and after metrics
 
-`builtin-iceberg-maintenance-task` reports these Validation metrics:
+`builtin-iceberg-maintenance-task` reports these metrics for Validation Before / After / Change:
 
-| Phase | Key | Source |
-| --- | --- | --- |
-| Before (S0) | _(none)_ | Orphan cleanup skips before-metrics |
-| After (S1) | `custom-removed-file-number` | Orphan files removed, or found when `dryRun` is true |
-| After (S1) | `custom-removed-file-size` | Bytes of orphan files removed (or found in dry-run) |
+| Phase  | Key                           | Source                                                                  |
+| ------ | ----------------------------- | ----------------------------------------------------------------------- |
+| Before | —                             | Orphan cleanup skips before-metrics                                     |
+| After  | `custom-removed-file-number`  | Orphan files removed, or found when `dryRun` is true                    |
+| After  | `custom-removed-file-size`    | Bytes of orphan files removed (or found in dry-run)                     |
 
 ## Policy Examples
 

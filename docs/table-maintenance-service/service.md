@@ -157,12 +157,13 @@ These endpoints are for the Spark job, not for operators. Schemas are in the [ma
 | Finish and release the slot | `POST /api/metalakes/{metalake}/maintenance/actions/{jobId}/finish`         |
 | After-maintenance metrics   | `POST /api/metalakes/{metalake}/maintenance/actions/{jobId}/metrics/after`  |
 
-S0/S1 metric keys for Validation depend on the policy type. See the **TMS before and after
-metrics** section in each policy page:
-[compaction](../iceberg-compaction-policy.md#tms-before-and-after-metrics),
-[rewrite manifests](../iceberg-rewrite-manifests-policy.md#tms-before-and-after-metrics),
-[snapshot expiration](../iceberg-snapshot-expiration-policy.md#tms-before-and-after-metrics), and
-[orphan file removal](../iceberg-orphan-file-removal-policy.md#tms-before-and-after-metrics).
+Before / After metric keys for Validation depend on the policy type. See the **Validation
+before and after metrics** section in each policy page:
+[compaction](../iceberg-compaction-policy.md#validation-before-and-after-metrics),
+[rewrite manifests](../iceberg-rewrite-manifests-policy.md#validation-before-and-after-metrics),
+[snapshot expiration](../iceberg-snapshot-expiration-policy.md#validation-before-and-after-metrics),
+and
+[orphan file removal](../iceberg-orphan-file-removal-policy.md#validation-before-and-after-metrics).
 
 ## Commit Trigger
 

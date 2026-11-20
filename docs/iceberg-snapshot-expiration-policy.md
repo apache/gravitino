@@ -10,8 +10,9 @@ import TabItem from '@theme/TabItem';
 
 ## Overview
 
-`system_iceberg_snapshot_expiration` is a built-in policy type used by the optimizer and TMS to
-expire old Iceberg snapshots through `builtin-iceberg-expire-snapshots`.
+`system_iceberg_snapshot_expiration` is a built-in policy type used by the optimizer and the
+Table Maintenance Service to expire old Iceberg snapshots through
+`builtin-iceberg-expire-snapshots`.
 
 This policy supports `CATALOG`, `SCHEMA`, and `TABLE` metadata objects.
 
@@ -19,11 +20,11 @@ This policy supports `CATALOG`, `SCHEMA`, and `TABLE` metadata objects.
 
 The typed content for `system_iceberg_snapshot_expiration` supports the following fields:
 
-| Field | Required | Default | Description |
-| --- | --- | --- | --- |
-| `olderThanDays` | No | `5` | Minimum age of snapshots eligible for expiration, in days. Must be between `1` and `36500`. |
-| `retainLast` | No | `1` | Minimum number of recent snapshots to keep regardless of age. Must be `>= 1`. |
-| `streamResults` | No | `false` | Whether the expire job should stream intermediate delete results. JSON boolean only. |
+| Field           | Required | Default | Description                                                                                         |
+| --------------- | -------- | ------- | --------------------------------------------------------------------------------------------------- |
+| `olderThanDays` | No       | `5`     | Minimum age of snapshots eligible for expiration, in days. Must be between `1` and `36500`.         |
+| `retainLast`    | No       | `1`     | Minimum number of recent snapshots to keep regardless of age. Must be `>= 1`.                       |
+| `streamResults` | No       | `false` | Whether the expire job should stream intermediate delete results. JSON boolean only.                |
 
 ## Generated Rules and Properties
 
@@ -39,19 +40,19 @@ The policy content is converted to:
   - `job.options.retainLast=<retainLast>`
   - `job.options.streamResults=<streamResults>`
 
-Eligibility for snapshot expiry is evaluated when the optimizer or TMS schedule runs; the
-in-Spark gate always maintains once a job starts.
+Eligibility for snapshot expiry is evaluated when the optimizer or maintenance schedule runs;
+the in-Spark gate always maintains once a job starts.
 
-## TMS before and after metrics
+## Validation before and after metrics
 
-`builtin-iceberg-maintenance-task` reports these Validation metrics:
+`builtin-iceberg-maintenance-task` reports these metrics for Validation Before / After / Change:
 
-| Phase | Key | Source |
-| --- | --- | --- |
-| Before (S0) | `custom-snapshot-number` | Snapshot count before expire |
-| After (S1) | `custom-snapshot-number` | Measured snapshot count after expire (not before minus expired) |
-| After (S1) | `custom-expired-snapshot-number` | Snapshots present in S0 but absent after expire |
-| After (S1) | `custom-expired-file-size` | Content-file bytes present in S0 but absent after expire |
+| Phase  | Key                              | Source                                                                  |
+| ------ | -------------------------------- | ----------------------------------------------------------------------- |
+| Before | `custom-snapshot-number`         | Snapshot count before expire                                            |
+| After  | `custom-snapshot-number`         | Measured snapshot count after expire (not before minus expired)         |
+| After  | `custom-expired-snapshot-number` | Snapshots present before expire but absent after                        |
+| After  | `custom-expired-file-size`       | Content-file bytes present before expire but absent after               |
 
 ## Policy Examples
 

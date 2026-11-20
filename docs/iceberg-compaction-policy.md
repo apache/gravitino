@@ -19,16 +19,16 @@ This policy supports `CATALOG`, `SCHEMA`, and `TABLE` metadata objects.
 
 The typed content for `system_iceberg_compaction` supports the following fields:
 
-| Field                    | Required | Default             | Description                                                                                            |
-| ------------------------ | -------- | ------------------- | ------------------------------------------------------------------------------------------------------ |
-| `minDataFileMse`         | No       | `405323966463344`   | Minimum threshold for metric `custom-data-file-mse`. Must be `>= 0`.                                   |
-| `minDeleteFileNumber`    | No       | `1`                 | Minimum threshold for metric `custom-delete-file-number`. Must be `>= 0`.                              |
-| `dataFileMseWeight`      | No       | `1`                 | Score weight of `custom-data-file-mse`. Must be `>= 0`.                                                |
-| `deleteFileNumberWeight` | No       | `100`               | Score weight of `custom-delete-file-number`. Must be `>= 0`.                                           |
-| `maxPartitionNum`        | No       | `50`                | Maximum number of partitions selected by optimizer. Must be `> 0`.                                     |
-| `rewriteStrategy`        | No       | `binpack`           | Iceberg `rewrite_data_files` top-level `strategy`. Supported values: `binpack`, `sort`.                |
-| `sortOrder`              | No       | `""`                | Iceberg `rewrite_data_files` top-level `sort_order`. Required for `sort`; must be empty for `binpack`. |
-| `rewriteOptions`         | No       | `{}`                | Iceberg `rewrite_data_files` `options` map entries, expanded as `job.options.*` rules.                 |
+| Field                    | Required | Default           | Description                                                                                            |
+| ------------------------ | -------- | ----------------- | ------------------------------------------------------------------------------------------------------ |
+| `minDataFileMse`         | No       | `405323966463344` | Minimum threshold for metric `custom-data-file-mse`. Must be `>= 0`.                                   |
+| `minDeleteFileNumber`    | No       | `1`               | Minimum threshold for metric `custom-delete-file-number`. Must be `>= 0`.                              |
+| `dataFileMseWeight`      | No       | `1`               | Score weight of `custom-data-file-mse`. Must be `>= 0`.                                                |
+| `deleteFileNumberWeight` | No       | `100`             | Score weight of `custom-delete-file-number`. Must be `>= 0`.                                           |
+| `maxPartitionNum`        | No       | `50`              | Maximum number of partitions selected by optimizer. Must be `> 0`.                                     |
+| `rewriteStrategy`        | No       | `binpack`         | Iceberg `rewrite_data_files` top-level `strategy`. Supported values: `binpack`, `sort`.                |
+| `sortOrder`              | No       | `""`              | Iceberg `rewrite_data_files` top-level `sort_order`. Required for `sort`; must be empty for `binpack`. |
+| `rewriteOptions`         | No       | `{}`              | Iceberg `rewrite_data_files` `options` map entries, expanded as `job.options.*` rules.                 |
 
 `rewriteStrategy` and `sortOrder` are **not** part of `rewriteOptions`. Iceberg treats them as procedure
 parameters separate from the `options` map.
@@ -48,19 +48,19 @@ The policy content is converted to:
   - `sortOrder=<sortOrder>`
   - `job.options.<key>=<value>` for each rewrite option
 
-## TMS before and after metrics
+## Validation before and after metrics
 
-`builtin-iceberg-maintenance-task` reports these Validation metrics:
+`builtin-iceberg-maintenance-task` reports these metrics for Validation Before / After / Change:
 
-| Phase | Key | Source |
-| --- | --- | --- |
-| Before (S0) and After (S1) | `custom-data-file-mse` | Inventory SQL (also used by `trigger-expr`) |
-| Before (S0) and After (S1) | `custom-delete-file-number` | Inventory SQL |
-| Before (S0) and After (S1) | `custom-avg-file-size` | Inventory SQL |
-| Before (S0) and After (S1) | `custom-total-file-size` | Inventory SQL |
-| Before (S0) and After (S1) | `custom-file-number` | Inventory SQL |
-| Before (S0) and After (S1) | `custom-small-file-number` | Inventory SQL (files smaller than 32 MiB) |
-| Before (S0) and After (S1) | `custom-data-mse-ratio` | Orchestrator: `custom-data-file-mse / minDataFileMse` from task rules |
+| Phase            | Key                          | Source                                                                      |
+| ---------------- | ---------------------------- | --------------------------------------------------------------------------- |
+| Before and After | `custom-data-file-mse`       | Inventory SQL (also used by `trigger-expr`)                                 |
+| Before and After | `custom-delete-file-number`  | Inventory SQL                                                               |
+| Before and After | `custom-avg-file-size`       | Inventory SQL                                                               |
+| Before and After | `custom-total-file-size`     | Inventory SQL                                                               |
+| Before and After | `custom-file-number`         | Inventory SQL                                                               |
+| Before and After | `custom-small-file-number`   | Inventory SQL (files smaller than 32 MiB)                                   |
+| Before and After | `custom-data-mse-ratio`      | Job orchestrator: `custom-data-file-mse / minDataFileMse` from task rules   |
 
 `custom-data-mse-ratio` is a display Fragmentation multiple stored as a JSON number (`double`).
 The job does not store `minDataFileMse` as a metric. Trigger evaluation still uses raw
