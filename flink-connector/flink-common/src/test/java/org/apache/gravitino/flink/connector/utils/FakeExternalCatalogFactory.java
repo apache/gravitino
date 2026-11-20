@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.Set;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.table.catalog.Catalog;
+import org.apache.flink.table.catalog.GenericInMemoryCatalog;
 import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalogFactory;
@@ -46,9 +47,11 @@ public class FakeExternalCatalogFactory implements BaseCatalogFactory {
     return Collections.emptySet();
   }
 
+  /** Creates an in-memory catalog after the checks that every Gravitino catalog factory runs. */
   @Override
   public Catalog createCatalog(Context context) {
-    throw new UnsupportedOperationException();
+    FactoryUtils.createCatalogFactoryHelper(this, context);
+    return new GenericInMemoryCatalog(context.getName());
   }
 
   @Override
