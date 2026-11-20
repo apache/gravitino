@@ -152,6 +152,28 @@ class TestOwnerOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testGlossaryOwnerUsesLiteralTermName() throws IOException {
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata properties = mock(PropertiesMetadata.class);
+    when(properties.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(properties);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+    when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
+    MetadataObject term =
+        MetadataObjects.of(null, "term.with.dot", MetadataObject.Type.GLOSSARY_TERM);
+    String path = "/metalakes/metalake1/owners/glossary_term/term.with.dot";
+    when(manager.getOwner("metalake1", term)).thenReturn(Optional.empty());
+    try (Response get = target(path).request().get();
+        Response set =
+            target(path).request().put(Entity.json(new OwnerSetRequest("user", Owner.Type.USER)))) {
+      Assertions.assertEquals(200, get.getStatus());
+      Assertions.assertEquals(200, set.getStatus());
+    }
+    Mockito.verify(manager).getOwner("metalake1", term);
+    Mockito.verify(manager).setOwner("metalake1", term, "user", Owner.Type.USER);
+  }
+
+  @Test
   void testGetOwnerForObject() throws IOException {
     Owner owner =
         new Owner() {

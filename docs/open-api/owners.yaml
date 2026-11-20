@@ -178,13 +178,14 @@ components:
     metadataObjectTypeOfOwner:
       name: metadataObjectType
       in: path
-      description: The type of the metadata object. DOMAIN ownership applies to the domain and its current subdomains; encode its literal name as one path segment.
+      description: The type of the metadata object. DOMAIN ownership applies to the domain and its current subdomains; encode its literal name as one path segment. A GLOSSARY_TERM name is also a single segment and may contain literal dots.
       required: true
       schema:
         type: string
         enum:
           - "METALAKE"
           - "DOMAIN"
+          - "GLOSSARY_TERM"
           - "CATALOG"
           - "SCHEMA"
           - "TABLE"
