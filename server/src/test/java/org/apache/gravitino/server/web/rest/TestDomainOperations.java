@@ -280,6 +280,19 @@ public class TestDomainOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testDeletePublishedDomain() {
+    when(dispatcher.deleteDomain("test", "Finance"))
+        .thenThrow(
+            new IllegalArgumentException("Domain Finance cannot be deleted while published"));
+    try (Response response = target(ITEM).request().delete()) {
+      assertEquals(400, response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      assertEquals(IllegalArgumentException.class.getSimpleName(), error.getType());
+    }
+  }
+
+  @Test
   public void testNullBodies() {
     for (String[] route :
         new String[][] {
