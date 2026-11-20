@@ -38,12 +38,19 @@ policy. A table with only `data_domain=risk` does not.
 | Type                                 | Rules                                      | Consumer                  |
 | ------------------------------------ | ------------------------------------------ | ------------------------- |
 | `system_iceberg_compaction`          | Compaction thresholds and scheduling       | Table maintenance service |
-| `system_iceberg_rewrite_manifests`   | Manifest count and average-size thresholds | Table maintenance service |
+| `system_iceberg_rewrite_manifests`   | Manifest count threshold and target spec   | Table maintenance service |
+| `system_iceberg_snapshot_expiration` | Snapshot retention age and retain-last     | Table maintenance service |
 | `system_iceberg_orphan_file_removal` | Orphan-file cleanup options                | Table maintenance service |
 | `system_row_filter`                  | Row-filter expression                      | Experimental Iceberg REST |
 | `system_column_mask`                 | Column-mask expression                     | Experimental Iceberg REST |
 | `system_access_control`              | Privileges and applicable roles            | Not enforced yet          |
 | `custom`                             | A free-form map that you define            | A system that you provide |
+
+Iceberg maintenance policy fields and TMS Validation metrics are documented in
+[Iceberg compaction policy](./iceberg-compaction-policy.md),
+[Iceberg rewrite manifests policy](./iceberg-rewrite-manifests-policy.md),
+[Iceberg snapshot expiration policy](./iceberg-snapshot-expiration-policy.md), and
+[Iceberg orphan file removal policy](./iceberg-orphan-file-removal-policy.md).
 
 Row-filter and column-mask policies can be associated with tags and returned as read restrictions
 by the experimental Iceberg REST service. Compatible readers enforce those restrictions. The

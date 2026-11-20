@@ -124,7 +124,11 @@ Built-in content types:
 | `system_iceberg_snapshot_expiration` | Yes          | Yes            |
 | `system_iceberg_orphan_file_removal` | Yes          | No             |
 
-Field lists for each type are in [Iceberg compaction policy](../iceberg-compaction-policy.md), [Iceberg rewrite manifests policy](../iceberg-rewrite-manifests-policy.md), and [Manage policies](../manage-policies-in-gravitino.md).
+Field lists for each type are in [Iceberg compaction policy](../iceberg-compaction-policy.md),
+[Iceberg rewrite manifests policy](../iceberg-rewrite-manifests-policy.md),
+[Iceberg snapshot expiration policy](../iceberg-snapshot-expiration-policy.md),
+[Iceberg orphan file removal policy](../iceberg-orphan-file-removal-policy.md), and
+[Manage policies](../manage-policies-in-gravitino.md).
 
 ## Cron Path
 
@@ -153,11 +157,12 @@ These endpoints are for the Spark job, not for operators. Schemas are in the [ma
 | Finish and release the slot | `POST /api/metalakes/{metalake}/maintenance/actions/{jobId}/finish`         |
 | After-maintenance metrics   | `POST /api/metalakes/{metalake}/maintenance/actions/{jobId}/metrics/after`  |
 
-S0/S1 metric keys for Validation depend on the policy type. See
-[Iceberg compaction policy](../iceberg-compaction-policy.md#tms-before-and-after-metrics) and
-[Iceberg rewrite manifests policy](../iceberg-rewrite-manifests-policy.md#tms-before-and-after-metrics).
-For snapshot expiry, after metrics include a measured `custom-snapshot-number` from the post-run
-table sample (not before minus expired), plus the expired snapshot/file-size counters.
+S0/S1 metric keys for Validation depend on the policy type. See the **TMS before and after
+metrics** section in each policy page:
+[compaction](../iceberg-compaction-policy.md#tms-before-and-after-metrics),
+[rewrite manifests](../iceberg-rewrite-manifests-policy.md#tms-before-and-after-metrics),
+[snapshot expiration](../iceberg-snapshot-expiration-policy.md#tms-before-and-after-metrics), and
+[orphan file removal](../iceberg-orphan-file-removal-policy.md#tms-before-and-after-metrics).
 
 ## Commit Trigger
 
@@ -184,4 +189,7 @@ Without the listener, time triggers still run. Commit-triggered maintenance does
 - [Configuration](./optimizer-configuration.md) for client authentication, Iceberg REST auth, and the job executor
 - [Table Maintenance Service](./optimizer.md) for the manual CLI workflow
 - [CLI Reference](./optimizer-cli-reference.md) for every command and the built-in job templates
-- [Iceberg Compaction Policy](../iceberg-compaction-policy.md) for tuning the built-in compaction strategy
+- [Iceberg Compaction Policy](../iceberg-compaction-policy.md)
+- [Iceberg Manifest Rewrite Policy](../iceberg-rewrite-manifests-policy.md)
+- [Iceberg Snapshot Expiration Policy](../iceberg-snapshot-expiration-policy.md)
+- [Iceberg Orphan File Removal Policy](../iceberg-orphan-file-removal-policy.md)
