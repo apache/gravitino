@@ -61,7 +61,9 @@ async function publishStatus({ github, repo, sha, context, state, description, t
 
 // Waiting for a committer is not a failure of the contributor's change.
 const NEEDS_ATTENTION = 'Fork CI needs attention';
-const TRUSTED_REQUIRED = 'Fork CI passed; trusted verification required';
+const LEGACY_TRUSTED_REQUIRED = 'Fork CI passed; trusted verification required';
+const TRUSTED_REQUIRED = 'Fork CI passed; CI files differ from target branch. ' +
+  'Committer: run Fork CI in apache/gravitino on that branch with this PR number.';
 
 function statusState(result) {
   if (result.status !== 'completed') return 'pending';
@@ -72,7 +74,7 @@ function statusState(result) {
 
 // Whether a published status reports a finished execution, including pending trusted verification.
 function statusCompleted(status) {
-  return status.state !== 'pending' || status.description === TRUSTED_REQUIRED;
+  return status.state !== 'pending' || [TRUSTED_REQUIRED, LEGACY_TRUSTED_REQUIRED].includes(status.description);
 }
 
-module.exports = { NEEDS_ATTENTION, TRUSTED_REQUIRED, latestStatus, parseRunUrl, publishStatus, runUrl, statusCompleted, statusState };
+module.exports = { NEEDS_ATTENTION, TRUSTED_REQUIRED, LEGACY_TRUSTED_REQUIRED, latestStatus, parseRunUrl, publishStatus, runUrl, statusCompleted, statusState };

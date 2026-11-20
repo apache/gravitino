@@ -26,6 +26,7 @@ import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyEvaluation;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyHandlerContext;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.job.GravitinoCompactionJobAdapter;
 import org.apache.gravitino.maintenance.optimizer.recommender.strategy.GravitinoStrategy;
 import org.apache.gravitino.policy.Policy;
@@ -141,7 +142,8 @@ class TestGravitinoPolicyCompactionStrategy {
     Assertions.assertEquals(Map.of("target-file-size-bytes", "1048576"), jobContext.jobOptions());
 
     GravitinoCompactionJobAdapter adapter = new GravitinoCompactionJobAdapter();
-    Map<String, String> jobConfig = adapter.jobConfig(jobContext);
+    Map<String, String> jobConfig =
+        adapter.jobConfig(jobContext, IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
     Assertions.assertEquals("sort", jobConfig.get("strategy"));
     Assertions.assertEquals("id DESC NULLS LAST", jobConfig.get("sort_order"));
     Assertions.assertEquals("{\"target-file-size-bytes\":\"1048576\"}", jobConfig.get("options"));

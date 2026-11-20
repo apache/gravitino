@@ -41,6 +41,7 @@ import org.apache.gravitino.maintenance.optimizer.api.updater.StatisticsUpdater;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.Recommender;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionJobContext;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionStrategyHandler;
@@ -215,7 +216,8 @@ public class RecommenderIT extends AbstractGravitinoOptimizerEnvIT {
       Assertions.assertEquals(1, jobs.size());
       Assertions.assertEquals("builtin-iceberg-remove-orphan-files", jobs.get(0).jobTemplateName());
       Map<String, String> config =
-          new GravitinoOrphanFileRemovalJobAdapter().jobConfig(jobs.get(0));
+          new GravitinoOrphanFileRemovalJobAdapter()
+              .jobConfig(jobs.get(0), IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
       Assertions.assertEquals(TEST_SCHEMA + "." + tableName, config.get("table_identifier"));
       Assertions.assertEquals("true", config.get("dry_run"));
       Assertions.assertEquals("", config.get("location"));

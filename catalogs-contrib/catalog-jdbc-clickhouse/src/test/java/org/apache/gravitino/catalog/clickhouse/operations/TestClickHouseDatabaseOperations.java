@@ -202,20 +202,13 @@ public class TestClickHouseDatabaseOperations {
   }
 
   // ---------------------------------------------------------------------------
-  // generateDatabaseExistSql — SQL injection escape
+  // generateDatabaseExistSql
   // ---------------------------------------------------------------------------
 
   @Test
-  void testGenerateDatabaseExistSqlNormalName() {
+  void testGenerateDatabaseExistSqlUsesBindParameter() {
     TestableClickHouseDatabaseOperations ops = newOps();
-    String sql = ops.generateDatabaseExistSql("my_db");
-    Assertions.assertEquals("SELECT name FROM system.databases WHERE name = 'my_db'", sql);
-  }
-
-  @Test
-  void testGenerateDatabaseExistSqlSingleQuoteEscaped() {
-    TestableClickHouseDatabaseOperations ops = newOps();
-    String sql = ops.generateDatabaseExistSql("test'db");
-    Assertions.assertEquals("SELECT name FROM system.databases WHERE name = 'test''db'", sql);
+    Assertions.assertEquals(
+        "SELECT name FROM system.databases WHERE name = ?", ops.generateDatabaseExistSql());
   }
 }

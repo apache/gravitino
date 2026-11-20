@@ -32,11 +32,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -545,6 +547,54 @@ public class TestDomainMetaService extends TestJDBCBackend {
       Assertions.assertFalse(backend.exists(finance.nameIdentifier(), Entity.EntityType.DOMAIN));
     } finally {
       allowAlterCommit.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  @TestTemplate
+  public void testDeleteChecksStatusOfLockedRow() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainMetaService domainMetaService = DomainMetaService.getInstance();
+    DomainEntity finance = newDomain(METALAKE_NAME, "Finance", null);
+    domainMetaService.insertDomain(finance, false);
+
+    CountDownLatch publishWritten = new CountDownLatch(1);
+    CountDownLatch allowPublishCommit = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<Throwable> publish =
+          alterInOpenTransaction(
+              executor,
+              finance.id(),
+              domain -> domain.toBuilder().withStatus(Domain.Status.PUBLISHED).build(),
+              publishWritten,
+              allowPublishCommit);
+      Assertions.assertTrue(publishWritten.await(30, TimeUnit.SECONDS));
+
+      // This delete reads the domain as a draft before the publish commits, then waits for its
+      // lock. The check, the same as DomainManager.checkDelete, must see the locked, published row.
+      Future<Boolean> delete =
+          executor.submit(
+              () ->
+                  domainMetaService.deleteDomain(
+                      finance.nameIdentifier(),
+                      domain ->
+                          Preconditions.checkArgument(
+                              domain.status() == Domain.Status.DRAFT,
+                              "Domain %s is published",
+                              domain.name())));
+      Assertions.assertThrows(TimeoutException.class, () -> delete.get(500, TimeUnit.MILLISECONDS));
+
+      allowPublishCommit.countDown();
+      Assertions.assertNull(publish.get(30, TimeUnit.SECONDS));
+      ExecutionException e =
+          Assertions.assertThrows(ExecutionException.class, () -> delete.get(30, TimeUnit.SECONDS));
+      Assertions.assertInstanceOf(IllegalArgumentException.class, e.getCause());
+      Assertions.assertEquals(
+          Domain.Status.PUBLISHED,
+          domainMetaService.getDomainByIdentifier(finance.nameIdentifier()).status());
+    } finally {
+      allowPublishCommit.countDown();
       executor.shutdownNow();
     }
   }
@@ -1060,11 +1110,24 @@ public class TestDomainMetaService extends TestJDBCBackend {
       String comment,
       CountDownLatch written,
       CountDownLatch allowCommit) {
+    return alterInOpenTransaction(
+        executor,
+        domainId,
+        domain -> domain.toBuilder().withComment(comment).build(),
+        written,
+        allowCommit);
+  }
+
+  private Future<Throwable> alterInOpenTransaction(
+      ExecutorService executor,
+      long domainId,
+      UnaryOperator<DomainEntity> change,
+      CountDownLatch written,
+      CountDownLatch allowCommit) {
     DomainPO observedPO = selectDomainPO(domainId);
     DomainEntity observed =
         DomainPO.fromDomainPO(observedPO, NamespaceUtil.ofDomain(METALAKE_NAME));
-    DomainPO alteredPO =
-        DomainPO.updateDomainPO(observedPO, observed.toBuilder().withComment(comment).build());
+    DomainPO alteredPO = DomainPO.updateDomainPO(observedPO, change.apply(observed));
     return executor.submit(
         () -> {
           try {

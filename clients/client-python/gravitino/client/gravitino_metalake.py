@@ -29,7 +29,6 @@ from gravitino.api.authorization.user import User
 from gravitino.api.domain.domain import Domain
 from gravitino.api.domain.domain_change import DomainChangeVariant
 from gravitino.api.domain.domain_operations import DomainOperations
-from gravitino.api.tag.tag_value import TagValue
 from gravitino.client.generic_domain import GenericDomain
 from gravitino.dto.requests.domain_create_request import (
     BackingTagCreate,
@@ -761,7 +760,7 @@ class GravitinoMetalake(
         name: str,
         comment: Optional[str],
         properties: Optional[dict[str, str]],
-        backing_tag: TagValue,
+        backing_tag: str,
         create_backing_tag: bool,
     ) -> Domain:
         """Create a draft top-level domain with an explicit new or existing tag."""
@@ -773,9 +772,7 @@ class GravitinoMetalake(
             comment,
             properties,
             None,
-            BackingTagCreate(
-                backing_tag.name(), backing_tag.value(), create_backing_tag
-            ),
+            BackingTagCreate(backing_tag, create_backing_tag),
         )
         request.validate()
         response = self.rest_client.post(
@@ -801,7 +798,12 @@ class GravitinoMetalake(
         return GenericDomain(self.name(), result.domain(), self.rest_client)
 
     def delete_domain(self, name: str) -> bool:
-        """Delete a domain, preserving tags; parents with children are rejected."""
+        """Delete a draft domain, preserving tags.
+
+        Published domains (unpublish first) and parents with children are rejected.
+        Returns False if the domain is absent or is a draft hidden from the caller;
+        a hidden draft is not deleted, so False does not mean absent.
+        """
         response = self.rest_client.delete(
             domain_path(self.name(), name),
             error_handler=DOMAIN_ERROR_HANDLER,

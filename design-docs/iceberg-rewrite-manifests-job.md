@@ -81,25 +81,25 @@ The initial implementation enters at the jobs API. A future policy-driven flow w
 
 The follow-up `system_iceberg_rewrite_manifests` policy uses the following configurable thresholds. No policy type is added by #12937.
 
-| Policy setting                      | Default           | Meaning                                                           |
-| ----------------------------------- | ----------------- | ----------------------------------------------------------------- |
-| `manifest_count_critical`           | `500`             | Trigger at or above this count, regardless of average size        |
-| `manifest_count_warning`            | `100`             | Minimum count for the size-based trigger                          |
-| `avg_manifest_size_threshold_bytes` | `8388608` (8 MiB) | Trigger below this average size when the warning count is reached |
+| Policy setting             | Default | Meaning                                                                                    |
+| -------------------------- | ------- | ------------------------------------------------------------------------------------------ |
+| `manifest_count_threshold` | `100`   | Trigger at or above this count (Iceberg `commit.manifest.min-count-to-merge` default)      |
 
-Evaluate the following expression using statistics for the resolved target spec only:
+Evaluate the following expression using statistics for the resolved target spec only
+(`custom-manifest-number` / `custom-avg-manifest-size` for that spec):
 
 ```text
-IF manifest_count >= manifest_count_critical:
-    trigger
-ELSE IF manifest_count >= manifest_count_warning
-        AND avg_manifest_size_bytes < avg_manifest_size_threshold_bytes:
+IF custom-manifest-number >= manifest_count_threshold:
     trigger
 ELSE:
     do not trigger
 ```
 
-Count comparisons are inclusive; the size comparison is strict. For example, 500 manifests trigger regardless of size, 100 manifests averaging less than 8 MiB trigger, and 100 manifests averaging exactly 8 MiB do not. Counts below 100 do not trigger under these defaults.
+Count comparisons are inclusive. Average manifest size is collected for observability but
+does not affect the trigger. At the default threshold, 99 manifests do not trigger and 100 or
+more trigger regardless of average size. Optimizer and TMS both evaluate the same
+`trigger-expr` (shared QL bindings). TMS jobConf carries policy `spec_id` / `use_caching`
+into flat placeholders so S0 collection and the procedure target the same resolved spec.
 
 ### 5.3 Layer 2 - Strategy Handler (`maintenance/optimizer/`, follow-up)
 
@@ -139,7 +139,7 @@ statistic_value: {"0": 10485760.0, "1": 4194304.0}
 
 These illustrate the object values, not a new REST serialization format. A collection run for spec `1` replaces only key `"1"` in each map and preserves key `"0"` and every other spec entry. Read and merge the existing maps before writing them through the table-statistics API. Coordinate concurrent collectors for the same table so one read/merge/write does not overwrite another spec's update. Publish both measurements from the same collection and do not evaluate a partially updated pair; the follow-up implementation must test these update guarantees.
 
-The handler declares `DataRequirement.TABLE_STATISTICS` and looks up the same resolved spec key in both objects. The threshold expression uses those two numeric values, never table-wide totals or values from another spec. Do not add small-manifest counts or spec-count statistics. Any last-success time required for a future cooldown belongs in `statistic_meta` as a `custom-` statistic written after successful completion.
+The handler declares `DataRequirement.TABLE_STATISTICS` and looks up the same resolved spec key in both objects. The trigger evaluates `trigger-expr` against the **per-spec** manifest count (and optional observability bindings such as average size); it never uses table-wide totals or values from another spec. Average size does not affect the default trigger. Do not add small-manifest counts or spec-count statistics. Any last-success time required for a future cooldown belongs in `statistic_meta` as a `custom-` statistic written after successful completion.
 
 ### 5.4 Layer 3 - Job Adapter (`maintenance/optimizer/`, follow-up)
 
@@ -320,20 +320,20 @@ The template is additive. No existing template name, REST endpoint, client API, 
 | Test                                                | Coverage                                                               |
 | --------------------------------------------------- | ---------------------------------------------------------------------- |
 | `TestIcebergRewriteManifestsJob`                    | Template, parsing, validation, and generated SQL                       |
-| `TestIcebergRewriteManifestsJobWithSpark` (planned) | Real procedure execution, preserved table contents, and spec selection |
+| `TestIcebergRewriteManifestsJobWithSpark`           | Real procedure execution, preserved table contents, per-spec S0, and spec selection |
 
 ## 8. Proposed PR Plan
 
 1. **Job implementation (#12937)**: Register the template, implement procedure execution and validation, and document submission and spec discovery. Add a Spark-backed test with manifests under two specs: verify that a run affects only the selected spec, preserves records, and handles a no-op.
 2. **Manifest statistics**: Collect `custom-manifest-number-by-spec` and `custom-avg-manifest-size-by-spec`. Test spec-filtered aggregation, empty results, missing entries, merge updates preserving other specs, and concurrent collection updates. Document the two object-valued statistics.
-3. **Automatic triggering**: Implement the policy defaults and expression in Section 5.2, the handler, and the adapter. Test counts at 99, 100, 499, and 500; sizes below, at, and above 8 MiB; and a default-spec change between collection and submission. Verify the submitted ID matches the collected and evaluated key.
+3. **Automatic triggering**: Implement the policy defaults and expression in Section 5.2, the handler, and the adapter. Test count boundaries at 99 and 100 against `manifest_count_threshold` (default 100); confirm average size does not change the default trigger; and cover a default-spec change between collection and submission. Verify the submitted ID matches the collected and evaluated key. Optimizer and TMS both evaluate the same `trigger-expr` (via shared QL bindings).
 
 ## 9. Review Decisions and Initial Compatibility
 
 The three open questions are resolved:
 
-1. **Trigger thresholds**: Use the critical-count or warning-count-plus-size expression in Section 5.2, with defaults of 500, 100, and 8 MiB respectively.
-2. **Spec consistency**: Collect, store, evaluate, and submit against the same resolved spec. Represent multiple specs in one object-valued row per statistic name, as specified in Sections 5.3 and 5.4.
+1. **Trigger thresholds**: Use a single inclusive `manifest_count_threshold` (default 100), aligned with Iceberg `commit.manifest.min-count-to-merge`. Average manifest size is collected for observability only and does not affect the default trigger (Section 5.2).
+2. **Spec consistency**: Collect, store, evaluate, and submit against the same resolved spec. Represent multiple specs in one object-valued row per statistic name, as specified in Sections 5.3 and 5.4. TMS S0 inventory for rewrite manifests counts that resolved spec only.
 3. **Initial runtime support**: Commit to and run CI against **Spark 3.5 and Iceberg 1.11.0** for the initial release, aligned with the other built-in Iceberg jobs. Other version combinations are outside the initial compatibility commitment. The Spark-backed tests in the PR plan must run on this combination.
 
 ## 10. Comparison with Other Maintenance Flows

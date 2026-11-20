@@ -373,6 +373,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
   void testIcebergSQLExtensions() throws NoSuchTableException {
     testIcebergPartitionFieldOperations();
     testIcebergBranchOperations();
+    testIcebergBranchReads();
     testIcebergTagOperations();
     testIcebergIdentifierOperations();
     testIcebergDistributionAndOrderingOperations();
@@ -903,8 +904,50 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     // drop branch
     sql(String.format("ALTER TABLE %s DROP BRANCH `%s`", tableName, branch1));
     Assertions.assertThrows(
-        ValidationException.class,
+        unknownVersionException(),
         () -> sql(String.format("SELECT * FROM %s VERSION AS OF '%s'", tableName, branch1)));
+  }
+
+  // Iceberg's Spark 4.1 module resolves the branch read option and the WAP branch in an analyzer
+  // rule that renames the relation to <table>.branch_<name>, and Spark 4.1 loads that name from
+  // the catalog again before the query runs.
+  private void testIcebergBranchReads() {
+    String tableName = "test_iceberg_branch_reads";
+    String branch = "audit";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+    sql(String.format("INSERT INTO %s VALUES(1, '1', 1);", tableName));
+    sql(String.format("ALTER TABLE %s CREATE BRANCH `%s`", tableName, branch));
+    sql(String.format("INSERT INTO %s VALUES(2, '2', 2);", tableName));
+
+    List<String> branchData =
+        getSparkSession()
+            .read()
+            .option("branch", branch)
+            .table(tableName)
+            .orderBy("id")
+            .collectAsList()
+            .stream()
+            .map(row -> row.mkString(","))
+            .collect(Collectors.toList());
+    Assertions.assertEquals(ImmutableList.of("1,1,1"), branchData);
+
+    sql(String.format("ALTER TABLE %s SET TBLPROPERTIES ('write.wap.enabled'='true')", tableName));
+    sql(String.format("SET spark.wap.branch=%s", branch));
+    try {
+      Assertions.assertEquals(ImmutableList.of("1,1,1"), getTableData(tableName));
+    } finally {
+      sql("RESET spark.wap.branch");
+    }
+    // A branch_ name reads the branch on Spark 4.1 but must not let a write reach main.
+    Assertions.assertThrows(
+        Exception.class,
+        () ->
+            sql(
+                String.format(
+                    "TRUNCATE TABLE %s.%s.branch_%s", getDefaultDatabase(), tableName, branch)));
+    Assertions.assertEquals(
+        "1,1,1;2,2,2", String.join(";", getQueryData(getSelectAllSqlWithOrder(tableName, "id"))));
   }
 
   private void testIcebergTagOperations() throws NoSuchTableException {
@@ -950,7 +993,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     // drop tag
     sql(String.format("ALTER TABLE %s DROP TAG `%s`", tableName, tag1));
     Assertions.assertThrows(
-        ValidationException.class,
+        unknownVersionException(),
         () -> sql(String.format("SELECT * FROM %s VERSION AS OF '%s'", tableName, tag1)));
   }
 
@@ -1114,6 +1157,18 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     queryResult = getTableData(tableName);
     Assertions.assertEquals(4, queryResult.size());
     Assertions.assertEquals("1,1,1;1,1,1;1,1,1;1,1,1", String.join(";", queryResult));
+  }
+
+  /**
+   * The exception a query against a branch or tag that no longer exists raises. Iceberg makes this
+   * check with {@code ValidationException.check} in {@code SparkCatalog} up to its Spark 4.0
+   * module, and with {@code Preconditions.checkArgument} in {@code SparkTable} from its Spark 4.1
+   * one.
+   *
+   * @return the exception class this Spark line raises
+   */
+  protected Class<? extends Throwable> unknownVersionException() {
+    return ValidationException.class;
   }
 
   protected SparkMetadataColumnInfo[] getIcebergMetadataColumns() {
