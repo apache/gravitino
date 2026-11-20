@@ -689,7 +689,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   @Test
   @EnabledIf("supportsPartition")
-  void testCreateDatasourceFormatPartitionTable() {
+  protected void testCreateDatasourceFormatPartitionTable() {
     String tableName = "datasource_partition_table";
 
     dropTableIfExists(tableName);
