@@ -72,7 +72,7 @@ import {
   genUpdates,
   normalizeColumnDefaultValue,
   isAutoIncrementColumnTypeSupported,
-  hasMySQLAutoIncrementRenameConflict
+  hasAutoIncrementEditConflict
 } from '@/lib/utils'
 import { cn } from '@/lib/utils/tailwind'
 import { createTable, updateTable, getTableDetails } from '@/lib/store/metalakes'
@@ -609,11 +609,11 @@ export default function CreateTableDialog({ ...props }) {
     form
       .validateFields()
       .then(async () => {
-        if (provider === 'jdbc-mysql' && hasMySQLAutoIncrementRenameConflict(cacheData?.columns, values?.columns)) {
+        if (editTable && hasAutoIncrementEditConflict(provider, cacheData?.columns, values?.columns)) {
           Modal.warning({
             title: 'Save these changes separately',
             content:
-              'For MySQL, rename an AutoIncrement column first. Then reopen the table and disable AutoIncrement in a separate save.'
+              'Save the AutoIncrement change by itself first. Then reopen the table and save the other changes to that column one at a time.'
           })
 
           return

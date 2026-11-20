@@ -39,17 +39,20 @@ export const isAutoIncrementColumnTypeSupported = type => {
   return ColumnTypeSupportAutoIncrement.includes(type.trim().toLowerCase())
 }
 
-export const hasMySQLAutoIncrementRenameConflict = (originalColumns, newColumns) => {
+export const hasAutoIncrementEditConflict = (provider, originalColumns, newColumns) => {
+  if (!['jdbc-mysql', 'jdbc-oceanbase'].includes(provider)) return false
+
   const originalColumnsMap = _.keyBy(originalColumns || [], 'uniqueId')
 
   return (newColumns || []).some(newColumn => {
+    if (!newColumn?.uniqueId || typeof newColumn.autoIncrement !== 'boolean') return false
+
     const originalColumn = originalColumnsMap[newColumn.uniqueId]
+    if (!originalColumn || Boolean(originalColumn.autoIncrement) === newColumn.autoIncrement) return false
 
     return (
-      originalColumn &&
-      Boolean(originalColumn.autoIncrement) &&
-      originalColumn.name !== newColumn.name &&
-      newColumn.autoIncrement === false
+      (!newColumn.autoIncrement && originalColumn.name !== newColumn.name) ||
+      (originalColumn.comment || '') !== (newColumn.comment || '')
     )
   })
 }

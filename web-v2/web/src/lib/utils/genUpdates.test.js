@@ -22,7 +22,7 @@ import {
   genUpdates,
   normalizeColumnDefaultValue,
   isAutoIncrementColumnTypeSupported,
-  hasMySQLAutoIncrementRenameConflict
+  hasAutoIncrementEditConflict
 } from './index'
 
 const createTableData = (autoIncrement, defaultValue) => ({
@@ -233,25 +233,69 @@ describe('genUpdates', () => {
     ])
   })
 })
-describe('hasMySQLAutoIncrementRenameConflict', () => {
-  it('detects renaming and disabling AutoIncrement together', () => {
-    const originalColumns = [{ uniqueId: 'id', name: 'id', autoIncrement: true }]
-    const newColumns = [{ uniqueId: 'id', name: 'user_id', autoIncrement: false }]
+describe('hasAutoIncrementEditConflict', () => {
+  const originalColumn = { uniqueId: 'id', name: 'id', autoIncrement: true, comment: 'Old comment' }
 
-    expect(hasMySQLAutoIncrementRenameConflict(originalColumns, newColumns)).toBe(true)
+  it.each(['jdbc-mysql', 'jdbc-oceanbase'])('blocks renaming and disabling AutoIncrement on %s', provider => {
+    const newColumn = { ...originalColumn, name: 'user_id', autoIncrement: false }
+
+    expect(hasAutoIncrementEditConflict(provider, [originalColumn], [newColumn])).toBe(true)
   })
 
-  it('allows renaming while keeping AutoIncrement enabled', () => {
-    const originalColumns = [{ uniqueId: 'id', name: 'id', autoIncrement: true }]
-    const newColumns = [{ uniqueId: 'id', name: 'user_id', autoIncrement: true }]
+  it.each(['jdbc-mysql', 'jdbc-oceanbase'])(
+    'blocks changing the comment and disabling AutoIncrement on %s',
+    provider => {
+      const newColumn = { ...originalColumn, comment: 'New comment', autoIncrement: false }
 
-    expect(hasMySQLAutoIncrementRenameConflict(originalColumns, newColumns)).toBe(false)
+      expect(hasAutoIncrementEditConflict(provider, [originalColumn], [newColumn])).toBe(true)
+    }
+  )
+
+  it('blocks clearing the comment while enabling AutoIncrement', () => {
+    const oldColumn = { ...originalColumn, autoIncrement: false }
+    const newColumn = { ...originalColumn, comment: '' }
+
+    expect(hasAutoIncrementEditConflict('jdbc-mysql', [oldColumn], [newColumn])).toBe(true)
   })
 
-  it('allows disabling AutoIncrement without renaming', () => {
-    const originalColumns = [{ uniqueId: 'id', name: 'id', autoIncrement: true }]
-    const newColumns = [{ uniqueId: 'id', name: 'id', autoIncrement: false }]
+  it.each([
+    { name: 'user_id' },
+    { comment: 'New comment' },
+    { autoIncrement: false },
+    { comment: 'New comment', autoIncrement: undefined }
+  ])('allows changes with no conflict on the column (%j)', changes => {
+    const newColumn = { ...originalColumn, ...changes }
 
-    expect(hasMySQLAutoIncrementRenameConflict(originalColumns, newColumns)).toBe(false)
+    expect(hasAutoIncrementEditConflict('jdbc-mysql', [originalColumn], [newColumn])).toBe(false)
+  })
+
+  it('treats an absent comment and an empty comment as the same', () => {
+    const oldColumn = { ...originalColumn, comment: undefined }
+    const newColumn = { ...originalColumn, comment: '', autoIncrement: false }
+
+    expect(hasAutoIncrementEditConflict('jdbc-mysql', [oldColumn], [newColumn])).toBe(false)
+  })
+
+  it('allows changing the comment on a different column', () => {
+    const otherColumn = { uniqueId: 'name', name: 'name', comment: 'Old comment' }
+
+    const newColumns = [
+      { ...originalColumn, autoIncrement: false },
+      { ...otherColumn, comment: 'New comment' }
+    ]
+
+    expect(hasAutoIncrementEditConflict('jdbc-mysql', [originalColumn, otherColumn], newColumns)).toBe(false)
+  })
+
+  it('allows adding a column with both AutoIncrement and a comment', () => {
+    const newColumn = { ...originalColumn, uniqueId: 'new_id', name: 'new_id' }
+
+    expect(hasAutoIncrementEditConflict('jdbc-mysql', [], [newColumn])).toBe(false)
+  })
+
+  it('does not apply the MySQL and OceanBase safeguard to PostgreSQL', () => {
+    const newColumn = { ...originalColumn, name: 'user_id', comment: 'New comment', autoIncrement: false }
+
+    expect(hasAutoIncrementEditConflict('jdbc-postgresql', [originalColumn], [newColumn])).toBe(false)
   })
 })

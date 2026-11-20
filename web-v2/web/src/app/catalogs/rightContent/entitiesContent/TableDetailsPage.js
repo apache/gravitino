@@ -435,67 +435,67 @@ export default function TableDetailsPage({ ...props }) {
           render: type => {
             const formattedType = formatColumnType(type)
 
-          return (
-            <Tag color={columnTypeColor(type)} title={formattedType}>
-              {formattedType}
-            </Tag>
-          )
+            return (
+              <Tag color={columnTypeColor(type)} title={formattedType}>
+                {formattedType}
+              </Tag>
+            )
+          }
+        },
+        {
+          title: 'Tags',
+          dataIndex: 'tags',
+          key: 'tags',
+          render: (_, record) =>
+            record?.node === 'tableColumn' ? (
+              <Tags
+                metadataObjectType={'column'}
+                metadataObjectFullName={`${catalog}.${schema}.${table}.${record.name}`}
+              />
+            ) : null
+        },
+        {
+          title: 'Policies',
+          dataIndex: 'policies',
+          key: 'policies',
+          render: (_, record) =>
+            record?.node === 'tableColumn' ? (
+              <Policies
+                metadataObjectType={'column'}
+                metadataObjectFullName={`${catalog}.${schema}.${table}.${record.name}`}
+              />
+            ) : null
+        },
+        {
+          title: 'Nullable',
+          dataIndex: 'nullable',
+          key: 'nullable',
+          metadataKey: 'nullable',
+          render: value => (value ? 'Yes' : 'No')
+        },
+        {
+          title: 'AutoIncrement',
+          dataIndex: 'autoIncrement',
+          key: 'autoIncrement',
+          metadataKey: 'autoIncrement',
+          render: value => (value ? 'Yes' : 'No')
+        },
+        {
+          title: 'Default Value',
+          dataIndex: 'defaultValue',
+          key: 'defaultValue',
+          metadataKey: 'defaultValue',
+          render: formatColumnDefaultValue
+        },
+        {
+          title: 'Comment',
+          dataIndex: 'comment',
+          key: 'comment',
+          metadataKey: 'comment',
+          ellipsis: true,
+          render: value => value || '-'
         }
-      },
-      {
-        title: 'Tags',
-        dataIndex: 'tags',
-        key: 'tags',
-        render: (_, record) =>
-          record?.node === 'tableColumn' ? (
-            <Tags
-              metadataObjectType={'column'}
-              metadataObjectFullName={`${catalog}.${schema}.${table}.${record.name}`}
-            />
-          ) : null
-      },
-      {
-        title: 'Policies',
-        dataIndex: 'policies',
-        key: 'policies',
-        render: (_, record) =>
-          record?.node === 'tableColumn' ? (
-            <Policies
-              metadataObjectType={'column'}
-              metadataObjectFullName={`${catalog}.${schema}.${table}.${record.name}`}
-            />
-          ) : null
-      },
-            {
-        title: 'Nullable',
-        dataIndex: 'nullable',
-        key: 'nullable',
-        metadataKey: 'nullable',
-        render: value => (value ? 'Yes' : 'No')
-      },
-      {
-        title: 'AutoIncrement',
-        dataIndex: 'autoIncrement',
-        key: 'autoIncrement',
-        metadataKey: 'autoIncrement',
-        render: value => (value ? 'Yes' : 'No')
-      },
-      {
-        title: 'Default Value',
-        dataIndex: 'defaultValue',
-        key: 'defaultValue',
-        metadataKey: 'defaultValue',
-        render: formatColumnDefaultValue
-      },
-      {
-        title: 'Comment',
-        dataIndex: 'comment',
-        key: 'comment',
-        metadataKey: 'comment',
-        ellipsis: true,
-        render: value => value || '-'
-      },
-    ].filter(column => !column.metadataKey || visibleMetadataColumns.includes(column.metadataKey)),
+      ].filter(column => !column.metadataKey || visibleMetadataColumns.includes(column.metadataKey)),
     [store.activatedDetails, visibleMetadataColumns]
   )
 
@@ -522,6 +522,7 @@ export default function TableDetailsPage({ ...props }) {
                 </span>
                 <Tooltip title='Edit'>
                   <Icons.Pencil
+                    data-refer='edit-table-btn'
                     className='relative size-4 hover:cursor-pointer hover:text-defaultPrimary'
                     onClick={handleEditTable}
                   />
