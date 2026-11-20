@@ -21,6 +21,7 @@ package org.apache.gravitino;
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
+import org.apache.gravitino.kb.KnowledgeBaseArticleOperations;
 import org.apache.gravitino.secret.SupportsSecrets;
 
 /**
@@ -72,5 +73,12 @@ public interface Metalake extends Auditable {
   default SupportsSecrets supportsSecrets() {
     throw new UnsupportedOperationException(
         "Metalake does not support secret property operations.");
+  }
+  /**
+   * @return operations on Knowledge Base Articles in this metalake
+   * @throws UnsupportedOperationException if this metalake does not support articles
+   */
+  default KnowledgeBaseArticleOperations articleOperations() {
+    throw new UnsupportedOperationException("Metalake does not support Knowledge Base Articles.");
   }
 }

@@ -260,6 +260,12 @@ public class Privileges {
         return ManageDomain.allow();
       case USE_DOMAIN:
         return UseDomain.allow();
+      case VIEW_DEFINITION:
+        return ViewDefinition.allow();
+      case CREATE_DEFINITION:
+        return CreateDefinition.allow();
+      case MANAGE_DEFINITIONS:
+        return ManageDefinitions.allow();
 
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
@@ -408,6 +414,12 @@ public class Privileges {
         return ManageDomain.deny();
       case USE_DOMAIN:
         return UseDomain.deny();
+      case VIEW_DEFINITION:
+        return ViewDefinition.deny();
+      case CREATE_DEFINITION:
+        return CreateDefinition.deny();
+      case MANAGE_DEFINITIONS:
+        return ManageDefinitions.deny();
 
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
@@ -1901,6 +1913,102 @@ public class Privileges {
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.DOMAIN;
+    }
+  }
+
+  /** The privilege to read published glossary definitions. */
+  public static class ViewDefinition extends GenericPrivilege<ViewDefinition> {
+
+    private static final ViewDefinition ALLOW_INSTANCE =
+        new ViewDefinition(Condition.ALLOW, Name.VIEW_DEFINITION);
+    private static final ViewDefinition DENY_INSTANCE =
+        new ViewDefinition(Condition.DENY, Name.VIEW_DEFINITION);
+
+    private ViewDefinition(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The allowed privilege.
+     */
+    public static ViewDefinition allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The denied privilege.
+     */
+    public static ViewDefinition deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE;
+    }
+  }
+
+  /** The privilege to create glossary definitions and maintain owned definitions. */
+  public static class CreateDefinition extends GenericPrivilege<CreateDefinition> {
+
+    private static final CreateDefinition ALLOW_INSTANCE =
+        new CreateDefinition(Condition.ALLOW, Name.CREATE_DEFINITION);
+    private static final CreateDefinition DENY_INSTANCE =
+        new CreateDefinition(Condition.DENY, Name.CREATE_DEFINITION);
+
+    private CreateDefinition(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The allowed privilege.
+     */
+    public static CreateDefinition allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The denied privilege.
+     */
+    public static CreateDefinition deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE;
+    }
+  }
+
+  /** The privilege to manage all glossary definitions. */
+  public static class ManageDefinitions extends GenericPrivilege<ManageDefinitions> {
+
+    private static final ManageDefinitions ALLOW_INSTANCE =
+        new ManageDefinitions(Condition.ALLOW, Name.MANAGE_DEFINITIONS);
+    private static final ManageDefinitions DENY_INSTANCE =
+        new ManageDefinitions(Condition.DENY, Name.MANAGE_DEFINITIONS);
+
+    private ManageDefinitions(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The allowed privilege.
+     */
+    public static ManageDefinitions allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The denied privilege.
+     */
+    public static ManageDefinitions deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE;
     }
   }
 }

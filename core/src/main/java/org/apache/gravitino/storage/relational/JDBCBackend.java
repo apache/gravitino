@@ -558,6 +558,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return DomainMetaService.getInstance()
             .deleteDomainMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case KNOWLEDGE_BASE_ARTICLE:
       case AUDIT:
         return 0;
         // TODO: Implement hard delete logic for these entity types.
@@ -595,6 +596,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       case JOB_TEMPLATE:
       case JOB:
       case VIEW:
+      case KNOWLEDGE_BASE_ARTICLE:
       case DOMAIN:
         // These entity types have not implemented multi-versions, so we can skip.
         return 0;
