@@ -38,7 +38,6 @@ import org.apache.spark.sql.connector.catalog.TableChange;
 import org.apache.spark.sql.connector.catalog.TableWritePrivilege;
 import org.apache.spark.sql.connector.expressions.Transform;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTable;
-import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTableCatalog;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
@@ -48,17 +47,22 @@ public class GravitinoDorisCatalogSpark35 extends GravitinoJdbcCatalogSpark35 {
   @Override
   protected TableCatalog createAndInitSparkCatalog(
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
+    return initializeJdbcTableCatalog(
+        name, options, jdbcOptions(gravitinoCatalog(), options, properties));
+  }
+
+  @Override
+  protected Map<String, String> jdbcOptions(
+      Catalog catalog, CaseInsensitiveStringMap options, Map<String, String> properties) {
     Map<String, String> all =
         DorisPropertiesConverter35.getInstance().toSparkCatalogProperties(options, properties);
-    JdbcCredential credential = requiredJdbcCredential(gravitinoCatalog());
+    JdbcCredential credential = requiredJdbcCredential(catalog);
     requireProperty(all, "url");
     requireProperty(all, "driver");
     all.put("user", credential.jdbcUser());
     all.put("password", credential.jdbcPassword());
 
-    JDBCTableCatalog jdbcTableCatalog = new JDBCTableCatalog();
-    jdbcTableCatalog.initialize(name, new CaseInsensitiveStringMap(all));
-    return jdbcTableCatalog;
+    return all;
   }
 
   @Override
@@ -100,10 +104,10 @@ public class GravitinoDorisCatalogSpark35 extends GravitinoJdbcCatalogSpark35 {
 
   /** Loads the physical JDBC schema with redacted failure diagnostics. */
   @Override
-  protected org.apache.spark.sql.connector.catalog.Table loadSparkTable(Identifier ident) {
+  protected org.apache.spark.sql.connector.catalog.Table loadJdbcTable(Identifier ident) {
     try {
-      return super.loadSparkTable(ident);
-    } catch (RuntimeException e) {
+      return sparkCatalog.loadTable(ident);
+    } catch (Exception e) {
       throw DorisPhysicalSchemaValidator35.physicalAccessFailure(
           ident, "Spark JDBC schema load", e);
     }
