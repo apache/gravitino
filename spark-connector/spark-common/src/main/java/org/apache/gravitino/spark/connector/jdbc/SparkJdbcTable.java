@@ -80,7 +80,7 @@ public class SparkJdbcTable extends SparkJdbcTableBase {
       SparkTransformConverter sparkTransformConverter,
       SparkTypeConverter sparkTypeConverter,
       Runnable validateConnection) {
-    super(identifier, jdbcTable.schema(), jdbcTable.jdbcOptions());
+    super(identifier, jdbcTable);
     this.validateConnection = validateConnection;
     this.gravitinoTable = gravitinoTable;
     this.gravitinoTableInfoHelper =
