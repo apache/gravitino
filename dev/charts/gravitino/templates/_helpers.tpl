@@ -670,6 +670,12 @@ Password Secret for external relational stores (schema-migrate Job).
 
 {{/*
 PostgreSQL currentSchema for schema-migrate Job (PG_CURRENT_SCHEMA / PGOPTIONS).
+
+Prefer schema.currentSchema; otherwise currentSchema from entity.jdbcUrl.
+Only simple (unquoted-style) identifiers are accepted. Fold to lowercase so
+lookup (pg_namespace.nspname), CREATE SCHEMA, and PGOPTIONS search_path all use
+the same name — matching PostgreSQL unquoted-identifier / JDBC currentSchema
+folding (e.g. currentSchema=App → app), same as gravitino.postgresqlInitCurrentSchema.
 */}}
 {{- define "gravitino.schemaMigrateCurrentSchema" -}}
 {{- $schema := "" -}}
@@ -682,7 +688,7 @@ PostgreSQL currentSchema for schema-migrate Job (PG_CURRENT_SCHEMA / PGOPTIONS).
 {{- if not (regexMatch "^[A-Za-z_][A-Za-z0-9_]*$" $schema) -}}
 {{- fail (printf "schema.currentSchema / entity.jdbcUrl currentSchema %q must be a simple PostgreSQL identifier" $schema) -}}
 {{- end -}}
-{{- $schema -}}
+{{- $schema | lower -}}
 {{- end -}}
 {{- end -}}
 

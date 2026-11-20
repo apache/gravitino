@@ -295,6 +295,79 @@ tests:
             name: PGOPTIONS
             value: "-c search_path=gravitino"
 
+  - it: folds mixed-case schema.currentSchema to lowercase for migrate Job and Deployment wait
+    release:
+      name: gravitino
+    set:
+      schema:
+        migrate:
+          enabled: true
+          existingSecret: gravitino-pg-secret
+        currentSchema: App
+      postgresql:
+        enabled: false
+      entity:
+        jdbcUrl: jdbc:postgresql://pg.example.ci.local:5432/gravitino_meta?currentSchema=OtherSchema
+        jdbcDriver: org.postgresql.Driver
+        jdbcUser: gravitino_app
+    asserts:
+      - template: schema-migrate-job.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PG_CURRENT_SCHEMA
+            value: app
+      - template: schema-migrate-job.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PGOPTIONS
+            value: "-c search_path=app"
+      - template: deployment.yaml
+        equal:
+          path: spec.template.spec.initContainers[1].name
+          value: wait-for-schema
+      - template: deployment.yaml
+        contains:
+          path: spec.template.spec.initContainers[1].env
+          content:
+            name: PGOPTIONS
+            value: "-c search_path=app"
+
+  - it: folds mixed-case currentSchema from entity.jdbcUrl to lowercase for migrate Job and wait
+    release:
+      name: gravitino
+    set:
+      schema:
+        migrate:
+          enabled: true
+          existingSecret: gravitino-pg-secret
+      postgresql:
+        enabled: false
+      entity:
+        jdbcUrl: jdbc:postgresql://pg.example.ci.local:5432/gravitino_meta?currentSchema=App&sslmode=require
+        jdbcDriver: org.postgresql.Driver
+        jdbcUser: gravitino_app
+    asserts:
+      - template: schema-migrate-job.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PG_CURRENT_SCHEMA
+            value: app
+      - template: schema-migrate-job.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PGOPTIONS
+            value: "-c search_path=app"
+      - template: deployment.yaml
+        contains:
+          path: spec.template.spec.initContainers[1].env
+          content:
+            name: PGOPTIONS
+            value: "-c search_path=app"
+
   - it: keeps distinct Job names across revisions for a long release name
     template: schema-migrate-job.yaml
     release:

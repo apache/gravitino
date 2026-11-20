@@ -210,6 +210,9 @@ schema:
   ## PostgreSQL libpq sslmode for the migrate Job when using external PostgreSQL.
   sslMode: ""
   ## PostgreSQL search_path for the migrate Job (external PostgreSQL).
+  ## Simple identifiers only; mixed case is folded to lowercase for lookup,
+  ## CREATE SCHEMA, and search_path (unquoted PostgreSQL identifier / JDBC
+  ## currentSchema semantics, e.g. App → app).
   currentSchema: ""
   ssl:
     ## @param schema.ssl.existingSecret CA Secret for verify-ca / verify-full (PGSSLROOTCERT).
