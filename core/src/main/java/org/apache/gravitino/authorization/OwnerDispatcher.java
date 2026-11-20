@@ -48,7 +48,9 @@ public interface OwnerDispatcher {
    * may persist using {@link org.apache.gravitino.SupportsRelationOperations#batchInsertRelations}.
    * The default implementation delegates per object so implementations that wrap {@code setOwner}
    * (e.g. for events) apply consistently. Equivalent glossary term names refer to one transfer,
-   * using the first spelling supplied. A later failure leaves earlier term transfers committed.
+   * using the first spelling supplied. For top-level calls, earlier term transfers remain committed
+   * if a later transfer fails. In a caller-owned transaction, individual calls can return and
+   * dispatch events before the caller commits or rolls back.
    *
    * <p>Note: implementations that persist via {@code batchInsertRelations} (such as {@link
    * OwnerManager}) require all {@code metadataObjects} to share the same {@link
