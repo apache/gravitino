@@ -70,6 +70,8 @@ import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
 import org.apache.gravitino.dto.requests.JobRunRequest;
 import org.apache.gravitino.dto.requests.OwnerSetRequest;
+import org.apache.gravitino.dto.requests.PolicyTagAddRequest;
+import org.apache.gravitino.dto.requests.PolicyUpdatesRequest;
 import org.apache.gravitino.dto.requests.PrivilegeGrantRequest;
 import org.apache.gravitino.dto.requests.PrivilegeRevokeRequest;
 import org.apache.gravitino.dto.requests.SchemaCreateRequest;
@@ -81,6 +83,7 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
@@ -93,6 +96,8 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
@@ -123,6 +128,7 @@ import org.apache.gravitino.server.web.rest.MetadataObjectSemanticModelOperation
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
 import org.apache.gravitino.server.web.rest.OwnerOperations;
 import org.apache.gravitino.server.web.rest.PermissionOperations;
+import org.apache.gravitino.server.web.rest.PolicyOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
 import org.apache.gravitino.server.web.rest.SecretsProviderOperations;
 import org.apache.gravitino.server.web.rest.SemanticModelMetricOperations;
@@ -1378,6 +1384,81 @@ public class TestGravitinoInterceptionService {
         verify(invocation).proceed();
       }
       verify(dispatcher, never()).associateTagsForMetadataObject(any(), any(), any(), any());
+    }
+  }
+
+  @Test
+  void testMissingPolicyAndInvalidSelectorReturnsBadRequest() throws Throwable {
+    try (TesterRequestMocks mocks = new TesterRequestMocks()) {
+      when(mocks.authorizer.isOwner(any(), any(), any(), any())).thenReturn(true);
+      PolicyDispatcher policies = mock(PolicyDispatcher.class);
+      when(mocks.env.policyDispatcher()).thenReturn(policies);
+      when(policies.getPolicy("lake", "missing")).thenThrow(new NoSuchPolicyException("missing"));
+      Method method =
+          TagOperations.class.getMethod(
+              "addPolicyForTag",
+              String.class,
+              String.class,
+              String.class,
+              PolicyTagAddRequest.class);
+      MethodInvocation invocation = mock(MethodInvocation.class);
+      when(invocation.getMethod()).thenReturn(method);
+      when(invocation.getArguments())
+          .thenReturn(new Object[] {"lake", "tag", "missing", new PolicyTagAddRequest()});
+      when(invocation.proceed()).thenReturn(Response.status(400).build());
+      MethodInterceptor interceptor =
+          new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
+      Response response = (Response) interceptor.invoke(invocation);
+      assertEquals(400, response.getStatus());
+    }
+  }
+
+  @Test
+  void testDeniedPolicyWideningDoesNotReachMutation() throws Throwable {
+    try (TesterRequestMocks mocks = new TesterRequestMocks()) {
+      when(mocks.authorizer.isOwner(any(), any(), any(), any()))
+          .thenAnswer(
+              invocation ->
+                  ((MetadataObject) invocation.getArgument(2)).type()
+                      == MetadataObject.Type.POLICY);
+      PolicyDispatcher policies = mock(PolicyDispatcher.class);
+      when(mocks.env.policyDispatcher()).thenReturn(policies);
+      PolicyEntity policy = mock(PolicyEntity.class);
+      when(policy.policyType()).thenReturn(Policy.BuiltInType.ACCESS_CONTROL);
+      when(policy.content())
+          .thenReturn(
+              PolicyContents.accessControl(
+                  List.of(Privilege.Name.SELECT_TABLE), List.of("reader")));
+      when(policies.getPolicy("lake", "policy")).thenReturn(policy);
+      RelationalEntity<?> relation = mock(RelationalEntity.class);
+      TagEntity tag = mock(TagEntity.class);
+      when(tag.name()).thenReturn("visible");
+      doReturn(tag).when(relation).targetEntity();
+      when(policies.listTagAssociationsForPolicy("lake", "policy"))
+          .thenReturn(new RelationalEntity<?>[] {relation});
+      PolicyUpdatesRequest request =
+          JsonUtils.objectMapper()
+              .readValue(
+                  "{\"updates\":[{\"@type\":\"rename\",\"newName\":\"renamed\"},"
+                      + "{\"@type\":\"updateContent\",\"policyType\":\"system_access_control\","
+                      + "\"newContent\":{\"privileges\":[\"SELECT_TABLE\",\"MODIFY_TABLE\"],"
+                      + "\"applicableRoles\":[\"reader\"]}}]}",
+                  PolicyUpdatesRequest.class);
+      Method method =
+          PolicyOperations.class.getMethod(
+              "alterPolicy", String.class, String.class, PolicyUpdatesRequest.class);
+      MethodInvocation invocation = mock(MethodInvocation.class);
+      when(invocation.getMethod()).thenReturn(method);
+      when(invocation.getArguments()).thenReturn(new Object[] {"lake", "policy", request});
+      Response response =
+          (Response)
+              new GravitinoInterceptionService()
+                  .getMethodInterceptors(method)
+                  .get(0)
+                  .invoke(invocation);
+      assertEquals(403, response.getStatus());
+      verify(invocation, never()).proceed();
+      verify(policies, never()).alterPolicy(any(), any(), any());
     }
   }
 

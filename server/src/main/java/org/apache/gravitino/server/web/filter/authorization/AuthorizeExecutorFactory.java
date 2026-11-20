@@ -43,6 +43,12 @@ public class AuthorizeExecutorFactory {
           expression, metadataContext, pathParams, entityType);
       case ASSOCIATE_TAG -> new AssociateTagAuthorizationExecutor(
           expression, parameters, args, metadataContext, pathParams, entityType);
+      case BIND_TAG_POLICY -> new BindTagPolicyAuthorizationExecutor(
+          expression, metadataContext, pathParams, entityType, parameters, args, true);
+      case UNBIND_TAG_POLICY -> new BindTagPolicyAuthorizationExecutor(
+          expression, metadataContext, pathParams, entityType, parameters, args, false);
+      case ALTER_POLICY -> new AlterPolicyAuthorizationExecutor(
+          expression, metadataContext, pathParams, entityType, parameters, args);
       case RUN_JOB -> new RunJobAuthorizationExecutor(
           parameters, args, expression, metadataContext, pathParams, entityType);
       case LINEAGE -> new LineageAuthorizationExecutor(parameters, args, expression);

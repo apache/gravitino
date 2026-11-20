@@ -417,7 +417,8 @@ public class TagOperations {
       @PathParam("tag") @AuthorizationMetadata(type = Entity.EntityType.TAG) String tagName,
       @PathParam("policy") @AuthorizationMetadata(type = Entity.EntityType.POLICY)
           String policyName,
-      PolicyTagAddRequest request) {
+      @AuthorizationRequest(type = AuthorizationRequest.RequestType.BIND_TAG_POLICY)
+          PolicyTagAddRequest request) {
     LOG.info(
         "Received add policy: {} for tag: {} under metalake: {}", policyName, tagName, metalake);
     try {
@@ -451,7 +452,9 @@ public class TagOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("tag") @AuthorizationMetadata(type = Entity.EntityType.TAG) String tagName,
-      @PathParam("policy") @AuthorizationMetadata(type = Entity.EntityType.POLICY)
+      @PathParam("policy")
+          @AuthorizationMetadata(type = Entity.EntityType.POLICY)
+          @AuthorizationRequest(type = AuthorizationRequest.RequestType.UNBIND_TAG_POLICY)
           String policyName) {
     LOG.info(
         "Received remove policy: {} from tag: {} under metalake: {}",

@@ -26,6 +26,7 @@ import javax.annotation.Nullable;
 import javax.ws.rs.GET;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.policy.PolicyEditAuthorization;
 import org.apache.gravitino.tag.TagAssignmentAuthorization;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -43,6 +44,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
  */
 public final class AuthorizationRequestScope implements AutoCloseable {
   private static final ThreadLocal<AuthorizationRequestScope> CURRENT = new ThreadLocal<>();
+  private final PolicyEditAuthorization policyEditAuthorization = PolicyEditAuthorization.open();
   private final TagAssignmentAuthorization tagAssignmentAuthorization =
       TagAssignmentAuthorization.open();
 
@@ -116,6 +118,7 @@ public final class AuthorizationRequestScope implements AutoCloseable {
   @Override
   public void close() {
     tagAssignmentAuthorization.close();
+    policyEditAuthorization.close();
     CURRENT.remove();
   }
 }

@@ -77,7 +77,7 @@ tasks {
   test {
     environment("GRAVITINO_HOME", rootDir.path)
     environment("GRAVITINO_TEST", "true")
-    useJUnitPlatform { excludeTags("server-tag-assignment-h2-test") }
+    useJUnitPlatform { excludeTags("server-tag-assignment-h2-test", "server-policy-h2-test") }
   }
 }
 
@@ -92,4 +92,15 @@ tasks.register<Test>("serverTagAssignmentH2Test") {
   maxParallelForks = 1
 }
 
-tasks.named("check") { dependsOn("serverTagAssignmentH2Test") }
+tasks.register<Test>("serverPolicyH2Test") {
+  group = "verification"
+  description = "Runs policy authorization persistence tests against H2."
+  testClassesDirs = sourceSets["test"].output.classesDirs
+  classpath = sourceSets["test"].runtimeClasspath
+  useJUnitPlatform { includeTags("server-policy-h2-test") }
+  systemProperty("gravitino.core.test.backend", "h2")
+  systemProperty("junit.jupiter.execution.parallel.enabled", "false")
+  maxParallelForks = 1
+}
+
+tasks.named("check") { dependsOn("serverTagAssignmentH2Test", "serverPolicyH2Test") }
