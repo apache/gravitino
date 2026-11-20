@@ -34,8 +34,8 @@ import org.apache.hadoop.fs.s3a.Constants;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-/** Tests the complete in-memory credential vending path for S3 credentials. */
-public class TestS3CredentialVending {
+/** Tests the complete in-memory credential vending path for S3 credentials with AWS SDK v1. */
+public class TestS3CredentialVendingV1 {
 
   private static final URI S3_URI = URI.create("s3a://test-bucket/");
   private static final long EXPIRATION_TIME = System.currentTimeMillis() + 60_000L;
