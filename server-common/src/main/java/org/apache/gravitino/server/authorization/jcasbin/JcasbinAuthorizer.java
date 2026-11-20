@@ -68,13 +68,11 @@ import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.DomainEntity;
-import org.apache.gravitino.meta.GlossaryTermNames;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.server.authorization.DomainAuthzHelper;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.po.RolePO;
@@ -485,14 +483,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     }
 
     if (metadataObject.type() == MetadataObject.Type.GLOSSARY_TERM) {
-      OwnerInfo owner =
-          SessionUtils.getWithoutCommitFresh(
-              OwnerMetaMapper.class,
-              mapper ->
-                  mapper.selectGlossaryTermOwner(
-                      metalake, GlossaryTermNames.key(metadataObject.name())));
       return ownerMatchesUserOrGroups(
-          Optional.ofNullable(owner), principal, metalake, requestContext);
+          lookups.currentGlossaryTermOwner(metalake, metadataObject.name()),
+          principal,
+          metalake,
+          requestContext);
     }
 
     if (metadataObject.type() == MetadataObject.Type.SCHEMA) {
@@ -542,13 +537,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   @Override
   public boolean isGlossaryTermOwner(
       Principal principal, String metalake, long termId, AuthorizationRequestContext context) {
-    OwnerInfo owner =
-        SessionUtils.getWithoutCommitFresh(
-            OwnerMetaMapper.class,
-            mapper ->
-                mapper.selectOwnerByMetadataObjectIdAndType(
-                    termId, Entity.EntityType.GLOSSARY_TERM.name()));
-    return ownerMatchesUserOrGroups(Optional.ofNullable(owner), principal, metalake, context);
+    return ownerMatchesUserOrGroups(
+        lookups.currentGlossaryTermOwner(termId), principal, metalake, context);
   }
 
   @Override

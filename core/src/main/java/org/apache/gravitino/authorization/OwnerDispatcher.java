@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.exceptions.ForbiddenException;
 
 /** Dispatcher interface for managing owners of metadata objects. */
 public interface OwnerDispatcher {
@@ -69,8 +70,10 @@ public interface OwnerDispatcher {
   }
 
   /**
-   * Retrieves the owner of a metadata object.
+   * Retrieves the owner of a metadata object. For glossary terms, the relational implementation
+   * checks visibility and reads ownership in one snapshot, started outside a caller transaction.
    *
+   * @throws ForbiddenException if the caller cannot view the glossary term
    * @param metalake the name of the metalake
    * @param metadataObject the metadata object for which the owner is being retrieved
    * @return an Optional containing the owner if it exists, otherwise an empty Optional

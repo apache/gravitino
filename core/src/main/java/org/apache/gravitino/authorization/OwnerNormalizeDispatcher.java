@@ -24,17 +24,13 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.CapabilityHelpers;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.capability.Capability;
-import org.apache.gravitino.exceptions.ForbiddenException;
-import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
-import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
  * Normalizes user-supplied metadata object names before ownership operations. Internal create hooks
@@ -89,22 +85,6 @@ public class OwnerNormalizeDispatcher implements OwnerDispatcher {
   /** {@inheritDoc} */
   @Override
   public Optional<Owner> getOwner(String metalake, MetadataObject metadataObject) {
-    if (metadataObject.type() == MetadataObject.Type.GLOSSARY_TERM) {
-      // Visibility and the returned owner must refer to the same generation of this name.
-      return SqlSessions.readSnapshot(
-          () -> {
-            if (!GravitinoEnv.getInstance()
-                .gravitinoAuthorizer()
-                .canAccessGlossaryTerm(
-                    PrincipalUtils.getCurrentPrincipal(),
-                    metalake,
-                    metadataObject,
-                    new AuthorizationRequestContext())) {
-              throw new ForbiddenException("Current user cannot get this object's owner");
-            }
-            return dispatcher.getOwner(metalake, metadataObject);
-          });
-    }
     return dispatcher.getOwner(metalake, normalize(metalake, metadataObject));
   }
 

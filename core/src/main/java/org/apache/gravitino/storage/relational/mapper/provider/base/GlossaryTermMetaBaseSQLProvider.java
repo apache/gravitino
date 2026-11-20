@@ -20,45 +20,32 @@
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import java.util.Map;
-import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
-import org.apache.ibatis.builder.annotation.ProviderContext;
+import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
 
 /** Portable SQL for glossary definitions and synonyms on H2, MySQL and PostgreSQL. */
-public final class GlossaryTermSQLProvider {
+public class GlossaryTermMetaBaseSQLProvider {
   private static final String LIVE_METALAKE_JOIN =
       " JOIN metalake_meta m ON m.metalake_id=t.metalake_id "
           + "AND m.metalake_name=#{metalakeName} AND m.deleted_at=0 ";
 
+  /** The live term selected by the caller's metalake ID and normalized name. */
+  protected static final String LIVE_NAME =
+      "metalake_id=#{metalakeId} AND name_key=#{key} AND deleted_at=0";
+
   /** Locks a definition after the caller has fenced its metalake. */
-  public static String getForUpdate(ProviderContext context) {
-    String liveName = "metalake_id=#{metalakeId} AND name_key=#{key} AND deleted_at=0";
-    // InnoDB normally locks the name index before the primary key for this lookup. Relation
-    // writers already hold primary-key locks when they update that index. Resolve the ID with a
-    // nonlocking subquery and acquire the primary-key lock first on both paths. Recheck the
-    // live name on the locked row in case another transaction renamed or retired the term.
-    String lookup =
-        JDBCBackendType.fromString(context.getDatabaseId()) == JDBCBackendType.MYSQL
-            ? " FORCE INDEX (PRIMARY) WHERE term_id=(SELECT term_id FROM glossary_term_meta WHERE "
-                + liveName
-                + ") AND "
-                + liveName
-            : " WHERE " + liveName;
-    return "SELECT term_id AS termId, name AS name, name_key AS nameKey, metalake_id AS "
-        + "metalakeId, definition AS definition, status AS status, links AS links, source_ref AS "
-        + "sourceRef, properties AS properties, audit_info AS auditInfo, current_version AS "
-        + "currentVersion, deleted_at AS deletedAt FROM glossary_term_meta"
-        + lookup
-        + " FOR UPDATE";
+  public String getForUpdate() {
+    return selectForUpdate(" WHERE " + LIVE_NAME);
   }
+
   /** Resolves IDs only while the parent still has the requested live name. */
-  public static String getIds() {
+  public String getIds() {
     return "SELECT t.term_id AS termId, t.metalake_id AS metalakeId FROM glossary_term_meta t"
         + LIVE_METALAKE_JOIN
         + "WHERE t.metalake_id=#{metalakeId} AND t.name_key=#{key} AND t.deleted_at=0";
   }
 
   /** Returns SQL for insert. */
-  public static String insert() {
+  public String insert() {
     return "INSERT INTO glossary_term_meta (term_id, name, name_key, metalake_id, definition, "
         + "status, links, source_ref, properties, audit_info, current_version, deleted_at) "
         + "VALUES (#{p.termId}, #{p.name}, #{p.nameKey}, #{p.metalakeId}, #{p.definition}, "
@@ -66,7 +53,7 @@ public final class GlossaryTermSQLProvider {
         + "#{p.currentVersion}, #{p.deletedAt})";
   }
   /** Returns SQL for update. */
-  public static String update() {
+  public String update() {
     return "UPDATE glossary_term_meta SET name=#{p.name}, name_key=#{p.nameKey}, "
         + "definition=#{p.definition}, status=#{p.status}, links=#{p.links}, "
         + "source_ref=#{p.sourceRef}, properties=#{p.properties}, audit_info=#{p.auditInfo}, "
@@ -74,54 +61,54 @@ public final class GlossaryTermSQLProvider {
         + "metalake_id=#{p.metalakeId} AND current_version=#{version} AND deleted_at=0";
   }
   /** Returns SQL for synonyms. */
-  public static String synonyms() {
+  public String synonyms() {
     return "SELECT synonym FROM glossary_term_synonym WHERE term_id=#{id} AND deleted_at=0 ORDER "
         + "BY synonym_key";
   }
   /** Returns SQL for addSynonym. */
-  public static String addSynonym() {
+  public String addSynonym() {
     return "INSERT INTO glossary_term_synonym (term_id, metalake_id, synonym, synonym_key, "
         + "deleted_at) VALUES (#{id},#{metalakeId},#{synonym},#{key},0)";
   }
   /** Returns SQL for clearSynonyms. */
-  public static String clearSynonyms() {
+  public String clearSynonyms() {
     return "DELETE FROM glossary_term_synonym WHERE term_id=#{id} AND deleted_at=0";
   }
   /** Returns SQL for delete. */
-  public static String delete() {
+  public String delete() {
     return "UPDATE glossary_term_meta SET deleted_at=#{deletedAt} WHERE term_id=#{id} AND "
         + "current_version=#{version} AND deleted_at=0";
   }
   /** Returns SQL for deleteSynonyms. */
-  public static String deleteSynonyms() {
+  public String deleteSynonyms() {
     return "UPDATE glossary_term_synonym SET deleted_at=#{deletedAt} WHERE term_id=#{id} AND "
         + "deleted_at=0";
   }
   /** Returns SQL for dropMetalake. */
-  public static String dropMetalake() {
+  public String dropMetalake() {
     return "UPDATE glossary_term_meta SET deleted_at=#{deletedAt} WHERE metalake_id=#{id} AND "
         + "deleted_at=0";
   }
   /** Returns SQL for dropMetalakeSynonyms. */
-  public static String dropMetalakeSynonyms() {
+  public String dropMetalakeSynonyms() {
     return "UPDATE glossary_term_synonym SET deleted_at=#{deletedAt} WHERE metalake_id=#{id} AND "
         + "deleted_at=0";
   }
   /** Returns SQL for expired. */
-  public static String expired() {
+  public String expired() {
     return "SELECT term_id FROM glossary_term_meta WHERE deleted_at>0 AND deleted_at<#{cutoff} "
         + "ORDER BY term_id LIMIT #{limit}";
   }
   /** Returns SQL for purgeSynonyms. */
-  public static String purgeSynonyms() {
+  public String purgeSynonyms() {
     return "DELETE FROM glossary_term_synonym WHERE term_id=#{id} AND deleted_at>0";
   }
   /** Returns SQL for purge. */
-  public static String purge() {
+  public String purge() {
     return "DELETE FROM glossary_term_meta WHERE term_id=#{id} AND deleted_at>0";
   }
   /** Reads definitions and synonyms together, including definitions without synonyms. */
-  public static String snapshot(Map<String, Object> params) {
+  public String snapshot(Map<String, Object> params) {
     // Validate the parent name in this snapshot too: it can be renamed after ID resolution.
     // A single statement avoids mixed revisions at READ_COMMITTED without locking readers.
     return "<script>SELECT t.term_id AS termId, t.name AS name, t.name_key AS nameKey, "
@@ -138,5 +125,35 @@ public final class GlossaryTermSQLProvider {
         + "AND s.metalake_id=t.metalake_id AND s.deleted_at=0 "
         + "WHERE m.metalake_id=#{metalakeId} AND m.metalake_name=#{metalakeName} AND m.deleted_at=0"
         + " ORDER BY t.term_id,s.synonym_key</script>";
+  }
+
+  /** Returns the SQL for {@link GlossaryTermMetaMapper#conflictingName}. */
+  public String conflictingName() {
+    return "<script>SELECT term_id FROM glossary_term_meta WHERE metalake_id=#{metalakeId} "
+        + "AND term_id != #{id} AND deleted_at=0 AND name_key IN "
+        + "<foreach collection='keys' item='key' open='(' separator=',' close=')'>#{key}</foreach> "
+        + "LIMIT 1</script>";
+  }
+
+  /** Returns the SQL for {@link GlossaryTermMetaMapper#conflictingSynonym}. */
+  public String conflictingSynonym() {
+    return "SELECT term_id FROM glossary_term_synonym WHERE metalake_id=#{metalakeId} AND synonym_key=#{key} AND term_id<>#{id} AND deleted_at=0 LIMIT 1";
+  }
+
+  /** Returns the SQL for {@link GlossaryTermMetaMapper#idsByKeys}. */
+  public String idsByKeys() {
+    return "<script>SELECT name_key AS nameKey, term_id AS termId FROM glossary_term_meta "
+        + "WHERE metalake_id=#{metalakeId} AND deleted_at=0 AND name_key IN "
+        + "<foreach collection='keys' item='key' open='(' separator=',' close=')'>#{key}</foreach></script>";
+  }
+
+  /** Builds the locking read with the backend's access path. */
+  protected String selectForUpdate(String lookup) {
+    return "SELECT term_id AS termId, name AS name, name_key AS nameKey, metalake_id AS "
+        + "metalakeId, definition AS definition, status AS status, links AS links, source_ref AS "
+        + "sourceRef, properties AS properties, audit_info AS auditInfo, current_version AS "
+        + "currentVersion, deleted_at AS deletedAt FROM glossary_term_meta"
+        + lookup
+        + " FOR UPDATE";
   }
 }

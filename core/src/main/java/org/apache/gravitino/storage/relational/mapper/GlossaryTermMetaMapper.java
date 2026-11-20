@@ -21,108 +21,99 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.gravitino.storage.relational.mapper.provider.base.GlossaryTermSQLProvider;
 import org.apache.gravitino.storage.relational.po.GlossaryTermPO;
 import org.apache.gravitino.storage.relational.po.GlossaryTermSnapshotPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
 /** Glossary definition and synonym persistence in the caller transaction. */
 public interface GlossaryTermMetaMapper {
+  /** Table containing glossary definitions. */
+  String TABLE_NAME = "glossary_term_meta";
+
   /** Looks up a live conflict on another term by normalized key. */
   @Nullable
-  @Select({
-    "<script>SELECT term_id FROM glossary_term_meta WHERE metalake_id=#{metalakeId}",
-    "AND term_id != #{id} AND deleted_at=0 AND name_key IN",
-    "<foreach collection='keys' item='key' open='(' separator=',' close=')'>#{key}</foreach>",
-    "LIMIT 1</script>"
-  })
+  @SelectProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "conflictingName")
   Long conflictingName(
       @Param("metalakeId") long metalakeId, @Param("id") long id, @Param("keys") List<String> keys);
 
   /** Looks up a live conflict on another term by normalized key. */
   @Nullable
-  @Select(
-      "SELECT term_id FROM glossary_term_synonym WHERE metalake_id=#{metalakeId} AND synonym_key=#{key} AND term_id<>#{id} AND deleted_at=0 LIMIT 1")
+  @SelectProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "conflictingSynonym")
   Long conflictingSynonym(
       @Param("metalakeId") long metalakeId, @Param("id") long id, @Param("key") String key);
 
   /** Locks the live definition, or returns null; the caller must fence its metalake first. */
   @Nullable
-  @SelectProvider(type = GlossaryTermSQLProvider.class, method = "getForUpdate")
+  @SelectProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "getForUpdate")
   GlossaryTermPO getForUpdate(@Param("metalakeId") long metalakeId, @Param("key") String key);
 
   /** Returns only term/metalake IDs, or null if the term or requested parent name is absent. */
   @Nullable
-  @SelectProvider(type = GlossaryTermSQLProvider.class, method = "getIds")
+  @SelectProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "getIds")
   GlossaryTermPO getIds(
       @Param("metalakeId") long metalakeId,
       @Param("metalakeName") String metalakeName,
       @Param("key") String key);
 
   /** Returns normalized names and IDs of live terms matching a nonempty batch of keys. */
-  @Select({
-    "<script>SELECT name_key AS nameKey, term_id AS termId FROM glossary_term_meta",
-    "WHERE metalake_id=#{metalakeId} AND deleted_at=0 AND name_key IN",
-    "<foreach collection='keys' item='key' open='(' separator=',' close=')'>#{key}</foreach></script>"
-  })
+  @SelectProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "idsByKeys")
   List<GlossaryTermPO> idsByKeys(
       @Param("metalakeId") long metalakeId, @Param("keys") List<String> keys);
 
   /** Executes insert within the current transaction. */
-  @InsertProvider(type = GlossaryTermSQLProvider.class, method = "insert")
+  @InsertProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "insert")
   void insert(@Param("p") GlossaryTermPO p);
   /** Executes update within the current transaction. */
-  @UpdateProvider(type = GlossaryTermSQLProvider.class, method = "update")
+  @UpdateProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "update")
   int update(@Param("p") GlossaryTermPO p, @Param("version") long version);
   /** Executes synonyms within the current transaction. */
-  @SelectProvider(type = GlossaryTermSQLProvider.class, method = "synonyms")
+  @SelectProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "synonyms")
   List<String> synonyms(@Param("id") long id);
   /** Executes addSynonym within the current transaction. */
-  @InsertProvider(type = GlossaryTermSQLProvider.class, method = "addSynonym")
+  @InsertProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "addSynonym")
   void addSynonym(
       @Param("id") long id,
       @Param("metalakeId") long metalakeId,
       @Param("synonym") String synonym,
       @Param("key") String key);
   /** Executes clearSynonyms within the current transaction. */
-  @DeleteProvider(type = GlossaryTermSQLProvider.class, method = "clearSynonyms")
+  @DeleteProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "clearSynonyms")
   void clearSynonyms(@Param("id") long id);
   /** Executes delete within the current transaction. */
-  @UpdateProvider(type = GlossaryTermSQLProvider.class, method = "delete")
+  @UpdateProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "delete")
   int delete(
       @Param("id") long id, @Param("version") long version, @Param("deletedAt") long deletedAt);
   /** Executes deleteSynonyms within the current transaction. */
-  @UpdateProvider(type = GlossaryTermSQLProvider.class, method = "deleteSynonyms")
+  @UpdateProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "deleteSynonyms")
   void deleteSynonyms(@Param("id") long id, @Param("deletedAt") long deletedAt);
   /** Executes dropMetalake within the current transaction. */
-  @UpdateProvider(type = GlossaryTermSQLProvider.class, method = "dropMetalake")
+  @UpdateProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "dropMetalake")
   void dropMetalake(@Param("id") long id, @Param("deletedAt") long deletedAt);
   /** Executes dropMetalakeSynonyms within the current transaction. */
-  @UpdateProvider(type = GlossaryTermSQLProvider.class, method = "dropMetalakeSynonyms")
+  @UpdateProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "dropMetalakeSynonyms")
   void dropMetalakeSynonyms(@Param("id") long id, @Param("deletedAt") long deletedAt);
   /** Executes expired within the current transaction. */
-  @SelectProvider(type = GlossaryTermSQLProvider.class, method = "expired")
+  @SelectProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "expired")
   List<Long> expired(@Param("cutoff") long cutoff, @Param("limit") int limit);
   /** Executes purgeSynonyms within the current transaction. */
-  @DeleteProvider(type = GlossaryTermSQLProvider.class, method = "purgeSynonyms")
+  @DeleteProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "purgeSynonyms")
   void purgeSynonyms(@Param("id") long id);
   /** Executes purge within the current transaction. */
-  @DeleteProvider(type = GlossaryTermSQLProvider.class, method = "purge")
+  @DeleteProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "purge")
   int purge(@Param("id") long id);
   /** Reads definitions, synonyms and the live parent name in one snapshot without row locks. */
-  @SelectProvider(type = GlossaryTermSQLProvider.class, method = "snapshot")
+  @SelectProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "snapshot")
   List<GlossaryTermSnapshotPO> snapshot(
       @Param("metalakeId") long metalakeId,
       @Param("metalakeName") String metalakeName,
       @Param("key") @Nullable String key);
 
   /** Reads definition snapshots for one bounded batch of live endpoints. */
-  @SelectProvider(type = GlossaryTermSQLProvider.class, method = "snapshot")
+  @SelectProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "snapshot")
   List<GlossaryTermSnapshotPO> snapshotByIds(
       @Param("metalakeId") long lake,
       @Param("metalakeName") String name,

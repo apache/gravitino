@@ -24,8 +24,10 @@ import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
@@ -445,6 +447,20 @@ public class OwnerMetaBaseSQLProvider {
         + " AND metadata_object_type = #{metadataObjectType}"
         + " AND deleted_at = 0"
         + " ORDER BY updated_at DESC, id DESC LIMIT 1";
+  }
+
+  /** Resolves the live term and its owner in the same statement, including after name reuse. */
+  public String selectGlossaryTermOwner() {
+    return "SELECT o.owner_id AS ownerId, o.owner_type AS ownerType FROM "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " m JOIN "
+        + GlossaryTermMetaMapper.TABLE_NAME
+        + " t ON t.metalake_id = m.metalake_id AND t.deleted_at = 0 JOIN "
+        + OWNER_TABLE_NAME
+        + " o ON o.metadata_object_id = t.term_id AND o.metalake_id = m.metalake_id"
+        + " WHERE m.metalake_name = #{metalake} AND m.deleted_at = 0 AND t.name_key = #{key}"
+        + " AND o.metadata_object_type = 'GLOSSARY_TERM' AND o.deleted_at = 0"
+        + " ORDER BY o.updated_at DESC, o.id DESC LIMIT 1";
   }
 
   public String selectChangedOwners(

@@ -132,6 +132,7 @@ public final class GlossaryAccess {
   }
 
   boolean canEdit(GlossaryTermEntity term) {
+    // Listing drafts as a creator requires a current owner lookup per draft to observe transfers.
     return manage() || (create.get() && owns.test(term.id()));
   }
 

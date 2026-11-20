@@ -39,8 +39,10 @@ import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -135,17 +137,23 @@ public class OwnerManager implements OwnerDispatcher {
       return;
     }
 
-    List<Optional<Owner>> originOwners = new ArrayList<>(metadataObjects.size());
-    for (MetadataObject mo : metadataObjects) {
-      originOwners.add(getOwner(metalake, mo));
-    }
-
     Entity.EntityType objectType = MetadataObjectUtil.toEntityType(metadataObjects.get(0));
     for (int i = 1; i < metadataObjects.size(); i++) {
       Preconditions.checkArgument(
           MetadataObjectUtil.toEntityType(metadataObjects.get(i)) == objectType,
           "All metadata objects in setOwners must share the same type");
     }
+    if (objectType == Entity.EntityType.GLOSSARY_TERM) {
+      // Each transfer must check the current owner while holding that term's row lock.
+      OwnerDispatcher.super.setOwners(metalake, metadataObjects, ownerName, ownerType);
+      return;
+    }
+
+    List<Optional<Owner>> originOwners = new ArrayList<>(metadataObjects.size());
+    for (MetadataObject mo : metadataObjects) {
+      originOwners.add(readOwner(metalake, mo));
+    }
+
     List<NameIdentifier> owned =
         metadataObjects.stream()
             .map(mo -> MetadataObjectUtil.toEntityIdent(metalake, mo))
@@ -275,6 +283,26 @@ public class OwnerManager implements OwnerDispatcher {
 
   @Override
   public Optional<Owner> getOwner(String metalake, MetadataObject metadataObject) {
+    if (metadataObject.type() == MetadataObject.Type.GLOSSARY_TERM) {
+      // Visibility and the returned owner must refer to the same generation of this name.
+      return SqlSessions.readSnapshot(
+          () -> {
+            if (!GravitinoEnv.getInstance()
+                .gravitinoAuthorizer()
+                .canAccessGlossaryTerm(
+                    PrincipalUtils.getCurrentPrincipal(),
+                    metalake,
+                    metadataObject,
+                    new AuthorizationRequestContext())) {
+              throw new ForbiddenException("Current user cannot get this object's owner");
+            }
+            return readOwner(metalake, metadataObject);
+          });
+    }
+    return readOwner(metalake, metadataObject);
+  }
+
+  private Optional<Owner> readOwner(String metalake, MetadataObject metadataObject) {
     NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     OwnerImpl owner = new OwnerImpl();
     try {
@@ -323,7 +351,7 @@ public class OwnerManager implements OwnerDispatcher {
 
   private Optional<Owner> replaceOwner(
       String metalake, MetadataObject object, NameIdentifier objectIdent, OwnerImpl newOwner) {
-    Optional<Owner> previous = getOwner(metalake, object);
+    Optional<Owner> previous = readOwner(metalake, object);
     NameIdentifier ownerIdent;
     Entity.EntityType ownerType;
     if (newOwner.type == Owner.Type.USER) {

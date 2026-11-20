@@ -31,7 +31,6 @@ import org.apache.gravitino.storage.relational.po.auth.ChangedOwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
@@ -155,14 +154,7 @@ public interface OwnerMetaMapper {
       @Param("metadataObjectType") String metadataObjectType);
 
   /** Resolves the current term identity and owner in one read, including after name reuse. */
-  @Select({
-    "SELECT o.owner_id AS ownerId, o.owner_type AS ownerType FROM metalake_meta m",
-    "JOIN glossary_term_meta t ON t.metalake_id=m.metalake_id AND t.deleted_at=0",
-    "JOIN owner_meta o ON o.metadata_object_id=t.term_id AND o.metalake_id=m.metalake_id",
-    "WHERE m.metalake_name=#{metalake} AND m.deleted_at=0 AND t.name_key=#{key}",
-    "AND o.metadata_object_type='GLOSSARY_TERM' AND o.deleted_at=0",
-    "ORDER BY o.updated_at DESC, o.id DESC LIMIT 1"
-  })
+  @SelectProvider(type = OwnerMetaSQLProviderFactory.class, method = "selectGlossaryTermOwner")
   OwnerInfo selectGlossaryTermOwner(@Param("metalake") String metalake, @Param("key") String key);
 
   @SelectProvider(type = OwnerMetaSQLProviderFactory.class, method = "selectChangedOwners")
