@@ -184,9 +184,12 @@ class TestGlossaryAuthorization extends TestJDBCBackend {
           assertEquals(status, as(actor.name(), () -> manager.createTerm(LAKE, spec)).status());
           assertTrue(as("admin", () -> manager.dropTerm(LAKE, spec.name())));
         } else {
-          assertThrows(
-              ForbiddenException.class,
-              () -> as(actor.name(), () -> manager.createTerm(LAKE, spec)));
+          ForbiddenException error =
+              assertThrows(
+                  ForbiddenException.class,
+                  () -> as(actor.name(), () -> manager.createTerm(LAKE, spec)));
+          assertTrue(error.getMessage().contains("VIEW_DEFINITION"));
+          assertTrue(error.getMessage().contains("CREATE_DEFINITION"));
         }
         for (boolean own : List.of(false, true)) {
           String name = actor.name() + "-" + status + "-" + own;

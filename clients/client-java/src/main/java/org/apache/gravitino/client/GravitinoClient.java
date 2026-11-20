@@ -38,6 +38,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
@@ -446,7 +447,9 @@ public class GravitinoClient extends GravitinoClientBase
    * @param object The metadata object
    * @return The owner of the metadata object. If the metadata object doesn't set the owner, it will
    *     return Optional.empty().
-   * @throws NoSuchMetadataObjectException If the metadata object is not found.
+   * @throws ForbiddenException If the caller cannot view the owner. The default authorizer also
+   *     returns this error for a missing glossary term.
+   * @throws NoSuchMetadataObjectException If the server reports the metadata object as missing.
    */
   public Optional<Owner> getOwner(MetadataObject object) throws NoSuchMetadataObjectException {
     return getMetalake().getOwner(object);

@@ -70,7 +70,7 @@ public class MetadataCommand extends Command {
       metadataObject = MetadataObjects.of(null, name, MetadataObject.Type.SCHEMA);
     } else if (entity.hasCatalogName()) {
       metadataObject = MetadataObjects.of(null, name, MetadataObject.Type.CATALOG);
-    } else if (entity.getMetalakeName() != null) {
+    } else if (!entity.hasName()) {
       metadataObject =
           MetadataObjects.of(null, entity.getMetalakeName(), MetadataObject.Type.METALAKE);
     } else {

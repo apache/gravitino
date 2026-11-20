@@ -137,7 +137,8 @@ public final class GlossaryAccess {
 
   void requireCreate() {
     if (!create.get()) {
-      throw new ForbiddenException("Creating a glossary term requires CREATE_DEFINITION");
+      throw new ForbiddenException(
+          "Creating a glossary term requires effective VIEW_DEFINITION and CREATE_DEFINITION");
     }
   }
 }

@@ -19,31 +19,40 @@
 
 package org.apache.gravitino.cli.commands;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.ParseException;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.cli.CommandContext;
+import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.cli.FullName;
 import org.apache.gravitino.cli.GravitinoOptions;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class TestRolePrivilegeCommands {
   @Test
-  void testGrantAndRevokeGlossaryPrivilegesOnMetalake() {
-    CommandLine line = mock(CommandLine.class);
-    when(line.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
-    when(line.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("lake");
+  void testGrantAndRevokeGlossaryPrivilegesOnMetalake() throws ParseException {
+    CommandLine line = parse("--metalake", "lake");
     CommandContext context = new CommandContext(line);
     FullName target = new FullName(line);
     String[] arguments = {"view_definition", "create_definition", "manage_definitions"};
@@ -68,5 +77,58 @@ class TestRolePrivilegeCommands {
     Set<Privilege> revoked = new HashSet<>(privileges);
     privileges.forEach(privilege -> revoked.add(Privileges.deny(privilege.name())));
     verify(client).revokePrivilegesFromRole("editor", metalake, revoked);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {".", ".."})
+  void testExplicitMalformedTargetCannotChangeMetalakePrivileges(String name)
+      throws ParseException {
+    CommandLine line = parse("--metalake", "lake", "--name", name);
+    CommandContext context = new CommandContext(line);
+    FullName target = new FullName(line);
+    String[] arguments = {"view_definition"};
+    GravitinoClient client = mock(GravitinoClient.class);
+    GrantPrivilegesToRole grant =
+        spy(new GrantPrivilegesToRole(context, "lake", "editor", target, arguments));
+    RevokePrivilegesFromRole revoke =
+        spy(new RevokePrivilegesFromRole(context, "lake", "editor", target, arguments));
+    doReturn(client).when(grant).buildClient("lake");
+    doReturn(client).when(revoke).buildClient("lake");
+    doNothing().when(grant).exitWithError(anyString());
+    doNothing().when(revoke).exitWithError(anyString());
+
+    grant.validate().handle();
+    revoke.validate().handle();
+
+    verify(grant).exitWithError("Unknown entity type: " + name);
+    verify(revoke).exitWithError("Unknown entity type: " + name);
+    verifyNoInteractions(client);
+  }
+
+  @Test
+  void testGrantReportsMissingTarget() throws ParseException {
+    CommandLine line = parse("--metalake", "lake", "--name", "catalog");
+    GrantPrivilegesToRole grant =
+        spy(
+            new GrantPrivilegesToRole(
+                new CommandContext(line),
+                "lake",
+                "editor",
+                new FullName(line),
+                new String[] {"use_catalog"}));
+    GravitinoClient client = mock(GravitinoClient.class);
+    doReturn(client).when(grant).buildClient("lake");
+    doNothing().when(grant).exitWithError(anyString());
+    doThrow(new NoSuchMetadataObjectException("Missing catalog"))
+        .when(client)
+        .grantPrivilegesToRole(anyString(), any(MetadataObject.class), anySet());
+
+    grant.validate().handle();
+
+    verify(grant).exitWithError(ErrorMessages.UNKNOWN_ENTITY);
+  }
+
+  private static CommandLine parse(String... args) throws ParseException {
+    return new DefaultParser().parse(new GravitinoOptions().options(), args);
   }
 }
