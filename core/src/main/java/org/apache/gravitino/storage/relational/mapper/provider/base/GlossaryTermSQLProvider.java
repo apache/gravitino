@@ -20,6 +20,8 @@
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import java.util.Map;
+import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
+import org.apache.ibatis.builder.annotation.ProviderContext;
 
 /** Portable SQL for glossary definitions and synonyms on H2, MySQL and PostgreSQL. */
 public final class GlossaryTermSQLProvider {
@@ -28,12 +30,25 @@ public final class GlossaryTermSQLProvider {
           + "AND m.metalake_name=#{metalakeName} AND m.deleted_at=0 ";
 
   /** Locks a definition after the caller has fenced its metalake. */
-  public static String getForUpdate() {
+  public static String getForUpdate(ProviderContext context) {
+    String liveName = "metalake_id=#{metalakeId} AND name_key=#{key} AND deleted_at=0";
+    // InnoDB normally locks the name index before the primary key for this lookup. Relation
+    // writers already hold primary-key locks when they update that index. Resolve the ID with a
+    // nonlocking subquery and acquire the primary-key lock first on both paths. Recheck the
+    // live name on the locked row in case another transaction renamed or retired the term.
+    String lookup =
+        JDBCBackendType.fromString(context.getDatabaseId()) == JDBCBackendType.MYSQL
+            ? " FORCE INDEX (PRIMARY) WHERE term_id=(SELECT term_id FROM glossary_term_meta WHERE "
+                + liveName
+                + ") AND "
+                + liveName
+            : " WHERE " + liveName;
     return "SELECT term_id AS termId, name AS name, name_key AS nameKey, metalake_id AS "
         + "metalakeId, definition AS definition, status AS status, links AS links, source_ref AS "
         + "sourceRef, properties AS properties, audit_info AS auditInfo, current_version AS "
-        + "currentVersion, deleted_at AS deletedAt FROM glossary_term_meta WHERE metalake_id = "
-        + "#{metalakeId} AND name_key = #{key} AND deleted_at=0 FOR UPDATE";
+        + "currentVersion, deleted_at AS deletedAt FROM glossary_term_meta"
+        + lookup
+        + " FOR UPDATE";
   }
   /** Resolves IDs only while the parent still has the requested live name. */
   public static String getIds() {

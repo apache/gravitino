@@ -501,6 +501,47 @@ class TestGlossaryRelations extends TestJDBCBackend {
     }
   }
 
+  @TestTemplate
+  void testContentEditWaitsForConcurrentDrop() throws Exception {
+    createAndInsertMakeLake(LAKE);
+    create("target");
+    CountDownLatch locked = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    CountDownLatch editing = new CountDownLatch(1);
+    GlossaryManager dropper =
+        new GlossaryManager(
+            ids::incrementAndGet,
+            false,
+            (before, after, persist) -> {
+              locked.countDown();
+              await(release);
+              persist.run();
+            });
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    try {
+      Future<Boolean> dropped = pool.submit(() -> dropper.dropTerm(LAKE, "target"));
+      await(locked);
+      Future<?> edit =
+          pool.submit(
+              () -> {
+                editing.countDown();
+                assertThrows(
+                    NoSuchTermException.class,
+                    () ->
+                        manager.alterTerm(LAKE, "target", TermChange.updateDefinition("updated")));
+              });
+      await(editing);
+      assertThrows(TimeoutException.class, () -> edit.get(100, TimeUnit.MILLISECONDS));
+      release.countDown();
+      assertTrue(dropped.get(20, TimeUnit.SECONDS));
+      edit.get(20, TimeUnit.SECONDS);
+      assertThrows(NoSuchTermException.class, () -> get("target"));
+    } finally {
+      release.countDown();
+      pool.shutdownNow();
+    }
+  }
+
   /** Covers T5.14. */
   @TestTemplate
   void testMixedRelationLoad() throws Exception {
