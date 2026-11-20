@@ -983,6 +983,9 @@ public class ErrorHandlers {
         case ErrorConstants.NOT_IN_USE_CODE:
           throw new MetalakeNotInUseException(errorMessage);
 
+        case ErrorConstants.IN_USE_CODE:
+          throw new InUseException(errorMessage);
+
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
 
