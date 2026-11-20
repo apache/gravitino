@@ -755,6 +755,11 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
                 .stream()
                 .map(RelationalEntity::targetEntity)
                 .collect(Collectors.toList());
+      case POLICY_ROLE_REL:
+        Preconditions.checkArgument(
+            identType == Entity.EntityType.ROLE,
+            "POLICY_ROLE_REL only supports listing the policies that name a role");
+        return (List<E>) PolicyMetaService.getInstance().listPoliciesByRoleIdent(nameIdentifier);
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));

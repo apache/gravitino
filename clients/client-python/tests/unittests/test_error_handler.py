@@ -33,6 +33,7 @@ from gravitino.exceptions.base import (
     IllegalPrivilegeException,
     IllegalRoleException,
     IllegalStatisticNameException,
+    InUseException,
     InternalError,
     MetalakeAlreadyExistsException,
     MetalakeNotInUseException,
@@ -840,6 +841,11 @@ class TestErrorHandler(unittest.TestCase):
                 ErrorResponse.generate_error_response(
                     MetalakeNotInUseException, "mock error"
                 )
+            )
+
+        with self.assertRaises(InUseException):
+            ROLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(InUseException, "mock error")
             )
 
         with self.assertRaises(RuntimeError):

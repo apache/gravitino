@@ -684,6 +684,9 @@ public class ExceptionHandlers {
       } else if (e instanceof NotInUseException) {
         return Utils.notInUse(errorMsg, e);
 
+      } else if (e instanceof InUseException) {
+        return Utils.inUse(errorMsg, e);
+
       } else {
         return super.handle(op, role, metalake, e);
       }

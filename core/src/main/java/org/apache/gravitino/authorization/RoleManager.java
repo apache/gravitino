@@ -30,6 +30,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
@@ -114,12 +115,11 @@ class RoleManager {
 
       try {
         RoleEntity roleEntity = store.get(ident, Entity.EntityType.ROLE, RoleEntity.class);
-        AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
-            metalake,
-            roleEntity.securableObjects(),
-            (authorizationPlugin, catalogName) ->
-                authorizationPlugin.onRoleDeleted(
-                    AuthorizationUtils.filterSecurableObjects(roleEntity, metalake, catalogName)));
+        // Refuse before the plugins drop the role. The plugins go first so that a failed plugin
+        // call leaves the role in Gravitino and a retry reaches the plugins again. The store
+        // checks again under a lock, for a policy that names the role after this check.
+        checkNoPolicyNamesRole(ident, metalake, role);
+        notifyRoleDeleted(metalake, roleEntity);
       } catch (NoSuchEntityException nse) {
         // ignore, because the role may have been deleted.
       }
@@ -171,6 +171,31 @@ class RoleManager {
           ioe);
       throw new RuntimeException(ioe);
     }
+  }
+
+  private void checkNoPolicyNamesRole(NameIdentifier ident, String metalake, String role)
+      throws IOException {
+    boolean named =
+        !store
+            .relationOperations()
+            .listEntitiesByRelation(
+                SupportsRelationOperations.Type.POLICY_ROLE_REL,
+                ident,
+                Entity.EntityType.ROLE,
+                false /* allFields */)
+            .isEmpty();
+    if (named) {
+      throw new InUseException(AuthorizationUtils.ROLE_IN_USE_MSG, role, metalake);
+    }
+  }
+
+  private static void notifyRoleDeleted(String metalake, RoleEntity roleEntity) {
+    AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
+        metalake,
+        roleEntity.securableObjects(),
+        (authorizationPlugin, catalogName) ->
+            authorizationPlugin.onRoleDeleted(
+                AuthorizationUtils.filterSecurableObjects(roleEntity, metalake, catalogName)));
   }
 
   private RoleEntity getRoleEntity(NameIdentifier identifier) {

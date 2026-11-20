@@ -45,8 +45,11 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -66,6 +69,7 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
@@ -81,6 +85,7 @@ import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -92,8 +97,12 @@ import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -605,6 +614,87 @@ public class TestAccessControlManager {
     Assertions.assertEquals("bulk_delete_role", results.get(0).name());
     Assertions.assertFalse(results.get(1).succeeded());
     Assertions.assertTrue(results.get(1).error().get() instanceof NoSuchRoleException);
+  }
+
+  @Test
+  public void testDeleteRoleNamedByPolicyIsRefusedBeforePlugins() throws Exception {
+    accessControlManager.createRole(
+        METALAKE,
+        "policy_role",
+        ImmutableMap.of(),
+        Lists.newArrayList(
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))));
+    PolicyEntity policy =
+        PolicyEntity.builder()
+            .withId(new RandomIdGenerator().nextId())
+            .withNamespace(NamespaceUtil.ofPolicy(METALAKE))
+            .withName("policy_role_reader")
+            .withPolicyType(Policy.BuiltInType.ACCESS_CONTROL)
+            .withComment("")
+            .withEnabled(true)
+            .withContent(
+                PolicyContents.accessControl(
+                    Collections.singletonList(Privilege.Name.SELECT_TABLE),
+                    Collections.singletonList("policy_role")))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    // Writing a policy also creates its hidden tag, which takes an ID from the environment.
+    Object previousIdGenerator =
+        FieldUtils.readField(GravitinoEnv.getInstance(), "idGenerator", true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", new RandomIdGenerator(), true);
+    try {
+      entityStore.put(policy, false);
+      reset(authorizationPlugin);
+
+      Assertions.assertThrows(
+          InUseException.class, () -> accessControlManager.deleteRole(METALAKE, "policy_role"));
+      BulkItemResult<String> bulkResult =
+          accessControlManager.deleteRoles(METALAKE, Lists.newArrayList("policy_role")).get(0);
+      Assertions.assertFalse(bulkResult.succeeded());
+      Assertions.assertInstanceOf(InUseException.class, bulkResult.error().orElse(null));
+
+      // The reference check refused first, so the plugins must still have the role.
+      verify(authorizationPlugin, never()).onRoleDeleted(any());
+      Assertions.assertEquals(
+          "policy_role", accessControlManager.getRole(METALAKE, "policy_role").name());
+
+      entityStore.delete(policy.nameIdentifier(), Entity.EntityType.POLICY);
+      Assertions.assertTrue(accessControlManager.deleteRole(METALAKE, "policy_role"));
+      verify(authorizationPlugin).onRoleDeleted(any());
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", previousIdGenerator, true);
+    }
+  }
+
+  @Test
+  public void testRoleDeletionRetriesPluginsAfterAFailure() {
+    accessControlManager.createRole(
+        METALAKE,
+        "plugin_retry_role",
+        ImmutableMap.of(),
+        Lists.newArrayList(
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))));
+    reset(authorizationPlugin);
+    doThrow(new RuntimeException("plugin unavailable"))
+        .doReturn(true)
+        .when(authorizationPlugin)
+        .onRoleDeleted(any());
+
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> accessControlManager.deleteRole(METALAKE, "plugin_retry_role"));
+    // The plugin failed before the store delete, so the role is still there to retry.
+    Assertions.assertEquals(
+        "plugin_retry_role", accessControlManager.getRole(METALAKE, "plugin_retry_role").name());
+
+    Assertions.assertTrue(accessControlManager.deleteRole(METALAKE, "plugin_retry_role"));
+    verify(authorizationPlugin, times(2)).onRoleDeleted(any());
+    Assertions.assertThrows(
+        NoSuchRoleException.class,
+        () -> accessControlManager.getRole(METALAKE, "plugin_retry_role"));
   }
 
   @Test
