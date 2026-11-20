@@ -52,13 +52,20 @@ export default function AuditDetail({ logId, onClose }) {
   const [log, setLog] = useState()
 
   useEffect(() => {
+    // Ignore an answer that comes after this entry closed, so it can't close another.
+    let current = true
     api
       .getAuditLog(logId)
-      .then(setLog)
+      .then(entry => current && setLog(entry))
       .catch(error => {
+        if (!current) return
         toast.error(gatewayErrorMessage(error))
         onClose()
       })
+
+    return () => {
+      current = false
+    }
   }, [api, logId, onClose])
 
   return (

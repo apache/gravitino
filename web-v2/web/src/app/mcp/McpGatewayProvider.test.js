@@ -23,6 +23,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const store = { auth: {} }
 const getMe = vi.fn()
+const gateway = vi.hoisted(() => ({ onSignedOut: undefined }))
 
 // Next.js returns the same router on every render.
 const router = vi.hoisted(() => ({ push: vi.fn() }))
@@ -31,7 +32,11 @@ vi.mock('@/lib/hooks/useStore', () => ({ useAppSelector: select => select(store)
 vi.mock('@/components/SectionContainer', () => ({ default: ({ children }) => children }))
 vi.mock('@/lib/api/mcpGateway', async importOriginal => ({
   ...(await importOriginal()),
-  createMcpGatewayApi: () => ({ getMe })
+  createMcpGatewayApi: (uri, getAccessToken, onSignedOut) => {
+    gateway.onSignedOut = onSignedOut
+
+    return { getMe }
+  }
 }))
 
 const { default: McpGatewayProvider, AdminOnly } = await import('./McpGatewayProvider')
@@ -49,9 +54,16 @@ const page = createElement(AdminOnly, null, 'admin page')
 beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true
   getMe.mockReset()
+  router.push.mockReset()
   container = document.createElement('div')
   root = createRoot(container)
-  store.auth = { authType: 'oauth', systemConfig: { 'gravitino.mcpGateway.uri': 'https://gw.example.com' } }
+  store.auth = {
+    authType: 'oauth',
+    systemConfig: {
+      'gravitino.mcpGateway.uri': 'https://gw.example.com',
+      'gravitino.authenticator.oauth.provider': 'oidc'
+    }
+  }
 })
 
 afterEach(() => act(() => root.unmount()))
@@ -84,13 +96,35 @@ describe('McpGatewayProvider', () => {
     expect(container.textContent).toContain('The MCP gateway is not set up')
   })
 
-  it('needs an OAuth sign-in to Gravitino', async () => {
+  it('needs an OIDC sign-in to Gravitino', async () => {
     store.auth = { ...store.auth, authType: 'simple' }
 
     await show(page)
 
-    expect(container.textContent).toContain('MCP servers need an OAuth sign-in')
+    expect(container.textContent).toContain('MCP servers need an OIDC sign-in')
     expect(getMe).not.toHaveBeenCalled()
+  })
+
+  it("doesn't send the token of another OAuth sign-in to the gateway", async () => {
+    store.auth = {
+      ...store.auth,
+      systemConfig: { ...store.auth.systemConfig, 'gravitino.authenticator.oauth.provider': 'default' }
+    }
+
+    await show(page)
+
+    expect(container.textContent).toContain('MCP servers need an OIDC sign-in')
+    expect(getMe).not.toHaveBeenCalled()
+  })
+
+  it('goes to the login page when a call finds nobody signed in', async () => {
+    getMe.mockResolvedValue({ is_admin: true })
+    await show(page)
+
+    // As when renewing the sign-in fails after the pages have loaded.
+    gateway.onSignedOut()
+
+    expect(router.push).toHaveBeenCalledWith('/login')
   })
 
   it('says the gateway is unavailable when it does not answer', async () => {

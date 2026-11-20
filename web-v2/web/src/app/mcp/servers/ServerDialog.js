@@ -20,9 +20,10 @@
 'use client'
 
 import { useState } from 'react'
-import { Form, Input, Modal, Select, Switch } from 'antd'
+import { Checkbox, Form, Input, Modal, Select, Switch } from 'antd'
 import toast from 'react-hot-toast'
 import { gatewayErrorMessage } from '@/lib/api/mcpGateway'
+import { hasBasicAuth, serverFields } from '@/lib/utils/mcpServers'
 import { useMcpGateway } from '../McpGatewayProvider'
 
 const CATEGORIES = ['data', 'ai', 'analytics', 'communication', 'devops', 'other']
@@ -50,11 +51,6 @@ const NEW_SERVER = {
   is_active: true
 }
 
-const SECRETS = ['oauth_client_secret', 'basic_auth_password']
-
-// Optional fields that the gateway takes as null, not as an empty string.
-const OPTIONAL_URLS = ['oauth_metadata_url']
-
 // An http(s) URL with a host, as the gateway checks it; service names such as
 // http://mcp-server:8000/mcp count.
 const httpUrl = (_, value) => {
@@ -79,6 +75,7 @@ export default function ServerDialog({ server, onClose, onSaved }) {
   const authType = Form.useWatch('auth_type', form)
   const singleSignOn = Form.useWatch('auto_sso_enabled', form)
   const serviceAuthType = Form.useWatch('service_auth_type', form)
+  const removeClientSecret = Form.useWatch('remove_oauth_client_secret', form)
 
   // The same credentials serve people's and service accounts' basic auth.
   const usesBasic = authType === 'basic' || serviceAuthType === 'basic'
@@ -88,12 +85,7 @@ export default function ServerDialog({ server, onClose, onSaved }) {
     const values = await form.validateFields().catch(() => null)
     if (!values) return
 
-    // Empty secret fields keep the current secrets; an empty optional URL is none.
-    const fields = Object.fromEntries(
-      Object.entries(values)
-        .filter(([key, value]) => !SECRETS.includes(key) || value)
-        .map(([key, value]) => [key, OPTIONAL_URLS.includes(key) && !value ? null : value])
-    )
+    const fields = serverFields(values)
     setSaving(true)
     try {
       if (server) {
@@ -181,9 +173,6 @@ export default function ServerDialog({ server, onClose, onSaved }) {
             >
               <Input />
             </Form.Item>
-            <Form.Item name='oauth_scopes' label='Scopes'>
-              <Input placeholder='Optional' />
-            </Form.Item>
           </>
         )}
         {authType === 'oauth' && !singleSignOn && (
@@ -191,11 +180,14 @@ export default function ServerDialog({ server, onClose, onSaved }) {
             <Form.Item
               name='oauth_metadata_url'
               label='Authorization server metadata URL'
-              dependencies={['oauth_client_secret']}
+              dependencies={['oauth_client_secret', 'remove_oauth_client_secret']}
               extra='Needed with a client secret, which is sent only to this authorization server.'
               rules={[
                 ({ getFieldValue }) => ({
-                  required: Boolean(getFieldValue('oauth_client_secret') || server?.oauth_client_secret_configured),
+                  required: Boolean(
+                    getFieldValue('oauth_client_secret') ||
+                    (server?.oauth_client_secret_configured && !getFieldValue('remove_oauth_client_secret'))
+                  ),
                   message: 'A client secret needs the authorization server metadata URL'
                 }),
                 { validator: httpUrl }
@@ -207,9 +199,19 @@ export default function ServerDialog({ server, onClose, onSaved }) {
               <Input placeholder='Registered by the gateway when empty' />
             </Form.Item>
             <Form.Item name='oauth_client_secret' label='Client secret'>
-              <Input.Password placeholder={server ? 'Unchanged' : 'Optional'} />
+              <Input.Password placeholder={server ? 'Unchanged' : 'Optional'} disabled={removeClientSecret} />
             </Form.Item>
+            {server?.oauth_client_secret_configured && (
+              <Form.Item name='remove_oauth_client_secret' valuePropName='checked' preserve={false}>
+                <Checkbox>Remove the client secret, for a public client</Checkbox>
+              </Form.Item>
+            )}
           </>
+        )}
+        {authType === 'oauth' && (
+          <Form.Item name='oauth_scopes' label='Scopes'>
+            <Input placeholder='Optional' />
+          </Form.Item>
         )}
         <Form.Item name='service_auth_type' label='How the gateway signs in for service accounts'>
           <Select options={SERVICE_AUTH_TYPES} />
@@ -219,8 +221,13 @@ export default function ServerDialog({ server, onClose, onSaved }) {
             <Form.Item name='basic_auth_username' label='User name' className='grow' rules={[{ required: true }]}>
               <Input />
             </Form.Item>
-            <Form.Item name='basic_auth_password' label='Password' className='grow' rules={[{ required: !server }]}>
-              <Input.Password placeholder={server ? 'Unchanged' : ''} />
+            <Form.Item
+              name='basic_auth_password'
+              label='Password'
+              className='grow'
+              rules={[{ required: !hasBasicAuth(server) }]}
+            >
+              <Input.Password placeholder={hasBasicAuth(server) ? 'Unchanged' : ''} />
             </Form.Item>
           </div>
         )}

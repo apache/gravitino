@@ -28,7 +28,7 @@ import { ROUTES } from '@/config/routes'
 import { usePathname, useSearchParams } from 'next/navigation'
 
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
-import { MCP_GATEWAY_URI_KEY } from '@/lib/api/mcpGateway'
+import { MCP_GATEWAY_URI_KEY, isOidcSignIn } from '@/lib/api/mcpGateway'
 import { getCurrentEntityOwner } from '@/lib/store/metalakes'
 import { to } from '@/lib/utils'
 
@@ -44,8 +44,8 @@ export function MainNav() {
   const { anthEnable, authUser, systemConfig } = auth
   const dispatch = useAppDispatch()
 
-  // The gateway takes the token of an OAuth sign-in, so other sign-ins can't use it.
-  const hasMcpGateway = !!systemConfig?.[MCP_GATEWAY_URI_KEY] && auth.authType === 'oauth'
+  // The gateway takes the token of an OIDC sign-in, so other sign-ins can't use it.
+  const hasMcpGateway = !!systemConfig?.[MCP_GATEWAY_URI_KEY] && isOidcSignIn(systemConfig, auth.authType)
 
   useEffect(() => {
     const init = async () => {

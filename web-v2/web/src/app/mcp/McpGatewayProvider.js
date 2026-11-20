@@ -23,7 +23,13 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button, Result, Spin } from 'antd'
 import SectionContainer from '@/components/SectionContainer'
-import { MCP_GATEWAY_URI_KEY, createMcpGatewayApi, gatewayErrorMessage, isSignedOut } from '@/lib/api/mcpGateway'
+import {
+  MCP_GATEWAY_URI_KEY,
+  createMcpGatewayApi,
+  gatewayErrorMessage,
+  isOidcSignIn,
+  isSignedOut
+} from '@/lib/api/mcpGateway'
 import { useAppSelector } from '@/lib/hooks/useStore'
 
 const McpGatewayContext = createContext(null)
@@ -43,21 +49,23 @@ export default function McpGatewayProvider({ children }) {
   const router = useRouter()
   const { systemConfig, authType } = useAppSelector(state => state.auth)
   const gatewayUri = systemConfig?.[MCP_GATEWAY_URI_KEY]
+  const oidc = isOidcSignIn(systemConfig, authType)
 
+  // A call that finds nobody signed in, on any page, goes back to the login page.
   const [api, uriError] = useMemo(() => {
     try {
-      return [gatewayUri ? createMcpGatewayApi(gatewayUri) : null, undefined]
+      return [gatewayUri ? createMcpGatewayApi(gatewayUri, undefined, () => router.push('/login')) : null, undefined]
     } catch (err) {
       return [null, err.message]
     }
-  }, [gatewayUri])
+  }, [gatewayUri, router])
   const [me, setMe] = useState()
   const [error, setError] = useState()
   const [attempt, setAttempt] = useState(0)
   const value = useMemo(() => ({ api, me }), [api, me])
 
   useEffect(() => {
-    if (!api || authType !== 'oauth') {
+    if (!api || !oidc) {
       return
     }
 
@@ -67,15 +75,15 @@ export default function McpGatewayProvider({ children }) {
       .getMe()
       .then(user => current && setMe(user))
       .catch(err => {
-        if (current) {
-          isSignedOut(err) ? router.push('/login') : setError(gatewayErrorMessage(err))
+        if (current && !isSignedOut(err)) {
+          setError(gatewayErrorMessage(err))
         }
       })
 
     return () => {
       current = false
     }
-  }, [api, authType, router, attempt])
+  }, [api, oidc, attempt])
 
   let unavailable = null
   if (systemConfig && !gatewayUri) {
@@ -88,12 +96,12 @@ export default function McpGatewayProvider({ children }) {
     )
   } else if (uriError) {
     unavailable = <Result status='error' title='The MCP gateway is not set up' subTitle={uriError} />
-  } else if (authType && authType !== 'oauth') {
+  } else if (systemConfig && !oidc) {
     unavailable = (
       <Result
         status='info'
-        title='MCP servers need an OAuth sign-in'
-        subTitle='The MCP gateway accepts the token of an OAuth sign-in to Gravitino.'
+        title='MCP servers need an OIDC sign-in'
+        subTitle='The MCP gateway accepts the token of an OIDC sign-in to Gravitino, and no other.'
       />
     )
   } else if (error) {

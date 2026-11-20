@@ -23,6 +23,9 @@ import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 // The server configuration key holding the MCP gateway's URL.
 export const MCP_GATEWAY_URI_KEY = 'gravitino.mcpGateway.uri'
 
+// The server configuration key naming the OAuth provider people sign in with.
+const OAUTH_PROVIDER_KEY = 'gravitino.authenticator.oauth.provider'
+
 const SIGNED_OUT = 'MCP_GATEWAY_SIGNED_OUT'
 
 // A failed download's body arrives as a Blob; this reads it, so the gateway's own message shows.
@@ -40,11 +43,20 @@ const readBlobError = async error => {
   }
 }
 
+// Whether people sign in to Gravitino with OIDC, whose token the gateway accepts.
+export const isOidcSignIn = (systemConfig, authType) =>
+  authType === 'oauth' && String(systemConfig?.[OAUTH_PROVIDER_KEY] ?? '').toLowerCase() === 'oidc'
+
 /**
  * A client for the MCP gateway's API, which runs on its own origin and accepts
- * the access token of the user signed in to this UI.
+ * the access token of the user signed in to this UI. `onSignedOut` runs when a
+ * call finds nobody signed in, as when renewing the sign-in failed.
  */
-export const createMcpGatewayApi = (gatewayUri, getAccessToken = () => oauthProviderFactory.getAccessToken()) => {
+export const createMcpGatewayApi = (
+  gatewayUri,
+  getAccessToken = () => oauthProviderFactory.getAccessToken(),
+  onSignedOut = () => {}
+) => {
   // The browser is sent to the gateway to connect servers, so it must be a web address,
   // and the user's token goes there: over https, or plain http only on this machine.
   if (
@@ -59,6 +71,7 @@ export const createMcpGatewayApi = (gatewayUri, getAccessToken = () => oauthProv
   http.interceptors.request.use(async config => {
     const token = await getAccessToken()
     if (!token) {
+      onSignedOut()
       throw Object.assign(new Error('Sign in to Gravitino again'), { code: SIGNED_OUT })
     }
     config.headers.Authorization = `Bearer ${token}`

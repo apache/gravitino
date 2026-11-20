@@ -19,7 +19,7 @@
 
 import axios from 'axios'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createMcpGatewayApi, gatewayErrorMessage, isSignedOut } from './index'
+import { createMcpGatewayApi, gatewayErrorMessage, isOidcSignIn, isSignedOut } from './index'
 
 vi.mock('@/lib/auth/providers/factory', () => ({
   oauthProviderFactory: { getAccessToken: vi.fn() }
@@ -44,9 +44,12 @@ describe('createMcpGatewayApi', () => {
   })
 
   it("sends the signed-in user's token to the gateway", async () => {
-    const api = createMcpGatewayApi('https://gateway.example.com', signedIn)
+    const onSignedOut = vi.fn()
+    const api = createMcpGatewayApi('https://gateway.example.com', signedIn, onSignedOut)
 
     await expect(api.getCatalog()).resolves.toEqual({ ok: true })
+
+    expect(onSignedOut).not.toHaveBeenCalled()
 
     const [request] = requests
     expect(request.baseURL).toBe('https://gateway.example.com')
@@ -55,10 +58,12 @@ describe('createMcpGatewayApi', () => {
   })
 
   it('does not call the gateway when no one is signed in', async () => {
-    const api = createMcpGatewayApi('https://gateway.example.com', async () => null)
+    const onSignedOut = vi.fn()
+    const api = createMcpGatewayApi('https://gateway.example.com', async () => null, onSignedOut)
 
     const error = await api.getMe().catch(err => err)
 
+    expect(onSignedOut).toHaveBeenCalledTimes(1)
     expect(isSignedOut(error)).toBe(true)
     expect(gatewayErrorMessage(error)).toBe('Sign in to Gravitino again')
     expect(requests).toEqual([])
@@ -249,4 +254,22 @@ describe('createMcpGatewayApi', () => {
       expect(() => createMcpGatewayApi(uri, async () => 'token')).not.toThrow()
     }
   )
+})
+
+describe('isOidcSignIn', () => {
+  const provider = name => ({ 'gravitino.authenticator.oauth.provider': name })
+
+  it('is true for an OAuth sign-in with the OIDC provider', () => {
+    expect(isOidcSignIn(provider('oidc'), 'oauth')).toBe(true)
+    expect(isOidcSignIn(provider('OIDC'), 'oauth')).toBe(true)
+  })
+
+  it.each([
+    ['the default OAuth provider', provider('default'), 'oauth'],
+    ['no OAuth provider', {}, 'oauth'],
+    ['no configuration yet', null, 'oauth'],
+    ['a simple sign-in', provider('oidc'), 'simple']
+  ])('is false for %s', (_, systemConfig, authType) => {
+    expect(isOidcSignIn(systemConfig, authType)).toBe(false)
+  })
 })
