@@ -22,6 +22,7 @@ package org.apache.gravitino.glossary;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -53,6 +54,7 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.apache.gravitino.exceptions.TermAlreadyExistsException;
 import org.apache.gravitino.meta.GlossaryTermEntity;
@@ -316,6 +318,33 @@ class TestGlossaryAuthorization extends TestJDBCBackend {
         () -> manager.alterTerm(LAKE, "published", TermChange.updateDefinition("new definition")));
     assertEquals(
         "new definition", as("viewer", () -> manager.getTerm(LAKE, "published")).definition());
+  }
+
+  @TestTemplate
+  void testListPreservesAuthorizationLookupFailure() throws Exception {
+    GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
+    NoSuchEntityException failure = new NoSuchEntityException("Owner lookup failed");
+    Mockito.when(authorizer.isOwner(Mockito.any(), Mockito.eq(LAKE), Mockito.any(), Mockito.any()))
+        .thenThrow(failure);
+    env.setGravitinoAuthorizer(authorizer);
+    assertSame(
+        failure,
+        assertThrows(
+            NoSuchEntityException.class, () -> as("viewer", () -> manager.listTerms(LAKE))));
+  }
+
+  @TestTemplate
+  void testRelationFilterHidesRootBeforeCheckingEditPermission() throws Exception {
+    as("admin", () -> manager.createTerm(LAKE, TermSpec.builder("Root").build()));
+    as("admin", () -> manager.createTerm(LAKE, TermSpec.builder("Peer").build()));
+    GlossaryManager filtered = manager.withTermVisibility(term -> !term.name().equals("Root"));
+    assertThrows(
+        ForbiddenException.class,
+        () -> as("viewer", () -> manager.alterTerm(LAKE, "Root", TermChange.addRelated("Peer"))));
+    assertThrows(
+        NoSuchTermException.class,
+        () -> as("viewer", () -> filtered.alterTerm(LAKE, "Root", TermChange.addRelated("Peer"))));
+    assertEquals(1, as("admin", () -> manager.getTerm(LAKE, "Root")).version());
   }
 
   /** Covers T6.4, T6.12 and T6.13 with independent authorizers over one metadata store. */

@@ -177,16 +177,17 @@ public final class GlossaryManager {
    * @throws NoSuchMetalakeException if the metalake does not exist
    */
   public List<GlossaryTermEntity> listTerms(String metalake) {
+    List<GlossaryTermEntity> result;
     try {
-      List<GlossaryTermEntity> result = terms.list(NamespaceUtil.ofGlossaryTerm(metalake));
-      GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
-      if (authorizationEnabled) {
-        result.removeIf(term -> !access.canRead(term));
-      }
-      return result;
+      result = terms.list(NamespaceUtil.ofGlossaryTerm(metalake));
     } catch (NoSuchEntityException e) {
       throw new NoSuchMetalakeException(e, "Metalake %s does not exist", metalake);
     }
+    if (authorizationEnabled) {
+      GlossaryAccess access = GlossaryAccess.forRequest(metalake, true);
+      result.removeIf(term -> !access.canRead(term));
+    }
+    return result;
   }
 
   /**
@@ -360,10 +361,7 @@ public final class GlossaryManager {
                 access,
                 false,
                 locked -> {
-                  requireEdit(access, ident, locked);
-                  if (!readable.test(locked)) {
-                    throw missingRelationRoot(ident);
-                  }
+                  requireEdit(access, ident, locked, readable);
                   checkRevision(ident, locked, conditional, token);
                 },
                 (locked, plan) ->
@@ -379,7 +377,7 @@ public final class GlossaryManager {
         locked -> {
           GlossaryTermEntity before =
               locked.orElseThrow(() -> new NoSuchTermException("Term %s does not exist", ident));
-          requireEdit(access, ident, before);
+          requireEdit(access, ident, before, null);
           Preconditions.checkArgument(request.length > 0, "At least one term change is required");
           checkRevision(ident, before, conditional, token);
           return applyChanges(ident, before, request, null);
@@ -387,15 +385,20 @@ public final class GlossaryManager {
   }
 
   private static void requireEdit(
-      GlossaryAccess access, NameIdentifier ident, GlossaryTermEntity term) {
-    if (access.canEdit(term)) {
-      return;
-    }
-    if (!access.view() || term.status() == GlossaryTerm.Status.DRAFT) {
+      GlossaryAccess access,
+      NameIdentifier ident,
+      GlossaryTermEntity term,
+      @Nullable Predicate<GlossaryTermEntity> relationFilter) {
+    boolean editable = access.canEdit(term);
+    if (!access.view()
+        || (term.status() == GlossaryTerm.Status.DRAFT && !editable)
+        || (relationFilter != null && !relationFilter.test(term))) {
       throw missingRelationRoot(ident);
     }
-    throw new ForbiddenException(
-        "Editing a glossary term requires MANAGE_DEFINITIONS or ownership with CREATE_DEFINITION");
+    if (!editable) {
+      throw new ForbiddenException(
+          "Editing a glossary term requires MANAGE_DEFINITIONS or ownership with CREATE_DEFINITION");
+    }
   }
 
   private void checkRevision(
