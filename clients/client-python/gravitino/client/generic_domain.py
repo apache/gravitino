@@ -22,7 +22,6 @@ from gravitino.api.domain.domain import Domain
 from gravitino.api.domain.domain_member import DomainMember
 from gravitino.api.domain.domain_member_filter import DomainMemberFilter
 from gravitino.api.domain.domain_relation import DomainRelation
-from gravitino.api.tag.tag_value import TagValue
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.domain_dto import DomainBackingTagDTO, DomainDTO
 from gravitino.dto.requests.domain_create_request import (
@@ -96,7 +95,7 @@ class GenericDomain(Domain):
     def parent(self) -> Optional[str]:
         return self._domain.parent()
 
-    def backing_tag(self) -> Optional[TagValue]:
+    def backing_tag(self) -> Optional[str]:
         return self._domain.backing_tag()
 
     def audit_info(self) -> AuditDTO:
@@ -142,11 +141,9 @@ class GenericDomain(Domain):
             )
         )
 
-    def update_backing_tag(self, backing_tag: Optional[TagValue]) -> Domain:
+    def update_backing_tag(self, backing_tag: Optional[str]) -> Domain:
         request = DomainBackingTagSetRequest(
-            DomainBackingTagDTO(backing_tag.name(), backing_tag.value())
-            if backing_tag is not None
-            else None
+            DomainBackingTagDTO(backing_tag) if backing_tag is not None else None
         )
         request.validate()
         return self._snapshot(
@@ -162,7 +159,7 @@ class GenericDomain(Domain):
         name: str,
         comment: Optional[str],
         properties: Optional[dict[str, str]],
-        backing_tag: TagValue,
+        backing_tag: str,
         create_backing_tag: bool,
     ) -> Domain:
         Precondition.check_argument(
@@ -173,9 +170,7 @@ class GenericDomain(Domain):
             comment,
             properties,
             self.name(),
-            BackingTagCreate(
-                backing_tag.name(), backing_tag.value(), create_backing_tag
-            ),
+            BackingTagCreate(backing_tag, create_backing_tag),
         )
         request.validate()
         return self._snapshot(
