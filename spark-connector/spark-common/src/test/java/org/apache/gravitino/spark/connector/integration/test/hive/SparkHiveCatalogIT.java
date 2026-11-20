@@ -551,7 +551,7 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
 
   @Test
   void testCreateTableWithTimestamp() {
-    String databaseName = "test_db_with_timestamp";
+    String databaseName = suiteDatabaseName("test_db_with_timestamp");
     String tableName = "test_table_with_timestamp";
     createDatabaseIfNotExists(databaseName, getProvider());
     sql(String.format("USE %s", databaseName));
@@ -654,7 +654,7 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
   void testSelectViewWithUnqualifiedSqlResolvesInViewNamespace() {
     String tableName = "view_base_table_unq";
     String schemaName = getDefaultDatabase();
-    String otherDb = "db_view_unq_other";
+    String otherDb = suiteDatabaseName("db_view_unq_other");
     String ownView = "test_hive_view_unq_own";
     String recordedView = "test_hive_view_unq_recorded";
 
