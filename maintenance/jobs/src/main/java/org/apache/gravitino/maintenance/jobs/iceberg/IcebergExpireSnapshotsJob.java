@@ -20,6 +20,7 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import java.time.Clock;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -288,9 +289,10 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenance
     StringBuilder sql = IcebergJobUtils.beginSystemProcedureCall(catalogName, "expire_snapshots");
     IcebergJobUtils.appendSqlStringTableArg(sql, tableIdentifier);
 
-    if (olderThan != null && !olderThan.isEmpty()) {
+    String resolvedOlderThan = IcebergJobUtils.normalizeOlderThan(olderThan, Clock.systemUTC());
+    if (resolvedOlderThan != null && !resolvedOlderThan.isEmpty()) {
       sql.append(", older_than => TIMESTAMP '")
-          .append(IcebergJobUtils.escapeSqlString(olderThan))
+          .append(IcebergJobUtils.escapeSqlString(resolvedOlderThan))
           .append("'");
     }
 
@@ -360,7 +362,7 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenance
             "  --catalog <name>          Iceberg catalog name registered in Spark",
             "  --table <identifier>      Fully qualified table name (e.g., db.table_name)"),
         IcebergJobUtils.withSparkConfUsage(
-            "  --older-than <timestamp>  Expire snapshots older than this timestamp",
+            "  --older-than <timestamp|days>  Expire older than timestamp or relative day count",
             "                              Example: '2024-01-01 00:00:00'",
             "                              Default: 5 days ago (Iceberg default)",
             "  --retain-last <count>     Number of most recent snapshots to retain",

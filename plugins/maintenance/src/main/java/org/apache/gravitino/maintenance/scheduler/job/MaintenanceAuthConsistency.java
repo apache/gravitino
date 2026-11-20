@@ -19,14 +19,11 @@
 package org.apache.gravitino.maintenance.scheduler.job;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
@@ -38,69 +35,74 @@ import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyExecutionSpec;
 
 /**
- * Fail-closed checks that merged maintenance work agrees on effective Gravitino / IRC auth after
- * cluster overlay.
+ * Effective Gravitino / IRC auth agreement after cluster overlay.
  *
- * <p>Used by commit-chain schedule (one Spark job, many policies) and snapshot-expiry merge (shared
- * {@code updater_options} / {@code spark_conf} on the survivor row). Cluster-static {@code
- * gravitinoAuth} / {@code ircAuth} normally make every policy identical; when overlays are empty,
- * disagreeing policy auth must not be merged silently.
+ * <p>Commit-chain and cron/snapshot-expiry merge both call {@link #hasSameAuth}. A {@code false}
+ * means callers must not co-schedule or merge; they decide whether to skip or log.
  */
 public final class MaintenanceAuthConsistency {
 
   private MaintenanceAuthConsistency() {}
 
   /**
-   * @param policies commit-chain (or other) policy members
+   * Whether every policy in the list agrees on effective gravitino/IRC auth after cluster overlay.
+   *
    * @param gravitinoConfig server config used for auth overlay
-   * @throws IllegalArgumentException when effective auth options disagree
+   * @param policies policies that would share one maintenance job (size &lt;= 1 always agrees)
+   * @return true when all members share the same effective auth
    */
-  public static void requireSameAuth(List<PolicyEntity> policies, Config gravitinoConfig) {
-    Preconditions.checkNotNull(policies, "policies");
+  public static boolean hasSameAuth(Config gravitinoConfig, List<PolicyEntity> policies) {
     Preconditions.checkNotNull(gravitinoConfig, "gravitinoConfig");
+    Preconditions.checkNotNull(policies, "policies");
     if (policies.size() <= 1) {
-      return;
+      return true;
     }
-
-    Set<String> clusterIrcKeys = MaintenanceAuthConfigs.loadIrcAuth(gravitinoConfig).keySet();
-    Map<String, String> expectedGravitino = null;
-    Map<String, String> expectedIrc = null;
-    long expectedId = -1L;
-
-    for (PolicyEntity policy : policies) {
-      PolicyContent content = policy.content();
-      PolicyExecutionSpec spec =
-          content instanceof ExecutablePolicyContent
-              ? ((ExecutablePolicyContent) content).executionSpec()
-              : PolicyExecutionSpec.empty();
-      Map<String, String> gravitinoAuth =
-          gravitinoAuthKeys(
-              MaintenanceAuthConfigs.overlayUpdaterOptions(gravitinoConfig, spec.updaterOptions()));
-      Map<String, String> ircAuth =
-          ircAuthKeys(
-              MaintenanceAuthConfigs.overlayJobOptions(gravitinoConfig, spec.jobOptions()),
-              clusterIrcKeys);
-
-      if (expectedGravitino == null) {
-        expectedGravitino = gravitinoAuth;
-        expectedIrc = ircAuth;
-        expectedId = policy.id();
-        continue;
-      }
-      if (!expectedGravitino.equals(gravitinoAuth)) {
-        throw new IllegalArgumentException(
-            differingKeysMessage(
-                "gravitinoAuth", expectedId, policy.id(), expectedGravitino, gravitinoAuth));
-      }
-      if (!Objects.equals(expectedIrc, ircAuth)) {
-        throw new IllegalArgumentException(
-            differingKeysMessage("ircAuth", expectedId, policy.id(), expectedIrc, ircAuth));
+    PolicyEntity first = policies.get(0);
+    for (int i = 1; i < policies.size(); i++) {
+      if (!hasSameAuth(gravitinoConfig, first, policies.get(i))) {
+        return false;
       }
     }
+    return true;
   }
 
   /**
-   * Compares schedule snapshots. Spec maps are already cluster-overlaid at build time.
+   * Whether two policies agree on effective gravitino/IRC auth after cluster overlay.
+   *
+   * @param gravitinoConfig server config used for auth overlay
+   * @param left policy
+   * @param right policy
+   * @return true when effective gravitino/IRC auth maps match
+   */
+  public static boolean hasSameAuth(Config gravitinoConfig, PolicyEntity left, PolicyEntity right) {
+    Preconditions.checkNotNull(gravitinoConfig, "gravitinoConfig");
+    Preconditions.checkNotNull(left, "left");
+    Preconditions.checkNotNull(right, "right");
+    Set<String> clusterIrcKeys = MaintenanceAuthConfigs.loadIrcAuth(gravitinoConfig).keySet();
+    PolicyExecutionSpec leftSpec = executionSpec(left);
+    PolicyExecutionSpec rightSpec = executionSpec(right);
+    Map<String, String> leftGravitino =
+        gravitinoAuthKeys(
+            MaintenanceAuthConfigs.overlayUpdaterOptions(
+                gravitinoConfig, leftSpec.updaterOptions()));
+    Map<String, String> rightGravitino =
+        gravitinoAuthKeys(
+            MaintenanceAuthConfigs.overlayUpdaterOptions(
+                gravitinoConfig, rightSpec.updaterOptions()));
+    Map<String, String> leftIrc =
+        ircAuthKeys(
+            MaintenanceAuthConfigs.overlayJobOptions(gravitinoConfig, leftSpec.jobOptions()),
+            clusterIrcKeys);
+    Map<String, String> rightIrc =
+        ircAuthKeys(
+            MaintenanceAuthConfigs.overlayJobOptions(gravitinoConfig, rightSpec.jobOptions()),
+            clusterIrcKeys);
+    return leftGravitino.equals(rightGravitino) && leftIrc.equals(rightIrc);
+  }
+
+  /**
+   * Whether two schedule snapshots agree on effective gravitino/IRC auth (same projection as the
+   * policy overloads).
    *
    * @param gravitinoConfig server config (for cluster IRC key set)
    * @param left schedule snapshot
@@ -113,42 +115,30 @@ public final class MaintenanceAuthConsistency {
     Preconditions.checkNotNull(left, "left");
     Preconditions.checkNotNull(right, "right");
     Set<String> clusterIrcKeys = MaintenanceAuthConfigs.loadIrcAuth(gravitinoConfig).keySet();
-    Map<String, String> leftUpdater =
-        IcebergSparkConfigUtils.parseFlatJsonMap(
-            left.getUpdaterOptions(), MaintenanceJobTemplates.UPDATER_OPTIONS_JOB_CONF_KEY);
-    Map<String, String> rightUpdater =
-        IcebergSparkConfigUtils.parseFlatJsonMap(
-            right.getUpdaterOptions(), MaintenanceJobTemplates.UPDATER_OPTIONS_JOB_CONF_KEY);
-    Map<String, String> leftSpark =
-        IcebergSparkConfigUtils.parseFlatJsonMap(left.getSparkConf(), "spark_conf");
-    Map<String, String> rightSpark =
-        IcebergSparkConfigUtils.parseFlatJsonMap(right.getSparkConf(), "spark_conf");
-    return gravitinoAuthKeys(leftUpdater).equals(gravitinoAuthKeys(rightUpdater))
-        && ircAuthKeys(leftSpark, clusterIrcKeys).equals(ircAuthKeys(rightSpark, clusterIrcKeys));
+    Map<String, String> leftGravitino =
+        gravitinoAuthKeys(
+            IcebergSparkConfigUtils.parseFlatJsonMap(
+                left.getUpdaterOptions(), MaintenanceJobTemplates.UPDATER_OPTIONS_JOB_CONF_KEY));
+    Map<String, String> rightGravitino =
+        gravitinoAuthKeys(
+            IcebergSparkConfigUtils.parseFlatJsonMap(
+                right.getUpdaterOptions(), MaintenanceJobTemplates.UPDATER_OPTIONS_JOB_CONF_KEY));
+    Map<String, String> leftIrc =
+        ircAuthKeys(
+            IcebergSparkConfigUtils.parseFlatJsonMap(left.getSparkConf(), "spark_conf"),
+            clusterIrcKeys);
+    Map<String, String> rightIrc =
+        ircAuthKeys(
+            IcebergSparkConfigUtils.parseFlatJsonMap(right.getSparkConf(), "spark_conf"),
+            clusterIrcKeys);
+    return leftGravitino.equals(rightGravitino) && leftIrc.equals(rightIrc);
   }
 
-  /**
-   * Ids and differing key names only. Auth values (passwords / tokens) must not land in server
-   * logs.
-   */
-  private static String differingKeysMessage(
-      String authName,
-      long expectedId,
-      long actualId,
-      Map<String, String> expected,
-      Map<String, String> actual) {
-    Set<String> names = new TreeSet<>();
-    names.addAll(expected.keySet());
-    names.addAll(actual.keySet());
-    List<String> differing = new ArrayList<>();
-    for (String key : names) {
-      if (!Objects.equals(expected.get(key), actual.get(key))) {
-        differing.add(key);
-      }
-    }
-    return String.format(
-        "%s mismatch: policy %s vs policy %s; differing keys=%s",
-        authName, expectedId, actualId, differing);
+  private static PolicyExecutionSpec executionSpec(PolicyEntity policy) {
+    PolicyContent content = policy.content();
+    return content instanceof ExecutablePolicyContent
+        ? ((ExecutablePolicyContent) content).executionSpec()
+        : PolicyExecutionSpec.empty();
   }
 
   private static Map<String, String> gravitinoAuthKeys(

@@ -18,22 +18,19 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import javax.annotation.Nullable;
 import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.maintenance.jobs.iceberg.IcebergMaintenanceJob.MaintenanceType;
-import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionTriggerEvaluator;
-import org.apache.gravitino.maintenance.optimizer.recommender.handler.manifest.ManifestRewriteTriggerEvaluator;
+import org.apache.gravitino.maintenance.optimizer.recommender.handler.TriggerExprEvaluator;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
-import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
+import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,98 +38,89 @@ import org.slf4j.LoggerFactory;
 /**
  * In-Spark maintain-or-skip gate after S0 metrics (§5.2.2).
  *
- * <p>Evaluates enqueue-time policy rules locally with the same QL stack as the optimizer. Does not
- * call Gravitino. Snapshot expiry always maintains (optimizer-only scheduling for that type).
- * Compaction uses {@code CompactionTriggerEvaluator}; manifest rewrite uses {@code
- * ManifestRewriteTriggerEvaluator}.
+ * <p>Only the four Iceberg maintenance {@link Policy.BuiltInType}s are accepted. Snapshot expiry
+ * and orphan cleanup always maintain. Compaction / rewrite-manifests evaluate enqueue-time {@code
+ * trigger-expr} via {@link TriggerExprEvaluator} after required S0 fields are present.
  */
 final class MaintenanceTriggerGate {
 
   private static final Logger LOG = LoggerFactory.getLogger(MaintenanceTriggerGate.class);
 
-  /** Spark job argument key: JSON map of wire maintenance type → policy {@code rules()} object. */
-  static final String RULES_ARG = "rules";
-
   private MaintenanceTriggerGate() {}
 
   /**
-   * @param type maintenance type for this sample
-   * @param argMap Spark job arguments (includes optional {@link #RULES_ARG})
+   * @param policyType one of the four Iceberg maintenance {@link Policy.BuiltInType}s
+   * @param rules per-task policy {@code rules()} object (may be empty → type defaults)
    * @param metricsJson S0 metrics JSON
    * @return whether the procedure should run
    */
   static boolean shouldMaintain(
-      MaintenanceType type, Map<String, String> argMap, @Nullable String metricsJson) {
-    if (type == MaintenanceType.EXPIRE_SNAPSHOTS) {
-      return true;
+      Policy.BuiltInType policyType,
+      @Nullable Map<String, Object> rules,
+      @Nullable String metricsJson) {
+    Preconditions.checkNotNull(policyType, "policyType");
+    switch (policyType) {
+      case ICEBERG_SNAPSHOT_EXPIRATION:
+      case ICEBERG_ORPHAN_FILE_REMOVAL:
+        // Optimizer schedules these; in-job gate does not re-evaluate trigger-expr.
+        return true;
+      case ICEBERG_COMPACTION:
+        return evaluateTrigger(
+            policyType,
+            effectiveRules(rules, PolicyContents.icebergDataCompaction().rules()),
+            metricsJson,
+            "Compaction recommend skip: metrics JSON missing compaction fields",
+            IcebergDataCompactionContent.DATA_FILE_MSE_METRIC,
+            IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC);
+      case ICEBERG_REWRITE_MANIFESTS:
+        return evaluateTrigger(
+            policyType,
+            effectiveRules(rules, PolicyContents.icebergRewriteManifests().rules()),
+            metricsJson,
+            "Manifest rewrite recommend skip: metrics JSON missing manifest fields",
+            IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC);
+      default:
+        throw new IllegalArgumentException(
+            "Unsupported maintenance policy type: " + policyType.policyType());
     }
+  }
 
-    Map<String, Object> rules = rulesForType(type, argMap);
+  private static boolean evaluateTrigger(
+      Policy.BuiltInType policyType,
+      Map<String, Object> effectiveRules,
+      @Nullable String metricsJson,
+      String missingMetricsMessage,
+      String... requiredMetricKeys) {
     Map<String, Object> metrics = parseNumericMetrics(metricsJson);
-    if (type == MaintenanceType.REWRITE_DATA_FILES
-        && (metrics.isEmpty()
-            || !metrics.containsKey(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC)
-            || !metrics.containsKey(IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC))) {
-      LOG.warn("Compaction recommend skip: metrics JSON missing compaction fields");
-      return false;
-    }
-    if (type == MaintenanceType.REWRITE_MANIFESTS
-        && (metrics.isEmpty()
-            || !metrics.containsKey(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC))) {
-      LOG.warn("Manifest rewrite recommend skip: metrics JSON missing manifest fields");
+    if (metrics.isEmpty() || !containsAll(metrics, requiredMetricKeys)) {
+      LOG.warn(missingMetricsMessage);
       return false;
     }
 
-    boolean maintain =
-        type == MaintenanceType.REWRITE_MANIFESTS
-            ? ManifestRewriteTriggerEvaluator.shouldMaintain(rules, metrics)
-            : CompactionTriggerEvaluator.shouldMaintain(rules, metrics);
-    String triggerExprKey =
-        type == MaintenanceType.REWRITE_MANIFESTS
-            ? IcebergRewriteManifestsContent.TRIGGER_EXPR_KEY
-            : IcebergDataCompactionContent.TRIGGER_EXPR_KEY;
+    boolean maintain = TriggerExprEvaluator.evaluate(effectiveRules, metrics);
     LOG.info(
         "In-Spark recommend type={} expr={} -> {}",
-        type.wireName(),
-        rules.get(triggerExprKey),
+        policyType.policyType(),
+        effectiveRules.get(TriggerExprEvaluator.TRIGGER_EXPR_KEY),
         maintain ? "MAINTAIN" : "SKIP");
     return maintain;
   }
 
-  private static Map<String, Object> rulesForType(
-      MaintenanceType type, Map<String, String> argMap) {
-    Map<String, Map<String, Object>> byType = Collections.emptyMap();
-    if (argMap != null) {
-      String raw = IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get(RULES_ARG));
-      if (raw != null && !raw.trim().isEmpty()) {
-        try {
-          Map<String, Map<String, Object>> parsed =
-              JsonUtils.anyFieldMapper()
-                  .readValue(raw, new TypeReference<Map<String, Map<String, Object>>>() {});
-          if (parsed != null) {
-            byType = parsed;
-          }
-        } catch (IOException | RuntimeException e) {
-          LOG.warn("Failed to parse {}: {}", RULES_ARG, e.toString());
-        }
-      }
-    }
-    Map<String, Object> rules = byType.get(type.wireName());
+  private static Map<String, Object> effectiveRules(
+      @Nullable Map<String, Object> rules, Map<String, Object> typeDefaults) {
     if (rules != null && !rules.isEmpty()) {
       return rules;
     }
-    if (type == MaintenanceType.REWRITE_DATA_FILES) {
-      return new HashMap<>(PolicyContents.icebergDataCompaction().rules());
+    return new HashMap<>(typeDefaults);
+  }
+
+  private static boolean containsAll(Map<String, Object> metrics, String... keys) {
+    for (String key : keys) {
+      if (!metrics.containsKey(key)) {
+        return false;
+      }
     }
-    if (type == MaintenanceType.REWRITE_MANIFESTS) {
-      return new HashMap<>(PolicyContents.icebergRewriteManifests().rules());
-    }
-    if (type == MaintenanceType.REMOVE_ORPHAN_FILES) {
-      return new HashMap<>(PolicyContents.icebergOrphanFileRemoval().rules());
-    }
-    Map<String, Object> empty = new HashMap<>();
-    empty.put(IcebergOrphanFileRemovalContent.TRIGGER_EXPR_KEY, "false");
-    return empty;
+    return true;
   }
 
   private static Map<String, Object> parseNumericMetrics(@Nullable String metricsJson) {
