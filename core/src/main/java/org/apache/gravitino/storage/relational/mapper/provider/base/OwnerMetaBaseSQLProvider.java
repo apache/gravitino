@@ -450,7 +450,8 @@ public class OwnerMetaBaseSQLProvider {
   }
 
   /** Resolves the live term and its owner in the same statement, including after name reuse. */
-  public String selectGlossaryTermOwner() {
+  public String selectGlossaryTermOwner(
+      @Param("metalake") String metalake, @Param("key") String key) {
     return "SELECT o.owner_id AS ownerId, o.owner_type AS ownerType FROM "
         + MetalakeMetaMapper.TABLE_NAME
         + " m JOIN "

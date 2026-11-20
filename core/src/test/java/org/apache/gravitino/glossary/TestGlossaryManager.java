@@ -288,6 +288,22 @@ class TestGlossaryManager extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testRenamingTermCanKeepItsOwnFormerNameAsSynonym() throws IOException {
+    createAndInsertMakeLake(LAKE);
+    GlossaryTermEntity original = manager.createTerm(LAKE, TermSpec.builder("Customer").build());
+    manager.createTerm(LAKE, TermSpec.builder("Account").build());
+
+    manager.alterTerm(
+        LAKE, "Customer", TermChange.rename("Client"), TermChange.addSynonym("Customer"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> manager.alterTerm(LAKE, "Client", TermChange.addSynonym("Account")));
+    GlossaryTermEntity stored = manager.getTerm(LAKE, "Client");
+    Assertions.assertEquals(original.id(), stored.id());
+    Assertions.assertArrayEquals(new String[] {"Customer"}, stored.synonyms());
+  }
+
+  @TestTemplate
   void testCancelledSynonymEditPreservesSpelling() throws IOException {
     createAndInsertMakeLake(LAKE);
     String name = "Account";
