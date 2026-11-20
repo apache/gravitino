@@ -20,11 +20,11 @@ This policy supports `CATALOG`, `SCHEMA`, and `TABLE` metadata objects.
 
 The typed content for `system_iceberg_rewrite_manifests` supports the following fields:
 
-| Field                      | Required | Default                   | Description                                                                                                      |
-| -------------------------- | -------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Field                      | Required | Default                   | Description                                                                                                                     |
+| -------------------------- | -------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `manifest_count_threshold` | No       | `100`                     | Trigger when manifest count is at least this value. Aligns with Iceberg `commit.manifest.min-count-to-merge`. Must be positive. |
-| `spec_id`                  | No       | Iceberg's current default | Existing partition spec to evaluate. Omission resolves the current default from Iceberg metadata.                |
-| `use_caching`              | No       | Omitted                   | Optional boolean forwarded to Iceberg; omission preserves the runtime default. JSON booleans only.               |
+| `spec_id`                  | No       | Iceberg's current default | Existing partition spec to evaluate. Omission resolves the current default from Iceberg metadata.                               |
+| `use_caching`              | No       | Omitted                   | Optional boolean forwarded to Iceberg; omission preserves the runtime default. JSON booleans only.                              |
 
 Spec IDs must be non-negative 32-bit integers. Recommendations are ranked by the selected
 spec's manifest count. Average manifest size is collected for observability but does not
