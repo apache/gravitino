@@ -154,8 +154,10 @@ The migrate script records the current schema version and applies the full
 `upgrade-*-to-*-*.sql` chain from that version to the image version. For an
 existing database that has no recorded version, set `schema.baselineVersion`
 (`X.Y.Z`) to the Gravitino version that created it (or to the image version to
-only record and skip DDL). Automatic inference only treats a snapshot as current
-when `upgrade-*-to-<version>` scripts add distinguishable columns; index-only
+only record and skip DDL). The Job validates that shape only when baseline is
+actually used; a stale value is ignored once `gravitino_schema_migration`
+already has a row. Automatic inference only treats a snapshot as current when
+`upgrade-*-to-<version>` scripts add distinguishable columns; index-only
 upgrades that share the same table set require an explicit baseline. The Job
 uses the same `nodeSelector` / `affinity` / `tolerations` as the Gravitino
 Deployment. The `entity.jdbcUser` (or in-chart DB admin) needs rights to create

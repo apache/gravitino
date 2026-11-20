@@ -345,11 +345,23 @@ class TestSchemaMigrate(unittest.TestCase):
             "1",
         )
 
-    def test_rejects_invalid_baseline_version(self):
+    def test_rejects_invalid_baseline_version_when_used(self):
         self.seed_schema_file("1.3.0")
         result = self.migrate(baseline="1.2", check=False)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("BASELINE_VERSION must be X.Y.Z", result.stderr)
+
+    def test_ignores_invalid_baseline_when_version_already_recorded(self):
+        """Stale/typo baseline must not fail once gravitino_schema_migration exists."""
+        self.seed_schema_file("1.3.0")
+        result = self.migrate(baseline="1.3.0")
+        self.assertIn("upgrade-1.3.0-to-2.0.0", result.stdout)
+        self.assert_version(TARGET)
+        # Re-run with a non-X.Y.Z baseline that would fail if validated eagerly.
+        result = self.migrate(baseline="1.2")
+        self.assertEqual(result.returncode, 0)
+        self.assertNotIn("using schema.baselineVersion=", result.stdout)
+        self.assert_version(TARGET)
 
 
 class TestSchemaMigratePostgresCurrentSchema(unittest.TestCase):

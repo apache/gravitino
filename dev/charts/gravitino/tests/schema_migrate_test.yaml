@@ -385,7 +385,7 @@ tests:
       - failedTemplate:
           errorPattern: "schema.migrate.enabled is true but no relational target"
 
-  - it: fails when schema.baselineVersion is not X.Y.Z
+  - it: does not fail render for a non-X.Y.Z baselineVersion left unused
     template: schema-migrate-job.yaml
     release:
       name: gravitino
@@ -393,12 +393,19 @@ tests:
       schema:
         migrate:
           enabled: true
+        # Runtime validates only when baseline is consumed; stale typos must not
+        # block helm template when a recorded version already exists.
         baselineVersion: "1.2"
       postgresql:
         enabled: true
     asserts:
-      - failedTemplate:
-          errorPattern: "schema.baselineVersion must be X.Y.Z"
+      - isKind:
+          of: Job
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASELINE_VERSION
+            value: "1.2"
 
   - it: fails external PostgreSQL migrate without existingSecret
     template: schema-migrate-job.yaml

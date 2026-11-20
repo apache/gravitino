@@ -520,9 +520,6 @@ if [ -z "$VERSION" ]; then
   exit 1
 fi
 require_semver "VERSION" "$VERSION"
-if [ -n "$BASELINE_VERSION" ]; then
-  require_semver "schema.baselineVersion / BASELINE_VERSION" "$BASELINE_VERSION"
-fi
 
 SCRIPT_DB_DIR="${SCRIPTS_DIR}/${DB_ENGINE}"
 schema_file=$(select_schema_file)
@@ -544,6 +541,9 @@ fi
 
 current=$(read_recorded_version)
 if [ -z "$current" ] && [ -n "$BASELINE_VERSION" ]; then
+  # Validate only when baseline is actually consumed (ignored if a row already exists
+  # or on fresh install).
+  require_semver "schema.baselineVersion / BASELINE_VERSION" "$BASELINE_VERSION"
   echo "No recorded schema version; using schema.baselineVersion=${BASELINE_VERSION}"
   current="$BASELINE_VERSION"
   write_recorded_version "$current"
