@@ -42,28 +42,6 @@ The policy content is converted to:
   - `trigger-expr=custom-manifest-number >= manifest_count_threshold`
   - optional `spec_id` and `use_caching` job options when set
 
-## Validation before and after metrics
-
-The Table Maintenance Service submits `builtin-iceberg-maintenance-task`, which reports these
-metrics through before / after callbacks for Validation Before / After / Change. Standalone
-procedure templates such as `builtin-iceberg-rewrite-manifests` (CLI / optimizer) do not report
-these Validation metrics.
-
-| Phase  | Key                                | Source                                              |
-| ------ | ---------------------------------- | --------------------------------------------------- |
-| Before | `custom-manifest-number`           | Manifest inventory for the resolved partition spec  |
-| Before | `custom-avg-manifest-size`         | Manifest inventory for the resolved partition spec  |
-| Before | `custom-manifest-spec-id`          | Partitioned specs only (observability)              |
-| Before | `custom-manifest-partition-spec`   | Partitioned specs only (observability)              |
-| After  | `custom-manifest-number`           | Re-collected inventory after rewrite                |
-| After  | `custom-avg-manifest-size`         | Re-collected inventory after rewrite                |
-| After  | `custom-rewritten-manifest-number` | Iceberg `rewrite_manifests` procedure result        |
-| After  | `custom-manifest-spec-id`          | Partitioned specs only (observability)              |
-| After  | `custom-manifest-partition-spec`   | Partitioned specs only (observability)              |
-
-After metrics re-read current manifests so Validation can show Before / After / Change for
-inventory fields, not only the rewritten count.
-
 ## Collect, evaluate, and submit
 
 Submit `builtin-iceberg-update-manifest-stats` to collect complete

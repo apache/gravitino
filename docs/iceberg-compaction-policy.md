@@ -48,27 +48,6 @@ The policy content is converted to:
   - `sortOrder=<sortOrder>`
   - `job.options.<key>=<value>` for each rewrite option
 
-## Validation before and after metrics
-
-The Table Maintenance Service submits `builtin-iceberg-maintenance-task`, which reports these
-metrics through before / after callbacks for Validation Before / After / Change. Standalone
-procedure templates such as `builtin-iceberg-rewrite-data-files` (CLI / optimizer) do not report
-these Validation metrics.
-
-| Phase            | Key                          | Source                                                                      |
-| ---------------- | ---------------------------- | --------------------------------------------------------------------------- |
-| Before and After | `custom-data-file-mse`       | Inventory SQL (also used by `trigger-expr`)                                 |
-| Before and After | `custom-delete-file-number`  | Inventory SQL                                                               |
-| Before and After | `custom-avg-file-size`       | Inventory SQL                                                               |
-| Before and After | `custom-total-file-size`     | Inventory SQL                                                               |
-| Before and After | `custom-file-number`         | Inventory SQL                                                               |
-| Before and After | `custom-small-file-number`   | Inventory SQL (files smaller than 32 MiB)                                   |
-| Before and After | `custom-data-mse-ratio`      | Job orchestrator: `custom-data-file-mse / minDataFileMse` from task rules   |
-
-`custom-data-mse-ratio` is a display Fragmentation multiple stored as a JSON number (`double`).
-The job does not store `minDataFileMse` as a metric. Trigger evaluation still uses raw
-`custom-data-file-mse`.
-
 ## Parameter Tuning Guide
 
 ### Metric Unit and Threshold Formula

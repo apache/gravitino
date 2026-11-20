@@ -43,20 +43,6 @@ The policy content is converted to:
 Eligibility for snapshot expiry is evaluated when the optimizer or maintenance schedule runs;
 the in-Spark gate always maintains once a job starts.
 
-## Validation before and after metrics
-
-The Table Maintenance Service submits `builtin-iceberg-maintenance-task`, which reports these
-metrics through before / after callbacks for Validation Before / After / Change. Standalone
-procedure templates such as `builtin-iceberg-expire-snapshots` (CLI / optimizer) do not report
-these Validation metrics.
-
-| Phase  | Key                              | Source                                                                  |
-| ------ | -------------------------------- | ----------------------------------------------------------------------- |
-| Before | `custom-snapshot-number`         | Snapshot count before expire                                            |
-| After  | `custom-snapshot-number`         | Measured snapshot count after expire (not before minus expired)         |
-| After  | `custom-expired-snapshot-number` | Snapshots present before expire but absent after                        |
-| After  | `custom-expired-file-size`       | Content-file bytes present before expire but absent after               |
-
 ## Policy Examples
 
 <Tabs groupId='language' queryString>

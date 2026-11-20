@@ -157,13 +157,59 @@ These endpoints are for the Spark job, not for operators. Schemas are in the [ma
 | Finish and release the slot | `POST /api/metalakes/{metalake}/maintenance/actions/{jobId}/finish`         |
 | After-maintenance metrics   | `POST /api/metalakes/{metalake}/maintenance/actions/{jobId}/metrics/after`  |
 
-Before / After metric keys for Validation depend on the policy type. See the **Validation
-before and after metrics** section in each policy page:
-[compaction](../iceberg-compaction-policy.md#validation-before-and-after-metrics),
-[rewrite manifests](../iceberg-rewrite-manifests-policy.md#validation-before-and-after-metrics),
-[snapshot expiration](../iceberg-snapshot-expiration-policy.md#validation-before-and-after-metrics),
-and
-[orphan file removal](../iceberg-orphan-file-removal-policy.md#validation-before-and-after-metrics).
+### Validation before and after metrics
+
+The cron and commit paths submit `builtin-iceberg-maintenance-task`, which reports Validation
+Before / After / Change metrics through the callbacks above. Standalone procedure templates
+(`builtin-iceberg-rewrite-data-files`, `builtin-iceberg-rewrite-manifests`,
+`builtin-iceberg-expire-snapshots`, `builtin-iceberg-remove-orphan-files`) used by the CLI or
+optimizer do not report these metrics.
+
+#### Compaction (`system_iceberg_compaction`)
+
+| Phase            | Key                         | Source                                                                    |
+| ---------------- | --------------------------- | ------------------------------------------------------------------------- |
+| Before and After | `custom-data-file-mse`      | Inventory SQL (also used by `trigger-expr`)                               |
+| Before and After | `custom-delete-file-number` | Inventory SQL                                                             |
+| Before and After | `custom-avg-file-size`      | Inventory SQL                                                             |
+| Before and After | `custom-total-file-size`    | Inventory SQL                                                             |
+| Before and After | `custom-file-number`        | Inventory SQL                                                             |
+| Before and After | `custom-small-file-number`  | Inventory SQL (files smaller than 32 MiB)                                 |
+| Before and After | `custom-data-mse-ratio`     | Job orchestrator: `custom-data-file-mse / minDataFileMse` from task rules |
+
+`custom-data-mse-ratio` is a display Fragmentation multiple stored as a JSON number (`double`).
+The job does not store `minDataFileMse` as a metric.
+
+#### Manifest rewrite (`system_iceberg_rewrite_manifests`)
+
+| Phase  | Key                                | Source                                             |
+| ------ | ---------------------------------- | -------------------------------------------------- |
+| Before | `custom-manifest-number`           | Manifest inventory for the resolved partition spec |
+| Before | `custom-avg-manifest-size`         | Manifest inventory for the resolved partition spec |
+| Before | `custom-manifest-spec-id`          | Partitioned specs only (observability)             |
+| Before | `custom-manifest-partition-spec`   | Partitioned specs only (observability)             |
+| After  | `custom-manifest-number`           | Re-collected inventory after rewrite               |
+| After  | `custom-avg-manifest-size`         | Re-collected inventory after rewrite               |
+| After  | `custom-rewritten-manifest-number` | Iceberg `rewrite_manifests` procedure result       |
+| After  | `custom-manifest-spec-id`          | Partitioned specs only (observability)             |
+| After  | `custom-manifest-partition-spec`   | Partitioned specs only (observability)             |
+
+#### Snapshot expiration (`system_iceberg_snapshot_expiration`)
+
+| Phase  | Key                              | Source                                                          |
+| ------ | -------------------------------- | --------------------------------------------------------------- |
+| Before | `custom-snapshot-number`         | Snapshot count before expire                                    |
+| After  | `custom-snapshot-number`         | Measured snapshot count after expire (not before minus expired) |
+| After  | `custom-expired-snapshot-number` | Snapshots present before expire but absent after                |
+| After  | `custom-expired-file-size`       | Content-file bytes present before expire but absent after       |
+
+#### Orphan file removal (`system_iceberg_orphan_file_removal`)
+
+| Phase  | Key                          | Source                                               |
+| ------ | ---------------------------- | ---------------------------------------------------- |
+| Before | —                            | Orphan cleanup skips before-metrics                  |
+| After  | `custom-removed-file-number` | Orphan files removed, or found when `dryRun` is true |
+| After  | `custom-removed-file-size`   | Bytes of orphan files removed (or found in dry-run)  |
 
 ## Commit Trigger
 

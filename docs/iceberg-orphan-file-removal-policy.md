@@ -44,19 +44,6 @@ The policy content is converted to:
 Eligibility for orphan cleanup is evaluated when the optimizer or maintenance schedule runs;
 the in-Spark gate always maintains once a job starts.
 
-## Validation before and after metrics
-
-The Table Maintenance Service submits `builtin-iceberg-maintenance-task`, which reports these
-metrics through before / after callbacks for Validation Before / After / Change. Standalone
-procedure templates such as `builtin-iceberg-remove-orphan-files` (CLI / optimizer) do not report
-these Validation metrics.
-
-| Phase  | Key                           | Source                                                                  |
-| ------ | ----------------------------- | ----------------------------------------------------------------------- |
-| Before | —                             | Orphan cleanup skips before-metrics                                     |
-| After  | `custom-removed-file-number`  | Orphan files removed, or found when `dryRun` is true                    |
-| After  | `custom-removed-file-size`    | Bytes of orphan files removed (or found in dry-run)                     |
-
 ## Policy Examples
 
 <Tabs groupId='language' queryString>

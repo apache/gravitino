@@ -46,11 +46,13 @@ policy. A table with only `data_domain=risk` does not.
 | `system_access_control`              | Privileges and applicable roles            | Not enforced yet          |
 | `custom`                             | A free-form map that you define            | A system that you provide |
 
-Iceberg maintenance policy fields and Validation before / after metrics are documented in
+Iceberg maintenance policy fields are documented in
 [Iceberg compaction policy](./iceberg-compaction-policy.md),
 [Iceberg rewrite manifests policy](./iceberg-rewrite-manifests-policy.md),
 [Iceberg snapshot expiration policy](./iceberg-snapshot-expiration-policy.md), and
-[Iceberg orphan file removal policy](./iceberg-orphan-file-removal-policy.md).
+[Iceberg orphan file removal policy](./iceberg-orphan-file-removal-policy.md). Validation
+Before / After metrics for the Table Maintenance Service are in
+[service](./table-maintenance-service/service.md#validation-before-and-after-metrics).
 
 Row-filter and column-mask policies can be associated with tags and returned as read restrictions
 by the experimental Iceberg REST service. Compatible readers enforce those restrictions. The
