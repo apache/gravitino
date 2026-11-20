@@ -711,10 +711,7 @@ public class RoleMetaService {
                 mapper -> mapper.listByRoleName(metalake, locked.getRoleName()))
             .isEmpty();
     if (referenced) {
-      throw new InUseException(
-          "Role %s in metalake %s is referenced by access control policies; remove it from"
-              + " those policies before deleting it",
-          identifier.name(), metalake);
+      throw new InUseException(AuthorizationUtils.ROLE_IN_USE_MSG, identifier.name(), metalake);
     }
   }
 

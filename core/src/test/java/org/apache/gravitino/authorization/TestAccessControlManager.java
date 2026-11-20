@@ -45,9 +45,11 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -653,7 +655,7 @@ public class TestAccessControlManager {
       Assertions.assertFalse(bulkResult.succeeded());
       Assertions.assertInstanceOf(InUseException.class, bulkResult.error().orElse(null));
 
-      // The store refused, so the plugins must still have the role.
+      // The reference check refused first, so the plugins must still have the role.
       verify(authorizationPlugin, never()).onRoleDeleted(any());
       Assertions.assertEquals(
           "policy_role", accessControlManager.getRole(METALAKE, "policy_role").name());
@@ -664,6 +666,35 @@ public class TestAccessControlManager {
     } finally {
       FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", previousIdGenerator, true);
     }
+  }
+
+  @Test
+  public void testRoleDeletionRetriesPluginsAfterAFailure() {
+    accessControlManager.createRole(
+        METALAKE,
+        "plugin_retry_role",
+        ImmutableMap.of(),
+        Lists.newArrayList(
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))));
+    reset(authorizationPlugin);
+    doThrow(new RuntimeException("plugin unavailable"))
+        .doReturn(true)
+        .when(authorizationPlugin)
+        .onRoleDeleted(any());
+
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> accessControlManager.deleteRole(METALAKE, "plugin_retry_role"));
+    // The plugin failed before the store delete, so the role is still there to retry.
+    Assertions.assertEquals(
+        "plugin_retry_role", accessControlManager.getRole(METALAKE, "plugin_retry_role").name());
+
+    Assertions.assertTrue(accessControlManager.deleteRole(METALAKE, "plugin_retry_role"));
+    verify(authorizationPlugin, times(2)).onRoleDeleted(any());
+    Assertions.assertThrows(
+        NoSuchRoleException.class,
+        () -> accessControlManager.getRole(METALAKE, "plugin_retry_role"));
   }
 
   @Test

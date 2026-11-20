@@ -37,6 +37,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -290,6 +291,41 @@ public class TestPolicyRoleRelService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testBackendListsThePoliciesNamingARole() throws IOException {
+    createAndInsertMakeLake(METALAKE);
+    String otherMetalake = METALAKE + "_other";
+    createAndInsertMakeLake(otherMetalake);
+    createRoles(METALAKE, "analyst", "auditor");
+    createRoles(otherMetalake, "analyst");
+    PolicyEntity reader = accessControlPolicy("reader", Arrays.asList("analyst", "auditor"));
+    backend.insert(reader, false);
+    backend.insert(accessControlPolicy("writer", Collections.singletonList("auditor")), false);
+    backend.insert(
+        accessControlPolicy(otherMetalake, "other", Collections.singletonList("analyst")), false);
+
+    Assertions.assertEquals(
+        Collections.singletonList("reader"), policiesNaming(METALAKE, "analyst"));
+    Assertions.assertEquals(Arrays.asList("reader", "writer"), policiesNaming(METALAKE, "auditor"));
+
+    backend.update(
+        reader.nameIdentifier(),
+        Entity.EntityType.POLICY,
+        entity -> withRoles(reader, Collections.singletonList("auditor")));
+    Assertions.assertEquals(Collections.emptyList(), policiesNaming(METALAKE, "analyst"));
+    Assertions.assertEquals(
+        Collections.singletonList("other"), policiesNaming(otherMetalake, "analyst"));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            backend.listEntitiesByRelation(
+                SupportsRelationOperations.Type.POLICY_ROLE_REL,
+                reader.nameIdentifier(),
+                Entity.EntityType.POLICY,
+                false));
+  }
+
+  @TestTemplate
   public void testMetalakeDeleteClearsReferencesOfAnInFlightPolicyUpdate() throws Exception {
     assertMetalakeDeleteClearsReferenceAddedWhileWaiting(true);
   }
@@ -515,6 +551,18 @@ public class TestPolicyRoleRelService extends TestJDBCBackend {
             PolicyRoleRelMapper.class, mapper -> mapper.listByRoleName(metalake, roleName))
         .stream()
         .map(PolicyRoleRelPO::getPolicyName)
+        .collect(Collectors.toList());
+  }
+
+  private List<String> policiesNaming(String metalake, String roleName) throws IOException {
+    return backend
+        .<PolicyEntity>listEntitiesByRelation(
+            SupportsRelationOperations.Type.POLICY_ROLE_REL,
+            AuthorizationUtils.ofRole(metalake, roleName),
+            Entity.EntityType.ROLE,
+            false)
+        .stream()
+        .map(PolicyEntity::name)
         .collect(Collectors.toList());
   }
 

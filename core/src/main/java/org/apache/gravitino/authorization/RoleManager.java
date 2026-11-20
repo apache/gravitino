@@ -30,6 +30,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
@@ -112,20 +113,18 @@ class RoleManager {
     try {
       NameIdentifier ident = AuthorizationUtils.ofRole(metalake, role);
 
-      RoleEntity roleEntity = null;
       try {
-        roleEntity = store.get(ident, Entity.EntityType.ROLE, RoleEntity.class);
+        RoleEntity roleEntity = store.get(ident, Entity.EntityType.ROLE, RoleEntity.class);
+        // Refuse before the plugins drop the role. The plugins go first so that a failed plugin
+        // call leaves the role in Gravitino and a retry reaches the plugins again. The store
+        // checks again under a lock, for a policy that names the role after this check.
+        checkNoPolicyNamesRole(ident, metalake, role);
+        notifyRoleDeleted(metalake, roleEntity);
       } catch (NoSuchEntityException nse) {
         // ignore, because the role may have been deleted.
       }
 
-      // Delete before telling the plugins: the store refuses to delete a role that an access
-      // control policy names, and the plugins must not drop a role that Gravitino keeps.
-      boolean deleted = store.delete(ident, Entity.EntityType.ROLE);
-      if (deleted && roleEntity != null) {
-        notifyRoleDeleted(metalake, roleEntity);
-      }
-      return deleted;
+      return store.delete(ident, Entity.EntityType.ROLE);
     } catch (IOException ioe) {
       LOG.error(
           "Deleting role {} in the metalake {} failed due to storage issues", role, metalake, ioe);
@@ -171,6 +170,22 @@ class RoleManager {
           object.type(),
           ioe);
       throw new RuntimeException(ioe);
+    }
+  }
+
+  private void checkNoPolicyNamesRole(NameIdentifier ident, String metalake, String role)
+      throws IOException {
+    boolean named =
+        !store
+            .relationOperations()
+            .listEntitiesByRelation(
+                SupportsRelationOperations.Type.POLICY_ROLE_REL,
+                ident,
+                Entity.EntityType.ROLE,
+                false /* allFields */)
+            .isEmpty();
+    if (named) {
+      throw new InUseException(AuthorizationUtils.ROLE_IN_USE_MSG, role, metalake);
     }
   }
 

@@ -97,6 +97,28 @@ public class PolicyMetaService {
         .collect(Collectors.toList());
   }
 
+  /**
+   * Lists the active access control policies whose content names a role.
+   *
+   * @param roleIdent the role identifier
+   * @return the policies naming the role, ordered by policy name
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listPoliciesByRoleIdent")
+  public List<PolicyEntity> listPoliciesByRoleIdent(NameIdentifier roleIdent) {
+    String metalakeName = roleIdent.namespace().level(0);
+    List<PolicyRoleRelPO> references =
+        SessionUtils.getWithoutCommit(
+            PolicyRoleRelMapper.class,
+            mapper -> mapper.listByRoleName(metalakeName, roleIdent.name()));
+    return references.stream()
+        // A policy deleted after the reference was read is skipped.
+        .map(reference -> getPolicyById(reference.getPolicyId()))
+        .filter(Objects::nonNull)
+        .collect(Collectors.toList());
+  }
+
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getPolicyByIdentifier")
