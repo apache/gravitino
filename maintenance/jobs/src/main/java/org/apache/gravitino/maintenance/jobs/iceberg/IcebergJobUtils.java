@@ -23,16 +23,23 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.time.Clock;
+import java.time.DateTimeException;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
+import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.spark.Spark3Util;
@@ -57,6 +64,16 @@ public final class IcebergJobUtils {
    * {{use_caching}}}.
    */
   private static final Pattern UNRESOLVED_PLACEHOLDER_PATTERN = Pattern.compile("^\\{\\{[^{}]*}}$");
+
+  /**
+   * Matches relative day wire values: a bare integer ({@code 7}) or legacy {@code 7d}/{@code 7D}.
+   */
+  private static final Pattern OLDER_THAN_RELATIVE_DAYS =
+      Pattern.compile("^(\\d+)d?$", Pattern.CASE_INSENSITIVE);
+
+  /** Formats {@code now - days} as the Iceberg {@code older_than} timestamp string. */
+  private static final DateTimeFormatter OLDER_THAN_TIMESTAMP =
+      DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ssXXX").withZone(ZoneOffset.UTC);
 
   /**
    * The Spark configurations that spark-submit decides. Set in the custom Spark configurations of a
@@ -561,6 +578,31 @@ public final class IcebergJobUtils {
       SparkSession spark, String catalogName, String tableIdentifier) {
     Snapshot snapshot = loadIcebergTable(spark, catalogName, tableIdentifier).currentSnapshot();
     return snapshot == null ? -1L : snapshot.snapshotId();
+  }
+
+  /**
+   * Expands relative day counts (bare {@code 7}, or legacy {@code 7d}) to a UTC Iceberg {@code
+   * older_than} timestamp; absolute timestamps pass through. Null/blank stay as-is. Pass {@link
+   * Clock#systemUTC()} in production.
+   */
+  public static String normalizeOlderThan(@Nullable String olderThan, Clock clock) {
+    if (olderThan == null || olderThan.trim().isEmpty()) {
+      return olderThan;
+    }
+    Preconditions.checkNotNull(clock, "clock");
+    String trimmed = olderThan.trim();
+    Matcher matcher = OLDER_THAN_RELATIVE_DAYS.matcher(trimmed);
+    if (!matcher.matches()) {
+      return olderThan;
+    }
+    long days = Long.parseLong(matcher.group(1));
+    IcebergSnapshotExpirationContent.validateOlderThanDays(days);
+    try {
+      return OLDER_THAN_TIMESTAMP.format(clock.instant().minus(days, ChronoUnit.DAYS));
+    } catch (DateTimeException | ArithmeticException e) {
+      throw new IllegalArgumentException(
+          "older_than days cannot be represented as a retention timestamp", e);
+    }
   }
 
   /** Visible for unit tests that assert the missing-class error message. */
