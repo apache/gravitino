@@ -25,7 +25,10 @@ import static org.apache.gravitino.spark.connector.iceberg.IcebergPropertiesCons
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -66,7 +69,9 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   protected String warehouse;
   protected FileSystem hdfs;
   protected String icebergRestServiceUri;
-  protected final String functionSchemaName = "test_function_schema";
+  private final String databaseSuffix = UUID.randomUUID().toString().replace("-", "");
+  private final Set<String> testDatabases = new HashSet<>();
+  protected final String functionSchemaName = suiteDatabaseName("test_function_schema");
   protected final String functionName = "my_string_length";
   protected final String nonSparkFunctionName = "trino_upper";
 
@@ -74,6 +79,22 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   private SparkSession sparkSession;
   private String gravitinoUri = "http://127.0.0.1:8090";
   private final String lakeHouseIcebergProvider = "lakehouse-iceberg";
+
+  /**
+   * Names a database for this suite instance and registers it for teardown.
+   *
+   * @param name the fixture's local database name
+   * @return a database name unique to this suite run
+   */
+  protected final String suiteDatabaseName(String name) {
+    String database = name + "_" + databaseSuffix;
+    testDatabases.add(database);
+    return database;
+  }
+
+  boolean ownsTestDatabase(String database) {
+    return testDatabases.contains(database);
+  }
 
   protected abstract String getCatalogName();
 
