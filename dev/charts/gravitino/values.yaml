@@ -197,9 +197,10 @@ schema:
   wait:
     timeoutSeconds: 600
   ## Used when an existing database has no gravitino_schema_migration row and the
-  ## version cannot be inferred from tables. Set to the Gravitino version that
-  ## created the database (for example 1.2.0). Set to the image version to only
-  ## record the version and skip DDL.
+  ## version cannot be inferred from tables. Must be X.Y.Z. Set to the Gravitino
+  ## version that created the database (for example 1.2.0). Set to the image
+  ## version to only record the version and skip DDL. Inference only trusts
+  ## upgrade scripts that ADD COLUMN; index-only upgrades need this baseline.
   baselineVersion: ""
   ## Optional overrides when entity.jdbcUrl is not enough (IPv6, multi-host, and so on).
   dbHost: ""

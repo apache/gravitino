@@ -18,7 +18,7 @@
   */}}
 
 {{- if eq (include "gravitino.schemaMigrateEnabled" . | trim) "true" }}
-{{- $_ := include "gravitino.schemaMigrateSslValidate" . }}
+{{- $_ := include "gravitino.schemaMigrateValidate" . }}
 {{- $engine := include "gravitino.schemaMigrateEngine" . | trim }}
 {{- $dbHost := include "gravitino.schemaMigrateHost" . | trim }}
 {{- $dbPort := include "gravitino.schemaMigratePort" . | trim }}
@@ -55,6 +55,14 @@ spec:
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      # Same scheduling as the Gravitino Deployment so the Job is not Pending on
+      # tainted / nodeSelector-restricted clusters while wait-init times out.
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
       initContainers:
         - name: sqlfile
           image: {{ include "gravitino.image" . }}

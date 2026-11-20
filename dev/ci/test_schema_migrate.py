@@ -310,6 +310,47 @@ class TestSchemaMigrate(unittest.TestCase):
             "1",
         )
 
+    def test_index_only_upgrade_does_not_infer_newer_snapshot(self):
+        """Index-only upgrade + same CREATE TABLE set must not claim the newer ver.
+
+        Without ADD COLUMN markers, vacuous marker success would skip the
+        upgrade. Seed schema-2.0.0, add a table-identical schema-2.1.0 snapshot
+        and upgrade-2.0.0-to-2.1.0 with only CREATE INDEX, then migrate to 2.1.0.
+        """
+        self.seed_schema_file("2.0.0")
+        engine_dir = self.scripts / ENGINE
+        shutil.copyfile(
+            engine_dir / f"schema-2.0.0-{ENGINE}.sql",
+            engine_dir / f"schema-2.1.0-{ENGINE}.sql",
+        )
+        (engine_dir / f"upgrade-2.0.0-to-2.1.0-{ENGINE}.sql").write_text(
+            "-- Index-only fixture for inference regression\n"
+            "CREATE INDEX idx_schema_migrate_probe ON metalake_meta (metalake_id);\n"
+        )
+        result = self.migrate(target="2.1.0", baseline="")
+        self.assertIn("inferred 2.0.0 from existing tables", result.stdout)
+        self.assertIn("upgrade-2.0.0-to-2.1.0", result.stdout)
+        self.assertIn(
+            "upgrade ADD COLUMN markers are absent; inferring 2.0.0",
+            result.stderr,
+        )
+        self.assert_version("2.1.0")
+        self.assertEqual(
+            self.sql(
+                self.database,
+                "SELECT COUNT(*) FROM information_schema.statistics "
+                f"WHERE table_schema=DATABASE() AND table_name='metalake_meta' "
+                "AND index_name='idx_schema_migrate_probe'",
+            ).stdout.strip(),
+            "1",
+        )
+
+    def test_rejects_invalid_baseline_version(self):
+        self.seed_schema_file("1.3.0")
+        result = self.migrate(baseline="1.2", check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("BASELINE_VERSION must be X.Y.Z", result.stderr)
+
 
 class TestSchemaMigratePostgresCurrentSchema(unittest.TestCase):
     """Fresh target schema must not skip init when public already has metalake_meta."""

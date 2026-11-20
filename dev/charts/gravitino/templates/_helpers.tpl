@@ -737,3 +737,14 @@ revisions collide while the previous Job's TTL is still active.
 {{- end -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Validate schema.migrate inputs (baselineVersion shape + PostgreSQL TLS).
+*/}}
+{{- define "gravitino.schemaMigrateValidate" -}}
+{{- $_ := include "gravitino.schemaMigrateSslValidate" . -}}
+{{- $baseline := .Values.schema.baselineVersion | default "" | toString | trim -}}
+{{- if and $baseline (not (regexMatch "^[0-9]+\\.[0-9]+\\.[0-9]+$" $baseline)) -}}
+{{- fail (printf "schema.baselineVersion must be X.Y.Z (got %q)" $baseline) -}}
+{{- end -}}
+{{- end -}}

@@ -152,9 +152,14 @@ created together in the same release; Gravitino Pods wait on
 
 The migrate script records the current schema version and applies the full
 `upgrade-*-to-*-*.sql` chain from that version to the image version. For an
-existing database that has no recorded version, set `schema.baselineVersion` to
-the Gravitino version that created it (or to the image version to only record and
-skip DDL).
+existing database that has no recorded version, set `schema.baselineVersion`
+(`X.Y.Z`) to the Gravitino version that created it (or to the image version to
+only record and skip DDL). Automatic inference only treats a snapshot as current
+when `upgrade-*-to-<version>` scripts add distinguishable columns; index-only
+upgrades that share the same table set require an explicit baseline. The Job
+uses the same `nodeSelector` / `affinity` / `tolerations` as the Gravitino
+Deployment. The `entity.jdbcUser` (or in-chart DB admin) needs rights to create
+and alter entity-store tables and to read `gravitino_schema_migration`.
 
 For external MySQL or PostgreSQL, set `schema.migrate.existingSecret` to a Secret
 that holds the `entity.jdbcUser` password. Optional `schema.dbHost`, `schema.dbPort`,

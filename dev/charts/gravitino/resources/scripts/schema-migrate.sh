@@ -70,11 +70,25 @@ version_lt() {
   [ "$1" != "$2" ] && version_le "$1" "$2"
 }
 
+require_semver() {
+  local name="$1"
+  local ver="$2"
+  if [[ ! "${ver}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "ERROR: ${name} must be X.Y.Z (got '${ver}')" >&2
+    exit 1
+  fi
+}
+
 wait_for_db() {
   echo "Waiting for ${DB_ENGINE} at ${DB_HOST}..."
   if [ "$DB_ENGINE" = mysql ]; then
     until mysql_client -e "SELECT 1" >/dev/null 2>&1; do
       echo "Waiting for MySQL to be ready..."
+      sleep 2
+    done
+    # Server ready does not mean Bitnami (or the operator) has created GRAVITINO_DB yet.
+    until mysql_client -D "$GRAVITINO_DB" -e "SELECT 1" >/dev/null 2>&1; do
+      echo "Waiting for MySQL database ${GRAVITINO_DB}..."
       sleep 2
     done
   else
@@ -308,6 +322,7 @@ extract_upgrade_add_columns() {
 schema_version_markers_present() {
   local ver="$1"
   local f table column
+  local found_marker=0
   shopt -s nullglob
   local files=("${SCRIPT_DB_DIR}"/upgrade-*-to-"${ver}"-"${DB_ENGINE}".sql)
   shopt -u nullglob
@@ -319,11 +334,15 @@ schema_version_markers_present() {
       if [ -z "$table" ] || [ -z "$column" ]; then
         continue
       fi
+      found_marker=1
       column_exists "$table" "$column" || return 1
     done < <(extract_upgrade_add_columns "$f")
   done
-  # Upgrade exists but only creates tables/indexes: table match is enough.
-  return 0
+  # Upgrade scripts exist but none ADD COLUMN (index-only / constraint-only).
+  # Vacuous success would claim this snapshot for an older DB that shares the
+  # same CREATE TABLE set and skip those upgrades. Treat markers as absent so
+  # inference keeps the prior version (or requires schema.baselineVersion).
+  [ "$found_marker" = "1" ]
 }
 
 infer_schema_version() {
@@ -349,7 +368,7 @@ infer_schema_version() {
     fi
   done < <(printf '%s\n' "${files[@]}" | sort -V)
   if [ -n "$matched_without_markers" ] && [ -z "$best" ]; then
-    echo "ERROR: Existing tables match schema-${matched_without_markers} but upgrade columns for that version are missing." >&2
+    echo "ERROR: Existing tables match schema-${matched_without_markers} but distinguishable upgrade markers (ADD COLUMN) for that version are missing." >&2
     echo "Cannot safely infer the starting schema version." >&2
     echo "Set schema.baselineVersion to the Gravitino version that created this database." >&2
     exit 1
@@ -357,7 +376,7 @@ infer_schema_version() {
   if [ -n "$matched_without_markers" ] && [ -n "$best" ] && version_lt "$best" "$matched_without_markers"; then
     # Keep diagnostics on stderr: callers capture stdout as the version only
     # (gravitino_schema_migration.schema_version is VARCHAR(64)).
-    echo "INFO: Tables also match schema-${matched_without_markers}, but upgrade columns are absent; inferring ${best}." >&2
+    echo "INFO: Tables also match schema-${matched_without_markers}, but upgrade ADD COLUMN markers are absent; inferring ${best}." >&2
   fi
   printf '%s' "$best"
 }
@@ -499,6 +518,10 @@ VERSION=$(cat "$VERSION_FILE")
 if [ -z "$VERSION" ]; then
   echo "ERROR: Please set VERSION (missing ${VERSION_FILE})" >&2
   exit 1
+fi
+require_semver "VERSION" "$VERSION"
+if [ -n "$BASELINE_VERSION" ]; then
+  require_semver "schema.baselineVersion / BASELINE_VERSION" "$BASELINE_VERSION"
 fi
 
 SCRIPT_DB_DIR="${SCRIPTS_DIR}/${DB_ENGINE}"
