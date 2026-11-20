@@ -42,7 +42,9 @@ dependencies {
   compileOnly(libs.aws.iam)
   compileOnly(libs.aws.policy)
   compileOnly(libs.aws.sts)
-  compileOnly(libs.hadoop3.aws)
+  compileOnly(libs.hadoop3.aws) {
+    exclude("software.amazon.awssdk", "bundle")
+  }
   compileOnly(libs.hadoop3.client.api)
   // AWS SDK v1 is only needed to compile S3CredentialsProvider, which serves Hadoop 3.3 and earlier.
   // The thin bundle does not ship it, the Hadoop runtime provides it.
@@ -56,7 +58,10 @@ dependencies {
   testImplementation(libs.aws.iam)
   testImplementation(libs.aws.policy)
   testImplementation(libs.aws.sts)
-  testImplementation(libs.hadoop3.aws)
+  testImplementation(libs.hadoop3.aws) {
+    exclude("software.amazon.awssdk", "bundle")
+  }
+  testImplementation(libs.bundles.hadoop.aws.sdk)
   testImplementation(libs.hadoop3.client.api)
   testImplementation(libs.hadoop3.client.runtime)
   testImplementation(libs.junit.jupiter.api)

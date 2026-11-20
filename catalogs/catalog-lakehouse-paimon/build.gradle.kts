@@ -125,6 +125,8 @@ dependencies {
     exclude("com.github.spotbugs")
     exclude("com.sun.jersey")
     exclude("com.github.pjfanning", "jersey-json")
+    // hadoop-common 3.4 brings the netty modules, which the catalog does not need.
+    exclude("io.netty")
     exclude("javax.servlet")
     exclude("org.apache.avro")
     exclude("net.java.dev.jets3t")
@@ -220,7 +222,10 @@ dependencies {
   testImplementation(libs.testcontainers.mysql)
 
   // Keep optional Hadoop S3A dependencies available only to tests.
-  s3aTestRuntime(libs.hadoop3.aws)
+  s3aTestRuntime(libs.hadoop3.aws) {
+    exclude("software.amazon.awssdk", "bundle")
+  }
+  s3aTestRuntime(libs.bundles.hadoop.aws.sdk)
   testRuntimeOnly(libs.junit.jupiter.engine)
   // The embedded JDBC credential integration test loads this driver by class name.
   testRuntimeOnly(libs.sqlite.jdbc)
@@ -228,34 +233,29 @@ dependencies {
 
 val s3aTestLibDirectory =
   "$rootDir/distribution/package-all/catalogs/lakehouse-paimon/libs"
+// hadoop-aws 3.4 is built on the AWS SDK v2, which is made of many jars. Provide all of them
+// except the ones the catalog already ships (same file name) and SLF4J, which the server provides.
+val s3aTestJars =
+  provider {
+    val shipped = configurations.runtimeClasspath.get().files.map { it.name }.toSet()
+    s3aTestRuntime.files.filter { !it.name.startsWith("slf4j-api-") && it.name !in shipped }
+  }
 val copyS3ATestDependencies =
   tasks.register("copyS3ATestDependencies") {
     inputs.files(s3aTestRuntime)
-    outputs.files(
-      provider {
-        s3aTestRuntime.files.filter {
-          it.name.startsWith("hadoop-aws-") || it.name.startsWith("aws-java-sdk-bundle-")
-        }.map { file("$s3aTestLibDirectory/${it.name}") }
-      }
-    )
+    outputs.files(provider { s3aTestJars.get().map { file("$s3aTestLibDirectory/${it.name}") } })
     // Copy tasks targeting the distribution depend on cleanDistributionPackage. Test setup
     // must preserve the existing deployment, so copy the optional jars in a regular task.
     doLast {
       copy {
-        from(s3aTestRuntime) {
-          include("hadoop-aws-*.jar", "aws-java-sdk-bundle-*.jar")
-        }
+        from(s3aTestJars)
         into(s3aTestLibDirectory)
       }
     }
   }
 val cleanS3ATestDependencies =
   tasks.register<Delete>("cleanS3ATestDependencies") {
-    delete(
-      fileTree(s3aTestLibDirectory) {
-        include("hadoop-aws-*.jar", "aws-java-sdk-bundle-*.jar")
-      }
-    )
+    delete(provider { s3aTestJars.get().map { file("$s3aTestLibDirectory/${it.name}") } })
   }
 
 tasks {

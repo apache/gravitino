@@ -111,7 +111,9 @@ optional S3A dependencies by default. To enable it, add the following JARs to
 
 - `hadoop-aws-<hadoop-version>.jar`, with the same version as the Hadoop libraries packaged by
   Gravitino.
-- The `aws-java-sdk-bundle` version required by that `hadoop-aws` release.
+- The AWS SDK v2 `bundle` jar (`software.amazon.awssdk:bundle`) required by that `hadoop-aws`
+  release, for example `bundle-2.35.4.jar` for `hadoop-aws-3.4.3.jar`. The older AWS SDK v1
+  `aws-java-sdk-bundle` jar is only needed with Hadoop 3.3 and earlier.
 
 The following example configures static credentials and a custom HTTP S3 endpoint:
 

@@ -53,7 +53,7 @@ inventory. A dependency's POM license declaration may omit embedded third-party 
 
 - ANTLR runtime 4.13.2: [BSD-3-Clause LICENSE](https://github.com/antlr/antlr4/blob/4.13.2/LICENSE.txt);
   the binary runtime JAR omits this text.
-- Aliyun OSS 3.10.2/3.13.0: the exact Maven Central source JARs contain the same
+- Aliyun OSS 3.10.2/3.13.0/3.13.2: the exact Maven Central source JARs contain the same
   BSD-2-Clause header in `com/aliyun/oss/common/utils/IniEditor.java`.
 - Google API Client 1.24.1: its exact Maven Central source JAR contains a separate
   BSD-3-Clause header in `com/google/api/client/googleapis/auth/oauth2/CloudShellCredential.java`.

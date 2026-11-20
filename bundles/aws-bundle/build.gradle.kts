@@ -39,7 +39,10 @@ dependencies {
   nettyBom(platform(libs.netty.bom))
 
   implementation(project(":bundles:aws"))
-  implementation(libs.hadoop3.aws)
+  implementation(libs.hadoop3.aws) {
+    exclude("software.amazon.awssdk", "bundle")
+  }
+  implementation(libs.bundles.hadoop.aws.sdk)
   implementation(libs.aws.iam)
   implementation(libs.aws.policy)
   implementation(libs.aws.sts)
@@ -79,6 +82,14 @@ tasks.withType(ShadowJar::class.java) {
   relocate("io.netty", "org.apache.gravitino.aws.shaded.io.netty")
   relocate("org.apache.commons", "org.apache.gravitino.aws.shaded.org.apache.commons")
   relocate("org.apache.http", "org.apache.gravitino.aws.shaded.org.apache.http")
+  // hadoop-aws links ConfigureShadedAWSSocketFactory against the Apache HTTP client that the
+  // software.amazon.awssdk:bundle shades. The bundle is replaced by the single SDK modules, which use
+  // org.apache.http, so map the shaded name to the same relocated package to keep
+  // fs.s3a.ssl.channel.mode working.
+  relocate(
+    "software.amazon.awssdk.thirdparty.org.apache.http",
+    "org.apache.gravitino.aws.shaded.org.apache.http"
+  )
   relocate("org.checkerframework", "org.apache.gravitino.aws.shaded.org.checkerframework")
   relocate("org.reactivestreams", "org.apache.gravitino.aws.shaded.org.reactivestreams")
 
@@ -98,5 +109,6 @@ tasks.test {
   val bundle = tasks.named<ShadowJar>("shadowJar")
   dependsOn(bundle)
   inputs.file(bundle.flatMap { it.archiveFile })
+  systemProperty("nettyVersion", libs.versions.netty.get())
   doFirst { systemProperty("shadowJarPath", bundle.get().archiveFile.get().asFile.absolutePath) }
 }

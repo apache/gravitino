@@ -21,6 +21,8 @@ package org.apache.gravitino.s3.fs;
 
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_CONNECTION_TIMEOUT;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_RETRY_LIMIT;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.S3_DIRECTORY_MARKER_RETENTION;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.S3_DIRECTORY_MARKER_RETENTION_DELETE;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.S3_ESTABLISH_TIMEOUT;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.S3_MAX_ERROR_RETRIES;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.S3_RETRY_LIMIT;
@@ -176,7 +178,8 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
    * @param configs Original configurations
    * @return Configurations with additional S3 settings
    */
-  private Map<String, String> additionalS3Config(Map<String, String> configs) {
+  @VisibleForTesting
+  Map<String, String> additionalS3Config(Map<String, String> configs) {
     Map<String, String> additionalConfigs = Maps.newHashMap(configs);
 
     // Avoid multiple retries to speed up failure in test cases.
@@ -196,6 +199,12 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
 
     if (!configs.containsKey(S3_RETRY_THROTTLE_LIMIT)) {
       additionalConfigs.put(S3_RETRY_THROTTLE_LIMIT, DEFAULT_RETRY_LIMIT);
+    }
+
+    // Keep deleting the directory markers like Hadoop 3.3 and earlier do, so that the objects
+    // written by Gravitino stay readable by S3A clients that do not understand kept markers.
+    if (!configs.containsKey(S3_DIRECTORY_MARKER_RETENTION)) {
+      additionalConfigs.put(S3_DIRECTORY_MARKER_RETENTION, S3_DIRECTORY_MARKER_RETENTION_DELETE);
     }
 
     // More tuning can be added here.
