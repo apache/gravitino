@@ -49,6 +49,7 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerManager;
+import org.apache.gravitino.authorization.OwnerNormalizeDispatcher;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObjects;
@@ -189,7 +190,7 @@ class TestGlossaryAuthorization extends TestJDBCBackend {
                   () ->
                       manager.createTerm(LAKE, TermSpec.builder(name).withStatus(status).build()));
           if (own) {
-            transfer(term, actor.name(), Owner.Type.USER);
+            as("lakeOwner", () -> transfer(term, actor.name(), Owner.Type.USER));
           }
           boolean edit = actor.manage() || own && actor.ownEdits();
           boolean visible = actor.published() && (status != GlossaryTerm.Status.DRAFT || edit);
@@ -444,7 +445,7 @@ class TestGlossaryAuthorization extends TestJDBCBackend {
                     manager.createTerm(
                         LAKE,
                         TermSpec.builder(name).withStatus(GlossaryTerm.Status.DRAFT).build()));
-        if (groups) transfer(original, "authors", Owner.Type.GROUP);
+        if (groups) as("writer", () -> transfer(original, "authors", Owner.Type.GROUP));
         MetadataObject object = object(original);
         assertEquals(
             original.id(),
@@ -521,6 +522,33 @@ class TestGlossaryAuthorization extends TestJDBCBackend {
         }
       }
     }
+  }
+
+  @TestTemplate
+  void testGlossaryOwnerOperationsUseCurrentTerm() throws Exception {
+    GlossaryTermEntity term =
+        as(
+            "writer",
+            () ->
+                manager.createTerm(
+                    LAKE,
+                    TermSpec.builder("draft.with.dot")
+                        .withStatus(GlossaryTerm.Status.DRAFT)
+                        .build()));
+    OwnerNormalizeDispatcher dispatcher =
+        new OwnerNormalizeDispatcher(owners, catalogs, env.entityStore());
+    assertEquals(
+        "writer", as("writer", () -> dispatcher.getOwner(LAKE, object(term))).orElseThrow().name());
+    as("writer", () -> transfer(term, "writer2", Owner.Type.USER));
+    assertThrows(
+        ForbiddenException.class,
+        () -> as("writer", () -> dispatcher.getOwner(LAKE, object(term))));
+    assertThrows(
+        ForbiddenException.class,
+        () -> as("writer", () -> transfer(term, "writer", Owner.Type.USER)));
+    assertEquals(
+        "writer2",
+        as("writer2", () -> dispatcher.getOwner(LAKE, object(term))).orElseThrow().name());
   }
 
   private static UserPrincipal principal(String user, @Nullable String group) {
@@ -600,8 +628,9 @@ class TestGlossaryAuthorization extends TestJDBCBackend {
     return MetadataObjects.of(null, term.name(), MetadataObject.Type.GLOSSARY_TERM);
   }
 
-  private void transfer(GlossaryTermEntity term, String owner, Owner.Type type) {
+  private Void transfer(GlossaryTermEntity term, String owner, Owner.Type type) {
     owners.setOwner(LAKE, object(term), owner, type);
+    return null;
   }
 
   private static <T> T as(String user, PrivilegedExceptionAction<T> work) throws Exception {

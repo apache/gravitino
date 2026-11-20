@@ -39,6 +39,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerManager;
@@ -58,13 +59,16 @@ import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
 import org.apache.gravitino.utils.MetadataObjectUtil;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 class TestOwnerOperations extends BaseOperationsTest {
@@ -152,23 +156,35 @@ class TestOwnerOperations extends BaseOperationsTest {
   }
 
   @Test
-  void testGlossaryOwnerUsesLiteralTermName() throws IOException {
+  void testGlossaryOwnerUsesLiteralTermName() throws Exception {
     BaseMetalake metalake = mock(BaseMetalake.class);
     PropertiesMetadata properties = mock(PropertiesMetadata.class);
     when(properties.getOrDefault(any(), any())).thenReturn(true);
     when(metalake.propertiesMetadata()).thenReturn(properties);
     when(entityStore.get(any(), any(), any())).thenReturn(metalake);
-    when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
-    MetadataObject term =
-        MetadataObjects.of(null, "term.with.dot", MetadataObject.Type.GLOSSARY_TERM);
-    String path = "/metalakes/metalake1/owners/glossary_term/term.with.dot";
-    when(manager.getOwner("metalake1", term)).thenReturn(Optional.empty());
-    try (Response get = target(path).request().get();
-        Response set =
-            target(path).request().put(Entity.json(new OwnerSetRequest("user", Owner.Type.USER)))) {
-      Assertions.assertEquals(200, get.getStatus());
-      Assertions.assertEquals(200, set.getStatus());
+    String name = "term.with.dot";
+    MetadataObject term = MetadataObjects.of(null, name, MetadataObject.Type.GLOSSARY_TERM);
+    OwnerOperations resource = new OwnerOperations();
+    FieldUtils.writeField(resource, "httpRequest", new MockServletRequestFactory().get(), true);
+    Mockito.doReturn(Optional.empty()).when(manager).getOwner("metalake1", term);
+    Mockito.doNothing().when(manager).setOwner("metalake1", term, "user", Owner.Type.USER);
+    GlossaryTermMetaService terms = mock(GlossaryTermMetaService.class);
+    try (MockedStatic<GlossaryTermMetaService> service =
+        Mockito.mockStatic(GlossaryTermMetaService.class)) {
+      service.when(GlossaryTermMetaService::getInstance).thenReturn(terms);
+      try (Response get = resource.getOwnerForObject("metalake1", "glossary_term", name);
+          Response set =
+              resource.setOwnerForObject(
+                  "metalake1",
+                  "glossary_term",
+                  name,
+                  new OwnerSetRequest("user", Owner.Type.USER))) {
+        Assertions.assertEquals(200, get.getStatus());
+        Assertions.assertEquals(200, set.getStatus());
+      }
     }
+    Mockito.verify(terms, Mockito.times(2))
+        .getIds(NameIdentifier.of(NamespaceUtil.ofGlossaryTerm("metalake1"), name));
     Mockito.verify(manager).getOwner("metalake1", term);
     Mockito.verify(manager).setOwner("metalake1", term, "user", Owner.Type.USER);
   }
