@@ -60,7 +60,12 @@ effect for every consumer immediately:
 1. **Publication workflow**: No public API for publishing a saved revision, and no reviewer
    assignment, approval, or UI. Publication is reachable only through the extension point.
 2. **Rollback and unpublish**: Making an older revision active again, or withdrawing a publication.
-   To roll back, save the old definition as a new revision.
+   To roll back, save the old definition as a new revision. The design does not assume that active
+   is latest or only moves forward: under a deferred policy it already trails latest, and reads,
+   retention, metric identities, and source ranges resolve any retained `active_version`. Only the
+   publication operation is limited to latest, so a later rollback can point `active_version` at a
+   retained older revision without a schema or read-path change; it would add its own record of who
+   rolled back.
 3. **Diff and impact analysis**: Gravitino exposes revisions for comparison but does not compute
    differences, and dataset lookup by source answers which published definitions use a source, not
    which unpublished ones would.
@@ -124,13 +129,13 @@ saves create drafts. The [Public API](#public-api) section gives the request and
 
 ## Key Concepts and Guarantees
 
-| Term               | Meaning                                                                                        |
-| ------------------ | ---------------------------------------------------------------------------------------------- |
-| Revision           | The number of a saved definition, starting at 1. Unrelated to the Ossie specification version. |
-| Latest             | The newest revision. Every edit applies to latest.                                             |
-| Active             | The revision consumers read. A model that has never published has none.                        |
-| Status             | `PUBLISHED` once a revision has been published; `DRAFT` otherwise.                             |
-| Publication policy | Decides whether a save also publishes. The built-in default publishes on save.                 |
+| Term               | Meaning                                                                                                                                                                |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Revision           | The number of a saved definition, starting at 1. Unrelated to the Ossie specification version.                                                                         |
+| Latest             | The newest revision. Every edit applies to latest.                                                                                                                     |
+| Active             | The revision consumers read. A model that has never been published has none (`active_version = 0`); without unpublish (Non-Goal 2), this is the only way to have none. |
+| Status             | `PUBLISHED` once a revision has been published; `DRAFT` otherwise.                                                                                                     |
+| Publication policy | Decides whether a save also publishes. The built-in default publishes on save.                                                                                         |
 
 ```mermaid
 flowchart LR
@@ -449,8 +454,11 @@ Forward queries read snapshots; reverse indexes track revision ranges.
 - Model and parent deletion use the existing soft-delete and purge paths; all new columns live on
   existing rows.
 - A collected revision returns `404 NoSuchSemanticModelRevisionException` on explicit reads.
-  Deployments that rely on reading past revisions, as in [User Journey 1](#user-journeys), should
-  raise `gravitino.entity.store.versionRetentionCount` accordingly.
+  Because revisions are numbered contiguously, a missing revision at or below latest was collected,
+  and the exception message says it was removed by version retention. A draft hidden from the
+  caller gets the same message as a revision that never existed. Deployments that rely on reading
+  past revisions, as in [User Journey 1](#user-journeys), should raise
+  `gravitino.entity.store.versionRetentionCount` accordingly.
 
 ---
 
@@ -675,6 +683,9 @@ A deferred policy needs a way to publish. `SemanticModelDispatcher` gains an int
 
 - It applies the publication rules in [Operations](#operations): only latest, conditional on
   `current_version = revision`, idempotent on the published latest.
+- It throws `OptimisticLockException` if `revision` is not latest or latest moves before the
+  publication commits, and `NoSuchSemanticModelRevisionException` if the revision does not exist,
+  so an entry point maps them to `409` and `404` through the existing exception handlers.
 - It runs through the event dispatcher, emitting `PublishSemanticModelRevisionPreEvent`,
   `PublishSemanticModelRevisionEvent`, and `PublishSemanticModelRevisionFailureEvent`.
 - Authorization is the caller's responsibility; the operation records the principal it is given.
