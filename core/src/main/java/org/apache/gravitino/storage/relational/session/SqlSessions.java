@@ -77,11 +77,14 @@ public final class SqlSessions {
   /**
    * Runs a top-level multi-statement read on one database snapshot without locking writers.
    *
+   * @param read the reads to run in the snapshot
+   * @param <T> the result type
+   * @return the result of the reads
    * @throws IllegalStateException if another session is active on this thread
    */
   public static <T> T readSnapshot(Supplier<T> read) {
     Preconditions.checkState(
-        !hasActiveSession(), "A snapshot read must start outside a write transaction");
+        !hasActiveSession(), "A snapshot read must start outside an active SQL session");
     SqlSessionFactory factory = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory();
     // H2's repeatable read permits phantoms. Its serializable isolation pins an MVStore snapshot.
     TransactionIsolationLevel isolation =
@@ -91,10 +94,8 @@ public final class SqlSessions {
     SqlSession session = factory.openSession(isolation);
     sessions.set(session);
     sessionCount.get().incrementAndGet();
-    try {
+    try (SnapshotScope ignored = SqlSessions::rollbackAndCloseSqlSession) {
       return read.get();
-    } finally {
-      rollbackAndCloseSqlSession();
     }
   }
 
@@ -194,5 +195,11 @@ public final class SqlSessions {
       sessions.remove();
       sessionCount.remove();
     }
+  }
+
+  @FunctionalInterface
+  private interface SnapshotScope extends AutoCloseable {
+    @Override
+    void close();
   }
 }

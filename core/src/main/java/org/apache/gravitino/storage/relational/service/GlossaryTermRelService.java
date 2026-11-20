@@ -47,10 +47,9 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
  *
  * <p>Use withHierarchyLock around the complete read/validate/write operation, before locking any
  * terms. Multiple changes must plan and lock all their term IDs in order before making changes.
- * Plain reads take no locks and return only live endpoints. Each query has a READ_COMMITTED
- * statement snapshot; a multi-level walk needs an enclosing hierarchy lock for a stable graph.
- * These ID-only reads do not apply authorization/status filters: the manager must filter each
- * frontier before expanding it.
+ * Plain reads take no locks and return only live endpoints. The manager runs a read-only walk in
+ * one database snapshot so every frontier sees the same graph. These ID-only reads do not apply
+ * authorization/status filters: the manager must filter each frontier before expanding it.
  */
 public final class GlossaryTermRelService {
   private static final int FRONTIER_BATCH_SIZE = 500;
