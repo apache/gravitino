@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
+import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -50,6 +51,7 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.OwnerResponse;
 import org.apache.gravitino.dto.responses.SetResponse;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
@@ -152,27 +154,36 @@ class TestOwnerOperations extends BaseOperationsTest {
   }
 
   @Test
-  void testGlossaryOwnerUsesLiteralTermName() throws Exception {
+  void testGlossaryOwnerUsesLiteralTermName() throws IOException {
     BaseMetalake metalake = mock(BaseMetalake.class);
     PropertiesMetadata properties = mock(PropertiesMetadata.class);
     when(properties.getOrDefault(any(), any())).thenReturn(true);
     when(metalake.propertiesMetadata()).thenReturn(properties);
     when(entityStore.get(any(), any(), any())).thenReturn(metalake);
-    String name = "term.with.dot";
+    String name = "cost.net/unit";
     MetadataObject term = MetadataObjects.of(null, name, MetadataObject.Type.GLOSSARY_TERM);
-    OwnerOperations resource = new OwnerOperations();
-    FieldUtils.writeField(resource, "httpRequest", new MockServletRequestFactory().get(), true);
+    WebTarget owner =
+        target("/metalakes/metalake1/owners/glossary_term/{name}").resolveTemplate("name", name);
     Mockito.doReturn(Optional.empty()).when(manager).getOwner("metalake1", term);
     Mockito.doNothing().when(manager).setOwner("metalake1", term, "user", Owner.Type.USER);
-    try (Response get = resource.getOwnerForObject("metalake1", "glossary_term", name);
+    try (Response get = owner.request().get();
         Response set =
-            resource.setOwnerForObject(
-                "metalake1", "glossary_term", name, new OwnerSetRequest("user", Owner.Type.USER))) {
+            owner.request().put(Entity.json(new OwnerSetRequest("user", Owner.Type.USER)))) {
       Assertions.assertEquals(200, get.getStatus());
+      Assertions.assertNull(get.readEntity(OwnerResponse.class).getOwner());
       Assertions.assertEquals(200, set.getStatus());
+      Assertions.assertTrue(set.readEntity(SetResponse.class).set());
     }
     Mockito.verify(manager).getOwner("metalake1", term);
     Mockito.verify(manager).setOwner("metalake1", term, "user", Owner.Type.USER);
+
+    doThrow(new ForbiddenException("Term is hidden")).when(manager).getOwner("metalake1", term);
+    try (Response get = owner.request().get()) {
+      Assertions.assertEquals(Response.Status.FORBIDDEN.getStatusCode(), get.getStatus());
+      ErrorResponse error = get.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.FORBIDDEN_CODE, error.getCode());
+      Assertions.assertEquals(ForbiddenException.class.getSimpleName(), error.getType());
+    }
   }
 
   @Test

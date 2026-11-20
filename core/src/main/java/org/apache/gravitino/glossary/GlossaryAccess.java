@@ -85,6 +85,10 @@ public final class GlossaryAccess {
     if (object == null || object.type() != MetadataObject.Type.GLOSSARY_TERM) {
       return false;
     }
+    GlossaryAccess access = forPrincipal(authorizer, principal, metalake, context);
+    if (!access.canView()) {
+      return false;
+    }
     GlossaryTermEntity term;
     try {
       term =
@@ -93,7 +97,7 @@ public final class GlossaryAccess {
     } catch (NoSuchEntityException missing) {
       return false;
     }
-    return forPrincipal(authorizer, principal, metalake, context).canRead(term);
+    return access.canRead(term);
   }
 
   private static GlossaryAccess forPrincipal(

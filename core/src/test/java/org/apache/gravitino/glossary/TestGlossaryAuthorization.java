@@ -398,6 +398,26 @@ class TestGlossaryAuthorization extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testOwnerReadChecksViewBeforeLoadingDefinitions() throws Exception {
+    MetadataObject term = MetadataObjects.of(null, "term", MetadataObject.Type.GLOSSARY_TERM);
+    GlossaryTermMetaService definitions = Mockito.mock(GlossaryTermMetaService.class);
+    IllegalStateException failure = new IllegalStateException("Definition store unavailable");
+    Mockito.when(definitions.get(Mockito.any())).thenThrow(failure);
+    try (MockedStatic<GlossaryTermMetaService> services =
+        Mockito.mockStatic(GlossaryTermMetaService.class)) {
+      services.when(GlossaryTermMetaService::getInstance).thenReturn(definitions);
+      assertThrows(ForbiddenException.class, () -> as("denied", () -> owners.getOwner(LAKE, term)));
+      assertThrows(
+          ForbiddenException.class, () -> as("viewer", () -> owners.getOwner("absent", term)));
+      Mockito.verifyNoInteractions(definitions);
+      assertSame(
+          failure,
+          assertThrows(
+              IllegalStateException.class, () -> as("viewer", () -> owners.getOwner(LAKE, term))));
+    }
+  }
+
+  @TestTemplate
   void testListPreservesAuthorizationLookupFailure() throws Exception {
     GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
     NoSuchEntityException failure = new NoSuchEntityException("Owner lookup failed");
