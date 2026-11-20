@@ -45,7 +45,10 @@ the in-Spark gate always maintains once a job starts.
 
 ## Validation before and after metrics
 
-`builtin-iceberg-maintenance-task` reports these metrics for Validation Before / After / Change:
+The Table Maintenance Service submits `builtin-iceberg-maintenance-task`, which reports these
+metrics through before / after callbacks for Validation Before / After / Change. Standalone
+procedure templates such as `builtin-iceberg-expire-snapshots` (CLI / optimizer) do not report
+these Validation metrics.
 
 | Phase  | Key                              | Source                                                                  |
 | ------ | -------------------------------- | ----------------------------------------------------------------------- |
