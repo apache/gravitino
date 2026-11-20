@@ -72,7 +72,9 @@ import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
@@ -298,14 +300,42 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    E updatedEntity;
+    // No JDBC factory (unit tests): backend finishes first, then drop the cache.
+    if (!SqlSessionFactoryHelper.getInstance().isInitialized()) {
+      E updatedEntity = updateInBackend(ident, entityType, updater);
+      invalidateCache(ident, entityType);
+      return updatedEntity;
+    }
+
+    // update sql -> delete cache -> commit. Hold the key lock so peers cannot refill.
+    SessionUtils.beginTransaction();
+    boolean committed = false;
     try {
-      updatedEntity = backend.update(ident, entityType, updater);
+      E updatedEntity = updateInBackend(ident, entityType, updater);
+      cache.withCacheLock(
+          EntityCacheKey.of(ident, entityType),
+          () -> {
+            invalidateCache(ident, entityType);
+            SessionUtils.commitTransaction();
+            cacheInvalidationEpoch.incrementAndGet();
+          });
+      committed = true;
+      return updatedEntity;
+    } finally {
+      if (!committed && SessionUtils.isInTransaction()) {
+        SessionUtils.rollbackTransaction();
+      }
+    }
+  }
+
+  private <E extends Entity & HasIdentifier> E updateInBackend(
+      NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
+      throws IOException {
+    try {
+      return backend.update(ident, entityType, updater);
     } catch (RuntimeException re) {
       throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
     }
-    invalidateCache(ident, entityType);
-    return updatedEntity;
   }
 
   @Override

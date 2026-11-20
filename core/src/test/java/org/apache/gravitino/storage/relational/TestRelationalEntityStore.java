@@ -20,10 +20,12 @@ package org.apache.gravitino.storage.relational;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mockStatic;
 
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -49,11 +51,14 @@ import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestRelationalEntityStore {
@@ -113,6 +118,45 @@ public class TestRelationalEntityStore {
     InOrder inOrder = Mockito.inOrder(backend, cache);
     inOrder.verify(backend).update(eq(ident), eq(Entity.EntityType.CATALOG), any(Function.class));
     inOrder.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
+  }
+
+  @Test
+  void testUpdateDropsCacheBeforeSqlCommit()
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException,
+          IllegalAccessException {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog");
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    AtomicBoolean invalidatedBeforeCommit = new AtomicBoolean(false);
+
+    SqlSessionFactoryHelper factoryHelper = Mockito.mock(SqlSessionFactoryHelper.class);
+    Mockito.when(factoryHelper.isInitialized()).thenReturn(true);
+
+    try (MockedStatic<SqlSessionFactoryHelper> factory = mockStatic(SqlSessionFactoryHelper.class);
+        MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class)) {
+      factory.when(SqlSessionFactoryHelper::getInstance).thenReturn(factoryHelper);
+      sessions.when(SessionUtils::isInTransaction).thenReturn(true);
+      sessions.when(SessionUtils::beginTransaction).thenAnswer(invocation -> null);
+      sessions
+          .when(SessionUtils::commitTransaction)
+          .thenAnswer(
+              invocation -> {
+                Mockito.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
+                invalidatedBeforeCommit.set(true);
+                return null;
+              });
+
+      Mockito.doAnswer(
+              invocation -> {
+                Mockito.verify(cache, Mockito.never()).invalidate(ident, Entity.EntityType.CATALOG);
+                return null;
+              })
+          .when(backend)
+          .update(eq(ident), eq(Entity.EntityType.CATALOG), any(Function.class));
+
+      store.update(ident, null, Entity.EntityType.CATALOG, entity -> entity);
+    }
+
+    Assertions.assertTrue(invalidatedBeforeCommit.get());
   }
 
   @Test
