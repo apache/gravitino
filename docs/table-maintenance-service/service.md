@@ -153,19 +153,11 @@ These endpoints are for the Spark job, not for operators. Schemas are in the [ma
 | Finish and release the slot | `POST /api/metalakes/{metalake}/maintenance/actions/{jobId}/finish`         |
 | After-maintenance metrics   | `POST /api/metalakes/{metalake}/maintenance/actions/{jobId}/metrics/after`  |
 
-Payload metric keys for Validation (Before / After / Change) depend on the policy type:
-
-| Policy type | Before (S0) | After (S1) |
-|-------------|-------------|------------|
-| `system_iceberg_compaction` | Inventory including `custom-small-file-number`; orchestrator adds `custom-data-mse-ratio` | Same shape after rewrite |
-| `system_iceberg_rewrite_manifests` | `custom-manifest-number`, `custom-avg-manifest-size` | Inventory again plus `custom-rewritten-manifest-number` |
-| `system_iceberg_snapshot_expiration` | `custom-snapshot-number` | Measured `custom-snapshot-number` plus `custom-expired-snapshot-number` and `custom-expired-file-size` |
-| `system_iceberg_orphan_file_removal` | (none) | Orphan cleanup result metrics |
-
-See [Iceberg compaction policy](../iceberg-compaction-policy.md#tms-before-and-after-metrics) and
-[Iceberg rewrite manifests policy](../iceberg-rewrite-manifests-policy.md#tms-before-and-after-metrics)
-for field-level notes. Snapshot expiry measures after `custom-snapshot-number` from the post-run
-table sample; it does not derive that value as before minus expired.
+S0/S1 metric keys for Validation depend on the policy type. See
+[Iceberg compaction policy](../iceberg-compaction-policy.md#tms-before-and-after-metrics) and
+[Iceberg rewrite manifests policy](../iceberg-rewrite-manifests-policy.md#tms-before-and-after-metrics).
+For snapshot expiry, after metrics include a measured `custom-snapshot-number` from the post-run
+table sample (not before minus expired), plus the expired snapshot/file-size counters.
 
 ## Commit Trigger
 
