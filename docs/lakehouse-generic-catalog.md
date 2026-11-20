@@ -51,6 +51,8 @@ For detailed information on available operations, see [Manage Relational Metadat
 | `table-location-provider`   | Name of the [table location provider](#pluggable-table-location-provider) that provisions and unprovisions the locations of this catalog's tables. Defaults to `default`, which resolves the location from the table, schema and catalog `location` properties as described below. Immutable once the catalog is created. | `default`               | No       |
 | `lance.schema-refresh-mode` | Lance table schema refresh mode. `DECLARED_AND_EMPTY` (default) refreshes declared tables and tables with empty stored columns. `VERSION_CHECK` additionally refreshes when the Lance dataset version changes.                                                                                                            | `DECLARED_AND_EMPTY`    | No       |
 | `lance.allow-external-table-purge` | Allow physical deletion of external or registered Lance tables, including Lance REST `DropTable` and create `OVERWRITE`. Catalog-only; table properties cannot enable it. Does not validate ownership of storage locations. | `false` | No |
+| `lance.session.metadata-cache-size-bytes` | The metadata cache size in bytes for the shared Lance session. Defaults to 1 GB (`1073741824`). Set to `0` to disable. | `1073741824` | No |
+| `lance.session.index-cache-size-bytes` | The index cache size in bytes for the shared Lance session. Defaults to 6 GB (`6442450944`). Set to `0` to disable. | `6442450944` | No |
 
 #### Pluggable table location provider
 
