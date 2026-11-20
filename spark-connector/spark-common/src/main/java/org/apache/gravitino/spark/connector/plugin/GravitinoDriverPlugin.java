@@ -174,7 +174,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
               SparkCatalogKind kind = SparkCatalogKind.fromProvider(provider);
               if (kind == null) {
                 Preconditions.checkArgument(
-                    !StringUtils.startsWithIgnoreCase(provider, "jdbc-"),
+                    !provider.regionMatches(true, 0, "jdbc-", 0, 5),
                     "Catalog %s has unsupported JDBC provider %s. It may be served by a separate extension jar.",
                     catalogName,
                     provider);
