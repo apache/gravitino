@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -78,6 +80,7 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
  * snapshot for definitions, synonyms and the live parent name without taking row locks.
  */
 public final class GlossaryTermMetaService {
+  private static final int LOOKUP_BATCH_SIZE = 500;
   private static final GlossaryTermMetaService INSTANCE = new GlossaryTermMetaService();
 
   private GlossaryTermMetaService() {}
@@ -126,11 +129,25 @@ public final class GlossaryTermMetaService {
 
   /** Loads a definition and its synonyms from one statement snapshot without row locks. */
   public GlossaryTermEntity get(NameIdentifier ident) {
-    List<GlossaryTermEntity> terms = read(ident.namespace(), GlossaryTermNames.key(ident.name()));
+    return getWithMetalakeId(ident).term();
+  }
+
+  /** A live term and its parent identity from the same definition snapshot. */
+  public record ScopedTerm(long metalakeId, GlossaryTermEntity term) {}
+
+  /**
+   * Loads the term and metalake identity used to scope subsequent relation queries.
+   *
+   * @throws NoSuchEntityException if the term or its parent metalake does not exist
+   */
+  public ScopedTerm getWithMetalakeId(NameIdentifier ident) {
+    Namespace ns = ident.namespace();
+    List<GlossaryTermSnapshotPO> rows = readRows(ns, GlossaryTermNames.key(ident.name()));
+    List<GlossaryTermEntity> terms = definitions(ns, rows);
     if (terms.isEmpty()) {
       throw new NoSuchEntityException("Glossary term %s does not exist", ident);
     }
-    return terms.get(0);
+    return new ScopedTerm(rows.get(0).getMetalakeId(), terms.get(0));
   }
 
   /** Resolves term and metalake identities without row locks. */
@@ -152,7 +169,7 @@ public final class GlossaryTermMetaService {
 
   /** Lists definitions and synonyms from one statement snapshot without row locks. */
   public List<GlossaryTermEntity> list(Namespace ns) {
-    return read(ns, null);
+    return definitions(ns, readRows(ns, null));
   }
 
   /**
@@ -262,6 +279,11 @@ public final class GlossaryTermMetaService {
 
   /** Runs a create request with the live parent and hierarchy locked through commit. */
   public <T> T withHierarchyLock(Namespace namespace, Supplier<T> work) {
+    return withHierarchyLock(namespace, lake -> work.get());
+  }
+
+  /** Runs creation with the locked metalake ID and preserves the missing-metalake error. */
+  public <T> T withHierarchyLock(Namespace namespace, Function<Long, T> work) {
     return transaction(
         namespace,
         true,
@@ -269,7 +291,7 @@ public final class GlossaryTermMetaService {
           throw new NoSuchMetalakeException(
               missing, "Metalake %s does not exist", namespace.level(0));
         },
-        (mapper, metalakeId) -> work.get());
+        (mapper, metalakeId) -> work.apply(metalakeId));
   }
 
   /**
@@ -289,6 +311,12 @@ public final class GlossaryTermMetaService {
           return operation.apply(
               Optional.ofNullable(row).map(term -> fromPO(term, mapper, ident.namespace())));
         });
+  }
+
+  /** Runs a graph operation under the live parent fence and hierarchy mutex. */
+  public <T> T withHierarchyLock(
+      Namespace ns, Function<Long, T> operation, Function<NoSuchEntityException, T> missingParent) {
+    return transaction(ns, true, missingParent, (mapper, lake) -> operation.apply(lake));
   }
 
   /** Checks indexed name/synonym conflicts inside the caller's hierarchy transaction. */
@@ -377,34 +405,62 @@ public final class GlossaryTermMetaService {
         });
   }
 
-  private List<GlossaryTermEntity> read(Namespace ns, @Nullable String key) {
+  private List<GlossaryTermSnapshotPO> readRows(Namespace ns, @Nullable String key) {
     validateNamespace(ns);
     return SessionUtils.getWithoutCommit(
         GlossaryTermMetaMapper.class,
-        mapper -> {
-          List<GlossaryTermSnapshotPO> rows =
-              mapper.snapshot(metalake(ns).getMetalakeId(), ns.level(0), key);
-          if (rows.isEmpty()) {
-            throw new NoSuchEntityException("Metalake %s no longer exists", ns.level(0));
-          }
-          // A live parent with no matching terms contributes one outer-join row.
-          if (rows.get(0).getTermId() == null) {
-            return new ArrayList<>();
-          }
-          Map<Long, GlossaryTermPO> definitions = new LinkedHashMap<>();
-          Map<Long, List<String>> synonyms = new LinkedHashMap<>();
-          for (GlossaryTermSnapshotPO row : rows) {
-            definitions.putIfAbsent(row.getTermId(), row);
-            List<String> values =
-                synonyms.computeIfAbsent(row.getTermId(), ignored -> new ArrayList<>());
-            if (row.getSynonym() != null) {
-              values.add(row.getSynonym());
-            }
-          }
-          List<GlossaryTermEntity> result = new ArrayList<>();
-          definitions.forEach((id, row) -> result.add(fromPO(row, synonyms.get(id), ns)));
-          return result;
-        });
+        mapper -> mapper.snapshot(metalake(ns).getMetalakeId(), ns.level(0), key));
+  }
+
+  /**
+   * Resolves normalized names in the fenced metalake before a relation writer locks term rows.
+   * Missing names are omitted so the writer can check the root revision before reporting them.
+   */
+  public Map<String, Long> getIdsByKeys(long metalakeId, Set<String> keys) {
+    Map<String, Long> result = new LinkedHashMap<>();
+    for (List<String> batch : Lists.partition(List.copyOf(keys), LOOKUP_BATCH_SIZE)) {
+      for (GlossaryTermPO row :
+          SessionUtils.getWithoutCommit(
+              GlossaryTermMetaMapper.class, mapper -> mapper.idsByKeys(metalakeId, batch))) {
+        result.put(row.getNameKey(), row.getTermId());
+      }
+    }
+    return result;
+  }
+
+  /** Loads live terms in bounded batches from the named metalake and its observed identity. */
+  public List<GlossaryTermEntity> getByIds(Namespace ns, long lake, Set<Long> ids) {
+    validateNamespace(ns);
+    List<GlossaryTermEntity> result = new ArrayList<>();
+    for (List<Long> batch : Lists.partition(List.copyOf(ids), LOOKUP_BATCH_SIZE)) {
+      result.addAll(
+          SessionUtils.getWithoutCommit(
+              GlossaryTermMetaMapper.class,
+              mapper -> definitions(ns, mapper.snapshotByIds(lake, ns.level(0), batch))));
+    }
+    return result;
+  }
+
+  private List<GlossaryTermEntity> definitions(Namespace ns, List<GlossaryTermSnapshotPO> rows) {
+    if (rows.isEmpty()) {
+      throw new NoSuchEntityException("Metalake %s no longer exists", ns.level(0));
+    }
+    // A live parent with no matching terms contributes one outer-join row.
+    if (rows.get(0).getTermId() == null) {
+      return new ArrayList<>();
+    }
+    Map<Long, GlossaryTermPO> definitions = new LinkedHashMap<>();
+    Map<Long, List<String>> synonyms = new LinkedHashMap<>();
+    for (GlossaryTermSnapshotPO row : rows) {
+      definitions.putIfAbsent(row.getTermId(), row);
+      List<String> values = synonyms.computeIfAbsent(row.getTermId(), ignored -> new ArrayList<>());
+      if (row.getSynonym() != null) {
+        values.add(row.getSynonym());
+      }
+    }
+    List<GlossaryTermEntity> result = new ArrayList<>();
+    definitions.forEach((id, row) -> result.add(fromPO(row, synonyms.get(id), ns)));
+    return result;
   }
 
   private MetalakePO metalake(Namespace ns) {

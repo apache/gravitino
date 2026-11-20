@@ -50,7 +50,10 @@ import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.apache.ibatis.session.TransactionIsolationLevel;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -216,6 +219,57 @@ public class TestSqlSession {
     assertFalse(SqlSessions.hasActiveSession());
     assertNull(SqlSessions.getSessions().get());
     assertEquals(0, SqlSessions.getSessionCount());
+  }
+
+  @Test
+  public void testNestedSnapshotPreservesOuterSession() {
+    SqlSessions.readSnapshot(
+        () -> {
+          SqlSession outer = SqlSessions.getSessions().get();
+          assertThrows(
+              IllegalStateException.class,
+              () ->
+                  SqlSessions.readSnapshot(
+                      () -> {
+                        throw new AssertionError("Nested read ran");
+                      }));
+          assertSame(outer, SqlSessions.getSessions().get());
+          assertEquals(1, SqlSessions.getSessionCount());
+          return null;
+        });
+    assertFalse(SqlSessions.hasActiveSession());
+  }
+
+  @Test
+  public void testSnapshotPreservesReadFailureWhenRollbackFails() {
+    SqlSessionFactoryHelper helper = Mockito.mock(SqlSessionFactoryHelper.class);
+    SqlSessionFactory factory = Mockito.mock(SqlSessionFactory.class);
+    SqlSession session = Mockito.mock(SqlSession.class);
+    Mockito.when(helper.getSqlSessionFactory()).thenReturn(factory);
+    Mockito.when(factory.getConfiguration()).thenReturn(new Configuration());
+    Mockito.when(factory.openSession(TransactionIsolationLevel.REPEATABLE_READ))
+        .thenReturn(session);
+    IllegalStateException rollbackFailure = new IllegalStateException("rollback failed");
+    Mockito.doThrow(rollbackFailure).when(session).rollback(true);
+    IllegalArgumentException readFailure = new IllegalArgumentException("read failed");
+    try (MockedStatic<SqlSessionFactoryHelper> helpers =
+        Mockito.mockStatic(SqlSessionFactoryHelper.class)) {
+      helpers.when(SqlSessionFactoryHelper::getInstance).thenReturn(helper);
+      assertSame(
+          readFailure,
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  SqlSessions.readSnapshot(
+                      () -> {
+                        throw readFailure;
+                      })));
+      assertEquals(1, readFailure.getSuppressed().length);
+      assertSame(rollbackFailure, readFailure.getSuppressed()[0]);
+      Mockito.verify(session).close();
+      assertFalse(SqlSessions.hasActiveSession());
+      assertEquals(0, SqlSessions.getSessionCount());
+    }
   }
 
   /** An unsuccessful fresh-read acquisition cannot release the caller's existing session. */

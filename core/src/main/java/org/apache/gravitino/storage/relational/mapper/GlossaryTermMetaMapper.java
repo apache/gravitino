@@ -64,6 +64,15 @@ public interface GlossaryTermMetaMapper {
       @Param("metalakeName") String metalakeName,
       @Param("key") String key);
 
+  /** Returns normalized names and IDs of live terms matching a nonempty batch of keys. */
+  @Select({
+    "<script>SELECT name_key AS nameKey, term_id AS termId FROM glossary_term_meta",
+    "WHERE metalake_id=#{metalakeId} AND deleted_at=0 AND name_key IN",
+    "<foreach collection='keys' item='key' open='(' separator=',' close=')'>#{key}</foreach></script>"
+  })
+  List<GlossaryTermPO> idsByKeys(
+      @Param("metalakeId") long metalakeId, @Param("keys") List<String> keys);
+
   /** Executes insert within the current transaction. */
   @InsertProvider(type = GlossaryTermSQLProvider.class, method = "insert")
   void insert(@Param("p") GlossaryTermPO p);
@@ -111,4 +120,11 @@ public interface GlossaryTermMetaMapper {
       @Param("metalakeId") long metalakeId,
       @Param("metalakeName") String metalakeName,
       @Param("key") @Nullable String key);
+
+  /** Reads definition snapshots for one bounded batch of live endpoints. */
+  @SelectProvider(type = GlossaryTermSQLProvider.class, method = "snapshot")
+  List<GlossaryTermSnapshotPO> snapshotByIds(
+      @Param("metalakeId") long lake,
+      @Param("metalakeName") String name,
+      @Param("ids") List<Long> ids);
 }

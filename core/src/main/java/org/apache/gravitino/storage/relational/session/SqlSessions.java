@@ -20,10 +20,13 @@
 package org.apache.gravitino.storage.relational.session;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.session.TransactionIsolationLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,6 +72,31 @@ public final class SqlSessions {
     }
     sessionCount.get().incrementAndGet();
     return sqlSession;
+  }
+
+  /**
+   * Runs a top-level multi-statement read on one database snapshot without locking writers.
+   *
+   * @param read the reads to run in the snapshot
+   * @param <T> the result type
+   * @return the result of the reads
+   * @throws IllegalStateException if another session is active on this thread
+   */
+  public static <T> T readSnapshot(Supplier<T> read) {
+    Preconditions.checkState(
+        !hasActiveSession(), "A snapshot read must start outside an active SQL session");
+    SqlSessionFactory factory = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory();
+    // H2's repeatable read permits phantoms. Its serializable isolation pins an MVStore snapshot.
+    TransactionIsolationLevel isolation =
+        "h2".equals(factory.getConfiguration().getDatabaseId())
+            ? TransactionIsolationLevel.SERIALIZABLE
+            : TransactionIsolationLevel.REPEATABLE_READ;
+    SqlSession session = factory.openSession(isolation);
+    sessions.set(session);
+    sessionCount.get().incrementAndGet();
+    try (SnapshotScope ignored = SqlSessions::rollbackAndCloseSqlSession) {
+      return read.get();
+    }
   }
 
   /**
@@ -167,5 +195,11 @@ public final class SqlSessions {
       sessions.remove();
       sessionCount.remove();
     }
+  }
+
+  @FunctionalInterface
+  private interface SnapshotScope extends AutoCloseable {
+    @Override
+    void close();
   }
 }

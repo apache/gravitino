@@ -27,6 +27,7 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Supplier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermRelMapper;
@@ -46,10 +47,9 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
  *
  * <p>Use withHierarchyLock around the complete read/validate/write operation, before locking any
  * terms. Multiple changes must plan and lock all their term IDs in order before making changes.
- * Plain reads take no locks and return only live endpoints. Each query has a READ_COMMITTED
- * statement snapshot; a multi-level walk needs an enclosing hierarchy lock for a stable graph.
- * These ID-only reads do not apply authorization/status filters: the manager must filter each
- * frontier before expanding it.
+ * Plain reads take no locks and return only live endpoints. The manager runs a read-only walk in
+ * one database snapshot so every frontier sees the same graph. These ID-only reads do not apply
+ * authorization/status filters: the manager must filter each frontier before expanding it.
  */
 public final class GlossaryTermRelService {
   private static final int FRONTIER_BATCH_SIZE = 500;
@@ -196,6 +196,11 @@ public final class GlossaryTermRelService {
     return readEdges(metalakeId, termIds, RelationType.BROADER, true);
   }
 
+  /** Reads each live RELATED pair touching the frontier once, in canonical endpoint order. */
+  public List<GlossaryTermRelPO> listRelatedEdges(long metalakeId, Set<Long> ids) {
+    return readEdges(metalakeId, ids, RelationType.RELATED, false);
+  }
+
   /**
    * Walks all live ancestors in bounded batches at each level, including the terminal frontier. IDs
    * are visited once, even for diamonds or malformed cycles; the root is excluded.
@@ -272,14 +277,15 @@ public final class GlossaryTermRelService {
           if (ids.size() <= FRONTIER_BATCH_SIZE) {
             return mapper.listEdges(metalakeId, ids, type.name(), reverse);
           }
-          List<GlossaryTermRelPO> edges = new ArrayList<>();
+          // A symmetric pair can match one endpoint in each of two batches.
+          Set<GlossaryTermRelPO> edges =
+              new TreeSet<>(
+                  Comparator.comparing(GlossaryTermRelPO::getFromTermId)
+                      .thenComparing(GlossaryTermRelPO::getToTermId));
           for (List<Long> batch : Lists.partition(List.copyOf(ids), FRONTIER_BATCH_SIZE)) {
             edges.addAll(mapper.listEdges(metalakeId, batch, type.name(), reverse));
           }
-          edges.sort(
-              Comparator.comparing(GlossaryTermRelPO::getFromTermId)
-                  .thenComparing(GlossaryTermRelPO::getToTermId));
-          return edges;
+          return new ArrayList<>(edges);
         });
   }
 

@@ -39,9 +39,7 @@ final class TermEdits {
 
   static GlossaryTermEntity create(long id, Namespace namespace, TermSpec spec) {
     Preconditions.checkArgument(spec != null, "Term spec is required");
-    Preconditions.checkArgument(
-        spec.domains().length == 0 && spec.broader().length == 0 && spec.related().length == 0,
-        "Domain and relation changes are not supported yet");
+    Preconditions.checkArgument(spec.domains().length == 0, "Domain changes are not supported yet");
     String[] synonyms = spec.synonyms();
     Preconditions.checkArgument(synonyms.length <= 100, "At most 100 synonyms are allowed");
     Map<String, String> distinct = synonymsByKey(synonyms);
@@ -72,7 +70,8 @@ final class TermEdits {
                     || c instanceof TermChange.RemoveSynonym);
   }
 
-  static GlossaryTermEntity apply(GlossaryTermEntity current, TermChange[] changes) {
+  static GlossaryTermEntity apply(
+      GlossaryTermEntity current, TermChange[] changes, boolean relationsChanged) {
     String name = current.name();
     String definition = current.definition();
     GlossaryTerm.Status status = current.status();
@@ -111,7 +110,8 @@ final class TermEdits {
         throw new IllegalArgumentException("Unsupported glossary change: " + change);
       }
     }
-    if (name.equals(current.name())
+    if (!relationsChanged
+        && name.equals(current.name())
         && Objects.equals(definition, current.definition())
         && status == current.status()
         && Arrays.equals(links, current.links())
