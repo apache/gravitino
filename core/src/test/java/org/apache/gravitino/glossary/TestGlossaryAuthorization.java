@@ -566,6 +566,14 @@ class TestGlossaryAuthorization extends TestJDBCBackend {
       env.setGravitinoAuthorizer(nodeA);
       writer.shutdownNow();
     }
+    // A custom authorizer may still allow the name-based route check after a transfer.
+    GravitinoAuthorizer cached =
+        Mockito.mock(GravitinoAuthorizer.class, AdditionalAnswers.delegatesTo(nodeA));
+    Mockito.doReturn(true)
+        .when(cached)
+        .hasSetOwnerPermission(
+            Mockito.eq(LAKE), Mockito.anyString(), Mockito.eq(term.name()), Mockito.any());
+    env.setGravitinoAuthorizer(cached);
     assertThrows(
         ForbiddenException.class,
         () -> as("writer", () -> dispatcher.getOwner(LAKE, object(term))));

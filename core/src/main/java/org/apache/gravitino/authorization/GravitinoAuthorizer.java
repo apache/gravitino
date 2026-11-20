@@ -76,7 +76,10 @@ public interface GravitinoAuthorizer extends Closeable {
     return false;
   }
 
-  /** Returns whether the caller may read this glossary term through a generic metadata endpoint. */
+  /**
+   * Returns whether the caller may read this glossary term through a generic metadata endpoint.
+   * When called inside a glossary read snapshot, evaluate the term and its owner in that snapshot.
+   */
   default boolean canAccessGlossaryTerm(
       Principal principal,
       String metalake,
@@ -110,7 +113,7 @@ public interface GravitinoAuthorizer extends Closeable {
   /**
    * Checks ownership of the observed live glossary term identity, including group owners. The
    * default grants no owner access. Implementations must read current ownership without shared
-   * owner caches.
+   * owner caches and must participate in the caller's transaction when one is active.
    */
   default boolean isGlossaryTermOwner(
       Principal principal, String metalake, long termId, AuthorizationRequestContext context) {

@@ -73,10 +73,10 @@ public interface OwnerDispatcher {
    * Retrieves the owner of a metadata object. For glossary terms, the relational implementation
    * checks visibility and reads ownership in one snapshot, started outside a caller transaction.
    *
-   * @throws ForbiddenException if the caller cannot view the glossary term
    * @param metalake the name of the metalake
    * @param metadataObject the metadata object for which the owner is being retrieved
    * @return an Optional containing the owner if it exists, otherwise an empty Optional
+   * @throws ForbiddenException if the caller cannot view the glossary term
    */
   Optional<Owner> getOwner(String metalake, MetadataObject metadataObject);
 }

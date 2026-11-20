@@ -39,7 +39,6 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerManager;
@@ -59,16 +58,13 @@ import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.rest.RESTUtils;
-import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
 import org.apache.gravitino.utils.MetadataObjectUtil;
-import org.apache.gravitino.utils.NamespaceUtil;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 class TestOwnerOperations extends BaseOperationsTest {
@@ -168,23 +164,13 @@ class TestOwnerOperations extends BaseOperationsTest {
     FieldUtils.writeField(resource, "httpRequest", new MockServletRequestFactory().get(), true);
     Mockito.doReturn(Optional.empty()).when(manager).getOwner("metalake1", term);
     Mockito.doNothing().when(manager).setOwner("metalake1", term, "user", Owner.Type.USER);
-    GlossaryTermMetaService terms = mock(GlossaryTermMetaService.class);
-    try (MockedStatic<GlossaryTermMetaService> service =
-        Mockito.mockStatic(GlossaryTermMetaService.class)) {
-      service.when(GlossaryTermMetaService::getInstance).thenReturn(terms);
-      try (Response get = resource.getOwnerForObject("metalake1", "glossary_term", name);
-          Response set =
-              resource.setOwnerForObject(
-                  "metalake1",
-                  "glossary_term",
-                  name,
-                  new OwnerSetRequest("user", Owner.Type.USER))) {
-        Assertions.assertEquals(200, get.getStatus());
-        Assertions.assertEquals(200, set.getStatus());
-      }
+    try (Response get = resource.getOwnerForObject("metalake1", "glossary_term", name);
+        Response set =
+            resource.setOwnerForObject(
+                "metalake1", "glossary_term", name, new OwnerSetRequest("user", Owner.Type.USER))) {
+      Assertions.assertEquals(200, get.getStatus());
+      Assertions.assertEquals(200, set.getStatus());
     }
-    Mockito.verify(terms, Mockito.times(2))
-        .getIds(NameIdentifier.of(NamespaceUtil.ofGlossaryTerm("metalake1"), name));
     Mockito.verify(manager).getOwner("metalake1", term);
     Mockito.verify(manager).setOwner("metalake1", term, "user", Owner.Type.USER);
   }

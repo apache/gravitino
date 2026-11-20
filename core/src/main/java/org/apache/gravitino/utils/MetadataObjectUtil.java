@@ -39,14 +39,12 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
-import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
-import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
 
 public class MetadataObjectUtil {
 
@@ -355,14 +353,6 @@ public class MetadataObjectUtil {
         try {
           env.internalJobOperationDispatcher().getJobTemplate(metalake, object.fullName());
         } catch (NoSuchJobTemplateException e) {
-          throw exceptionToThrowSupplier.get();
-        }
-        break;
-
-      case GLOSSARY_TERM:
-        try {
-          GlossaryTermMetaService.getInstance().getIds(identifier);
-        } catch (NoSuchEntityException missing) {
           throw exceptionToThrowSupplier.get();
         }
         break;

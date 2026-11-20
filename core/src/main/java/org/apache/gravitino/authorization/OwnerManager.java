@@ -20,6 +20,7 @@ package org.apache.gravitino.authorization;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.security.Principal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -30,6 +31,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.ForbiddenException;
@@ -90,15 +92,7 @@ public class OwnerManager implements OwnerDispatcher {
                         throw new NoSuchMetadataObjectException(
                             "Glossary term %s does not exist", objectIdent);
                       }
-                      if (!GravitinoEnv.getInstance()
-                          .gravitinoAuthorizer()
-                          .hasSetOwnerPermission(
-                              metalake,
-                              metadataObject.type().name(),
-                              metadataObject.fullName(),
-                              new AuthorizationRequestContext())) {
-                        throw new ForbiddenException("Current user cannot set this object's owner");
-                      }
+                      checkTermOwnerTransfer(metalake, current.get().id());
                       return replaceOwner(metalake, metadataObject, objectIdent, newOwner);
                     });
       } else {
@@ -346,6 +340,17 @@ public class OwnerManager implements OwnerDispatcher {
     } catch (IOException ioe) {
       LOG.info("Failed to get the owner of entity {}", metadataObject.fullName(), ioe);
       throw new RuntimeException(ioe);
+    }
+  }
+
+  private void checkTermOwnerTransfer(String metalake, long termId) {
+    GravitinoAuthorizer authorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    Principal principal = PrincipalUtils.getCurrentPrincipal();
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    MetadataObject lake = MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE);
+    if (!authorizer.isOwner(principal, metalake, lake, context)
+        && !authorizer.isGlossaryTermOwner(principal, metalake, termId, context)) {
+      throw new ForbiddenException("Current user cannot set this object's owner");
     }
   }
 
