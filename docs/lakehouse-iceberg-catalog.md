@@ -110,6 +110,8 @@ mysql -h <host> -u <username> -p <database> < ${GRAVITINO_HOME}/scripts/mysql/ic
 # PostgreSQL
 psql -h <host> -U <username> -d <database> -f ${GRAVITINO_HOME}/scripts/postgresql/iceberg-jdbc-schema-postgresql.sql
 ```
+
+When using H2, the JDBC connection URL must include `;DATABASE_TO_LOWER=TRUE` (e.g., `jdbc:h2:<path>;DATABASE_TO_LOWER=TRUE`). By default, H2 converts unquoted identifiers to uppercase, whereas Iceberg looks up metadata in lowercase. Without `DATABASE_TO_LOWER=TRUE`, Iceberg fails to detect existing columns such as `iceberg_type` and attempts an `ALTER TABLE`, which fails if the database user only has DML permissions.
 :::
 
 #### REST Catalog Backend
