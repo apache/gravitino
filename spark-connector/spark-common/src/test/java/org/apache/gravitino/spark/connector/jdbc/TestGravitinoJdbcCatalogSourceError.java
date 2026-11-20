@@ -126,7 +126,9 @@ public class TestGravitinoJdbcCatalogSourceError {
       // with the source's error. Spark 4.0 already reports it as FAILED_JDBC with the source
       // error as the cause. Either way the source's reason must reach the caller.
       Exception error =
-          Assertions.assertThrows(Exception.class, () -> catalog.loadSparkTable(TABLE));
+          Assertions.assertThrows(
+              Exception.class,
+              () -> catalog.loadSparkTable(TABLE, mock(org.apache.gravitino.rel.Table.class)));
       Assertions.assertFalse(
           String.valueOf(error.getMessage()).contains("Failed to load the real sparkTable"),
           error.getMessage());
