@@ -300,7 +300,7 @@ public class RelationalEntityStore
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     // Own the SQL commit: run update SQL without the cache lock (it may wait on row locks),
-    // then drop the cache and commit.
+    // then under the key lock: drop the cache, commit, and bump the epoch.
     SessionUtils.beginTransaction();
     boolean committed = false;
     try {
@@ -883,22 +883,20 @@ public class RelationalEntityStore
   }
 
   /**
-   * Drops {@code ident} from the cache, then commits the current SQL session.
+   * Drops {@code ident} from the cache and commits under the key lock.
    *
-   * <p>Order is delete cache → commit → (under the key lock) invalidate again then bump epoch. The
-   * cache lock is not held across commit, so this thread does not wait on a peer {@code get} while
-   * still holding the DB row lock. After commit the row lock is gone; the locked invalidate drops
-   * any pre-commit row put in the gap, then the epoch bump rejects a waiting put of that row.
+   * <p>Update SQL runs outside the lock. Under the lock: invalidate (so commit does not publish
+   * while an old row is cached), commit, then bump the epoch so a {@code batchGet} that loaded the
+   * pre-commit row cannot put it back after the lock is released. Ordinary cache {@code get} does
+   * not use {@code SELECT FOR UPDATE}, so holding the cache lock across commit does not deadlock
+   * with it under READ_COMMITTED.
    */
   private void invalidateCacheAndCommit(NameIdentifier ident, Entity.EntityType entityType) {
-    invalidateCache(ident, entityType);
-    SessionUtils.commitTransaction();
     cache.withCacheLock(
         EntityCacheKey.of(ident, entityType),
         () -> {
-          // Invalidate first so unlocked getIfPresent (batchGet) cannot hit a gap refill; then bump
-          // so a waiting put of the pre-commit row fails the epoch check.
-          cache.invalidate(ident, entityType);
+          invalidateCache(ident, entityType);
+          SessionUtils.commitTransaction();
           cacheInvalidationEpoch.incrementAndGet();
         });
   }
