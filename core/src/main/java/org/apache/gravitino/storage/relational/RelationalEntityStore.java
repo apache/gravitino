@@ -885,10 +885,10 @@ public class RelationalEntityStore
   /**
    * Drops {@code ident} from the cache, then commits the current SQL session.
    *
-   * <p>Order is delete cache → commit → (under the key lock) bump epoch and invalidate again. The
+   * <p>Order is delete cache → commit → (under the key lock) invalidate again then bump epoch. The
    * cache lock is not held across commit, so this thread does not wait on a peer {@code get} while
-   * still holding the DB row lock. After commit the row lock is gone; the locked bump + invalidate
-   * drops any pre-commit row that was put in the gap before the lock was taken.
+   * still holding the DB row lock. After commit the row lock is gone; the locked invalidate drops
+   * any pre-commit row put in the gap, then the epoch bump rejects a waiting put of that row.
    */
   private void invalidateCacheAndCommit(NameIdentifier ident, Entity.EntityType entityType) {
     invalidateCache(ident, entityType);
@@ -896,8 +896,10 @@ public class RelationalEntityStore
     cache.withCacheLock(
         EntityCacheKey.of(ident, entityType),
         () -> {
-          cacheInvalidationEpoch.incrementAndGet();
+          // Invalidate first so unlocked getIfPresent (batchGet) cannot hit a gap refill; then bump
+          // so a waiting put of the pre-commit row fails the epoch check.
           cache.invalidate(ident, entityType);
+          cacheInvalidationEpoch.incrementAndGet();
         });
   }
 
