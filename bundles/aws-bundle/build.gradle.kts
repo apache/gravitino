@@ -25,7 +25,19 @@ plugins {
   alias(libs.plugins.shadow)
 }
 
+// Keeps the Netty artifacts brought in by the AWS SDK on the single version of the catalog. The BOM
+// sits in a dedicated configuration so that it only applies to this module.
+val nettyBom: Configuration by configurations.creating {
+  isCanBeConsumed = false
+  isCanBeResolved = false
+}
+
+listOf("compileClasspath", "runtimeClasspath", "testCompileClasspath", "testRuntimeClasspath")
+  .forEach { configurations.named(it) { extendsFrom(nettyBom) } }
+
 dependencies {
+  nettyBom(platform(libs.netty.bom))
+
   implementation(project(":bundles:aws"))
   implementation(libs.hadoop3.aws)
   implementation(libs.aws.iam)
