@@ -300,7 +300,7 @@ public class RelationalEntityStore
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     // Own the SQL commit: run update SQL without the cache lock (it may wait on row locks),
-    // then drop the cache and commit under the key lock.
+    // then drop the cache and commit.
     SessionUtils.beginTransaction();
     boolean committed = false;
     try {
@@ -318,21 +318,6 @@ public class RelationalEntityStore
         SessionUtils.rollbackTransaction();
       }
     }
-  }
-
-  /**
-   * Drops {@code ident} from the cache, then commits the current SQL session.
-   *
-   * <p>Order is delete cache → commit → bump epoch. The cache lock is not held across commit:
-   * {@link #invalidateCache} takes it only briefly, so this thread (still holding the DB row lock
-   * until commit returns) does not wait on a peer {@code get} that already holds the cache lock and
-   * is blocked on that row. The post-commit epoch bump rejects a miss that loaded the pre-commit
-   * row.
-   */
-  private void invalidateCacheAndCommit(NameIdentifier ident, Entity.EntityType entityType) {
-    invalidateCache(ident, entityType);
-    SessionUtils.commitTransaction();
-    cacheInvalidationEpoch.incrementAndGet();
   }
 
   @Override
@@ -895,6 +880,21 @@ public class RelationalEntityStore
     // backend after the change that triggered the invalidation is visible.
     cacheInvalidationEpoch.incrementAndGet();
     cache.invalidate(ident, type);
+  }
+
+  /**
+   * Drops {@code ident} from the cache, then commits the current SQL session.
+   *
+   * <p>Order is delete cache → commit → bump epoch. The cache lock is not held across commit:
+   * {@link #invalidateCache} takes it only briefly, so this thread (still holding the DB row lock
+   * until commit returns) does not wait on a peer {@code get} that already holds the cache lock and
+   * is blocked on that row. The post-commit epoch bump rejects a miss that loaded the pre-commit
+   * row.
+   */
+  private void invalidateCacheAndCommit(NameIdentifier ident, Entity.EntityType entityType) {
+    invalidateCache(ident, entityType);
+    SessionUtils.commitTransaction();
+    cacheInvalidationEpoch.incrementAndGet();
   }
 
   @VisibleForTesting
