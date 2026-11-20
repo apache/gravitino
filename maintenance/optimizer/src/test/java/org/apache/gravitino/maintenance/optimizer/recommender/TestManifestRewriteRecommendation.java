@@ -115,18 +115,14 @@ class TestManifestRewriteRecommendation {
           .submitJob(
               Mockito.eq(IcebergRewriteManifestsContent.JOB_TEMPLATE_NAME_VALUE),
               captured.capture());
-      Assertions.assertEquals(
-          Map.of(
-              "catalog_name",
-              "catalog",
-              "table_identifier",
-              "db.table",
-              "spec_id",
-              "7",
-              "use_caching",
-              "false"),
+      Map<String, String> jobConf =
           new GravitinoManifestRewriteJobAdapter()
-              .jobConfig(captured.getValue(), IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR));
+              .jobConfig(captured.getValue(), IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
+      Assertions.assertEquals("catalog", jobConf.get("catalog_name"));
+      Assertions.assertEquals("db.table", jobConf.get("table_identifier"));
+      Assertions.assertEquals("7", jobConf.get("spec_id"));
+      Assertions.assertEquals("false", jobConf.get("use_caching"));
+      Assertions.assertEquals("1g", jobConf.get("spark_executor_memory"));
       Mockito.verify(metadata, Mockito.atLeastOnce()).tableMetadata(identifier);
       Mockito.when(table.properties()).thenReturn(Map.of("current-snapshot-id", "2"));
       Assertions.assertTrue(

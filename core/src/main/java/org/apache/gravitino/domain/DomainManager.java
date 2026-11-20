@@ -198,7 +198,8 @@ public class DomainManager implements DomainDispatcher {
   }
 
   @Override
-  public boolean deleteDomain(String metalake, String name) throws NonEmptyDomainException {
+  public boolean deleteDomain(String metalake, String name)
+      throws IllegalArgumentException, NonEmptyDomainException {
     checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
     try {
       // The row lock fences parent changes until the caller check and deletion complete.
@@ -206,9 +207,12 @@ public class DomainManager implements DomainDispatcher {
           domainOperations()
               .deleteDomain(
                   NameIdentifierUtil.ofDomain(metalake, name),
-                  domain ->
-                      mutationCheck.accept(
-                          new LockedDomainState(domain, null, Collections.emptyList())));
+                  domain -> {
+                    LockedDomainState state =
+                        new LockedDomainState(domain, null, Collections.emptyList());
+                    mutationCheck.accept(state);
+                    checkDelete(state);
+                  });
       return deleted;
     } catch (NonEmptyEntityException e) {
       throw new NonEmptyDomainException(
@@ -419,6 +423,20 @@ public class DomainManager implements DomainDispatcher {
         domain.name(),
         parent.name(),
         parent.name());
+  }
+
+  /**
+   * Checks a delete against the locked domain: only a draft domain can be deleted. The check runs
+   * before the sub-domain check, so a published domain with sub-domains fails here.
+   *
+   * @param state The locked state of the delete.
+   */
+  @VisibleForTesting
+  static void checkDelete(LockedDomainState state) {
+    Preconditions.checkArgument(
+        state.domain().status() == Domain.Status.DRAFT,
+        "Domain %s cannot be deleted while it is published, unpublish it first",
+        state.domain().name());
   }
 
   /**

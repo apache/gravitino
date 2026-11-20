@@ -71,5 +71,10 @@ class DomainOperations(ABC):
 
     @abstractmethod
     def delete_domain(self, name: str) -> bool:
-        """Delete, keeping tags; return False if absent, reject nonempty parents."""
+        """Delete a draft domain, keeping tags.
+
+        Return False if the domain is absent or is a draft hidden from the
+        caller; a hidden draft is not deleted, so False does not mean absent.
+        Reject published domains (unpublish first) and nonempty parents.
+        """
         raise NotImplementedError

@@ -447,6 +447,7 @@ public class DomainAuthorizationIT extends DomainIT {
               .createSubdomain("denied-subdomain", null, null, "denied-tag", true);
       assertEquals(creationParent.name(), subdomain.parent().orElseThrow());
       assertEquals(created.name(), manager.getDomain(created.name()).name());
+      assertEquals(Domain.Status.DRAFT, managed.unpublish().status());
       assertTrue(manager.deleteDomain(child.name()));
       assertThrows(NoSuchDomainException.class, () -> metalake.getDomain(child.name()));
     }

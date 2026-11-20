@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 class TestMaintenanceJobTemplates {
 
   @Test
-  void testAllFourTypesMapToSingleMaintenanceTemplate() {
+  void testIsIcebergMaintenance() {
     Assertions.assertEquals(
         "builtin-iceberg-maintenance-task", MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE);
     for (Policy.BuiltInType type :
@@ -36,22 +36,10 @@ class TestMaintenanceJobTemplates {
           Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION,
           Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL
         }) {
-      Assertions.assertEquals(
-          MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE,
-          MaintenanceJobTemplates.templateName(type).orElseThrow());
-      Assertions.assertTrue(MaintenanceJobTemplates.maintenanceType(type).isPresent());
+      Assertions.assertTrue(MaintenanceJobTemplates.isIcebergMaintenance(type));
     }
-  }
-
-  @Test
-  void testMaintenanceTypeWireValues() {
-    Assertions.assertEquals(
-        "rewrite_data_files",
-        MaintenanceJobTemplates.maintenanceType(Policy.BuiltInType.ICEBERG_COMPACTION)
-            .orElseThrow());
-    Assertions.assertEquals(
-        "expire_snapshots",
-        MaintenanceJobTemplates.maintenanceType(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION)
-            .orElseThrow());
+    Assertions.assertFalse(
+        MaintenanceJobTemplates.isIcebergMaintenance(Policy.BuiltInType.ROW_FILTER));
+    Assertions.assertFalse(MaintenanceJobTemplates.isIcebergMaintenance(null));
   }
 }

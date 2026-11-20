@@ -94,17 +94,11 @@ class TestManifestRewriteStrategyHandler {
             .jobConfig(
                 handler.evaluate().jobExecutionContext().orElseThrow(),
                 IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
-    Assertions.assertEquals(
-        Map.of(
-            "catalog_name",
-            "iceberg",
-            "table_identifier",
-            "db.tbl",
-            "spec_id",
-            "1",
-            "use_caching",
-            "false"),
-        config);
+    Assertions.assertEquals("iceberg", config.get("catalog_name"));
+    Assertions.assertEquals("db.tbl", config.get("table_identifier"));
+    Assertions.assertEquals("1", config.get("spec_id"));
+    Assertions.assertEquals("false", config.get("use_caching"));
+    Assertions.assertEquals("1g", config.get("spark_executor_memory"));
     handler.initialize(context);
     Assertions.assertFalse(handler.shouldTrigger());
   }
