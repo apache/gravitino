@@ -283,6 +283,84 @@ tests:
             name: PGOPTIONS
             value: "-c search_path=gravitino"
 
+  - it: keeps distinct Job names across revisions for a long release name
+    template: schema-migrate-job.yaml
+    release:
+      # 48 chars: truncating the full printf would drop "-schema-migrate-rN".
+      name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      revision: 1
+    set:
+      schema:
+        migrate:
+          enabled: true
+      postgresql:
+        enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-schema-migrate-r1
+      - matchRegex:
+          path: metadata.name
+          pattern: "-schema-migrate-r1$"
+
+  - it: keeps a different Job name for revision 2 with the same long release name
+    template: schema-migrate-job.yaml
+    release:
+      name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      revision: 2
+    set:
+      schema:
+        migrate:
+          enabled: true
+      postgresql:
+        enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-schema-migrate-r2
+      - matchRegex:
+          path: metadata.name
+          pattern: "-schema-migrate-r2$"
+
+  - it: keeps distinct Job names across revisions for a long release name
+    template: schema-migrate-job.yaml
+    release:
+      # 48 chars: truncating the full printf would drop "-schema-migrate-rN".
+      name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      revision: 1
+    set:
+      schema:
+        migrate:
+          enabled: true
+      postgresql:
+        enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-schema-migrate-r1
+      - matchRegex:
+          path: metadata.name
+          pattern: "-schema-migrate-r1$"
+
+  - it: keeps a different Job name for revision 2 with the same long release name
+    template: schema-migrate-job.yaml
+    release:
+      name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      revision: 2
+    set:
+      schema:
+        migrate:
+          enabled: true
+      postgresql:
+        enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-schema-migrate-r2
+      - matchRegex:
+          path: metadata.name
+          pattern: "-schema-migrate-r2$"
+
   - it: fails when schema migrate enabled without relational target
     template: schema-migrate-job.yaml
     release:

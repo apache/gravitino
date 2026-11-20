@@ -47,6 +47,7 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.rest.RESTUtil;
+import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 
 /**
@@ -187,6 +188,8 @@ public class IcebergMetadataAuthorizationMethodInterceptor
             return Optional.of(new RenameViewAuthzHandler(parameters, args));
           case CREATE_NAMESPACE:
             return Optional.of(new CreateNamespaceAuthzHandler(parameters, args));
+          case CREATE_TABLE:
+            return Optional.of(new CreateTableAuthzHandler((CreateTableRequest) args[i]));
           case UPDATE_TABLE:
             return Optional.of(new UpdateTableAuthzHandler((UpdateTableRequest) args[i]));
           case REGISTER_TABLE:

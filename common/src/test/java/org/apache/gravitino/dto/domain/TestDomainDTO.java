@@ -20,6 +20,7 @@
 package org.apache.gravitino.dto.domain;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
@@ -34,7 +35,6 @@ import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.responses.DomainListResponse;
 import org.apache.gravitino.dto.responses.DomainMemberListResponse;
 import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.tag.TagValue;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -42,7 +42,7 @@ public class TestDomainDTO {
 
   private static final String DOMAIN_JSON =
       "{\"name\":\"Finance\",\"comment\":\"Financial data\",\"properties\":{\"key\":\"value\"},"
-          + "\"status\":\"published\",\"parent\":\"Parent\",\"backingTag\":{\"name\":\"department\",\"value\":\"finance\"},"
+          + "\"status\":\"published\",\"parent\":\"Parent\",\"backingTag\":{\"name\":\"finance\"},"
           + "\"audit\":{\"creator\":\"user\",\"createTime\":\"2026-10-01T00:00:00Z\",\"lastModifier\":null,\"lastModifiedTime\":null},"
           + "\"relations\":[{\"relation\":\"direct\"},{\"relation\":\"inherited\",\"source\":{\"type\":\"schema\",\"fullName\":\"cat.schema\"}},"
           + "{\"relation\":\"via_subdomain\",\"source\":{\"type\":\"domain\",\"fullName\":\"Finance_US\"}}]}";
@@ -89,9 +89,8 @@ public class TestDomainDTO {
   }
 
   @Test
-  public void testBackingTagValues() throws IOException {
-    for (TagValue tag :
-        new TagValue[] {TagValue.noValue("department"), TagValue.of("department", "finance")}) {
+  public void testBackingTagName() throws IOException {
+    for (String tag : new String[] {"finance", null}) {
       DomainDTO dto =
           new DomainDTO(
               "Finance",
@@ -105,8 +104,11 @@ public class TestDomainDTO {
       DomainDTO decoded =
           JsonUtils.objectMapper()
               .readValue(JsonUtils.objectMapper().writeValueAsString(dto), DomainDTO.class);
-      Assertions.assertEquals(tag.name(), decoded.getBackingTag().getName());
-      Assertions.assertEquals(tag.value().orElse(null), decoded.getBackingTag().getValue());
+      if (tag == null) {
+        Assertions.assertNull(decoded.getBackingTag());
+      } else {
+        Assertions.assertEquals(tag, decoded.getBackingTag().getName());
+      }
       Assertions.assertEquals("Parent", decoded.getParent());
       Assertions.assertEquals("comment", decoded.getComment());
       Assertions.assertEquals("user", decoded.getAudit().creator());
@@ -174,7 +176,7 @@ public class TestDomainDTO {
             Collections.singletonMap("key", "value"),
             Domain.Status.PUBLISHED,
             "Parent",
-            TagValue.of("department", "finance"),
+            "finance",
             AUDIT,
             new DomainRelation[] {
               DomainRelation.direct(),
@@ -193,8 +195,7 @@ public class TestDomainDTO {
     Assertions.assertEquals(Collections.singletonMap("key", "value"), dto.getProperties());
     Assertions.assertEquals(Domain.Status.PUBLISHED, dto.getStatus());
     Assertions.assertEquals("Parent", dto.getParent());
-    Assertions.assertEquals("department", dto.getBackingTag().getName());
-    Assertions.assertEquals("finance", dto.getBackingTag().getValue());
+    Assertions.assertEquals("finance", dto.getBackingTag().getName());
     Assertions.assertEquals(AUDIT, dto.getAudit());
     Assertions.assertEquals(3, dto.getRelations().length);
     Assertions.assertEquals(DomainRelation.Type.DIRECT, dto.getRelations()[0].getRelation());
@@ -222,23 +223,17 @@ public class TestDomainDTO {
 
   @Test
   public void testBackingTagJson() throws IOException {
-    for (String json :
-        new String[] {
-          "{\"name\":\"department\",\"value\":\"finance\"}",
-          "{\"name\":\"department\",\"value\":null}"
-        }) {
-      DomainBackingTagDTO tag = JsonUtils.objectMapper().readValue(json, DomainBackingTagDTO.class);
-      Assertions.assertEquals("department", tag.getName());
-      Assertions.assertEquals(
-          JsonUtils.objectMapper().readTree(json).get("value").isNull() ? null : "finance",
-          tag.getValue());
-      tag.validate();
-      assertJsonEquals(json, tag);
-    }
-    DomainBackingTagDTO noValue =
-        JsonUtils.objectMapper().readValue("{\"name\":\"department\"}", DomainBackingTagDTO.class);
-    Assertions.assertNull(noValue.getValue());
-    assertJsonEquals("{\"name\":\"department\",\"value\":null}", noValue);
+    DomainBackingTagDTO tag =
+        JsonUtils.objectMapper().readValue("{\"name\":\"finance\"}", DomainBackingTagDTO.class);
+    Assertions.assertEquals("finance", tag.getName());
+    tag.validate();
+    assertJsonEquals("{\"name\":\"finance\"}", tag);
+    Assertions.assertThrows(
+        UnrecognizedPropertyException.class,
+        () ->
+            JsonUtils.objectMapper()
+                .readValue(
+                    "{\"name\":\"department\",\"value\":\"finance\"}", DomainBackingTagDTO.class));
   }
 
   @Test

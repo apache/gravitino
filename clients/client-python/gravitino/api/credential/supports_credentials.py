@@ -69,7 +69,7 @@ class SupportsCredentials(ABC):
         matched_credentials = [
             credential
             for credential in credentials
-            if credential.credential_type == credential_type
+            if credential.credential_type() == credential_type
         ]
         if len(matched_credentials) == 0:
             raise NoSuchCredentialException(

@@ -17,7 +17,9 @@
 import base64
 import os
 import random
+import shutil
 import string
+import tempfile
 import time
 import unittest
 from datetime import datetime
@@ -73,20 +75,15 @@ def generate_unique_random_string(length):
 class TestLocalFilesystem(unittest.TestCase):
     _metalake_name: str = "metalake_demo"
     _server_uri = "http://localhost:9090"
-    _local_base_dir_path: str = "file:/tmp/fileset"
-    _fileset_dir: str = (
-        f"{_local_base_dir_path}/{generate_unique_random_string(10)}/fileset_catalog/tmp"
-    )
 
     def setUp(self) -> None:
+        temporary = tempfile.mkdtemp(prefix="gravitino-gvfs-local-")
+        self.addCleanup(shutil.rmtree, temporary)
+        self._local_base_dir_path = f"file:{temporary}"
+        self._fileset_dir = f"{self._local_base_dir_path}/fileset_catalog/tmp"
         local_fs = LocalFileSystem()
         if not local_fs.exists(self._fileset_dir):
             local_fs.mkdir(self._fileset_dir)
-
-    def tearDown(self) -> None:
-        local_fs = LocalFileSystem()
-        if local_fs.exists(self._local_base_dir_path):
-            local_fs.rm(self._local_base_dir_path, recursive=True)
 
     def test_request_headers(self, *mock_methods):
         options = {

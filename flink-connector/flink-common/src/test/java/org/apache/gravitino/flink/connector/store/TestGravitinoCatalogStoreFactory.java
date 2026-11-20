@@ -44,6 +44,8 @@ public class TestGravitinoCatalogStoreFactory {
 
   private static final String EXCLUDED_CATALOGS_KEY =
       "table.catalog-store.gravitino.gravitino.excludedCatalogs";
+  private static final String SESSION_CATALOG_SHADOWING_KEY =
+      "table.catalog-store.gravitino.gravitino.enableSessionCatalogShadowing";
 
   /**
    * When {@code gravitino.enableSessionCatalogSupport=true} the factory must return a {@link
@@ -214,6 +216,58 @@ public class TestGravitinoCatalogStoreFactory {
   }
 
   // -------------------------------------------------------------------------
+  // session catalog shadowing
+  // -------------------------------------------------------------------------
+
+  @Test
+  void testOptionParsing_sessionCatalogShadowingAbsent_defaultsToFalse() {
+    Assertions.assertFalse(parseSessionCatalogShadowingOption(baseConfiguration()));
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testOptionParsing_sessionCatalogShadowing_isReadFromConfig() {
+    Configuration configuration = baseConfiguration();
+    configuration.setString(SESSION_CATALOG_SHADOWING_KEY, "true");
+    Assertions.assertTrue(parseSessionCatalogShadowingOption(configuration));
+  }
+
+  @Test
+  void testParseSessionCatalogShadowing() {
+    Assertions.assertTrue(GravitinoCatalogStoreFactory.parseSessionCatalogShadowing(true, true));
+    Assertions.assertFalse(GravitinoCatalogStoreFactory.parseSessionCatalogShadowing(false, true));
+    Assertions.assertFalse(GravitinoCatalogStoreFactory.parseSessionCatalogShadowing(false, false));
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> GravitinoCatalogStoreFactory.parseSessionCatalogShadowing(true, false));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                GravitinoCatalogStoreFactoryOptions.GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT
+                    .key()));
+  }
+
+  /**
+   * The real {@link GravitinoCatalogStoreFactory#open} path must reject session catalog shadowing
+   * when session catalog support is disabled, before any Gravitino client is created.
+   */
+  @Test
+  @SuppressWarnings("deprecation")
+  void testOpen_sessionCatalogShadowingWithoutSessionCatalogSupport_failsFast() {
+    Configuration configuration = baseConfiguration();
+    configuration.setString(SESSION_CATALOG_SHADOWING_KEY, "true");
+    CatalogStoreFactory.Context context =
+        TableFactoryUtil.buildCatalogStoreFactoryContext(
+            configuration, TestGravitinoCatalogStoreFactory.class.getClassLoader());
+
+    GravitinoCatalogStoreFactory factory = new GravitinoCatalogStoreFactory();
+    Assertions.assertThrows(IllegalArgumentException.class, () -> factory.open(context));
+    Assertions.assertNull(factory.createCatalogStore());
+  }
+
+  // -------------------------------------------------------------------------
   // helpers
   // -------------------------------------------------------------------------
 
@@ -281,6 +335,18 @@ public class TestGravitinoCatalogStoreFactory {
         createCatalogStoreFactoryHelper(new GravitinoCatalogStoreFactory(), context);
     helper.validate();
     return helper.getOptions().get(GravitinoCatalogStoreFactoryOptions.GRAVITINO_EXCLUDED_CATALOGS);
+  }
+
+  private static boolean parseSessionCatalogShadowingOption(Configuration configuration) {
+    CatalogStoreFactory.Context context =
+        TableFactoryUtil.buildCatalogStoreFactoryContext(
+            configuration, TestGravitinoCatalogStoreFactory.class.getClassLoader());
+    FactoryUtil.FactoryHelper<CatalogStoreFactory> helper =
+        createCatalogStoreFactoryHelper(new GravitinoCatalogStoreFactory(), context);
+    helper.validate();
+    return helper
+        .getOptions()
+        .get(GravitinoCatalogStoreFactoryOptions.GRAVITINO_ENABLE_SESSION_CATALOG_SHADOWING);
   }
 
   private static Configuration baseConfiguration() {

@@ -19,17 +19,15 @@
 package org.apache.gravitino.server.web.filter;
 
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.CREATE_TABLE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION;
 
-import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
-import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler;
+import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 
@@ -43,6 +41,7 @@ import org.apache.iceberg.rest.requests.UpdateTableRequest;
  */
 public class UpdateTableAuthzHandler implements AuthorizationHandler {
   private final boolean stagedCreate;
+  private final UpdateTableRequest request;
 
   /**
    * Creates a handler using the same staged-create predicate as the table hook dispatcher.
@@ -51,6 +50,7 @@ public class UpdateTableAuthzHandler implements AuthorizationHandler {
    */
   public UpdateTableAuthzHandler(UpdateTableRequest request) {
     IcebergRESTUtils.validateRequest(request, "UpdateTableRequest");
+    this.request = request;
     stagedCreate =
         request.requirements().stream()
             .anyMatch(UpdateRequirement.AssertTableDoesNotExist.class::isInstance);
@@ -58,23 +58,29 @@ public class UpdateTableAuthzHandler implements AuthorizationHandler {
 
   @Override
   public void process(Map<EntityType, NameIdentifier> nameIdentifierMap) {
-    if (stagedCreate
-        && !new AuthorizationExpressionEvaluator(CREATE_TABLE_AUTHORIZATION_EXPRESSION)
-            .evaluate(
-                nameIdentifierMap,
-                new HashMap<>(),
-                new AuthorizationRequestContext(),
-                Optional.of(EntityType.SCHEMA.name()))) {
+    String expression =
+        stagedCreate
+            ? CREATE_TABLE_AUTHORIZATION_EXPRESSION
+            : MODIFY_TABLE_AUTHORIZATION_EXPRESSION;
+    if (!IcebergTableLocationAuthzHelper.allowed(nameIdentifierMap, expression, entityType())) {
       throw new ForbiddenException(
-          "Not authorized to create table in schema '%s'",
-          nameIdentifierMap.get(EntityType.SCHEMA));
+          stagedCreate
+              ? "Not authorized to create table in the requested schema"
+              : "Not authorized to modify the requested table");
+    }
+    for (MetadataUpdate update : request.updates()) {
+      if (update instanceof MetadataUpdate.SetLocation) {
+        IcebergTableLocationAuthzHelper.authorizeLocation(
+            nameIdentifierMap,
+            nameIdentifierMap.get(EntityType.TABLE).name(),
+            ((MetadataUpdate.SetLocation) update).location());
+      }
     }
   }
 
   @Override
   public boolean authorizationCompleted() {
-    // Ordinary commits continue through the endpoint's existing MODIFY_TABLE expression.
-    return stagedCreate;
+    return true;
   }
 
   @Override

@@ -29,7 +29,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ printf "%s-schema-migrate-r%d" .Release.Name .Release.Revision | trunc 63 | trimSuffix "-" }}
+  name: {{ include "gravitino.schemaMigrateJobName" . }}
   namespace: {{ include "gravitino.namespace" . }}
   labels:
     {{- include "gravitino.labels" . | nindent 4 }}

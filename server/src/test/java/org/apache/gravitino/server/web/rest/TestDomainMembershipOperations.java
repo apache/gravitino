@@ -333,7 +333,6 @@ public class TestDomainMembershipOperations extends BaseOperationsTest {
       assertEquals(Domain.Status.DRAFT, dto.getStatus());
       assertEquals("Finance", dto.getParent());
       assertEquals("department", dto.getBackingTag().getName());
-      assertEquals("tax", dto.getBackingTag().getValue());
       assertEquals("user", dto.getAudit().creator());
       assertEquals(DomainRelation.Type.DIRECT, dto.getRelations()[0].getRelation());
     }
