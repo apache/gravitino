@@ -41,6 +41,23 @@ public class ImpersonationHDFSFileSystemProxy extends HDFSFileSystemProxy {
    *
    * @param path the HDFS path
    * @param config the configuration map of Gravitino
+   * @param handler the handle of retrieving proxy user
+   */
+  public ImpersonationHDFSFileSystemProxy(
+      Path path, Map<String, String> config, ProxyUserHandler handler) {
+    super();
+
+    Preconditions.checkArgument(handler != null, "ProxyUserHandler cannot be null");
+    this.proxyUserHandler = handler;
+    initFileSystem(path, config);
+  }
+
+  /**
+   * Create a HDFSAuthenticationFileSystem with the given path and configuration. Supports both
+   * simple and Kerberos authentication and has user impersonation capability.
+   *
+   * @param path the HDFS path
+   * @param config the configuration map of Gravitino
    * @param hadoopConf the Hadoop configuration to log in and connect with, built from {@code
    *     config} by {@link HDFSFileSystemProxy#hadoopConfiguration(Map)}, or null to build it here
    * @param handler the handle of retrieving proxy user

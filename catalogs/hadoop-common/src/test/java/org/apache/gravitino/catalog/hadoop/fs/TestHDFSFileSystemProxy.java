@@ -45,11 +45,13 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosAuthUtils;
@@ -118,6 +120,9 @@ public class TestHDFSFileSystemProxy {
           () -> new HDFSFileSystemProxy(new Path("nosuchfs:///"), KERBEROS_CONFIG));
       verify(client, times(1)).close();
       assertFalse(keytabs.get(0).exists());
+      // The failed proxy freed its name.
+      new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy().close();
+      assertEquals(keytabs.get(0).getName(), keytabs.get(1).getName());
     }
   }
 
@@ -337,6 +342,9 @@ public class TestHDFSFileSystemProxy {
       // The failure may be temporary, so the file is still deleted at exit.
       assertTrue(HDFSFileSystemProxy.isLiveKeytabFile(keytabs.get(0)));
       assertTrue(isDeletedOnExit(keytabs.get(0)));
+      // Its name stays taken while the file may still be there.
+      new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy().close();
+      assertNotEquals(keytabs.get(0).getName(), keytabs.get(1).getName());
     }
   }
 
@@ -353,6 +361,93 @@ public class TestHDFSFileSystemProxy {
           GravitinoRuntimeException.class,
           () -> new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG));
       assertFalse(keytabs.get(0).exists());
+      // The failed proxy freed its name.
+      assertThrows(
+          GravitinoRuntimeException.class,
+          () -> new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG));
+      assertEquals(keytabs.get(0).getName(), keytabs.get(1).getName());
+    }
+  }
+
+  @Test
+  public void testKeytabFileNamesAreReusedOnceDeleted(@TempDir File keytabDir) throws Exception {
+    // The JDK keeps every keytab path it has read until the JVM exits.
+    Map<String, String> config =
+        ImmutableMap.of(
+            AuthenticationConfig.AUTH_TYPE_KEY,
+            "kerberos",
+            KerberosConfig.PRINCIPAL_KEY,
+            "test@EXAMPLE.COM",
+            KerberosConfig.KEY_TAB_URI_KEY,
+            "file:///tmp/test.keytab",
+            "gravitino.identifier",
+            "fileset-reused");
+    Map<String, String> otherKeytab =
+        ImmutableMap.of(
+            AuthenticationConfig.AUTH_TYPE_KEY,
+            "kerberos",
+            KerberosConfig.PRINCIPAL_KEY,
+            "test@EXAMPLE.COM",
+            KerberosConfig.KEY_TAB_URI_KEY,
+            "file:///tmp/other.keytab",
+            "gravitino.identifier",
+            "fileset-reused");
+    KerberosClient client = mockLoggedInClient();
+    try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
+        MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
+      stubKerberosLogin(clients, client);
+      List<File> keytabs = stubKeytabFetch(authUtils, keytabDir);
+
+      new HDFSFileSystemProxy(new Path("file:///"), config).getProxy().close();
+      new HDFSFileSystemProxy(new Path("file:///"), config).getProxy().close();
+      assertEquals(keytabs.get(0).getName(), keytabs.get(1).getName());
+      // A file of another keytab never takes that name, so the JDK never reads it as this one.
+      new HDFSFileSystemProxy(new Path("file:///"), otherKeytab).getProxy().close();
+      assertNotEquals(keytabs.get(0).getName(), keytabs.get(2).getName());
+    }
+  }
+
+  @Test
+  public void testFailedFetchDeletesWhatItWrote() throws Exception {
+    KerberosClient client = mockLoggedInClient();
+    AtomicReference<File> destination = new AtomicReference<>();
+    AtomicBoolean createdDir = new AtomicBoolean();
+    AtomicBoolean written = new AtomicBoolean();
+    try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
+        MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
+      stubKerberosLogin(clients, client);
+      // Like a download that writes part of the file in place and then fails.
+      authUtils
+          .when(
+              () ->
+                  KerberosAuthUtils.fetchKeytabFromUri(
+                      anyString(), any(), anyInt(), anyBoolean(), any()))
+          .thenAnswer(
+              invocation -> {
+                File file = invocation.getArgument(1);
+                destination.set(file);
+                File dir = file.getAbsoluteFile().getParentFile();
+                createdDir.set(!dir.exists());
+                Files.createDirectories(dir.toPath());
+                Files.write(file.toPath(), new byte[] {1});
+                written.set(true);
+                throw new IOException("Connection reset");
+              });
+      try {
+        assertThrows(
+            GravitinoRuntimeException.class,
+            () -> new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG));
+        assertTrue(written.get());
+        assertFalse(destination.get().exists());
+        assertFalse(HDFSFileSystemProxy.isLiveKeytabFile(destination.get()));
+      } finally {
+        if (destination.get() != null) {
+          Files.deleteIfExists(destination.get().toPath());
+          if (createdDir.get()) {
+            Files.deleteIfExists(destination.get().getAbsoluteFile().getParentFile().toPath());
+          }
+        }
+      }
     }
   }
 
@@ -381,6 +476,29 @@ public class TestHDFSFileSystemProxy {
       assertTrue(keytabs.get(1).exists());
       second.close();
       assertFalse(keytabs.get(1).exists());
+
+      // A name freed by a closed proxy is reused, never one an open proxy still holds.
+      FileSystem a = new HDFSFileSystemProxy(new Path("file:///"), config).getProxy();
+      FileSystem b = new HDFSFileSystemProxy(new Path("file:///"), config).getProxy();
+      a.close();
+      FileSystem c = new HDFSFileSystemProxy(new Path("file:///"), config).getProxy();
+      FileSystem d = new HDFSFileSystemProxy(new Path("file:///"), config).getProxy();
+      try {
+        String nameOfB = keytabs.get(3).getName();
+        assertEquals(keytabs.get(2).getName(), keytabs.get(4).getName());
+        assertNotEquals(nameOfB, keytabs.get(4).getName());
+        assertNotEquals(nameOfB, keytabs.get(5).getName());
+        assertNotEquals(keytabs.get(4).getName(), keytabs.get(5).getName());
+        // Closing b frees its own name, not another one.
+        b.close();
+        try (FileSystem e = new HDFSFileSystemProxy(new Path("file:///"), config).getProxy()) {
+          assertEquals(nameOfB, keytabs.get(6).getName());
+        }
+      } finally {
+        b.close();
+        c.close();
+        d.close();
+      }
     }
   }
 
@@ -430,6 +548,63 @@ public class TestHDFSFileSystemProxy {
           settings.get(Constants.HADOOP_KRB5_CONF),
           loginConf.getValue().get(krb5ConfKey.getValue()));
     }
+  }
+
+  @Test
+  public void testLoginSettingsExpandVariablesWhereverTheirPropertiesComeFrom(
+      @TempDir File resourceDir) throws Exception {
+    assertFalse(
+        HDFSFileSystemProxy.loginSettingsExpandVariables(
+            HDFSFileSystemProxy.hadoopConfiguration(KERBEROS_CONFIG)));
+    // Each Hadoop property the settings come from, set to a variable that expands to kerberos.
+    for (String key :
+        new String[] {
+          HADOOP_SECURITY_AUTHENTICATION,
+          Constants.HADOOP_SECURITY_PRINCIPAL,
+          Constants.HADOOP_SECURITY_KEYTAB,
+          Constants.HADOOP_KRB5_CONF
+        }) {
+      Map<String, String> config =
+          ImmutableMap.<String, String>builder()
+              .putAll(KERBEROS_CONFIG)
+              .put(FileSystemProvider.GRAVITINO_BYPASS + "auth", "kerberos")
+              .put(FileSystemProvider.GRAVITINO_BYPASS + key, "${auth}")
+              .build();
+      assertTrue(
+          HDFSFileSystemProxy.loginSettingsExpandVariables(
+              HDFSFileSystemProxy.hadoopConfiguration(config)),
+          key);
+    }
+
+    // A variable that expands to another spelling of kerberos is still seen, though the value is
+    // normalized for the login.
+    Map<String, String> upperCase =
+        ImmutableMap.<String, String>builder()
+            .putAll(KERBEROS_CONFIG)
+            .put(FileSystemProvider.GRAVITINO_BYPASS + "auth", "KERBEROS")
+            .put(FileSystemProvider.GRAVITINO_BYPASS + HADOOP_SECURITY_AUTHENTICATION, "${auth}")
+            .build();
+    Configuration normalized = HDFSFileSystemProxy.hadoopConfiguration(upperCase);
+    assertTrue(HDFSFileSystemProxy.loginSettingsExpandVariables(normalized));
+    assertEquals("kerberos", normalized.get(HADOOP_SECURITY_AUTHENTICATION));
+
+    // A variable in a config.resources file counts too.
+    File resource = new File(resourceDir, "login-site.xml");
+    Files.write(
+        resource.toPath(),
+        ("<configuration><property><name>"
+                + Constants.HADOOP_SECURITY_PRINCIPAL
+                + "</name><value>svc@${realm}</value></property></configuration>")
+            .getBytes(StandardCharsets.UTF_8));
+    Map<String, String> fromResource =
+        ImmutableMap.of(
+            AuthenticationConfig.AUTH_TYPE_KEY,
+            "kerberos",
+            Constants.CONFIG_RESOURCES,
+            resource.getAbsolutePath());
+    assertTrue(
+        HDFSFileSystemProxy.loginSettingsExpandVariables(
+            HDFSFileSystemProxy.hadoopConfiguration(fromResource)));
   }
 
   private static KerberosClient mockLoggedInClient() throws Exception {
