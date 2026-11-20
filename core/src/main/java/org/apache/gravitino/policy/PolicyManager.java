@@ -331,6 +331,7 @@ public class PolicyManager implements PolicyDispatcher {
           PolicyEntity.class,
           Entity.EntityType.POLICY,
           policyEntity -> {
+            PolicyEditAuthorization.check(policyEntity.nameIdentifier(), policyEntity);
             PolicyEntity.Builder builder = newPolicyBuilder(policyEntity);
             builder.withEnabled(expectedEnabledState);
             // Enable/disable must not re-validate legacy stored content.
@@ -370,6 +371,7 @@ public class PolicyManager implements PolicyDispatcher {
     try {
       PolicyEntity policyEntity =
           entityStore.get(policyIdent, Entity.EntityType.POLICY, PolicyEntity.class);
+      PolicyEditAuthorization.check(policyIdent, policyEntity);
       return policyEntity.enabled();
     } catch (NoSuchEntityException e) {
       throw new NoSuchPolicyException(
@@ -382,6 +384,7 @@ public class PolicyManager implements PolicyDispatcher {
 
   @SuppressWarnings("deprecation")
   private PolicyEntity updatePolicyEntity(PolicyEntity policyEntity, PolicyChange... changes) {
+    PolicyEditAuthorization.check(policyEntity.nameIdentifier(), policyEntity);
     String newName = policyEntity.name();
     String newComment = policyEntity.comment();
     PolicyContent newContent = policyEntity.content();

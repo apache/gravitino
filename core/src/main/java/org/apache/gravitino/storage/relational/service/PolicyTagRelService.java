@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Entity;
@@ -47,6 +48,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
+import org.apache.gravitino.policy.PolicyEditAuthorization;
 import org.apache.gravitino.policy.TagValueSelector;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
@@ -54,6 +56,7 @@ import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.po.PolicyTagRelPO;
 import org.apache.gravitino.storage.relational.po.TagPO;
+import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -190,6 +193,20 @@ public class PolicyTagRelService {
     TagPO tagPO = lockTag(tagIdentifier);
     long tagId = tagPO.getTagId();
     Map<String, Long> policyIds = resolvePolicyIds(metalake, targetsToAdd, targetsToRemove);
+    for (RelationEdgeTarget target :
+        Stream.concat(Arrays.stream(targetsToAdd), Arrays.stream(targetsToRemove))
+            .toArray(RelationEdgeTarget[]::new)) {
+      NameIdentifier identifier = target.nameIdentifier();
+      if (PolicyEditAuthorization.isChecked(identifier)) {
+        SessionUtils.clearSessionCache();
+        PolicyEntity current =
+            PolicyMetaService.getInstance().getPolicyById(policyIds.get(identifier.name()));
+        if (current == null) {
+          throw ExceptionUtils.concurrentModification(Entity.EntityType.POLICY, identifier);
+        }
+        PolicyEditAuthorization.check(identifier, current);
+      }
+    }
 
     // Validate the locked row in the same transaction as the relation write. Do not carry a
     // constraint read by REST or a dispatcher across this transaction boundary.

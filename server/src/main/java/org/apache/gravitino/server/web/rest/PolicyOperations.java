@@ -66,6 +66,7 @@ import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -218,7 +219,8 @@ public class PolicyOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("policy") @AuthorizationMetadata(type = Entity.EntityType.POLICY) String name,
-      PolicyUpdatesRequest request) {
+      @AuthorizationRequest(type = AuthorizationRequest.RequestType.ALTER_POLICY)
+          PolicyUpdatesRequest request) {
     LOG.info("Received alter policy request for policy: {} under metalake: {}", name, metalake);
     if (request == null) {
       return ExceptionHandlers.handlePolicyException(
@@ -265,7 +267,8 @@ public class PolicyOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("policy") @AuthorizationMetadata(type = Entity.EntityType.POLICY) String name,
-      PolicySetRequest request) {
+      @AuthorizationRequest(type = AuthorizationRequest.RequestType.ALTER_POLICY)
+          PolicySetRequest request) {
     if (request == null) {
       return ExceptionHandlers.handlePolicyException(
           OperationType.SET,
