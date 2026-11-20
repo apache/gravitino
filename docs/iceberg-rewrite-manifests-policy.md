@@ -78,6 +78,18 @@ When the policy omits `use_caching`, the adapter supplies an empty option to cle
 caching setting and leave the Iceberg runtime default in effect.
 Recollect statistics after a successful rewrite before evaluating again.
 
+## TMS before and after metrics
+
+`builtin-iceberg-maintenance-task` reports:
+
+| Phase | Keys |
+| --- | --- |
+| Before (S0) | `custom-manifest-number`, `custom-avg-manifest-size`, plus partitioned-spec observability keys when applicable |
+| After (S1) | The same inventory keys as before for the resolved spec, plus `custom-rewritten-manifest-number` from the Iceberg procedure result |
+
+After metrics re-read current manifests so Validation can show Before / After / Change for
+inventory fields, not only the rewritten count.
+
 ## Selecting a partition spec
 
 When `spec_id` is omitted, the recommender resolves Iceberg's current `default-spec-id` from

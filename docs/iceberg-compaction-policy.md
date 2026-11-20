@@ -48,6 +48,24 @@ The policy content is converted to:
   - `sortOrder=<sortOrder>`
   - `job.options.<key>=<value>` for each rewrite option
 
+## TMS before and after metrics
+
+`builtin-iceberg-maintenance-task` reports these keys on both before (S0) and after (S1)
+samples for Validation:
+
+| Key | Source |
+| --- | --- |
+| `custom-data-file-mse` | Inventory SQL (also used by `trigger-expr`) |
+| `custom-delete-file-number` | Inventory SQL |
+| `custom-avg-file-size` | Inventory SQL |
+| `custom-total-file-size` | Inventory SQL |
+| `custom-file-number` | Inventory SQL |
+| `custom-small-file-number` | Inventory SQL (files smaller than 32 MiB) |
+| `custom-data-mse-ratio` | Orchestrator: `custom-data-file-mse / minDataFileMse` from task rules |
+
+`custom-data-mse-ratio` is a display Fragmentation multiple. The job does not store
+`minDataFileMse` as a metric. Trigger evaluation still uses raw `custom-data-file-mse`.
+
 ## Parameter Tuning Guide
 
 ### Metric Unit and Threshold Formula
