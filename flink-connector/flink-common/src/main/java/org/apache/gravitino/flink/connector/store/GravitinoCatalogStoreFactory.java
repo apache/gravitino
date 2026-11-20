@@ -22,6 +22,7 @@ package org.apache.gravitino.flink.connector.store;
 import static org.apache.flink.table.factories.FactoryUtil.createCatalogStoreFactoryHelper;
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO;
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_CLIENT_CONFIG;
+import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_ENABLE_SESSION_CATALOG_SHADOWING;
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT;
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_EXCLUDED_CATALOGS;
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_METALAKE;
@@ -83,6 +84,9 @@ public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
     // unused client behind.
     Set<String> excludedCatalogs =
         parseExcludedCatalogs(options.get(GRAVITINO_EXCLUDED_CATALOGS), sessionCatalogSupport);
+    boolean sessionCatalogShadowing =
+        parseSessionCatalogShadowing(
+            options.get(GRAVITINO_ENABLE_SESSION_CATALOG_SHADOWING), sessionCatalogSupport);
 
     this.catalogManager =
         GravitinoCatalogManager.create(gravitinoUri, gravitinoName, extractClientConfig(options));
@@ -97,9 +101,14 @@ public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
                 + "can use these names.",
             excludedCatalogs);
       }
+      if (sessionCatalogShadowing) {
+        LOG.info(
+            "Session catalog shadowing is enabled; session catalogs can use the names of "
+                + "Gravitino catalogs that this session has not accessed.");
+      }
       this.catalogStore =
           new GravitinoSessionCatalogStore(
-              gravitinoCatalogStore, memoryCatalogStore, excludedCatalogs);
+              gravitinoCatalogStore, memoryCatalogStore, excludedCatalogs, sessionCatalogShadowing);
     } else {
       this.catalogStore = gravitinoCatalogStore;
     }
@@ -130,7 +139,28 @@ public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
     return ImmutableSet.of(
         GRAVITINO_CLIENT_CONFIG,
         GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT,
-        GRAVITINO_EXCLUDED_CATALOGS);
+        GRAVITINO_EXCLUDED_CATALOGS,
+        GRAVITINO_ENABLE_SESSION_CATALOG_SHADOWING);
+  }
+
+  /**
+   * Validates the session catalog shadowing option.
+   *
+   * @param sessionCatalogShadowing the configured session catalog shadowing option
+   * @param sessionCatalogSupport whether session catalog support is enabled
+   * @return the session catalog shadowing option
+   * @throws IllegalArgumentException if shadowing is enabled while session catalog support is
+   *     disabled
+   */
+  @VisibleForTesting
+  static boolean parseSessionCatalogShadowing(
+      boolean sessionCatalogShadowing, boolean sessionCatalogSupport) {
+    Preconditions.checkArgument(
+        !sessionCatalogShadowing || sessionCatalogSupport,
+        "%s can only be enabled when %s is true",
+        GRAVITINO_ENABLE_SESSION_CATALOG_SHADOWING.key(),
+        GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT.key());
+    return sessionCatalogShadowing;
   }
 
   /**

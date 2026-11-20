@@ -511,7 +511,7 @@ test('scheduled publication ignores poisoned cache state and recomputes definiti
   const { github, statuses } = publisherMock();
   github.rest.git = serviceMock({ changed: true }).rest.git;
   await update({ github, context: ctx, core, stateFile, sleep: async () => {} });
-  assert.equal(statuses[0].description, 'Fork CI passed; trusted verification required');
+  assert.equal(statuses[0].description, TRUSTED_REQUIRED);
   const workflow = await readFile(path.join(__dirname, '../../workflows/fork-ci-status-update.yml'), 'utf8');
   assert.ok(!workflow.includes('actions/cache/'));
 }));
@@ -1289,7 +1289,7 @@ test('changed CI definitions stay pending, not red, until trusted CI verifies th
   await update({ github, context: ctx, core, sleep: async () => {} });
   // Waiting for a committer is not a failure of the contributor's change.
   assert.equal(statuses[0].state, 'pending');
-  assert.equal(statuses[0].description, 'Fork CI passed; trusted verification required');
+  assert.equal(statuses[0].description, TRUSTED_REQUIRED);
 }));
 
 test('CI edits mirror execution progress and failures without self-approving success', async () => withPublisher(async ({ ctx, core }) => {
@@ -1298,7 +1298,7 @@ test('CI edits mirror execution progress and failures without self-approving suc
     ['in_progress', null, 'pending', 'Fork CI is running'],
     ['completed', 'failure', 'failure', 'Failed: backend / test; re-run it in your fork'],
     ['completed', 'cancelled', 'error', 'Fork CI cancelled; re-run it in your fork'],
-    ['completed', 'success', 'pending', 'Fork CI passed; trusted verification required']]) {
+    ['completed', 'success', 'pending', TRUSTED_REQUIRED]]) {
     const { github, statuses } = publisherMock({ rerun: { ...run(), status, conclusion } });
     github.rest.git = serviceMock({ changed: true }).rest.git;
     await update({ github, context: ctx, core, sleep: async () => {} });
@@ -2316,3 +2316,36 @@ test('trusted rerun failures stay retryable until the current summary identifies
     }
   }
 });
+
+
+test('trusted verification hint explains the cause and recovery without truncation', async () => withPublisher(async ({ ctx, core }) => {
+  const { github, statuses } = publisherMock();
+  github.rest.git = serviceMock({ changed: true }).rest.git;
+  await update({ github, context: ctx, core });
+  assert.equal(statuses[0].state, 'pending');
+  assert.equal(statuses[0].description, 'Fork CI passed; CI files differ from target branch. ' +
+    'Committer: run Fork CI in apache/gravitino on that branch with this PR number.');
+  assert.ok(statuses[0].description.length <= 140);
+}));
+
+test('scheduled probes upgrade the old trust hint without repeatedly rewriting the new hint', async () => withPublisher(async ({ ctx, core }) => {
+  ctx.eventName = 'schedule'; delete ctx.payload.inputs;
+  const recent = { ...pr(), updated_at: new Date().toISOString() };
+  for (const description of ['Fork CI passed; trusted verification required', TRUSTED_REQUIRED]) {
+    const { github, statuses } = publisherMock({ latest: forkStatus('pending', description) });
+    github.rest.git = serviceMock({ changed: true }).rest.git;
+    const listPulls = github.rest.pulls.list, paginate = github.paginate;
+    github.paginate = async (endpoint, args) => endpoint === listPulls ? [recent] : paginate(endpoint, args);
+    github.rest.pulls.get = async () => ({ data: recent });
+    let inspected = false;
+    const getTree = github.rest.git.getTree;
+    github.rest.git.getTree = async args => { inspected = true; return getTree(args); };
+    await update({ github, context: ctx, core, sleep: async () => {} });
+    assert.equal(inspected, description !== TRUSTED_REQUIRED);
+    assert.equal(statuses.length, description === TRUSTED_REQUIRED ? 0 : 1);
+    if (statuses.length) {
+      assert.equal(statuses[0].state, 'pending');
+      assert.equal(statuses[0].description, TRUSTED_REQUIRED);
+    }
+  }
+}));

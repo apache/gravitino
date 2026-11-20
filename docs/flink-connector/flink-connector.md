@@ -58,6 +58,7 @@ Do not mix runtime JARs from different Flink minor versions in the same Flink de
 | table.catalog-store.gravitino.gravitino.uri                         | string  | (none)            | The uri of Gravitino server address.                                                  | Yes      |
 | table.catalog-store.gravitino.gravitino.enableSessionCatalogSupport | boolean | false             | Whether to enable support for Flink's session catalog in the Gravitino catalog store. | No       |
 | table.catalog-store.gravitino.gravitino.excludedCatalogs            | list    | (none)            | Semicolon-separated catalog names that are never resolved against Gravitino in this session. Only valid when `enableSessionCatalogSupport` is `true`. See [Use a session catalog with the name of a Gravitino catalog](#use-a-session-catalog-with-the-name-of-a-gravitino-catalog). | No       |
+| table.catalog-store.gravitino.gravitino.enableSessionCatalogShadowing | boolean | false           | Whether a session catalog can use the name of a Gravitino catalog that the session has not accessed yet. Only valid when `enableSessionCatalogSupport` is `true`. See [Let session catalogs shadow Gravitino catalogs](#let-session-catalogs-shadow-gravitino-catalogs). | No       |
 | table.catalog-store.gravitino.gravitino.client.                     | string  | (none)            | The configuration key prefix for the Gravitino client config.                         | No       |
 
 When `table.catalog-store.gravitino.gravitino.enableSessionCatalogSupport` is set to `true`, Gravitino uses `GravitinoSessionCatalogStore`, which combines a `GravitinoCatalogStore` (backed by the Gravitino server) with an in-memory store to support Flink's session catalog. When `false` (the default), only `GravitinoCatalogStore` is used.
@@ -69,7 +70,7 @@ When session catalog support is enabled, the following behaviors apply:
 - **DROP CATALOG**: The in-memory store is checked first. If the catalog exists there it is removed from memory; otherwise it is removed from the Gravitino server.
 - **SHOW / LIST CATALOGS**: Returns the combined set of catalogs from both the in-memory store and the Gravitino server.
 - **Session scope**: Catalogs stored only in memory are session-scoped and will not survive when Flink restarts.
-- **Name conflict**: `CREATE CATALOG` fails if a catalog with the same name already exists in either store, including a Gravitino catalog created by another client. If a Gravitino catalog with the same name as an existing in-memory catalog is created later, the in-memory entry takes precedence in this session. To create a session catalog with the name of an existing Gravitino catalog, use `excludedCatalogs`.
+- **Name conflict**: `CREATE CATALOG` fails if a catalog with the same name already exists in either store, including a Gravitino catalog created by another client. If a Gravitino catalog with the same name as an existing in-memory catalog is created later, the in-memory entry takes precedence in this session. To create a session catalog with the name of an existing Gravitino catalog, use `excludedCatalogs` or `enableSessionCatalogShadowing`.
 
 To configure the Gravitino client, use properties prefixed with `table.catalog-store.gravitino.gravitino.client.`. These properties will be passed to the Gravitino client after removing the `table.catalog-store.gravitino.` prefix.
 
@@ -138,8 +139,30 @@ For each excluded name, the Flink session behaves as follows:
 Exclusion only affects the current Flink session. The Gravitino catalog and its metadata are not modified, and other sessions still see it. Names are case-sensitive.
 
 :::caution
-A session catalog uses its own connector configuration and authentication. Gravitino does not authorize access through a session catalog, regardless of whether its name is excluded. Excluding a name does not grant any additional access, but make sure that session catalogs are permitted by your platform's access policy.
+A session catalog uses its own connector configuration and authentication. Gravitino does not authorize access through a session catalog, regardless of whether its name is excluded or it shadows a Gravitino catalog. Excluding a name or enabling shadowing does not grant any additional access, but make sure that session catalogs are permitted by your platform's access policy.
 :::
+
+### Let session catalogs shadow Gravitino catalogs
+
+`excludedCatalogs` requires the conflicting names to be known in advance, and it hides the Gravitino catalogs from every job that uses the configuration. If the names are not known, for example because the jobs are maintained by different teams, enable session catalog shadowing instead. The option has no catalog names, so it can be set once in the cluster-wide Flink configuration:
+
+```yaml
+table.catalog-store.gravitino.gravitino.enableSessionCatalogSupport: true
+table.catalog-store.gravitino.gravitino.enableSessionCatalogShadowing: true
+```
+
+With shadowing enabled, a job that runs `CREATE CATALOG paimon_catalog WITH ('type'='paimon', ...)` gets its own session catalog, even if Gravitino has a catalog named `paimon_catalog`. A job that does not create the catalog keeps using the Gravitino catalog.
+
+A Gravitino catalog is *accessed* by a session once the session loads it, for example through `USE CATALOG`, a table lookup, or `DESCRIBE CATALOG`, or creates it through Flink. The Flink session behaves as follows:
+
+- `CREATE CATALOG` with a non-Gravitino-managed type, such as `paimon` or `hive`, creates a session catalog in memory if the session has not accessed a Gravitino catalog with the same name. The session catalog shadows the Gravitino catalog in this session: `USE CATALOG`, table lookups, `ALTER CATALOG`, and `DROP CATALOG` use the session catalog, and `SHOW CATALOGS` lists the name once. Creating a second catalog with the same name still fails.
+- `DROP CATALOG` on the session catalog never drops the Gravitino catalog. After the drop, the name resolves to the Gravitino catalog again.
+- A Gravitino catalog that the session has accessed cannot be shadowed. `CREATE CATALOG` with its name fails, as it does without shadowing.
+- Creating a Gravitino-managed catalog type, such as `gravitino-paimon`, under the name of an existing Gravitino catalog fails, including with `IF NOT EXISTS`. Altering a session catalog that shadows a Gravitino catalog into a Gravitino-managed type also fails.
+- `DROP CATALOG` on a Gravitino catalog that the session has not accessed fails with `does not exist`, and `DROP CATALOG IF EXISTS` does nothing. Flink SQL only drops Gravitino catalogs that the session has accessed. To drop a Gravitino catalog from Flink SQL, use it in the session first, or drop it through Gravitino.
+
+Shadowing only affects the current Flink session. The Gravitino catalog and its metadata are not modified, and other sessions still see it. Names are case-sensitive. Names in `excludedCatalogs` are never resolved against Gravitino, regardless of shadowing. When a session catalog shadows a Gravitino catalog, the connector logs a warning.
+
 
 ## Catalog Naming Restrictions
 

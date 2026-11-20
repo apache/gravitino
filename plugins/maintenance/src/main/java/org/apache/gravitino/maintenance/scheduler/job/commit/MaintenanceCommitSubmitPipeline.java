@@ -112,7 +112,7 @@ public final class MaintenanceCommitSubmitPipeline {
         LOG.info(
             "Skipping commit-job submit for table {} (type {} policy {} still occupied)",
             tableId,
-            task.getMaintenanceType(),
+            task.getPolicyType(),
             task.getPolicyId());
         return;
       }
@@ -132,8 +132,7 @@ public final class MaintenanceCommitSubmitPipeline {
 
     Map<String, String> jobConf;
     try {
-      jobConf =
-          jobConfBuilder.resolveForSubmit(MaintenanceJobSpecFactory.jobConfForCommitChain(spec));
+      jobConf = jobConfBuilder.resolveForSubmit(MaintenanceJobSpecFactory.jobConfForSpec(spec));
     } catch (RuntimeException e) {
       actionMetaService.deleteClaims(claims.get());
       LOG.warn(
@@ -147,7 +146,7 @@ public final class MaintenanceCommitSubmitPipeline {
           "Submitted commit-job for table {} as job {} (chain={}, policies={})",
           tableId,
           jobId.get(),
-          spec.getTasks().stream().map(Task::getMaintenanceType).collect(Collectors.toList()),
+          spec.getTasks().stream().map(Task::getPolicyType).collect(Collectors.toList()),
           policyIds);
     }
   }

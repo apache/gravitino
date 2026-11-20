@@ -26,34 +26,35 @@ import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionCo
  * Translates optimizer job execution context into Gravitino job submission inputs.
  *
  * <p>Usage: {@link GravitinoJobSubmitter} looks up an adapter for the requested job template,
- * creates a new instance, and calls {@link #jobConfig(JobExecutionContext, Map)} when submitting
- * the job to Gravitino.
+ * creates a new instance, and calls {@link #jobConfig(JobExecutionContext, Map, String)} when
+ * submitting the job to Gravitino. The schema separator must come from {@code GET /configs};
+ * built-in adapters never invent a default {@code :}.
  */
 public interface GravitinoJobAdapter {
 
   /**
-   * Returns the Gravitino job configuration map derived from the execution context.
-   *
-   * <p>The returned map is supplied as job parameters when submitting the job to Gravitino.
-   *
-   * @param jobExecutionContext job execution context
-   * @return job configuration map
-   */
-  Map<String, String> jobConfig(JobExecutionContext jobExecutionContext);
-
-  /**
-   * Same as {@link #jobConfig(JobExecutionContext)}, with access to optimizer job-submitter
-   * defaults (for example Spark {@code catalog_name}) before they are merged over.
-   *
-   * <p>Default delegates to {@link #jobConfig(JobExecutionContext)}. Compaction overrides this so
-   * partition {@code where_clause} functions use the same Spark catalog alias as the CALL.
+   * Builds job configuration using submitter defaults and the server's {@code
+   * gravitino.schema.separator}.
    *
    * @param jobExecutionContext job execution context
    * @param submitterConfigs {@code gravitino.optimizer.jobSubmitterConfig.*} values (may be empty)
+   * @param schemaSeparator configured external schema separator from {@code GET /configs}
+   * @return job configuration map
+   */
+  Map<String, String> jobConfig(
+      JobExecutionContext jobExecutionContext,
+      Map<String, String> submitterConfigs,
+      String schemaSeparator);
+
+  /**
+   * Same as {@link #jobConfig(JobExecutionContext, Map, String)} with empty submitter defaults.
+   *
+   * @param jobExecutionContext job execution context
+   * @param schemaSeparator configured external schema separator
    * @return job configuration map
    */
   default Map<String, String> jobConfig(
-      JobExecutionContext jobExecutionContext, Map<String, String> submitterConfigs) {
-    return jobConfig(jobExecutionContext);
+      JobExecutionContext jobExecutionContext, String schemaSeparator) {
+    return jobConfig(jobExecutionContext, Map.of(), schemaSeparator);
   }
 }

@@ -453,11 +453,7 @@ class DTOConverters:
         if isinstance(content, IcebergRewriteManifestsContent):
             spec = content.execution_spec()
             return IcebergRewriteManifestsContentDTO(
-                _manifest_count_critical=content.manifest_count_critical(),
-                _manifest_count_warning=content.manifest_count_warning(),
-                _avg_manifest_size_threshold_bytes=(
-                    content.avg_manifest_size_threshold_bytes()
-                ),
+                _manifest_count_threshold=content.manifest_count_threshold(),
                 _spec_id=content.spec_id(),
                 _use_caching=content.use_caching(),
                 _time_trigger=spec.time_trigger(),

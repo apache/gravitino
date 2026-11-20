@@ -26,7 +26,8 @@ a parent cannot be unpublished while a child is published. See the
 
 ## Membership through tags
 
-A domain explicitly binds a backing tag, optionally with one value. Membership is derived from
+Each domain explicitly binds its own backing tag, and a tag backs at most one domain. Membership
+depends only on the presence of that tag and is derived from
 existing [tag assignments and inheritance](./tags.md), rather than maintained in a separate list.
 Use the [tag API](./manage-tags-in-gravitino.md) to assign/remove a backing tag on a leaf, schema or
 catalog. There is no Domain add-member or remove-member API.
@@ -44,23 +45,19 @@ A member query has two modes:
   absent.
 
 Clients identify a member that includes its children by its `catalog` or `schema` type. Such a
-member stands for the objects under it, except those where a nearer assignment of the same tag
-overrides it as described below; use `expand=true` or object-to-domain lookup to resolve them.
+member stands for the leaves under it that inherit the tag; use `expand=true` or object-to-domain
+lookup to resolve them.
 
-For the same tag, the assignment nearest the leaf wins: leaf before schema before catalog.
-Assignments are replaced as a whole at each nearer level, not combined with ancestor values.
-For example, `department=hr` on a table masks `department=finance` on its schema, so the table does
-not belong to the domain backed by `department=finance`. A binding without a value matches any
-effective assignment of that tag; a valued binding tests exact, case-sensitive containment in the
-assignment's values. Different tags resolve independently, allowing membership in multiple domains.
+A leaf is a member when it carries the backing tag directly or inherits it from its schema or
+catalog. Membership uses only the presence of the tag, and any value on an assignment is ignored.
+The assignment itself follows the tag's constraint: a tag with an allowed-values list must be assigned
+one of its allowed values with the v2 tag-value API. To remove a backing tag from an object, remove it by name with the v1 tag
+API, which clears all its direct assignments on the object whatever their values.
+Different tags resolve independently, allowing membership in multiple domains.
 
 Removing a tag from a leaf changes only its own assignment; it is not an opt-out from inheritance.
 If its schema or catalog still assigns that backing tag, the leaf remains a member through
-inheritance. Removing the last directly assigned value can also reveal an ancestor assignment and
-move the leaf back into a different valued domain. To remove inherited membership, change the
-assignment at its source or use a nearer assignment that does not match the valued binding.
-A valueless backing-tag binding matches any assignment of that tag, so assigning another value
-cannot exclude the leaf from that domain.
+inheritance. To remove inherited membership, remove the assignment at its source.
 
 ## Relations and sources
 
