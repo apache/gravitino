@@ -61,7 +61,7 @@ _CONTENT_ROUND_TRIP_CASES = [
     ),
     (
         "system_iceberg_rewrite_manifests",
-        {"manifest_count_critical": 900},
+        {"manifest_count_threshold": 900},
         IcebergRewriteManifestsContentDTO,
     ),
     (

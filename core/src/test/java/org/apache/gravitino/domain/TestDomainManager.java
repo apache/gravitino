@@ -954,11 +954,6 @@ public class TestDomainManager {
         IllegalArgumentException.class,
         () ->
             domainManager.createDomain(
-                METALAKE, "Markets", null, null, TagValue.noValue("dept"), false));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            domainManager.createDomain(
                 METALAKE, "Markets", null, null, TagValue.of("plain", "v"), false));
 
     // A value backs one domain, and valued and valueless bindings of a tag are never mixed.
@@ -990,6 +985,51 @@ public class TestDomainManager {
             .createDomain(METALAKE, "Markets", null, null, TagValue.of("dept", "markets"), false)
             .backingTag()
             .orElse(null));
+  }
+
+  @Test
+  public void testBindTagWithAllowedValuesWithoutValue() throws IOException {
+    createTag("region", TagValueConstraint.ofAllowedValues("emea", "apac"));
+    createTag("dept", TagValueConstraint.ofAllowedValues("finance", "markets"));
+
+    // A tag that requires values on assignments can still back a domain without a value.
+    DomainEntity emea =
+        domainManager.createDomain(METALAKE, "Emea", null, null, TagValue.noValue("region"), false);
+    Assertions.assertEquals(TagValue.noValue("region"), emea.backingTag().orElse(null));
+    DomainEntity markets =
+        domainManager.createDomain(
+            METALAKE, "Markets", null, null, TagValue.noValue("dept"), false);
+    DomainEntity child =
+        domainManager.createSubdomain(
+            METALAKE, "Markets", "Child", null, null, TagValue.noValue("plain_child"), true);
+    Assertions.assertEquals(TagValue.noValue("plain_child"), child.backingTag().orElse(null));
+
+    // A tag backs at most one domain, at creation and on update.
+    Assertions.assertThrows(
+        BackingTagAlreadyBoundException.class,
+        () ->
+            domainManager.createDomain(
+                METALAKE, "Apac", null, null, TagValue.noValue("region"), false));
+    Assertions.assertThrows(
+        BackingTagAlreadyBoundException.class,
+        () ->
+            domainManager.createSubdomain(
+                METALAKE, "Markets", "Apac", null, null, TagValue.noValue("region"), false));
+    Assertions.assertThrows(
+        BackingTagAlreadyBoundException.class,
+        () -> domainManager.updateBackingTag(METALAKE, "Child", TagValue.noValue("region")));
+    Assertions.assertThrows(
+        NoSuchDomainException.class, () -> domainManager.getDomain(METALAKE, "Apac"));
+
+    // A domain can move to a tag with allowed values once no other domain uses that tag.
+    domainManager.updateBackingTag(METALAKE, "Emea", null);
+    Assertions.assertEquals(
+        TagValue.noValue("region"),
+        domainManager
+            .updateBackingTag(METALAKE, "Child", TagValue.noValue("region"))
+            .backingTag()
+            .orElse(null));
+    Assertions.assertEquals(markets, domainManager.getDomain(METALAKE, "Markets"));
   }
 
   @Test
