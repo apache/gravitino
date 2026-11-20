@@ -63,6 +63,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.apache.gravitino.exceptions.TermAlreadyExistsException;
 import org.apache.gravitino.meta.GlossaryTermEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizationLookups;
@@ -540,6 +541,105 @@ class TestGlossaryAuthorization extends TestJDBCBackend {
         }
       }
     }
+  }
+
+  @TestTemplate
+  void testDraftReadsUseOwnershipFromTheDefinitionSnapshot() throws Exception {
+    ExecutorService worker = Executors.newSingleThreadExecutor();
+    try {
+      for (String name : List.of("get", "list")) {
+        GlossaryTermEntity term =
+            as(
+                "writer",
+                () ->
+                    manager.createTerm(
+                        LAKE,
+                        TermSpec.builder(name)
+                            .withStatus(GlossaryTerm.Status.DRAFT)
+                            .withDefinition("original")
+                            .build()));
+        GravitinoAuthorizer observed =
+            Mockito.mock(GravitinoAuthorizer.class, AdditionalAnswers.delegatesTo(nodeA));
+        // Redact and transfer after the term rows have been read, before checking the reader's
+        // ownership.
+        Mockito.doAnswer(
+                invocation -> {
+                  worker
+                      .submit(
+                          () ->
+                              as(
+                                  "writer",
+                                  () -> {
+                                    manager.alterTerm(
+                                        LAKE, name, TermChange.updateDefinition("revised"));
+                                    return transfer(term, "writer2", Owner.Type.USER);
+                                  }))
+                      .get(30, TimeUnit.SECONDS);
+                  return nodeA.isGlossaryTermOwner(
+                      invocation.getArgument(0), LAKE, term.id(), invocation.getArgument(3));
+                })
+            .when(observed)
+            .isGlossaryTermOwner(
+                Mockito.argThat(principal -> principal.getName().equals("writer2")),
+                    Mockito.eq(LAKE),
+                Mockito.eq(term.id()), Mockito.any());
+        env.setGravitinoAuthorizer(observed);
+        try {
+          if (name.equals("get")) {
+            assertThrows(
+                NoSuchTermException.class, () -> as("writer2", () -> manager.getTerm(LAKE, name)));
+          } else {
+            assertTrue(
+                as("writer2", () -> manager.listTerms(LAKE)).stream()
+                    .noneMatch(result -> result.id().longValue() == term.id()));
+          }
+        } finally {
+          env.setGravitinoAuthorizer(nodeA);
+        }
+        assertEquals("revised", as("writer2", () -> manager.getTerm(LAKE, name)).definition());
+      }
+    } finally {
+      worker.shutdownNow();
+    }
+  }
+
+  @TestTemplate
+  void testAuthorizedReadsLeaveAnEnclosingTransactionIntact() throws Exception {
+    SessionUtils.beginTransaction();
+    try {
+      as("writer", () -> manager.createTerm(LAKE, TermSpec.builder("pending").build()));
+      assertThrows(
+          IllegalStateException.class, () -> as("writer", () -> manager.getTerm(LAKE, "pending")));
+      assertThrows(IllegalStateException.class, () -> as("writer", () -> manager.listTerms(LAKE)));
+    } finally {
+      SessionUtils.rollbackTransaction();
+    }
+    assertTrue(as("writer", () -> manager.listTerms(LAKE)).isEmpty());
+  }
+
+  @TestTemplate
+  void testBatchTransferAcceptsEquivalentTermNames() throws Exception {
+    GlossaryTermEntity term =
+        as("writer", () -> manager.createTerm(LAKE, TermSpec.builder("Net Revenue").build()));
+    MetadataObject alias = MetadataObjects.parse("NET  revenue", MetadataObject.Type.GLOSSARY_TERM);
+    GravitinoAuthorizer observed =
+        Mockito.mock(GravitinoAuthorizer.class, AdditionalAnswers.delegatesTo(nodeA));
+    env.setGravitinoAuthorizer(observed);
+    NameIdentifier previous = NameIdentifierUtil.ofUser(LAKE, "writer");
+    long previousId = backend.get(previous, Entity.EntityType.USER).id();
+    Mockito.doThrow(new NoSuchEntityException("Previous owner was removed"))
+        .when(env.entityStore())
+        .get(previous, Entity.EntityType.USER, UserEntity.class);
+    as(
+        "writer",
+        () -> {
+          owners.setOwners(LAKE, List.of(object(term), alias), "writer2", Owner.Type.USER);
+          return null;
+        });
+    Mockito.verify(observed)
+        .handleMetadataOwnerChange(
+            LAKE, previousId, term.nameIdentifier(), Entity.EntityType.GLOSSARY_TERM);
+    assertEquals("writer2", as("writer2", () -> owners.getOwner(LAKE, alias)).orElseThrow().name());
   }
 
   @TestTemplate

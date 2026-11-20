@@ -175,33 +175,42 @@ public final class GlossaryManager {
    * Lists the visible term definitions in the given metalake.
    *
    * @throws NoSuchMetalakeException if the metalake does not exist
+   * @throws IllegalStateException if authorization is enabled and the caller already has a SQL
+   *     session
    */
   public List<GlossaryTermEntity> listTerms(String metalake) {
-    List<GlossaryTermEntity> result;
-    try {
-      result = terms.list(NamespaceUtil.ofGlossaryTerm(metalake));
-    } catch (NoSuchEntityException e) {
-      throw new NoSuchMetalakeException(e, "Metalake %s does not exist", metalake);
+    if (!authorizationEnabled) {
+      return loadTerms(metalake);
     }
-    if (authorizationEnabled) {
-      GlossaryAccess access = GlossaryAccess.forRequest(metalake, true);
-      result.removeIf(term -> !access.canRead(term));
-    }
-    return result;
+    return SqlSessions.readSnapshot(
+        () -> {
+          List<GlossaryTermEntity> result = loadTerms(metalake);
+          GlossaryAccess access = GlossaryAccess.forRequest(metalake, true);
+          result.removeIf(term -> !access.canRead(term));
+          return result;
+        });
   }
 
   /**
    * Loads a definition by normalized name.
    *
    * @throws NoSuchTermException if the term is hidden or the term or its metalake does not exist
+   * @throws IllegalStateException if authorization is enabled and the caller already has a SQL
+   *     session
    */
   public GlossaryTermEntity getTerm(String metalake, String name) {
     NameIdentifier ident = NameIdentifier.of(NamespaceUtil.ofGlossaryTerm(metalake), name);
-    GlossaryTermEntity term = relationRoot(ident).term();
-    if (!GlossaryAccess.forRequest(metalake, authorizationEnabled).canRead(term)) {
-      throw missingRelationRoot(ident);
+    if (!authorizationEnabled) {
+      return relationRoot(ident).term();
     }
-    return term;
+    return SqlSessions.readSnapshot(
+        () -> {
+          GlossaryTermEntity term = relationRoot(ident).term();
+          if (!GlossaryAccess.forRequest(metalake, true).canRead(term)) {
+            throw missingRelationRoot(ident);
+          }
+          return term;
+        });
   }
 
   /**
@@ -471,6 +480,14 @@ public final class GlossaryManager {
       throw new TermAlreadyExistsException(e, "Term name or source reference already exists");
     } catch (IOException e) {
       throw new UncheckedIOException(e);
+    }
+  }
+
+  private List<GlossaryTermEntity> loadTerms(String metalake) {
+    try {
+      return terms.list(NamespaceUtil.ofGlossaryTerm(metalake));
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchMetalakeException(e, "Metalake %s does not exist", metalake);
     }
   }
 

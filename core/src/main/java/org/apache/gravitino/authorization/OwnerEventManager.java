@@ -22,7 +22,6 @@ package org.apache.gravitino.authorization;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import lombok.Getter;
@@ -83,11 +82,8 @@ public class OwnerEventManager implements OwnerDispatcher {
     }
     if (metadataObjects.stream()
         .allMatch(object -> object.type() == MetadataObject.Type.GLOSSARY_TERM)) {
-      // Each term commits separately. Report the outcome of each attempted transfer even if a
-      // later term fails, and preserve the public dispatcher's deduplication of repeated targets.
-      for (MetadataObject term : new LinkedHashSet<>(metadataObjects)) {
-        setOwner(metalake, term, ownerName, ownerType);
-      }
+      // A later failure must not emit failure events for transfers that already committed.
+      OwnerDispatcher.super.setOwners(metalake, metadataObjects, ownerName, ownerType);
       return;
     }
     String user = PrincipalUtils.getCurrentUserName();

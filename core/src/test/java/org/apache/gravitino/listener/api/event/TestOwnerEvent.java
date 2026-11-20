@@ -88,6 +88,7 @@ public class TestOwnerEvent {
   void testGlossaryTransferEventsReflectPartialCompletion() {
     String lake = "lake";
     MetadataObject first = MetadataObjects.parse("first", MetadataObject.Type.GLOSSARY_TERM);
+    MetadataObject alias = MetadataObjects.parse("FIRST", MetadataObject.Type.GLOSSARY_TERM);
     MetadataObject second = MetadataObjects.parse("second", MetadataObject.Type.GLOSSARY_TERM);
     MetadataObject last = MetadataObjects.parse("last", MetadataObject.Type.GLOSSARY_TERM);
     OwnerDispatcher transfers = Mockito.mock(OwnerDispatcher.class);
@@ -103,7 +104,7 @@ public class TestOwnerEvent {
             RuntimeException.class,
             () ->
                 dispatcher.setOwners(
-                    lake, List.of(first, first, second, last), "user", Owner.Type.USER)));
+                    lake, List.of(first, alias, second, last), "user", Owner.Type.USER)));
     Mockito.verify(transfers).setOwner(lake, first, "user", Owner.Type.USER);
     Mockito.verify(transfers).setOwner(lake, second, "user", Owner.Type.USER);
     Mockito.verifyNoMoreInteractions(transfers);

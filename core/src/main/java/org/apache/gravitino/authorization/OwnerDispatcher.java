@@ -20,10 +20,13 @@
 package org.apache.gravitino.authorization;
 
 import com.google.common.base.Preconditions;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.meta.GlossaryTermNames;
 
 /** Dispatcher interface for managing owners of metadata objects. */
 public interface OwnerDispatcher {
@@ -44,7 +47,8 @@ public interface OwnerDispatcher {
    * {@link #setOwner} calls; relational {@link org.apache.gravitino.EntityStore} implementations
    * may persist using {@link org.apache.gravitino.SupportsRelationOperations#batchInsertRelations}.
    * The default implementation delegates per object so implementations that wrap {@code setOwner}
-   * (e.g. for events) apply consistently.
+   * (e.g. for events) apply consistently. Equivalent glossary term names refer to one transfer,
+   * using the first spelling supplied. A later failure leaves earlier term transfers committed.
    *
    * <p>Note: implementations that persist via {@code batchInsertRelations} (such as {@link
    * OwnerManager}) require all {@code metadataObjects} to share the same {@link
@@ -64,7 +68,12 @@ public interface OwnerDispatcher {
       String ownerName,
       Owner.Type ownerType) {
     Preconditions.checkArgument(metadataObjects != null, "metadataObjects must not be null");
+    Set<String> glossaryNames = new HashSet<>();
     for (MetadataObject metadataObject : metadataObjects) {
+      if (metadataObject.type() == MetadataObject.Type.GLOSSARY_TERM
+          && !glossaryNames.add(GlossaryTermNames.key(metadataObject.name()))) {
+        continue;
+      }
       setOwner(metalake, metadataObject, ownerName, ownerType);
     }
   }
