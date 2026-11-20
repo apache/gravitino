@@ -44,6 +44,8 @@ paths:
           description: Returns the set operation result
           $ref: "./openapi.yaml#/components/responses/SetResponse"
 
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "404":
           description: Not Found - The specified owner or metadata object does not exist in the specified metalake
           content:
@@ -73,8 +75,10 @@ paths:
               examples:
                 OwnerResponse:
                   $ref: "#/components/examples/OwnerResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "404":
-          description: Not Found - The specified owner does not exist in the specified metalake
+          description: Not Found - The specified metadata object does not exist in the specified metalake
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -178,7 +182,7 @@ components:
     metadataObjectTypeOfOwner:
       name: metadataObjectType
       in: path
-      description: The type of the metadata object. DOMAIN ownership applies to the domain and its current subdomains; encode its literal name as one path segment. A GLOSSARY_TERM name is also a single segment and may contain literal dots.
+      description: The type of the metadata object. DOMAIN ownership applies to the domain and its current subdomains; encode its literal name as one path segment. A GLOSSARY_TERM name is also a single segment and may contain literal dots. Names consisting solely of one or two dots cannot be addressed through this path.
       required: true
       schema:
         type: string

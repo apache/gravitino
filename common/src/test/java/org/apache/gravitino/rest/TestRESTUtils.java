@@ -25,6 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.junit.jupiter.api.Test;
 
 class TestRESTUtils {
@@ -76,6 +78,18 @@ class TestRESTUtils {
     assertEquals("a%2Bb", RESTUtils.encodeString("a+b"));
     assertEquals("a+b c", RESTUtils.decodeString(RESTUtils.encodeString("a+b c")));
     assertThrows(IllegalArgumentException.class, () -> RESTUtils.encodeString(null));
+  }
+
+  @Test
+  void testEncodeGlossaryTermOwnerTarget() {
+    MetadataObject.Type type = MetadataObject.Type.GLOSSARY_TERM;
+    assertEquals(
+        "cost.net%2Funit",
+        RESTUtils.encodeMetadataObjectName(MetadataObjects.parse("cost.net/unit", type)));
+    for (String name : new String[] {".", ".."}) {
+      MetadataObject term = MetadataObjects.parse(name, type);
+      assertThrows(IllegalArgumentException.class, () -> RESTUtils.encodeMetadataObjectName(term));
+    }
   }
 
   @Test
