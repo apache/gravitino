@@ -31,6 +31,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -48,6 +51,7 @@ import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.authorization.OwnerNormalizeDispatcher;
 import org.apache.gravitino.authorization.Privilege;
@@ -537,9 +541,25 @@ class TestGlossaryAuthorization extends TestJDBCBackend {
                         .build()));
     OwnerNormalizeDispatcher dispatcher =
         new OwnerNormalizeDispatcher(owners, catalogs, env.entityStore());
-    assertEquals(
-        "writer", as("writer", () -> dispatcher.getOwner(LAKE, object(term))).orElseThrow().name());
-    as("writer", () -> transfer(term, "writer2", Owner.Type.USER));
+    // Transfer on another connection after the visibility check and before the owner lookup.
+    OwnerDispatcher interleaved = Mockito.mock(OwnerDispatcher.class);
+    ExecutorService writer = Executors.newSingleThreadExecutor();
+    try {
+      Mockito.when(interleaved.getOwner(Mockito.eq(LAKE), Mockito.any()))
+          .thenAnswer(
+              ignored -> {
+                writer
+                    .submit(() -> as("writer", () -> transfer(term, "writer2", Owner.Type.USER)))
+                    .get(30, TimeUnit.SECONDS);
+                return owners.getOwner(LAKE, object(term));
+              });
+      OwnerNormalizeDispatcher reader =
+          new OwnerNormalizeDispatcher(interleaved, catalogs, env.entityStore());
+      assertEquals(
+          "writer", as("writer", () -> reader.getOwner(LAKE, object(term))).orElseThrow().name());
+    } finally {
+      writer.shutdownNow();
+    }
     assertThrows(
         ForbiddenException.class,
         () -> as("writer", () -> dispatcher.getOwner(LAKE, object(term))));
