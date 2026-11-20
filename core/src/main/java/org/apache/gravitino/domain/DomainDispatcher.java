@@ -191,15 +191,19 @@ public interface DomainDispatcher {
       throws NoSuchDomainException, DomainAlreadyExistsException, IllegalArgumentException;
 
   /**
-   * Deletes a domain, with its parent edge.
+   * Deletes a draft domain, with its parent edge. A published domain must be unpublished first. The
+   * status is checked before the sub-domains, so deleting a published domain with sub-domains
+   * throws {@link IllegalArgumentException}.
    *
    * @param metalake The name of the metalake.
    * @param name The name of the domain.
    * @return True if the domain is deleted, false if it does not exist.
    * @throws NoSuchMetalakeException If the metalake does not exist.
-   * @throws NonEmptyDomainException If the domain has sub-domains.
+   * @throws IllegalArgumentException If the domain is published.
+   * @throws NonEmptyDomainException If the domain is a draft with sub-domains.
    */
-  boolean deleteDomain(String metalake, String name) throws NonEmptyDomainException;
+  boolean deleteDomain(String metalake, String name)
+      throws IllegalArgumentException, NonEmptyDomainException;
 
   /**
    * Publishes a domain. Publishing a published domain changes nothing.

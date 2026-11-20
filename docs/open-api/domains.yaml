@@ -238,10 +238,12 @@ paths:
       summary: Delete a domain
       operationId: deleteDomain
       description: >-
-        Deletes only the domain and its parent edge. The backing tag, its assignments and member
-        metadata objects remain unchanged; member objects do not prevent deletion. Deletion does
-        not cascade to subdomains: a domain with subdomains fails with HTTP 409,
-        NonEmptyDomainException and error code 1005. Returns dropped=false if the domain is absent
+        Deletes only the domain and its parent edge. Only a draft domain can be deleted: deleting a
+        published domain fails with HTTP 400 and IllegalArgumentException; unpublish it first. The
+        backing tag, its assignments and member metadata objects remain unchanged; member objects
+        do not prevent deletion. Deletion does not cascade to subdomains: a draft domain with
+        subdomains fails with HTTP 409, NonEmptyDomainException and error code 1005. The status is checked
+        before the subdomains, so a published domain with subdomains fails with HTTP 400. Returns dropped=false if the domain is absent
         or is a draft hidden from the caller; a hidden draft is not deleted.
         Requires MANAGE_DOMAIN on the domain, inherited from its current parent or the metalake.
         Other permission failures return 403.
@@ -267,7 +269,7 @@ paths:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "409":
-          description: The metalake is disabled, the domain has subdomains, or the deletion conflicts with a concurrent update.
+          description: The metalake is disabled, the domain is a draft with subdomains, or the deletion conflicts with a concurrent update.
           content:
             application/json:
               schema:
