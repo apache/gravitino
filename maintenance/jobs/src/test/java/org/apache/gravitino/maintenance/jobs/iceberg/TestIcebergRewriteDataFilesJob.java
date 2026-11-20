@@ -544,7 +544,7 @@ public class TestIcebergRewriteDataFilesJob {
   public void testCompactionMetricsSchemaForTms() {
     Map<String, Object> metrics =
         IcebergRewriteDataFilesJob.aggregatePartitionCompactionMetrics(new Row[0]);
-    assertEquals(5, metrics.size());
+    assertEquals(6, metrics.size());
     assertEquals(
         0D,
         ((Number) metrics.get(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC)).doubleValue());
@@ -559,5 +559,9 @@ public class TestIcebergRewriteDataFilesJob {
         ((Number) metrics.get(IcebergDataCompactionContent.TOTAL_FILE_SIZE_METRIC)).longValue());
     assertEquals(
         0L, ((Number) metrics.get(IcebergDataCompactionContent.FILE_NUMBER_METRIC)).longValue());
+    assertEquals(
+        0L,
+        ((Number) metrics.get(IcebergDataCompactionContent.SMALL_FILE_NUMBER_METRIC)).longValue());
+    assertFalse(metrics.containsKey(IcebergDataCompactionContent.DATA_MSE_RATIO_METRIC));
   }
 }
