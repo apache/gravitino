@@ -38,7 +38,8 @@ public interface TermChange {
   /**
    * Creates a change to rename the term. Bindings, relations and domains are kept.
    *
-   * @param newName The new name of the term.
+   * @param newName The new name of the term, subject to the same naming rules as {@link
+   *     TermSpec#builder}.
    * @return The term change.
    * @throws IllegalArgumentException If the new name is null or blank.
    */

@@ -237,6 +237,9 @@ components:
             - MODIFY_SEMANTIC_MODEL
             - MANAGE_DOMAIN
             - USE_DOMAIN
+            - VIEW_DEFINITION
+            - CREATE_DEFINITION
+            - MANAGE_DEFINITIONS
           description: The name of the privilege
         condition:
           type: string

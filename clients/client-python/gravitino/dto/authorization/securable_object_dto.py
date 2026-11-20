@@ -55,7 +55,8 @@ class SecurableObjectDTO(SecurableObject):
 
     def __post_init__(self):
         if (
-            self._type != MetadataObject.Type.DOMAIN
+            self._type
+            not in {MetadataObject.Type.DOMAIN, MetadataObject.Type.GLOSSARY_TERM}
             and self._full_name
             and "." in self._full_name
         ):

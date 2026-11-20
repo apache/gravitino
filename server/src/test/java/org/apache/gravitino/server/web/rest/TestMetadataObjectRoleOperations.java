@@ -141,6 +141,18 @@ public class TestMetadataObjectRoleOperations extends JerseyTest {
   }
 
   @Test
+  public void testGlossaryTermDoesNotAcceptRoleBindings() {
+    try (Response response =
+        target("/metalakes/metalake1/objects/glossary_term/cost.net/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get()) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    }
+    Mockito.verifyNoInteractions(manager);
+  }
+
+  @Test
   public void testListRoleNames() throws IOException {
     when(manager.listRoleNamesByObject(any(), any())).thenReturn(new String[] {"role"});
 

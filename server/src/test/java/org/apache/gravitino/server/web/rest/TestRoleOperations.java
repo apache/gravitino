@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletRequest;
@@ -160,6 +161,43 @@ public class TestRoleOperations extends BaseOperationsTest {
         });
 
     return resourceConfig;
+  }
+
+  /** Covers T6.5: grant validation rejects invalid scopes before resolving the target. */
+  @Test
+  public void testCreateRoleRejectsInvalidGlossaryScopes() throws IOException {
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata properties = mock(PropertiesMetadata.class);
+    when(properties.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(properties);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+    clearInvocations(manager);
+    for (SecurableObject scope :
+        List.of(
+            SecurableObjects.ofCatalog("catalog", List.of(Privileges.ViewDefinition.allow())),
+            SecurableObjects.ofCatalog("catalog", List.of(Privileges.CreateDefinition.deny())),
+            SecurableObjects.ofCatalog("catalog", List.of(Privileges.ManageDefinitions.allow())),
+            SecurableObjects.parse(
+                "term.with.dot",
+                MetadataObject.Type.GLOSSARY_TERM,
+                List.of(Privileges.ManageGrants.allow())))) {
+      RoleCreateRequest request =
+          new RoleCreateRequest(
+              "role",
+              Collections.emptyMap(),
+              new SecurableObjectDTO[] {DTOConverters.toDTO(scope)});
+      try (Response response =
+          target("/metalakes/metalake1/roles")
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .accept("application/vnd.gravitino.v1+json")
+              .post(Entity.json(request))) {
+        Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+        Assertions.assertEquals(
+            ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+            response.readEntity(ErrorResponse.class).getCode());
+      }
+    }
+    verify(manager, never()).createRole(any(), any(), any(), any());
   }
 
   /** Rejects initial role grants on internal tags at the REST boundary. */

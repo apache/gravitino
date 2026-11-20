@@ -153,6 +153,10 @@ public interface OwnerMetaMapper {
       @Param("metadataObjectId") long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType);
 
+  /** Resolves the current term identity and owner in one read, including after name reuse. */
+  @SelectProvider(type = OwnerMetaSQLProviderFactory.class, method = "selectGlossaryTermOwner")
+  OwnerInfo selectGlossaryTermOwner(@Param("metalake") String metalake, @Param("key") String key);
+
   @SelectProvider(type = OwnerMetaSQLProviderFactory.class, method = "selectChangedOwners")
   List<ChangedOwnerInfo> selectChangedOwners(
       @Param("lastConsumedUpdatedAt") long lastConsumedUpdatedAt,

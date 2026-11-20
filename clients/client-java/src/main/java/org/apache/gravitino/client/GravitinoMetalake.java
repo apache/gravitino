@@ -113,6 +113,7 @@ import org.apache.gravitino.dto.secret.SecretBindingDTO;
 import org.apache.gravitino.dto.secret.SecretReferenceDTO;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
@@ -1747,7 +1748,9 @@ public class GravitinoMetalake extends MetalakeDTO
    * @param object The metadata object
    * @return The owner of the metadata object. If the metadata object doesn't set the owner, it will
    *     return Optional.empty().
-   * @throws NoSuchMetadataObjectException If the metadata object is not found.
+   * @throws ForbiddenException If the caller cannot view the owner. The default authorizer also
+   *     returns this error for a missing glossary term.
+   * @throws NoSuchMetadataObjectException If the server reports the metadata object as missing.
    */
   public Optional<Owner> getOwner(MetadataObject object) throws NoSuchMetadataObjectException {
     OwnerResponse resp =
@@ -1772,6 +1775,7 @@ public class GravitinoMetalake extends MetalakeDTO
    * @param object The metadata object.
    * @param ownerName The name of the owner
    * @param ownerType The type of the owner, The owner can be a user or a group.
+   * @throws ForbiddenException If the caller lacks permission to transfer ownership.
    * @throws NotFoundException If the metadata object isn't found or the owner doesn't exist.
    */
   public void setOwner(MetadataObject object, String ownerName, Owner.Type ownerType)

@@ -997,6 +997,9 @@ public class ExceptionHandlers {
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
 
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
       } else if (e instanceof NotInUseException) {
         return Utils.notInUse(errorMsg, e);
 

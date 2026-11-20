@@ -172,6 +172,16 @@ public final class GlossaryTermMetaService {
     return definitions(ns, readRows(ns, null));
   }
 
+  /** Reads all definitions for the metalake identity resolved in the caller's snapshot. */
+  public List<GlossaryTermEntity> list(Namespace ns, long metalakeId) {
+    validateNamespace(ns);
+    return definitions(
+        ns,
+        SessionUtils.getWithoutCommit(
+            GlossaryTermMetaMapper.class,
+            mapper -> mapper.snapshot(metalakeId, ns.level(0), null)));
+  }
+
   /**
    * Loads requested terms, omitting missing names.
    *

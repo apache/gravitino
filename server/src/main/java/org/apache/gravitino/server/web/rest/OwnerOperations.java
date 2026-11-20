@@ -91,8 +91,7 @@ public class OwnerOperations {
             if (object.type() != MetadataObject.Type.METALAKE) {
               MetalakeManager.checkMetalakeInUse(metalake);
             }
-            TagOperations.checkVisibleTag(metalake, object);
-            MetadataObjectUtil.checkMetadataObject(metalake, object);
+            checkOwnerTarget(metalake, object);
             Optional<Owner> owner = ownerDispatcher.getOwner(metalake, object);
             if (owner.isPresent()) {
               return Utils.ok(new OwnerResponse(DTOConverters.toDTO(owner.get())));
@@ -138,14 +137,21 @@ public class OwnerOperations {
           () -> {
             request.validate();
             MetalakeManager.checkMetalakeInUse(metalake);
-            TagOperations.checkVisibleTag(metalake, object);
-            MetadataObjectUtil.checkMetadataObject(metalake, object);
+            checkOwnerTarget(metalake, object);
             ownerDispatcher.setOwner(metalake, object, request.getName(), request.getType());
             return Utils.ok(new SetResponse(true));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleOwnerException(
           OperationType.SET, String.format("metadata object %s", fullName), metalake, e);
+    }
+  }
+
+  private static void checkOwnerTarget(String metalake, MetadataObject object) {
+    // The owner manager resolves glossary terms in the same transaction as its access check.
+    if (object.type() != MetadataObject.Type.GLOSSARY_TERM) {
+      TagOperations.checkVisibleTag(metalake, object);
+      MetadataObjectUtil.checkMetadataObject(metalake, object);
     }
   }
 }

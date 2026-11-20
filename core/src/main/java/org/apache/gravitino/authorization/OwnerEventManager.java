@@ -80,6 +80,12 @@ public class OwnerEventManager implements OwnerDispatcher {
     if (metadataObjects.isEmpty()) {
       return;
     }
+    if (metadataObjects.stream()
+        .allMatch(object -> object.type() == MetadataObject.Type.GLOSSARY_TERM)) {
+      // A later failure must not emit failure events for transfers that already committed.
+      OwnerDispatcher.super.setOwners(metalake, metadataObjects, ownerName, ownerType);
+      return;
+    }
     String user = PrincipalUtils.getCurrentUserName();
     OwnerInfo ownerInfo = new OwnerInfo(ownerName, ownerType);
     List<NameIdentifier> identifiers = new ArrayList<>(metadataObjects.size());
