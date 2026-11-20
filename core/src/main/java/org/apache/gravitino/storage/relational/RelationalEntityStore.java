@@ -290,12 +290,13 @@ public class RelationalEntityStore
       // row it already had. Caching the copy handed in here would publish values the stored row
       // does not carry, so the next read is served from the backend instead.
       invalidateCache(e.nameIdentifier(), e.type());
-    } else {
+    } else if (SessionUtils.isInTransaction()) {
       // Nested under an outer doMultipleWithCommit, insert returns while that SQL session is still
-      // open. Publishing a cacheable entity then would expose an uncommitted row (and leave a ghost
-      // after rollback). Publish only after the owning transaction has closed.
-      boolean publishToCache = !SessionUtils.isInTransaction();
-      applyCacheAfterInsert(e, epochBeforeWrite, publishToCache);
+      // open. Publishing into the process-wide cache would expose an uncommitted row and leave a
+      // ghost after rollback. Skip publish; only run related-key invalidation (safe to clear).
+      cache.invalidateOnKeyChange(e);
+    } else {
+      cacheIfEpochUnchanged(e, epochBeforeWrite);
     }
   }
 
@@ -352,7 +353,7 @@ public class RelationalEntityStore
     long epochBeforeRead = cacheInvalidationEpoch.get();
     List<E> fetchEntities = backend.batchGet(noCacheIdents, entityType);
     for (E entity : fetchEntities) {
-      applyCacheAfterInsert(entity, epochBeforeRead, true /* publishToCache */);
+      cacheIfEpochUnchanged(entity, epochBeforeRead);
       allEntities.add(entity);
     }
     return allEntities;
@@ -840,21 +841,11 @@ public class RelationalEntityStore
     }
   }
 
-  /**
-   * Applies cache side effects after a successful insert.
-   *
-   * <p>Non-cacheable types never store the entity; {@link EntityCache#put} only runs related
-   * invalidation. Cacheable types are stored only when {@code publishToCache} is true.
-   */
-  private <E extends Entity & HasIdentifier> void applyCacheAfterInsert(
-      E entity, long epoch, boolean publishToCache) {
+  private <E extends Entity & HasIdentifier> void cacheIfEpochUnchanged(E entity, long epoch) {
     if (cache instanceof BaseEntityCache && !BaseEntityCache.isCacheable(entity.type())) {
-      // Related invalidation only: there is no value to publish, and taking this entity's key lock
-      // can nest locks inside that hook.
+      // Uncached entities still invoke the cache's related-invalidation hook. There is no stale
+      // value to publish, and taking this entity's key lock can nest locks inside that hook.
       cache.put(entity);
-      return;
-    }
-    if (!publishToCache) {
       return;
     }
     cache.withCacheLock(
