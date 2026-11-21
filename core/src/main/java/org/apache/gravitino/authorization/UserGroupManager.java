@@ -95,7 +95,17 @@ class UserGroupManager {
   boolean removeUser(String metalake, String user) {
     MetalakeManager.checkMetalake(NameIdentifier.of(metalake), store);
     try {
-      return store.delete(AuthorizationUtils.ofUser(metalake, user), Entity.EntityType.USER);
+      NameIdentifier userIdent = AuthorizationUtils.ofUser(metalake, user);
+      UserEntity userEntity;
+      try {
+        userEntity = store.get(userIdent, Entity.EntityType.USER, UserEntity.class);
+      } catch (NoSuchEntityException e) {
+        LOG.warn("User {} does not exist in the metalake {}", user, metalake, e);
+        return false;
+      }
+      AuthorizationUtils.callAuthorizationPluginForMetalake(
+          metalake, authorizationPlugin -> authorizationPlugin.onMetalakeUserRemoved(userEntity));
+      return store.delete(userIdent, Entity.EntityType.USER);
     } catch (IOException ioe) {
       LOG.error(
           "Removing user {} in the metalake {} failed due to storage issues", user, metalake, ioe);
@@ -171,7 +181,17 @@ class UserGroupManager {
   boolean removeGroup(String metalake, String group) {
     MetalakeManager.checkMetalake(NameIdentifier.of(metalake), store);
     try {
-      return store.delete(AuthorizationUtils.ofGroup(metalake, group), Entity.EntityType.GROUP);
+      NameIdentifier groupIdent = AuthorizationUtils.ofGroup(metalake, group);
+      GroupEntity groupEntity;
+      try {
+        groupEntity = store.get(groupIdent, Entity.EntityType.GROUP, GroupEntity.class);
+      } catch (NoSuchEntityException e) {
+        LOG.warn("Group {} does not exist in the metalake {}", group, metalake, e);
+        return false;
+      }
+      AuthorizationUtils.callAuthorizationPluginForMetalake(
+          metalake, authorizationPlugin -> authorizationPlugin.onMetalakeGroupRemoved(groupEntity));
+      return store.delete(groupIdent, Entity.EntityType.GROUP);
     } catch (IOException ioe) {
       LOG.error(
           "Removing group {} in the metalake {} failed due to storage issues",

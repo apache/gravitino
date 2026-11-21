@@ -173,6 +173,9 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
     if (!dispatcher.catalogExists(ident)) {
       return false;
     }
+    if (!force && AuthorizationUtils.isCatalogInUse(ident)) {
+      return dispatcher.dropCatalog(ident, false);
+    }
 
     List<String> locations =
         AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.CATALOG);
