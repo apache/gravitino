@@ -313,7 +313,8 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
     }
     Table table = IcebergJobUtils.loadIcebergTable(spark, catalogName, tableIdentifier);
     int resolvedSpec = Integer.parseInt(specId);
-    Map<String, Object> metrics = new HashMap<>();
+    Map<String, Object> metrics =
+        new HashMap<>(collectManifestBeforeMetrics(spark, catalogName, tableIdentifier, specId));
     metrics.put(IcebergRewriteManifestsContent.REWRITTEN_MANIFEST_NUMBER_METRIC, rewritten);
     putPartitionSpecContext(metrics, table, resolvedSpec);
     return TableSnapshotMetrics.of(

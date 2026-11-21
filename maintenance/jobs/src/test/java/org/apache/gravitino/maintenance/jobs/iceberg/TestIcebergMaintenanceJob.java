@@ -22,8 +22,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.job.SparkJobTemplate;
+import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.policy.IcebergDataCompactionContent;
+import org.apache.gravitino.policy.Policy;
 import org.junit.jupiter.api.Test;
 
 /** Unit tests for {@link IcebergMaintenanceJob} orchestration. */
@@ -67,5 +74,47 @@ public class TestIcebergMaintenanceJob {
                   + "\"action_id\":100,\"params\":{\"catalog_name\":\"c\","
                   + "\"table_identifier\":\"db.t\"}}]"
             }));
+  }
+
+  @Test
+  public void testCompactionMinDataFileMseFromRules() {
+    assertEquals(
+        IcebergDataCompactionContent.DEFAULT_MIN_DATA_FILE_MSE,
+        IcebergMaintenanceJob.compactionMinDataFileMse(null));
+    assertEquals(
+        IcebergDataCompactionContent.DEFAULT_MIN_DATA_FILE_MSE,
+        IcebergMaintenanceJob.compactionMinDataFileMse(Collections.emptyMap()));
+    assertEquals(
+        10L,
+        IcebergMaintenanceJob.compactionMinDataFileMse(
+            Collections.singletonMap(IcebergDataCompactionContent.MIN_DATA_FILE_MSE_KEY, 10)));
+  }
+
+  @Test
+  public void testWithCompactionDataMseRatioEnrichesBeforeAndAfterShape() throws Exception {
+    Map<String, Object> inventory = new HashMap<>();
+    inventory.put(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC, 20D);
+    inventory.put(IcebergDataCompactionContent.FILE_NUMBER_METRIC, 3L);
+    TableSnapshotMetrics sample = TableSnapshotMetrics.of(42L, inventory);
+
+    TableSnapshotMetrics enriched =
+        IcebergMaintenanceJob.withCompactionDataMseRatio(
+            sample,
+            Policy.BuiltInType.ICEBERG_COMPACTION,
+            Collections.singletonMap(IcebergDataCompactionContent.MIN_DATA_FILE_MSE_KEY, 10));
+
+    Map<String, Object> metrics =
+        JsonUtils.anyFieldMapper()
+            .readValue(enriched.metricsJson(), new TypeReference<Map<String, Object>>() {});
+    assertEquals(42L, enriched.snapshotId());
+    assertEquals(
+        2D,
+        ((Number) metrics.get(IcebergDataCompactionContent.DATA_MSE_RATIO_METRIC)).doubleValue());
+    assertFalse(metrics.containsKey(IcebergDataCompactionContent.MIN_DATA_FILE_MSE_KEY));
+
+    TableSnapshotMetrics skipped =
+        IcebergMaintenanceJob.withCompactionDataMseRatio(
+            sample, Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION, null);
+    assertEquals(sample.metricsJson(), skipped.metricsJson());
   }
 }

@@ -259,6 +259,7 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenance
     PreExpireData beforeData = preExpireData == null ? after : preExpireData;
     preExpireData = null;
     Map<String, Object> metrics = new HashMap<>();
+    metrics.put(IcebergSnapshotExpirationContent.SNAPSHOT_NUMBER_METRIC, after.snapshotCount());
     metrics.put(
         IcebergSnapshotExpirationContent.EXPIRED_SNAPSHOT_NUMBER_METRIC,
         snapshotsCleared(beforeData.snapshotIds(), after.snapshotIds()));
