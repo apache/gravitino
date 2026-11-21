@@ -18,14 +18,18 @@
  */
 package org.apache.gravitino.catalog.lakehouse.generic;
 
+import javax.annotation.Nullable;
+import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+
 /**
- * A pluggable strategy for deciding where the data of a newly created table lives.
+ * A pluggable strategy for deciding where the data of newly created tables, and optionally of
+ * schemas, lives.
  *
  * <p>Implementations are discovered through Java's {@link java.util.ServiceLoader} and selected by
- * {@link #name()} using the {@code table-location-provider} catalog property. The built-in {@link
- * DefaultTableLocationProvider} derives the location from the table, schema and catalog {@code
- * location} properties; deployments that allocate storage through an external service can register
- * their own implementation instead.
+ * {@link #name()} using the {@code location-provider} catalog property. The built-in {@link
+ * DefaultLocationProvider} derives the location from the table, schema and catalog {@code location}
+ * properties; deployments that allocate storage through an external service can register their own
+ * implementation instead.
  *
  * <p><b>The catalog reports; the provider decides.</b> The catalog's part is to hand over an
  * accurate account of what happened -- what the creation request asked for, where the table ended
@@ -68,6 +72,15 @@ package org.apache.gravitino.catalog.lakehouse.generic;
  * requests. A failure on the provisioning path fails the table creation; one on the drop path is
  * logged at WARN and nothing else happens.
  *
+ * <p><b>Schemas.</b> Services that allocate storage usually do so hierarchically: a schema is
+ * registered first, with the owner and the storage domain it belongs to, and the paths of its
+ * tables are derived from it. A provider takes part in that by overriding {@link
+ * #provisionSchemaLocation(SchemaLocationContext)} and {@link
+ * #unprovisionSchemaLocation(SchemaLocationContext)}. Both default to doing nothing, so a provider
+ * that only places tables is not involved in schemas. Like the table callbacks, they may be called
+ * concurrently by different schema requests and must be thread-safe. If either throws, the schema
+ * creation or drop fails.
+ *
  * <p>Implementations must satisfy two constraints imposed by the {@link java.util.ServiceLoader}
  * based discovery:
  *
@@ -80,12 +93,12 @@ package org.apache.gravitino.catalog.lakehouse.generic;
  *       all. The instances that were not selected are then discarded, and nothing is closed on
  *       them, so anything a constructor acquires is leaked once per catalog creation.
  *   <li>{@link #name()} must be unique across the classpath, and must not be {@value
- *       DefaultTableLocationProvider#NAME}, which is reserved by {@link
- *       DefaultTableLocationProvider}. If two providers share a name, every catalog selecting that
- *       name fails to initialize. A provider whose constructor or {@link #name()} throws is logged
- *       and skipped rather than failing the lookup, so a provider that is broken at runtime does
- *       not stop catalogs that named a different one from starting. A services file naming a class
- *       that cannot be loaded at all still fails the lookup.
+ *       DefaultLocationProvider#NAME}, which is reserved by {@link DefaultLocationProvider}. If two
+ *       providers share a name, every catalog selecting that name fails to initialize. A provider
+ *       whose constructor or {@link #name()} throws is logged and skipped rather than failing the
+ *       lookup, so a provider that is broken at runtime does not stop catalogs that named a
+ *       different one from starting. A services file naming a class that cannot be loaded at all
+ *       still fails the lookup.
  * </ul>
  *
  * <p><b>Known limitations.</b> Six of them, and they all point the same way: a provider that
@@ -134,15 +147,15 @@ package org.apache.gravitino.catalog.lakehouse.generic;
  *       forbid renaming tables in this catalog.
  * </ul>
  */
-public interface TableLocationProvider {
+public interface LocationProvider {
 
   /**
-   * Returns the name this provider is selected by, matched against the {@code
-   * table-location-provider} catalog property.
+   * Returns the name this provider is selected by, matched against the {@code location-provider}
+   * catalog property.
    *
    * <p>It must be unique across the classpath and must not be {@value
-   * DefaultTableLocationProvider#NAME}. It is read once per lookup, on every registered provider,
-   * so it must be cheap and must not throw.
+   * DefaultLocationProvider#NAME}. It is read once per lookup, on every registered provider, so it
+   * must be cheap and must not throw.
    *
    * @return the name of this provider, never null or blank
    */
@@ -253,7 +266,67 @@ public interface TableLocationProvider {
    * #provisionTableLocation(TableLocationContext)}, it is called concurrently and must be
    * thread-safe.
    *
+   * <p>The result reports whether this call released anything. The catalog only logs it; it does
+   * not change the outcome of the drop.
+   *
    * @param context the table that is gone and the context needed to release its location
+   * @return true if the provider released an allocation for the location, false if there was
+   *     nothing to release, such as a location it does not recognize or one already released
    */
-  void unprovisionTableLocation(TableLocationContext context);
+  boolean unprovisionTableLocation(TableLocationContext context);
+
+  /**
+   * Provisions the location of a schema that is being created. The default implementation returns
+   * null.
+   *
+   * <p>The context carries the properties of the creation request, including a caller-supplied
+   * {@code location}, if any. As with tables, what happens to a supplied location is the provider's
+   * decision: return a location to place the schema there; return null or a blank string to leave
+   * the location to the caller, in which case the schema is created with the properties of the
+   * request as they are, including any {@code location} the caller supplied; or throw to refuse the
+   * creation.
+   *
+   * <p>A location that is returned is stored verbatim as the schema's {@code location} property.
+   *
+   * <p>It is called before the schema is stored, so it can be called for a name that is already
+   * taken; a provider that knows the schema exists may throw {@link SchemaAlreadyExistsException}.
+   * If the creation fails after this method returned, for example because the schema already exists
+   * or storing it fails, the catalog does not call {@link
+   * #unprovisionSchemaLocation(SchemaLocationContext)}; any allocation made for that request is
+   * left to the provider to reconcile.
+   *
+   * @param context the schema being created, with the properties of the creation request
+   * @return the location to store on the schema, or null or blank to leave the properties of the
+   *     request unchanged
+   * @throws SchemaAlreadyExistsException if the provider knows a schema of that name exists
+   */
+  @Nullable
+  default String provisionSchemaLocation(SchemaLocationContext context)
+      throws SchemaAlreadyExistsException {
+    return null;
+  }
+
+  /**
+   * Unprovisions the location of a schema that is being dropped. The default implementation does
+   * nothing and returns false.
+   *
+   * <p>It is called before the schema is removed, after any tables it contained are dropped. It is
+   * not called when a cascading drop left an external table's data in place, since that data may
+   * still be under the schema location.
+   *
+   * <p>It releases what the provider issued for the schema and must not delete content under the
+   * location. If it throws, the drop fails and the schema stays in place, so the drop can be
+   * retried. It may therefore be called more than once for the same schema and must tolerate a
+   * location that is already released.
+   *
+   * <p>The result reports whether this call released anything. The catalog only logs it; it does
+   * not change the outcome of the drop.
+   *
+   * @param context the schema being dropped
+   * @return true if the provider released an allocation for the schema location, false if there was
+   *     nothing to release, such as a location it does not recognize or one already released
+   */
+  default boolean unprovisionSchemaLocation(SchemaLocationContext context) {
+    return false;
+  }
 }

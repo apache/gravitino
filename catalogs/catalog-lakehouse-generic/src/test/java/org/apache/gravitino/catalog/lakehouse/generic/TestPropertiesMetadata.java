@@ -40,19 +40,19 @@ public class TestPropertiesMetadata {
   }
 
   @Test
-  void testTableLocationProviderPropertyIsImmutableWithDefault() {
+  void testLocationProviderPropertyIsImmutableWithDefault() {
     PropertiesMetadata catalogPropertiesMetadata = genericCatalog.catalogPropertiesMetadata();
 
     Assertions.assertTrue(
         catalogPropertiesMetadata.containsProperty(
-            GenericCatalogPropertiesMetadata.TABLE_LOCATION_PROVIDER));
+            GenericCatalogPropertiesMetadata.LOCATION_PROVIDER));
     Assertions.assertEquals(
-        DefaultTableLocationProvider.NAME,
+        DefaultLocationProvider.NAME,
         catalogPropertiesMetadata.getOrDefault(
-            ImmutableMap.of(), GenericCatalogPropertiesMetadata.TABLE_LOCATION_PROVIDER));
+            ImmutableMap.of(), GenericCatalogPropertiesMetadata.LOCATION_PROVIDER));
     Assertions.assertTrue(
         catalogPropertiesMetadata.isImmutableProperty(
-            GenericCatalogPropertiesMetadata.TABLE_LOCATION_PROVIDER));
+            GenericCatalogPropertiesMetadata.LOCATION_PROVIDER));
   }
 
   @Test

@@ -16,4 +16,6 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-org.apache.gravitino.catalog.lakehouse.generic.DefaultTableLocationProvider
+org.apache.gravitino.catalog.lakehouse.generic.FakeLocationProvider
+org.apache.gravitino.catalog.lakehouse.generic.BrokenLocationProvider
+org.apache.gravitino.catalog.lakehouse.generic.FakeSchemaLocationProvider

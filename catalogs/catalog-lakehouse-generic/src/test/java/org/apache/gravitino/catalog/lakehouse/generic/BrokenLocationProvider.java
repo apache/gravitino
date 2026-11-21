@@ -28,7 +28,7 @@ package org.apache.gravitino.catalog.lakehouse.generic;
  * calls {@code name()} itself rather than going through the loader, so nothing wraps this into a
  * {@link java.util.ServiceConfigurationError} on the way out.
  */
-public class BrokenTableLocationProvider implements TableLocationProvider {
+public class BrokenLocationProvider implements LocationProvider {
 
   @Override
   public String name() {
@@ -41,7 +41,7 @@ public class BrokenTableLocationProvider implements TableLocationProvider {
   }
 
   @Override
-  public void unprovisionTableLocation(TableLocationContext context) {
+  public boolean unprovisionTableLocation(TableLocationContext context) {
     throw new UnsupportedOperationException("This provider can never be selected");
   }
 }

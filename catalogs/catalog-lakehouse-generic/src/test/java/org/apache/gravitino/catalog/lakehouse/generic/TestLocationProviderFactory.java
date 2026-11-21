@@ -21,30 +21,29 @@ package org.apache.gravitino.catalog.lakehouse.generic;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestTableLocationProviderFactory {
+public class TestLocationProviderFactory {
 
   @Test
   void testCreateDefaultProvider() {
-    TableLocationProvider provider = create(DefaultTableLocationProvider.NAME);
-    Assertions.assertInstanceOf(DefaultTableLocationProvider.class, provider);
-    Assertions.assertEquals(DefaultTableLocationProvider.NAME, provider.name());
+    LocationProvider provider = create(DefaultLocationProvider.NAME);
+    Assertions.assertInstanceOf(DefaultLocationProvider.class, provider);
+    Assertions.assertEquals(DefaultLocationProvider.NAME, provider.name());
   }
 
   @Test
   void testProviderNameIsCaseInsensitive() {
-    Assertions.assertInstanceOf(DefaultTableLocationProvider.class, create("DeFaUlT"));
+    Assertions.assertInstanceOf(DefaultLocationProvider.class, create("DeFaUlT"));
   }
 
   @Test
   void testCreateCustomProviderDiscoveredViaServiceLoader() {
-    Assertions.assertInstanceOf(
-        FakeTableLocationProvider.class, create(FakeTableLocationProvider.NAME));
+    Assertions.assertInstanceOf(FakeLocationProvider.class, create(FakeLocationProvider.NAME));
   }
 
   @Test
   void testEachCallReturnsANewInstance() {
     Assertions.assertNotSame(
-        create(DefaultTableLocationProvider.NAME), create(DefaultTableLocationProvider.NAME));
+        create(DefaultLocationProvider.NAME), create(DefaultLocationProvider.NAME));
   }
 
   @Test
@@ -53,24 +52,24 @@ public class TestTableLocationProviderFactory {
     // constructor left it. Pinned because the factory used to initialize it here, and a provider
     // written against that behaviour would otherwise fail in a way nothing else in the module
     // catches: the instance it gets is the instance it keeps.
-    FakeTableLocationProvider.reset();
-    TableLocationProvider provider = create(FakeTableLocationProvider.NAME);
+    FakeLocationProvider.reset();
+    LocationProvider provider = create(FakeLocationProvider.NAME);
 
-    Assertions.assertInstanceOf(FakeTableLocationProvider.class, provider);
+    Assertions.assertInstanceOf(FakeLocationProvider.class, provider);
     Assertions.assertTrue(
-        FakeTableLocationProvider.provisioned().isEmpty(),
+        FakeLocationProvider.provisioned().isEmpty(),
         "creating a provider must not call anything on it");
   }
 
   @Test
   void testABrokenProviderOnTheClasspathIsSkippedRatherThanFailingTheLookup() {
-    // BrokenTableLocationProvider is registered in this module's test services file, so it is
+    // BrokenLocationProvider is registered in this module's test services file, so it is
     // instantiated and asked for its name on every lookup here, including this one. That it fails
     // with an Error rather than an exception is the point: name() is called by the factory and not
     // by the loader, so nothing wraps it, and a catch that only took RuntimeException would let it
     // through and stop every catalog from starting over one broken jar.
     Assertions.assertInstanceOf(
-        DefaultTableLocationProvider.class, create(DefaultTableLocationProvider.NAME));
+        DefaultLocationProvider.class, create(DefaultLocationProvider.NAME));
 
     // The name it never managed to report is still not a name anyone can select.
     Assertions.assertThrows(IllegalArgumentException.class, () -> create("broken"));
@@ -81,7 +80,7 @@ public class TestTableLocationProviderFactory {
     IllegalArgumentException e =
         Assertions.assertThrows(IllegalArgumentException.class, () -> create("no-such-provider"));
     Assertions.assertTrue(
-        e.getMessage().contains("No TableLocationProvider found for name 'no-such-provider'"),
+        e.getMessage().contains("No LocationProvider found for name 'no-such-provider'"),
         "Unexpected message: " + e.getMessage());
   }
 
@@ -93,23 +92,23 @@ public class TestTableLocationProviderFactory {
 
   @Test
   void testEveryLookupScansRatherThanAnsweringFromACache() {
-    FakeTableLocationProvider.reset();
+    FakeLocationProvider.reset();
 
-    create(DefaultTableLocationProvider.NAME);
-    int afterFirstLookup = FakeTableLocationProvider.constructedCount();
+    create(DefaultLocationProvider.NAME);
+    int afterFirstLookup = FakeLocationProvider.constructedCount();
     Assertions.assertTrue(afterFirstLookup >= 1, "selection has to construct every candidate");
 
-    create(DefaultTableLocationProvider.NAME);
+    create(DefaultLocationProvider.NAME);
 
     // Discovery is repeated per catalog rather than remembered. Pinned because it is a deliberate
     // choice and not an oversight: a provider registered after the first catalog started is found
     // by the next one, and nothing static outlives the lookup to be invalidated later.
     Assertions.assertTrue(
-        FakeTableLocationProvider.constructedCount() > afterFirstLookup,
+        FakeLocationProvider.constructedCount() > afterFirstLookup,
         "a second lookup should scan again rather than answer from a remembered index");
   }
 
-  private static TableLocationProvider create(String name) {
-    return TableLocationProviderFactory.create(name);
+  private static LocationProvider create(String name) {
+    return LocationProviderFactory.create(name);
   }
 }

@@ -48,23 +48,25 @@ For detailed information on available operations, see [Manage Relational Metadat
 |-----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------|
 | `provider`                  | Catalog provider type                                                                                                                                                                                                                                                                                                     | `lakehouse-generic`     | Yes      |
 | `location`                  | Root storage path for all schemas and tables                                                                                                                                                                                                                                                                              | `s3://bucket/lakehouse` | No       |
-| `table-location-provider`   | Name of the [table location provider](#pluggable-table-location-provider) that provisions and unprovisions the locations of this catalog's tables. Defaults to `default`, which resolves the location from the table, schema and catalog `location` properties as described below. Immutable once the catalog is created. | `default`               | No       |
+| `location-provider`         | Name of the [location provider](#pluggable-location-provider) that provisions and unprovisions the locations of this catalog's tables and, optionally, schemas. Defaults to `default`, which resolves the location from the table, schema and catalog `location` properties as described below. Immutable once the catalog is created. | `default`               | No       |
 | `lance.schema-refresh-mode` | Lance table schema refresh mode. `DECLARED_AND_EMPTY` (default) refreshes declared tables and tables with empty stored columns. `VERSION_CHECK` additionally refreshes when the Lance dataset version changes.                                                                                                            | `DECLARED_AND_EMPTY`    | No       |
 | `lance.allow-external-table-purge` | Allow physical deletion of external or registered Lance tables, including Lance REST `DropTable` and create `OVERWRITE`. Catalog-only; table properties cannot enable it. Does not validate ownership of storage locations. | `false` | No |
 
-#### Pluggable table location provider
+#### Pluggable location provider
 
 By default the catalog derives a new table's location from the `location` properties, following the
 hierarchy described in [Key Property: `location`](#key-property-location). Deployments that allocate
 storage through an external service can replace that logic with their own strategy.
 
-Implement `org.apache.gravitino.catalog.lakehouse.generic.TableLocationProvider`, register it in
-`META-INF/services/org.apache.gravitino.catalog.lakehouse.generic.TableLocationProvider`, drop the jar
-into `catalogs/lakehouse-generic/libs`, and select it with the `table-location-provider` catalog
-property (matched case-insensitively against `TableLocationProvider#name()`).
+Implement `org.apache.gravitino.catalog.lakehouse.generic.LocationProvider`, register it in
+`META-INF/services/org.apache.gravitino.catalog.lakehouse.generic.LocationProvider`, drop the jar
+into `catalogs/lakehouse-generic/libs`, and select it with the `location-provider` catalog
+property (matched case-insensitively against `LocationProvider#name()`).
 
 The interface is two operations wide -- `provisionTableLocation` and `unprovisionTableLocation` --
-plus `name()`.
+plus `name()`, and two optional schema callbacks described in
+[Schema locations](#schema-locations-optional). Both unprovision callbacks return whether they
+released anything; the catalog only logs the result.
 
 **The catalog reports; the provider decides.** The catalog's part is to hand over an accurate account
 of what happened -- what the creation request asked for, where the table ended up, whether the data
@@ -292,12 +294,45 @@ Two constraints follow from `ServiceLoader` discovery:
   class that cannot be loaded at all is not survivable in the same way: it fails the scan before any
   candidate is reached.
 
+##### Schema locations (optional)
+
+Services that allocate storage usually do it hierarchically: a schema is registered first, with the
+owner and the storage domain it belongs to, and the paths of its tables are derived from it. A
+provider that needs a say in schemas overrides `provisionSchemaLocation` and
+`unprovisionSchemaLocation` on `LocationProvider`. Both default to doing nothing, so a provider that
+only places tables is not involved in schemas.
+
+- **Create.** `provisionSchemaLocation` is called before the schema is stored, with the properties of
+  the creation request, including a caller-supplied `location` if there is one. It returns the
+  schema location, which is stored verbatim as the schema's `location` property, or `null` or a
+  blank string to leave the location to the caller, in which case the request's properties are used
+  as they are. If it throws, the schema is not created. It is called before the catalog finds out
+  whether the name is taken, so a creation of an existing schema consults the provider and then
+  fails with `SchemaAlreadyExistsException`; a provider may also throw that itself.
+- **Drop.** `unprovisionSchemaLocation` is called after the tables are dropped and before the schema
+  itself is removed. With cascade, the tables are dropped through the usual path, so their table
+  callbacks have already run. It is not called when the cascade dropped an external table whose
+  data was left in place, for the same reason a dropped external table skips its own unprovision:
+  that data may still be under the schema location. If the provider throws, the drop fails and the
+  schema stays in place (tables already dropped by the cascade stay dropped), so the drop can be
+  retried. A retry calls the provider again for the same schema, so `unprovisionSchemaLocation`
+  must tolerate a location that is already released.
+
+Both callbacks may be called concurrently by different schema requests and must be thread-safe, and
+the catalog applies no timeout to them. The same limitations apply as for tables: if a creation fails
+after the provider was consulted (an existing name, or a store failure), the catalog does not call
+`unprovisionSchemaLocation`, so any allocation made for it is left to the provider; altering the schema's `location` property does not tell the
+provider; a schema whose cascade left external data in place keeps its location; and if removing
+the schema fails after the provider released its location, the schema stays with that location
+released until it is dropped again. A provider reclaiming real storage needs its own
+reconciliation.
+
 #### Key Property: `location`
 
 The `location` property specifies the root directory for the lakehouse table. All schemas and tables are stored under this location unless explicitly overridden at the schema or table level.
 
 **Location Resolution Hierarchy** (applies to the built-in provider; a custom
-`table-location-provider` defines its own):
+`location-provider` defines its own):
 1. Table-level `location` (highest priority)
 2. Schema-level `location`, then the location of the table will be `{schema_location}/{table_name}`
 3. Catalog-level `location` (fallback), then the location of the table will be `{catalog_location}/{schema_name}/{table_name}`
@@ -457,6 +492,6 @@ was the one out of step.
 
 :::note
 Introduced together with the [pluggable table location
-provider](#pluggable-table-location-provider), whose drop path reads the table before removing it
+provider](#pluggable-location-provider), whose drop path reads the table before removing it
 so that the location can be handed back.
 :::

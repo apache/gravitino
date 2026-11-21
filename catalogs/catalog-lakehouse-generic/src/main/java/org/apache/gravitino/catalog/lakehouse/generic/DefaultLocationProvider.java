@@ -25,8 +25,8 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.rel.Table;
 
 /**
- * The built-in {@link TableLocationProvider}, used when the {@code table-location-provider} catalog
- * property is not set.
+ * The built-in {@link LocationProvider}, used when the {@code location-provider} catalog property
+ * is not set.
  *
  * <p>It derives the table location from the {@code location} property, falling back through three
  * levels:
@@ -45,7 +45,7 @@ import org.apache.gravitino.rel.Table;
  * TableLocationContext#catalogProperties()} on each call, since this interface has no
  * initialization callback in which to capture it.
  */
-public class DefaultTableLocationProvider implements TableLocationProvider {
+public class DefaultLocationProvider implements LocationProvider {
 
   /** The name under which this provider is registered. */
   public static final String NAME = "default";
@@ -97,9 +97,12 @@ public class DefaultTableLocationProvider implements TableLocationProvider {
    * data itself stays the responsibility of the table format.
    *
    * @param context the table that was dropped, unused
+   * @return false, as nothing is ever registered
    */
   @Override
-  public void unprovisionTableLocation(TableLocationContext context) {}
+  public boolean unprovisionTableLocation(TableLocationContext context) {
+    return false;
+  }
 
   /**
    * Appends a trailing slash to the given path unless it already ends with one.
