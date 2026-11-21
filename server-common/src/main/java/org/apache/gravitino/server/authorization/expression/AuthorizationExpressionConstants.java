@@ -381,6 +381,15 @@ public class AuthorizationExpressionConstants {
           ((CAN_ACCESS_METADATA) && (TAG::OWNER || ANY_APPLY_TAG))
           """;
 
+  /** Authority required to assign or remove a tag carrying an access policy. */
+  public static final String APPLY_ACCESS_TAG_AUTHORIZATION_EXPRESSION =
+      "METALAKE::OWNER || (TAG::APPLY_TAG && !(ANY(DENY_APPLY_TAG, METALAKE, TAG))"
+          + " && CAN_OPERATE_METADATA_PRIVILEGE)";
+
+  /** Authority required to bind an access policy to a tag. */
+  public static final String BIND_ACCESS_POLICY_AUTHORIZATION_EXPRESSION =
+      "METALAKE::OWNER || METALAKE::CREATE_POLICY";
+
   public static final String LOAD_USER_AUTHORIZATION_EXPRESSION =
       "METALAKE::OWNER || METALAKE::MANAGE_USERS || USER::SELF";
 

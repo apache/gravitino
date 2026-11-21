@@ -30,6 +30,7 @@ import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.tag.TagAssignmentAuthorization;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
@@ -150,12 +151,32 @@ public class JcasbinAuthorizationLookups {
       // by throwing through the loaders and translated back to Optional.empty() here. This caches
       // only positive results, never a negative one. Load the same canonical name as the key,
       // rather than applying the request spelling again in the loader.
-      return new MetadataIdResolution(
-          Optional.of(
-              requestContext.computeMetadataIdIfAbsent(
-                  cacheKey,
-                  k -> metadataIdCache.get(k, ignored -> loadMetadataId(cacheObject, metalake)))),
-          false);
+      Long resolved =
+          requestContext.computeMetadataIdIfAbsent(
+              cacheKey,
+              k -> metadataIdCache.get(k, ignored -> loadMetadataId(cacheObject, metalake)));
+      if (cacheObject.type() == MetadataObject.Type.TAG) {
+        Long checked =
+            TagAssignmentAuthorization.checkedIdentity(
+                NameIdentifierUtil.ofTag(metalake, cacheObject.name()));
+        if (checked != null && !checked.equals(resolved)) {
+          // An unstable identity must deny both ALLOW and DENY lookups, so a stale DENY cannot
+          // disappear when the caller also has a broader ALLOW.
+          return new MetadataIdResolution(Optional.empty(), true);
+        }
+      }
+      if (TagAssignmentAuthorization.hasTargetType(cacheObject.type())) {
+        NameIdentifier objectIdentifier = MetadataObjectUtil.toEntityIdent(metalake, cacheObject);
+        if (TagAssignmentAuthorization.wasCheckedAbsent(objectIdentifier, cacheObject.type())) {
+          return new MetadataIdResolution(Optional.empty(), true);
+        }
+        Long checkedTarget =
+            TagAssignmentAuthorization.checkedTargetIdentity(objectIdentifier, cacheObject.type());
+        if (checkedTarget != null && !checkedTarget.equals(resolved)) {
+          return new MetadataIdResolution(Optional.empty(), true);
+        }
+      }
+      return new MetadataIdResolution(Optional.of(resolved), false);
     } catch (NotFoundException e) {
       return new MetadataIdResolution(Optional.empty(), false);
     }
@@ -192,7 +213,7 @@ public class JcasbinAuthorizationLookups {
       return metadataId;
     }
 
-    /** Returns whether the catalog rules needed to normalize the object could not be resolved. */
+    /** Returns whether the metadata identity could not be resolved safely for this request. */
     boolean normalizationFailed() {
       return normalizationFailed;
     }

@@ -23,6 +23,7 @@ import static org.apache.gravitino.server.authorization.expression.Authorization
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.TEST_CATALOG_CONNECTION_WITH_CHANGES_AUTHORIZATION_EXPRESSION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -54,6 +55,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
@@ -68,6 +70,8 @@ import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
 import org.apache.gravitino.dto.requests.JobRunRequest;
 import org.apache.gravitino.dto.requests.OwnerSetRequest;
+import org.apache.gravitino.dto.requests.PolicyTagAddRequest;
+import org.apache.gravitino.dto.requests.PolicyUpdatesRequest;
 import org.apache.gravitino.dto.requests.PrivilegeGrantRequest;
 import org.apache.gravitino.dto.requests.PrivilegeRevokeRequest;
 import org.apache.gravitino.dto.requests.SchemaCreateRequest;
@@ -79,13 +83,21 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.NamespacedEntityId;
+import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metalake.MetalakeManager;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
@@ -116,13 +128,17 @@ import org.apache.gravitino.server.web.rest.MetadataObjectSemanticModelOperation
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
 import org.apache.gravitino.server.web.rest.OwnerOperations;
 import org.apache.gravitino.server.web.rest.PermissionOperations;
+import org.apache.gravitino.server.web.rest.PolicyOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
 import org.apache.gravitino.server.web.rest.SecretsProviderOperations;
 import org.apache.gravitino.server.web.rest.SemanticModelMetricOperations;
 import org.apache.gravitino.server.web.rest.SemanticModelOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
+import org.apache.gravitino.server.web.rest.TagOperations;
 import org.apache.gravitino.server.web.rest.ViewOperations;
+import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.tag.TagDispatcher;
+import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.RequestContext;
 import org.apache.logging.log4j.Level;
@@ -1372,6 +1388,183 @@ public class TestGravitinoInterceptionService {
   }
 
   @Test
+  void testMissingPolicyAndInvalidSelectorReturnsBadRequest() throws Throwable {
+    try (TesterRequestMocks mocks = new TesterRequestMocks()) {
+      when(mocks.authorizer.isOwner(any(), any(), any(), any())).thenReturn(true);
+      PolicyDispatcher policies = mock(PolicyDispatcher.class);
+      when(mocks.env.policyDispatcher()).thenReturn(policies);
+      when(policies.getPolicy("lake", "missing")).thenThrow(new NoSuchPolicyException("missing"));
+      Method method =
+          TagOperations.class.getMethod(
+              "addPolicyForTag",
+              String.class,
+              String.class,
+              String.class,
+              PolicyTagAddRequest.class);
+      MethodInvocation invocation = mock(MethodInvocation.class);
+      when(invocation.getMethod()).thenReturn(method);
+      when(invocation.getArguments())
+          .thenReturn(new Object[] {"lake", "tag", "missing", new PolicyTagAddRequest()});
+      when(invocation.proceed()).thenReturn(Response.status(400).build());
+      MethodInterceptor interceptor =
+          new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
+      Response response = (Response) interceptor.invoke(invocation);
+      assertEquals(400, response.getStatus());
+    }
+  }
+
+  @Test
+  void testDeniedPolicyWideningDoesNotReachMutation() throws Throwable {
+    try (TesterRequestMocks mocks = new TesterRequestMocks()) {
+      when(mocks.authorizer.isOwner(any(), any(), any(), any()))
+          .thenAnswer(
+              invocation ->
+                  ((MetadataObject) invocation.getArgument(2)).type()
+                      == MetadataObject.Type.POLICY);
+      PolicyDispatcher policies = mock(PolicyDispatcher.class);
+      when(mocks.env.policyDispatcher()).thenReturn(policies);
+      PolicyEntity policy = mock(PolicyEntity.class);
+      when(policy.policyType()).thenReturn(Policy.BuiltInType.ACCESS_CONTROL);
+      when(policy.content())
+          .thenReturn(
+              PolicyContents.accessControl(
+                  List.of(Privilege.Name.SELECT_TABLE), List.of("reader")));
+      when(policies.getPolicy("lake", "policy")).thenReturn(policy);
+      RelationalEntity<?> relation = mock(RelationalEntity.class);
+      TagEntity tag = mock(TagEntity.class);
+      when(tag.name()).thenReturn("visible");
+      doReturn(tag).when(relation).targetEntity();
+      when(policies.listTagAssociationsForPolicy("lake", "policy"))
+          .thenReturn(new RelationalEntity<?>[] {relation});
+      PolicyUpdatesRequest request =
+          JsonUtils.objectMapper()
+              .readValue(
+                  "{\"updates\":[{\"@type\":\"rename\",\"newName\":\"renamed\"},"
+                      + "{\"@type\":\"updateContent\",\"policyType\":\"system_access_control\","
+                      + "\"newContent\":{\"privileges\":[\"SELECT_TABLE\",\"MODIFY_TABLE\"],"
+                      + "\"applicableRoles\":[\"reader\"]}}]}",
+                  PolicyUpdatesRequest.class);
+      Method method =
+          PolicyOperations.class.getMethod(
+              "alterPolicy", String.class, String.class, PolicyUpdatesRequest.class);
+      MethodInvocation invocation = mock(MethodInvocation.class);
+      when(invocation.getMethod()).thenReturn(method);
+      when(invocation.getArguments()).thenReturn(new Object[] {"lake", "policy", request});
+      Response response =
+          (Response)
+              new GravitinoInterceptionService()
+                  .getMethodInterceptors(method)
+                  .get(0)
+                  .invoke(invocation);
+      assertEquals(403, response.getStatus());
+      verify(invocation, never()).proceed();
+      verify(policies, never()).alterPolicy(any(), any(), any());
+    }
+  }
+
+  @Test
+  void testMixedTagBatchesAreRejectedBeforeMutation() throws Throwable {
+    try (TesterRequestMocks mocks = new TesterRequestMocks();
+        MockedStatic<EntityIdService> ids = mockStatic(EntityIdService.class)) {
+      ids.when(() -> EntityIdService.getEntityIds(any(), any()))
+          .thenReturn(new NamespacedEntityId(2L, 1L));
+      when(mocks.authorizer.authorize(any(), any(), any(), any(), any())).thenReturn(true);
+      TagDispatcher dispatcher = mock(TagDispatcher.class);
+      when(mocks.env.tagDispatcher()).thenReturn(dispatcher);
+      when(mocks.env.internalTagDispatcher()).thenReturn(dispatcher);
+      TagEntity descriptiveTag = mock(TagEntity.class);
+      TagEntity accessTag = mock(TagEntity.class);
+      when(descriptiveTag.id()).thenReturn(1L);
+      when(accessTag.id()).thenReturn(2L);
+      when(dispatcher.getTag("testMetalake", "descriptive")).thenReturn(descriptiveTag);
+      when(dispatcher.getTag("testMetalake", "access")).thenReturn(accessTag);
+      RelationalEntity<?> relation = mock(RelationalEntity.class);
+      PolicyEntity policy = mock(PolicyEntity.class);
+      doReturn(policy).when(relation).targetEntity();
+      when(policy.policyType()).thenReturn(Policy.BuiltInType.ACCESS_CONTROL);
+      when(dispatcher.listPolicyAssociationsForTag("testMetalake", "descriptive"))
+          .thenReturn(new RelationalEntity<?>[0]);
+      when(dispatcher.listPolicyAssociationsForTag("testMetalake", "access"))
+          .thenReturn(new RelationalEntity<?>[] {relation});
+      Object[] requests = {
+        new TagsAssociateRequest(new String[] {"descriptive", "access"}, null),
+        new TagValuesAssociateRequest(
+            new TagValue[] {TagValue.noValue("descriptive"), TagValue.of("access", "finance")},
+            null),
+        new TagsAssociateRequest(new String[] {"descriptive", "access"}, null)
+      };
+      for (int i = 0; i < requests.length; i++) {
+        Object request = requests[i];
+        String methodName =
+            request instanceof TagsAssociateRequest
+                ? "associateTagsForObject"
+                : "associateTagValuesForObject";
+        Class<?> resource = i == 2 ? TagOperations.class : MetadataObjectTagOperations.class;
+        Method method =
+            resource.getMethod(
+                methodName, String.class, String.class, String.class, request.getClass());
+        MethodInvocation invocation = mock(MethodInvocation.class);
+        when(invocation.getMethod()).thenReturn(method);
+        when(invocation.getArguments())
+            .thenReturn(new Object[] {"testMetalake", "catalog", "object1", request});
+        Response response =
+            (Response)
+                new GravitinoInterceptionService()
+                    .getMethodInterceptors(method)
+                    .get(0)
+                    .invoke(invocation);
+        assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
+        verify(invocation, never()).proceed();
+      }
+    }
+  }
+
+  @Test
+  void testHiddenTagNamesCannotBeProbed() throws Throwable {
+    try (TesterRequestMocks mocks = new TesterRequestMocks()) {
+      TagDispatcher dispatcher = mock(TagDispatcher.class);
+      when(mocks.env.tagDispatcher()).thenReturn(dispatcher);
+      when(dispatcher.listPolicyAssociationsForTag("testMetalake", "gravitino_hidden_123"))
+          .thenReturn(new RelationalEntity<?>[0]);
+      when(dispatcher.listPolicyAssociationsForTag("testMetalake", "gravitino_hidden_999"))
+          .thenThrow(new NoSuchTagException("missing"));
+      Method method =
+          MetadataObjectTagOperations.class.getMethod(
+              "associateTagsForObject",
+              String.class,
+              String.class,
+              String.class,
+              TagsAssociateRequest.class);
+      MethodInterceptor interceptor =
+          new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
+      MethodInvocation existing = mock(MethodInvocation.class);
+      when(existing.getMethod()).thenReturn(method);
+      when(existing.getArguments())
+          .thenReturn(
+              new Object[] {
+                "testMetalake",
+                "catalog",
+                "object1",
+                new TagsAssociateRequest(new String[] {"gravitino_hidden_123"}, null)
+              });
+      MethodInvocation missing = mock(MethodInvocation.class);
+      when(missing.getMethod()).thenReturn(method);
+      when(missing.getArguments())
+          .thenReturn(
+              new Object[] {
+                "testMetalake",
+                "catalog",
+                "object1",
+                new TagsAssociateRequest(new String[] {"gravitino_hidden_999"}, null)
+              });
+      Response existingResponse = (Response) interceptor.invoke(existing);
+      Response missingResponse = (Response) interceptor.invoke(missing);
+      assertEquals(Response.Status.NOT_FOUND.getStatusCode(), existingResponse.getStatus());
+      assertEquals(missingResponse.getStatus(), existingResponse.getStatus());
+    }
+  }
+
+  @Test
   public void testInvalidV2TagAssociationBodyReturnsBadRequestAfterAuthorization()
       throws Throwable {
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
@@ -2262,6 +2455,38 @@ public class TestGravitinoInterceptionService {
             ArgumentMatchers.any()))
         .thenReturn(owner);
     return authorizer;
+  }
+
+  private static class TesterRequestMocks implements AutoCloseable {
+    private final MockedStatic<PrincipalUtils> principals = mockStatic(PrincipalUtils.class);
+    private final MockedStatic<GravitinoAuthorizerProvider> providers =
+        mockStatic(GravitinoAuthorizerProvider.class);
+    private final MockedStatic<AuthorizationUtils> authorizationUtils =
+        mockStatic(AuthorizationUtils.class);
+    private final MockedStatic<GravitinoEnv> environments = mockStatic(GravitinoEnv.class);
+    private final GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    private final GravitinoEnv env = mock(GravitinoEnv.class);
+
+    private TesterRequestMocks() {
+      principals.when(PrincipalUtils::getCurrentPrincipal).thenReturn(new UserPrincipal("tester"));
+      principals.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+      GravitinoAuthorizerProvider provider = mock(GravitinoAuthorizerProvider.class);
+      providers.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
+      when(provider.getGravitinoAuthorizer()).thenReturn(authorizer);
+      authorizationUtils
+          .when(() -> AuthorizationUtils.checkCurrentUser(any(), any(), any()))
+          .thenAnswer(invocation -> null);
+      environments.when(GravitinoEnv::getInstance).thenReturn(env);
+      when(env.eventBus()).thenReturn(mock(EventBus.class));
+    }
+
+    @Override
+    public void close() {
+      environments.close();
+      authorizationUtils.close();
+      providers.close();
+      principals.close();
+    }
   }
 
   private static class MockGravitinoAuthorizer implements GravitinoAuthorizer {
