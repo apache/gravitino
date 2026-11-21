@@ -22,6 +22,7 @@ package org.apache.gravitino.integration.test.web.ui;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.identity;
 
 import com.google.common.collect.Maps;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +37,7 @@ import org.apache.gravitino.integration.test.web.ui.pages.CatalogsPage;
 import org.apache.gravitino.integration.test.web.ui.pages.MetalakePage;
 import org.apache.gravitino.integration.test.web.ui.utils.BaseWebIT;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -44,7 +46,11 @@ import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.utils.RandomNameUtils;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -55,6 +61,9 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.openqa.selenium.By;
+import org.openqa.selenium.Keys;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
 
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -444,6 +453,22 @@ public class CatalogsPageTest extends BaseWebIT {
         TABLE_NAME);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(TABLE_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyTableColumns());
+    List<String> metadataColumns =
+        Arrays.asList("Nullable", "AutoIncrement", "Default Value", "Comment");
+
+    catalogsPage.clickColumnSettings();
+
+    for (String column : metadataColumns) {
+      catalogsPage.toggleMetadataColumn(column);
+      Assertions.assertTrue(
+          catalogsPage.verifyTableColumnVisibility(column, false), column + " should be hidden");
+    }
+
+    for (String column : metadataColumns) {
+      catalogsPage.toggleMetadataColumn(column);
+      Assertions.assertTrue(
+          catalogsPage.verifyTableColumnVisibility(column, true), column + " should be visible");
+    }
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME, true));
     Assertions.assertTrue(catalogsPage.verifySelectedNode(TABLE_NAME));
   }
@@ -670,6 +695,73 @@ public class CatalogsPageTest extends BaseWebIT {
 
   @Test
   @Order(23)
+  void testMysqlAutoIncrementAndColumnCommentRequireSeparateSaves() throws InterruptedException {
+    String schema = RandomNameUtils.genRandomName("auto_increment");
+    String table = "users";
+    String originalComment = "Original comment";
+    String newComment = "Updated comment";
+    NameIdentifier tableIdent = NameIdentifier.of(schema, table);
+    Catalog catalog = gravitinoClient.loadMetalake(METALAKE_NAME).loadCatalog(MYSQL_CATALOG_NAME);
+    TableCatalog tables = catalog.asTableCatalog();
+    catalog.asSchemas().createSchema(schema, "", Map.of());
+    try {
+      tables.createTable(
+          tableIdent,
+          new Column[] {Column.of("id", Types.LongType.get(), originalComment, false, true, null)},
+          "",
+          Map.of(),
+          Transforms.EMPTY_TRANSFORM,
+          Distributions.NONE,
+          new SortOrder[0],
+          new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"id"}})});
+      driver.get(
+          String.format(
+              "%s/ui/catalogs?metalake=%s&catalog=%s&catalogType=%s&schema=%s&table=%s",
+              gravitinoUri,
+              METALAKE_NAME,
+              MYSQL_CATALOG_NAME,
+              CATALOG_TYPE_RELATIONAL,
+              schema,
+              table));
+
+      By editTable = By.cssSelector("[data-refer='edit-table-btn']");
+      By autoIncrement = By.id("tableForm_columns_0_autoIncrement");
+      By columnComment = By.id("tableForm_columns_0_comment");
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+      clickAndWait(editTable);
+      wait.until(ExpectedConditions.attributeToBe(autoIncrement, "aria-checked", "true"));
+      clickAndWait(autoIncrement);
+      driver.findElement(columnComment).sendKeys(Keys.chord(Keys.CONTROL, "a"), newComment);
+      clickAndWait(catalogsPage.handleSubmitTableBtn);
+      wait.until(
+          ExpectedConditions.textToBePresentInElementLocated(
+              By.cssSelector(".ant-modal-confirm-title"), "Save these changes separately"));
+      Column unchanged = tables.loadTable(tableIdent).columns()[0];
+      Assertions.assertTrue(unchanged.autoIncrement());
+      Assertions.assertEquals(originalComment, unchanged.comment());
+      clickAndWait(
+          By.xpath(
+              "//div[contains(@class, 'ant-modal-confirm-warning')]//button[normalize-space(.)='OK']"));
+
+      driver.findElement(columnComment).sendKeys(Keys.chord(Keys.CONTROL, "a"), originalComment);
+      clickAndWait(catalogsPage.handleSubmitTableBtn);
+      wait.until(ExpectedConditions.invisibilityOfElementLocated(columnComment));
+
+      clickAndWait(editTable);
+      wait.until(ExpectedConditions.attributeToBe(autoIncrement, "aria-checked", "false"));
+      driver.findElement(columnComment).sendKeys(Keys.chord(Keys.CONTROL, "a"), newComment);
+      clickAndWait(catalogsPage.handleSubmitTableBtn);
+      wait.until(ExpectedConditions.invisibilityOfElementLocated(columnComment));
+      Column saved = tables.loadTable(tableIdent).columns()[0];
+      Assertions.assertFalse(saved.autoIncrement());
+      Assertions.assertEquals(newComment, saved.comment());
+    } finally {
+      catalog.asSchemas().dropSchema(schema, true);
+    }
+  }
+
+  @Test
+  @Order(24)
   public void testBackHomePage() throws InterruptedException {
     clickAndWait(catalogsPage.backHomeBtn);
     Assertions.assertTrue(catalogsPage.verifyBackHomePage());
