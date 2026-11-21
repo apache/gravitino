@@ -49,11 +49,13 @@ import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestRelationalEntityStore {
@@ -138,6 +140,56 @@ public class TestRelationalEntityStore {
     inOrder.verify(backend).insert(topic, true);
     inOrder.verify(cache).invalidate(ident, Entity.EntityType.TOPIC);
     Mockito.verify(cache, Mockito.never()).put(topic);
+  }
+
+  @Test
+  void testPutDoesNotPublishCacheableEntityWhileTransactionOpen() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "topic");
+    TopicEntity topic = Mockito.mock(TopicEntity.class);
+    Mockito.when(topic.nameIdentifier()).thenReturn(ident);
+    Mockito.when(topic.type()).thenReturn(Entity.EntityType.TOPIC);
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+
+    try (MockedStatic<SessionUtils> sessions = Mockito.mockStatic(SessionUtils.class)) {
+      sessions.when(SessionUtils::isInTransaction).thenReturn(true);
+      store.put(topic, false);
+    }
+
+    Mockito.verify(backend).insert(topic, false);
+    Mockito.verify(cache, Mockito.never()).put(topic);
+  }
+
+  @Test
+  void testPutPublishesCacheableEntityWhenNoTransactionOpen() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "topic");
+    TopicEntity topic = Mockito.mock(TopicEntity.class);
+    Mockito.when(topic.nameIdentifier()).thenReturn(ident);
+    Mockito.when(topic.type()).thenReturn(Entity.EntityType.TOPIC);
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+
+    try (MockedStatic<SessionUtils> sessions = Mockito.mockStatic(SessionUtils.class)) {
+      sessions.when(SessionUtils::isInTransaction).thenReturn(false);
+      store.put(topic, false);
+    }
+
+    Mockito.verify(backend).insert(topic, false);
+    Mockito.verify(cache).put(topic);
+  }
+
+  @Test
+  void testPutStillRunsRelatedInvalidationForUncachedTypeWhileTransactionOpen() throws Exception {
+    BaseEntityCache cache = Mockito.mock(BaseEntityCache.class);
+    FieldUtils.writeField(store, "cache", cache, true);
+    ModelEntity entity = Mockito.mock(ModelEntity.class);
+    Mockito.when(entity.type()).thenReturn(Entity.EntityType.MODEL);
+
+    try (MockedStatic<SessionUtils> sessions = Mockito.mockStatic(SessionUtils.class)) {
+      sessions.when(SessionUtils::isInTransaction).thenReturn(true);
+      store.put(entity, false);
+    }
+
+    Mockito.verify(backend).insert(entity, false);
+    Mockito.verify(cache).put(entity);
   }
 
   @Test

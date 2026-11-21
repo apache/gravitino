@@ -73,6 +73,7 @@ import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
@@ -289,6 +290,11 @@ public class RelationalEntityStore
       // row it already had. Caching the copy handed in here would publish values the stored row
       // does not carry, so the next read is served from the backend instead.
       invalidateCache(e.nameIdentifier(), e.type());
+    } else if (SessionUtils.isInTransaction()) {
+      // Nested under an outer doMultipleWithCommit, insert returns while that SQL session is still
+      // open. Publishing into the process-wide cache would expose an uncommitted row and leave a
+      // ghost after rollback. Skip publish; only run related-key invalidation (safe to clear).
+      cache.invalidateOnKeyChange(e);
     } else {
       cacheIfEpochUnchanged(e, epochBeforeWrite);
     }
