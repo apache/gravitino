@@ -73,7 +73,8 @@ dependencies {
     exclude(group = "com.google.code.findbugs")
     exclude(group = "com.google.guava")
     exclude(group = "com.sun.jersey")
-    exclude(group = "io.netty", module = "netty")
+    // hadoop-mapreduce-client-core 3.4 brings netty-all and the netty modules, which are not needed.
+    exclude(group = "io.netty")
     exclude(group = "log4j")
     exclude(group = "org.apache.avro")
     exclude(group = "org.apache.logging.log4j")

@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.PrivilegedAction;
+import java.security.PrivilegedExceptionAction;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
@@ -126,6 +127,48 @@ public class HDFSKerberosIT {
     UserGroupInformation.reset();
     Exception e = Assertions.assertThrows(Exception.class, action::run);
     Assertions.assertInstanceOf(AccessControlException.class, e.getCause());
+  }
+
+  /**
+   * Logs in from the keytab and logs in again with the Kerberos client of Hadoop 3.4 (Kerby 2.0.3
+   * in hadoop-auth), the way a long-running client renews its ticket. The HDFS access must keep
+   * working with the renewed ticket.
+   */
+  @Test
+  public void testKerberosHDFSKeytabRelogin() throws Exception {
+    Configuration conf = new Configuration();
+    conf.set("fs.defaultFS", defaultBaseLocation());
+    conf.setBoolean("fs.hdfs.impl.disable.cache", true);
+    conf.set("hadoop.security.authentication", "kerberos");
+    UserGroupInformation.reset();
+    UserGroupInformation.setConfiguration(conf);
+
+    UserGroupInformation ugi =
+        UserGroupInformation.loginUserFromKeytabAndReturnUGI(CLIENT_PRINCIPAL, keytabPath);
+    Assertions.assertTrue(ugi.isFromKeytab());
+    Assertions.assertTrue(ugi.hasKerberosCredentials());
+    Assertions.assertEquals(CLIENT_PRINCIPAL, ugi.getUserName());
+    assertRootExists(ugi, conf);
+
+    // Force a new login with the keytab, then the conditional relogin used by long-running clients.
+    ugi.reloginFromKeytab();
+    Assertions.assertTrue(ugi.hasKerberosCredentials());
+    assertRootExists(ugi, conf);
+    ugi.checkTGTAndReloginFromKeytab();
+    assertRootExists(ugi, conf);
+  }
+
+  private static void assertRootExists(UserGroupInformation ugi, Configuration conf)
+      throws Exception {
+    boolean exists =
+        ugi.doAs(
+            (PrivilegedExceptionAction<Boolean>)
+                () -> {
+                  try (FileSystem fs = FileSystem.get(conf)) {
+                    return fs.exists(new Path("/"));
+                  }
+                });
+    Assertions.assertTrue(exists);
   }
 
   private static String defaultBaseLocation() {

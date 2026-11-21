@@ -42,13 +42,26 @@ dependencies {
   compileOnly(libs.aws.iam)
   compileOnly(libs.aws.policy)
   compileOnly(libs.aws.sts)
-  compileOnly(libs.hadoop3.aws)
+  compileOnly(libs.hadoop3.aws) {
+    exclude("software.amazon.awssdk", "bundle")
+  }
   compileOnly(libs.hadoop3.client.api)
+  // AWS SDK v1 is only needed to compile S3CredentialsProvider, which serves Hadoop 3.3 and earlier.
+  // The thin bundle does not ship it, the Hadoop runtime provides it.
+  compileOnly(libs.aws.v1.core) {
+    isTransitive = false
+  }
 
+  testCompileOnly(libs.aws.v1.core) {
+    isTransitive = false
+  }
   testImplementation(libs.aws.iam)
   testImplementation(libs.aws.policy)
   testImplementation(libs.aws.sts)
-  testImplementation(libs.hadoop3.aws)
+  testImplementation(libs.hadoop3.aws) {
+    exclude("software.amazon.awssdk", "bundle")
+  }
+  testImplementation(libs.bundles.hadoop.aws.sdk)
   testImplementation(libs.hadoop3.client.api)
   testImplementation(libs.hadoop3.client.runtime)
   testImplementation(libs.junit.jupiter.api)
@@ -58,4 +71,41 @@ dependencies {
 
 tasks.compileJava {
   dependsOn(":catalogs:catalog-fileset:runtimeJars")
+}
+
+// The thin bundle runs on the Hadoop of its host, which can be 3.3 (AWS SDK v1, for example Spark 3.5)
+// or 3.4 and later (AWS SDK v2). The default test task runs against the Hadoop version of the
+// project, this one runs the AWS SDK v1 tests against the oldest supported Hadoop 3.3.
+val hadoop33Version: String = libs.versions.hadoop33.get()
+val hadoop33TestRuntime: Configuration =
+  configurations.testRuntimeClasspath.get().copyRecursive().apply {
+    resolutionStrategy.eachDependency {
+      if (requested.group == "org.apache.hadoop") {
+        useVersion(hadoop33Version)
+      }
+    }
+    exclude(group = "software.amazon.awssdk")
+  }
+
+val testHadoop33 = tasks.register<Test>("testHadoop33") {
+  group = "verification"
+  description = "Runs the AWS SDK v1 tests against Hadoop $hadoop33Version"
+  testClassesDirs = sourceSets.test.get().output.classesDirs
+  classpath = sourceSets.test.get().output + sourceSets.main.get().output + hadoop33TestRuntime
+  include("**/*V1.class", "**/TestS3CredentialsProviderSelection.class")
+  systemProperty("s3a.expectedSdk", "v1")
+  onlyIf { !project.hasProperty("skipTests") }
+}
+
+tasks.test {
+  // The AWS SDK v1 tests run in testHadoop33, the AWS SDK v1 is not on this classpath.
+  exclude("**/*V1.class")
+  systemProperty(
+    "s3a.expectedSdk",
+    if (libs.versions.hadoop3.asProvider().get().startsWith("3.3.")) "v1" else "v2"
+  )
+}
+
+tasks.check {
+  dependsOn(testHadoop33)
 }

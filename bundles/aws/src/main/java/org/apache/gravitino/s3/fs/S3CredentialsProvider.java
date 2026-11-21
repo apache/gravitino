@@ -16,7 +16,6 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
-
 package org.apache.gravitino.s3.fs;
 
 import com.amazonaws.auth.AWSCredentials;
@@ -24,73 +23,40 @@ import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.BasicSessionCredentials;
 import java.net.URI;
-import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
-import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
-import org.apache.gravitino.credential.AwsIrsaCredential;
-import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.S3SecretKeyCredential;
-import org.apache.gravitino.credential.S3TokenCredential;
+import org.apache.gravitino.s3.fs.S3CredentialsRefresher.S3Credentials;
 import org.apache.hadoop.conf.Configuration;
 
+/**
+ * An AWS SDK v1 credentials provider that vends the S3 credentials of Gravitino. It is used by
+ * Hadoop 3.3 and earlier, whose S3A connector is built on the AWS SDK v1. Hadoop 3.4 and later use
+ * {@link S3CredentialsProviderV2}.
+ */
 public class S3CredentialsProvider implements AWSCredentialsProvider {
-  private GravitinoFileSystemCredentialsProvider gravitinoFileSystemCredentialsProvider;
 
-  private AWSCredentials basicSessionCredentials;
-  private long expirationTime = Long.MAX_VALUE;
-  private static final double EXPIRATION_TIME_FACTOR = 0.5D;
+  private final S3CredentialsRefresher refresher;
 
+  /**
+   * Creates the provider. Hadoop instantiates it by reflection with this signature.
+   *
+   * @param uri The URI of the file system.
+   * @param conf The Hadoop configuration that carries the Gravitino credential provider settings.
+   */
   public S3CredentialsProvider(final URI uri, final Configuration conf) {
-    this.gravitinoFileSystemCredentialsProvider = FileSystemUtils.getGvfsCredentialProvider(conf);
+    this.refresher = new S3CredentialsRefresher(conf);
   }
 
   @Override
   public AWSCredentials getCredentials() {
-    // Refresh credentials if they are null or about to expire.
-    if (basicSessionCredentials == null || System.currentTimeMillis() >= expirationTime) {
-      synchronized (this) {
-        refresh();
-      }
+    S3Credentials credentials = refresher.getCredentials();
+    if (credentials.sessionToken() == null) {
+      return new BasicAWSCredentials(credentials.accessKeyId(), credentials.secretAccessKey());
     }
-
-    return basicSessionCredentials;
+    return new BasicSessionCredentials(
+        credentials.accessKeyId(), credentials.secretAccessKey(), credentials.sessionToken());
   }
 
   @Override
   public void refresh() {
-    Credential[] gravitinoCredentials = gravitinoFileSystemCredentialsProvider.getCredentials();
-    Credential credential = S3Utils.getSuitableCredential(gravitinoCredentials);
-
-    if (credential == null) {
-      throw new RuntimeException("No suitable credential for S3 found...");
-    }
-
-    if (credential instanceof S3SecretKeyCredential) {
-      S3SecretKeyCredential s3SecretKeyCredential = (S3SecretKeyCredential) credential;
-      basicSessionCredentials =
-          new BasicAWSCredentials(
-              s3SecretKeyCredential.accessKeyId(), s3SecretKeyCredential.secretAccessKey());
-    } else if (credential instanceof S3TokenCredential) {
-      S3TokenCredential s3TokenCredential = (S3TokenCredential) credential;
-      basicSessionCredentials =
-          new BasicSessionCredentials(
-              s3TokenCredential.accessKeyId(),
-              s3TokenCredential.secretAccessKey(),
-              s3TokenCredential.sessionToken());
-    } else if (credential instanceof AwsIrsaCredential) {
-      AwsIrsaCredential awsIrsaCredential = (AwsIrsaCredential) credential;
-      basicSessionCredentials =
-          new BasicSessionCredentials(
-              awsIrsaCredential.accessKeyId(),
-              awsIrsaCredential.secretAccessKey(),
-              awsIrsaCredential.sessionToken());
-    }
-
-    if (credential.expireTimeInMs() > 0) {
-      expirationTime =
-          System.currentTimeMillis()
-              + (long)
-                  ((credential.expireTimeInMs() - System.currentTimeMillis())
-                      * EXPIRATION_TIME_FACTOR);
-    }
+    refresher.refresh();
   }
 }

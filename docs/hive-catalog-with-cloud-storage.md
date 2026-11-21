@@ -271,7 +271,7 @@ To access S3-stored tables using Spark, you need to configure the SparkSession a
 ```
 
 :::note
-Please download [Hadoop AWS jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-aws), [aws java sdk jar](https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-bundle) and place them in the classpath of the Spark. If the JARs are missing, Spark will not be able to access the S3 storage.
+Please download [Hadoop AWS jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-aws), the AWS SDK jar that matches the Hadoop version of the Spark ([aws java sdk v1 jar](https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-bundle) for Hadoop 3.3, [aws java sdk v2 jar](https://mvnrepository.com/artifact/software.amazon.awssdk/bundle) for Hadoop 3.4 and later) and place them in the classpath of the Spark. If the JARs are missing, Spark will not be able to access the S3 storage.
 Azure Blob Storage(ADLS) requires the [Hadoop Azure jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-azure), [Azure cloud sdk jar](https://mvnrepository.com/artifact/com.azure/azure-storage-blob) to be placed in the classpath of the Spark.
 for Google Cloud Storage(GCS), you need to download the [Hadoop GCS jar](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases) and place it in the classpath of the Spark.
 :::
