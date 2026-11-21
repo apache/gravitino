@@ -26,12 +26,14 @@ import com.google.common.base.Suppliers;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.Maps;
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -80,6 +82,9 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
 
   private final Map<String, Supplier<ManagedTableOperations>> tableOpsCache;
 
+  private final Map<String, ManagedTableOperations> instantiatedTableOps =
+      new ConcurrentHashMap<>();
+
   private volatile TableLocationProvider tableLocationProvider;
 
   private volatile Map<String, String> catalogProperties = Map.of();
@@ -119,7 +124,12 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
                         e -> {
                           LakehouseTableDelegator delegator = e.getValue();
                           return Suppliers.memoize(
-                              () -> delegator.createTableOps(store, schemaOps, idGenerator));
+                              () -> {
+                                ManagedTableOperations ops =
+                                    delegator.createTableOps(store, schemaOps, idGenerator);
+                                instantiatedTableOps.put(e.getKey(), ops);
+                                return ops;
+                              });
                         })));
     if (tableOpsCache.isEmpty()) {
       throw new IllegalArgumentException("No table delegators found, this is unexpected.");
@@ -156,6 +166,21 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
   @Override
   public void close() {
     tableFormatCache.cleanUp();
+    for (ManagedTableOperations ops : instantiatedTableOps.values()) {
+      if (ops instanceof Closeable closeable) {
+        try {
+          closeable.close();
+        } catch (Exception e) {
+          LOG.warn("Failed to close table operations: {}", ops, e);
+        }
+      }
+    }
+    instantiatedTableOps.clear();
+  }
+
+  @VisibleForTesting
+  Map<String, ManagedTableOperations> instantiatedTableOps() {
+    return Collections.unmodifiableMap(instantiatedTableOps);
   }
 
   @Override

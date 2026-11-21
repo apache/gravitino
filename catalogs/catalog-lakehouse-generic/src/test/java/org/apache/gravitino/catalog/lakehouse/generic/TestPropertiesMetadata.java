@@ -20,6 +20,8 @@
 package org.apache.gravitino.catalog.lakehouse.generic;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SESSION_INDEX_CACHE_SIZE_BYTES;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SESSION_METADATA_CACHE_SIZE_BYTES;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
@@ -30,6 +32,7 @@ import org.apache.gravitino.rel.Table;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.lance.Session;
 
 public class TestPropertiesMetadata {
   public static GenericCatalog genericCatalog;
@@ -66,6 +69,31 @@ public class TestPropertiesMetadata {
         metadata.getOrDefault(
             Map.of(LANCE_ALLOW_EXTERNAL_TABLE_PURGE, "true"), LANCE_ALLOW_EXTERNAL_TABLE_PURGE));
     Assertions.assertFalse(metadata.isImmutableProperty(LANCE_ALLOW_EXTERNAL_TABLE_PURGE));
+  }
+
+  @Test
+  void testSessionCachePropertiesMetadata() {
+    PropertiesMetadata metadata = genericCatalog.catalogPropertiesMetadata();
+    Assertions.assertTrue(metadata.containsProperty(LANCE_SESSION_METADATA_CACHE_SIZE_BYTES));
+    Assertions.assertTrue(metadata.containsProperty(LANCE_SESSION_INDEX_CACHE_SIZE_BYTES));
+    Assertions.assertEquals(
+        Session.DEFAULT_METADATA_CACHE_SIZE_BYTES,
+        metadata.getOrDefault(Map.of(), LANCE_SESSION_METADATA_CACHE_SIZE_BYTES));
+    Assertions.assertEquals(
+        Session.DEFAULT_INDEX_CACHE_SIZE_BYTES,
+        metadata.getOrDefault(Map.of(), LANCE_SESSION_INDEX_CACHE_SIZE_BYTES));
+    Assertions.assertEquals(
+        12345L,
+        metadata.getOrDefault(
+            Map.of(LANCE_SESSION_METADATA_CACHE_SIZE_BYTES, "12345"),
+            LANCE_SESSION_METADATA_CACHE_SIZE_BYTES));
+    Assertions.assertEquals(
+        67890L,
+        metadata.getOrDefault(
+            Map.of(LANCE_SESSION_INDEX_CACHE_SIZE_BYTES, "67890"),
+            LANCE_SESSION_INDEX_CACHE_SIZE_BYTES));
+    Assertions.assertFalse(metadata.isImmutableProperty(LANCE_SESSION_METADATA_CACHE_SIZE_BYTES));
+    Assertions.assertFalse(metadata.isImmutableProperty(LANCE_SESSION_INDEX_CACHE_SIZE_BYTES));
   }
 
   @Test

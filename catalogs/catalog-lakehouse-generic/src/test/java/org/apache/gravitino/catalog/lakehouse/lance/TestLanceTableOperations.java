@@ -21,6 +21,8 @@ package org.apache.gravitino.catalog.lakehouse.lance;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SCHEMA_REFRESH_MODE;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SESSION_INDEX_CACHE_SIZE_BYTES;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SESSION_METADATA_CACHE_SIZE_BYTES;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_DECLARED;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
@@ -48,6 +50,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -78,6 +85,7 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -85,7 +93,9 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.lance.CacheStats;
 import org.lance.Dataset;
+import org.lance.Session;
 import org.lance.Version;
 import org.lance.index.IndexOptions;
 import org.mockito.InOrder;
@@ -106,6 +116,13 @@ public class TestLanceTableOperations {
     schemaOps = mock(ManagedSchemaOperations.class);
     idGenerator = mock(IdGenerator.class);
     lanceTableOps = spy(new LanceTableOperations(store, schemaOps, idGenerator));
+  }
+
+  @AfterEach
+  public void tearDown() {
+    if (lanceTableOps != null && !lanceTableOps.isClosed()) {
+      lanceTableOps.close();
+    }
   }
 
   /** Registered tables persist external ownership and retain the existing dataset on drop. */
@@ -2487,5 +2504,226 @@ public class TestLanceTableOperations {
         .when(lanceTableOps)
         .openDataset(location, Map.of("endpoint", "http://endpoint"));
     return ident;
+  }
+
+  @Test
+  void testLanceSessionCacheHit() throws Exception {
+    String location = tempDir.resolve("cache_hit_table").toString();
+    Column[] columns = {
+      Column.of("id", Types.IntegerType.get()), Column.of("name", Types.StringType.get())
+    };
+    try (Dataset ignored = lanceTableOps.createDataset(location, columns, Map.of())) {}
+
+    // Verify session is lazily created (null before first open)
+    Assertions.assertNull(lanceTableOps.getLanceSession());
+
+    // First open: populates metadata cache
+    try (Dataset dataset1 = lanceTableOps.openDataset(location)) {
+      Assertions.assertEquals(2, dataset1.getSchema().getFields().size());
+    }
+
+    Session session = lanceTableOps.session();
+    Assertions.assertNotNull(session);
+    CacheStats statsAfterFirst = session.metadataCacheStats();
+    Assertions.assertNotNull(statsAfterFirst);
+
+    // Second open: reuses cached metadata (cache hit)
+    try (Dataset dataset2 = lanceTableOps.openDataset(location)) {
+      Assertions.assertEquals(2, dataset2.getSchema().getFields().size());
+    }
+
+    CacheStats statsAfterSecond = session.metadataCacheStats();
+    Assertions.assertTrue(
+        statsAfterSecond.getHits() > 0,
+        "Expected cache hits > 0, but got: " + statsAfterSecond.getHits());
+    Assertions.assertTrue(
+        statsAfterSecond.getSizeBytes() > 0,
+        "Expected cache size > 0 bytes, but got: " + statsAfterSecond.getSizeBytes());
+  }
+
+  @Test
+  void testLanceSessionLifecycleAndClose() throws Exception {
+    String location = tempDir.resolve("lifecycle_table").toString();
+    Column[] columns = {Column.of("id", Types.IntegerType.get())};
+    try (Dataset ignored = lanceTableOps.createDataset(location, columns, Map.of())) {}
+
+    Assertions.assertFalse(lanceTableOps.isClosed());
+    try (Dataset ds = lanceTableOps.openDataset(location)) {
+      Assertions.assertNotNull(ds);
+    }
+
+    Session session = lanceTableOps.session();
+    Assertions.assertFalse(session.isClosed());
+
+    // Close LanceTableOperations
+    lanceTableOps.close();
+    Assertions.assertTrue(lanceTableOps.isClosed());
+    Assertions.assertTrue(session.isClosed());
+
+    // Idempotent close
+    Assertions.assertDoesNotThrow(() -> lanceTableOps.close());
+
+    // Operation after close throws IllegalStateException
+    IllegalStateException ex =
+        Assertions.assertThrows(
+            IllegalStateException.class, () -> lanceTableOps.openDataset(location));
+    Assertions.assertTrue(ex.getMessage().contains("LanceTableOperations is closed"));
+  }
+
+  @Test
+  void testStorageOptionsIsolationWithSession() throws Exception {
+    String location1 = tempDir.resolve("storage_iso_1").toString();
+    String location2 = tempDir.resolve("storage_iso_2").toString();
+    Column[] cols = {Column.of("id", Types.IntegerType.get())};
+    try (Dataset ignored = lanceTableOps.createDataset(location1, cols, Map.of());
+        Dataset ignored2 = lanceTableOps.createDataset(location2, cols, Map.of())) {}
+
+    Map<String, String> opts1 = Map.of("test.custom.key", "val1");
+    Map<String, String> opts2 = Map.of("test.custom.key", "val2");
+
+    try (Dataset ds1 = lanceTableOps.openDataset(location1, opts1);
+        Dataset ds2 = lanceTableOps.openDataset(location2, opts2);
+        Dataset ds1Again = lanceTableOps.openDataset(location1, opts2)) {
+      Assertions.assertNotNull(ds1);
+      Assertions.assertNotNull(ds2);
+      Assertions.assertNotNull(ds1Again);
+
+      Assertions.assertEquals(1, ds1.getSchema().getFields().size());
+      Assertions.assertEquals(1, ds2.getSchema().getFields().size());
+      Assertions.assertEquals(1, ds1Again.getSchema().getFields().size());
+
+      Session session = lanceTableOps.session();
+      Assertions.assertNotNull(session);
+      Assertions.assertFalse(session.isClosed());
+      try (Session s1 = ds1.session();
+          Session s2 = ds2.session();
+          Session s3 = ds1Again.session()) {
+        Assertions.assertTrue(session.isSameAs(s1));
+        Assertions.assertTrue(session.isSameAs(s2));
+        Assertions.assertTrue(session.isSameAs(s3));
+      }
+    }
+  }
+
+  @Test
+  void testMultiCatalogSessionIsolation() throws Exception {
+    String location = tempDir.resolve("multi_catalog_table").toString();
+    Column[] cols = {Column.of("id", Types.IntegerType.get())};
+    try (Dataset ignored = lanceTableOps.createDataset(location, cols, Map.of())) {}
+
+    LanceTableOperations ops1 = new LanceTableOperations(store, schemaOps, idGenerator);
+    LanceTableOperations ops2 = new LanceTableOperations(store, schemaOps, idGenerator);
+
+    try (Dataset d1 = ops1.openDataset(location);
+        Dataset d2 = ops2.openDataset(location)) {
+      Assertions.assertNotNull(d1);
+      Assertions.assertNotNull(d2);
+    }
+
+    Session s1 = ops1.session();
+    Session s2 = ops2.session();
+    Assertions.assertNotNull(s1);
+    Assertions.assertNotNull(s2);
+    Assertions.assertFalse(s1.isSameAs(s2));
+
+    ops1.close();
+    Assertions.assertTrue(s1.isClosed());
+    Assertions.assertFalse(s2.isClosed());
+    ops2.close();
+    Assertions.assertTrue(s2.isClosed());
+  }
+
+  @Test
+  void testCustomSessionCacheSizeProperties() throws Exception {
+    String location = tempDir.resolve("custom_props_table").toString();
+    Column[] cols = {Column.of("id", Types.IntegerType.get())};
+    try (Dataset ignored = lanceTableOps.createDataset(location, cols, Map.of())) {}
+
+    LanceTableOperations ops = new LanceTableOperations(store, schemaOps, idGenerator);
+    ops.setCatalogProperties(
+        Map.of(
+            LANCE_SESSION_METADATA_CACHE_SIZE_BYTES, "10485760",
+            LANCE_SESSION_INDEX_CACHE_SIZE_BYTES, "20971520"));
+
+    try (Dataset ds = ops.openDataset(location)) {
+      Assertions.assertNotNull(ds);
+    }
+    Session session = ops.session();
+    Assertions.assertNotNull(session);
+    Assertions.assertFalse(session.isClosed());
+    ops.close();
+
+    // Valid zero value (allowed by Lance to disable cache)
+    LanceTableOperations opsZero = new LanceTableOperations(store, schemaOps, idGenerator);
+    opsZero.setCatalogProperties(
+        Map.of(
+            LANCE_SESSION_METADATA_CACHE_SIZE_BYTES, "0",
+            LANCE_SESSION_INDEX_CACHE_SIZE_BYTES, "0"));
+    try (Dataset ds = opsZero.openDataset(location)) {
+      Assertions.assertNotNull(ds);
+    }
+    opsZero.close();
+
+    // Invalid negative value
+    LanceTableOperations opsInvalid = new LanceTableOperations(store, schemaOps, idGenerator);
+    opsInvalid.setCatalogProperties(Map.of(LANCE_SESSION_METADATA_CACHE_SIZE_BYTES, "-1"));
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> opsInvalid.openDataset(location));
+    Assertions.assertTrue(ex.getMessage().contains("must be greater than or equal to 0"));
+    opsInvalid.close();
+
+    // Invalid string
+    LanceTableOperations opsNan = new LanceTableOperations(store, schemaOps, idGenerator);
+    opsNan.setCatalogProperties(Map.of(LANCE_SESSION_INDEX_CACHE_SIZE_BYTES, "not_a_number"));
+    IllegalArgumentException ex2 =
+        Assertions.assertThrows(IllegalArgumentException.class, () -> opsNan.openDataset(location));
+    Assertions.assertTrue(ex2.getMessage().contains("Invalid long value"));
+    opsNan.close();
+  }
+
+  @Test
+  void testConcurrentOpenWithSharedSession() throws Exception {
+    String location = tempDir.resolve("concurrent_table").toString();
+    Column[] cols = {
+      Column.of("id", Types.IntegerType.get()), Column.of("data", Types.StringType.get())
+    };
+    try (Dataset ignored = lanceTableOps.createDataset(location, cols, Map.of())) {}
+
+    Assertions.assertNotNull(lanceTableOps, "LanceTableOperations must not be null");
+    Assertions.assertFalse(lanceTableOps.isClosed(), "LanceTableOperations must not be closed");
+    Assertions.assertNull(
+        lanceTableOps.getLanceSession(), "Session must not be initialized before opening datasets");
+
+    int threads = 4;
+    int iterationsPerThread = 10;
+    ExecutorService executor = Executors.newFixedThreadPool(threads);
+    try {
+      List<Callable<Void>> tasks = new ArrayList<>();
+      for (int i = 0; i < threads; i++) {
+        tasks.add(
+            () -> {
+              for (int j = 0; j < iterationsPerThread; j++) {
+                try (Dataset ds = lanceTableOps.openDataset(location)) {
+                  Assertions.assertNotNull(ds, "Opened dataset must not be null");
+                  Assertions.assertNotNull(ds.getSchema(), "Dataset schema must not be null");
+                  Assertions.assertEquals(2, ds.getSchema().getFields().size());
+                }
+              }
+              return null;
+            });
+      }
+      List<Future<Void>> futures = executor.invokeAll(tasks);
+      for (Future<Void> f : futures) {
+        Assertions.assertNotNull(f, "Future task must not be null");
+        f.get(30, TimeUnit.SECONDS);
+      }
+    } finally {
+      executor.shutdownNow();
+    }
+
+    Session session = lanceTableOps.session();
+    Assertions.assertNotNull(session, "Session must be initialized after concurrent opens");
+    Assertions.assertTrue(session.metadataCacheStats().getHits() > 0);
   }
 }

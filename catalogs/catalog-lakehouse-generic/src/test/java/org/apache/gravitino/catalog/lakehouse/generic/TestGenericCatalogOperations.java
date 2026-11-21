@@ -73,10 +73,12 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.catalog.lakehouse.lance.LanceTableOperations;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -99,6 +101,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.lance.Dataset;
+import org.lance.Session;
 import org.lance.WriteParams;
 import org.mockito.Mockito;
 
@@ -350,6 +353,62 @@ public class TestGenericCatalogOperations {
     Assertions.assertThrows(
         UnsupportedOperationException.class,
         () -> ops.testConnection(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME)));
+  }
+
+  @Test
+  void testCloseCascadesToTableOperations() throws Exception {
+    GenericCatalogOperations catalogOps = new GenericCatalogOperations(store, idGenerator);
+    Assertions.assertTrue(catalogOps.instantiatedTableOps().isEmpty());
+
+    String schemaName = randomSchemaName();
+    NameIdentifier schemaIdent =
+        NameIdentifierUtil.ofSchema(METALAKE_NAME, CATALOG_NAME, schemaName);
+    StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
+    Map<String, String> schemaProperties = StringIdentifier.newPropertiesWithId(stringId, null);
+    ops.createSchema(schemaIdent, "schema comment", schemaProperties);
+
+    NameIdentifier ident =
+        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName, "cascade_table");
+    Map<String, String> properties =
+        Map.of(
+            Table.PROPERTY_TABLE_FORMAT,
+            "lance",
+            Table.PROPERTY_LOCATION,
+            "/tmp/cascade_table_" + UUID.randomUUID(),
+            LanceConstants.LANCE_TABLE_VERSION,
+            "1");
+
+    TableEntity entity =
+        TableEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(ident.name())
+            .withNamespace(ident.namespace())
+            .withProperties(properties)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    store.put(entity, false);
+
+    try {
+      catalogOps.loadTable(ident);
+    } catch (Exception ignored) {
+      // Table doesn't exist on disk, but tableOps delegator resolution is what we test
+    }
+
+    Assertions.assertEquals(1, catalogOps.instantiatedTableOps().size());
+    LanceTableOperations lanceOps =
+        (LanceTableOperations) catalogOps.instantiatedTableOps().get("lance");
+    Assertions.assertNotNull(lanceOps);
+    Assertions.assertFalse(lanceOps.isClosed());
+
+    Session session = lanceOps.session();
+    Assertions.assertNotNull(session);
+    Assertions.assertFalse(session.isClosed());
+
+    catalogOps.close();
+    Assertions.assertTrue(lanceOps.isClosed());
+    Assertions.assertTrue(session.isClosed());
+    Assertions.assertTrue(catalogOps.instantiatedTableOps().isEmpty());
   }
 
   @Test

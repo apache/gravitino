@@ -21,10 +21,13 @@ package org.apache.gravitino.catalog.lakehouse.generic;
 
 import static org.apache.gravitino.connector.PropertyEntry.booleanPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.enumPropertyEntry;
+import static org.apache.gravitino.connector.PropertyEntry.longOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyPrefixEntry;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SCHEMA_REFRESH_MODE;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SESSION_INDEX_CACHE_SIZE_BYTES;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SESSION_METADATA_CACHE_SIZE_BYTES;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 
 import com.google.common.collect.ImmutableList;
@@ -35,6 +38,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.lance.LanceTableOperations;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.lance.Session;
 
 public class GenericCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
 
@@ -89,7 +93,19 @@ public class GenericCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 LanceTableOperations.SchemaRefreshMode.class,
                 LanceTableOperations.SchemaRefreshMode.DECLARED_AND_EMPTY,
                 false /* hidden */,
-                false /* reserved */));
+                false /* reserved */),
+            longOptionalPropertyEntry(
+                LANCE_SESSION_METADATA_CACHE_SIZE_BYTES,
+                "The metadata cache size in bytes for the Lance session.",
+                false /* immutable */,
+                Session.DEFAULT_METADATA_CACHE_SIZE_BYTES,
+                false /* hidden */),
+            longOptionalPropertyEntry(
+                LANCE_SESSION_INDEX_CACHE_SIZE_BYTES,
+                "The index cache size in bytes for the Lance session.",
+                false /* immutable */,
+                Session.DEFAULT_INDEX_CACHE_SIZE_BYTES,
+                false /* hidden */));
 
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
   }
