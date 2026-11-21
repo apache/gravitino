@@ -24,6 +24,9 @@ import static org.mockito.ArgumentMatchers.eq;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -40,6 +43,7 @@ import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.BaseEntityCache;
 import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
+import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -94,15 +98,24 @@ public class TestRelationalEntityStore {
   }
 
   @Test
-  void testUpdateInvalidatesCacheAfterBackendUpdate()
+  void testUpdateDropsCacheBeforeBackendUpdate()
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException,
           IllegalAccessException {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog");
+    EntityCacheKey key = EntityCacheKey.of(ident, Entity.EntityType.CATALOG);
     NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    @SuppressWarnings("unchecked")
+    Map<EntityCacheKey, AtomicInteger> pendingWrites =
+        (Map<EntityCacheKey, AtomicInteger>) FieldUtils.readField(store, "pendingWrites", true);
+    AtomicBoolean invalidatedBeforeBackend = new AtomicBoolean(false);
+    AtomicBoolean pendingDuringBackend = new AtomicBoolean(false);
 
     Mockito.doAnswer(
             invocation -> {
-              Mockito.verify(cache, Mockito.never()).invalidate(ident, Entity.EntityType.CATALOG);
+              Mockito.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
+              invalidatedBeforeBackend.set(true);
+              AtomicInteger count = pendingWrites.get(key);
+              pendingDuringBackend.set(count != null && count.get() > 0);
               return null;
             })
         .when(backend)
@@ -110,9 +123,28 @@ public class TestRelationalEntityStore {
 
     store.update(ident, null, Entity.EntityType.CATALOG, entity -> entity);
 
-    InOrder inOrder = Mockito.inOrder(backend, cache);
-    inOrder.verify(backend).update(eq(ident), eq(Entity.EntityType.CATALOG), any(Function.class));
-    inOrder.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
+    Assertions.assertTrue(invalidatedBeforeBackend.get());
+    Assertions.assertTrue(pendingDuringBackend.get());
+    Assertions.assertFalse(pendingWrites.containsKey(key));
+  }
+
+  @Test
+  void testGetDoesNotPublishWhileWritePending() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "topic");
+    EntityCacheKey key = EntityCacheKey.of(ident, Entity.EntityType.TOPIC);
+    TopicEntity entity = Mockito.mock(TopicEntity.class);
+    Mockito.when(entity.nameIdentifier()).thenReturn(ident);
+    Mockito.when(entity.type()).thenReturn(Entity.EntityType.TOPIC);
+    Mockito.when(backend.get(ident, Entity.EntityType.TOPIC)).thenReturn(entity);
+
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    @SuppressWarnings("unchecked")
+    Map<EntityCacheKey, AtomicInteger> pendingWrites =
+        (Map<EntityCacheKey, AtomicInteger>) FieldUtils.readField(store, "pendingWrites", true);
+    pendingWrites.put(key, new AtomicInteger(1));
+
+    Assertions.assertSame(entity, store.get(ident, Entity.EntityType.TOPIC, TopicEntity.class));
+    Mockito.verify(cache, Mockito.never()).put(entity);
   }
 
   @Test
