@@ -22,11 +22,85 @@ import static org.apache.gravitino.server.authorization.expression.Authorization
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import org.apache.gravitino.policy.AccessControlContent;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /** Test for {@link AuthorizationExpressionConverter} */
 public class TestAuthorizationExpressionConverter {
+
+  /** Tests that every supported tag privilege uses the composition adapter. */
+  @Test
+  public void testTagConferrableMacrosUseComposition() {
+    Map<String, String> targetTypes =
+        Map.ofEntries(
+            Map.entry("SELECT_TABLE", "TABLE"),
+            Map.entry("MODIFY_TABLE", "TABLE"),
+            Map.entry("PROBE_TABLE_LIKE", "(TABLE != null ? TABLE : VIEW)"),
+            Map.entry("SELECT_VIEW", "VIEW"),
+            Map.entry("READ_FILESET", "FILESET"),
+            Map.entry("WRITE_FILESET", "FILESET"),
+            Map.entry("CONSUME_TOPIC", "TOPIC"),
+            Map.entry("PRODUCE_TOPIC", "TOPIC"),
+            Map.entry("USE_MODEL", "MODEL"),
+            Map.entry("EXECUTE_FUNCTION", "FUNCTION"),
+            Map.entry("USE_SEMANTIC_MODEL", "SEMANTIC_MODEL"));
+    Assertions.assertEquals(
+        AccessControlContent.PERMITTED_PRIVILEGES.stream()
+            .map(Enum::name)
+            .collect(Collectors.toSet()),
+        targetTypes.keySet());
+    targetTypes.forEach(
+        (privilege, type) ->
+            Assertions.assertEquals(
+                "tagAuthorization.authorize(principal,METALAKE_NAME,{METALAKE,CATALOG,SCHEMA,"
+                    + type
+                    + "},@org.apache.gravitino.authorization.Privilege$Name@"
+                    + privilege
+                    + ",authorizationContext)",
+                AuthorizationExpressionConverter.convertToOgnlExpression("ANY_" + privilege),
+                privilege));
+  }
+
+  /** Checks that production expressions do not bypass privilege composition. */
+  @Test
+  public void testNoBareTagConferrablePrivilegesInProduction() throws Exception {
+    Pattern bare =
+        Pattern.compile(
+            "\\b[A-Z_]+::(?:"
+                + AccessControlContent.PERMITTED_PRIVILEGES.stream()
+                    .map(Enum::name)
+                    .collect(Collectors.joining("|"))
+                + ")\\b");
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    Assertions.assertNotNull(gravitinoHome, "GRAVITINO_HOME environment variable is not set");
+    Path root = Path.of(gravitinoHome);
+    try (Stream<Path> files =
+        Files.find(
+            root,
+            20,
+            (path, attrs) -> {
+              String file = path.toString().replace(File.separatorChar, '/');
+              return attrs.isRegularFile()
+                  && file.endsWith(".java")
+                  && file.contains("/src/main/java/")
+                  && !file.contains("/build/");
+            })) {
+      List<Path> productionFiles = files.collect(Collectors.toList());
+      assertFalse(productionFiles.isEmpty(), "No production Java files found in " + root);
+      for (Path file : productionFiles) {
+        assertFalse(bare.matcher(Files.readString(file)).find(), file.toString());
+      }
+    }
+  }
 
   /** Test for PATTERN. */
   @Test

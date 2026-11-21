@@ -401,6 +401,14 @@ public class Configs {
           .stringConf()
           .createWithDefault("org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer");
 
+  /** Whether the built-in authorizer evaluates tag access policies; disabled by default. */
+  public static final ConfigEntry<Boolean> ENABLE_TAG_BASED_AUTHORIZATION =
+      new ConfigBuilder("gravitino.authorization.tagBasedAuthorization.enable")
+          .doc("Enable tag based authorization in the built-in authorizer.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .booleanConf()
+          .createWithDefault(false);
+
   public static final ConfigEntry<Integer> GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE =
       new ConfigBuilder("gravitino.authorization.threadPoolSize")
           .doc("The thread pool size of metadata authorization requests")
