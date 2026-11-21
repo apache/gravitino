@@ -67,6 +67,7 @@ import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -87,6 +88,7 @@ import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.tag.TagAssignmentAuthorization;
 import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.tag.TagValueConstraint;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -100,6 +102,48 @@ public class TestTagMetaService extends TestJDBCBackend {
   private static final String METALAKE_NAME = "metalake_for_tag_meta_service_test";
 
   private final Map<String, String> props = ImmutableMap.of("k1", "v1");
+
+  /** Verifies a changed schema identity rejects an assignment before writing relations. */
+  @TestTemplate
+  public void testAssignmentChecksSchemaIdentity() throws IOException {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "catalog");
+    SchemaEntity schema = createAndInsertSchema(METALAKE_NAME, "catalog", "schema");
+    TableEntity table =
+        createAndInsertTableEntity(Namespace.of(METALAKE_NAME, "catalog", "schema"), "table");
+    TagEntity tag = createAndInsertTagEntity("label", "", METALAKE_NAME);
+    TagMetaService service = TagMetaService.getInstance();
+    try (TagAssignmentAuthorization scope = TagAssignmentAuthorization.open()) {
+      TagAssignmentAuthorization.recordSchemaAncestor(
+          schema.nameIdentifier(),
+          new NamespacedEntityId(RandomIdGenerator.INSTANCE.nextId(), metalake.id(), catalog.id()));
+      Assertions.assertThrows(
+          OptimisticLockException.class,
+          () ->
+              service.associateTagsWithMetadataObject(
+                  table.nameIdentifier(),
+                  Entity.EntityType.TABLE,
+                  new NameIdentifier[] {tag.nameIdentifier()},
+                  new NameIdentifier[0]));
+    }
+    Assertions.assertTrue(
+        service
+            .listTagsForMetadataObject(table.nameIdentifier(), Entity.EntityType.TABLE)
+            .isEmpty());
+    try (TagAssignmentAuthorization scope = TagAssignmentAuthorization.open()) {
+      TagAssignmentAuthorization.recordSchemaAncestor(
+          schema.nameIdentifier(),
+          new NamespacedEntityId(schema.id(), metalake.id(), catalog.id()));
+      service.associateTagsWithMetadataObject(
+          table.nameIdentifier(),
+          Entity.EntityType.TABLE,
+          new NameIdentifier[] {tag.nameIdentifier()},
+          new NameIdentifier[0]);
+    }
+    Assertions.assertEquals(
+        1,
+        service.listTagsForMetadataObject(table.nameIdentifier(), Entity.EntityType.TABLE).size());
+  }
 
   /** Verifies membership lookups against live stored tags and object lifecycles. */
   @TestTemplate
