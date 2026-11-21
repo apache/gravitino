@@ -165,7 +165,7 @@ public class CatalogsPage extends BaseWebIT {
   @FindBy(xpath = "//*[@data-refer='metalake-name-link']")
   public WebElement metalakeNameLink;
 
-  @FindBy(xpath = "//thead[contains(@class, 'ant-table-thead')]//tr")
+  @FindBy(css = "[data-refer='table-grid'] thead.ant-table-thead > tr")
   public WebElement columnHeaders;
 
   @FindBy(xpath = "//*[@data-refer='metalake-page-title']")
@@ -1405,49 +1405,10 @@ public class CatalogsPage extends BaseWebIT {
               "Default Value",
               "Comment");
 
-      // Ant Design Table structure: thead > tr > th
-      List<WebElement> columnHeadersRows =
-          columnHeaders.findElements(By.xpath("./th[contains(@class, 'ant-table-cell')]"));
-      // Filter out header cells that have no visible text (selection/expand columns)
-      List<String> headerTexts = new ArrayList<>();
-      for (WebElement th : columnHeadersRows) {
-        String txt = th.getText() == null ? "" : th.getText().trim();
-        boolean hasInteractiveChild = false;
-        try {
-          // if header contains inputs/icons/buttons and no text, treat as non-data header
-          List<WebElement> interactive =
-              th.findElements(By.xpath(".//input|.//button|.//svg|.//i"));
-          if (interactive != null && !interactive.isEmpty()) {
-            hasInteractiveChild = true;
-          }
-        } catch (Exception e) {
-          LOG.debug("Error checking interactive children of header: {}", e.getMessage());
-        }
-
-        if (!txt.isEmpty()) {
-          headerTexts.add(txt);
-        } else if (!hasInteractiveChild) {
-          // If there is no interactive child but text is empty, still skip it
-          // (some UIs render invisible helper headers)
-          continue;
-        }
-      }
-
-      if (headerTexts.size() != columns.size()) {
-        LOG.error(
-            "Column headers count does not match after filtering, expected: {}, actual: {} -> {}",
-            columns.size(),
-            headerTexts.size(),
-            headerTexts);
+      List<String> headerTexts = getTableColumnNames();
+      if (!columns.equals(headerTexts)) {
+        LOG.error("Column headers do not match, expected: {}, actual: {}", columns, headerTexts);
         return false;
-      }
-
-      for (int i = 0; i < columns.size(); i++) {
-        String headerText = headerTexts.get(i);
-        if (!headerText.equals(columns.get(i))) {
-          LOG.error("Column header '{}' does not match, expected '{}'", headerText, columns.get(i));
-          return false;
-        }
       }
 
       return true;
@@ -1491,18 +1452,8 @@ public class CatalogsPage extends BaseWebIT {
     try {
       WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
 
-      return wait.until(
-          currentDriver -> {
-            List<WebElement> headers =
-                currentDriver.findElements(
-                    By.xpath(
-                        "//div[@data-refer='table-grid']//thead//th[contains(@class, 'ant-table-cell')]"));
-
-            boolean visible =
-                headers.stream().anyMatch(header -> columnName.equals(header.getText().trim()));
-
-            return visible == expectedVisible;
-          });
+      return wait.ignoring(StaleElementReferenceException.class)
+          .until(currentDriver -> getTableColumnNames().contains(columnName) == expectedVisible);
     } catch (Exception e) {
       LOG.error("Failed to verify column visibility: {}", columnName, e);
       return false;
@@ -1739,5 +1690,17 @@ public class CatalogsPage extends BaseWebIT {
       return false;
     }
     return true;
+  }
+
+  private List<String> getTableColumnNames() {
+    List<String> names = new ArrayList<>();
+    for (WebElement header : columnHeaders.findElements(By.cssSelector("th.ant-table-cell"))) {
+      // getText() can omit headers clipped by the horizontal scroll container.
+      String name = Objects.toString(header.getDomProperty("textContent"), "").trim();
+      if (!name.isEmpty()) {
+        names.add(name);
+      }
+    }
+    return names;
   }
 }
