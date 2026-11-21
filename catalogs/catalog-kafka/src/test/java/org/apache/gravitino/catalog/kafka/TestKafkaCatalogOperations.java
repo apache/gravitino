@@ -57,9 +57,17 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
@@ -98,10 +106,24 @@ import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AlterConfigOp;
+import org.apache.kafka.clients.admin.AlterConfigsResult;
+import org.apache.kafka.clients.admin.ConfigEntry;
+import org.apache.kafka.clients.admin.CreateTopicsResult;
+import org.apache.kafka.clients.admin.DescribeConfigsResult;
+import org.apache.kafka.clients.admin.DescribeTopicsResult;
 import org.apache.kafka.clients.admin.ListTopicsResult;
+import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.common.KafkaFuture;
+import org.apache.kafka.common.Node;
+import org.apache.kafka.common.TopicPartitionInfo;
+import org.apache.kafka.common.Uuid;
+import org.apache.kafka.common.config.ConfigResource;
 import org.apache.kafka.common.config.TopicConfig;
 import org.apache.kafka.common.errors.InvalidPartitionsException;
+import org.apache.kafka.common.errors.InvalidRequestException;
+import org.apache.kafka.common.internals.KafkaFutureImpl;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -848,5 +870,574 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     } finally {
       Thread.interrupted();
     }
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testTableTopicLinkageEnrichmentAndLifecycle() throws Exception {
+    String topicName = "orders_table_topic";
+    NameIdentifier ident =
+        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName);
+    Uuid topicUuid = Uuid.randomUuid();
+    Map<String, String> brokerTopicConfigs = new HashMap<>();
+
+    AdminClient mockAdminClient = Mockito.mock(AdminClient.class);
+
+    when(mockAdminClient.createTopics(Mockito.anyCollection()))
+        .thenAnswer(
+            invocation -> {
+              Collection<NewTopic> newTopics = invocation.getArgument(0);
+              NewTopic newTopic = newTopics.iterator().next();
+              for (String reserved :
+                  KafkaTopicPropertiesMetadata.RESERVED_TABLE_TOPIC_LINKAGE_KEYS) {
+                Assertions.assertFalse(
+                    newTopic.configs().containsKey(reserved),
+                    "Reserved linkage key " + reserved + " must not be forwarded to Kafka");
+              }
+              brokerTopicConfigs.clear();
+              brokerTopicConfigs.putAll(newTopic.configs());
+
+              CreateTopicsResult result = Mockito.mock(CreateTopicsResult.class);
+              when(result.all()).thenReturn(completedKafkaFuture(null));
+              when(result.topicId(topicName)).thenReturn(completedKafkaFuture(topicUuid));
+              when(result.numPartitions(topicName)).thenReturn(completedKafkaFuture(1));
+              when(result.replicationFactor(topicName)).thenReturn(completedKafkaFuture(1));
+              when(result.config(topicName))
+                  .thenAnswer(ignored -> completedKafkaFuture(toKafkaConfig(brokerTopicConfigs)));
+              return result;
+            });
+
+    when(mockAdminClient.describeTopics(Mockito.anyCollection()))
+        .thenAnswer(
+            invocation -> {
+              TopicPartitionInfo partitionInfo = Mockito.mock(TopicPartitionInfo.class);
+              when(partitionInfo.replicas())
+                  .thenReturn(Collections.singletonList(Mockito.mock(Node.class)));
+              TopicDescription description = Mockito.mock(TopicDescription.class);
+              when(description.topicId()).thenReturn(topicUuid);
+              when(description.partitions()).thenReturn(Collections.singletonList(partitionInfo));
+              DescribeTopicsResult result = Mockito.mock(DescribeTopicsResult.class);
+              when(result.topicNameValues())
+                  .thenReturn(
+                      Collections.singletonMap(topicName, completedKafkaFuture(description)));
+              return result;
+            });
+
+    when(mockAdminClient.describeConfigs(Mockito.anyCollection()))
+        .thenAnswer(
+            invocation -> {
+              ConfigResource resource = new ConfigResource(ConfigResource.Type.TOPIC, topicName);
+              DescribeConfigsResult result = Mockito.mock(DescribeConfigsResult.class);
+              when(result.all())
+                  .thenAnswer(
+                      ignored ->
+                          completedKafkaFuture(
+                              Collections.singletonMap(
+                                  resource, toKafkaConfig(brokerTopicConfigs))));
+              return result;
+            });
+
+    when(mockAdminClient.incrementalAlterConfigs(Mockito.anyMap()))
+        .thenAnswer(
+            invocation -> {
+              Map<ConfigResource, Collection<AlterConfigOp>> updates = invocation.getArgument(0);
+              for (Collection<AlterConfigOp> ops : updates.values()) {
+                for (AlterConfigOp op : ops) {
+                  if (op.opType() == AlterConfigOp.OpType.SET) {
+                    brokerTopicConfigs.put(op.configEntry().name(), op.configEntry().value());
+                  } else if (op.opType() == AlterConfigOp.OpType.DELETE) {
+                    brokerTopicConfigs.remove(op.configEntry().name());
+                  }
+                }
+              }
+              AlterConfigsResult result = Mockito.mock(AlterConfigsResult.class);
+              when(result.all()).thenReturn(completedKafkaFuture(null));
+              return result;
+            });
+
+    Map<String, String> tableTopicCatalogProps =
+        ImmutableMap.of(
+            BOOTSTRAP_SERVERS,
+            brokerList(),
+            ID_KEY,
+            "gravitino.v1.uid33220758755757001",
+            KafkaCatalogPropertiesMetadata.TABLE_TOPIC_ICEBERG_CATALOG,
+            "lakehouse_iceberg",
+            KafkaCatalogPropertiesMetadata.TABLE_TOPIC_DEFAULT_NAMESPACE,
+            "analytics_default");
+    try (KafkaCatalogOperations operations = new KafkaCatalogOperations(store, idGenerator)) {
+      operations.initialize(
+          tableTopicCatalogProps, kafkaCatalogEntity.toCatalogInfo(), KAFKA_PROPERTIES_METADATA);
+      operations.adminClient.close();
+      operations.adminClient = mockAdminClient;
+
+      Topic created =
+          operations.createTopic(
+              ident,
+              "AutoMQ table topic",
+              null,
+              ImmutableMap.of(
+                  PARTITION_COUNT,
+                  "1",
+                  REPLICATION_FACTOR,
+                  "1",
+                  KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE,
+                  "true",
+                  KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_SCHEMA_TYPE,
+                  "schema"));
+
+      Assertions.assertEquals(
+          "analytics_default",
+          brokerTopicConfigs.get(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_NAMESPACE));
+      Assertions.assertEquals(
+          "true", created.properties().get(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ENABLED));
+      Assertions.assertEquals(
+          "lakehouse_iceberg",
+          created.properties().get(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_CATALOG));
+      Assertions.assertEquals(
+          "analytics_default",
+          created.properties().get(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_NAMESPACE));
+      Assertions.assertEquals(
+          topicName,
+          created.properties().get(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_TABLE));
+      Assertions.assertEquals(
+          "metalake.lakehouse_iceberg.analytics_default." + topicName,
+          created.properties().get(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_IDENT));
+
+      Topic loaded = operations.loadTopic(ident);
+      Assertions.assertEquals(
+          "metalake.lakehouse_iceberg.analytics_default." + topicName,
+          loaded.properties().get(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_IDENT));
+
+      Topic alteredNamespace =
+          operations.alterTopic(
+              ident,
+              TopicChange.setProperty(
+                  KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_NAMESPACE, "custom_ns"));
+      Assertions.assertEquals(
+          "custom_ns",
+          alteredNamespace
+              .properties()
+              .get(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_NAMESPACE));
+      Assertions.assertEquals(
+          "metalake.lakehouse_iceberg.custom_ns." + topicName,
+          alteredNamespace
+              .properties()
+              .get(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_IDENT));
+
+      Topic disabled =
+          operations.alterTopic(
+              ident,
+              TopicChange.setProperty(
+                  KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE, "false"),
+              TopicChange.removeProperty(
+                  KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_NAMESPACE));
+      for (String reservedKey : KafkaTopicPropertiesMetadata.RESERVED_TABLE_TOPIC_LINKAGE_KEYS) {
+        Assertions.assertFalse(
+            disabled.properties().containsKey(reservedKey),
+            "Linkage key " + reservedKey + " should be removed when disabled");
+      }
+
+      Topic loadedAfterDisable = operations.loadTopic(ident);
+      Assertions.assertFalse(
+          loadedAfterDisable
+              .properties()
+              .containsKey(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ENABLED));
+
+      // Enabling Table Topic via alterTopic without an explicit namespace applies default-namespace
+      // to automq.table.topic.namespace on the broker.
+      Topic reEnabled =
+          operations.alterTopic(
+              ident,
+              TopicChange.setProperty(
+                  KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE, "true"));
+      Assertions.assertEquals(
+          "analytics_default",
+          brokerTopicConfigs.get(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_NAMESPACE));
+      Assertions.assertEquals(
+          "metalake.lakehouse_iceberg.analytics_default." + topicName,
+          reEnabled.properties().get(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_IDENT));
+
+      // An externally created AutoMQ Table Topic without automq.table.topic.namespace on the
+      // broker materializes into AutoMQ's built-in "default" namespace.
+      brokerTopicConfigs.remove(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_NAMESPACE);
+      Topic externalLoaded = operations.loadTopic(ident);
+      Assertions.assertEquals(
+          "default",
+          externalLoaded
+              .properties()
+              .get(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_NAMESPACE));
+      Assertions.assertEquals(
+          "metalake.lakehouse_iceberg.default." + topicName,
+          externalLoaded.properties().get(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_IDENT));
+    }
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testTableTopicValidationAndReservedProperties() throws Exception {
+    String topicName = "validated_table_topic";
+    NameIdentifier ident =
+        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName);
+    Uuid topicUuid = Uuid.randomUuid();
+
+    AdminClient mockAdminClient = Mockito.mock(AdminClient.class);
+    TopicPartitionInfo partitionInfo = Mockito.mock(TopicPartitionInfo.class);
+    when(partitionInfo.replicas()).thenReturn(Collections.singletonList(Mockito.mock(Node.class)));
+    TopicDescription description = Mockito.mock(TopicDescription.class);
+    when(description.topicId()).thenReturn(topicUuid);
+    when(description.partitions()).thenReturn(Collections.singletonList(partitionInfo));
+    DescribeTopicsResult describeTopicsResult = Mockito.mock(DescribeTopicsResult.class);
+    when(describeTopicsResult.topicNameValues())
+        .thenReturn(Collections.singletonMap(topicName, completedKafkaFuture(description)));
+    when(mockAdminClient.describeTopics(Mockito.anyCollection())).thenReturn(describeTopicsResult);
+
+    ConfigResource resource = new ConfigResource(ConfigResource.Type.TOPIC, topicName);
+    DescribeConfigsResult describeConfigsResult = Mockito.mock(DescribeConfigsResult.class);
+    when(describeConfigsResult.all())
+        .thenReturn(
+            completedKafkaFuture(
+                Collections.singletonMap(
+                    resource,
+                    toKafkaConfig(
+                        ImmutableMap.of(
+                            KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE, "true")))));
+    when(mockAdminClient.describeConfigs(Mockito.anyCollection()))
+        .thenReturn(describeConfigsResult);
+
+    try (KafkaCatalogOperations operations = new KafkaCatalogOperations(store, idGenerator)) {
+      operations.initialize(
+          MOCK_CATALOG_PROPERTIES, kafkaCatalogEntity.toCatalogInfo(), KAFKA_PROPERTIES_METADATA);
+      operations.adminClient.close();
+      operations.adminClient = mockAdminClient;
+
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              operations.createTopic(
+                  ident,
+                  null,
+                  null,
+                  ImmutableMap.of(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ENABLED, "true")));
+
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              operations.createTopic(
+                  ident,
+                  null,
+                  null,
+                  ImmutableMap.of(
+                      KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE,
+                      "true",
+                      KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_UPSERT_ENABLE,
+                      "true")));
+
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              operations.alterTopic(
+                  ident,
+                  TopicChange.setProperty(
+                      KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_IDENT, "foo.bar.baz")));
+
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              operations.alterTopic(
+                  ident,
+                  TopicChange.removeProperty(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ENABLED)));
+
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              operations.alterTopic(
+                  ident,
+                  TopicChange.setProperty(
+                      KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_UPSERT_ENABLE, "true")));
+    }
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testAlterTopicRemoveTableTopicEnableWithRemainingUpsert() throws Exception {
+    String topicName = "remove_table_topic_enable";
+    NameIdentifier ident =
+        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName);
+    Uuid topicUuid = Uuid.randomUuid();
+
+    Map<String, String> brokerTopicConfigs = new HashMap<>();
+    brokerTopicConfigs.put(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE, "true");
+    brokerTopicConfigs.put(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_UPSERT_ENABLE, "true");
+    brokerTopicConfigs.put(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ID_COLUMNS, "id");
+
+    AdminClient mockAdminClient = Mockito.mock(AdminClient.class);
+    TopicPartitionInfo partitionInfo = Mockito.mock(TopicPartitionInfo.class);
+    when(partitionInfo.replicas()).thenReturn(Collections.singletonList(Mockito.mock(Node.class)));
+    TopicDescription description = Mockito.mock(TopicDescription.class);
+    when(description.topicId()).thenReturn(topicUuid);
+    when(description.partitions()).thenReturn(Collections.singletonList(partitionInfo));
+    DescribeTopicsResult describeTopicsResult = Mockito.mock(DescribeTopicsResult.class);
+    when(describeTopicsResult.topicNameValues())
+        .thenAnswer(inv -> Collections.singletonMap(topicName, completedKafkaFuture(description)));
+    when(mockAdminClient.describeTopics(Mockito.anyCollection())).thenReturn(describeTopicsResult);
+
+    when(mockAdminClient.describeConfigs(Mockito.anyCollection()))
+        .thenAnswer(
+            invocation -> {
+              ConfigResource resource = new ConfigResource(ConfigResource.Type.TOPIC, topicName);
+              DescribeConfigsResult result = Mockito.mock(DescribeConfigsResult.class);
+              when(result.all())
+                  .thenAnswer(
+                      ignored ->
+                          completedKafkaFuture(
+                              Collections.singletonMap(
+                                  resource, toKafkaConfig(brokerTopicConfigs))));
+              return result;
+            });
+
+    when(mockAdminClient.incrementalAlterConfigs(Mockito.anyMap()))
+        .thenAnswer(
+            invocation -> {
+              Map<ConfigResource, Collection<AlterConfigOp>> updates = invocation.getArgument(0);
+              for (Collection<AlterConfigOp> ops : updates.values()) {
+                for (AlterConfigOp op : ops) {
+                  if (op.opType() == AlterConfigOp.OpType.SET) {
+                    brokerTopicConfigs.put(op.configEntry().name(), op.configEntry().value());
+                  } else if (op.opType() == AlterConfigOp.OpType.DELETE) {
+                    brokerTopicConfigs.remove(op.configEntry().name());
+                  }
+                }
+              }
+              AlterConfigsResult result = Mockito.mock(AlterConfigsResult.class);
+              when(result.all()).thenReturn(completedKafkaFuture(null));
+              return result;
+            });
+
+    try (KafkaCatalogOperations operations = new KafkaCatalogOperations(store, idGenerator)) {
+      operations.initialize(
+          MOCK_CATALOG_PROPERTIES, kafkaCatalogEntity.toCatalogInfo(), KAFKA_PROPERTIES_METADATA);
+      operations.adminClient.close();
+      operations.adminClient = mockAdminClient;
+
+      Topic altered =
+          operations.alterTopic(
+              ident,
+              TopicChange.removeProperty(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE),
+              TopicChange.removeProperty(
+                  KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ID_COLUMNS));
+
+      Assertions.assertFalse(
+          altered.properties().containsKey(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE));
+      Assertions.assertFalse(
+          altered
+              .properties()
+              .containsKey(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ID_COLUMNS));
+      for (String reservedKey : KafkaTopicPropertiesMetadata.RESERVED_TABLE_TOPIC_LINKAGE_KEYS) {
+        Assertions.assertFalse(altered.properties().containsKey(reservedKey));
+      }
+
+      // Subsequent unrelated alterations must still succeed while automq.table.topic.enable is
+      // absent and automq.table.topic.upsert.enable=true remains on the broker.
+      Topic followUpAltered =
+          operations.alterTopic(ident, TopicChange.setProperty("retention.ms", "60000"));
+      Assertions.assertEquals("60000", followUpAltered.properties().get("retention.ms"));
+    }
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testDefaultConfigEntriesCoalescingImmutableKeysAndInvalidRequest() throws Exception {
+    String topicName = "broker_defaults_and_coalesce";
+    NameIdentifier ident =
+        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName);
+    Uuid topicUuid = Uuid.randomUuid();
+
+    List<ConfigEntry> brokerConfigEntries =
+        Arrays.asList(
+            defaultBrokerConfigEntry("leader.replication.throttled.replicas", ""),
+            defaultBrokerConfigEntry("sensitive.null.config", null),
+            defaultBrokerConfigEntry(
+                KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE, "false"),
+            defaultBrokerConfigEntry(
+                KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_NAMESPACE, "default"),
+            defaultBrokerConfigEntry(
+                KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ID_COLUMNS, ""),
+            defaultBrokerConfigEntry(
+                KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_CDC_FIELD, ""));
+
+    AdminClient mockAdminClient = Mockito.mock(AdminClient.class);
+    TopicPartitionInfo partitionInfo = Mockito.mock(TopicPartitionInfo.class);
+    when(partitionInfo.replicas()).thenReturn(Collections.singletonList(Mockito.mock(Node.class)));
+    TopicDescription description = Mockito.mock(TopicDescription.class);
+    when(description.topicId()).thenReturn(topicUuid);
+    when(description.partitions()).thenReturn(Collections.singletonList(partitionInfo));
+    DescribeTopicsResult describeTopicsResult = Mockito.mock(DescribeTopicsResult.class);
+    when(describeTopicsResult.topicNameValues())
+        .thenAnswer(inv -> Collections.singletonMap(topicName, completedKafkaFuture(description)));
+    when(mockAdminClient.describeTopics(Mockito.anyCollection())).thenReturn(describeTopicsResult);
+
+    ConfigResource resource = new ConfigResource(ConfigResource.Type.TOPIC, topicName);
+    DescribeConfigsResult describeConfigsResult = Mockito.mock(DescribeConfigsResult.class);
+    when(describeConfigsResult.all())
+        .thenAnswer(
+            inv ->
+                completedKafkaFuture(
+                    Collections.singletonMap(
+                        resource, new org.apache.kafka.clients.admin.Config(brokerConfigEntries))));
+    when(mockAdminClient.describeConfigs(Mockito.anyCollection()))
+        .thenReturn(describeConfigsResult);
+
+    AtomicReference<Collection<AlterConfigOp>> capturedOps = new AtomicReference<>();
+    when(mockAdminClient.incrementalAlterConfigs(Mockito.anyMap()))
+        .thenAnswer(
+            inv -> {
+              Map<ConfigResource, Collection<AlterConfigOp>> updates = inv.getArgument(0);
+              capturedOps.set(updates.get(resource));
+              AlterConfigsResult result = Mockito.mock(AlterConfigsResult.class);
+              when(result.all()).thenReturn(completedKafkaFuture(null));
+              return result;
+            });
+
+    Map<String, String> catalogPropsWithDefaultNs =
+        ImmutableMap.of(
+            BOOTSTRAP_SERVERS,
+            brokerList(),
+            ID_KEY,
+            "gravitino.v1.uid33220758755757099",
+            KafkaCatalogPropertiesMetadata.TABLE_TOPIC_DEFAULT_NAMESPACE,
+            "configured_ns");
+
+    try (KafkaCatalogOperations operations = new KafkaCatalogOperations(store, idGenerator)) {
+      operations.initialize(
+          catalogPropsWithDefaultNs, kafkaCatalogEntity.toCatalogInfo(), KAFKA_PROPERTIES_METADATA);
+      operations.adminClient.close();
+      operations.adminClient = mockAdminClient;
+
+      Topic loaded = operations.loadTopic(ident);
+      Assertions.assertEquals("", loaded.properties().get("leader.replication.throttled.replicas"));
+      Assertions.assertFalse(loaded.properties().containsKey("sensitive.null.config"));
+      Assertions.assertFalse(
+          loaded
+              .properties()
+              .containsKey(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ID_COLUMNS));
+      Assertions.assertFalse(
+          loaded
+              .properties()
+              .containsKey(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_CDC_FIELD));
+
+      // Enabling Table Topic when broker only has DEFAULT_CONFIG namespace='default' injects
+      // catalog's table-topic.default-namespace, trims values, and coalesces duplicate
+      // AlterConfigOps
+      Topic enabled =
+          operations.alterTopic(
+              ident,
+              TopicChange.setProperty(
+                  KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE, " true "),
+              TopicChange.setProperty(
+                  KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_SCHEMA_TYPE, "schemaless"),
+              TopicChange.setProperty(
+                  KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_SCHEMA_TYPE, " schema "),
+              TopicChange.setProperty("cleanup.policy", "compact"),
+              TopicChange.removeProperty("cleanup.policy"));
+
+      Assertions.assertEquals(
+          "configured_ns",
+          enabled.properties().get(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_NAMESPACE));
+      Assertions.assertEquals(
+          "schema",
+          enabled.properties().get(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_SCHEMA_TYPE));
+
+      Map<String, AlterConfigOp> opsByName =
+          capturedOps.get().stream()
+              .collect(Collectors.toMap(op -> op.configEntry().name(), op -> op));
+      Assertions.assertEquals(4, opsByName.size());
+      Assertions.assertEquals(
+          "true",
+          opsByName
+              .get(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE)
+              .configEntry()
+              .value());
+      Assertions.assertEquals(
+          "schema",
+          opsByName
+              .get(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_SCHEMA_TYPE)
+              .configEntry()
+              .value());
+      Assertions.assertEquals(
+          "configured_ns",
+          opsByName
+              .get(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_NAMESPACE)
+              .configEntry()
+              .value());
+      Assertions.assertEquals(
+          AlterConfigOp.OpType.DELETE, opsByName.get("cleanup.policy").opType());
+
+      // Reserved ID_KEY and immutable REPLICATION_FACTOR cannot be altered or removed
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> operations.alterTopic(ident, TopicChange.setProperty(ID_KEY, "spoof")));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> operations.alterTopic(ident, TopicChange.removeProperty(ID_KEY)));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> operations.alterTopic(ident, TopicChange.setProperty(REPLICATION_FACTOR, "2")));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> operations.alterTopic(ident, TopicChange.removeProperty(REPLICATION_FACTOR)));
+
+      // InvalidRequestException from broker maps to IllegalArgumentException
+      KafkaFutureImpl<Void> failedFuture = new KafkaFutureImpl<>();
+      failedFuture.completeExceptionally(new InvalidRequestException("invalid broker config op"));
+      CreateTopicsResult failedCreate = Mockito.mock(CreateTopicsResult.class);
+      when(failedCreate.all()).thenReturn(failedFuture);
+      when(mockAdminClient.createTopics(Mockito.anyCollection())).thenReturn(failedCreate);
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> operations.createTopic(ident, null, null, Collections.emptyMap()));
+
+      AlterConfigsResult failedAlter = Mockito.mock(AlterConfigsResult.class);
+      when(failedAlter.all()).thenReturn(failedFuture);
+      when(mockAdminClient.incrementalAlterConfigs(Mockito.anyMap())).thenReturn(failedAlter);
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> operations.alterTopic(ident, TopicChange.setProperty("retention.ms", "1000")));
+    }
+  }
+
+  private static ConfigEntry defaultBrokerConfigEntry(String name, String value) throws Exception {
+    Constructor<ConfigEntry> ctor =
+        ConfigEntry.class.getDeclaredConstructor(
+            String.class,
+            String.class,
+            ConfigEntry.ConfigSource.class,
+            boolean.class,
+            boolean.class,
+            List.class,
+            ConfigEntry.ConfigType.class,
+            String.class);
+    ctor.setAccessible(true);
+    return ctor.newInstance(
+        name,
+        value,
+        ConfigEntry.ConfigSource.DEFAULT_CONFIG,
+        false,
+        false,
+        Collections.emptyList(),
+        ConfigEntry.ConfigType.STRING,
+        null);
+  }
+
+  private static <T> KafkaFuture<T> completedKafkaFuture(T value) {
+    return KafkaFuture.completedFuture(value);
+  }
+
+  private static org.apache.kafka.clients.admin.Config toKafkaConfig(Map<String, String> values) {
+    List<ConfigEntry> entries =
+        values.entrySet().stream()
+            .map(e -> new ConfigEntry(e.getKey(), e.getValue()))
+            .collect(Collectors.toList());
+    return new org.apache.kafka.clients.admin.Config(entries);
   }
 }
