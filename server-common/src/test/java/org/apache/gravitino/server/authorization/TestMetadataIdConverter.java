@@ -50,6 +50,7 @@ import org.apache.gravitino.connector.SupportsTableNameResolution;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -430,6 +431,67 @@ public class TestMetadataIdConverter {
     }
   }
 
+  @Test
+  void testNormalizedTableIdLookupDoesNotLoadEntity() throws IOException {
+    EntityStore store = mock(EntityStore.class);
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    when(env.entityStore()).thenReturn(store);
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    when(store.getEntityId(ident, Entity.EntityType.TABLE)).thenReturn(42L);
+    MetadataObject object =
+        MetadataObjects.parse("catalog.schema.table", MetadataObject.Type.TABLE);
+    try (MockedStatic<GravitinoEnv> mocked = mockStatic(GravitinoEnv.class)) {
+      mocked.when(GravitinoEnv::getInstance).thenReturn(env);
+      Assertions.assertEquals(
+          Optional.of(42L), MetadataIdConverter.getIdForNormalizedObject(object, "metalake"));
+      Mockito.verify(store).getEntityId(ident, Entity.EntityType.TABLE);
+      Mockito.verifyNoMoreInteractions(store);
+      Mockito.verify(env, Mockito.never()).catalogManager();
+    }
+  }
+
+  @Test
+  void testTableIdLookupSupportsStoresWithoutOptimizedLookup() throws IOException {
+    EntityStore store = mock(EntityStore.class, CALLS_REAL_METHODS);
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    when(env.entityStore()).thenReturn(store);
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    TableEntity table = mock(TableEntity.class);
+    when(table.id()).thenReturn(42L);
+    when(store.get(ident, Entity.EntityType.TABLE, TableEntity.class)).thenReturn(table);
+    try (MockedStatic<GravitinoEnv> mocked = mockStatic(GravitinoEnv.class)) {
+      mocked.when(GravitinoEnv::getInstance).thenReturn(env);
+      Assertions.assertEquals(
+          Optional.of(42L),
+          MetadataIdConverter.getIdForNormalizedObject(
+              MetadataObjects.parse("catalog.schema.table", MetadataObject.Type.TABLE),
+              "metalake"));
+    }
+  }
+
+  @Test
+  void testTableIdLookupMissingAndStorageFailure() throws IOException {
+    EntityStore store = mock(EntityStore.class);
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    when(env.entityStore()).thenReturn(store);
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    MetadataObject object =
+        MetadataObjects.parse("catalog.schema.table", MetadataObject.Type.TABLE);
+    when(store.getEntityId(ident, Entity.EntityType.TABLE))
+        .thenThrow(new NoSuchEntityException("Missing table"))
+        .thenThrow(new IOException("Storage unavailable"));
+    try (MockedStatic<GravitinoEnv> mocked = mockStatic(GravitinoEnv.class)) {
+      mocked.when(GravitinoEnv::getInstance).thenReturn(env);
+      Assertions.assertEquals(
+          Optional.empty(), MetadataIdConverter.getIdForNormalizedObject(object, "metalake"));
+      RuntimeException failure =
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () -> MetadataIdConverter.getIdForNormalizedObject(object, "metalake"));
+      Assertions.assertInstanceOf(IOException.class, failure.getCause());
+    }
+  }
+
   private void initTestNameIdentifier() {
     ident1 = NameIdentifier.of("metalake");
     ident2 = NameIdentifier.of("metalake", "catalog");
@@ -470,7 +532,7 @@ public class TestMetadataIdConverter {
     when(mockStore.get(ident1, Entity.EntityType.METALAKE, BaseMetalake.class)).thenReturn(entity1);
     when(mockStore.get(ident2, Entity.EntityType.CATALOG, CatalogEntity.class)).thenReturn(entity2);
     when(mockStore.get(ident3, Entity.EntityType.SCHEMA, SchemaEntity.class)).thenReturn(entity3);
-    when(mockStore.get(ident4, Entity.EntityType.TABLE, TableEntity.class)).thenReturn(entity4);
+    when(mockStore.getEntityId(ident4, Entity.EntityType.TABLE)).thenReturn(entity4.id());
     when(mockStore.get(ident5, Entity.EntityType.MODEL, ModelEntity.class)).thenReturn(entity5);
     when(mockStore.get(ident6, Entity.EntityType.FILESET, FilesetEntity.class)).thenReturn(entity6);
     when(mockStore.get(ident7, Entity.EntityType.TOPIC, TopicEntity.class)).thenReturn(entity7);

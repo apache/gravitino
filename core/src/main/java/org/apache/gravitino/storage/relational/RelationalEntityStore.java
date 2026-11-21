@@ -67,11 +67,13 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
+import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.Executable;
@@ -325,6 +327,23 @@ public class RelationalEntityStore
           // The SPI does not require reentrant locks. Publish under the lock already held here.
           publishIfEpochUnchanged(entity, epochBeforeRead);
           return entity;
+        });
+  }
+
+  @Override
+  public long getEntityId(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
+    if (entityType != Entity.EntityType.TABLE) {
+      return EntityStore.super.getEntityId(ident, entityType);
+    }
+
+    return cache.withCacheLock(
+        EntityCacheKey.of(ident, entityType),
+        () -> {
+          Optional<TableEntity> cached = cache.getIfPresent(ident, entityType);
+          // Do not publish a partial TableEntity or introduce a separate name-to-ID cache.
+          return cached.isPresent()
+              ? cached.get().id()
+              : TableMetaService.getInstance().getTableIdByIdentifier(ident);
         });
   }
 

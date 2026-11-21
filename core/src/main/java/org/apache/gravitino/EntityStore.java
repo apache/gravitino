@@ -31,6 +31,7 @@ import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.utils.EntityClassMapper;
 import org.apache.gravitino.utils.Executable;
 
 public interface EntityStore extends Closeable {
@@ -215,6 +216,22 @@ public interface EntityStore extends Closeable {
    */
   <E extends Entity & HasIdentifier> E get(NameIdentifier ident, EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException;
+
+  /**
+   * Resolve an entity ID without requiring its complete metadata.
+   *
+   * <p>Stores may override this method to avoid loading expensive child metadata. The default
+   * implementation retains compatibility with stores that only support full entity reads.
+   *
+   * @param ident the unique identifier of the entity
+   * @param entityType the general type of the entity
+   * @return the entity ID
+   * @throws NoSuchEntityException if the entity does not exist
+   * @throws IOException if the lookup fails
+   */
+  default long getEntityId(NameIdentifier ident, EntityType entityType) throws IOException {
+    return get(ident, entityType, EntityClassMapper.getEntityClass(entityType)).id();
+  }
 
   /**
    * Batch get the entity from the underlying storage.

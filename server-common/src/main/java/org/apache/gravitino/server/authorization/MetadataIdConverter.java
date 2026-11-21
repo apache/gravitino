@@ -162,6 +162,9 @@ public class MetadataIdConverter {
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject.type());
     Entity entity;
     try {
+      if (entityType == Entity.EntityType.TABLE) {
+        return Optional.of(entityStore.getEntityId(ident, entityType));
+      }
       entity = entityStore.get(ident, entityType, EntityClassMapper.getEntityClass(entityType));
     } catch (NoSuchEntityException e) {
       return Optional.empty();
