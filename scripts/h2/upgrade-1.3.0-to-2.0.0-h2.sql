@@ -425,3 +425,16 @@ CREATE TABLE IF NOT EXISTS `domain_rel` (
     KEY `domain_rel_idx_parent` (`parent_id`, `deleted_at`),
     KEY `domain_rel_idx_metalake` (`metalake_id`, `deleted_at`)
 ) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `iceberg_idempotency_key_meta` (
+  `idempotency_key`   VARCHAR(36)  NOT NULL COMMENT 'client-provided UUIDv7 idempotency key',
+  `operation_binding` TEXT NOT NULL COMMENT 'request identity, e.g. POST /v1/{prefix}/namespaces/{ns}/tables',
+  `claim`             BIGINT NOT NULL COMMENT 'reservation fencing token',
+  `http_status`       INT          NULL COMMENT 'HTTP status of finalized response, NULL while reserved',
+  `response_summary`  CLOB         NULL COMMENT 'serialized response body (JSON) for replay',
+  `audit_info`        CLOB         NOT NULL COMMENT 'idempotency record audit info',
+  `created_at`        BIGINT       NOT NULL COMMENT 'record created at (unix epoch millis)',
+  `expires_at`        BIGINT       NOT NULL COMMENT 'record expires at (unix epoch millis)',
+  PRIMARY KEY (`idempotency_key`)
+) COMMENT='Iceberg REST idempotency key records';
+CREATE INDEX IF NOT EXISTS `idx_iik_expires` ON `iceberg_idempotency_key_meta` (`expires_at`);

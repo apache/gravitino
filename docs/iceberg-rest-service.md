@@ -195,19 +195,98 @@ The header applies to the create, update, drop, register, and rename endpoints f
 |---------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
 | `gravitino.iceberg-rest.idempotency-enabled`      | Whether to honor the `Idempotency-Key` header. When `false`, the header is ignored and no lifetime is advertised.                                                             | `false`       | No       |
 | `gravitino.iceberg-rest.idempotency-key-lifetime` | The client reuse window for a key, an ISO-8601 duration such as `PT30M`. Advertised to clients as `idempotency-key-lifetime`.                                                 | `PT30M`       | No       |
-| `gravitino.iceberg-rest.idempotency-store-type`   | The store holding idempotency records, either the `in-memory` short name or the fully-qualified class name of an `IdempotencyStore` implementation.                           | `in-memory`   | No       |
+| `gravitino.iceberg-rest.idempotency-store-type`   | The store holding idempotency records: `in-memory`, `jdbc` in auxiliary mode, or the fully-qualified class name of an `IdempotencyStore` implementation.                       | `in-memory`   | No       |
 | `gravitino.iceberg-rest.idempotency-max-entries`  | The maximum number of records retained by the in-memory store. Records beyond it are evicted before their reuse window elapses.                                               | `10000`       | No       |
 
-Phase-1 limitations:
+Limitations:
 
 - Request identity covers the HTTP method, path, and query parameters. It does **not** compare request bodies or behavior-changing headers such as `X-Iceberg-Access-Delegation`. Reusing a key on the same URL with a changed body or header replays the first response; it does not apply the changed request. Always generate a new key for a different logical operation. Request validation runs before replay, so a retry with an invalid body can return `400 Bad Request` even if the key already has a stored success.
 - Replay preserves the status and JSON body but omits response headers such as `ETag`. Load the table again if the client needs its current ETag.
-- The catalog mutation and response persistence are not one transaction. A crash, serialization failure, lost reservation, or post-commit failure can leave a successful mutation without a replayable response. A retry can then execute again. Claim fencing protects replacement records, but cannot undo or fence catalog side effects.
-- This phase does not schedule `IdempotencyStore.purgeExpired`. The in-memory store reclaims expired entries through Caffeine. Custom stores must enforce expiry on reads/reservations and arrange their own cleanup; durable-store purge scheduling belongs to the JDBC follow-up.
+- The catalog mutation and response persistence are not one transaction. A crash, serialization failure, lost reservation, or post-commit failure can leave a successful mutation without a replayable response. When saving a terminal response fails, the manager keeps any existing reservation until expiry and returns the original mutation response. Retries receive `409` with `Retry-After` while an unfinalized reservation remains. Expiry, eviction, or a released reservation can still permit re-execution. Claim fencing protects replacement records, but cannot undo or fence catalog side effects.
+- The in-memory store reclaims expired entries through Caffeine. The JDBC store schedules bounded cleanup as described below. Custom stores must enforce expiry on reads/reservations and arrange their own cleanup.
 
 :::caution
 Enabling `idempotency-enabled=true` with the default `idempotency-store-type=in-memory` on more than one replica does **not** provide cluster-wide deduplication: retries can execute a mutation twice. The `in-memory` store is node-local and not durable. A retry routed to another replica, or to a replica that restarted, finds no record and re-executes the mutation, and its size bound can evict a record before its reuse window elapses, including an in-flight reservation. A retry can then run concurrently with the original mutation. Use it for single-node deployments, development, and testing.
 :::
+
+### JDBC Idempotency Storage
+
+The `jdbc` idempotency store persists request reservations and response bodies in Gravitino's
+relational entity store. Replicas connected to the same database share records, and finalized
+responses survive Iceberg REST service restarts. Set `gravitino.iceberg-rest.idempotency-enabled=true`
+and `gravitino.iceberg-rest.idempotency-store-type=jdbc` to enable durable request replay on the
+mutation endpoints described above.
+
+Use this backend in auxiliary mode, with an initialized relational entity store. Standalone Iceberg
+REST servers cannot use it. It reuses Gravitino's connection pool and supports H2, MySQL, and
+PostgreSQL. For multiple replicas, use the same shared MySQL or PostgreSQL database; separate local
+H2 databases do not provide cross-replica deduplication.
+
+The `jdbc` implementation is packaged in the Iceberg REST server JAR, which must be available to
+the auxiliary service's class loader. The `iceberg-common` JAR alone is insufficient: resolving the
+`jdbc` alias then fails at store creation with a `ClassNotFoundException` cause.
+
+Create one store instance per Iceberg REST service instance and share it across requests. Each
+store starts its own cleanup scheduler; creating stores per request adds redundant purge work and
+database lock contention. Close the store when stopping the service to shut down its scheduler.
+
+| Configuration item | Description | Default value | Required |
+|--------------------|-------------|---------------|----------|
+| `gravitino.iceberg-rest.idempotency-store-type` | Select `jdbc` for durable storage, `in-memory` for node-local storage, or a custom implementation class. | `in-memory` | No |
+| `gravitino.iceberg-rest.idempotency-cleanup-interval` | Time between bounded JDBC cleanup passes, as an ISO-8601 duration of at least one millisecond. | `PT5M` | No |
+
+Initialize a new database with the 2.0.0 schema or apply the 1.3.0-to-2.0.0 upgrade before selecting
+`jdbc`. An existing development 2.0.0 database created before this table was added must also apply
+the `iceberg_idempotency_key_meta` table and its expiry index from the matching database's schema
+script. Store initialization fails if the table is missing. The new table is additive and does not
+modify catalog metadata.
+
+Reservations are atomic across replicas. A claim token prevents an old request from finalizing or
+releasing a newer reservation. Expiry is enforced on reads, finalization, and reservation attempts;
+reusing an expired key does not depend on the cleanup schedule. Each cleanup pass deletes at most
+100 batches of 1,000 expired rows, and transient failures are retried on the next pass.
+
+:::warning Clock synchronization is required for safe replay
+All replicas sharing the JDBC store must maintain synchronized system clocks, for example through
+NTP or chrony. Monitor clock offset and synchronization health. Stop the Iceberg REST service on an
+unsynchronized replica until its clock is corrected so neither requests nor its cleanup task can
+expire records early. A fast clock can reclaim or purge a key while another replica still considers
+it live, allowing the mutation to execute again within that
+replica's reuse window. This affects replay safety, not just cleanup timing. The store does not add
+a clock-skew grace period; changing the cleanup interval does not prevent early reclaim by
+`reserve()`.
+:::
+
+:::warning The reuse window must outlast the mutation
+There is no heartbeat or in-flight lease renewal. Configure `idempotency-key-lifetime` to exceed
+the maximum elapsed time from starting reservation through completing the mutation and persisting
+its response, plus maximum clock skew and a safety margin. Include database lock waits, backend
+retries, serialization time, and JVM pauses in that bound; typical or percentile latency is not
+sufficient. A client or HTTP timeout does not necessarily stop an already-running catalog mutation.
+
+Once the deadline passes, another replica may reclaim the key while the original mutation is still
+running. If a duration or clock-skew bound cannot be enforced, do not rely on this mechanism for
+at-most-once execution. Reconcile catalog state before retrying outside the reuse window, and do not
+use a new key to bypass an existing reservation for the same logical operation.
+:::
+
+If reservation or replay lookup fails, the server returns `503 Service Unavailable` with
+`Retry-After` and does not execute the mutation in that attempt. The reservation may still have
+committed before a connection failure, so it is retained and a retry with the same key may receive
+`409` until the reservation expires. Retry with the same key within the advertised window; after
+the window, inspect catalog state before deciding whether to execute the operation again. A generic
+mutation `5xx` can still have an uncertain catalog outcome and must not be treated as proof that
+nothing changed.
+
+The 100,000-row cleanup cap applies to each pass, and remaining expired rows wait for later passes.
+Monitor expired-row backlog and database storage growth; shorten the cleanup interval if cleanup
+falls behind, while checking database load and lock waits. Cleanup lag does not extend record
+validity because expiry is checked on access.
+
+Durable storage does not make catalog mutations and response persistence one transaction. Failed
+response persistence leaves any reservation in place until expiry, but cannot recover a missing
+response after a crash. Claim fencing protects idempotency records, not external catalog side
+effects. A request running beyond its reuse window can overlap a retry.
 
 ### Catalog Backend Configuration
 
