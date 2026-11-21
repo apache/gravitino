@@ -45,27 +45,40 @@ import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.apache.gravitino.catalog.fileset.FilesetCatalogImpl.CATALOG_PROPERTIES_META;
 import static org.apache.gravitino.catalog.fileset.FilesetCatalogImpl.FILESET_PROPERTIES_META;
 import static org.apache.gravitino.catalog.fileset.FilesetCatalogImpl.SCHEMA_PROPERTIES_META;
+import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.DEFAULT_FS_PROVIDER;
 import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.DISABLE_FILESYSTEM_OPS;
+import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS;
 import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.LOCATION;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_HDFS_FS_PROVIDER;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_LOCAL_FS_PROVIDER;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.CONFIG_RESOURCES;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_KRB5_CONF;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_KEYTAB;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_PRINCIPAL;
 import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITINO_BYPASS;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
 import static org.apache.gravitino.storage.GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.ConnectException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -84,10 +97,13 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -116,8 +132,11 @@ import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.catalog.ManagedFunctionOperations;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
+import org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProxy;
 import org.apache.gravitino.catalog.hadoop.fs.LocalFileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
+import org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig;
+import org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
@@ -184,6 +203,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
@@ -2679,7 +2699,7 @@ public class TestFilesetCatalogOperations {
         Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
       doReturn(fileSystem)
           .when(ops)
-          .getFileSystem(Mockito.eq(path), Mockito.anyMap(), Mockito.anyString());
+          .getFileSystem(Mockito.eq(path), Mockito.anyMap(), Mockito.anyString(), Mockito.any());
       ConnectionFailedException failure =
           Assertions.assertThrows(
               ConnectionFailedException.class,
@@ -2693,6 +2713,91 @@ public class TestFilesetCatalogOperations {
           "Failed to check Fileset catalog storage at location-s3 (access denied)",
           failure.getMessage());
       Assertions.assertNull(failure.getCause());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testFailedInitializeClosesTheFileSystemsItCreated(boolean locationIsAFile)
+      throws IOException {
+    Path checked = new Path("s3a://bucket-a/checked");
+    Path failing = new Path("s3a://bucket-b/failing");
+    FileSystem checkedFs = Mockito.mock(FileSystem.class);
+    FileSystem failingFs = Mockito.mock(FileSystem.class);
+    if (locationIsAFile) {
+      FileStatus file = Mockito.mock(FileStatus.class);
+      when(file.isFile()).thenReturn(true);
+      when(failingFs.exists(failing)).thenReturn(true);
+      when(failingFs.getFileStatus(failing)).thenReturn(file);
+    } else {
+      when(failingFs.exists(failing)).thenThrow(new IOException("Connection refused"));
+    }
+
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      doReturn(checkedFs)
+          .when(ops)
+          .getFileSystem(Mockito.eq(checked), Mockito.anyMap(), Mockito.anyString(), Mockito.any());
+      doReturn(failingFs)
+          .when(ops)
+          .getFileSystem(Mockito.eq(failing), Mockito.anyMap(), Mockito.anyString(), Mockito.any());
+      RuntimeException failure =
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () ->
+                  ops.initialize(
+                      ImmutableMap.of(
+                          PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "checked",
+                          checked.toString(),
+                          PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "failing",
+                          failing.toString()),
+                      randomCatalogInfo("metalake", "catalog"),
+                      FILESET_PROPERTIES_METADATA));
+      Class<? extends RuntimeException> expected =
+          locationIsAFile ? IllegalArgumentException.class : ConnectionFailedException.class;
+      Assertions.assertInstanceOf(expected, failure);
+      // Checked before the try closes ops: no catalog keeps an ops whose initialization failed.
+      Mockito.verify(checkedFs, Mockito.atLeastOnce()).close();
+      Mockito.verify(failingFs, Mockito.atLeastOnce()).close();
+      Assertions.assertTrue(ops.fileSystemExecutor.isShutdown());
+      Assertions.assertTrue(ops.loginSettingsExecutor.isShutdown());
+    }
+  }
+
+  @Test
+  public void testFailedInitializeClosesEveryFileSystemWhenClosingOneFails() throws IOException {
+    Path checked = new Path("s3a://bucket-a/checked");
+    Path failing = new Path("s3a://bucket-b/failing");
+    FileSystem checkedFs = Mockito.mock(FileSystem.class);
+    FileSystem failingFs = Mockito.mock(FileSystem.class);
+    when(failingFs.exists(failing)).thenThrow(new IOException("Connection refused"));
+    // Whichever is closed first fails, so a cleanup that stops there leaves the other one open.
+    // Only the close of the failed initialization fails, not the one of the try below.
+    for (FileSystem fs : new FileSystem[] {checkedFs, failingFs}) {
+      Mockito.doThrow(new IllegalStateException("close failed")).doNothing().when(fs).close();
+    }
+
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      doReturn(checkedFs)
+          .when(ops)
+          .getFileSystem(Mockito.eq(checked), Mockito.anyMap(), Mockito.anyString(), Mockito.any());
+      doReturn(failingFs)
+          .when(ops)
+          .getFileSystem(Mockito.eq(failing), Mockito.anyMap(), Mockito.anyString(), Mockito.any());
+      Assertions.assertThrows(
+          ConnectionFailedException.class,
+          () ->
+              ops.initialize(
+                  ImmutableMap.of(
+                      PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "checked",
+                      checked.toString(),
+                      PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "failing",
+                      failing.toString()),
+                  randomCatalogInfo("metalake", "catalog"),
+                  FILESET_PROPERTIES_METADATA));
+      Mockito.verify(checkedFs, Mockito.atLeastOnce()).close();
+      Mockito.verify(failingFs, Mockito.atLeastOnce()).close();
     }
   }
 
@@ -2779,11 +2884,16 @@ public class TestFilesetCatalogOperations {
                 (proxy, context) ->
                     handlers.add(
                         (ImpersonationHDFSFileSystemProxy.ProxyUserHandler)
-                            context.arguments().get(2)))) {
+                            context.arguments().get(3)))) {
       ops.initialize(ImmutableMap.of(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
       // Called directly: construction mocks only intercept on the current thread.
       ops.createFileSystem(
-          new Path("hdfs://localhost:8020/proxy_user"), ImmutableMap.of(), "hdfs", null, "bob");
+          new Path("hdfs://localhost:8020/proxy_user"),
+          ImmutableMap.of(),
+          "hdfs",
+          null,
+          "bob",
+          null);
 
       Assertions.assertEquals(1, handlers.size());
       Assertions.assertEquals(
@@ -2801,7 +2911,7 @@ public class TestFilesetCatalogOperations {
               return invocation.callRealMethod();
             })
         .when(ops)
-        .createFileSystem(any(), any(), any(), any(), any());
+        .createFileSystem(any(), any(), any(), any(), any(), any());
     return users;
   }
 
@@ -2813,6 +2923,664 @@ public class TestFilesetCatalogOperations {
     ops.fileSystemExecutor.allowCoreThreadTimeOut(false);
     PrincipalUtils.doAs(
         new UserPrincipal(user), () -> ops.fileSystemExecutor.prestartAllCoreThreads());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {BUILTIN_HDFS_FS_PROVIDER, BUILTIN_LOCAL_FS_PROVIDER})
+  public void testFileSystemCacheSeparatesAuthenticationSettings(String defaultProvider)
+      throws Exception {
+    File resourceA = new File(UNFORMALIZED_TEST_ROOT_PATH, "cache_key/a-site.xml");
+    File resourceB = new File(UNFORMALIZED_TEST_ROOT_PATH, "cache_key/b-site.xml");
+    FileUtils.writeStringToFile(resourceA, "<configuration/>", StandardCharsets.UTF_8);
+    FileUtils.writeStringToFile(resourceB, "<configuration/>", StandardCharsets.UTF_8);
+    // Listed here, not read from the code under test, so that dropping a setting there fails this
+    // test.
+    Map<String, String[]> settings =
+        ImmutableMap.<String, String[]>builder()
+            .put(AuthenticationConfig.AUTH_TYPE_KEY, new String[] {"simple", "kerberos"})
+            .put(HADOOP_SECURITY_AUTHENTICATION, new String[] {"simple", "kerberos"})
+            .put(
+                GRAVITINO_BYPASS + HADOOP_SECURITY_AUTHENTICATION,
+                new String[] {"simple", "kerberos"})
+            .put(AuthenticationConfig.IMPERSONATION_ENABLE_KEY, new String[] {"false", "true"})
+            .put(
+                CONFIG_RESOURCES,
+                new String[] {resourceA.getAbsolutePath(), resourceB.getAbsolutePath()})
+            .build();
+    Map<String, String[]> kerberosSettings = kerberosOnlySettings();
+
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(defaultProvider)) {
+      for (Path path : hdfsCacheKeyPaths(defaultProvider)) {
+        assertSettingsSeparateFileSystems(ops, path, ImmutableMap.of(), settings);
+        assertSettingsSeparateFileSystems(
+            ops,
+            path,
+            ImmutableMap.of(AuthenticationConfig.AUTH_TYPE_KEY, "kerberos"),
+            kerberosSettings);
+      }
+    }
+  }
+
+  @Test
+  public void testFileSystemCacheIgnoresKerberosSettingsWithSimpleAuthentication()
+      throws Exception {
+    Map<String, String> simple = ImmutableMap.of(AuthenticationConfig.AUTH_TYPE_KEY, "simple");
+    Path path = new Path("hdfs://localhost:8020/cache_key");
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER)) {
+      for (Map.Entry<String, String[]> setting : kerberosOnlySettings().entrySet()) {
+        Assertions.assertSame(
+            ops.getFileSystemWithCache(
+                path, withSetting(simple, setting.getKey(), setting.getValue()[0])),
+            ops.getFileSystemWithCache(
+                path, withSetting(simple, setting.getKey(), setting.getValue()[1])),
+            setting.getKey());
+      }
+    }
+  }
+
+  // These decide the login only with Kerberos authentication.
+  private static Map<String, String[]> kerberosOnlySettings() {
+    return ImmutableMap.<String, String[]>builder()
+        .put(KerberosConfig.PRINCIPAL_KEY, new String[] {"svc@A.COM", "svc@B.COM"})
+        .put(KerberosConfig.KEY_TAB_URI_KEY, new String[] {"file:///a.keytab", "file:///b.keytab"})
+        .put(HADOOP_SECURITY_PRINCIPAL, new String[] {"svc@A.COM", "svc@B.COM"})
+        .put(GRAVITINO_BYPASS + HADOOP_SECURITY_PRINCIPAL, new String[] {"svc@A.COM", "svc@B.COM"})
+        .put(HADOOP_SECURITY_KEYTAB, new String[] {"/a.keytab", "/b.keytab"})
+        .put(GRAVITINO_BYPASS + HADOOP_SECURITY_KEYTAB, new String[] {"/a.keytab", "/b.keytab"})
+        .put(HADOOP_KRB5_CONF, new String[] {"/a-krb5.conf", "/b-krb5.conf"})
+        .put(GRAVITINO_BYPASS + HADOOP_KRB5_CONF, new String[] {"/a-krb5.conf", "/b-krb5.conf"})
+        .build();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {BUILTIN_HDFS_FS_PROVIDER, BUILTIN_LOCAL_FS_PROVIDER})
+  public void testFileSystemCacheSeparatesResolvedLoginSettings(String defaultProvider)
+      throws Exception {
+    File resource = new File(UNFORMALIZED_TEST_ROOT_PATH, "cache_key/shared-site.xml");
+    FileUtils.writeStringToFile(
+        resource,
+        "<configuration><property><name>"
+            + HADOOP_SECURITY_PRINCIPAL
+            + "</name><value>svc@${tenant.realm}</value></property></configuration>",
+        StandardCharsets.UTF_8);
+    Map<String, String> first =
+        ImmutableMap.of(
+            AuthenticationConfig.AUTH_TYPE_KEY,
+            "kerberos",
+            CONFIG_RESOURCES,
+            resource.getAbsolutePath(),
+            GRAVITINO_BYPASS + "tenant.realm",
+            "A.COM");
+    Map<String, String> second =
+        ImmutableMap.of(
+            AuthenticationConfig.AUTH_TYPE_KEY,
+            "kerberos",
+            CONFIG_RESOURCES,
+            resource.getAbsolutePath(),
+            GRAVITINO_BYPASS + "tenant.realm",
+            "B.COM");
+
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(defaultProvider)) {
+      for (Path path : hdfsCacheKeyPaths(defaultProvider)) {
+        Assertions.assertNotSame(
+            ops.getFileSystemWithCache(path, first), ops.getFileSystemWithCache(path, second));
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {BUILTIN_HDFS_FS_PROVIDER, BUILTIN_LOCAL_FS_PROVIDER})
+  public void testFileSystemCacheResolvesPrincipalWithKerberosAuthentication(String defaultProvider)
+      throws Exception {
+    // The proxy switches Hadoop to Kerberos authentication before it expands the principal.
+    Map<String, String> first =
+        ImmutableMap.of(
+            AuthenticationConfig.AUTH_TYPE_KEY,
+            "kerberos",
+            HADOOP_SECURITY_PRINCIPAL,
+            "svc-${" + HADOOP_SECURITY_AUTHENTICATION + "}@EXAMPLE.COM");
+    Map<String, String> second =
+        ImmutableMap.of(
+            AuthenticationConfig.AUTH_TYPE_KEY,
+            "kerberos",
+            HADOOP_SECURITY_PRINCIPAL,
+            "svc-simple@EXAMPLE.COM");
+    // What the first principal expands to.
+    Map<String, String> expanded =
+        ImmutableMap.of(
+            AuthenticationConfig.AUTH_TYPE_KEY,
+            "kerberos",
+            HADOOP_SECURITY_PRINCIPAL,
+            "svc-kerberos@EXAMPLE.COM");
+
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(defaultProvider)) {
+      for (Path path : hdfsCacheKeyPaths(defaultProvider)) {
+        FileSystem fs = ops.getFileSystemWithCache(path, first);
+        Assertions.assertNotSame(fs, ops.getFileSystemWithCache(path, second));
+        Assertions.assertSame(fs, ops.getFileSystemWithCache(path, expanded));
+      }
+    }
+  }
+
+  @Test
+  public void testFileSystemCacheIgnoresAuthenticationSettingsOfNonHdfsPaths() throws Exception {
+    Map<String, String> simple = ImmutableMap.of(AuthenticationConfig.AUTH_TYPE_KEY, "simple");
+    Map<String, String> kerberos =
+        ImmutableMap.of(
+            AuthenticationConfig.AUTH_TYPE_KEY,
+            "kerberos",
+            KerberosConfig.PRINCIPAL_KEY,
+            "svc@A.COM");
+
+    // Only HDFS file systems log in with these settings. The default provider here is local.
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
+      ops.initialize(ImmutableMap.of(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
+      for (Path path :
+          new Path[] {new Path(TEST_ROOT_PATH, "cache_key"), new Path("/tmp/cache_key")}) {
+        Assertions.assertSame(
+            ops.getFileSystemWithCache(path, simple), ops.getFileSystemWithCache(path, kerberos));
+      }
+    }
+  }
+
+  @Test
+  public void testFileSystemCacheResolvesLoginSettingsOncePerConfiguration() throws Exception {
+    Map<String, String> conf =
+        ImmutableMap.of(
+            AuthenticationConfig.AUTH_TYPE_KEY,
+            "kerberos",
+            KerberosConfig.PRINCIPAL_KEY,
+            "svc@A.COM");
+    Path path = new Path("hdfs://localhost:8020/cache_key");
+
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER)) {
+      // Each request merges its own copy of the configuration.
+      FileSystem fs = ops.getFileSystemWithCache(path, new HashMap<>(conf));
+      // Once for the settings, and once for the configuration the new file system logs in with.
+      Mockito.verify(ops, Mockito.times(2)).resolveHdfsLogin(any(), any());
+      Mockito.clearInvocations(ops);
+      Assertions.assertSame(fs, ops.getFileSystemWithCache(path, new HashMap<>(conf)));
+      // Resolving parses XML, so the second lookup must not do it again.
+      Mockito.verify(ops, never()).resolveHdfsLogin(any(), any());
+    }
+  }
+
+  @Test
+  public void testFileSystemCacheSharesLoginSettingsAcrossFilesets() throws Exception {
+    Path path = new Path("hdfs://localhost:8020/cache_key");
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER)) {
+      FileSystem fs = ops.getFileSystemWithCache(path, filesetConf("svc@EXAMPLE.COM", "1"));
+      Mockito.clearInvocations(ops);
+      // The configurations of filesets that inherit the same settings differ in the identifier.
+      Assertions.assertSame(
+          fs, ops.getFileSystemWithCache(path, filesetConf("svc@EXAMPLE.COM", "2")));
+      Mockito.verify(ops, never()).resolveHdfsLogin(any(), any());
+    }
+  }
+
+  @Test
+  public void testFileSystemCacheResolvesLoginSettingsOfEachFilesetThatExpandsVariables()
+      throws Exception {
+    String principal = "svc-${" + StringIdentifier.ID_KEY + "}@EXAMPLE.COM";
+    Path path = new Path("hdfs://localhost:8020/cache_key");
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER)) {
+      FileSystem first = ops.getFileSystemWithCache(path, filesetConf(principal, "1"));
+      // Once for the settings, and once for the configuration the new file system logs in with.
+      Mockito.verify(ops, Mockito.times(2)).resolveHdfsLogin(any(), any());
+      FileSystem second = ops.getFileSystemWithCache(path, filesetConf(principal, "2"));
+      Assertions.assertNotSame(first, second);
+      ArgumentCaptor<Configuration> loginConf = ArgumentCaptor.forClass(Configuration.class);
+      Mockito.verify(ops, Mockito.times(2))
+          .createFileSystem(any(), any(), any(), any(), any(), loginConf.capture());
+      Assertions.assertEquals(
+          "svc-2@EXAMPLE.COM", loginConf.getValue().get(HADOOP_SECURITY_PRINCIPAL));
+
+      // The settings of each fileset are cached under its whole configuration.
+      Mockito.clearInvocations(ops);
+      Assertions.assertSame(first, ops.getFileSystemWithCache(path, filesetConf(principal, "1")));
+      Assertions.assertSame(second, ops.getFileSystemWithCache(path, filesetConf(principal, "2")));
+      Mockito.verify(ops, never()).resolveHdfsLogin(any(), any());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"kerberos", "KERBEROS"})
+  void testFileSystemCacheResolvesAuthenticationOfEachFilesetThatExpandsIt(String kerberosType)
+      throws Exception {
+    Path path = new Path("hdfs://localhost:8020/cache_key");
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER)) {
+      // The authentication type of each fileset is its identifier.
+      FileSystem kerberos =
+          ops.getFileSystemWithCache(path, identifierAuthenticationConf(kerberosType));
+      Assertions.assertNotSame(
+          kerberos, ops.getFileSystemWithCache(path, identifierAuthenticationConf("simple")));
+    }
+  }
+
+  @Test
+  public void testFileSystemCacheResolvesLoginSettingsUnderTheConnectionTimeout() throws Exception {
+    Path path = new Path("hdfs://localhost:8020/cache_key");
+    Map<String, String> conf =
+        withSetting(
+            filesetConf("svc@EXAMPLE.COM", "1"), FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "1");
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER)) {
+      // As if reading the config.resources files hung while the settings were resolved.
+      AtomicInteger resolutions = new AtomicInteger();
+      Mockito.doAnswer(
+              invocation -> {
+                if (resolutions.getAndIncrement() == 0) {
+                  Thread.sleep(10_000);
+                }
+                return invocation.callRealMethod();
+              })
+          .when(ops)
+          .resolveHdfsLogin(any(), any());
+      GravitinoRuntimeException e =
+          Assertions.assertThrows(
+              GravitinoRuntimeException.class, () -> ops.getFileSystemWithCache(path, conf));
+      // The settings step timed out, not the file system step after it.
+      Assertions.assertTrue(
+          e.getMessage().contains("Failed to resolve the login settings"), e.getMessage());
+      Assertions.assertInstanceOf(TimeoutException.class, e.getCause());
+    }
+  }
+
+  @Test
+  public void testFileSystemCacheGivesALookupOneConnectionTimeout() throws Exception {
+    Path path = new Path("hdfs://localhost:8020/cache_key");
+    Map<String, String> conf =
+        withSetting(
+            filesetConf("svc@EXAMPLE.COM", "1"), FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "2");
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER)) {
+      // Resolving the settings takes half the timeout, and creating the file system takes more
+      // than the other half, though less than a whole timeout.
+      AtomicInteger resolutions = new AtomicInteger();
+      Mockito.doAnswer(
+              invocation -> {
+                if (resolutions.getAndIncrement() == 0) {
+                  Thread.sleep(1_000);
+                }
+                return invocation.callRealMethod();
+              })
+          .when(ops)
+          .resolveHdfsLogin(any(), any());
+      Mockito.doAnswer(
+              invocation -> {
+                Thread.sleep(1_500);
+                return Mockito.mock(FileSystem.class);
+              })
+          .when(ops)
+          .createFileSystem(any(), any(), any(), any(), any(), any());
+      GravitinoRuntimeException e =
+          Assertions.assertThrows(
+              GravitinoRuntimeException.class, () -> ops.getFileSystemWithCache(path, conf));
+      // Creating the file system timed out, with the time left after resolving the settings.
+      Assertions.assertFalse(
+          e.getMessage().contains("Failed to resolve the login settings"), e.getMessage());
+      Assertions.assertTrue(
+          Throwables.getCausalChain(e).stream().anyMatch(TimeoutException.class::isInstance));
+    }
+  }
+
+  @Test
+  public void testFileSystemCacheWrapsAnErrorFromResolvingLoginSettings() throws Exception {
+    Path path = new Path("hdfs://localhost:8020/cache_key");
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER)) {
+      NoClassDefFoundError error = new NoClassDefFoundError("org/example/Missing");
+      Mockito.doThrow(error).when(ops).resolveHdfsLogin(any(), any());
+      // As when creating the file system, so that callers that catch exceptions handle it.
+      GravitinoRuntimeException e =
+          Assertions.assertThrows(
+              GravitinoRuntimeException.class,
+              () -> ops.getFileSystemWithCache(path, filesetConf("svc@EXAMPLE.COM", "1")));
+      Assertions.assertSame(error, e.getCause());
+    }
+  }
+
+  @Test
+  public void testFileSystemCachePassesOnARuntimeExceptionFromResolvingLoginSettings()
+      throws Exception {
+    Path path = new Path("hdfs://localhost:8020/cache_key");
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER)) {
+      IllegalArgumentException failure = new IllegalArgumentException("bad principal");
+      Mockito.doThrow(failure).when(ops).resolveHdfsLogin(any(), any());
+      Assertions.assertSame(
+          failure,
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> ops.getFileSystemWithCache(path, filesetConf("svc@EXAMPLE.COM", "1"))));
+    }
+  }
+
+  @Test
+  public void testFileSystemCacheReportsPathWhenItsPoolsRejectTasks() throws Exception {
+    Path hdfsPath = new Path("hdfs://localhost:8020/cache_key");
+    Path localPath = new Path(TEST_ROOT_PATH, "rejected");
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER)) {
+      // As after the catalog is closed.
+      ops.loginSettingsExecutor.shutdownNow();
+      ops.fileSystemExecutor.shutdownNow();
+      for (Path path : new Path[] {hdfsPath, localPath}) {
+        GravitinoRuntimeException e =
+            Assertions.assertThrows(
+                GravitinoRuntimeException.class,
+                () -> ops.getFileSystemWithCache(path, filesetConf("svc@EXAMPLE.COM", "1")));
+        Assertions.assertTrue(e.getMessage().contains(path.toString()), e.getMessage());
+        Assertions.assertTrue(
+            Throwables.getCausalChain(e).stream()
+                .anyMatch(RejectedExecutionException.class::isInstance));
+      }
+    }
+  }
+
+  @Test
+  public void testFileSystemCacheFindsCachedFileSystemWhileCreationsHang() throws Exception {
+    Path path = new Path("hdfs://localhost:8020/cache_key");
+    Map<String, String> conf =
+        withSetting(
+            filesetConf("svc@EXAMPLE.COM", "1"), FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "10");
+    CountDownLatch release = new CountDownLatch(1);
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER)) {
+      FileSystem fs = ops.getFileSystemWithCache(path, conf);
+      // As if logins to a KDC that does not answer held every thread that creates file systems.
+      int threads = ops.fileSystemExecutor.getCorePoolSize();
+      CountDownLatch started = new CountDownLatch(threads);
+      try {
+        for (int i = 0; i < threads; i++) {
+          ops.fileSystemExecutor.execute(
+              () -> {
+                started.countDown();
+                Uninterruptibles.awaitUninterruptibly(release);
+              });
+        }
+        Assertions.assertTrue(started.await(10, TimeUnit.SECONDS));
+        // As if the settings of the configuration expired.
+        ops.sharedHdfsLoginSettingsCache.invalidateAll();
+        ops.hdfsLoginSettingsCache.invalidateAll();
+        Assertions.assertSame(fs, ops.getFileSystemWithCache(path, conf));
+      } finally {
+        release.countDown();
+      }
+    }
+  }
+
+  @Test
+  public void testFileSystemCacheReportsPathOfUnreadableLoginSettings() throws Exception {
+    File resource = new File(UNFORMALIZED_TEST_ROOT_PATH, "cache_key/malformed-site.xml");
+    FileUtils.writeStringToFile(resource, "<configuration>", StandardCharsets.UTF_8);
+    Map<String, String> conf = ImmutableMap.of(CONFIG_RESOURCES, resource.getAbsolutePath());
+    Path path = new Path("hdfs://localhost:8020/cache_key");
+
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER)) {
+      GravitinoRuntimeException e =
+          Assertions.assertThrows(
+              GravitinoRuntimeException.class, () -> ops.getFileSystemWithCache(path, conf));
+      Assertions.assertTrue(e.getMessage().contains(path.toString()), e.getMessage());
+      // The cause carries the parse error.
+      Assertions.assertNotNull(e.getCause());
+    }
+  }
+
+  @Test
+  public void testFileSystemCacheKeyHoldsLoginSettingsOfNewFileSystem() throws Exception {
+    File resource = new File(UNFORMALIZED_TEST_ROOT_PATH, "cache_key/edited-site.xml");
+    writePrincipal(resource, "svc-v1@EXAMPLE.COM");
+    Map<String, String> conf =
+        ImmutableMap.of(
+            AuthenticationConfig.AUTH_TYPE_KEY,
+            "kerberos",
+            CONFIG_RESOURCES,
+            resource.getAbsolutePath());
+    // A plain key overrides the resource file, so this configuration still logs in as svc-v1.
+    Map<String, String> svcV1 = withSetting(conf, HADOOP_SECURITY_PRINCIPAL, "svc-v1@EXAMPLE.COM");
+    Path path = new Path("hdfs://localhost:8020/cache_key");
+
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER)) {
+      ops.getFileSystemWithCache(path, conf);
+      writePrincipal(resource, "svc-v2@EXAMPLE.COM");
+
+      // Bob's file system is new, so it logs in as svc-v2 while the settings of conf are cached.
+      UserPrincipal bob = new UserPrincipal("bob");
+      FileSystem edited = PrincipalUtils.doAs(bob, () -> ops.getFileSystemWithCache(path, conf));
+      ArgumentCaptor<Configuration> loginConf = ArgumentCaptor.forClass(Configuration.class);
+      Mockito.verify(ops, Mockito.times(2))
+          .createFileSystem(any(), any(), any(), any(), any(), loginConf.capture());
+      Assertions.assertEquals(
+          "svc-v2@EXAMPLE.COM", loginConf.getValue().get(HADOOP_SECURITY_PRINCIPAL));
+      Assertions.assertSame(
+          edited, PrincipalUtils.doAs(bob, () -> ops.getFileSystemWithCache(path, conf)));
+      Assertions.assertNotSame(
+          edited, PrincipalUtils.doAs(bob, () -> ops.getFileSystemWithCache(path, svcV1)));
+    }
+  }
+
+  @Test
+  public void testFileSystemCacheFailsWhenLoginSettingsKeepChanging() throws Exception {
+    Map<String, String> conf =
+        ImmutableMap.of(
+            AuthenticationConfig.AUTH_TYPE_KEY,
+            "kerberos",
+            KerberosConfig.PRINCIPAL_KEY,
+            "svc@EXAMPLE.COM");
+    Path path = new Path("hdfs://localhost:8020/cache_key");
+
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER)) {
+      // As if the config.resources files changed again before each file system was created.
+      doReturn(null).when(ops).getFileSystem(any(), any(), any(), any());
+
+      GravitinoRuntimeException e =
+          Assertions.assertThrows(
+              GravitinoRuntimeException.class, () -> ops.getFileSystemWithCache(path, conf));
+      Assertions.assertTrue(e.getMessage().contains(path.toString()), e.getMessage());
+      // The retry resolves the settings again before it gives up.
+      Mockito.verify(ops, Mockito.times(2)).getFileSystem(any(), any(), any(), any());
+      Mockito.verify(ops, Mockito.times(2)).resolveHdfsLogin(any(), any());
+    }
+  }
+
+  @Test
+  public void testFileSystemCacheReportsPathOfUnresolvableLoginSettings() throws Exception {
+    // Hadoop fails a lookup that needs 20 or more variable substitutions.
+    ImmutableMap.Builder<String, String> conf =
+        ImmutableMap.<String, String>builder()
+            .put(AuthenticationConfig.AUTH_TYPE_KEY, "kerberos")
+            .put(HADOOP_SECURITY_PRINCIPAL, "${v0}")
+            .put("v21", "svc@EXAMPLE.COM");
+    for (int i = 0; i < 21; i++) {
+      conf.put("v" + i, "${v" + (i + 1) + "}");
+    }
+    Path path = new Path("hdfs://localhost:8020/cache_key");
+
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER)) {
+      GravitinoRuntimeException e =
+          Assertions.assertThrows(
+              GravitinoRuntimeException.class,
+              () -> ops.getFileSystemWithCache(path, conf.build()));
+      Assertions.assertTrue(e.getMessage().contains(path.toString()), e.getMessage());
+    }
+  }
+
+  @Test
+  public void testHdfsFileSystemLogsInWithTheGivenConfiguration() throws Exception {
+    Configuration hadoopConf = HDFSFileSystemProxy.hadoopConfiguration(ImmutableMap.of());
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
+      ops.initialize(ImmutableMap.of(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
+      // The scheme selects the HDFS proxy, and the local path needs no NameNode.
+      try (FileSystem fs =
+          ops.createFileSystem(
+              new Path(TEST_ROOT_PATH), ImmutableMap.of(), "hdfs", null, "bob", hadoopConf)) {
+        Assertions.assertSame(hadoopConf, fs.getConf());
+      }
+    }
+  }
+
+  @Test
+  public void testFileSystemCreatedAfterTimeoutIsClosed() throws Exception {
+    FileSystem late = Mockito.mock(FileSystem.class);
+    CountDownLatch timedOut = new CountDownLatch(1);
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      ops.initialize(ImmutableMap.of(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
+      // Like a Kerberos login that swallows the interrupt of the timeout.
+      Mockito.doAnswer(
+              invocation -> {
+                Uninterruptibles.awaitUninterruptibly(timedOut);
+                Thread.interrupted();
+                return late;
+              })
+          .when(ops)
+          .createFileSystem(any(), any(), any(), any(), any(), any());
+
+      try {
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class,
+            () ->
+                ops.getFileSystemWithCache(
+                    new Path(TEST_ROOT_PATH, "late"),
+                    ImmutableMap.of(FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "1")));
+      } finally {
+        timedOut.countDown();
+      }
+      Mockito.verify(late, Mockito.timeout(10_000)).close();
+    }
+  }
+
+  @Test
+  public void testFileSystemCreatedAfterInterruptIsClosed() throws Exception {
+    FileSystem late = Mockito.mock(FileSystem.class);
+    AtomicBoolean closedInterrupted = new AtomicBoolean(true);
+    CountDownLatch closed = new CountDownLatch(1);
+    Mockito.doAnswer(
+            invocation -> {
+              closedInterrupted.set(Thread.currentThread().isInterrupted());
+              closed.countDown();
+              return null;
+            })
+        .when(late)
+        .close();
+    CountDownLatch started = new CountDownLatch(1);
+    CountDownLatch interrupted = new CountDownLatch(1);
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      ops.initialize(ImmutableMap.of(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
+      // Like a Kerberos login that ignores the interrupt.
+      Mockito.doAnswer(
+              invocation -> {
+                started.countDown();
+                Uninterruptibles.awaitUninterruptibly(interrupted);
+                return late;
+              })
+          .when(ops)
+          .createFileSystem(any(), any(), any(), any(), any(), any());
+
+      AtomicReference<Throwable> failure = new AtomicReference<>();
+      AtomicBoolean stillInterrupted = new AtomicBoolean();
+      Thread caller =
+          new Thread(
+              () -> {
+                try {
+                  ops.getFileSystemWithCache(
+                      new Path(TEST_ROOT_PATH, "interrupted"),
+                      ImmutableMap.of(FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "60"));
+                } catch (Throwable t) {
+                  failure.set(t);
+                  stillInterrupted.set(Thread.currentThread().isInterrupted());
+                }
+              });
+      caller.start();
+      boolean callerStillWaiting;
+      try {
+        Assertions.assertTrue(started.await(10, TimeUnit.SECONDS));
+        caller.interrupt();
+        caller.join(10_000);
+        callerStillWaiting = caller.isAlive();
+      } finally {
+        interrupted.countDown();
+      }
+      Assertions.assertFalse(callerStillWaiting, "the caller kept waiting after the interrupt");
+      Assertions.assertNotNull(failure.get(), "the caller returned without an exception");
+      Assertions.assertInstanceOf(
+          InterruptedException.class, Throwables.getRootCause(failure.get()));
+      Assertions.assertTrue(stillInterrupted.get());
+      Mockito.verify(late, Mockito.timeout(10_000)).close();
+      // The interrupt that cancelled the task does not reach the close of its result.
+      Assertions.assertTrue(closed.await(10, TimeUnit.SECONDS));
+      Assertions.assertFalse(closedInterrupted.get());
+    }
+  }
+
+  private static void writePrincipal(File resource, String principal) throws IOException {
+    FileUtils.writeStringToFile(
+        resource,
+        "<configuration><property><name>"
+            + HADOOP_SECURITY_PRINCIPAL
+            + "</name><value>"
+            + principal
+            + "</value></property></configuration>",
+        StandardCharsets.UTF_8);
+  }
+
+  // A real HDFS file system needs a NameNode, and a Kerberos login needs a KDC.
+  private FilesetCatalogOperations newOpsWithStubbedHdfs(String defaultProvider)
+      throws IOException {
+    FilesetCatalogOperations ops = Mockito.spy(new FilesetCatalogOperations(store, secretManager));
+    ops.initialize(
+        ImmutableMap.of(DEFAULT_FS_PROVIDER, defaultProvider),
+        randomCatalogInfo("m1", "c1"),
+        FILESET_PROPERTIES_METADATA);
+    Mockito.doAnswer(invocation -> Mockito.mock(FileSystem.class))
+        .when(ops)
+        .createFileSystem(any(), any(), any(), any(), any(), any());
+    return ops;
+  }
+
+  // An absolute HDFS path, and a path without a scheme when HDFS is the default provider.
+  private static Path[] hdfsCacheKeyPaths(String defaultProvider) {
+    Path absolute = new Path("hdfs://localhost:8020/cache_key");
+    return BUILTIN_HDFS_FS_PROVIDER.equals(defaultProvider)
+        ? new Path[] {absolute, new Path("/cache_key")}
+        : new Path[] {absolute};
+  }
+
+  private static void assertSettingsSeparateFileSystems(
+      FilesetCatalogOperations ops,
+      Path path,
+      Map<String, String> base,
+      Map<String, String[]> settings) {
+    for (Map.Entry<String, String[]> setting : settings.entrySet()) {
+      Map<String, String> first = withSetting(base, setting.getKey(), setting.getValue()[0]);
+      Map<String, String> second = withSetting(base, setting.getKey(), setting.getValue()[1]);
+      FileSystem fs = ops.getFileSystemWithCache(path, first);
+      Assertions.assertSame(
+          fs, ops.getFileSystemWithCache(path, withSetting(first, "k", "v")), setting.getKey());
+      Assertions.assertNotSame(fs, ops.getFileSystemWithCache(path, second), setting.getKey());
+    }
+  }
+
+  private static Map<String, String> withSetting(
+      Map<String, String> conf, String key, String value) {
+    return ImmutableMap.<String, String>builder().putAll(conf).put(key, value).build();
+  }
+
+  private static Map<String, String> identifierAuthenticationConf(String identifier) {
+    return ImmutableMap.of(
+        HADOOP_SECURITY_AUTHENTICATION,
+        "${" + StringIdentifier.ID_KEY + "}",
+        HADOOP_SECURITY_PRINCIPAL,
+        "svc@EXAMPLE.COM",
+        StringIdentifier.ID_KEY,
+        identifier);
+  }
+
+  // The merged configuration of a Kerberos fileset with the given identifier.
+  private static Map<String, String> filesetConf(String principal, String identifier) {
+    return ImmutableMap.of(
+        AuthenticationConfig.AUTH_TYPE_KEY,
+        "kerberos",
+        HADOOP_SECURITY_PRINCIPAL,
+        principal,
+        StringIdentifier.ID_KEY,
+        identifier);
   }
 
   @Test
@@ -3568,7 +4336,7 @@ public class TestFilesetCatalogOperations {
       String subPath = "/test/test.parquet";
       when(mockOps.getFileLocation(filesetIdent, subPath)).thenCallRealMethod();
       when(mockOps.getFileLocation(filesetIdent, subPath, null)).thenCallRealMethod();
-      when(mockOps.getFileSystem(any(), any(), any()))
+      when(mockOps.getFileSystem(any(), any(), any(), any()))
           .thenReturn(FileSystem.getLocal(new Configuration()));
       when(mockOps.getFileSystemWithCache(any(), any())).thenCallRealMethod();
       String fileLocation = mockOps.getFileLocation(filesetIdent, subPath);
@@ -4115,7 +4883,7 @@ public class TestFilesetCatalogOperations {
       ops.fileSystemCache.invalidateAll();
       Mockito.doThrow(cause)
           .when(ops)
-          .getFileSystem(Mockito.eq(path), Mockito.eq(conf), Mockito.anyString());
+          .getFileSystem(Mockito.eq(path), Mockito.eq(conf), Mockito.anyString(), Mockito.any());
 
       GravitinoRuntimeException e =
           Assertions.assertThrows(
