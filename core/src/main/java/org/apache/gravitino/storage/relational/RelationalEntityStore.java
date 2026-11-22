@@ -325,10 +325,9 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> E get(
       NameIdentifier ident, Entity.EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException {
-    EntityCacheKey key = EntityCacheKey.of(ident, entityType);
     Optional<E> cached =
         cache.withCacheLock(
-            key,
+            EntityCacheKey.of(ident, entityType),
             () ->
                 isPendingWrite(ident, entityType)
                     ? Optional.empty()
@@ -340,7 +339,9 @@ public class RelationalEntityStore
     // DB I/O stays outside the cache lock so this thread never holds both.
     long epochBeforeRead = cacheInvalidationEpoch.get();
     E entity = backend.get(ident, entityType);
-    cache.withCacheLock(key, () -> publishIfEpochUnchanged(entity, epochBeforeRead));
+    cache.withCacheLock(
+        EntityCacheKey.of(ident, entityType),
+        () -> publishIfEpochUnchanged(entity, epochBeforeRead));
     return entity;
   }
 
