@@ -375,15 +375,15 @@ public class RelationalEntityStore
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
+    beginPendingWrite(ident, entityType);
     try {
-      boolean deleted = backend.delete(ident, entityType, cascade);
-      return deleted;
+      return backend.delete(ident, entityType, cascade);
     } catch (NoSuchEntityException e) {
       return false;
     } catch (RuntimeException re) {
       throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
     } finally {
-      invalidateCache(ident, entityType);
+      endPendingWrite(ident, entityType);
     }
   }
 
@@ -394,12 +394,13 @@ public class RelationalEntityStore
       Class<E> clazz,
       Consumer<E> postDeleteAction)
       throws IOException {
+    beginPendingWrite(ident, entityType);
     try {
       return backend.deleteAndGet(ident, entityType, clazz, postDeleteAction);
     } catch (RuntimeException re) {
       throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
     } finally {
-      invalidateCache(ident, entityType);
+      endPendingWrite(ident, entityType);
     }
   }
 
@@ -407,12 +408,13 @@ public class RelationalEntityStore
   public Optional<SchemaEntity> deleteSchemaAndGet(
       NameIdentifier ident, boolean cascadeFunctions, Consumer<SchemaEntity> postDeleteAction)
       throws IOException {
+    beginPendingWrite(ident, Entity.EntityType.SCHEMA);
     try {
       return backend.deleteSchemaAndGet(ident, cascadeFunctions, postDeleteAction);
     } catch (RuntimeException re) {
       throw ExceptionUtils.lockWaitTimeoutAsConflict(re, Entity.EntityType.SCHEMA, ident);
     } finally {
-      invalidateCache(ident, Entity.EntityType.SCHEMA);
+      endPendingWrite(ident, Entity.EntityType.SCHEMA);
     }
   }
 

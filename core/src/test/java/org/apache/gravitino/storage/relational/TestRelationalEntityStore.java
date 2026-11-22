@@ -182,14 +182,23 @@ public class TestRelationalEntityStore {
   }
 
   @Test
-  void testDeleteInvalidatesCacheAfterBackendDelete()
+  void testDeleteDropsCacheBeforeBackendDelete()
       throws IOException, NoSuchEntityException, IllegalAccessException {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog");
+    EntityCacheKey key = EntityCacheKey.of(ident, Entity.EntityType.CATALOG);
     NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    @SuppressWarnings("unchecked")
+    Map<EntityCacheKey, AtomicInteger> pendingWrites =
+        (Map<EntityCacheKey, AtomicInteger>) FieldUtils.readField(store, "pendingWrites", true);
+    AtomicBoolean invalidatedBeforeBackend = new AtomicBoolean(false);
+    AtomicBoolean pendingDuringBackend = new AtomicBoolean(false);
 
     Mockito.doAnswer(
             invocation -> {
-              Mockito.verify(cache, Mockito.never()).invalidate(ident, Entity.EntityType.CATALOG);
+              Mockito.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
+              invalidatedBeforeBackend.set(true);
+              AtomicInteger count = pendingWrites.get(key);
+              pendingDuringBackend.set(count != null && count.get() > 0);
               return true;
             })
         .when(backend)
@@ -197,9 +206,9 @@ public class TestRelationalEntityStore {
 
     Assertions.assertTrue(store.delete(ident, Entity.EntityType.CATALOG, true));
 
-    InOrder inOrder = Mockito.inOrder(backend, cache);
-    inOrder.verify(backend).delete(ident, Entity.EntityType.CATALOG, true);
-    inOrder.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
+    Assertions.assertTrue(invalidatedBeforeBackend.get());
+    Assertions.assertTrue(pendingDuringBackend.get());
+    Assertions.assertFalse(pendingWrites.containsKey(key));
   }
 
   @Test
