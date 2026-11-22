@@ -860,8 +860,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
    *
    * <p>Subclasses that need the Gravitino table for routing must use the passed-in {@code
    * gravitinoTable} rather than fetching it again: every caller of this hook has just obtained it
-   * (loaded, created, or altered) for this identifier, and a second fetch doubles the server round
-   * trips of every table operation.
+   * (loaded, created, or altered) for this identifier.
    *
    * @param ident the Spark table identifier
    * @param gravitinoTable the Gravitino table the caller already obtained for this identifier

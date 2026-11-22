@@ -506,8 +506,7 @@ public class TestGravitinoGlueCatalog {
     when(client.asTableCatalog()).thenReturn(gravitinoTableCatalog);
     Table gravitinoTable = createMockGravitinoTable(ImmutableMap.of());
     when(gravitinoTableCatalog.loadTable(any(), any())).thenReturn(gravitinoTable);
-    org.apache.spark.sql.connector.catalog.TableCatalog mockSparkCatalog =
-        mock(org.apache.spark.sql.connector.catalog.TableCatalog.class);
+    TableCatalog mockSparkCatalog = mock(TableCatalog.class);
     when(mockSparkCatalog.loadTable(any()))
         .thenReturn(mock(org.apache.spark.sql.connector.catalog.Table.class));
 
@@ -527,7 +526,7 @@ public class TestGravitinoGlueCatalog {
               Identifier identifier,
               Table gravitinoTable,
               org.apache.spark.sql.connector.catalog.Table sparkTable,
-              org.apache.spark.sql.connector.catalog.TableCatalog sparkHiveCatalog,
+              TableCatalog sparkHiveCatalog,
               PropertiesConverter propertiesConverter,
               SparkTransformConverter sparkTransformConverter,
               SparkTypeConverter sparkTypeConverter) {

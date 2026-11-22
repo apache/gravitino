@@ -190,9 +190,7 @@ class TestJdbcCatalogRefresh {
       assertEquals(
           "ID",
           catalog
-              .loadSparkTable(
-                  Identifier.of(new String[] {"PUBLIC"}, "FRESH"),
-                  mock(org.apache.gravitino.rel.Table.class))
+              .loadSparkTable(Identifier.of(new String[] {"PUBLIC"}, "FRESH"), mock(Table.class))
               .columns()[0]
               .name());
     } finally {
@@ -220,8 +218,7 @@ class TestJdbcCatalogRefresh {
               IllegalStateException.class,
               () ->
                   catalog.loadSparkTable(
-                      Identifier.of(new String[] {"PUBLIC"}, "T"),
-                      mock(org.apache.gravitino.rel.Table.class)));
+                      Identifier.of(new String[] {"PUBLIC"}, "T"), mock(Table.class)));
       assertTrue(error.getMessage().contains("Restart the Spark session"));
     } finally {
       manager.close();
@@ -249,8 +246,7 @@ class TestJdbcCatalogRefresh {
           IllegalStateException.class,
           () ->
               catalog.loadSparkTable(
-                  Identifier.of(new String[] {"PUBLIC"}, "T"),
-                  mock(org.apache.gravitino.rel.Table.class)));
+                  Identifier.of(new String[] {"PUBLIC"}, "T"), mock(Table.class)));
       verify(credentials).getCredentials();
     } finally {
       manager.close();

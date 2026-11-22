@@ -129,7 +129,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
    * the table, so read the schema again and report the source's own error instead.
    *
    * @param ident the Spark table identifier
-   * @param gravitinoTable the Gravitino table the caller already loaded for this identifier
+   * @param gravitinoTable the Gravitino table the caller already obtained for this identifier
    * @return the Spark JDBC table
    */
   @Override
