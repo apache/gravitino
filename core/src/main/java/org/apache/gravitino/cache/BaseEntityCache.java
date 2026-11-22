@@ -21,12 +21,14 @@ package org.apache.gravitino.cache;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 /**
  * An abstract class that provides a basic implementation for the {@link EntityCache} interface.
@@ -100,6 +102,61 @@ public abstract class BaseEntityCache implements EntityCache {
     Preconditions.checkArgument(type != null, "Entity type cannot be null");
 
     return CACHEABLE_TYPES.contains(type);
+  }
+
+  /**
+   * Separates {@link NameIdentifier} levels in a cache index key. Matching on this boundary (not
+   * the bare identifier) keeps sibling prefix scans exact, e.g. {@code catalog1} vs {@code
+   * catalog10}.
+   */
+  public static final String NAME_LEVEL_BOUNDARY = ".";
+
+  /** Escapes {@link #NAME_LEVEL_BOUNDARY} and itself inside a level of an index key. */
+  private static final char INDEX_ESCAPE = '\u0001';
+
+  /**
+   * Joins the levels of an identifier into prefix-index text used by hierarchy scans.
+   *
+   * @param ident The identifier to encode.
+   * @return The escaped index text for {@code ident}.
+   */
+  public static String indexText(NameIdentifier ident) {
+    StringBuilder text = new StringBuilder();
+    for (String level : ident.namespace().levels()) {
+      appendEscaped(text, level).append(NAME_LEVEL_BOUNDARY);
+    }
+    return appendEscaped(text, ident.name()).toString();
+  }
+
+  /**
+   * Returns the descendant index prefixes used when cascading from {@code ident}.
+   *
+   * <p>Same prefixes {@link CaffeineEntityCache} uses for hierarchy invalidation. Does not include
+   * {@code ident} itself.
+   *
+   * @param ident The ancestor identifier.
+   * @param type The ancestor entity type.
+   * @return One or two prefixes ending at a name-level or schema-separator boundary.
+   */
+  public static List<String> descendantPrefixes(NameIdentifier ident, Entity.EntityType type) {
+    String identifier = indexText(ident);
+    List<String> prefixes = new ArrayList<>(2);
+    prefixes.add(identifier + NAME_LEVEL_BOUNDARY);
+    if (type == Entity.EntityType.SCHEMA) {
+      prefixes.add(identifier + HierarchicalSchemaUtil.schemaSeparator());
+    }
+    return prefixes;
+  }
+
+  private static StringBuilder appendEscaped(StringBuilder text, String level) {
+    for (int i = 0; i < level.length(); i++) {
+      char c = level.charAt(i);
+      if (c == INDEX_ESCAPE || c == NAME_LEVEL_BOUNDARY.charAt(0)) {
+        text.append(INDEX_ESCAPE);
+      }
+      text.append(c);
+    }
+    return text;
   }
 
   /** {@inheritDoc} */

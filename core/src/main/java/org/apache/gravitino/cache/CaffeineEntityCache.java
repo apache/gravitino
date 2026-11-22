@@ -331,8 +331,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
     cacheData.invalidate(key);
     removeIndexEntryIfAbsent(key);
 
-    for (String prefix :
-        EntityCacheHierarchy.descendantPrefixes(key.identifier(), key.entityType())) {
+    for (String prefix : descendantPrefixes(key.identifier(), key.entityType())) {
       invalidateDescendants(prefix);
     }
   }
@@ -356,7 +355,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * entity type.
    */
   private static String indexKey(EntityCacheKey key) {
-    return EntityCacheHierarchy.indexText(key.identifier()) + ":" + key.entityType();
+    return indexText(key.identifier()) + ":" + key.entityType();
   }
 
   /**

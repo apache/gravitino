@@ -30,6 +30,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.TestUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -75,6 +76,36 @@ public class TestBaseEntityCache {
   void testIsCacheableRejectsNullType() {
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> BaseEntityCache.isCacheable(null));
+  }
+
+  @Test
+  void testDescendantPrefixesUseNameLevelBoundary() {
+    NameIdentifier catalog1 = NameIdentifier.of("metalake", "catalog1");
+    List<String> prefixes = BaseEntityCache.descendantPrefixes(catalog1, Entity.EntityType.CATALOG);
+
+    Assertions.assertEquals(1, prefixes.size());
+    Assertions.assertTrue(
+        BaseEntityCache.indexText(NameIdentifier.of("metalake", "catalog1", "schema"))
+            .startsWith(prefixes.get(0)));
+    Assertions.assertFalse(
+        BaseEntityCache.indexText(NameIdentifier.of("metalake", "catalog10"))
+            .startsWith(prefixes.get(0)));
+    Assertions.assertFalse(
+        BaseEntityCache.indexText(NameIdentifier.of("metalake", "catalog1"))
+            .startsWith(prefixes.get(0)));
+  }
+
+  @Test
+  void testSchemaAddsHierarchicalSeparatorPrefix() {
+    NameIdentifier schema = NameIdentifier.of("metalake", "catalog", "schema");
+    List<String> prefixes = BaseEntityCache.descendantPrefixes(schema, Entity.EntityType.SCHEMA);
+
+    Assertions.assertEquals(2, prefixes.size());
+    Assertions.assertEquals(
+        BaseEntityCache.indexText(schema) + BaseEntityCache.NAME_LEVEL_BOUNDARY, prefixes.get(0));
+    Assertions.assertEquals(
+        BaseEntityCache.indexText(schema) + HierarchicalSchemaUtil.schemaSeparator(),
+        prefixes.get(1));
   }
 
   @Test

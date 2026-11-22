@@ -60,7 +60,6 @@ import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
 import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
-import org.apache.gravitino.cache.EntityCacheHierarchy;
 import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.domain.Domain;
@@ -944,7 +943,7 @@ public class RelationalEntityStore
           }
           return count.decrementAndGet() == 0 ? null : count;
         });
-    for (String prefix : EntityCacheHierarchy.descendantPrefixes(ident, entityType)) {
+    for (String prefix : BaseEntityCache.descendantPrefixes(ident, entityType)) {
       pendingHierarchyPrefixes.compute(
           prefix,
           (ignored, count) -> {
@@ -971,7 +970,7 @@ public class RelationalEntityStore
     if (pendingHierarchyPrefixes.isEmpty()) {
       return false;
     }
-    String text = EntityCacheHierarchy.indexText(ident);
+    String text = BaseEntityCache.indexText(ident);
     for (Map.Entry<String, AtomicInteger> entry : pendingHierarchyPrefixes.entrySet()) {
       AtomicInteger count = entry.getValue();
       if (count != null && count.get() > 0 && text.startsWith(entry.getKey())) {
