@@ -331,9 +331,10 @@ public class RelationalEntityStore
               NameIdentifier newIdent = updated.nameIdentifier();
               if (!ident.equals(newIdent)) {
                 // Commit has not happened yet: drop any stale cache under the new name and block
-                // refill before the renamed row becomes visible.
-                renamedTo[0] = newIdent;
+                // refill before the renamed row becomes visible. Record renamedTo only after
+                // begin succeeds so finally does not end a pending write that never started.
                 beginPendingWrite(newIdent, entityType);
+                renamedTo[0] = newIdent;
               }
             });
       } catch (RuntimeException re) {
