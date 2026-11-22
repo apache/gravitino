@@ -279,7 +279,9 @@ public class RelationalEntityStore
 
   @Override
   public boolean exists(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
-    return cachedContains(ident, entityType) || backend.exists(ident, entityType);
+    EntityCacheKey key = EntityCacheKey.of(ident, entityType);
+    return (!isPendingWrite(key) && cache.contains(ident, entityType))
+        || backend.exists(ident, entityType);
   }
 
   @Override
@@ -322,7 +324,10 @@ public class RelationalEntityStore
       NameIdentifier ident, Entity.EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException {
     EntityCacheKey key = EntityCacheKey.of(ident, entityType);
-    Optional<E> cached = cache.withCacheLock(key, () -> cachedGet(key, ident, entityType));
+    Optional<E> cached =
+        cache.withCacheLock(
+            key,
+            () -> isPendingWrite(key) ? Optional.empty() : cache.getIfPresent(ident, entityType));
     if (cached.isPresent()) {
       return cached.get();
     }
@@ -342,8 +347,11 @@ public class RelationalEntityStore
         idents.stream()
             .filter(
                 ident -> {
+                  EntityCacheKey key = EntityCacheKey.of(ident, entityType);
                   Optional<E> entity =
-                      cachedGet(EntityCacheKey.of(ident, entityType), ident, entityType);
+                      isPendingWrite(key)
+                          ? Optional.empty()
+                          : cache.getIfPresent(ident, entityType);
                   entity.ifPresent(allEntities::add);
                   return entity.isEmpty();
                 })
@@ -906,16 +914,6 @@ public class RelationalEntityStore
             cacheInvalidationEpoch.incrementAndGet();
           });
     }
-  }
-
-  private boolean cachedContains(NameIdentifier ident, Entity.EntityType entityType) {
-    EntityCacheKey key = EntityCacheKey.of(ident, entityType);
-    return !isPendingWrite(key) && cache.contains(ident, entityType);
-  }
-
-  private <E extends Entity & HasIdentifier> Optional<E> cachedGet(
-      EntityCacheKey key, NameIdentifier ident, Entity.EntityType entityType) {
-    return isPendingWrite(key) ? Optional.empty() : cache.getIfPresent(ident, entityType);
   }
 
   private boolean isPendingWrite(EntityCacheKey key) {
