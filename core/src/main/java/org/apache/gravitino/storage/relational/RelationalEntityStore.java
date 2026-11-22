@@ -60,6 +60,7 @@ import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
 import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
+import org.apache.gravitino.cache.EntityCacheHierarchy;
 import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.domain.Domain;
@@ -116,9 +117,15 @@ public class RelationalEntityStore
   // version check: this counter cannot detect changes made on another node.
   private final AtomicLong cacheInvalidationEpoch = new AtomicLong();
 
-  // Refcount of keys whose update is still running. Dropped from the cache before the backend
-  // runs; readers skip and do not refill the entry until the count is zero.
+  // Refcount of keys whose write is still running. Dropped from the cache before the backend runs;
+  // readers skip and do not refill the entry until the count is zero.
   private final ConcurrentHashMap<EntityCacheKey, AtomicInteger> pendingWrites =
+      new ConcurrentHashMap<>();
+
+  // Hierarchy index prefixes for those same writes (same rules as invalidateHierarchy). Exact-key
+  // pending above covers the written entity; these prefixes block descendant refill without
+  // pending every child key.
+  private final ConcurrentHashMap<String, AtomicInteger> pendingHierarchyPrefixes =
       new ConcurrentHashMap<>();
 
   // Non-null only for a LOCAL_PER_NODE cache, which needs cross-node invalidation. SHARED and NONE
@@ -896,24 +903,17 @@ public class RelationalEntityStore
   }
 
   /**
-   * Invalidates {@code ident} and marks it pending so readers skip and do not refill the key until
-   * {@link #endPendingWrite} runs.
+   * Marks {@code ident} and its hierarchy prefixes pending, then invalidates. Register pending
+   * before dropping the cache so a concurrent descendant read sees the block before it can
+   * republish.
    */
   private void beginPendingWrite(NameIdentifier ident, Entity.EntityType entityType) {
     EntityCacheKey key = EntityCacheKey.of(ident, entityType);
     cache.withCacheLock(
         key,
         () -> {
+          adjustPending(key, ident, entityType, /* delta */ 1);
           invalidateCache(ident, entityType);
-          pendingWrites.compute(
-              key,
-              (ignored, count) -> {
-                if (count == null) {
-                  return new AtomicInteger(1);
-                }
-                count.incrementAndGet();
-                return count;
-              });
         });
   }
 
@@ -922,27 +922,70 @@ public class RelationalEntityStore
     cache.withCacheLock(
         key,
         () -> {
-          pendingWrites.compute(
-              key,
-              (ignored, count) -> {
-                if (count == null) {
-                  return null;
-                }
-                return count.decrementAndGet() == 0 ? null : count;
-              });
+          adjustPending(key, ident, entityType, /* delta */ -1);
           cacheInvalidationEpoch.incrementAndGet();
         });
   }
 
+  private void adjustPending(
+      EntityCacheKey key, NameIdentifier ident, Entity.EntityType entityType, int delta) {
+    pendingWrites.compute(
+        key,
+        (ignored, count) -> {
+          if (delta > 0) {
+            if (count == null) {
+              return new AtomicInteger(1);
+            }
+            count.incrementAndGet();
+            return count;
+          }
+          if (count == null) {
+            return null;
+          }
+          return count.decrementAndGet() == 0 ? null : count;
+        });
+    for (String prefix : EntityCacheHierarchy.descendantPrefixes(ident, entityType)) {
+      pendingHierarchyPrefixes.compute(
+          prefix,
+          (ignored, count) -> {
+            if (delta > 0) {
+              if (count == null) {
+                return new AtomicInteger(1);
+              }
+              count.incrementAndGet();
+              return count;
+            }
+            if (count == null) {
+              return null;
+            }
+            return count.decrementAndGet() == 0 ? null : count;
+          });
+    }
+  }
+
   private boolean isPendingWrite(NameIdentifier ident, Entity.EntityType entityType) {
-    AtomicInteger count = pendingWrites.get(EntityCacheKey.of(ident, entityType));
-    return count != null && count.get() > 0;
+    AtomicInteger exact = pendingWrites.get(EntityCacheKey.of(ident, entityType));
+    if (exact != null && exact.get() > 0) {
+      return true;
+    }
+    if (pendingHierarchyPrefixes.isEmpty()) {
+      return false;
+    }
+    String text = EntityCacheHierarchy.indexText(ident);
+    for (Map.Entry<String, AtomicInteger> entry : pendingHierarchyPrefixes.entrySet()) {
+      AtomicInteger count = entry.getValue();
+      if (count != null && count.get() > 0 && text.startsWith(entry.getKey())) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @VisibleForTesting
   void clearCache() {
     cacheInvalidationEpoch.incrementAndGet();
     pendingWrites.clear();
+    pendingHierarchyPrefixes.clear();
     cache.clear();
   }
 }

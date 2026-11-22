@@ -43,6 +43,7 @@ import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.BaseEntityCache;
 import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
+import org.apache.gravitino.cache.EntityCacheHierarchy;
 import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.domain.Domain;
@@ -144,6 +145,28 @@ public class TestRelationalEntityStore {
     pendingWrites.put(key, new AtomicInteger(1));
 
     Assertions.assertSame(entity, store.get(ident, Entity.EntityType.TOPIC, TopicEntity.class));
+    Mockito.verify(cache, Mockito.never()).put(entity);
+  }
+
+  @Test
+  void testGetDoesNotPublishWhileAncestorWritePending() throws Exception {
+    NameIdentifier catalog = NameIdentifier.of("metalake", "catalog");
+    NameIdentifier topic = NameIdentifier.of("metalake", "catalog", "schema", "topic");
+    TopicEntity entity = Mockito.mock(TopicEntity.class);
+    Mockito.when(entity.nameIdentifier()).thenReturn(topic);
+    Mockito.when(entity.type()).thenReturn(Entity.EntityType.TOPIC);
+    Mockito.when(backend.get(topic, Entity.EntityType.TOPIC)).thenReturn(entity);
+
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    @SuppressWarnings("unchecked")
+    Map<String, AtomicInteger> pendingHierarchyPrefixes =
+        (Map<String, AtomicInteger>) FieldUtils.readField(store, "pendingHierarchyPrefixes", true);
+    for (String prefix :
+        EntityCacheHierarchy.descendantPrefixes(catalog, Entity.EntityType.CATALOG)) {
+      pendingHierarchyPrefixes.put(prefix, new AtomicInteger(1));
+    }
+
+    Assertions.assertSame(entity, store.get(topic, Entity.EntityType.TOPIC, TopicEntity.class));
     Mockito.verify(cache, Mockito.never()).put(entity);
   }
 
