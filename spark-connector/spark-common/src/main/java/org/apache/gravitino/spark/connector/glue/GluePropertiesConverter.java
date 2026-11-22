@@ -145,7 +145,11 @@ public class GluePropertiesConverter implements PropertiesConverter {
    *
    * <p>AWS credentials are read via the default AWS credential chain (environment variables,
    * instance profile, etc.) inside the isolated Hive classloader. The static credentials in
-   * Gravitino catalog properties are used by the Iceberg GlueCatalog path instead.
+   * Gravitino catalog properties are used by the Iceberg GlueCatalog path. For S3 data access on
+   * the Hive path, the S3 secret key credential the catalog vends from those properties is passed
+   * as {@code fs.s3a.access.key} and {@code fs.s3a.secret.key}, unless either key is configured
+   * with a non-blank value in the Spark catalog options or the session's Hadoop configuration; see
+   * {@code GravitinoGlueCatalog.applyS3Credential}.
    */
   @Override
   public Map<String, String> toSparkCatalogProperties(Map<String, String> properties) {

@@ -45,8 +45,11 @@ import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
+import org.apache.gravitino.spark.connector.utils.LocalSparkSessions;
 import org.apache.iceberg.spark.SparkCatalog;
+import org.apache.kyuubi.spark.connector.hive.HiveTableCatalog;
 import org.apache.spark.SparkConf;
+import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
@@ -54,6 +57,7 @@ import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.catalog.TableChange;
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
 import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -61,6 +65,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.Timeout;
 import org.mockito.ArgumentCaptor;
 
 @TestInstance(Lifecycle.PER_CLASS)
@@ -200,7 +205,7 @@ public class TestGravitinoGlueCatalog {
   // -------------------------------------------------------------------------
 
   @Test
-  void testApplyS3CredentialInjectsHadoopProperties() {
+  void testApplyS3CredentialInjectsFilesystemKeysAndGlueApiKeys() {
     Catalog mockCatalog = mock(Catalog.class);
     S3SecretKeyCredential s3Cred = new S3SecretKeyCredential("test-access-key", "test-secret-key");
     SupportsCredentials supportsCredentials = mock(SupportsCredentials.class);
@@ -208,10 +213,10 @@ public class TestGravitinoGlueCatalog {
     when(supportsCredentials.getCredentials()).thenReturn(new Credential[] {s3Cred});
 
     Map<String, String> props = new HashMap<>();
-    Map<String, String> vended = GravitinoGlueCatalog.applyS3Credential(mockCatalog, props);
+    Map<String, String> vended = GravitinoGlueCatalog.applyS3Credential(mockCatalog, props, null);
 
-    Assertions.assertEquals("test-access-key", props.get("hadoop.fs.s3a.access.key"));
-    Assertions.assertEquals("test-secret-key", props.get("hadoop.fs.s3a.secret.key"));
+    Assertions.assertEquals("test-access-key", props.get("fs.s3a.access.key"));
+    Assertions.assertEquals("test-secret-key", props.get("fs.s3a.secret.key"));
     Assertions.assertEquals(
         "test-access-key", vended.get(GluePropertiesConverter.AWS_ACCESS_KEY_ID));
     Assertions.assertEquals(
@@ -219,7 +224,7 @@ public class TestGravitinoGlueCatalog {
   }
 
   @Test
-  void testApplyS3CredentialUsesAwsForGlueAndS3ForStorage() {
+  void testApplyS3CredentialUsesAwsKeysForGlueAndS3KeysForStorage() {
     Catalog mockCatalog = mock(Catalog.class);
     AwsSecretKeyCredential awsCred = new AwsSecretKeyCredential("glue-ak", "glue-sk");
     S3SecretKeyCredential s3Cred = new S3SecretKeyCredential("s3-ak", "s3-sk");
@@ -228,10 +233,10 @@ public class TestGravitinoGlueCatalog {
     when(supportsCredentials.getCredentials()).thenReturn(new Credential[] {awsCred, s3Cred});
 
     Map<String, String> props = new HashMap<>();
-    Map<String, String> vended = GravitinoGlueCatalog.applyS3Credential(mockCatalog, props);
+    Map<String, String> vended = GravitinoGlueCatalog.applyS3Credential(mockCatalog, props, null);
 
-    Assertions.assertEquals("s3-ak", props.get("hadoop.fs.s3a.access.key"));
-    Assertions.assertEquals("s3-sk", props.get("hadoop.fs.s3a.secret.key"));
+    Assertions.assertEquals("s3-ak", props.get("fs.s3a.access.key"));
+    Assertions.assertEquals("s3-sk", props.get("fs.s3a.secret.key"));
     Assertions.assertEquals("glue-ak", vended.get(GluePropertiesConverter.AWS_ACCESS_KEY_ID));
     Assertions.assertEquals("glue-sk", vended.get(GluePropertiesConverter.AWS_SECRET_ACCESS_KEY));
   }
@@ -244,10 +249,118 @@ public class TestGravitinoGlueCatalog {
     when(supportsCredentials.getCredentials()).thenReturn(new Credential[] {});
 
     Map<String, String> props = new HashMap<>();
-    Map<String, String> vended = GravitinoGlueCatalog.applyS3Credential(mockCatalog, props);
+    Map<String, String> vended = GravitinoGlueCatalog.applyS3Credential(mockCatalog, props, null);
 
     Assertions.assertTrue(props.isEmpty());
     Assertions.assertTrue(vended.isEmpty());
+  }
+
+  @Test
+  void testApplyS3CredentialKeepsConfiguredS3Keys() {
+    Catalog mockCatalog = mock(Catalog.class);
+    S3SecretKeyCredential s3Cred = new S3SecretKeyCredential("vended-ak", "vended-sk");
+    SupportsCredentials supportsCredentials = mock(SupportsCredentials.class);
+    when(mockCatalog.supportsCredentials()).thenReturn(supportsCredentials);
+    when(supportsCredentials.getCredentials()).thenReturn(new Credential[] {s3Cred});
+    Map<String, String> props =
+        new HashMap<>(
+            ImmutableMap.of("fs.s3a.access.key", "user-ak", "fs.s3a.secret.key", "user-sk"));
+
+    GravitinoGlueCatalog.applyS3Credential(mockCatalog, props, null);
+
+    Assertions.assertEquals("user-ak", props.get("fs.s3a.access.key"));
+    Assertions.assertEquals("user-sk", props.get("fs.s3a.secret.key"));
+  }
+
+  /**
+   * The options handed to the kyuubi catalog carry the vended keys only where the user configured
+   * none. Keys arriving as {@code spark.bypass.*} catalog properties count as configured: the Glue
+   * documentation offers them as an alternative for S3 access.
+   */
+  @Test
+  void testConfiguredBypassKeysKeepTheVendedPairOutOfTheKyuubiCatalogOptions() {
+    HiveTableCatalog kyuubi = mock(HiveTableCatalog.class);
+    TestableGlueCatalog catalog = newGlueCatalogVending(kyuubi, "vended-ak", "vended-sk");
+
+    catalog.initializeKyuubiCatalog(ImmutableMap.of(), ImmutableMap.of());
+    CaseInsensitiveStringMap vended = capturedOptions(kyuubi);
+    Assertions.assertEquals("vended-ak", vended.get("fs.s3a.access.key"));
+    Assertions.assertEquals("vended-sk", vended.get("fs.s3a.secret.key"));
+
+    HiveTableCatalog configuredKyuubi = mock(HiveTableCatalog.class);
+    newGlueCatalogVending(configuredKyuubi, "vended-ak", "vended-sk")
+        .initializeKyuubiCatalog(
+            ImmutableMap.of(),
+            ImmutableMap.of(
+                "spark.bypass.fs.s3a.access.key", "bypass-ak",
+                "spark.bypass.fs.s3a.secret.key", "bypass-sk"));
+    CaseInsensitiveStringMap kept = capturedOptions(configuredKyuubi);
+    Assertions.assertEquals("bypass-ak", kept.get("fs.s3a.access.key"));
+    Assertions.assertEquals("bypass-sk", kept.get("fs.s3a.secret.key"));
+  }
+
+  /**
+   * The {@code fs.s3a.*} pair is treated as a unit, blank values do not count, and a differently
+   * cased entry is still one the user made, as on the Hive catalog.
+   */
+  @Test
+  void testApplyS3CredentialWritesThePairOnlyAsAWholeAndOnlyWhereUnconfigured() {
+    Catalog client = catalogVending("vended-ak", "vended-sk");
+
+    Map<String, String> withAccessKeyOnly =
+        new HashMap<>(ImmutableMap.of("fs.s3a.access.key", "user-ak"));
+    GravitinoGlueCatalog.applyS3Credential(client, withAccessKeyOnly, null);
+    Assertions.assertEquals(
+        ImmutableMap.of("fs.s3a.access.key", "user-ak"),
+        withAccessKeyOnly,
+        "a vended secret next to a configured access key would not authenticate");
+
+    Map<String, String> withSecretKeyOnly =
+        new HashMap<>(ImmutableMap.of("fs.s3a.secret.key", "user-sk"));
+    GravitinoGlueCatalog.applyS3Credential(client, withSecretKeyOnly, null);
+    Assertions.assertEquals(
+        ImmutableMap.of("fs.s3a.secret.key", "user-sk"),
+        withSecretKeyOnly,
+        "a vended access key next to a configured secret would not authenticate");
+
+    Map<String, String> withBlanks = new HashMap<>(ImmutableMap.of("FS.S3A.SECRET.KEY", " "));
+    GravitinoGlueCatalog.applyS3Credential(client, withBlanks, null);
+    Assertions.assertEquals(
+        ImmutableMap.of("fs.s3a.access.key", "vended-ak", "fs.s3a.secret.key", "vended-sk"),
+        withBlanks,
+        "a blank value is replaced");
+
+    Map<String, String> differentlyCased =
+        new HashMap<>(ImmutableMap.of("FS.S3A.ACCESS.KEY", "user-ak"));
+    GravitinoGlueCatalog.applyS3Credential(client, differentlyCased, null);
+    Assertions.assertEquals(
+        ImmutableMap.of("FS.S3A.ACCESS.KEY", "user-ak"),
+        differentlyCased,
+        "no vended key is written beside an entry the user made, whatever its case");
+  }
+
+  /**
+   * A key set on the session counts through the real catalog path too: were the catalog to skip the
+   * session, the vended pair would land in the options and kyuubi would apply it over the session's
+   * keys.
+   */
+  @Test
+  @Timeout(60)
+  void testSessionKeysWinThroughTheRealCatalogPath() {
+    try (LocalSparkSessions.Session local =
+        LocalSparkSessions.create("test-glue-catalog-credentials", ImmutableMap.of())) {
+      SparkSession spark = local.spark();
+      spark.conf().set("fs.s3a.access.key", "runtime-ak");
+      spark.conf().set("fs.s3a.secret.key", "runtime-sk");
+
+      HiveTableCatalog kyuubi = mock(HiveTableCatalog.class);
+      newGlueCatalogVending(kyuubi, "vended-ak", "vended-sk")
+          .initializeKyuubiCatalog(ImmutableMap.of(), ImmutableMap.of());
+      CaseInsensitiveStringMap options = capturedOptions(kyuubi);
+
+      Assertions.assertNull(options.get("fs.s3a.access.key"), "the session's key must win");
+      Assertions.assertNull(options.get("fs.s3a.secret.key"), "the session's key must win");
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -507,6 +620,54 @@ public class TestGravitinoGlueCatalog {
         icebergGlueCatalog = icebergCatalog;
       }
     };
+  }
+
+  private static Catalog catalogVending(String accessKey, String secretKey) {
+    Catalog client = mock(Catalog.class);
+    SupportsCredentials supportsCredentials = mock(SupportsCredentials.class);
+    when(client.supportsCredentials()).thenReturn(supportsCredentials);
+    when(supportsCredentials.getCredentials())
+        .thenReturn(new Credential[] {new S3SecretKeyCredential(accessKey, secretKey)});
+    return client;
+  }
+
+  private static TestableGlueCatalog newGlueCatalogVending(
+      HiveTableCatalog kyuubi, String accessKey, String secretKey) {
+    return new TestableGlueCatalog(catalogVending(accessKey, secretKey), kyuubi);
+  }
+
+  private static CaseInsensitiveStringMap capturedOptions(HiveTableCatalog kyuubi) {
+    ArgumentCaptor<CaseInsensitiveStringMap> options =
+        ArgumentCaptor.forClass(CaseInsensitiveStringMap.class);
+    verify(kyuubi).initialize(any(), options.capture());
+    return options.getValue();
+  }
+
+  /** A Glue catalog over a mocked Gravitino client and kyuubi catalog, exposing the init path. */
+  private static final class TestableGlueCatalog extends GravitinoGlueCatalog {
+
+    private final Catalog client;
+    private final HiveTableCatalog kyuubi;
+
+    private TestableGlueCatalog(Catalog client, HiveTableCatalog kyuubi) {
+      this.client = client;
+      this.kyuubi = kyuubi;
+    }
+
+    @Override
+    protected Catalog gravitinoCatalog() {
+      return client;
+    }
+
+    @Override
+    protected HiveTableCatalog createHiveTableCatalog() {
+      return kyuubi;
+    }
+
+    private void initializeKyuubiCatalog(
+        Map<String, String> options, Map<String, String> properties) {
+      createAndInitSparkCatalog("glue", new CaseInsensitiveStringMap(options), properties);
+    }
   }
 
   /** Creates a mock Gravitino Table with the given properties. */
