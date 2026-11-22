@@ -91,9 +91,12 @@ policy = client.create_policy(
 </TabItem>
 </Tabs>
 
-The built-in compaction policy has a fixed content shape, documented in
-[Iceberg compaction policy](./iceberg-compaction-policy.md), and a helper that builds it with
-defaults.
+Built-in Iceberg maintenance policies have fixed content shapes. See
+[Iceberg compaction policy](./iceberg-compaction-policy.md),
+[Iceberg rewrite manifests policy](./iceberg-rewrite-manifests-policy.md),
+[Iceberg snapshot expiration policy](./iceberg-snapshot-expiration-policy.md), and
+[Iceberg orphan file removal policy](./iceberg-orphan-file-removal-policy.md). Compaction also has
+a helper that builds defaults:
 
 ```java
 Policy policy = client.createPolicy(
