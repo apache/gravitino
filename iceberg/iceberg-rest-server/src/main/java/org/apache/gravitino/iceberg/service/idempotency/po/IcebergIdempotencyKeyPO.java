@@ -35,11 +35,11 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
- * Persistence object for one {@code iceberg_idempotency_key_meta} row. Mirrors the table columns
- * and is mapped by {@link IcebergIdempotencyKeyMapper}, and converts to the {@link
- * IdempotencyRecord} the store SPI hands back. Instances are created through the generated {@code
- * builder()} (or populated by MyBatis via field reflection through the private no-arg constructor)
- * and expose no setters, so they are effectively immutable once built.
+ * Persistence object for one {@code iceberg_idempotency_meta} row. Mirrors the table columns and is
+ * mapped by {@link IcebergIdempotencyKeyMapper}, and converts to the {@link IdempotencyRecord} the
+ * store SPI hands back. Instances are created through the generated {@code builder()} (or populated
+ * by MyBatis via field reflection through the private no-arg constructor) and expose no setters.
+ * MyBatis fills in the generated fencing token on insert.
  */
 @Getter
 @Builder(setterPrefix = "with")
@@ -48,8 +48,10 @@ import org.apache.gravitino.utils.PrincipalUtils;
 public class IcebergIdempotencyKeyPO {
 
   private String idempotencyKey;
-  private String operationBinding;
-  private Long claim;
+  private String httpMethod;
+  private String requestUri;
+  @Nullable private String queryDigest;
+  private Long generation;
   @Nullable private Integer httpStatus;
   @Nullable private String responseSummary;
   private String auditInfo;
@@ -62,7 +64,7 @@ public class IcebergIdempotencyKeyPO {
    * @param idempotencyKey the client-provided UUIDv7 key
    * @param operationBinding request identity, for example {@code POST
    *     /v1/cat1/namespaces/ns1/tables}
-   * @param claim the reserving caller's fencing token
+   * @param generation the reservation fencing token
    * @param createdAtMs reservation time in unix epoch millis
    * @param expiresAtMs time after which the record may be purged, in unix epoch millis
    * @return the persistence object
@@ -70,13 +72,19 @@ public class IcebergIdempotencyKeyPO {
   public static IcebergIdempotencyKeyPO reserved(
       String idempotencyKey,
       String operationBinding,
-      long claim,
+      long generation,
       long createdAtMs,
       long expiresAtMs) {
+    int separator = operationBinding.indexOf(' ');
+    String method = separator < 0 ? operationBinding : operationBinding.substring(0, separator);
+    String target = separator < 0 ? "" : operationBinding.substring(separator + 1);
+    int query = target.indexOf('?');
     return builder()
         .withIdempotencyKey(idempotencyKey)
-        .withOperationBinding(operationBinding)
-        .withClaim(claim)
+        .withHttpMethod(method)
+        .withRequestUri(query < 0 ? target : target.substring(0, query))
+        .withQueryDigest(query < 0 ? null : target.substring(query + 1))
+        .withGeneration(generation)
         .withHttpStatus(null)
         .withResponseSummary(null)
         .withAuditInfo(auditInfoJson(createdAtMs))
@@ -91,8 +99,12 @@ public class IcebergIdempotencyKeyPO {
    * @return the domain record, finalized iff the row carries an HTTP status
    */
   public IdempotencyRecord toIdempotencyRecord() {
+    String binding = requestUri.isEmpty() ? httpMethod : httpMethod + " " + requestUri;
+    if (queryDigest != null) {
+      binding += "?" + queryDigest;
+    }
     IdempotencyRecord record =
-        IdempotencyRecord.reserved(idempotencyKey, operationBinding, claim, createdAt, expiresAt);
+        IdempotencyRecord.reserved(idempotencyKey, binding, generation, createdAt, expiresAt);
     return httpStatus == null ? record : record.withResponse(httpStatus, responseSummary);
   }
 

@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
@@ -34,7 +35,6 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.idempotency.IdempotencyRecord;
 import org.apache.gravitino.iceberg.common.idempotency.IdempotencyStore;
-import org.apache.gravitino.iceberg.common.idempotency.IdempotencyStore.ReserveResult;
 import org.apache.gravitino.iceberg.common.idempotency.InMemoryIdempotencyStore;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -231,10 +231,8 @@ public class TestIcebergIdempotencyManager {
   @Test
   void testRetryWhileTheFirstRequestIsRunningIsRetryable() {
     IdempotencyStore store = Mockito.mock(IdempotencyStore.class);
-    Mockito.when(
-            store.reserve(
-                Mockito.anyString(), Mockito.anyString(), Mockito.anyLong(), Mockito.anyLong()))
-        .thenReturn(ReserveResult.DUPLICATE);
+    Mockito.when(store.reserve(Mockito.anyString(), Mockito.anyString(), Mockito.anyLong()))
+        .thenReturn(OptionalLong.empty());
     Mockito.when(store.load(KEY)).thenReturn(Optional.empty());
     IcebergIdempotencyManager manager =
         new IcebergIdempotencyManager(enabledConfig(ImmutableMap.of()), Optional.of(store));
@@ -257,7 +255,7 @@ public class TestIcebergIdempotencyManager {
     Mockito.when(uriInfo.getQueryParameters()).thenReturn(queryParameters);
 
     Assertions.assertEquals(
-        "DELETE /v1/cat1/namespaces/ns1/tables/t1?mode=async&purgeRequested=true",
+        "DELETE /v1/cat1/namespaces/ns1/tables/t1?66532a1d5c66e58204f1ed51206ebc902cc7cea6673cc76547e83f630ab80bfe",
         IcebergIdempotencyManager.operationBinding("DELETE", uriInfo));
   }
 
@@ -269,10 +267,8 @@ public class TestIcebergIdempotencyManager {
   @Test
   void testNoOpFinalizeRetainsReservation() {
     IdempotencyStore store = Mockito.mock(IdempotencyStore.class);
-    Mockito.when(
-            store.reserve(
-                Mockito.eq(KEY), Mockito.anyString(), Mockito.anyLong(), Mockito.anyLong()))
-        .thenReturn(ReserveResult.RESERVED);
+    Mockito.when(store.reserve(Mockito.eq(KEY), Mockito.anyString(), Mockito.anyLong()))
+        .thenReturn(OptionalLong.of(1));
     IcebergIdempotencyManager manager =
         new IcebergIdempotencyManager(enabledConfig(ImmutableMap.of()), Optional.of(store));
     Response response = execute(manager, KEY, new AtomicInteger());
@@ -283,19 +279,15 @@ public class TestIcebergIdempotencyManager {
   @Test
   void testFinalizeWithReplacementClaimDoesNotRelease() {
     IdempotencyStore store = Mockito.mock(IdempotencyStore.class);
-    Mockito.when(
-            store.reserve(
-                Mockito.eq(KEY), Mockito.anyString(), Mockito.anyLong(), Mockito.anyLong()))
+    Mockito.when(store.reserve(Mockito.eq(KEY), Mockito.anyString(), Mockito.anyLong()))
         .thenAnswer(
             invocation -> {
-              long originalClaim = invocation.getArgument(2);
               Mockito.when(store.load(KEY))
                   .thenReturn(
                       Optional.of(
-                          IdempotencyRecord.reserved(
-                                  KEY, BINDING, originalClaim + 1, 0, Long.MAX_VALUE)
+                          IdempotencyRecord.reserved(KEY, BINDING, 2, 0, Long.MAX_VALUE)
                               .withResponse(200, "replacement")));
-              return ReserveResult.RESERVED;
+              return OptionalLong.of(1);
             });
     IcebergIdempotencyManager manager =
         new IcebergIdempotencyManager(enabledConfig(ImmutableMap.of()), Optional.of(store));
@@ -352,9 +344,12 @@ public class TestIcebergIdempotencyManager {
     Mockito.when(uri.getQueryParameters()).thenReturn(query);
     String binding = IcebergIdempotencyManager.operationBinding("POST", uri);
     Assertions.assertEquals(
-        "POST /v1/namespaces/ns%2Fone/tables?a%26b=x%3Dy%26c&a%26b=z&a%26b=z", binding);
+        "POST /v1/namespaces/ns%2Fone/tables?79d3ba3a8406738ce1bc95270798292111dbe1f89cbf5c2c27f11aca55030cd5",
+        binding);
     query.put("a&b", Arrays.asList("z", "z", "x=y&c"));
     Assertions.assertEquals(binding, IcebergIdempotencyManager.operationBinding("POST", uri));
+    query.put("a&b", Arrays.asList("x=y&c", "z"));
+    Assertions.assertNotEquals(binding, IcebergIdempotencyManager.operationBinding("POST", uri));
   }
 
   private static Response execute(

@@ -426,15 +426,23 @@ CREATE TABLE IF NOT EXISTS `domain_rel` (
     KEY `domain_rel_idx_metalake` (`metalake_id`, `deleted_at`)
 ) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS `iceberg_idempotency_key_meta` (
+CREATE TABLE IF NOT EXISTS `iceberg_idempotency_meta` (
   `idempotency_key`   VARCHAR(36)  NOT NULL COMMENT 'client-provided UUIDv7 idempotency key',
-  `operation_binding` TEXT NOT NULL COMMENT 'request identity, e.g. POST /v1/{prefix}/namespaces/{ns}/tables',
-  `claim`             BIGINT NOT NULL COMMENT 'reservation fencing token',
+  `http_method`      VARCHAR(16) NOT NULL COMMENT 'HTTP method of the request',
+  `request_uri`      TEXT NOT NULL COMMENT 'encoded request path',
+  `query_digest`     VARCHAR(64) DEFAULT NULL COMMENT 'SHA-256 of the canonical query string, if any',
+  `generation`       BIGINT NOT NULL COMMENT 'reservation fencing token',
   `http_status`       INT          NULL COMMENT 'HTTP status of finalized response, NULL while reserved',
   `response_summary`  CLOB         NULL COMMENT 'serialized response body (JSON) for replay',
   `audit_info`        CLOB         NOT NULL COMMENT 'idempotency record audit info',
   `created_at`        BIGINT       NOT NULL COMMENT 'record created at (unix epoch millis)',
   `expires_at`        BIGINT       NOT NULL COMMENT 'record expires at (unix epoch millis)',
   PRIMARY KEY (`idempotency_key`)
-) COMMENT='Iceberg REST idempotency key records';
-CREATE INDEX IF NOT EXISTS `idx_iik_expires` ON `iceberg_idempotency_key_meta` (`expires_at`);
+) COMMENT='Iceberg REST idempotency records';
+CREATE INDEX IF NOT EXISTS `idx_iim_expires` ON `iceberg_idempotency_meta` (`expires_at`);
+
+
+CREATE TABLE IF NOT EXISTS iceberg_idempotency_generation_meta (
+  stripe INT NOT NULL PRIMARY KEY,
+  generation BIGINT NOT NULL
+) ENGINE=InnoDB;

@@ -30,10 +30,10 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.TreeMap;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -47,7 +47,6 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.idempotency.IdempotencyKeys;
 import org.apache.gravitino.iceberg.common.idempotency.IdempotencyRecord;
 import org.apache.gravitino.iceberg.common.idempotency.IdempotencyStore;
-import org.apache.gravitino.iceberg.common.idempotency.IdempotencyStore.ReserveResult;
 import org.apache.gravitino.iceberg.common.idempotency.IdempotencyStoreFactory;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
@@ -162,16 +161,14 @@ public class IcebergIdempotencyManager {
     }
 
     IdempotencyStore idempotencyStore = store.get();
-    String binding =
-        Hashing.sha256().hashString(operationBinding, StandardCharsets.UTF_8).toString();
     long expiresAtMs = System.currentTimeMillis() + keyLifetime.toMillis();
-    // A fresh claim per attempt, so that if this reservation is dropped underneath us and another
-    // request takes the key, our finalize or release lands on nothing instead of on its record.
-    long claim = ThreadLocalRandom.current().nextLong();
+    long claim;
     try {
-      if (idempotencyStore.reserve(key, binding, claim, expiresAtMs) == ReserveResult.DUPLICATE) {
-        return replay(idempotencyStore, key, binding);
+      OptionalLong reservation = idempotencyStore.reserve(key, operationBinding, expiresAtMs);
+      if (reservation.isEmpty()) {
+        return replay(idempotencyStore, key, operationBinding);
       }
+      claim = reservation.getAsLong();
     } catch (RuntimeException e) {
       LOG.warn(
           "Failed to access idempotency state for key {} before executing the mutation", key, e);
@@ -229,7 +226,7 @@ public class IcebergIdempotencyManager {
     if (queryParameters != null && !queryParameters.isEmpty()) {
       // Sorted, so that clients that order query parameters differently between a request and its
       // retry still land on the same binding.
-      StringJoiner query = new StringJoiner("&", "?", "");
+      StringJoiner query = new StringJoiner("&");
       for (Map.Entry<String, List<String>> parameter : new TreeMap<>(queryParameters).entrySet()) {
         for (String value : parameter.getValue().stream().sorted().collect(Collectors.toList())) {
           query.add(
@@ -238,7 +235,9 @@ public class IcebergIdempotencyManager {
                   + URLEncoder.encode(value, StandardCharsets.UTF_8));
         }
       }
-      binding.append(query);
+      binding
+          .append('?')
+          .append(Hashing.sha256().hashString(query.toString(), StandardCharsets.UTF_8));
     }
     return binding.toString();
   }
@@ -278,9 +277,8 @@ public class IcebergIdempotencyManager {
     }
 
     LOG.info(
-        "Replaying the stored response for Idempotency-Key: {}, operation: {}, http status: {}.",
+        "Replaying the stored response for Idempotency-Key: {}, http status: {}.",
         idempotencyKey,
-        binding,
         found.httpStatus());
     Response.ResponseBuilder builder = Response.status(found.httpStatus());
     if (found.responseSummary() != null) {

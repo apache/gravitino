@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.Optional;
+import java.util.OptionalLong;
 import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
@@ -134,12 +135,12 @@ public class TestIcebergIdempotencyFinalizeFailure extends IcebergTestBase {
   /** Fault-injection store simulating missing writes and lost commit acknowledgements. */
   public static class FaultInjectingStore extends InMemoryIdempotencyStore {
     @Override
-    public ReserveResult reserve(String key, String binding, long claim, long expiresAtMs) {
+    public OptionalLong reserve(String key, String binding, long expiresAtMs) {
       if (key.endsWith("3")) {
         throw new IllegalStateException("reservation unavailable");
       }
-      ReserveResult result = super.reserve(key, binding, claim, expiresAtMs);
-      if (key.endsWith("4") && result == ReserveResult.RESERVED) {
+      OptionalLong result = super.reserve(key, binding, expiresAtMs);
+      if (key.endsWith("4") && result.isPresent()) {
         throw new IllegalStateException("reservation committed but acknowledgement lost");
       }
       return result;

@@ -24,11 +24,12 @@ import org.apache.gravitino.iceberg.service.idempotency.po.IcebergIdempotencyKey
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
 /**
- * MyBatis mapper for the {@code iceberg_idempotency_key_meta} table. SQL is supplied per backend by
+ * MyBatis mapper for the {@code iceberg_idempotency_meta} table. SQL is supplied per backend by
  * {@link IcebergIdempotencyKeySQLProviderFactory} and executed through the Gravitino entity store's
  * shared {@code SqlSessionFactory}, so the durable idempotency store reuses the relational
  * backend's connection pool and multi-backend handling instead of opening its own JDBC connections.
@@ -36,7 +37,7 @@ import org.apache.ibatis.annotations.UpdateProvider;
 public interface IcebergIdempotencyKeyMapper {
 
   /** Table containing reservations and replayable responses. */
-  String TABLE_NAME = "iceberg_idempotency_key_meta";
+  String TABLE_NAME = "iceberg_idempotency_meta";
 
   /**
    * Inserts a reservation; a duplicate key is handled by the store.
@@ -48,13 +49,33 @@ public interface IcebergIdempotencyKeyMapper {
   int insert(@Param("po") IcebergIdempotencyKeyPO po);
 
   /**
-   * Replaces an expired row only if it has not been reclaimed by a peer.
+   * Replaces an expired reservation with a new generation.
    *
    * @param po reservation to persist
    * @return number of affected rows
    */
   @UpdateProvider(type = IcebergIdempotencyKeySQLProviderFactory.class, method = "replaceExpired")
   int replaceExpired(@Param("po") IcebergIdempotencyKeyPO po);
+
+  /**
+   * Advances a counter under a transaction lock or creates it on first use.
+   *
+   * @param stripe counter selected by the key's final byte
+   */
+  @InsertProvider(
+      type = IcebergIdempotencyKeySQLProviderFactory.class,
+      method = "advanceGeneration")
+  void advanceGeneration(@Param("stripe") int stripe);
+
+  /**
+   * Reads the counter advanced by the current transaction.
+   *
+   * @param stripe counter selected by the key's final byte
+   * @return current generation, or null when the stripe has never been used
+   */
+  @Select("SELECT generation FROM iceberg_idempotency_generation_meta WHERE stripe = #{stripe}")
+  @Nullable
+  Long selectGeneration(@Param("stripe") int stripe);
 
   /**
    * Loads a finalized response within its reuse window.

@@ -147,8 +147,8 @@ Client                 Load Balancer            Node A / Node B
   |                         |          +--------------+---------------+
   |                         |          | 1. Validate UUIDv7 format    |
   |                         |          | 2. store.reserve(key)        |
-  |                         |          |    +- RESERVED -> execute    |
-  |                         |          |    +- DUPLICATE -> replay    |
+  |                         |          |    +- Claim -> execute       |
+  |                         |          |    +- Empty -> replay        |
   |                         |          | 3. Execute mutation          |
   |                         |          | 4. store.finalize(key, resp) |
   |                         |          +--------------+---------------+
@@ -162,17 +162,15 @@ A storage-agnostic interface that any backend can implement:
 ```java
 public interface IdempotencyStore extends Closeable {
 
-  enum ReserveResult { RESERVED, DUPLICATE }
-
   /**
-   * Attempt to reserve a key. Returns DUPLICATE if already reserved or finalized.
+   * Attempt to reserve a key. Returns empty if already reserved or finalized.
    *
    * @param idempotencyKey the client-provided UUIDv7 key
    * @param operationBinding request identity, e.g. "POST /v1/cat1/namespaces/ns1/tables"
-   * @param expiresAt instant after which this record may be purged
-   * @return RESERVED if newly claimed, DUPLICATE if already exists
+   * @param expiresAtMs deadline in Unix epoch milliseconds
+   * @return a fresh fencing token if acquired, empty if the key is live
    */
-  ReserveResult reserve(String idempotencyKey, String operationBinding, Instant expiresAt);
+  OptionalLong reserve(String idempotencyKey, String operationBinding, long expiresAtMs);
 
   /**
    * Load a finalized record for replay.
@@ -186,26 +184,28 @@ public interface IdempotencyStore extends Closeable {
    * Mark a reserved key as finalized with the response to replay on duplicates.
    *
    * @param idempotencyKey the client-provided key
+   * @param claim the fencing token returned by reserve
    * @param httpStatus the HTTP status code of the original response
    * @param responseSummary serialized response body (JSON string)
    */
-  void finalize(String idempotencyKey, int httpStatus, String responseSummary);
+  void finalizeRecord(String idempotencyKey, long claim, int httpStatus, String responseSummary);
 
   /**
    * Release a reservation so the client can retry with the same key.
    * Called when the mutation fails with a retryable error.
    *
    * @param idempotencyKey the client-provided key
+   * @param claim the fencing token returned by reserve
    */
-  void release(String idempotencyKey);
+  void release(String idempotencyKey, long claim);
 
   /**
    * Purge expired records. Called periodically by a background task.
    *
-   * @param before cutoff instant; records expiring before this time are removed
+   * @param beforeMs inclusive expiry cutoff in Unix epoch milliseconds
    * @return number of records purged
    */
-  int purgeExpired(Instant before);
+  int purgeExpired(long beforeMs);
 }
 ```
 
@@ -215,6 +215,7 @@ public interface IdempotencyStore extends Closeable {
 public class IdempotencyRecord {
   private final String idempotencyKey;     // UUIDv7 (RFC 9562), 36-char canonical form
   private final String operationBinding;   // e.g., "POST /v1/cat1/namespaces/ns1/tables"
+  private final long claim;               // store-issued fencing token
   private final Integer httpStatus;        // null while reserved / in-progress
   private final String responseSummary;    // serialized response body (JSON)
   private final long createdAtMs;          // unix epoch millis (matches BIGINT column)
@@ -280,26 +281,44 @@ MEDIUMTEXT `audit_info` column, per-column `COMMENT`s, and
 MySQL:
 
 ```sql
-CREATE TABLE IF NOT EXISTS `iceberg_idempotency_key_meta` (
-    `idempotency_key`   VARCHAR(36)         NOT NULL COMMENT 'client-provided UUIDv7 idempotency key',
-    `operation_binding` TEXT               NOT NULL COMMENT 'request identity, e.g. POST /v1/{prefix}/namespaces/{ns}/tables',
-    `claim`             BIGINT             NOT NULL COMMENT 'reservation fencing token',
-    `http_status`       INT UNSIGNED        DEFAULT NULL COMMENT 'HTTP status of finalized response, NULL while reserved',
-    `response_summary`  MEDIUMTEXT          DEFAULT NULL COMMENT 'serialized response body (JSON) for replay',
-    `audit_info`        MEDIUMTEXT          NOT NULL COMMENT 'idempotency record audit info',
-    `created_at`        BIGINT(20) UNSIGNED NOT NULL COMMENT 'record created at (unix epoch millis)',
-    `expires_at`        BIGINT(20) UNSIGNED NOT NULL COMMENT 'record expires at (unix epoch millis)',
-    PRIMARY KEY (`idempotency_key`),
-    KEY `idx_iik_expires` (`expires_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Iceberg REST idempotency key records';
+CREATE TABLE IF NOT EXISTS `iceberg_idempotency_meta` (
+  `idempotency_key`   VARCHAR(36)         NOT NULL COMMENT 'client-provided UUIDv7 idempotency key',
+  `http_method`      VARCHAR(16) NOT NULL COMMENT 'HTTP method of the request',
+  `request_uri`      TEXT NOT NULL COMMENT 'encoded request path',
+  `query_digest`     VARCHAR(64) DEFAULT NULL COMMENT 'SHA-256 of the canonical query string, if any',
+  `generation`       BIGINT NOT NULL COMMENT 'reservation fencing token',
+  `http_status`       INT(10)    UNSIGNED DEFAULT NULL COMMENT 'HTTP status of finalized response, NULL while reserved',
+  `response_summary`  MEDIUMTEXT          DEFAULT NULL COMMENT 'serialized response body (JSON) for replay',
+  `audit_info`        MEDIUMTEXT          NOT NULL COMMENT 'idempotency record audit info',
+  `created_at`        BIGINT(20) UNSIGNED NOT NULL COMMENT 'record created at (unix epoch millis)',
+  `expires_at`        BIGINT(20) UNSIGNED NOT NULL COMMENT 'record expires at (unix epoch millis)',
+  PRIMARY KEY (`idempotency_key`),
+  KEY `idx_iim_expires` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Iceberg REST idempotency records';
+
+
+CREATE TABLE IF NOT EXISTS iceberg_idempotency_generation_meta (
+  stripe INT NOT NULL PRIMARY KEY,
+  generation BIGINT NOT NULL
+) ENGINE=InnoDB;
 ```
 
-The H2 and PostgreSQL variants follow the same column names with
-database-specific types. All three backends include the table and expiry index
-in `scripts/<backend>/schema-2.0.0-<backend>.sql` and
-`scripts/<backend>/upgrade-1.3.0-to-2.0.0-<backend>.sql`. The signed `claim`
-column holds the reservation's fencing token; finalize and release only affect
-the matching unfinalized reservation.
+The H2 and PostgreSQL variants use the same columns. All three backends ship the
+table in `scripts/<backend>/schema-2.0.0-<backend>.sql` and
+`scripts/<backend>/upgrade-1.3.0-to-2.0.0-<backend>.sql`.
+
+A key's final byte selects one of 256 generation counters in
+`iceberg_idempotency_generation_meta`. The database advances that counter in
+the same transaction that acquires the reservation, so a key's generations
+increase across replicas. Release and purge leave the counters in place.
+A per-key counter initialized to 1 would repeat after deletion and let a late
+owner touch the new reservation. The store returns the generation as the claim
+that finalize and release match against the current row.
+
+The HTTP method and encoded path are readable in `http_method` and
+`request_uri`. The service hashes the sorted, encoded query string into
+`query_digest` to distinguish requests without persisting caller-supplied
+query values.
 
 ### 4.1 Row Lifecycle
 
@@ -310,14 +329,13 @@ the matching unfinalized reservation.
 
 ### 4.2 Conflict Handling
 
-`reserve()` attempts a plain `INSERT` in its own transaction. On a duplicate-key
-error, it rolls back before attempting to replace an expired row in a separate
-transaction. If replacement affects no rows, it retries `INSERT` once in case
-purge or release freed the key in between. Each attempt refreshes its clock and
-tries expired-row replacement after a duplicate insert. If neither attempt
-claims the key, it returns `DUPLICATE`; other SQL errors propagate. A live row
-is never overwritten, even when its operation binding differs. Finalized,
-unexpired records can be loaded for replay.
+`reserve()` advances the key's generation counter and attempts a plain
+`INSERT` in one transaction. After a duplicate-key rollback, a separate
+transaction advances the counter and replaces the matching row only if it is
+expired. If no expired row matches, the store retries once with a fresh expiry
+cutoff in case purge or release freed the key. If neither attempt claims the
+key, it returns empty. Other SQL errors propagate. Only finalized, unexpired
+records can be loaded for replay.
 
 ---
 
@@ -329,14 +347,14 @@ unexpired records can be loaded for replay.
    ignore the `Idempotency-Key` header and execute the mutation directly.
 2. Extract `Idempotency-Key` header; validate UUIDv7 format (400 if invalid).
 3. If header absent, execute mutation directly (no idempotency overhead).
-4. Generate a fresh claim and call `store.reserve(key, binding, claim, now + lifetime)`.
-5. Result = `RESERVED`: execute mutation, call `store.finalizeRecord(key, claim, status, body)`.
+4. Call `store.reserve(key, binding, now + lifetime)` to acquire the key and receive a claim.
+5. If a claim was returned, execute the mutation and call `store.finalizeRecord(key, claim, status, body)`.
 6. Return response to client.
 
 ### 5.2 Replay Path (Duplicate Key)
 
 1. Extract and validate header.
-2. Call `store.reserve(key, binding, claim, expiresAt)` - returns `DUPLICATE`.
+2. Call `store.reserve(key, binding, expiresAt)`. An empty result indicates a duplicate.
 3. Call `store.load(key)`:
    - If finalized: reconstruct and return cached response.
    - If in-progress (not yet finalized): return `409 Conflict` with
@@ -389,13 +407,13 @@ must not rely on an at-most-once guarantee or blindly retry after the window.
 store per service instance and close it at service shutdown. MySQL and H2 use:
 
 ```sql
-DELETE FROM iceberg_idempotency_key_meta WHERE expires_at <= ? LIMIT ?;
+DELETE FROM iceberg_idempotency_meta WHERE expires_at <= ? LIMIT ?;
 ```
 
 - Deletes are performed in at most 100 batches of 1,000 rows per pass to avoid
   long-held locks and large transactions. Larger backlogs wait for later passes;
   expiry is enforced on access independently of cleanup.
-- The `idx_iik_expires` index makes the predicate efficient.
+- The `idx_iim_expires` index makes the predicate efficient.
 - PostgreSQL selects a bounded set of candidate keys in a subquery and rechecks
   expiry on the target row. MySQL and H2 recheck the target-row predicate after
   a lock wait, preserving reservations concurrently reclaimed with a future
@@ -500,7 +518,7 @@ running catalog mutation.
 
 ### Phase 2: JDBC Store
 
-- Add `iceberg_idempotency_key_meta` table schema for H2, MySQL, and PostgreSQL.
+- Add `iceberg_idempotency_meta` table schema for H2, MySQL, and PostgreSQL.
 - Implement `JdbcIdempotencyStore` using Gravitino's existing connection pool.
 - Background cleanup task for expired records.
 - Integration tests with testcontainers.

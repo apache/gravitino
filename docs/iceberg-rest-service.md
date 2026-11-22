@@ -232,12 +232,23 @@ database lock contention. Close the store when stopping the service to shut down
 
 Initialize a new database with the 2.0.0 schema or apply the 1.3.0-to-2.0.0 upgrade before selecting
 `jdbc`. An existing development 2.0.0 database created before this table was added must also apply
-the `iceberg_idempotency_key_meta` table and its expiry index from the matching database's schema
-script. Store initialization fails if the table is missing. The new table is additive and does not
-modify catalog metadata.
+the `iceberg_idempotency_meta` and `iceberg_idempotency_generation_meta` tables and the expiry index
+from the matching database's schema script. Store initialization fails if either table is missing.
+These tables are additive and do not modify catalog metadata.
 
-Reservations are atomic across replicas. A claim token prevents an old request from finalizing or
-releasing a newer reservation. Expiry is enforced on reads, finalization, and reservation attempts;
+If testing against an earlier development build that used `iceberg_idempotency_key_meta`, let its
+reuse windows expire and drain in-flight mutations before switching to this schema. The new table
+starts empty.
+
+Custom stores built against the earlier development interface must update `reserve` to return the
+store's fencing token, or an empty result for a duplicate key.
+
+Reservations are atomic across replicas. The database assigns a new generation even when the
+previous reservation for the same key was released or purged. Finalization and release match that
+generation to protect a newer reservation from an old request. The table stores the HTTP method and
+encoded request path alongside a digest of the canonical query string.
+
+Expiry is enforced on reads, finalization, and reservation attempts;
 reusing an expired key does not depend on the cleanup schedule. Each cleanup pass deletes at most
 100 batches of 1,000 expired rows, and transient failures are retried on the next pass.
 

@@ -51,13 +51,23 @@ public class IcebergIdempotencyKeySQLProviderFactory {
   }
 
   /**
-   * Returns the statement for the configured entity-store database.
+   * Returns the expired reservation replacement statement.
    *
    * @param po reservation to persist
    * @return SQL statement
    */
   public static String replaceExpired(@Param("po") IcebergIdempotencyKeyPO po) {
     return getProvider().replaceExpired(po);
+  }
+
+  /**
+   * Returns the counter advance statement for the configured entity store.
+   *
+   * @param stripe counter selected by the key's final byte
+   * @return SQL statement
+   */
+  public static String advanceGeneration(@Param("stripe") int stripe) {
+    return getProvider().advanceGeneration(stripe);
   }
 
   /**

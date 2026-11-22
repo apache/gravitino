@@ -25,6 +25,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -63,6 +64,8 @@ import org.slf4j.LoggerFactory;
  */
 public class JdbcIdempotencyStore implements IdempotencyStore {
   private static final Logger LOG = LoggerFactory.getLogger(JdbcIdempotencyStore.class);
+  // The UUID tail spreads unrelated keys across 256 independently locked counters.
+  private static final int COUNTER_HEX_DIGITS = 2;
   @VisibleForTesting static final int PURGE_BATCH_SIZE = 1000;
   @VisibleForTesting static final int MAX_PURGE_BATCHES = 100;
 
@@ -108,9 +111,9 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
     }
     // Fail startup, rather than the first mutation, when the database has not been upgraded.
     try (SqlSession session = factory.openSession()) {
-      session
-          .getMapper(IcebergIdempotencyKeyMapper.class)
-          .selectRecord("00000000-0000-7000-8000-000000000000", clock.millis());
+      IcebergIdempotencyKeyMapper mapper = session.getMapper(IcebergIdempotencyKeyMapper.class);
+      mapper.selectRecord("00000000-0000-7000-8000-000000000000", clock.millis());
+      mapper.selectGeneration(0);
       session.commit();
     }
     sessionFactory = factory;
@@ -126,31 +129,43 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
   }
 
   @Override
-  public ReserveResult reserve(
-      String idempotencyKey, String operationBinding, long claim, long expiresAtMs) {
+  public OptionalLong reserve(String idempotencyKey, String operationBinding, long expiresAtMs) {
     String key = IdempotencyKeys.canonicalize(idempotencyKey);
     Preconditions.checkArgument(operationBinding != null, "operationBinding should not be null");
     for (int attempt = 0; attempt < 2; attempt++) {
-      IcebergIdempotencyKeyPO po =
-          IcebergIdempotencyKeyPO.reserved(
-              key, operationBinding, claim, clock.millis(), expiresAtMs);
+      long nowMs = clock.millis();
       try {
-        execute(mapper -> mapper.insert(po));
-        return ReserveResult.RESERVED;
+        return execute(
+            mapper -> {
+              long generation = nextGeneration(mapper, key);
+              mapper.insert(
+                  IcebergIdempotencyKeyPO.reserved(
+                      key, operationBinding, generation, nowMs, expiresAtMs));
+              return OptionalLong.of(generation);
+            });
       } catch (RuntimeException e) {
         if (!ExceptionUtils.isDuplicateKey(e)) {
           throw e;
         }
       }
-      // The failed insert has rolled back before this update, including on PostgreSQL.
-      // Separate transactions also avoid upgrading duplicate-insert locks on MySQL.
-      if (execute(mapper -> mapper.replaceExpired(po)) > 0) {
-        return ReserveResult.RESERVED;
+      // Allocate and replace in the same transaction so the next owner cannot obtain an older
+      // generation. The separate transaction avoids upgrading a failed INSERT's MySQL locks.
+      OptionalLong replacement =
+          execute(
+              mapper -> {
+                long generation = nextGeneration(mapper, key);
+                int replaced =
+                    mapper.replaceExpired(
+                        IcebergIdempotencyKeyPO.reserved(
+                            key, operationBinding, generation, nowMs, expiresAtMs));
+                return replaced == 0 ? OptionalLong.empty() : OptionalLong.of(generation);
+              });
+      if (replacement.isPresent()) {
+        return replacement;
       }
-      // Purge or release may have removed the row before replacement. Retry INSERT once to
-      // claim a now-free key, recheck expiry with a fresh clock, or observe another live owner.
+      // Purge or release may have removed the row. Retry once with a fresh expiry cutoff.
     }
-    return ReserveResult.DUPLICATE;
+    return OptionalLong.empty();
   }
 
   @Override
@@ -219,6 +234,13 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
       // A transient database failure must not cancel all future scheduled cleanup attempts.
       LOG.warn("Purging expired Iceberg idempotency records failed", e);
     }
+  }
+
+  @VisibleForTesting
+  static long nextGeneration(IcebergIdempotencyKeyMapper mapper, String key) {
+    int stripe = Integer.parseInt(key.substring(key.length() - COUNTER_HEX_DIGITS), 16);
+    mapper.advanceGeneration(stripe);
+    return mapper.selectGeneration(stripe);
   }
 
   private <T> T execute(Function<IcebergIdempotencyKeyMapper, T> operation) {

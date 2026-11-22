@@ -26,8 +26,8 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 import javax.annotation.Nullable;
@@ -61,6 +61,7 @@ public class InMemoryIdempotencyStore implements IdempotencyStore {
   /** Evictions between two warnings, so an undersized cache is visible without flooding the log. */
   private static final long EVICTION_LOG_INTERVAL = 1000;
 
+  private final AtomicLong generations = new AtomicLong();
   private final AtomicLong sizeEvictions = new AtomicLong();
   private final LongSupplier clock;
 
@@ -123,26 +124,23 @@ public class InMemoryIdempotencyStore implements IdempotencyStore {
   }
 
   @Override
-  public ReserveResult reserve(
-      String idempotencyKey, String operationBinding, long claim, long expiresAtMs) {
+  public OptionalLong reserve(String idempotencyKey, String operationBinding, long expiresAtMs) {
     String key = IdempotencyKeys.canonicalize(idempotencyKey);
     IdempotencyRecord reserved =
-        IdempotencyRecord.reserved(key, operationBinding, claim, clock.getAsLong(), expiresAtMs);
+        IdempotencyRecord.reserved(
+            key, operationBinding, generations.incrementAndGet(), clock.getAsLong(), expiresAtMs);
     // A record past its deadline is treated as absent rather than waiting for the cache to reclaim
     // it, so behavior turns on the record's own expiry instead of when maintenance happens to run.
-    AtomicBoolean claimed = new AtomicBoolean();
-    cache
-        .asMap()
-        .compute(
-            key,
-            (cacheKey, existing) -> {
-              if (existing == null || isExpired(existing)) {
-                claimed.set(true);
-                return reserved;
-              }
-              return existing;
-            });
-    return claimed.get() ? ReserveResult.RESERVED : ReserveResult.DUPLICATE;
+    IdempotencyRecord actual =
+        cache
+            .asMap()
+            .compute(
+                key,
+                (cacheKey, existing) ->
+                    existing == null || isExpired(existing) ? reserved : existing);
+    return actual.claim() == reserved.claim()
+        ? OptionalLong.of(reserved.claim())
+        : OptionalLong.empty();
   }
 
   @Override

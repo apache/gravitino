@@ -35,8 +35,8 @@ public class IcebergIdempotencyKeyBaseSQLProvider {
   public String insert(@Param("po") IcebergIdempotencyKeyPO po) {
     return "INSERT INTO "
         + TABLE_NAME
-        + " (idempotency_key, operation_binding, claim, audit_info, created_at, expires_at)"
-        + " VALUES (#{po.idempotencyKey}, #{po.operationBinding}, #{po.claim}, #{po.auditInfo},"
+        + " (idempotency_key, http_method, request_uri, query_digest, generation, audit_info, created_at, expires_at)"
+        + " VALUES (#{po.idempotencyKey}, #{po.httpMethod}, #{po.requestUri}, #{po.queryDigest}, #{po.generation}, #{po.auditInfo},"
         + " #{po.createdAt}, #{po.expiresAt})";
   }
 
@@ -49,10 +49,22 @@ public class IcebergIdempotencyKeyBaseSQLProvider {
   public String replaceExpired(@Param("po") IcebergIdempotencyKeyPO po) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET operation_binding = #{po.operationBinding}, claim = #{po.claim},"
+        + " SET http_method = #{po.httpMethod}, request_uri = #{po.requestUri},"
+        + " query_digest = #{po.queryDigest}, generation = #{po.generation},"
         + " http_status = NULL, response_summary = NULL, audit_info = #{po.auditInfo},"
         + " created_at = #{po.createdAt}, expires_at = #{po.expiresAt}"
         + " WHERE idempotency_key = #{po.idempotencyKey} AND expires_at <= #{po.createdAt}";
+  }
+
+  /**
+   * Returns the counter advance statement.
+   *
+   * @param stripe counter selected by the key's final byte
+   * @return SQL statement
+   */
+  public String advanceGeneration(@Param("stripe") int stripe) {
+    return "INSERT INTO iceberg_idempotency_generation_meta (stripe, generation) VALUES (#{stripe}, 1)"
+        + " ON DUPLICATE KEY UPDATE generation = generation + 1";
   }
 
   /**
@@ -64,8 +76,8 @@ public class IcebergIdempotencyKeyBaseSQLProvider {
    */
   public String selectRecord(
       @Param("idempotencyKey") String idempotencyKey, @Param("nowMs") long nowMs) {
-    return "SELECT idempotency_key AS idempotencyKey, operation_binding AS operationBinding,"
-        + " claim, http_status AS httpStatus, response_summary AS responseSummary,"
+    return "SELECT idempotency_key AS idempotencyKey, http_method AS httpMethod, request_uri AS requestUri,"
+        + " query_digest AS queryDigest, generation, http_status AS httpStatus, response_summary AS responseSummary,"
         + " audit_info AS auditInfo, created_at AS createdAt, expires_at AS expiresAt FROM "
         + TABLE_NAME
         + " WHERE idempotency_key = #{idempotencyKey}"
@@ -91,7 +103,7 @@ public class IcebergIdempotencyKeyBaseSQLProvider {
     return "UPDATE "
         + TABLE_NAME
         + " SET http_status = #{httpStatus}, response_summary = #{responseSummary}"
-        + " WHERE idempotency_key = #{idempotencyKey} AND claim = #{claim}"
+        + " WHERE idempotency_key = #{idempotencyKey} AND generation = #{claim}"
         + " AND http_status IS NULL AND expires_at > #{nowMs}";
   }
 
@@ -106,7 +118,7 @@ public class IcebergIdempotencyKeyBaseSQLProvider {
       @Param("idempotencyKey") String idempotencyKey, @Param("claim") long claim) {
     return "DELETE FROM "
         + TABLE_NAME
-        + " WHERE idempotency_key = #{idempotencyKey} AND claim = #{claim} AND http_status IS NULL";
+        + " WHERE idempotency_key = #{idempotencyKey} AND generation = #{claim} AND http_status IS NULL";
   }
 
   /**
