@@ -285,32 +285,26 @@ public class RelationalEntityStore
   @Override
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
-    NameIdentifier ident = e.nameIdentifier();
-    Entity.EntityType entityType = e.type();
-    if (overwritten) {
-      // Drop the cache and block refill before the overwrite commits. Do not publish {@code e}:
-      // the database may keep the identity and version of the row it already had, so the handed-in
-      // copy can disagree with what a later backend read returns.
-      beginPendingWrite(ident, entityType);
-      try {
-        try {
-          backend.insert(e, true);
-        } catch (RuntimeException re) {
-          throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
-        }
-      } finally {
-        endPendingWrite(ident, entityType);
-      }
-      return;
-    }
-
     long epochBeforeWrite = cacheInvalidationEpoch.get();
     try {
-      backend.insert(e, false);
+      if (overwritten) {
+        // Drop the cache and block refill before the overwrite commits. Do not publish {@code e}:
+        // the database may keep the identity and version of the row it already had.
+        beginPendingWrite(e.nameIdentifier(), e.type());
+        try {
+          backend.insert(e, true);
+        } finally {
+          endPendingWrite(e.nameIdentifier(), e.type());
+        }
+      } else {
+        backend.insert(e, false);
+      }
     } catch (RuntimeException re) {
-      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, e.type(), e.nameIdentifier());
     }
-    cacheIfEpochUnchanged(e, epochBeforeWrite);
+    if (!overwritten) {
+      cacheIfEpochUnchanged(e, epochBeforeWrite);
+    }
   }
 
   @Override
@@ -319,11 +313,9 @@ public class RelationalEntityStore
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     beginPendingWrite(ident, entityType);
     try {
-      try {
-        return backend.update(ident, entityType, updater);
-      } catch (RuntimeException re) {
-        throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
-      }
+      return backend.update(ident, entityType, updater);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
     } finally {
       endPendingWrite(ident, entityType);
     }
