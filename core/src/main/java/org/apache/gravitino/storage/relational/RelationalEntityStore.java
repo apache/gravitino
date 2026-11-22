@@ -278,8 +278,7 @@ public class RelationalEntityStore
 
   @Override
   public boolean exists(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
-    EntityCacheKey key = EntityCacheKey.of(ident, entityType);
-    return (!isPendingWrite(key) && cache.contains(ident, entityType))
+    return (!isPendingWrite(ident, entityType) && cache.contains(ident, entityType))
         || backend.exists(ident, entityType);
   }
 
@@ -340,7 +339,10 @@ public class RelationalEntityStore
     Optional<E> cached =
         cache.withCacheLock(
             key,
-            () -> isPendingWrite(key) ? Optional.empty() : cache.getIfPresent(ident, entityType));
+            () ->
+                isPendingWrite(ident, entityType)
+                    ? Optional.empty()
+                    : cache.getIfPresent(ident, entityType));
     if (cached.isPresent()) {
       return cached.get();
     }
@@ -360,9 +362,8 @@ public class RelationalEntityStore
         idents.stream()
             .filter(
                 ident -> {
-                  EntityCacheKey key = EntityCacheKey.of(ident, entityType);
                   Optional<E> entity =
-                      isPendingWrite(key)
+                      isPendingWrite(ident, entityType)
                           ? Optional.empty()
                           : cache.getIfPresent(ident, entityType);
                   entity.ifPresent(allEntities::add);
@@ -881,14 +882,15 @@ public class RelationalEntityStore
       cache.put(entity);
       return;
     }
-    EntityCacheKey key = EntityCacheKey.of(entity.nameIdentifier(), entity.type());
-    if (isPendingWrite(key) || cacheInvalidationEpoch.get() != epoch) {
+    if (isPendingWrite(entity.nameIdentifier(), entity.type())
+        || cacheInvalidationEpoch.get() != epoch) {
       return;
     }
     cache.put(entity);
     // The key lock excludes same-key invalidation, but an ancestor can advance the epoch while put
     // runs on another segment. Drop a raced publication before releasing the lock.
-    if (isPendingWrite(key) || cacheInvalidationEpoch.get() != epoch) {
+    if (isPendingWrite(entity.nameIdentifier(), entity.type())
+        || cacheInvalidationEpoch.get() != epoch) {
       cache.invalidate(entity.nameIdentifier(), entity.type());
     }
   }
@@ -900,8 +902,8 @@ public class RelationalEntityStore
     cache.invalidate(ident, type);
   }
 
-  private boolean isPendingWrite(EntityCacheKey key) {
-    AtomicInteger count = pendingWrites.get(key);
+  private boolean isPendingWrite(NameIdentifier ident, Entity.EntityType entityType) {
+    AtomicInteger count = pendingWrites.get(EntityCacheKey.of(ident, entityType));
     return count != null && count.get() > 0;
   }
 
