@@ -157,9 +157,19 @@ public class GravitinoDriverPlugin implements DriverPlugin {
                 return;
               }
               if (SparkCatalogKind.LAKEHOUSE_ICEBERG.equals(kind) && !enableIcebergSupport) {
+                LOG.warn(
+                    "Skip registering catalog {} because {} is not set to true; lakehouse Iceberg"
+                        + " catalogs are not registered without it.",
+                    catalogName,
+                    GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT);
                 return;
               }
               if (SparkCatalogKind.LAKEHOUSE_PAIMON.equals(kind) && !enablePaimonSupport) {
+                LOG.warn(
+                    "Skip registering catalog {} because {} is not set to true; lakehouse Paimon"
+                        + " catalogs are not registered without it.",
+                    catalogName,
+                    GravitinoSparkConfig.GRAVITINO_ENABLE_PAIMON_SUPPORT);
                 return;
               }
               if ("jdbc-doris".equalsIgnoreCase(provider) && enableDorisSupport) {
