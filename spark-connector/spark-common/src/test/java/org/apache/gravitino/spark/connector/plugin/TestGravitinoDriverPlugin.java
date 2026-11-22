@@ -613,65 +613,71 @@ public class TestGravitinoDriverPlugin {
   }
 
   /**
-   * A real session's configuration inherits the application's non-static {@code spark.sql.*}
-   * settings at creation (Spark's {@code BaseSessionStateBuilder} merges the application SparkConf
-   * into the session SQLConf), so the stubs below model inheritance: a key the session never set
-   * still resolves to the application's value. Scope-first resolution must see through the
-   * inheritance: a session that sets only a literal token wins over the application's token file,
-   * so a shared driver presents the session end user's token rather than the application's.
+   * Every new session starts with the application's token file in its configuration. A token the
+   * session sets itself must still win, and a session that sets nothing uses the application's.
    */
   @Test
-  void testSessionTokenValueWinsOverApplicationTokenFile(@TempDir Path tempDir) throws IOException {
+  void testSessionOwnTokenWinsInRealSparkSession(@TempDir Path tempDir) throws IOException {
     Path appTokenFile = tempDir.resolve("driver.token");
     Files.write(appTokenFile, "app-file-token\n".getBytes(StandardCharsets.UTF_8));
-    SparkConf sparkConf = tokenAuthConf();
-    sparkConf.set(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE, appTokenFile.toString());
+    Path userTokenFile = tempDir.resolve("user.token");
+    Files.write(userTokenFile, "user-file-token\n".getBytes(StandardCharsets.UTF_8));
+    SparkSession root =
+        SparkSession.builder()
+            .master("local[1]")
+            .appName("test-session-token-resolution")
+            .config("spark.ui.enabled", "false")
+            .config("spark.driver.host", "127.0.0.1")
+            .config("spark.driver.bindAddress", "127.0.0.1")
+            .config("spark.sql.warehouse.dir", tempDir.resolve("warehouse").toUri().toString())
+            .config(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.TOKEN_AUTH_TYPE)
+            .config(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE, appTokenFile.toString())
+            .getOrCreate();
+    try {
+      SparkConf sparkConf = root.sparkContext().conf();
+      // A reused SparkContext would not carry the token file.
+      assertEquals(
+          appTokenFile.toString(), sparkConf.get(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE, null));
 
-    RuntimeConfig sessionConf = mock(RuntimeConfig.class);
-    // the session inherits the application's file path; the end user sets only the token value
-    when(sessionConf.getOption(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE))
-        .thenReturn(Option.apply(appTokenFile.toString()));
-    when(sessionConf.getOption(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE))
-        .thenReturn(Option.apply("session-token"));
-    SparkSession session = mock(SparkSession.class);
-    when(session.conf()).thenReturn(sessionConf);
-
-    try (MockedStatic<SparkSession> sparkSessions = Mockito.mockStatic(SparkSession.class)) {
-      sparkSessions.when(SparkSession::getActiveSession).thenReturn(Option.apply(session));
+      SparkSession valueSession = root.newSession();
+      assertEquals(
+          appTokenFile.toString(),
+          valueSession.conf().get(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE));
+      valueSession.conf().set(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE, "session-token");
+      SparkSession.setActiveSession(valueSession);
       assertEquals("session-token", GravitinoDriverPlugin.resolveToken(sparkConf));
+
+      SparkSession fileSession = root.newSession();
+      fileSession.conf().set(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE, userTokenFile.toString());
+      SparkSession.setActiveSession(fileSession);
+      assertEquals("user-file-token", GravitinoDriverPlugin.resolveToken(sparkConf));
+
+      SparkSession.setActiveSession(root.newSession());
+      assertEquals("app-file-token", GravitinoDriverPlugin.resolveToken(sparkConf));
+    } finally {
+      SparkSession.clearActiveSession();
+      SparkSession.clearDefaultSession();
+      root.stop();
     }
   }
 
-  /**
-   * Within the session scope the file-over-token rule still applies to a file the session itself
-   * configures: a session that refreshes its token on disk keeps using the file even when the
-   * application carries a literal token (which the session inherits but does not own).
-   */
+  /** Within the session's own configuration the token file wins over the literal token. */
   @Test
-  void testSessionTokenFileWinsOverApplicationTokenValue(@TempDir Path tempDir) throws IOException {
+  void testSessionTokenFileWinsOverSessionTokenValue(@TempDir Path tempDir) throws IOException {
     Path sessionTokenFile = tempDir.resolve("session.token");
     Files.write(sessionTokenFile, "session-file-token\n".getBytes(StandardCharsets.UTF_8));
     SparkConf sparkConf = tokenAuthConf();
     sparkConf.set(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE, "app-value-token");
 
-    RuntimeConfig sessionConf = mock(RuntimeConfig.class);
-    when(sessionConf.getOption(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE))
-        .thenReturn(Option.apply(sessionTokenFile.toString()));
-    when(sessionConf.getOption(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE))
-        .thenReturn(Option.apply("app-value-token")); // inherited from the application
-    SparkSession session = mock(SparkSession.class);
-    when(session.conf()).thenReturn(sessionConf);
-
-    try (MockedStatic<SparkSession> sparkSessions = Mockito.mockStatic(SparkSession.class)) {
-      sparkSessions.when(SparkSession::getActiveSession).thenReturn(Option.apply(session));
+    try (MockedStatic<SparkSession> sparkSessions =
+        mockActiveSession(sessionTokenFile.toString(), "session-value-token")) {
       assertEquals("session-file-token", GravitinoDriverPlugin.resolveToken(sparkConf));
     }
   }
 
   /**
-   * The same masking with both application keys set: the application carries a file and a literal,
-   * the session inherits the file while setting its own literal. The session user's token must
-   * still win - this exercises the discriminating masking path against both application keys.
+   * The session inherits the application's token file and sets its own literal token, which wins
+   * although the application also sets a literal token. The session's token is trimmed.
    */
   @Test
   void testSessionTokenValueWinsWhenApplicationSetsBothKeys(@TempDir Path tempDir)
@@ -682,46 +688,26 @@ public class TestGravitinoDriverPlugin {
     sparkConf.set(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE, appTokenFile.toString());
     sparkConf.set(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE, "app-value-token");
 
-    RuntimeConfig sessionConf = mock(RuntimeConfig.class);
-    when(sessionConf.getOption(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE))
-        .thenReturn(Option.apply(appTokenFile.toString())); // inherited from the application
-    when(sessionConf.getOption(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE))
-        .thenReturn(Option.apply("session-token"));
-    SparkSession session = mock(SparkSession.class);
-    when(session.conf()).thenReturn(sessionConf);
-
-    try (MockedStatic<SparkSession> sparkSessions = Mockito.mockStatic(SparkSession.class)) {
-      sparkSessions.when(SparkSession::getActiveSession).thenReturn(Option.apply(session));
+    try (MockedStatic<SparkSession> sparkSessions =
+        mockActiveSession(appTokenFile.toString(), " session-token\n")) {
       assertEquals("session-token", GravitinoDriverPlugin.resolveToken(sparkConf));
     }
   }
 
-  /**
-   * A session that owns neither token key (both values inherited from the application) falls
-   * through to the application scope: the application's token file is used and remains re-readable
-   * per request. The application's file is read either way here; what this pins is the
-   * fall-through, not the inherited-value masking (the headline test above is the one that
-   * discriminates masking).
-   */
+  /** An empty token file set by the session fails instead of using the application's token. */
   @Test
-  void testSessionWithOnlyInheritedConfigFallsThroughToApplication(@TempDir Path tempDir)
-      throws IOException {
+  void testEmptySessionTokenFileFails(@TempDir Path tempDir) throws IOException {
     Path appTokenFile = tempDir.resolve("driver.token");
     Files.write(appTokenFile, "app-file-token\n".getBytes(StandardCharsets.UTF_8));
+    Path sessionTokenFile = tempDir.resolve("session.token");
+    Files.write(sessionTokenFile, new byte[0]);
     SparkConf sparkConf = tokenAuthConf();
     sparkConf.set(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE, appTokenFile.toString());
 
-    RuntimeConfig sessionConf = mock(RuntimeConfig.class);
-    when(sessionConf.getOption(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE))
-        .thenReturn(Option.apply(appTokenFile.toString())); // inherited from the application
-    when(sessionConf.getOption(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE))
-        .thenReturn(Option.empty());
-    SparkSession session = mock(SparkSession.class);
-    when(session.conf()).thenReturn(sessionConf);
-
-    try (MockedStatic<SparkSession> sparkSessions = Mockito.mockStatic(SparkSession.class)) {
-      sparkSessions.when(SparkSession::getActiveSession).thenReturn(Option.apply(session));
-      assertEquals("app-file-token", GravitinoDriverPlugin.resolveToken(sparkConf));
+    try (MockedStatic<SparkSession> sparkSessions =
+        mockActiveSession(sessionTokenFile.toString(), null)) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> GravitinoDriverPlugin.resolveToken(sparkConf));
     }
   }
 
@@ -802,5 +788,25 @@ public class TestGravitinoDriverPlugin {
     SparkConf sparkConf = new SparkConf(false);
     sparkConf.set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.TOKEN_AUTH_TYPE);
     return sparkConf;
+  }
+
+  /** Makes a mocked session with the given token settings the active session. */
+  private static MockedStatic<SparkSession> mockActiveSession(
+      @Nullable String tokenFile, @Nullable String tokenValue) {
+    RuntimeConfig sessionConf = mock(RuntimeConfig.class);
+    when(sessionConf.getOption(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE))
+        .thenReturn(Option.apply(tokenFile));
+    when(sessionConf.getOption(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE))
+        .thenReturn(Option.apply(tokenValue));
+    SparkSession session = mock(SparkSession.class);
+    when(session.conf()).thenReturn(sessionConf);
+    MockedStatic<SparkSession> sparkSessions = Mockito.mockStatic(SparkSession.class);
+    try {
+      sparkSessions.when(SparkSession::getActiveSession).thenReturn(Option.apply(session));
+    } catch (RuntimeException e) {
+      sparkSessions.close();
+      throw e;
+    }
+    return sparkSessions;
   }
 }

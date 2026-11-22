@@ -39,7 +39,7 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 | spark.sql.gravitino.client.                      | string  | (none)        | The configuration key prefix for the Gravitino client config.                                                                                                            | No       |
 | spark.sql.gravitino.authType                     | string  | `simple`      | The authentication type, one of `simple`, `basic`, `oauth2`, `kerberos`, `token`.                                                                                        | No       |
 | spark.sql.gravitino.token.value                  | string  | (none)        | The bearer token to present to Gravitino, used when `authType` is `token`.                                                                                               | No       |
-| spark.sql.gravitino.token.file                   | string  | (none)        | Path to a file holding the bearer token. Takes precedence over `token.value` and is re-read per request.                                                                 | No       |
+| spark.sql.gravitino.token.file                   | string  | (none)        | Path to a file holding the bearer token. Wins over a `token.value` set in the same session or application configuration, and is re-read per request.                     | No       |
 | spark.sql.gravitino.token.principalFields        | string  | `sub`         | Comma separated, ordered JWT claim names used to identify the caller in `token` mode.                                                                                    | No       |
 | spark.sql.gravitino.clientCacheMaxSize           | int     | `100`         | The maximum number of Gravitino clients cached, one per identity.                                                                                                        | No       |
 | spark.sql.gravitino.clientCacheTtlSec            | long    | `3600`        | Evicts a cached Gravitino client this many seconds after it was last used.                                                                                               | No       |
@@ -65,13 +65,14 @@ for supported client configuration.
 
 ### Per-user identity in `token` mode
 
-When `spark.sql.gravitino.authType` is `token`, the connector presents the bearer token found in
-`spark.sql.gravitino.token.file`, or failing that `spark.sql.gravitino.token.value`, resolving it again on
-every request and reading the active Spark session's configuration in preference to the
-application's. Spark copies the application's `spark.sql.*` settings into every session, so a
-session value identical to the application's counts as the application's; a session that wants its
-own token must set a value different from the application's. The identity of the caller is taken
-from the JWT claim named by
+When `spark.sql.gravitino.authType` is `token`, the connector presents a bearer token and resolves it
+again on every request. A token that the active Spark session sets, through
+`spark.sql.gravitino.token.file` or `spark.sql.gravitino.token.value`, wins over the application's.
+If the session sets both, or the application sets both, `token.file` wins over `token.value`.
+Spark copies the application's configuration into every session, so a session setting equal to the
+application's counts as the application's; a session that wants its own token must set a token file
+or token value different from the application's. The identity of the caller is taken from the JWT
+claim named by
 `spark.sql.gravitino.token.principalFields`, which should be set to match the server's
 `gravitino.authenticator.oauth.principalFields` so that the connector and the server agree on who
 is asking. The claim is read without verifying the signature, because validating the token remains

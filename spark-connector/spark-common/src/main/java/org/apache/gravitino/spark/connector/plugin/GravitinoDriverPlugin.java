@@ -361,30 +361,28 @@ public class GravitinoDriverPlugin implements DriverPlugin {
    * Resolves the bearer token to present to Gravitino for the operation running on the current
    * thread.
    *
-   * <p>Resolution is scope-first: the active Spark session's own token configuration wins over the
-   * application's, so a shared driver can carry a different end user's token per session even when
-   * the application configures a token file of its own. Within one scope, {@code tokenFile} wins
-   * over {@code token}, so a token refreshed on disk is picked up without touching the
-   * configuration. Neither the token nor any prefix of it is ever logged.
+   * <p>The active Spark session's own token, from either property, wins over the application's, so
+   * a shared driver can carry a different end user's token per session even when the application
+   * configures a token file of its own. Within one scope, {@code token.file} wins over {@code
+   * token.value}, so a token refreshed on disk is picked up without touching the configuration.
+   * Neither the token nor any prefix of it is ever logged.
    *
-   * <p>A session inherits the application's non-static {@code spark.sql.*} settings at creation
-   * (Spark merges the application SparkConf into the session configuration), so a value equal to
-   * the application's is treated as inherited rather than session-set; see {@link #sessionConfig}.
+   * <p>A session starts with a copy of the application's configuration, so a session value equal to
+   * the application's is treated as inherited rather than set by the session.
    *
    * @param sparkConf the application Spark configuration, used when no session sets a token
    * @return the bearer token, never blank
-   * @throws IllegalArgumentException if neither token property is set
+   * @throws IllegalArgumentException if neither token property is set, or the token that applies is
+   *     blank
    * @throws UncheckedIOException if the configured token file cannot be read
    */
   public static String resolveToken(SparkConf sparkConf) {
     Option<SparkSession> activeSession = SparkSession.getActiveSession();
-    if (activeSession.isDefined()) {
-      String token = tokenFromSession(activeSession.get(), sparkConf);
-      if (StringUtils.isNotBlank(token)) {
-        return token.trim();
-      }
+    String token =
+        activeSession.isDefined() ? tokenFromSession(activeSession.get(), sparkConf) : null;
+    if (token == null) {
+      token = tokenFromApplication(sparkConf);
     }
-    String token = tokenFromApplication(sparkConf);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(token),
         String.format(
@@ -406,14 +404,15 @@ public class GravitinoDriverPlugin implements DriverPlugin {
 
   /**
    * Resolves the token from one configuration scope, applying the within-scope rule that {@code
-   * tokenFile} wins over {@code token}.
+   * token.file} wins over {@code token.value}.
    *
    * @param tokenFile the token file configured in this scope, nullable
    * @param tokenValue the literal token configured in this scope, nullable
    * @return the token for this scope, or null when the scope configures neither
    */
   @Nullable
-  private static String resolveScopedToken(String tokenFile, String tokenValue) {
+  private static String resolveScopedToken(
+      @Nullable String tokenFile, @Nullable String tokenValue) {
     return StringUtils.isNotBlank(tokenFile) ? readTokenFile(tokenFile) : tokenValue;
   }
 
@@ -435,14 +434,10 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   /**
    * Returns the value the session itself set for the key, or null when the session did not set it.
    *
-   * <p>Spark copies the application's non-static {@code spark.sql.*} settings into every session's
-   * configuration at session creation, so an inherited value is indistinguishable from a
-   * session-set one except by comparison with the application configuration. A session value equal
-   * to the application's is therefore treated as inherited; a session deliberately setting the same
-   * token value as the application resolves identically either way, and a session that deliberately
-   * re-sets the application's token file path is treated as inherited too. The session-wins
-   * precedence is restored for every configuration a session can distinguish; the equal-value
-   * corners are the irreducible cost of the seeding.
+   * <p>Spark copies the application's configuration into every session's configuration at session
+   * creation, and only comparison with the application configuration tells an inherited value from
+   * one the session set. A session value equal to the application's is therefore treated as
+   * inherited, even when the session set it deliberately.
    *
    * @param sessionConf the active session's configuration
    * @param sparkConf the application Spark configuration
