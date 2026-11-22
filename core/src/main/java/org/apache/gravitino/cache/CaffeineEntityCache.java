@@ -43,6 +43,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,6 +93,15 @@ public class CaffeineEntityCache extends BaseEntityCache {
           new ThreadPoolExecutor.CallerRunsPolicy());
 
   private static final Logger LOG = LoggerFactory.getLogger(CaffeineEntityCache.class.getName());
+
+  /**
+   * Separates {@link NameIdentifier} levels in a cache key. See {@link
+   * #invalidateHierarchy(EntityCacheKey)} for why it is not the only child boundary.
+   */
+  public static final String NAME_LEVEL_BOUNDARY = ".";
+
+  /** Escapes {@link #NAME_LEVEL_BOUNDARY} and itself inside a level of an index key. */
+  private static final char INDEX_ESCAPE = '\u0001';
 
   /** Segmented locking for better concurrency */
   private final SegmentedLock segmentedLock;
@@ -356,6 +366,62 @@ public class CaffeineEntityCache extends BaseEntityCache {
    */
   private static String indexKey(EntityCacheKey key) {
     return indexText(key.identifier()) + ":" + key.entityType();
+  }
+
+  /**
+   * Joins the levels of an identifier into prefix-index text.
+   *
+   * <p>{@link NameIdentifier#toString()} is not one-to-one when a level contains {@code "."}: table
+   * {@code a.b} in schema {@code sch} and table {@code b} in schema {@code sch.a} both render as
+   * {@code sch.a.b}. Escaping {@code "."} and the escape character inside each level makes the text
+   * unique, while every real level boundary stays a bare {@code "."}, so both prefix scans in
+   * {@link #invalidateHierarchy(EntityCacheKey)} still match exactly the descendants. The schema
+   * separator can be neither {@code "."} nor the escape character (see {@link
+   * Configs#SCHEMA_SEPARATOR}), so it is kept as is.
+   *
+   * @param ident The identifier to encode.
+   * @return The escaped index text for {@code ident}.
+   */
+  public static String indexText(NameIdentifier ident) {
+    StringBuilder text = new StringBuilder();
+    for (String level : ident.namespace().levels()) {
+      appendEscaped(text, level).append(NAME_LEVEL_BOUNDARY);
+    }
+    return appendEscaped(text, ident.name()).toString();
+  }
+
+  /**
+   * Returns the descendant index prefixes used when cascading from {@code ident}.
+   *
+   * <p>Same prefixes {@link #invalidateHierarchy} uses. Does not include {@code ident} itself.
+   *
+   * @param ident The ancestor identifier.
+   * @param type The ancestor entity type.
+   * @return One or two prefixes ending at a name-level or schema-separator boundary.
+   */
+  public static List<String> descendantPrefixes(NameIdentifier ident, Entity.EntityType type) {
+    String identifier = indexText(ident);
+    List<String> prefixes = Lists.newArrayListWithCapacity(2);
+    prefixes.add(identifier + NAME_LEVEL_BOUNDARY);
+    if (type == Entity.EntityType.SCHEMA) {
+      prefixes.add(identifier + HierarchicalSchemaUtil.schemaSeparator());
+    }
+    return prefixes;
+  }
+
+  /**
+   * Appends a level to prefix-index text, prefixing {@code "."} and the escape character with the
+   * escape character.
+   */
+  private static StringBuilder appendEscaped(StringBuilder text, String level) {
+    for (int i = 0; i < level.length(); i++) {
+      char c = level.charAt(i);
+      if (c == INDEX_ESCAPE || c == NAME_LEVEL_BOUNDARY.charAt(0)) {
+        text.append(INDEX_ESCAPE);
+      }
+      text.append(c);
+    }
+    return text;
   }
 
   /**

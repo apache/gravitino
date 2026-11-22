@@ -41,6 +41,7 @@ import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.BaseEntityCache;
+import org.apache.gravitino.cache.CaffeineEntityCache;
 import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.EntityCacheKey;
@@ -160,7 +161,8 @@ public class TestRelationalEntityStore {
     @SuppressWarnings("unchecked")
     Map<String, AtomicInteger> pendingHierarchyPrefixes =
         (Map<String, AtomicInteger>) FieldUtils.readField(store, "pendingHierarchyPrefixes", true);
-    for (String prefix : BaseEntityCache.descendantPrefixes(catalog, Entity.EntityType.CATALOG)) {
+    for (String prefix :
+        CaffeineEntityCache.descendantPrefixes(catalog, Entity.EntityType.CATALOG)) {
       pendingHierarchyPrefixes.put(prefix, new AtomicInteger(1));
     }
 

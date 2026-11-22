@@ -58,6 +58,7 @@ import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.BaseEntityCache;
 import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
+import org.apache.gravitino.cache.CaffeineEntityCache;
 import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.EntityCacheKey;
@@ -943,7 +944,7 @@ public class RelationalEntityStore
           }
           return count.decrementAndGet() == 0 ? null : count;
         });
-    for (String prefix : BaseEntityCache.descendantPrefixes(ident, entityType)) {
+    for (String prefix : CaffeineEntityCache.descendantPrefixes(ident, entityType)) {
       pendingHierarchyPrefixes.compute(
           prefix,
           (ignored, count) -> {
@@ -970,7 +971,7 @@ public class RelationalEntityStore
     if (pendingHierarchyPrefixes.isEmpty()) {
       return false;
     }
-    String text = BaseEntityCache.indexText(ident);
+    String text = CaffeineEntityCache.indexText(ident);
     for (Map.Entry<String, AtomicInteger> entry : pendingHierarchyPrefixes.entrySet()) {
       AtomicInteger count = entry.getValue();
       if (count != null && count.get() > 0 && text.startsWith(entry.getKey())) {

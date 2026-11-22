@@ -410,4 +410,37 @@ public class TestCaffeineEntityCacheInvalidation {
     Assertions.assertEquals(0, cache.size());
     Assertions.assertFalse(cache.contains(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
   }
+
+  @Test
+  void testDescendantPrefixesUseNameLevelBoundary() {
+    NameIdentifier catalog1 = NameIdentifier.of("metalake", "catalog1");
+    java.util.List<String> prefixes =
+        CaffeineEntityCache.descendantPrefixes(catalog1, Entity.EntityType.CATALOG);
+
+    Assertions.assertEquals(1, prefixes.size());
+    Assertions.assertTrue(
+        CaffeineEntityCache.indexText(NameIdentifier.of("metalake", "catalog1", "schema"))
+            .startsWith(prefixes.get(0)));
+    Assertions.assertFalse(
+        CaffeineEntityCache.indexText(NameIdentifier.of("metalake", "catalog10"))
+            .startsWith(prefixes.get(0)));
+    Assertions.assertFalse(
+        CaffeineEntityCache.indexText(NameIdentifier.of("metalake", "catalog1"))
+            .startsWith(prefixes.get(0)));
+  }
+
+  @Test
+  void testSchemaAddsHierarchicalSeparatorPrefix() {
+    NameIdentifier schema = NameIdentifier.of("metalake", "catalog", "schema");
+    java.util.List<String> prefixes =
+        CaffeineEntityCache.descendantPrefixes(schema, Entity.EntityType.SCHEMA);
+
+    Assertions.assertEquals(2, prefixes.size());
+    Assertions.assertEquals(
+        CaffeineEntityCache.indexText(schema) + CaffeineEntityCache.NAME_LEVEL_BOUNDARY,
+        prefixes.get(0));
+    Assertions.assertEquals(
+        CaffeineEntityCache.indexText(schema) + HierarchicalSchemaUtil.schemaSeparator(),
+        prefixes.get(1));
+  }
 }
