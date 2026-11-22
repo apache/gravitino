@@ -606,12 +606,12 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   /**
    * Loads a Gravitino view as a Spark Table when {@link #loadTable(Identifier)} fails because the
-   * object is a view. Subclasses can override {@link #createSparkView} to enable view support. A
-   * view the caller is denied from loading returns the authorization placeholder instead, mirroring
-   * denied tables.
+   * object is a view. Subclasses can override {@link #createSparkView} to enable view support. When
+   * {@link #supportsSparkViews} is true, a view the caller is denied from loading returns the
+   * authorization placeholder instead, as a denied table does.
    *
    * @param ident the identifier to load
-   * @return Spark Table wrapping the view
+   * @return Spark Table wrapping the view, or the authorization placeholder of a denied view
    * @throws NoSuchTableException if no view exists or views are not supported by this catalog
    */
   protected Table loadViewAsTable(Identifier ident) throws NoSuchTableException {
@@ -622,9 +622,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
               .asViewCatalog()
               .loadView(NameIdentifier.of(getDatabase(ident), ident.name()));
     } catch (ForbiddenException e) {
-      // Mirror the table branch of loadTable: a denied view must surface the authorization
-      // failure through the placeholder for RequiredPrivilegesCheck to report during analysis,
-      // not mask it as "table or view not found".
+      // Only a catalog that can read the view reports the denial. The server also denies a name
+      // that does not exist when its catalog has no views.
+      if (!supportsSparkViews()) {
+        throw new NoSuchTableException(ident);
+      }
       return AuthorizationTable.deny(
           ident.name(),
           String.format("%s.%s.%s", catalogName, getDatabase(ident), ident.name()),
@@ -637,6 +639,17 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     // avoiding the RuntimeException wrapping in loadSparkTable.
     Table sparkTable = sparkCatalog.loadTable(ident);
     return createSparkView(ident, gravitinoView, sparkTable);
+  }
+
+  /**
+   * Returns whether this catalog reads Gravitino views, so that a denied view lookup is reported as
+   * denied rather than as not found. Subclasses that override {@link #createSparkView} must return
+   * true.
+   *
+   * @return true if this catalog reads views
+   */
+  protected boolean supportsSparkViews() {
+    return false;
   }
 
   /**
