@@ -148,17 +148,26 @@ public class TestRelationalEntityStore {
   }
 
   @Test
-  void testOverwriteInvalidatesCacheAfterBackendInsert()
+  void testOverwriteDropsCacheBeforeBackendInsert()
       throws IOException, EntityAlreadyExistsException, IllegalAccessException {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "topic");
+    EntityCacheKey key = EntityCacheKey.of(ident, Entity.EntityType.TOPIC);
     TopicEntity topic = Mockito.mock(TopicEntity.class);
     Mockito.when(topic.nameIdentifier()).thenReturn(ident);
     Mockito.when(topic.type()).thenReturn(Entity.EntityType.TOPIC);
     NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    @SuppressWarnings("unchecked")
+    Map<EntityCacheKey, AtomicInteger> pendingWrites =
+        (Map<EntityCacheKey, AtomicInteger>) FieldUtils.readField(store, "pendingWrites", true);
+    AtomicBoolean invalidatedBeforeBackend = new AtomicBoolean(false);
+    AtomicBoolean pendingDuringBackend = new AtomicBoolean(false);
 
     Mockito.doAnswer(
             invocation -> {
-              Mockito.verify(cache, Mockito.never()).invalidate(ident, Entity.EntityType.TOPIC);
+              Mockito.verify(cache).invalidate(ident, Entity.EntityType.TOPIC);
+              invalidatedBeforeBackend.set(true);
+              AtomicInteger count = pendingWrites.get(key);
+              pendingDuringBackend.set(count != null && count.get() > 0);
               return null;
             })
         .when(backend)
@@ -166,9 +175,9 @@ public class TestRelationalEntityStore {
 
     store.put(topic, true);
 
-    InOrder inOrder = Mockito.inOrder(backend, cache);
-    inOrder.verify(backend).insert(topic, true);
-    inOrder.verify(cache).invalidate(ident, Entity.EntityType.TOPIC);
+    Assertions.assertTrue(invalidatedBeforeBackend.get());
+    Assertions.assertTrue(pendingDuringBackend.get());
+    Assertions.assertFalse(pendingWrites.containsKey(key));
     Mockito.verify(cache, Mockito.never()).put(topic);
   }
 

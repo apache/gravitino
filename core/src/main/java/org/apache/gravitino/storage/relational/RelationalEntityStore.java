@@ -285,33 +285,39 @@ public class RelationalEntityStore
   @Override
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
+    NameIdentifier ident = e.nameIdentifier();
+    Entity.EntityType entityType = e.type();
+    if (overwritten) {
+      // Drop the cache and block refill before the overwrite commits. Do not publish {@code e}:
+      // the database may keep the identity and version of the row it already had, so the handed-in
+      // copy can disagree with what a later backend read returns.
+      beginPendingWrite(ident, entityType);
+      try {
+        try {
+          backend.insert(e, true);
+        } catch (RuntimeException re) {
+          throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
+        }
+      } finally {
+        endPendingWrite(ident, entityType);
+      }
+      return;
+    }
+
     long epochBeforeWrite = cacheInvalidationEpoch.get();
     try {
-      backend.insert(e, overwritten);
+      backend.insert(e, false);
     } catch (RuntimeException re) {
-      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, e.type(), e.nameIdentifier());
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
     }
-    if (overwritten) {
-      // An overwrite is resolved by the database, which may keep the identity and version of the
-      // row it already had. Caching the copy handed in here would publish values the stored row
-      // does not carry, so the next read is served from the backend instead.
-      invalidateCache(e.nameIdentifier(), e.type());
-    } else {
-      cacheIfEpochUnchanged(e, epochBeforeWrite);
-    }
+    cacheIfEpochUnchanged(e, epochBeforeWrite);
   }
 
   @Override
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    EntityCacheKey key = EntityCacheKey.of(ident, entityType);
-    cache.withCacheLock(
-        key,
-        () -> {
-          invalidateCache(ident, entityType);
-          pendingWrites.computeIfAbsent(key, ignored -> new AtomicInteger()).incrementAndGet();
-        });
+    beginPendingWrite(ident, entityType);
     try {
       try {
         return backend.update(ident, entityType, updater);
@@ -319,15 +325,7 @@ public class RelationalEntityStore
         throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
       }
     } finally {
-      cache.withCacheLock(
-          key,
-          () -> {
-            AtomicInteger count = pendingWrites.get(key);
-            if (count != null && count.decrementAndGet() == 0) {
-              pendingWrites.remove(key);
-            }
-            cacheInvalidationEpoch.incrementAndGet();
-          });
+      endPendingWrite(ident, entityType);
     }
   }
 
@@ -900,6 +898,45 @@ public class RelationalEntityStore
     // backend after the change that triggered the invalidation is visible.
     cacheInvalidationEpoch.incrementAndGet();
     cache.invalidate(ident, type);
+  }
+
+  /**
+   * Invalidates {@code ident} and marks it pending so readers skip and do not refill the key until
+   * {@link #endPendingWrite} runs.
+   */
+  private void beginPendingWrite(NameIdentifier ident, Entity.EntityType entityType) {
+    EntityCacheKey key = EntityCacheKey.of(ident, entityType);
+    cache.withCacheLock(
+        key,
+        () -> {
+          invalidateCache(ident, entityType);
+          pendingWrites.compute(
+              key,
+              (ignored, count) -> {
+                if (count == null) {
+                  return new AtomicInteger(1);
+                }
+                count.incrementAndGet();
+                return count;
+              });
+        });
+  }
+
+  private void endPendingWrite(NameIdentifier ident, Entity.EntityType entityType) {
+    EntityCacheKey key = EntityCacheKey.of(ident, entityType);
+    cache.withCacheLock(
+        key,
+        () -> {
+          pendingWrites.compute(
+              key,
+              (ignored, count) -> {
+                if (count == null) {
+                  return null;
+                }
+                return count.decrementAndGet() == 0 ? null : count;
+              });
+          cacheInvalidationEpoch.incrementAndGet();
+        });
   }
 
   private boolean isPendingWrite(NameIdentifier ident, Entity.EntityType entityType) {
