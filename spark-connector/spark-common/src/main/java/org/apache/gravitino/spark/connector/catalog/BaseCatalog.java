@@ -511,6 +511,10 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
           .alterTable(NameIdentifier.of(getDatabase(oldIdent), oldIdent.name()), rename);
     } catch (org.apache.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(oldIdent);
+    } catch (org.apache.gravitino.exceptions.TableAlreadyExistsException e) {
+      // Mirror createTable: a rename onto an existing name must surface as Spark's
+      // already-exists analysis error, which this method declares, not a raw runtime error.
+      throw new TableAlreadyExistsException(newIdent);
     }
   }
 
