@@ -22,16 +22,23 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -62,6 +69,8 @@ import org.apache.hadoop.util.Progressable;
 import org.junit.jupiter.api.Test;
 
 public class TestBaseGVFSOperationsSecrets {
+  private static final NameIdentifier PROBE_IDENT =
+      NameIdentifier.of("ml", "catalog", "schema", "fs");
 
   @Test
   public void testMergeSecrets() throws Exception {
@@ -301,6 +310,36 @@ public class TestBaseGVFSOperationsSecrets {
   }
 
   @Test
+  void testCredentialVendingReusesLoadedFileset() throws Exception {
+    Catalog catalog =
+        mockCatalogWithCredentials(Map.of("s3-endpoint", "http://s3.example.com"), null);
+    FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
+    Fileset fileset = filesetCatalog.loadFileset(NameIdentifier.of("schema", "fs"));
+    when(fileset.storageLocations()).thenReturn(Map.of("default", "s3a://bucket/data"));
+    SupportsCredentials filesetCredentials = mock(SupportsCredentials.class);
+    when(fileset.supportsCredentials()).thenReturn(filesetCredentials);
+    when(filesetCredentials.getCredentials())
+        .thenReturn(
+            new Credential[] {
+              new S3TokenCredential("SCOPED", "scoped-secret", "token", Long.MAX_VALUE)
+            });
+    TestOps ops = spy(opsFor(catalog));
+    NameIdentifier ident = NameIdentifier.of("ml", "catalog", "schema", "fs");
+    doReturn(true).when(ops).enableCredentialVending();
+    doReturn(mock(FileSystem.class)).when(ops).getActualFileSystemByPath(any(Path.class), anyMap());
+    clearInvocations(filesetCatalog);
+
+    ops.getActualFileSystemByLocationName(ident, "default");
+
+    // Expected values: the resolution and credential vending call getFileset as before, while the
+    // catalog and the fileset are each loaded once during the resolution.
+    verify(ops, times(2)).getFileset(ident);
+    verify(ops.getGravitinoClient(), times(1)).loadCatalog("catalog");
+    verify(filesetCatalog, times(1)).loadFileset(NameIdentifier.of("schema", "fs"));
+    verify(filesetCredentials, times(1)).getCredentials();
+  }
+
+  @Test
   public void testRestFailureDoesNotCacheEmptyStaticCredentials() throws Exception {
     SupportsCredentials credentials = mock(SupportsCredentials.class);
     when(credentials.getCredentials())
@@ -344,7 +383,59 @@ public class TestBaseGVFSOperationsSecrets {
     return opsFor(catalog).getAllProperties(NameIdentifier.of("ml", "catalog", "schema", "fs"));
   }
 
+  @Test
+  void testOverriddenFilesetCatalogDoesNotChangePropertiesSource() throws Exception {
+    ScopeProbeOps ops = new ScopeProbeOps(probeCatalog("server"));
+    ops.hookCatalog = probeCatalog("hook").asFilesetCatalog();
+
+    ops.getActualFileSystemByLocationName(PROBE_IDENT, "default");
+
+    // Expected value: as before the operation scope, getAllProperties reads the fileset from the
+    // catalog loaded through the client, not the one loaded through the overriding hook.
+    assertEquals("server", ops.props.get(0).get("probe"));
+  }
+
+  @Test
+  void testNestedOperationsInstancesDoNotShareScope() throws Exception {
+    ScopeProbeOps outer = new ScopeProbeOps(probeCatalog("outer"));
+    Catalog innerCatalog = probeCatalog("inner");
+    FilesetCatalog innerFilesetCatalog = innerCatalog.asFilesetCatalog();
+    ScopeProbeOps inner = new ScopeProbeOps(innerCatalog);
+    outer.inner = inner;
+    clearInvocations(innerFilesetCatalog);
+
+    outer.getActualFileSystemByLocationName(PROBE_IDENT, "default");
+
+    // Expected values: each instance resolves its own fileset within its own scope, so each loads
+    // its catalog and its fileset once.
+    assertEquals("outer", outer.props.get(0).get("probe"));
+    assertEquals("inner", inner.props.get(0).get("probe"));
+    verify(outer.client, times(1)).loadCatalog("catalog");
+    verify(inner.client, times(1)).loadCatalog("catalog");
+    verify(innerFilesetCatalog, times(1)).loadFileset(NameIdentifier.of("schema", "fs"));
+
+    // A later resolution on the same thread opens a new scope and loads the catalog again.
+    outer.inner = null;
+    outer.getActualFileSystemByLocationName(PROBE_IDENT, "default");
+    verify(outer.client, times(2)).loadCatalog("catalog");
+  }
+
+  /** Mocks a catalog whose fileset carries the given marker in its properties. */
+  private static Catalog probeCatalog(String marker) {
+    Catalog catalog = mockCatalogWithCredentials(Map.of(), null);
+    Fileset fileset = catalog.asFilesetCatalog().loadFileset(NameIdentifier.of("schema", "fs"));
+    when(fileset.properties()).thenReturn(Map.of("probe", marker));
+    when(fileset.storageLocations()).thenReturn(Map.of("default", "s3a://bucket/data"));
+    return catalog;
+  }
+
   private static TestOps opsFor(Catalog catalog) {
+    GravitinoClient client = mock(GravitinoClient.class);
+    when(client.loadCatalog("catalog")).thenReturn(catalog);
+    return new TestOps(opsConf(), client);
+  }
+
+  private static Configuration opsConf() {
     Configuration conf = new Configuration();
     conf.setBoolean(
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_AUTO_CREATE_LOCATION, false);
@@ -352,9 +443,7 @@ public class TestBaseGVFSOperationsSecrets {
     conf.set(
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY,
         "http://localhost:8090");
-    GravitinoClient client = mock(GravitinoClient.class);
-    when(client.loadCatalog("catalog")).thenReturn(catalog);
-    return new TestOps(conf, client);
+    return conf;
   }
 
   /** Mocks catalog/schema/fileset chain with the given catalog props and credentials. */
@@ -435,6 +524,136 @@ public class TestBaseGVFSOperationsSecrets {
       verify(filesetSecrets, times(2)).getSecrets();
     } finally {
       ops.close();
+    }
+  }
+
+  @Test
+  public void testGetSchemaLazyInitializesMetadataCache() throws Exception {
+    Catalog catalog = mock(Catalog.class);
+    Schema schema = mock(Schema.class);
+    SupportsSchemas schemas = mock(SupportsSchemas.class);
+    when(catalog.asSchemas()).thenReturn(schemas);
+    when(schemas.loadSchema("schema")).thenReturn(schema);
+
+    GravitinoClient client = mock(GravitinoClient.class);
+    when(client.loadCatalog("catalog")).thenReturn(catalog);
+
+    Configuration cachedConf = new Configuration();
+    cachedConf.set(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, "ml");
+    cachedConf.set(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY,
+        "http://localhost:8090");
+    cachedConf.setBoolean(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE, true);
+
+    NameIdentifier schemaIdent = NameIdentifier.of("ml", "catalog", "schema");
+    try (TestOps cachedOps = new TestOps(cachedConf, client)) {
+      assertSame(schema, cachedOps.getSchema(schemaIdent));
+      assertSame(schema, cachedOps.getSchema(schemaIdent));
+      verify(client, times(1)).loadCatalog("catalog");
+      verify(schemas, times(1)).loadSchema("schema");
+    }
+
+    Configuration uncachedConf = new Configuration();
+    uncachedConf.set(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, "ml");
+    uncachedConf.set(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY,
+        "http://localhost:8090");
+    try (TestOps uncachedOps = new TestOps(uncachedConf, client)) {
+      assertSame(schema, uncachedOps.getSchema(schemaIdent));
+      verify(client, times(2)).loadCatalog("catalog");
+      verify(schemas, times(2)).loadSchema("schema");
+    }
+  }
+
+  @Test
+  void testCustomGetFilesetWithSecretsDoesNotChangeBackendProperties() throws Exception {
+    for (boolean enableCache : new boolean[] {false, true}) {
+      Catalog clientCatalog = mockCatalogWithCredentials(Map.of("c-prop", "client"), null);
+      Fileset clientFileset =
+          clientCatalog.asFilesetCatalog().loadFileset(NameIdentifier.of("schema", "fs"));
+      SupportsSecrets clientSecrets = mock(SupportsSecrets.class);
+      when(clientSecrets.getSecrets()).thenReturn(Map.of("fs-secret", "client-secret"));
+      when(clientFileset.properties()).thenReturn(Map.of("fs-prop", "client-val"));
+      when(clientFileset.supportsSecrets()).thenReturn(clientSecrets);
+      when(clientFileset.storageLocations()).thenReturn(Map.of("default", "s3a://client/data"));
+
+      Fileset hookFileset = mock(Fileset.class);
+      SupportsSecrets hookSecrets = mock(SupportsSecrets.class);
+      when(hookSecrets.getSecrets())
+          .thenReturn(Map.of("fs-secret", "hook-secret", "hook-only", "x"));
+      when(hookFileset.properties()).thenReturn(Map.of("fs-prop", "hook-val"));
+      when(hookFileset.supportsSecrets()).thenReturn(hookSecrets);
+      when(hookFileset.storageLocations()).thenReturn(Map.of("default", "s3a://hook/data"));
+
+      try (ScopeProbeOps ops = new ScopeProbeOps(clientCatalog, enableCache)) {
+        ops.hookFileset = hookFileset;
+        ops.getActualFileSystemByLocationName(PROBE_IDENT, "default");
+
+        assertEquals(List.of(new Path("s3a://hook/data")), ops.paths);
+        assertEquals("client-val", ops.props.get(0).get("fs-prop"));
+        assertEquals("client-secret", ops.props.get(0).get("fs-secret"));
+        assertFalse(ops.props.get(0).containsKey("hook-only"));
+      }
+    }
+  }
+
+  @Test
+  void testCreateFilesetLocationUsesHookCatalogDisableFilesystemOpsFlag() throws Exception {
+    java.nio.file.Path tempRoot = Files.createTempDirectory("gvfs-hook-autocreate");
+    java.nio.file.Path missingDir = tempRoot.resolve("missing-hook-dir");
+    String missingUri = missingDir.toUri().toString();
+
+    Catalog clientCatalog =
+        mockCatalogWithCredentials(Map.of("disable-filesystem-ops", "false"), null);
+    Fileset clientFileset =
+        clientCatalog.asFilesetCatalog().loadFileset(NameIdentifier.of("schema", "fs"));
+    when(clientFileset.storageLocations())
+        .thenReturn(Map.of("default", tempRoot.resolve("client-dir").toUri().toString()));
+
+    Catalog hookCatalog = mock(Catalog.class, withSettings().extraInterfaces(FilesetCatalog.class));
+    FilesetCatalog hookFilesetCatalog = (FilesetCatalog) hookCatalog;
+    Fileset hookFileset = mock(Fileset.class);
+    when(hookCatalog.properties()).thenReturn(Map.of("disable-filesystem-ops", "true"));
+    when(hookFilesetCatalog.loadFileset(NameIdentifier.of("schema", "fs"))).thenReturn(hookFileset);
+    when(hookFileset.properties())
+        .thenReturn(Map.of(Fileset.PROPERTY_DEFAULT_LOCATION_NAME, "default"));
+    when(hookFileset.storageLocations()).thenReturn(Map.of("default", missingUri));
+    when(hookFilesetCatalog.getFileLocation(NameIdentifier.of("schema", "fs"), "", null))
+        .thenReturn(missingUri);
+
+    GravitinoClient client = mock(GravitinoClient.class);
+    when(client.loadCatalog("catalog")).thenReturn(clientCatalog);
+
+    Configuration conf = new Configuration();
+    conf.setBoolean("fs.gvfs.impl.disable.cache", true);
+    conf.setBoolean(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_AUTO_CREATE_LOCATION, true);
+    conf.set(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, "ml");
+    conf.set(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY,
+        "http://localhost:8090");
+
+    try (DefaultGVFSOperations ops =
+        new DefaultGVFSOperations(conf) {
+          @Override
+          GravitinoClient getGravitinoClient() {
+            return client;
+          }
+
+          @Override
+          protected FilesetCatalog getFilesetCatalog(NameIdentifier catalogIdent) {
+            return hookFilesetCatalog;
+          }
+        }) {
+      FileStatus[] statuses = ops.listStatus(new Path("gvfs://fileset/catalog/schema/fs"));
+      assertEquals(0, statuses.length);
+      assertTrue(Files.isDirectory(missingDir));
+
+      // Verify a null catalog properties map on the hook catalog is safely ignored.
+      when(hookCatalog.properties()).thenReturn(null);
+      assertEquals(0, ops.listStatus(new Path("gvfs://fileset/catalog/schema/fs")).length);
     }
   }
 
@@ -519,5 +738,62 @@ public class TestBaseGVFSOperationsSecrets {
 
     @Override
     public void close() {}
+  }
+
+  /** Records the properties of each resolution and can override the scope-related hooks. */
+  private static class ScopeProbeOps extends DefaultGVFSOperations {
+    private final GravitinoClient client = mock(GravitinoClient.class);
+    private final List<Map<String, String>> props = new ArrayList<>();
+    private final List<Path> paths = new ArrayList<>();
+    private FilesetCatalog hookCatalog;
+    private Fileset hookFileset;
+    private ScopeProbeOps inner;
+
+    private ScopeProbeOps(Catalog catalog) {
+      this(catalog, false);
+    }
+
+    private ScopeProbeOps(Catalog catalog, boolean enableCache) {
+      super(opsConf(enableCache));
+      when(client.loadCatalog("catalog")).thenReturn(catalog);
+    }
+
+    private static Configuration opsConf(boolean enableCache) {
+      Configuration conf = TestBaseGVFSOperationsSecrets.opsConf();
+      conf.setBoolean(
+          GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE,
+          enableCache);
+      return conf;
+    }
+
+    @Override
+    GravitinoClient getGravitinoClient() {
+      return client;
+    }
+
+    @Override
+    protected FilesetCatalog getFilesetCatalog(NameIdentifier catalogIdent) {
+      return hookCatalog != null ? hookCatalog : super.getFilesetCatalog(catalogIdent);
+    }
+
+    @Override
+    protected Fileset getFileset(NameIdentifier filesetIdent) {
+      if (inner != null) {
+        // A hook that resolves through another operations instance on the same thread.
+        try {
+          inner.getActualFileSystemByLocationName(filesetIdent, "default");
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
+        }
+      }
+      return hookFileset != null ? hookFileset : super.getFileset(filesetIdent);
+    }
+
+    @Override
+    protected FileSystem getActualFileSystemByPath(Path path, Map<String, String> allProperties) {
+      paths.add(path);
+      props.add(allProperties);
+      return mock(FileSystem.class);
+    }
   }
 }

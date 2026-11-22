@@ -69,7 +69,7 @@ paths:
       summary: Create a domain
       operationId: createDomain
       description: >-
-        Creates a DRAFT domain, its optional parent edge and an optional new backing tag atomically. A failure leaves no new domain or tag behind. Requires MANAGE_DOMAIN on the metalake and, when specified, the parent. The backing tag must be explicit: create=true never adopts an existing tag and cannot include a value. Bindings use tag identity, so tag rename preserves a binding while delete/recreate does not. A tag can back one domain without a value, or multiple domains with distinct exact values; these forms cannot be mixed. A new tag additionally requires CREATE_TAG on the metalake; an existing tag requires ownership of that tag or the metalake. Hidden drafts return 404; other permission failures return 403.
+        Creates a DRAFT domain, its optional parent edge and an optional new backing tag atomically. A failure leaves no new domain or tag behind. Requires MANAGE_DOMAIN on the metalake and, when specified, the parent. The backing tag must be explicit: create=true creates a new valueless tag and never adopts an existing tag; create=false binds an existing tag whatever values it allows. Bindings use tag identity, so tag rename preserves a binding while delete/recreate does not. A tag backs at most one domain. Membership depends only on the presence of the tag; any value on an assignment is ignored. A new tag additionally requires CREATE_TAG on the metalake; an existing tag requires ownership of that tag or the metalake. Hidden drafts return 404; other permission failures return 403.
       requestBody:
         required: true
         content:
@@ -238,10 +238,12 @@ paths:
       summary: Delete a domain
       operationId: deleteDomain
       description: >-
-        Deletes only the domain and its parent edge. The backing tag, its assignments and member
-        metadata objects remain unchanged; member objects do not prevent deletion. Deletion does
-        not cascade to subdomains: a domain with subdomains fails with HTTP 409,
-        NonEmptyDomainException and error code 1005. Returns dropped=false if the domain is absent
+        Deletes only the domain and its parent edge. Only a draft domain can be deleted: deleting a
+        published domain fails with HTTP 400 and IllegalArgumentException; unpublish it first. The
+        backing tag, its assignments and member metadata objects remain unchanged; member objects
+        do not prevent deletion. Deletion does not cascade to subdomains: a draft domain with
+        subdomains fails with HTTP 409, NonEmptyDomainException and error code 1005. The status is checked
+        before the subdomains, so a published domain with subdomains fails with HTTP 400. Returns dropped=false if the domain is absent
         or is a draft hidden from the caller; a hidden draft is not deleted.
         Requires MANAGE_DOMAIN on the domain, inherited from its current parent or the metalake.
         Other permission failures return 403.
@@ -267,7 +269,7 @@ paths:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "409":
-          description: The metalake is disabled, the domain has subdomains, or the deletion conflicts with a concurrent update.
+          description: The metalake is disabled, the domain is a draft with subdomains, or the deletion conflicts with a concurrent update.
           content:
             application/json:
               schema:
@@ -367,7 +369,7 @@ paths:
       summary: Set or remove the backing tag
       operationId: setDomainBackingTag
       description: >-
-        Binds an existing tag with an optional exact value, or removes the binding when backingTag is null. Members are not migrated; previous tag assignments remain unchanged. Requires MANAGE_DOMAIN on the domain, inherited from its current parent or the metalake. Binding a tag additionally requires ownership of that tag or the metalake; removing a binding needs no tag privilege. Hidden drafts return 404; other permission failures return 403.
+        Binds an existing tag by name, whatever values it allows, or removes the binding when backingTag is null. A tag backs at most one domain. Members are not migrated; previous tag assignments remain unchanged. Requires MANAGE_DOMAIN on the domain, inherited from its current parent or the metalake. Binding a tag additionally requires ownership of that tag or the metalake; removing a binding needs no tag privilege. Hidden drafts return 404; other permission failures return 403.
       requestBody:
         required: true
         content:
@@ -732,10 +734,7 @@ components:
           properties:
             name:
               type: string
-            value:
-              type: string
-              nullable: true
-              description: Null matches any effective assignment of this tag, including valueless assignments.
+              description: The name of the backing tag. Objects that carry the tag are members whatever values the assignment has.
         audit:
           $ref: "./openapi.yaml#/components/schemas/Audit"
         relations:
@@ -831,16 +830,16 @@ components:
     BackingTag:
       type: object
       required: [name]
+      additionalProperties: false
       properties:
         name:
           type: string
           minLength: 1
-        value:
-          type: string
-          nullable: true
-          minLength: 1
-          maxLength: 256
-          description: Exact assignment value; null binds any effective assignment of the tag.
+          description: The name of the backing tag.
+        create:
+          type: boolean
+          default: false
+          description: True creates a new valueless tag. False binds an existing tag, whatever values it allows.
 
     DomainName:
       type: string
@@ -874,19 +873,11 @@ components:
               enum: [null]
           description: Optional top-level parent. A subdomain is created atomically under it.
         backingTag:
-          allOf:
-            - $ref: "#/components/schemas/BackingTag"
-            - type: object
-              properties:
-                create:
-                  type: boolean
-                  default: false
-                  description: True creates a new valueless tag; value must be null or omitted. False binds an existing tag.
+          $ref: "#/components/schemas/BackingTag"
       example:
         name: Finance
         backingTag:
-          name: department
-          value: finance
+          name: finance
           create: false
 
     DomainSetRequest:
@@ -917,16 +908,12 @@ components:
           type: object
           nullable: true
           required: [name]
+          additionalProperties: false
           properties:
             name:
               type: string
               minLength: 1
-            value:
-              type: string
-              nullable: true
-              minLength: 1
-              maxLength: 256
-              description: Exact assignment value; null binds any effective assignment of the tag.
+              description: The name of the existing tag to bind.
 
     DomainUpdatesRequest:
       type: object

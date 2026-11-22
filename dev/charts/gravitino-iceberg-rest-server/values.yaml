@@ -283,11 +283,12 @@ service:
   portName: http
   nodePort: ""
 
+## Keep "exec" on the start command so the JVM runs as PID 1 and receives SIGTERM on pod termination.
 initScript: |
   echo "Override config."
   cp /tmp/conf/* ${GRAVITINO_HOME}/conf
   echo "Start the Gravitino Iceberg Rest Catalog Server"
-  /bin/bash ${GRAVITINO_HOME}/bin/start-iceberg-rest-server.sh
+  exec /bin/bash ${GRAVITINO_HOME}/bin/start-iceberg-rest-server.sh
 
 ## Readiness probe for the Gravitino deployment
 ##

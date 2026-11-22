@@ -21,12 +21,11 @@ package org.apache.gravitino.secret;
 import com.google.common.base.Preconditions;
 
 /**
- * Mutable holder so {@code store.update} lambdas can record secret version changes.
- *
- * <p>Used by catalog, schema, and fileset alter paths that stage secret versions inside {@code
- * store.update}, commit them after the update and roll them back on failure.
+ * Mutable holder that records the secret version changes a catalog, schema, or fileset alter
+ * stages, including from inside a {@code store.update} lambda, so the alter path can commit them
+ * after the alter succeeds and roll them back if it fails.
  */
-public final class SecretMaterialsHolder {
+public final class SecretVersionChangesHolder {
 
   private SecretVersionChanges changes = SecretVersionChanges.EMPTY;
 

@@ -97,6 +97,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   private GravitinoCatalogManager catalogManager;
   private boolean enableIcebergSupport = false;
   private boolean enablePaimonSupport = false;
+  private boolean enableDorisSupport = false;
 
   /**
    * Creates the plugin from the classes a connector build supplies.
@@ -112,37 +113,30 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   @Override
   public Map<String, String> init(SparkContext sc, PluginContext pluginContext) {
     SparkConf conf = sc.conf();
-    String gravitinoUri = conf.get(GravitinoSparkConfig.GRAVITINO_URI);
-    String metalake = conf.get(GravitinoSparkConfig.GRAVITINO_METALAKE);
-    Map<String, String> gravitinoClientConfig = extractGravitinoClientConfig(conf);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(gravitinoUri),
-        String.format(
-            "%s:%s, should not be empty", GravitinoSparkConfig.GRAVITINO_URI, gravitinoUri));
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(metalake),
-        String.format(
-            "%s:%s, should not be empty", GravitinoSparkConfig.GRAVITINO_METALAKE, metalake));
-
-    registerOptInExtensions(conf);
-
-    this.catalogManager =
-        GravitinoCatalogManager.create(
-            conf,
-            sc.sparkUser(),
-            identity ->
-                createGravitinoClient(
-                    gravitinoUri, metalake, conf, sc.sparkUser(), gravitinoClientConfig));
-    catalogManager.loadRelationalCatalogs();
-    registerGravitinoCatalogs(conf, catalogManager.getCatalogs());
-    registerSqlExtensions(conf);
+    boolean failFast = conf.getBoolean(GravitinoSparkConfig.GRAVITINO_FAIL_FAST, false);
+    try {
+      initializeCatalogManager(sc, conf);
+      registerOptInExtensions(conf);
+    } catch (RuntimeException e) {
+      handleInitializationFailure(e, failFast);
+      return Collections.emptyMap();
+    }
+    try {
+      registerGravitinoCatalogs(conf, catalogManager.getCatalogs());
+      registerSqlExtensions(conf);
+    } catch (RuntimeException e) {
+      closeAfterInitializationFailure(e);
+      throw e;
+    }
     return Collections.emptyMap();
   }
 
   @Override
   public void shutdown() {
-    if (catalogManager != null) {
-      catalogManager.close();
+    GravitinoCatalogManager manager = catalogManager;
+    catalogManager = null;
+    if (manager != null) {
+      manager.close();
     }
   }
 
@@ -159,12 +153,36 @@ public class GravitinoDriverPlugin implements DriverPlugin {
                 LOG.warn("Skip registering {} because catalog provider is empty.", catalogName);
                 return;
               }
-              // The provider is read once, here, and every decision below is made from the kind, so
-              // no two places can disagree about what this catalog is.
+              String sparkCatalogConfigName = "spark.sql.catalog." + catalogName;
+              if (sparkConf.contains(sparkCatalogConfigName)) {
+                LOG.info(
+                    "Skip registering catalog {} because it is already configured in Spark.",
+                    catalogName);
+                return;
+              }
+              String extensionCatalogClassName = bindings.extensionCatalogClassName(provider);
+              if (extensionCatalogClassName != null) {
+                try {
+                  registerCatalogClass(sparkConf, catalogName, extensionCatalogClassName);
+                } catch (RuntimeException e) {
+                  LOG.warn("Register catalog {} failed.", catalogName, e);
+                }
+                return;
+              }
+              // Resolve the default kind from the provider. Opt-in settings below may select a
+              // specialized kind for the same provider.
               SparkCatalogKind kind = SparkCatalogKind.fromProvider(provider);
               if (kind == null) {
+                Preconditions.checkArgument(
+                    !provider.regionMatches(true, 0, "jdbc-", 0, 5),
+                    "Catalog %s has unsupported JDBC provider %s. It may be served by a separate extension jar.",
+                    catalogName,
+                    provider);
                 LOG.warn(
-                    "Skip registering {} because {} is not supported yet.", catalogName, provider);
+                    "Skip registering {} because {} is not supported yet. "
+                        + "It may be served by a separate extension jar.",
+                    catalogName,
+                    provider);
                 return;
               }
               if (SparkCatalogKind.LAKEHOUSE_ICEBERG.equals(kind) && !enableIcebergSupport) {
@@ -173,12 +191,12 @@ public class GravitinoDriverPlugin implements DriverPlugin {
               if (SparkCatalogKind.LAKEHOUSE_PAIMON.equals(kind) && !enablePaimonSupport) {
                 return;
               }
-              String sparkCatalogConfigName = "spark.sql.catalog." + catalogName;
-              if (sparkConf.contains(sparkCatalogConfigName)) {
-                LOG.info(
-                    "Skip registering catalog {} because it is already configured in Spark.",
-                    catalogName);
-                return;
+              if ("jdbc-doris".equalsIgnoreCase(provider) && enableDorisSupport) {
+                if (!bindings.catalogClassNames().containsKey(SparkCatalogKind.DORIS)) {
+                  throw new IllegalArgumentException(
+                      "Specialized Doris Spark support is unavailable in this Spark build");
+                }
+                kind = SparkCatalogKind.DORIS;
               }
               try {
                 registerCatalog(sparkConf, catalogName, kind);
@@ -206,12 +224,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
       return;
     }
 
-    String sparkCatalogConfigName = "spark.sql.catalog." + catalogName;
-    Preconditions.checkArgument(
-        !sparkConf.contains(sparkCatalogConfigName),
-        catalogName + " is already registered to SparkCatalogManager");
-    sparkConf.set(sparkCatalogConfigName, catalogClassName);
-    LOG.info("Register {} catalog to Spark catalog manager.", catalogName);
+    registerCatalogClass(sparkConf, catalogName, catalogClassName);
   }
 
   /**
@@ -239,6 +252,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, false);
     this.enablePaimonSupport =
         conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_PAIMON_SUPPORT, false);
+    this.enableDorisSupport =
+        conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_DORIS_SUPPORT, false);
     if (enablePaimonSupport) {
       registerPaimonExtensionsIfSupported();
     }
@@ -346,6 +361,16 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     return builder.build();
   }
 
+  private void registerCatalogClass(
+      SparkConf sparkConf, String catalogName, String catalogClassName) {
+    String sparkCatalogConfigName = "spark.sql.catalog." + catalogName;
+    Preconditions.checkArgument(
+        !sparkConf.contains(sparkCatalogConfigName),
+        catalogName + " is already registered to SparkCatalogManager");
+    sparkConf.set(sparkCatalogConfigName, catalogClassName);
+    LOG.info("Register {} catalog to Spark catalog manager.", catalogName);
+  }
+
   private static String getRequiredConfig(SparkConf sparkConf, String configKey) {
     String configValue = sparkConf.get(configKey, null);
     Preconditions.checkArgument(
@@ -442,5 +467,58 @@ public class GravitinoDriverPlugin implements DriverPlugin {
                             t -> t._2,
                             (oldVal, newVal) -> newVal)))
         .orElse(ImmutableMap.of());
+  }
+
+  private void initializeCatalogManager(SparkContext sc, SparkConf conf) {
+    String gravitinoUri = conf.get(GravitinoSparkConfig.GRAVITINO_URI, "");
+    String metalake = conf.get(GravitinoSparkConfig.GRAVITINO_METALAKE, "");
+    validateConnectionSettings(gravitinoUri, metalake);
+    Map<String, String> gravitinoClientConfig = extractGravitinoClientConfig(conf);
+    this.catalogManager =
+        GravitinoCatalogManager.create(
+            conf,
+            sc.sparkUser(),
+            identity ->
+                createGravitinoClient(
+                    gravitinoUri, metalake, conf, sc.sparkUser(), gravitinoClientConfig));
+    catalogManager.loadRelationalCatalogs();
+  }
+
+  private void handleInitializationFailure(RuntimeException failure, boolean failFast) {
+    closeAfterInitializationFailure(failure);
+    if (failFast) {
+      throw failure;
+    }
+    // Authentication failures can include credentials in exception messages.
+    LOG.warn(
+        "Failed to initialize the Gravitino Spark connector ({}). "
+            + "Gravitino catalogs will not be registered. Check the URI, metalake and authentication "
+            + "settings. Set {}=true to fail Spark startup instead.",
+        failure.getClass().getSimpleName(),
+        GravitinoSparkConfig.GRAVITINO_FAIL_FAST);
+  }
+
+  private void closeAfterInitializationFailure(RuntimeException failure) {
+    try {
+      shutdown();
+    } catch (RuntimeException closeFailure) {
+      if (closeFailure != failure) {
+        failure.addSuppressed(closeFailure);
+      }
+      LOG.warn(
+          "Failed to close the Gravitino catalog manager after initialization failed ({}).",
+          closeFailure.getClass().getSimpleName());
+    }
+  }
+
+  private static void validateConnectionSettings(String gravitinoUri, String metalake) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(gravitinoUri),
+        String.format(
+            "%s:%s, should not be empty", GravitinoSparkConfig.GRAVITINO_URI, gravitinoUri));
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(metalake),
+        String.format(
+            "%s:%s, should not be empty", GravitinoSparkConfig.GRAVITINO_METALAKE, metalake));
   }
 }

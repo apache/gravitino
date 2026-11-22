@@ -422,11 +422,13 @@ public class TestDomainAuthorizationOperations extends BaseOperationsTest {
   void parentOnlyManagerAndOwnerCanDeleteChildBeforeDetach() {
     for (Domain.Status status : Domain.Status.values()) {
       current.set(domain("Trading", "Finance", status));
+      // Authorization passes for both statuses; only a draft domain can then be deleted.
+      int expected = status == Domain.Status.DRAFT ? 200 : 400;
       allows.add("Finance:MANAGE_DOMAIN");
-      expect("DELETE", BASE + "/Trading", null, 200);
+      expect("DELETE", BASE + "/Trading", null, expected);
       allows.clear();
       owners.add("Finance");
-      expect("DELETE", BASE + "/Trading", null, 200);
+      expect("DELETE", BASE + "/Trading", null, expected);
       owners.clear();
     }
   }

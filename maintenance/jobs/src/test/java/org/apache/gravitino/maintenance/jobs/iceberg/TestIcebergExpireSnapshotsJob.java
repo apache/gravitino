@@ -25,6 +25,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
@@ -116,6 +119,7 @@ public class TestIcebergExpireSnapshotsJob {
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.type"));
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.uri"));
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.warehouse"));
+    assertEquals("{{catalog_name}}", configs.get("spark.sql.defaultCatalog"));
 
     // Verify Iceberg extensions
     assertTrue(configs.containsKey("spark.sql.extensions"));
@@ -258,6 +262,11 @@ public class TestIcebergExpireSnapshotsJob {
         "CALL `iceberg_prod`.system.expire_snapshots(table => 'db.sample', "
             + "older_than => TIMESTAMP '2024-01-01 00:00:00')",
         sql);
+    Clock fixed = Clock.fixed(Instant.parse("2024-06-15T12:00:00Z"), ZoneOffset.UTC);
+    assertEquals("2024-06-08 12:00:00Z", IcebergJobUtils.normalizeOlderThan("7", fixed));
+    assertEquals("2024-06-08 12:00:00Z", IcebergJobUtils.normalizeOlderThan("7d", fixed));
+    assertEquals(
+        "2024-01-01 00:00:00", IcebergJobUtils.normalizeOlderThan("2024-01-01 00:00:00", fixed));
   }
 
   @Test
@@ -324,6 +333,19 @@ public class TestIcebergExpireSnapshotsJob {
     // Test null and empty
     assertEquals(null, IcebergJobUtils.escapeSqlString(null));
     assertEquals("", IcebergJobUtils.escapeSqlString(""));
+  }
+
+  @Test
+  public void testEscapeSparkCallStringArg() {
+    // Doubles backslashes first, then encodes ' as \' (Spark CALL where => '...').
+    assertEquals(
+        "region = \\'a\"b\\\\\\\\c\\'",
+        IcebergJobUtils.escapeSparkCallStringArg("region = 'a\"b\\\\c'"));
+    assertEquals(
+        "(region = \\'O\\\\\\'Brien\\')",
+        IcebergJobUtils.escapeSparkCallStringArg("(region = 'O\\'Brien')"));
+    assertEquals(null, IcebergJobUtils.escapeSparkCallStringArg(null));
+    assertEquals("", IcebergJobUtils.escapeSparkCallStringArg(""));
   }
 
   @Test

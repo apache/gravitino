@@ -150,7 +150,7 @@ public class CommitJobPlanner {
         if (!Boolean.TRUE.equals(commitTrigger)) {
           continue;
         }
-        if (MaintenanceJobTemplates.maintenanceType(policy.policyType()).isEmpty()) {
+        if (!MaintenanceJobTemplates.isIcebergMaintenance(policy.policyType())) {
           continue;
         }
         chain.add(policy);
@@ -161,7 +161,7 @@ public class CommitJobPlanner {
       }
 
       long nowMs = System.currentTimeMillis();
-      List<PolicyEntity> due = new ArrayList<>();
+      List<PolicyEntity> readyPolicies = new ArrayList<>();
       for (PolicyEntity policy : chain) {
         Long contentMinInterval = null;
         if (policy.content() instanceof ExecutablePolicyContent) {
@@ -180,16 +180,21 @@ public class CommitJobPlanner {
               minIntervalMs);
           continue;
         }
-        due.add(policy);
+        readyPolicies.add(policy);
       }
-      if (due.isEmpty()) {
+      if (readyPolicies.isEmpty()) {
         LOG.debug(
             "Skipping commit-job schedule for table {}: all onCommit types within minIntervalMs",
             tableId);
         return Optional.empty();
       }
 
-      MaintenanceAuthConsistency.requireSameAuth(due, gravitinoConfig);
+      if (!MaintenanceAuthConsistency.hasSameAuth(gravitinoConfig, readyPolicies)) {
+        LOG.error(
+            "Skipping commit-job schedule for {}: onCommit policies disagree on effective auth",
+            identifier);
+        return Optional.empty();
+      }
       return Optional.of(
           specFactory.forCommit(
               List.of(
@@ -197,12 +202,9 @@ public class CommitJobPlanner {
                       tableId,
                       MaintenanceJobSpecFactory.catalogName(identifier),
                       MaintenanceJobSpecFactory.sparkTableIdentifier(identifier),
-                      due))));
+                      readyPolicies))));
     } catch (NoSuchEntityException e) {
       LOG.debug("No Gravitino table for IRC update {}: {}", identifier, e.getMessage());
-      return Optional.empty();
-    } catch (IllegalArgumentException e) {
-      LOG.error("Skipping commit-job schedule for {}: {}", identifier, e.getMessage());
       return Optional.empty();
     } catch (RuntimeException e) {
       LOG.warn("Failed to plan commit-job for IRC update {}: {}", identifier, e.toString());

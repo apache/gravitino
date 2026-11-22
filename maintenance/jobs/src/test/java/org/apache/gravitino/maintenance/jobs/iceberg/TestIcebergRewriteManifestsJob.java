@@ -29,12 +29,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.hadoop.HadoopTables;
+import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 public class TestIcebergRewriteManifestsJob {
 
@@ -186,6 +195,7 @@ public class TestIcebergRewriteManifestsJob {
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.type"));
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.uri"));
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.warehouse"));
+    assertEquals("{{catalog_name}}", configs.get("spark.sql.defaultCatalog"));
   }
 
   @Test
@@ -455,5 +465,57 @@ public class TestIcebergRewriteManifestsJob {
     assertEquals(
         "custom-rewritten-manifest-number",
         IcebergRewriteManifestsContent.REWRITTEN_MANIFEST_NUMBER_METRIC);
+    assertEquals("custom-manifest-spec-id", IcebergRewriteManifestsContent.MANIFEST_SPEC_ID_METRIC);
+    assertEquals(
+        "custom-manifest-partition-spec",
+        IcebergRewriteManifestsContent.MANIFEST_PARTITION_SPEC_METRIC);
+  }
+
+  @Test
+  public void testFormatPartitionSpecForPartitionedAndUnpartitioned() {
+    Schema schema =
+        new Schema(
+            Types.NestedField.required(1, "id", Types.LongType.get()),
+            Types.NestedField.required(2, "event_time", Types.TimestampType.withoutZone()));
+    assertTrue(PartitionSpec.unpartitioned().isUnpartitioned());
+    PartitionSpec daySpec =
+        PartitionSpec.builderFor(schema).day("event_time").withSpecId(1).build();
+    assertFalse(daySpec.isUnpartitioned());
+    assertEquals("day(event_time)", IcebergRewriteManifestsJob.formatPartitionSpec(daySpec));
+  }
+
+  @Test
+  public void testPutPartitionSpecContextOmitsKeysForUnpartitioned(@TempDir Path tempDir) {
+    Table unpartitioned =
+        new HadoopTables(new Configuration())
+            .create(
+                new Schema(Types.NestedField.optional(1, "id", Types.IntegerType.get())),
+                tempDir.resolve("unpart").toString());
+    Map<String, Object> metrics = new HashMap<>();
+    IcebergRewriteManifestsJob.putPartitionSpecContext(
+        metrics, unpartitioned, unpartitioned.spec().specId());
+    assertFalse(metrics.containsKey(IcebergRewriteManifestsContent.MANIFEST_SPEC_ID_METRIC));
+    assertFalse(metrics.containsKey(IcebergRewriteManifestsContent.MANIFEST_PARTITION_SPEC_METRIC));
+
+    Schema partitionedSchema =
+        new Schema(
+            Types.NestedField.required(1, "id", Types.LongType.get()),
+            Types.NestedField.required(2, "event_time", Types.TimestampType.withoutZone()));
+    Table partitioned =
+        new HadoopTables(new Configuration())
+            .create(
+                partitionedSchema,
+                PartitionSpec.builderFor(partitionedSchema).day("event_time").build(),
+                Map.of(),
+                tempDir.resolve("part").toString());
+    Map<String, Object> partitionedMetrics = new HashMap<>();
+    IcebergRewriteManifestsJob.putPartitionSpecContext(
+        partitionedMetrics, partitioned, partitioned.spec().specId());
+    assertEquals(
+        partitioned.spec().specId(),
+        partitionedMetrics.get(IcebergRewriteManifestsContent.MANIFEST_SPEC_ID_METRIC));
+    assertEquals(
+        "day(event_time)",
+        partitionedMetrics.get(IcebergRewriteManifestsContent.MANIFEST_PARTITION_SPEC_METRIC));
   }
 }
