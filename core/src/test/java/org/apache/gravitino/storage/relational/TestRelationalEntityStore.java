@@ -50,6 +50,7 @@ import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.TagEntity;
@@ -111,22 +112,71 @@ public class TestRelationalEntityStore {
     AtomicBoolean invalidatedBeforeBackend = new AtomicBoolean(false);
     AtomicBoolean pendingDuringBackend = new AtomicBoolean(false);
 
+    CatalogEntity updated = Mockito.mock(CatalogEntity.class);
+    Mockito.when(updated.nameIdentifier()).thenReturn(ident);
+
     Mockito.doAnswer(
             invocation -> {
               Mockito.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
               invalidatedBeforeBackend.set(true);
               AtomicInteger count = pendingWrites.get(key);
               pendingDuringBackend.set(count != null && count.get() > 0);
-              return null;
+              @SuppressWarnings("unchecked")
+              Consumer<CatalogEntity> beforeCommit = invocation.getArgument(3);
+              beforeCommit.accept(updated);
+              return updated;
             })
         .when(backend)
-        .update(eq(ident), eq(Entity.EntityType.CATALOG), any(Function.class));
+        .update(eq(ident), eq(Entity.EntityType.CATALOG), any(Function.class), any(Consumer.class));
 
     store.update(ident, null, Entity.EntityType.CATALOG, entity -> entity);
 
     Assertions.assertTrue(invalidatedBeforeBackend.get());
     Assertions.assertTrue(pendingDuringBackend.get());
     Assertions.assertFalse(pendingWrites.containsKey(key));
+  }
+
+  @Test
+  void testRenamePendingBlocksNewIdentBeforeCommit()
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException,
+          IllegalAccessException {
+    NameIdentifier oldIdent = NameIdentifier.of("metalake", "catalog", "schema", "old");
+    NameIdentifier newIdent = NameIdentifier.of("metalake", "catalog", "schema", "new");
+    EntityCacheKey newKey = EntityCacheKey.of(newIdent, Entity.EntityType.TOPIC);
+    TopicEntity renamed = Mockito.mock(TopicEntity.class);
+    Mockito.when(renamed.nameIdentifier()).thenReturn(newIdent);
+    Mockito.when(renamed.type()).thenReturn(Entity.EntityType.TOPIC);
+
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    @SuppressWarnings("unchecked")
+    Map<EntityCacheKey, AtomicInteger> pendingWrites =
+        (Map<EntityCacheKey, AtomicInteger>) FieldUtils.readField(store, "pendingWrites", true);
+    AtomicBoolean newPendingBeforeReturn = new AtomicBoolean(false);
+    AtomicBoolean newInvalidatedBeforeReturn = new AtomicBoolean(false);
+
+    Mockito.doAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              Consumer<TopicEntity> beforeCommit = invocation.getArgument(3);
+              beforeCommit.accept(renamed);
+              AtomicInteger count = pendingWrites.get(newKey);
+              newPendingBeforeReturn.set(count != null && count.get() > 0);
+              Mockito.verify(cache).invalidate(newIdent, Entity.EntityType.TOPIC);
+              newInvalidatedBeforeReturn.set(true);
+              return renamed;
+            })
+        .when(backend)
+        .update(
+            eq(oldIdent), eq(Entity.EntityType.TOPIC), any(Function.class), any(Consumer.class));
+
+    Assertions.assertSame(
+        renamed, store.update(oldIdent, null, Entity.EntityType.TOPIC, entity -> renamed));
+
+    Assertions.assertTrue(newPendingBeforeReturn.get());
+    Assertions.assertTrue(newInvalidatedBeforeReturn.get());
+    Assertions.assertFalse(pendingWrites.containsKey(newKey));
+    Assertions.assertFalse(
+        pendingWrites.containsKey(EntityCacheKey.of(oldIdent, Entity.EntityType.TOPIC)));
   }
 
   @Test

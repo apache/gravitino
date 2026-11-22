@@ -318,12 +318,31 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    // Populated in beforeCommit when updater renames the entity; ended in finally.
+    NameIdentifier[] renamedTo = new NameIdentifier[1];
     beginPendingWrite(ident, entityType);
     try {
-      return backend.update(ident, entityType, updater);
-    } catch (RuntimeException re) {
-      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
+      try {
+        return backend.update(
+            ident,
+            entityType,
+            updater,
+            updated -> {
+              NameIdentifier newIdent = updated.nameIdentifier();
+              if (!ident.equals(newIdent)) {
+                // Commit has not happened yet: drop any stale cache under the new name and block
+                // refill before the renamed row becomes visible.
+                renamedTo[0] = newIdent;
+                beginPendingWrite(newIdent, entityType);
+              }
+            });
+      } catch (RuntimeException re) {
+        throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
+      }
     } finally {
+      if (renamedTo[0] != null) {
+        endPendingWrite(renamedTo[0], entityType);
+      }
       endPendingWrite(ident, entityType);
     }
   }
