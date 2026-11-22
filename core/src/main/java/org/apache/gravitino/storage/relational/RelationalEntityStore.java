@@ -60,7 +60,6 @@ import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
 import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
-import org.apache.gravitino.cache.EntityCache.ThrowingSupplier;
 import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.domain.Domain;
@@ -307,16 +306,30 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    return withPendingWrite(
-        ident,
-        entityType,
+    EntityCacheKey key = EntityCacheKey.of(ident, entityType);
+    cache.withCacheLock(
+        key,
         () -> {
-          try {
-            return backend.update(ident, entityType, updater);
-          } catch (RuntimeException re) {
-            throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
-          }
+          invalidateCache(ident, entityType);
+          pendingWrites.computeIfAbsent(key, ignored -> new AtomicInteger()).incrementAndGet();
         });
+    try {
+      try {
+        return backend.update(ident, entityType, updater);
+      } catch (RuntimeException re) {
+        throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
+      }
+    } finally {
+      cache.withCacheLock(
+          key,
+          () -> {
+            AtomicInteger count = pendingWrites.get(key);
+            if (count != null && count.decrementAndGet() == 0) {
+              pendingWrites.remove(key);
+            }
+            cacheInvalidationEpoch.incrementAndGet();
+          });
+    }
   }
 
   @Override
@@ -885,35 +898,6 @@ public class RelationalEntityStore
     // backend after the change that triggered the invalidation is visible.
     cacheInvalidationEpoch.incrementAndGet();
     cache.invalidate(ident, type);
-  }
-
-  /**
-   * Invalidates {@code ident}, runs {@code action} without the cache lock, then clears the pending
-   * mark. Readers skip and do not refill the key for the whole interval, so a backend commit cannot
-   * leave an old cacheable row.
-   */
-  private <T, E extends Exception> T withPendingWrite(
-      NameIdentifier ident, Entity.EntityType entityType, ThrowingSupplier<T, E> action) throws E {
-    EntityCacheKey key = EntityCacheKey.of(ident, entityType);
-    cache.withCacheLock(
-        key,
-        () -> {
-          invalidateCache(ident, entityType);
-          pendingWrites.computeIfAbsent(key, ignored -> new AtomicInteger()).incrementAndGet();
-        });
-    try {
-      return action.get();
-    } finally {
-      cache.withCacheLock(
-          key,
-          () -> {
-            AtomicInteger count = pendingWrites.get(key);
-            if (count != null && count.decrementAndGet() == 0) {
-              pendingWrites.remove(key);
-            }
-            cacheInvalidationEpoch.incrementAndGet();
-          });
-    }
   }
 
   private boolean isPendingWrite(EntityCacheKey key) {
