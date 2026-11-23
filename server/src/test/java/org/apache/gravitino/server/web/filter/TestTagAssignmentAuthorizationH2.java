@@ -418,6 +418,227 @@ public class TestTagAssignmentAuthorizationH2 extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testReviewRequestedTagAuthority() throws Throwable {
+    String metalake = "review_auth_h2";
+    createAndInsertMakeLake(metalake);
+    createAndInsertCatalog(metalake, "catalog");
+    createAndInsertSchema(metalake, "catalog", "schema");
+    backend.insert(
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("coltable")
+            .withNamespace(Namespace.of(metalake, "catalog", "schema"))
+            .withColumns(
+                List.of(
+                    ColumnEntity.builder()
+                        .withId(RandomIdGenerator.INSTANCE.nextId())
+                        .withName("c1")
+                        .withPosition(0)
+                        .withComment("c")
+                        .withDataType(Types.IntegerType.get())
+                        .withNullable(true)
+                        .withAutoIncrement(false)
+                        .withAuditInfo(AUDIT_INFO)
+                        .build()))
+            .withAuditInfo(AUDIT_INFO)
+            .build(),
+        false);
+    createAndInsertTagEntity("visible", "", metalake);
+    createAndInsertTagEntity("label", "", metalake);
+    RelationalEntityStore store =
+        new RelationalEntityStore() {
+          @Override
+          public void registerEntityChangeLogListener(EntityChangeLogListener listener) {}
+
+          @Override
+          public void unregisterEntityChangeLogListener(EntityChangeLogListener listener) {}
+        };
+    Config config = new Config(false) {};
+    config.set(Configs.ENABLE_AUTHORIZATION, true);
+    config.set(Configs.GRAVITINO_AUTHORIZATION_CHANGE_POLL_INTERVAL_SECS, 3600L);
+    wireStore(store, config);
+    PolicyManager policies = new PolicyManager(RandomIdGenerator.INSTANCE, store);
+    TagManager tags = new TagManager(RandomIdGenerator.INSTANCE, store);
+    putPolicy(store, metalake, "policy", Policy.BuiltInType.ACCESS_CONTROL, selectContent());
+    long roleId =
+        putRole(
+            store,
+            metalake,
+            "role",
+            List.of(
+                SecurableObjects.ofTag("visible", List.of(Privileges.ApplyTag.allow())),
+                SecurableObjects.ofCatalog(
+                    "catalog",
+                    List.of(Privileges.ManageGrants.allow(), Privileges.UseCatalog.allow()))));
+    long governanceRoleId =
+        putRole(
+            store,
+            metalake,
+            "governanceRole",
+            List.of(
+                SecurableObjects.ofCatalog(
+                    "catalog",
+                    List.of(Privileges.UseCatalog.allow(), Privileges.ManageGrants.allow())),
+                SecurableObjects.ofSchema(
+                    SecurableObjects.ofCatalog("catalog", List.of(Privileges.UseCatalog.allow())),
+                    "schema",
+                    List.of(Privileges.UseSchema.allow()))));
+    long metalakeDenyRoleId =
+        putRole(
+            store,
+            metalake,
+            "denyMetalake",
+            List.of(SecurableObjects.ofMetalake(metalake, List.of(Privileges.ApplyTag.deny()))));
+    SecurableObject columnCatalog =
+        SecurableObjects.ofCatalog("catalog", List.of(Privileges.UseCatalog.allow()));
+    SecurableObject columnSchema =
+        SecurableObjects.ofSchema(columnCatalog, "schema", List.of(Privileges.UseSchema.allow()));
+    long tableGrantRoleId =
+        putRole(
+            store,
+            metalake,
+            "tableGrant",
+            List.of(
+                columnCatalog,
+                columnSchema,
+                SecurableObjects.ofTable(
+                    columnSchema, "coltable", List.of(Privileges.ManageGrants.allow())),
+                SecurableObjects.ofTag("visible", List.of(Privileges.ApplyTag.allow()))));
+    putUser(
+        store,
+        metalake,
+        "deniedMetalake",
+        List.of(roleId, metalakeDenyRoleId),
+        List.of("role", "denyMetalake"));
+    putUser(store, metalake, "tableGrant", List.of(tableGrantRoleId), List.of("tableGrant"));
+    putUser(store, metalake, "allowed", List.of(roleId), List.of("role"));
+    putUser(store, metalake, "governor", List.of(governanceRoleId), List.of("governanceRole"));
+    setOwner(
+        metalake, NameIdentifierUtil.ofTag(metalake, "label"), Entity.EntityType.TAG, "governor");
+    setOwner(
+        metalake, NameIdentifierUtil.ofTag(metalake, "visible"), Entity.EntityType.TAG, "governor");
+    GravitinoEnv env = GravitinoEnv.getInstance();
+    try (EnvOverride overrides =
+            new EnvOverride(
+                "config",
+                "entityStore",
+                "gravitinoAuthorizer",
+                "policyDispatcher",
+                "tagDispatcher",
+                "internalTagDispatcher",
+                "internalCatalogDispatcher",
+                "internalSchemaDispatcher",
+                "internalTableDispatcher",
+                "catalogManager",
+                "eventBus");
+        JcasbinAuthorizer authorizer = new JcasbinAuthorizer();
+        MockedStatic<PrincipalUtils> principals = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> providers =
+            mockStatic(GravitinoAuthorizerProvider.class)) {
+      overrides
+          .set("config", config)
+          .set("entityStore", store)
+          .setPolicyAndTagDispatchers(policies, tags)
+          .set("eventBus", mock(EventBus.class))
+          .set("internalCatalogDispatcher", existingCatalogs());
+      SchemaDispatcher schemas = mock(SchemaDispatcher.class);
+      when(schemas.schemaExists(any())).thenReturn(true);
+      overrides.set("internalSchemaDispatcher", schemas);
+      TableDispatcher tables = mock(TableDispatcher.class);
+      when(tables.tableExists(any())).thenReturn(true);
+      overrides.set("internalTableDispatcher", tables);
+      BaseCatalog<?> catalog = mock(BaseCatalog.class);
+      when(catalog.capability()).thenReturn(Capability.DEFAULT);
+      overrides.set("catalogManager", catalogManagerFor(catalog));
+      AtomicReference<UserPrincipal> current = new AtomicReference<>(new UserPrincipal("governor"));
+      principals.when(PrincipalUtils::getCurrentPrincipal).thenAnswer(i -> current.get());
+      principals.when(PrincipalUtils::getCurrentUserName).thenAnswer(i -> current.get().getName());
+      principals.when(() -> PrincipalUtils.doAs(any(), any())).thenCallRealMethod();
+      tags.addPolicyForTag(metalake, "visible", "policy", AllValuesSelector.get());
+      authorizer.initialize();
+      env.setGravitinoAuthorizer(authorizer);
+      assertTrue(authorizer.isMetalakeUser(metalake, new AuthorizationRequestContext()));
+      GravitinoAuthorizerProvider provider = mock(GravitinoAuthorizerProvider.class);
+      providers.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
+      when(provider.getGravitinoAuthorizer()).thenReturn(authorizer);
+      MetadataObjectTagOperations operations =
+          withHttpRequest(new MetadataObjectTagOperations(tags));
+      TagsAssociateRequest add = new TagsAssociateRequest(new String[] {"visible"}, new String[0]);
+      current.set(new UserPrincipal("governor"));
+      TagsAssociateRequest labelAdd =
+          new TagsAssociateRequest(new String[] {"label"}, new String[0]);
+      TagsAssociateRequest labelRemove =
+          new TagsAssociateRequest(new String[0], new String[] {"label"});
+      assertEquals(
+          200,
+          invokeRealTagRoute(operations, "associateTagsForObject", metalake, labelAdd).getStatus());
+      assertEquals(
+          200,
+          invokeRealTagRoute(operations, "associateTagsForObject", metalake, labelRemove)
+              .getStatus());
+      assertEquals(
+          403, invokeRealTagRoute(operations, "associateTagsForObject", metalake, add).getStatus());
+      assertEquals(0, tags.listMetadataObjectsForTag(metalake, "visible").length);
+      current.set(new UserPrincipal("deniedMetalake"));
+      assertEquals(
+          403, invokeRealTagRoute(operations, "associateTagsForObject", metalake, add).getStatus());
+      assertEquals(0, tags.listMetadataObjectsForTag(metalake, "visible").length);
+      current.set(new UserPrincipal("allowed"));
+      assertEquals(
+          200, invokeRealTagRoute(operations, "associateTagsForObject", metalake, add).getStatus());
+      TagsAssociateRequest catalogRemove =
+          new TagsAssociateRequest(new String[0], new String[] {"visible"});
+      current.set(new UserPrincipal("deniedMetalake"));
+      assertEquals(
+          403,
+          invokeRealTagRoute(operations, "associateTagsForObject", metalake, catalogRemove)
+              .getStatus());
+      current.set(new UserPrincipal("allowed"));
+      assertEquals(
+          200,
+          invokeRealTagRoute(operations, "associateTagsForObject", metalake, catalogRemove)
+              .getStatus());
+      current.set(new UserPrincipal("tableGrant"));
+      assertEquals(
+          200,
+          invokeRealTagRoute(
+                  operations,
+                  "associateTagsForObject",
+                  metalake,
+                  "column",
+                  "catalog.schema.coltable.c1",
+                  add)
+              .getStatus());
+      assertEquals(1, tags.listMetadataObjectsForTag(metalake, "visible").length);
+      TagsAssociateRequest remove =
+          new TagsAssociateRequest(new String[0], new String[] {"visible"});
+      current.set(new UserPrincipal("governor"));
+      assertEquals(
+          403,
+          invokeRealTagRoute(
+                  operations,
+                  "associateTagsForObject",
+                  metalake,
+                  "column",
+                  "catalog.schema.coltable.c1",
+                  remove)
+              .getStatus());
+      current.set(new UserPrincipal("tableGrant"));
+      assertEquals(
+          200,
+          invokeRealTagRoute(
+                  operations,
+                  "associateTagsForObject",
+                  metalake,
+                  "column",
+                  "catalog.schema.coltable.c1",
+                  remove)
+              .getStatus());
+      assertEquals(0, tags.listMetadataObjectsForTag(metalake, "visible").length);
+    }
+  }
+
+  @TestTemplate
   void testActualJcasbinTagAssignment() throws Throwable {
     String metalake = "real_auth_h2";
     String foreignMetalake = "foreign_auth_h2";

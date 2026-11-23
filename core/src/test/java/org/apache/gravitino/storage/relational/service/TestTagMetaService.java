@@ -57,6 +57,7 @@ import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -75,6 +76,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -143,6 +145,81 @@ public class TestTagMetaService extends TestJDBCBackend {
     Assertions.assertEquals(
         1,
         service.listTagsForMetadataObject(table.nameIdentifier(), Entity.EntityType.TABLE).size());
+  }
+
+  /** Verifies that stale tag and target observations reject the assignment transaction. */
+  @TestTemplate
+  public void testAssignmentRechecksTagAndTarget() throws IOException {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "catalog");
+    TagEntity tag = createAndInsertTagEntity("label", "", METALAKE_NAME);
+    TagMetaService service = TagMetaService.getInstance();
+    NameIdentifier[] added = {tag.nameIdentifier()};
+    NameIdentifier[] removed = {};
+    try (TagAssignmentAuthorization scope = TagAssignmentAuthorization.open()) {
+      TagAssignmentAuthorization.recordTarget(
+          catalog.nameIdentifier(),
+          catalog.type(),
+          new NamespacedEntityId(RandomIdGenerator.INSTANCE.nextId(), metalake.id()));
+      Assertions.assertThrows(
+          OptimisticLockException.class,
+          () ->
+              service.associateTagsWithMetadataObject(
+                  catalog.nameIdentifier(), catalog.type(), added, removed));
+    }
+    try (TagAssignmentAuthorization scope = TagAssignmentAuthorization.open()) {
+      TagAssignmentAuthorization.recordIdentity(
+          tag.nameIdentifier(), RandomIdGenerator.INSTANCE.nextId());
+      Assertions.assertThrows(
+          OptimisticLockException.class,
+          () ->
+              service.associateTagsWithMetadataObject(
+                  catalog.nameIdentifier(), catalog.type(), added, removed));
+    }
+    PolicyEntity policy =
+        PolicyEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withNamespace(Namespace.of(METALAKE_NAME))
+            .withName("access")
+            .withPolicyType(Policy.BuiltInType.ACCESS_CONTROL)
+            .withEnabled(false)
+            .withContent(
+                PolicyContents.accessControl(
+                    List.of(Privilege.Name.SELECT_TABLE), List.of("reader")))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    backend.insert(policy, false);
+    backend.updateEntityRelations(
+        RelationUpdate.of(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            tag.nameIdentifier(),
+            Entity.EntityType.TAG,
+            new RelationEdgeTarget[] {
+              RelationEdgeTarget.of(policy.nameIdentifier(), Entity.EntityType.POLICY, null)
+            },
+            new RelationEdgeTarget[0]));
+    try (TagAssignmentAuthorization scope = TagAssignmentAuthorization.open()) {
+      TagAssignmentAuthorization.recordIdentity(tag.nameIdentifier(), tag.id());
+      TagAssignmentAuthorization.requireDescriptive(tag.nameIdentifier());
+      Assertions.assertThrows(
+          OptimisticLockException.class,
+          () ->
+              service.associateTagsWithMetadataObject(
+                  catalog.nameIdentifier(), catalog.type(), added, removed));
+    }
+    Assertions.assertTrue(
+        service.listTagsForMetadataObject(catalog.nameIdentifier(), catalog.type()).isEmpty());
+    try (TagAssignmentAuthorization scope = TagAssignmentAuthorization.open()) {
+      TagAssignmentAuthorization.recordIdentity(tag.nameIdentifier(), tag.id());
+      TagAssignmentAuthorization.recordTarget(
+          catalog.nameIdentifier(),
+          catalog.type(),
+          new NamespacedEntityId(catalog.id(), metalake.id()));
+      service.associateTagsWithMetadataObject(
+          catalog.nameIdentifier(), catalog.type(), added, removed);
+    }
+    Assertions.assertEquals(
+        1, service.listTagsForMetadataObject(catalog.nameIdentifier(), catalog.type()).size());
   }
 
   /** Verifies membership lookups against live stored tags and object lifecycles. */
