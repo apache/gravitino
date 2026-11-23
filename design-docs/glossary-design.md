@@ -274,10 +274,12 @@ not as an implementation prerequisite.
   silently would change how they are grouped and who manages them in Step 2.
 - **Clearing a non-empty domain**: the `409` response tells the administrator to detach the
   remaining members explicitly. It reveals that at least one member exists without returning
-  names or counts. When a member is hidden, the administrator may need its name from someone
-  allowed to read it. An absent Term or membership gets the same empty detach response
-  as successful removals. In Step 2, proposed detachments must be approved before the Domain
-  can be dropped.
+  names or counts. With effective `MANAGE_DOMAIN`, the administrator can use the shared
+  `GET /domains/{domain}/definition-members` list to find direct members. The list includes
+  hidden drafts and returns only `type` and the current `name` per live member. Term content
+  reads use the Glossary definition permissions. An absent Term or membership gets the same
+  success response as an effective detach. In Step 2, proposed detachments must be approved
+  before the Domain can be dropped.
 - **Descriptive tags** on terms use the existing tag APIs and `APPLY_TAG`. A tag on a term never
   changes its domains, even when the tag backs a domain.
 
@@ -714,7 +716,8 @@ All paths are under `/api/metalakes/{metalake}`. They follow the Tag, Policy and
 | Get                    | `GET /terms/{term}?status=`                                                      | -> `TermResponse`                                                        |
 | Alter                  | `PUT /terms/{term}`                                                              | `TermUpdatesRequest` -> `TermResponse`                                   |
 | Drop                   | `DELETE /terms/{term}`                                                           | -> `DropResponse`                                                        |
-| Detach from a Domain   | `DELETE /terms/{term}/domains/{domain}`                                          | No body -> `204`                                                         |
+| Detach from a Domain   | `DELETE /terms/{term}/domains/{domain}`                                          | No body -> `200` with `code: 0`                                          |
+| List Domain members    | `GET /domains/{domain}/definition-members`                                       | `limit`, `offset` -> `members`, `hasMore`                                |
 | Hierarchy              | `GET /terms/{term}/hierarchy?direction=BROADER\|NARROWER&status=`                | -> `TermTreeResponse`                                                    |
 | Bindings of a term     | `GET /terms/{term}/objects?kind=&types=&status=&pageSize=&pageToken=`            | -> `TermBindingListResponse`                                             |
 | Terms of an object     | `GET /objects/{type}/{fullName}/terms?details=&children=&status=`                | -> `NameListResponse` / `ObjectTermsResponse`                            |
@@ -725,7 +728,11 @@ All paths are under `/api/metalakes/{metalake}`. They follow the Tag, Policy and
 | Tags                   | existing `/objects/glossary_term/{term}/tags`                                    |                                                                          |
 
 For the Step 1 detach endpoint, resolve the Domain and check `MANAGE_DOMAIN` first. A successful
-detach, missing Term or absent membership all return `204` without exposing Term details.
+detach, missing Term or absent membership all return HTTP `200` with `{"code":0}`.
+
+The Domain definition member list uses `limit=20` and `offset=0` by default, with limits
+from 1 to 1,000 and nonnegative offsets. Resolve live names from `domain_member_rel` by member
+type and ID, and page by `(member_type, member_id)` after excluding retired members.
 
 ```
 TermCreateRequest     { name, definition, synonyms, status?, domains, broader, related, links,
@@ -1516,9 +1523,11 @@ The users for these cases:
   name, ID or count; stored membership stays intact, and reads do not change the revision.
   Endpoint wiring is covered by T8.8, T12.8 and T13.12. **(guard)**
 - T7.9 A Domain admin with no Glossary privileges gets 409 when dropping a Domain with a hidden
-  draft member. The error returns no Term name or count. Use the known Term name to detach it
-  explicitly and verify the same empty `204` on retry. Verify the draft, other memberships and
-  bindings remain intact, the revision advances once, and the now-empty Domain can be dropped.
+  draft member. The error returns no Term name or count. Use the Domain member list to obtain
+  the draft's type and name, and verify ordinary Term reads still apply definition permissions.
+  Detach the Term explicitly. Verify `200` with `{"code":0}` on success, retry and for an absent Term.
+  Verify the draft, other memberships and bindings remain intact, the revision advances once,
+  and the now-empty Domain can be dropped.
   The same caller cannot use the ordinary alter to edit or add membership. **(guard)**
 
 **T8. REST**
@@ -1865,10 +1874,11 @@ parallel once the tasks they depend on are merged.
       shared glossary authorization checks, grant implications and deny precedence; owner checks
       for CREATE edits and draft reads; MANAGE-only deletion in every status; filtering of hidden
       terms inside relation lists. No Step 1 approval capability. Depends on: T4.
-- [ ] **T7. Add domain membership** (`core/`, `scripts/`). Introduce the shared `domain_member_rel`
+- [ ] **T7. Add domain membership** (`core/`, `scripts/`, `server/`). Introduce the shared `domain_member_rel`
       schema and mapper as a standalone storage change for reuse by Article T2. Add and remove
       term memberships on create and alter with the Domain management check. Support explicit
-      detach by the Domain administrator. Check all live member types on Domain drop.
+      detach by the Domain administrator. Provide the shared Domain member list and Term
+      name resolution for reuse by Article. Check all live member types on Domain drop.
       Shared domain filtering on term results and mixed relation/domain lock-order tests.
       Depends on: T4, T5, T6, prerequisites.
 
