@@ -25,8 +25,10 @@ import static org.apache.gravitino.integration.test.web.ui.CatalogsPageTest.SORT
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import org.apache.gravitino.integration.test.web.ui.utils.BaseWebIT;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
@@ -530,19 +532,30 @@ public class CatalogsPage extends BaseWebIT {
    * @throws InterruptedException if interrupted while interacting with the editor
    */
   public void selectTableColumnType(int index, String type) throws InterruptedException {
-    String columnType = "//div[@data-refer='column-type-" + index + "']";
-    clickAndWait(driver.findElement(By.xpath(columnType)));
-
+    String columnType = "[data-refer='column-type-" + index + "']";
+    clickAndWait(By.cssSelector(columnType + " .ant-select-selector"));
     WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
-    String optionXpath =
-        columnType
-            + "//div[contains(@class, 'ant-select-dropdown') and not(contains(@class, 'ant-select-dropdown-hidden'))]"
-            + "//div[contains(@class, 'ant-select-item-option') and (@title='"
-            + type
-            + "' or .//div[text()='"
-            + capitalizeFirstLetter(type)
-            + "'])]";
-    clickAndWait(wait.until(ExpectedConditions.elementToBeClickable(By.xpath(optionXpath))));
+    WebElement combobox = driver.findElement(By.cssSelector(columnType + " [role='combobox']"));
+    wait.until(ExpectedConditions.attributeToBe(combobox, "aria-expanded", "true"));
+
+    // The dropdown renders only a window of options. Keyboard navigation brings each into view.
+    Set<String> visited = new HashSet<>();
+    String activeOption = wait.until(ignored -> combobox.getDomAttribute("aria-activedescendant"));
+    while (activeOption != null && visited.add(activeOption)) {
+      String activeType = driver.findElement(By.id(activeOption)).getDomProperty("textContent");
+      if (type.equalsIgnoreCase(activeType)) {
+        combobox.sendKeys(Keys.ENTER);
+        wait.until(ExpectedConditions.attributeToBe(combobox, "aria-expanded", "false"));
+        wait.until(
+            ExpectedConditions.textToBe(
+                By.cssSelector(columnType + " .ant-select-selection-item"),
+                capitalizeFirstLetter(type)));
+        return;
+      }
+      combobox.sendKeys(Keys.ARROW_DOWN);
+      activeOption = combobox.getDomAttribute("aria-activedescendant");
+    }
+    throw new IllegalStateException("Column type option is unavailable: " + type);
   }
 
   private String capitalizeFirstLetter(String str) {

@@ -704,6 +704,13 @@ public class CatalogsPageTest extends BaseWebIT {
 
   @Test
   @Order(23)
+  public void testBackHomePage() throws InterruptedException {
+    clickAndWait(catalogsPage.backHomeBtn);
+    Assertions.assertTrue(catalogsPage.verifyBackHomePage());
+  }
+
+  @Test
+  @Order(24)
   void testMysqlAutoIncrementAndColumnEditsRequireSeparateSaves() throws InterruptedException {
     String schema = RandomNameUtils.genRandomName("auto_increment");
     String table = "users";
@@ -791,12 +798,5 @@ public class CatalogsPageTest extends BaseWebIT {
     } finally {
       catalog.asSchemas().dropSchema(schema, true);
     }
-  }
-
-  @Test
-  @Order(24)
-  public void testBackHomePage() throws InterruptedException {
-    clickAndWait(catalogsPage.backHomeBtn);
-    Assertions.assertTrue(catalogsPage.verifyBackHomePage());
   }
 }
