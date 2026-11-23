@@ -57,6 +57,7 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.EntityIdResolver;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -290,6 +291,14 @@ public class TestRelationalEntityStore {
     TopicEntity cachedEntity = Mockito.mock(TopicEntity.class);
     Mockito.when(cachedEntity.id()).thenReturn(1L);
     EntityCache cache = Mockito.mock(EntityCache.class);
+    Mockito.when(
+            cache.withCacheLock(any(EntityCacheKey.class), any(EntityCache.ThrowingSupplier.class)))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              EntityCache.ThrowingSupplier<?, Exception> action = invocation.getArgument(1);
+              return action.get();
+            });
     Mockito.when(cache.getIfPresent(ident, Entity.EntityType.TOPIC))
         .thenReturn(Optional.of(cachedEntity));
     EntityIdResolver underlying = Mockito.mock(EntityIdResolver.class);
@@ -309,10 +318,39 @@ public class TestRelationalEntityStore {
   }
 
   @Test
-  void testEndPendingWriteAdvancesEpochBeforeReleasingPrefixes() throws Exception {
+  void testCachedEntityIdResolverFallsBackWhenParentChainMisses() {
+    NameIdentifier topic = NameIdentifier.of("metalake", "catalog", "schema", "topic");
+    NameIdentifier schema = NameIdentifier.of("metalake", "catalog", "schema");
+    TopicEntity cachedTopic = Mockito.mock(TopicEntity.class);
+    Mockito.when(cachedTopic.id()).thenReturn(1L);
+    EntityCache cache = Mockito.mock(EntityCache.class);
+    Mockito.when(
+            cache.withCacheLock(any(EntityCacheKey.class), any(EntityCache.ThrowingSupplier.class)))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              EntityCache.ThrowingSupplier<?, Exception> action = invocation.getArgument(1);
+              return action.get();
+            });
+    Mockito.when(cache.getIfPresent(topic, Entity.EntityType.TOPIC))
+        .thenReturn(Optional.of(cachedTopic));
+    Mockito.when(cache.getIfPresent(schema, Entity.EntityType.SCHEMA)).thenReturn(Optional.empty());
+    EntityIdResolver underlying = Mockito.mock(EntityIdResolver.class);
+    NamespacedEntityId fromDb = new NamespacedEntityId(99L, 10L, 20L, 30L);
+    Mockito.when(underlying.getEntityIds(topic, Entity.EntityType.TOPIC)).thenReturn(fromDb);
+
+    EntityIdResolver resolver = new CachedEntityIdResolver(cache, underlying);
+
+    Assertions.assertSame(fromDb, resolver.getEntityIds(topic, Entity.EntityType.TOPIC));
+    Mockito.verify(underlying).getEntityIds(topic, Entity.EntityType.TOPIC);
+  }
+
+  @Test
+  void testEndPendingWriteInvalidatesBeforeReleasingPrefixes() throws Exception {
     NameIdentifier schema = NameIdentifier.of("metalake", "catalog", "schema");
     NameIdentifier table = NameIdentifier.of("metalake", "catalog", "schema", "table");
     EntityCacheKey schemaKey = EntityCacheKey.of(schema, Entity.EntityType.SCHEMA);
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
     @SuppressWarnings("unchecked")
     Map<EntityCacheKey, AtomicInteger> pendingWrites =
         (Map<EntityCacheKey, AtomicInteger>) FieldUtils.readField(store, "pendingWrites", true);
@@ -331,9 +369,20 @@ public class TestRelationalEntityStore {
             org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
                 store, true, "isPendingWrite", table, Entity.EntityType.TABLE));
 
+    AtomicBoolean pendingDuringInvalidate = new AtomicBoolean(false);
+    Mockito.doAnswer(
+            invocation -> {
+              pendingDuringInvalidate.set(
+                  pendingWrites.containsKey(schemaKey) && !pendingHierarchyPrefixes.isEmpty());
+              return false;
+            })
+        .when(cache)
+        .invalidate(schema, Entity.EntityType.SCHEMA);
+
     org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
         store, true, "endPendingWrite", schema, Entity.EntityType.SCHEMA);
 
+    Assertions.assertTrue(pendingDuringInvalidate.get());
     Assertions.assertTrue(epoch.get() > epochBefore);
     Assertions.assertFalse(pendingWrites.containsKey(schemaKey));
     Assertions.assertTrue(pendingHierarchyPrefixes.isEmpty());

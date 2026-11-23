@@ -995,16 +995,16 @@ public class RelationalEntityStore
 
   /**
    * Ends a pending write without taking the interruptible cache key lock, so a writer interrupted
-   * after backend commit cannot leak registrations. Advances the epoch before releasing prefixes so
-   * a reader that loads under a pending ancestor cannot publish against the old epoch once the
-   * prefix is gone. Invalidates again after release so a {@link Coherence#SHARED} cache drops
-   * entries another store may have published while this write was pending.
+   * after backend commit cannot leak registrations. Invalidates while still pending so cache-hit
+   * readers stay blocked until entries (including hierarchy descendants and {@link
+   * Coherence#SHARED} peer fills) are dropped. {@link #invalidateCache} also advances the epoch
+   * before prefixes are released, so a reader that loaded under a pending ancestor cannot publish
+   * against the old epoch once the prefix is gone.
    */
   private void endPendingWrite(NameIdentifier ident, Entity.EntityType entityType) {
     EntityCacheKey key = EntityCacheKey.of(ident, entityType);
-    cacheInvalidationEpoch.incrementAndGet();
-    releasePendingWrite(key, ident, entityType);
     invalidateCache(ident, entityType);
+    releasePendingWrite(key, ident, entityType);
   }
 
   private void retainPendingWrite(
