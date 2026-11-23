@@ -193,7 +193,8 @@ public final class GlossaryManager {
 
   /**
    * Lists the visible term definitions in the given metalake. With a domain, lists only the terms
-   * of that domain and of its subdomains that the caller can see.
+   * of that domain and of its subdomains that the caller can see. A caller without glossary view
+   * access receives an empty list before the domain filter is evaluated.
    *
    * @throws NoSuchMetalakeException if the metalake does not exist
    * @throws NoSuchDomainException if the domain does not exist or is a draft hidden from the caller

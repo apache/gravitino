@@ -22,12 +22,16 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.security.PrivilegedExceptionAction;
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -168,6 +172,8 @@ class TestGlossaryDomains extends TestJDBCBackend {
   void tearDownDomains() throws Exception {
     try {
       if (authorizer != null) authorizer.close();
+      GlossaryInvariants.assertDefinitions();
+      GlossaryInvariants.assertRelations();
       GlossaryInvariants.assertDomainMembership();
     } finally {
       env.setGravitinoAuthorizer(previous);
@@ -659,6 +665,7 @@ class TestGlossaryDomains extends TestJDBCBackend {
         ForbiddenException.class, () -> as("writer", () -> manager.listTerms(LAKE, "Finance")));
   }
 
+  /** Covers T7.9. */
   @TestTemplate
   void testDomainAdminCannotClearHiddenDraft() throws Exception {
     Mockito.when(env.config().get(Configs.ENABLE_AUTHORIZATION)).thenReturn(true);
@@ -713,6 +720,7 @@ class TestGlossaryDomains extends TestJDBCBackend {
     assertTrue(as("lakeOwner", () -> env.internalDomainDispatcher().deleteDomain(LAKE, "Finance")));
   }
 
+  /** Covers T7.4. */
   @TestTemplate
   void testDropDomainWithTermsFails() throws Exception {
     create("Churn", "Finance");
@@ -723,105 +731,142 @@ class TestGlossaryDomains extends TestJDBCBackend {
     assertTrue(env.internalDomainDispatcher().deleteDomain(LAKE, "Finance"));
   }
 
+  /** Covers T7.5. */
   @TestTemplate
-  void testAddDomainRacesDomainDrop() throws Exception {
-    for (boolean dropFirst : List.of(false, true)) {
-      String domain = dropFirst ? "DropFirst" : "AddFirst";
-      long domainId =
-          GlossaryDomainFixtures.insertDomain(
-              LAKE, domain, Domain.Status.PUBLISHED, null, AUDIT_INFO);
-      assertTrue(canLockDomain(domainId));
-      GlossaryTermEntity before = create(domain);
-      CountDownLatch locked = new CountDownLatch(1);
-      CountDownLatch release = new CountDownLatch(1);
-      CountDownLatch started = new CountDownLatch(1);
-      ExecutorService workers = Executors.newFixedThreadPool(2);
-      Runnable pause =
-          () -> {
-            locked.countDown();
-            await(release);
-          };
-      GlossaryManager writer =
-          new GlossaryManager(
-              ids::incrementAndGet,
-              true,
-              (oldTerm, newTerm, persist) -> {
-                if (!dropFirst) pause.run();
-                persist.run();
-              });
-      DomainDispatcher dropper =
-          env.internalDomainDispatcher()
-              .withMutationCheck(
-                  state -> {
-                    if (dropFirst) pause.run();
-                  });
+  void testAddDomainRacesDomainDrop() {
+    assertTimeoutPreemptively(
+        Duration.ofMinutes(3),
+        () -> {
+          for (int round = 0; round < 20; round++) {
+            runDomainDropRace(round);
+          }
+        });
+  }
+
+  private void runDomainDropRace(int round) throws Exception {
+    boolean dropFirst = round % 2 == 0;
+    String domain = (dropFirst ? "DropFirst" : "AddFirst") + round;
+    long domainId =
+        GlossaryDomainFixtures.insertDomain(
+            LAKE, domain, Domain.Status.PUBLISHED, null, AUDIT_INFO);
+    assertTrue(canLockDomain(domainId));
+    GlossaryTermEntity before = create(domain);
+    CountDownLatch locked = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    CountDownLatch started = new CountDownLatch(1);
+    ExecutorService workers = Executors.newFixedThreadPool(2);
+    Runnable pause =
+        () -> {
+          locked.countDown();
+          await(release);
+        };
+    GlossaryManager writer =
+        new GlossaryManager(
+            ids::incrementAndGet,
+            true,
+            (oldTerm, newTerm, persist) -> {
+              if (!dropFirst) pause.run();
+              persist.run();
+            });
+    DomainDispatcher dropper =
+        env.internalDomainDispatcher()
+            .withMutationCheck(
+                state -> {
+                  if (dropFirst) pause.run();
+                });
+    try {
+      Future<?> first =
+          workers.submit(
+              () ->
+                  as(
+                      "lakeOwner",
+                      () -> {
+                        if (dropFirst) assertTrue(dropper.deleteDomain(LAKE, domain));
+                        else writer.alterTerm(LAKE, before.name(), TermChange.addDomain(domain));
+                        return null;
+                      }));
+      await(locked);
+      Future<?> second =
+          workers.submit(
+              () ->
+                  as(
+                      "lakeOwner",
+                      () -> {
+                        started.countDown();
+                        if (dropFirst)
+                          assertThrows(
+                              NoSuchDomainException.class,
+                              () ->
+                                  writer.alterTerm(
+                                      LAKE, before.name(), TermChange.addDomain(domain)));
+                        else
+                          assertThrows(
+                              NonEmptyDomainException.class,
+                              () -> dropper.deleteDomain(LAKE, domain));
+                        return null;
+                      }));
+      await(started);
+      // An independent session touches only the domain row. The metalake fence cannot
+      // satisfy this assertion, even on H2 where its shared lock is exclusive.
+      assertFalse(canLockDomain(domainId));
+      release.countDown();
+      first.get(20, TimeUnit.SECONDS);
+      second.get(20, TimeUnit.SECONDS);
+      GlossaryTermEntity after = as("lakeOwner", () -> manager.getTerm(LAKE, before.name()));
+      if (dropFirst) {
+        assertArrayEquals(new String[0], after.domains());
+        assertEquals(before.revisionToken(), after.revisionToken());
+      } else {
+        assertArrayEquals(new String[] {domain}, after.domains());
+        assertEquals(before.version() + 1, after.version());
+      }
+      GlossaryInvariants.assertDomainMembership();
+    } finally {
+      release.countDown();
+      workers.shutdownNow();
+    }
+  }
+
+  private boolean canLockDomain(long id) throws SQLException {
+    try (SqlSession session =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession()) {
+      Connection connection = session.getConnection();
       try {
-        Future<?> first =
-            workers.submit(
-                () ->
-                    as(
-                        "lakeOwner",
-                        () -> {
-                          if (dropFirst) assertTrue(dropper.deleteDomain(LAKE, domain));
-                          else writer.alterTerm(LAKE, before.name(), TermChange.addDomain(domain));
-                          return null;
-                        }));
-        await(locked);
-        Future<?> second =
-            workers.submit(
-                () ->
-                    as(
-                        "lakeOwner",
-                        () -> {
-                          started.countDown();
-                          if (dropFirst)
-                            assertThrows(
-                                NoSuchDomainException.class,
-                                () ->
-                                    writer.alterTerm(
-                                        LAKE, before.name(), TermChange.addDomain(domain)));
-                          else
-                            assertThrows(
-                                NonEmptyDomainException.class,
-                                () -> dropper.deleteDomain(LAKE, domain));
-                          return null;
-                        }));
-        await(started);
-        // An independent session touches only the domain row. The metalake fence cannot
-        // satisfy this assertion, even on H2 where its shared lock is exclusive.
-        assertFalse(canLockDomain(domainId));
-        release.countDown();
-        first.get(20, TimeUnit.SECONDS);
-        second.get(20, TimeUnit.SECONDS);
-        GlossaryTermEntity after = as("lakeOwner", () -> manager.getTerm(LAKE, before.name()));
-        if (dropFirst) {
-          assertArrayEquals(new String[0], after.domains());
-          assertEquals(before.revisionToken(), after.revisionToken());
-        } else {
-          assertArrayEquals(new String[] {domain}, after.domains());
-          assertEquals(before.version() + 1, after.version());
+        if ("mysql".equalsIgnoreCase(backendType)) {
+          // MySQL 5.7 does not support SKIP LOCKED. Restore the pooled session's timeout.
+          try (Statement settings = connection.createStatement()) {
+            int previous;
+            try (ResultSet value =
+                settings.executeQuery("SELECT @@session.innodb_lock_wait_timeout")) {
+              assertTrue(value.next());
+              previous = value.getInt(1);
+            }
+            settings.execute("SET SESSION innodb_lock_wait_timeout=1");
+            try {
+              return lockDomainRow(connection, id, false);
+            } catch (SQLException e) {
+              if (e.getErrorCode() == 1205) return false;
+              throw e;
+            } finally {
+              settings.execute("SET SESSION innodb_lock_wait_timeout=" + previous);
+            }
+          }
         }
-        GlossaryInvariants.assertDomainMembership();
+        return lockDomainRow(connection, id, true);
       } finally {
-        release.countDown();
-        workers.shutdownNow();
+        session.rollback(true);
       }
     }
   }
 
-  private static boolean canLockDomain(long id) throws SQLException {
-    try (SqlSession session =
-            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession();
-        PreparedStatement query =
-            session
-                .getConnection()
-                .prepareStatement(
-                    "SELECT domain_id FROM domain_meta WHERE domain_id=? FOR UPDATE SKIP LOCKED")) {
+  private static boolean lockDomainRow(Connection connection, long id, boolean skipLocked)
+      throws SQLException {
+    String sql = "SELECT domain_id FROM domain_meta WHERE domain_id=? FOR UPDATE";
+    try (PreparedStatement query =
+        connection.prepareStatement(skipLocked ? sql + " SKIP LOCKED" : sql)) {
       query.setLong(1, id);
       try (ResultSet rows = query.executeQuery()) {
         return rows.next();
-      } finally {
-        session.rollback(true);
       }
     }
   }

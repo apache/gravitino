@@ -138,7 +138,7 @@ GlossaryTerm { id, name, definition, synonyms[], status: DRAFT | APPROVED | DEPR
                links[{label, url}], sourceRef?, properties, currentVersion, audit_info }
                // tags: the existing tag relation tables
 TermRelation { fromTermId, toTermId, type: BROADER | RELATED, audit_info }
-TermDomain   { termId, domainId, audit_info }                // Option A in Domain membership
+TermDomain   { metalakeId, termId, domainId, deletedAt }     // Option A in Domain membership
 TermBinding  { termId, targetId, targetType, audit_info }
 TermVersion  { termId, version, state, snapshot, audit_info }   // Step 2 only; schema defined then
 ```
@@ -272,7 +272,8 @@ not as an implementation prerequisite.
 
 - A table `glossary_term_domain_rel (term_id, domain_id)`. Only the term API changes it: `domains`
   on create, `addDomain` and `removeDomain`. These changes go through `TermChangeHandler`, like any
-  term change.
+  term change. The membership row records its live or retired state. T10 records the actor and
+  revision for the term change.
 - To add a term to a domain, the caller needs the edit privilege on the term, and must be able to
   see the domain (`USE_DOMAIN`). In Step 2, the caller also needs `CREATE_DEFINITION` on that
   domain, so nobody can move a term into a domain where they cannot write.
