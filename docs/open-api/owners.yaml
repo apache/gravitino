@@ -30,6 +30,11 @@ paths:
         - access control
       summary: Set owner
       operationId: setOwner
+      description: >-
+        For a glossary term, the default authorizer allows the current term owner or the metalake
+        owner to transfer ownership. A term owner can transfer even after an explicit deny of
+        VIEW_DEFINITION or loss of CREATE_DEFINITION. Reading and editing the definition require
+        the corresponding glossary privileges.
       requestBody:
         content:
           application/json:

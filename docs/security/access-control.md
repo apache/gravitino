@@ -268,6 +268,12 @@ includes both privileges and allows viewing, editing, and deleting any term in t
 
 An explicit deny of view access hides every term and blocks changes to its definition. An explicit
 deny of create access prevents creation even for a manager. The metalake owner can manage all terms.
+
+The current term owner or the metalake owner can transfer ownership. A term owner keeps this
+authority even if `VIEW_DEFINITION` is denied or `CREATE_DEFINITION` is revoked. After the
+transfer, the new owner's effective glossary privileges determine whether they can read or edit
+the definition.
+
 For grant and revoke examples, see [Glossary Privileges on a Metalake](../cli.md#glossary-privileges-on-a-metalake).
 
 ### Required Privileges

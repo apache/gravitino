@@ -39,13 +39,16 @@ import org.apache.gravitino.exceptions.TermVersionConflictException;
  * caller. {@code MANAGE_DEFINITIONS} includes create and view access and permits managing all
  * terms, including other owners' drafts. Ownership means the current owner, including group
  * members; ownership alone does not replace effective create access. Expand allowed grant
- * implications before applying explicit denies to each required capability. Every term read and
- * write requires effective {@code VIEW_DEFINITION}; denying view hides terms from reads and blocks
- * writes even for an owner with create access. Denying create prevents creation even with an allow
- * on manage, but effective manage can still authorize edits. Denying manage removes the all-term
- * path without removing effective create access to own terms. These privileges are granted on the
- * metalake in Step 1. The metalake owner passes privilege checks, but remains subject to the Step 2
- * workflow and no-self-approval rule.
+ * implications before applying explicit denies to each required capability. All reads and writes of
+ * term definitions require effective {@code VIEW_DEFINITION}. Denying view hides terms from reads
+ * and blocks writes even for an owner with create access. Denying create prevents creation even
+ * with an allow on manage, but effective manage can still authorize edits. Denying manage removes
+ * the all-term path without removing effective create access to own terms. These privileges are
+ * granted on the metalake in Step 1. The metalake owner passes privilege checks, but remains
+ * subject to the Step 2 workflow and no-self-approval rule.
+ *
+ * <p>The owner API permits the current term owner or metalake owner to transfer ownership
+ * independently of glossary privileges.
  *
  * <p>The write methods describe Step 1: changes take effect immediately, without review. Step 2
  * adds scoped management and review: new terms default to draft, and another authorized manage user

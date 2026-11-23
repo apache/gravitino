@@ -527,6 +527,16 @@ class TestGlossaryAuthorization extends TestJDBCBackend {
     assertEquals(1, as("admin", () -> manager.getTerm(LAKE, "Root")).version());
   }
 
+  @TestTemplate
+  void testOwnerTransferAfterViewDenied() throws Exception {
+    assertDraftOwnerCanTransferAfterRoleChange(List.of("view", "create", "denyView"));
+  }
+
+  @TestTemplate
+  void testOwnerTransferAfterCreateRevoked() throws Exception {
+    assertDraftOwnerCanTransferAfterRoleChange(List.of("view"));
+  }
+
   /** Covers T6.4, T6.12 and T6.13 with independent authorizers over one metadata store. */
   @TestTemplate
   void testOwnershipAcrossNodesAndNameReuse() throws Exception {
@@ -809,6 +819,55 @@ class TestGlossaryAuthorization extends TestJDBCBackend {
         : new UserPrincipal(user, List.of(new UserGroup(Optional.empty(), group)));
   }
 
+  private void assertDraftOwnerCanTransferAfterRoleChange(List<String> rolesAfterChange)
+      throws Exception {
+    String author = "draftAuthor";
+    user(author, "view", "create");
+    GlossaryTermEntity draft =
+        as(
+            author,
+            () ->
+                manager.createTerm(
+                    LAKE,
+                    TermSpec.builder("draft")
+                        .withStatus(GlossaryTerm.Status.DRAFT)
+                        .withDefinition("original definition")
+                        .build()));
+
+    List<Long> roleIds = roleIds(rolesAfterChange);
+    backend.update(
+        NameIdentifierUtil.ofUser(LAKE, author),
+        Entity.EntityType.USER,
+        (UserEntity user) ->
+            createUserEntity(
+                user.id(),
+                user.namespace(),
+                user.name(),
+                user.auditInfo(),
+                rolesAfterChange,
+                roleIds));
+    nodeA.handleUserRoleRelChange(LAKE, author);
+
+    as(
+        author,
+        () -> {
+          assertThrows(NoSuchTermException.class, () -> manager.getTerm(LAKE, draft.name()));
+          assertThrows(
+              NoSuchTermException.class,
+              () -> manager.alterTerm(LAKE, draft.name(), TermChange.updateDefinition("edited")));
+          assertTrue(canTransfer(nodeA, draft.name()));
+          return transfer(draft, "lakeOwner", Owner.Type.USER);
+        });
+
+    assertEquals(
+        "lakeOwner",
+        as("lakeOwner", () -> owners.getOwner(LAKE, object(draft))).orElseThrow().name());
+    assertEquals(
+        draft.revisionToken(),
+        as("lakeOwner", () -> manager.getTerm(LAKE, draft.name())).revisionToken());
+    assertFalse(as(author, () -> canTransfer(nodeA, draft.name())));
+  }
+
   private boolean canTransfer(JcasbinAuthorizer node, String name) {
     return node.hasSetOwnerPermission(
         LAKE, "glossary_term", name, new AuthorizationRequestContext());
@@ -862,18 +921,24 @@ class TestGlossaryAuthorization extends TestJDBCBackend {
   }
 
   private void user(String name, String... roles) throws Exception {
-    List<Long> roleIds = new ArrayList<>();
-    for (String role : roles)
-      roleIds.add(backend.get(NameIdentifierUtil.ofRole(LAKE, role), Entity.EntityType.ROLE).id());
+    List<String> roleNames = List.of(roles);
     backend.insert(
         createUserEntity(
             ids.incrementAndGet(),
             AuthorizationUtils.ofUserNamespace(LAKE),
             name,
             AUDIT_INFO,
-            List.of(roles),
-            roleIds),
+            roleNames,
+            roleIds(roleNames)),
         false);
+  }
+
+  private List<Long> roleIds(List<String> roles) throws Exception {
+    List<Long> ids = new ArrayList<>();
+    for (String role : roles) {
+      ids.add(backend.get(NameIdentifierUtil.ofRole(LAKE, role), Entity.EntityType.ROLE).id());
+    }
+    return ids;
   }
 
   private static MetadataObject object(GlossaryTermEntity term) {
