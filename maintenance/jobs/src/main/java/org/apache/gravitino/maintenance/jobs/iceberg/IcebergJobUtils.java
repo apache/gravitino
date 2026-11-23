@@ -23,15 +23,23 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.time.Clock;
+import java.time.DateTimeException;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
+import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.spark.Spark3Util;
@@ -56,6 +64,16 @@ public final class IcebergJobUtils {
    * {{use_caching}}}.
    */
   private static final Pattern UNRESOLVED_PLACEHOLDER_PATTERN = Pattern.compile("^\\{\\{[^{}]*}}$");
+
+  /**
+   * Matches relative day wire values: a bare integer ({@code 7}) or legacy {@code 7d}/{@code 7D}.
+   */
+  private static final Pattern OLDER_THAN_RELATIVE_DAYS =
+      Pattern.compile("^(\\d+)d?$", Pattern.CASE_INSENSITIVE);
+
+  /** Formats {@code now - days} as the Iceberg {@code older_than} timestamp string. */
+  private static final DateTimeFormatter OLDER_THAN_TIMESTAMP =
+      DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ssXXX").withZone(ZoneOffset.UTC);
 
   /**
    * The Spark configurations that spark-submit decides. Set in the custom Spark configurations of a
@@ -176,16 +194,42 @@ public final class IcebergJobUtils {
   }
 
   /**
-   * Escape single quotes in SQL string literals by replacing ' with ''.
+   * Escape single quotes in SQL string literals by replacing {@code '} with {@code ''}.
+   *
+   * <p>Suitable for expression-level literals such as {@code map('k','v')} entries. <b>Do not use
+   * for Spark {@code CALL} named-arg strings</b> ({@code table => '...'}, {@code where => '...'},
+   * …): with default {@code spark.sql.parser.escapedStringLiterals=false}, Spark treats {@code ''}
+   * there as empty and drops the apostrophe. Use {@link #escapeSparkCallStringArg(String)} for
+   * those CALL arguments.
    *
    * @param value the string value to escape
-   * @return escaped string safe for use in SQL string literals
+   * @return escaped string using SQL-standard quote doubling
    */
   public static String escapeSqlString(String value) {
     if (value == null) {
       return null;
     }
     return value.replace("'", "''");
+  }
+
+  /**
+   * Escapes a value for a Spark {@code CALL} named-arg single-quoted string (e.g. {@code table =>
+   * '...'}, {@code where => '...'}).
+   *
+   * <p>With the default {@code spark.sql.parser.escapedStringLiterals=false}, Spark still consumes
+   * backslash escapes inside the outer single-quoted argument ({@code \\}, {@code \"}, {@code \'}),
+   * but treats SQL-standard {@code ''} as empty and drops the apostrophe ({@code O''Brien} → {@code
+   * OBrien}). Double every backslash first so one outer parse leaves inner escapes (from a
+   * single-quoted predicate literal) intact, then encode {@code '} as {@code \'}.
+   *
+   * @param value the string value to escape
+   * @return escaped string safe for use in a Spark CALL string argument, or null if input is null
+   */
+  public static String escapeSparkCallStringArg(String value) {
+    if (value == null) {
+      return null;
+    }
+    return value.replace("\\", "\\\\").replace("'", "\\'");
   }
 
   /**
@@ -204,6 +248,90 @@ public final class IcebergJobUtils {
     }
     String escaped = identifier.replace("`", "``");
     return "`" + escaped + "`";
+  }
+
+  /**
+   * Builds a backtick-quoted {@code catalog.ns…table} SQL reference from a Spark table identifier
+   * that may include hierarchical Iceberg namespace levels (e.g. {@code a.b.c.events}).
+   *
+   * @param catalogName Spark catalog name
+   * @param sparkTableIdentifier dotted schema…table identifier
+   * @return qualified SQL identifier
+   */
+  public static String qualifyCatalogTableSql(String catalogName, String sparkTableIdentifier) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(catalogName), "catalogName must not be blank");
+    StringBuilder sql = new StringBuilder(escapeSqlIdentifier(catalogName.trim()));
+    for (String level : IdentifierUtils.sparkTableIdentifierLevels(sparkTableIdentifier)) {
+      sql.append('.').append(escapeSqlIdentifier(level));
+    }
+    return sql.toString();
+  }
+
+  /**
+   * Qualifies an Iceberg metadata table such as {@code files} or {@code all_files}.
+   *
+   * @param catalogName Spark catalog name
+   * @param sparkTableIdentifier dotted schema…table identifier
+   * @param metadataTable metadata table name (for example {@code files})
+   * @return qualified SQL identifier including the metadata table
+   */
+  public static String qualifyCatalogMetadataTableSql(
+      String catalogName, String sparkTableIdentifier, String metadataTable) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(metadataTable), "metadataTable must not be blank");
+    return qualifyCatalogTableSql(catalogName, sparkTableIdentifier)
+        + "."
+        + escapeSqlIdentifier(metadataTable.trim());
+  }
+
+  /**
+   * Validates a Spark table identifier has at least {@code schema.table} levels.
+   *
+   * @param sparkTableIdentifier dotted schema…table identifier
+   * @return the split levels
+   */
+  public static String[] requireSparkTableIdentifier(String sparkTableIdentifier) {
+    return IdentifierUtils.sparkTableIdentifierLevels(sparkTableIdentifier);
+  }
+
+  /**
+   * Starts a {@code CALL catalog.system.<procedure>(} fragment shared by Iceberg maintenance jobs.
+   *
+   * @param catalogName Spark catalog name
+   * @param procedure system procedure name
+   * @return mutable SQL builder positioned after the opening parenthesis
+   */
+  public static StringBuilder beginSystemProcedureCall(String catalogName, String procedure) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(catalogName), "catalogName must not be blank");
+    Preconditions.checkArgument(StringUtils.isNotBlank(procedure), "procedure must not be blank");
+    return new StringBuilder("CALL ")
+        .append(escapeSqlIdentifier(catalogName))
+        .append(".system.")
+        .append(procedure)
+        .append("(");
+  }
+
+  /**
+   * Appends {@code table => '<identifier>'} using {@link #escapeSqlString(String)}.
+   *
+   * @param sql procedure CALL builder
+   * @param sparkTableIdentifier Spark table id
+   */
+  public static void appendSqlStringTableArg(StringBuilder sql, String sparkTableIdentifier) {
+    sql.append("table => '").append(escapeSqlString(sparkTableIdentifier)).append("'");
+  }
+
+  /**
+   * Appends {@code table => '<identifier>'} using {@link #escapeSparkCallStringArg(String)} for
+   * nested CALL string arguments.
+   *
+   * @param sql procedure CALL builder
+   * @param sparkTableIdentifier Spark table id
+   */
+  public static void appendSparkCallStringTableArg(StringBuilder sql, String sparkTableIdentifier) {
+    sql.append("table => '").append(escapeSparkCallStringArg(sparkTableIdentifier)).append("'");
   }
 
   /**
@@ -359,15 +487,33 @@ public final class IcebergJobUtils {
   }
 
   /**
+   * Requires {@code spark.sql.parser.escapedStringLiterals=false} (Spark's default).
+   *
+   * <p>Built-in CALL builders that use {@link #escapeSparkCallStringArg(String)} ({@code '} →
+   * {@code \'}), and orphan-file literals rendered via Spark {@code lit().expr().sql()}, depend on
+   * backslash escapes. With {@code escapedStringLiterals=true}, those encodings are not reliable.
+   *
+   * @param spark active Spark session
+   * @throws IllegalArgumentException when the setting is enabled
+   */
+  public static void requireEscapedStringLiteralsDisabled(SparkSession spark) {
+    Preconditions.checkNotNull(spark, "spark");
+    Preconditions.checkArgument(
+        !Boolean.parseBoolean(spark.conf().get("spark.sql.parser.escapedStringLiterals", "false")),
+        "spark.sql.parser.escapedStringLiterals must be false");
+  }
+
+  /**
    * Checks the Iceberg Spark runtime after the session is created, then stops Spark and exits the
-   * process on failure.
+   * process on failure. Also requires {@link #requireEscapedStringLiteralsDisabled(SparkSession)}.
    *
    * @param spark Spark session created for this job; stopped if the runtime check fails
    */
   public static void requireIcebergSparkRuntimeOrExit(SparkSession spark) {
     try {
       requireIcebergSparkRuntime();
-    } catch (IllegalStateException e) {
+      requireEscapedStringLiteralsDisabled(spark);
+    } catch (IllegalStateException | IllegalArgumentException e) {
       System.err.println("Error: " + e.getMessage());
       spark.stop();
       System.exit(1);
@@ -432,6 +578,31 @@ public final class IcebergJobUtils {
       SparkSession spark, String catalogName, String tableIdentifier) {
     Snapshot snapshot = loadIcebergTable(spark, catalogName, tableIdentifier).currentSnapshot();
     return snapshot == null ? -1L : snapshot.snapshotId();
+  }
+
+  /**
+   * Expands relative day counts (bare {@code 7}, or legacy {@code 7d}) to a UTC Iceberg {@code
+   * older_than} timestamp; absolute timestamps pass through. Null/blank stay as-is. Pass {@link
+   * Clock#systemUTC()} in production.
+   */
+  public static String normalizeOlderThan(@Nullable String olderThan, Clock clock) {
+    if (olderThan == null || olderThan.trim().isEmpty()) {
+      return olderThan;
+    }
+    Preconditions.checkNotNull(clock, "clock");
+    String trimmed = olderThan.trim();
+    Matcher matcher = OLDER_THAN_RELATIVE_DAYS.matcher(trimmed);
+    if (!matcher.matches()) {
+      return olderThan;
+    }
+    long days = Long.parseLong(matcher.group(1));
+    IcebergSnapshotExpirationContent.validateOlderThanDays(days);
+    try {
+      return OLDER_THAN_TIMESTAMP.format(clock.instant().minus(days, ChronoUnit.DAYS));
+    } catch (DateTimeException | ArithmeticException e) {
+      throw new IllegalArgumentException(
+          "older_than days cannot be represented as a retention timestamp", e);
+    }
   }
 
   /** Visible for unit tests that assert the missing-class error message. */

@@ -25,6 +25,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.Setter;
@@ -38,6 +39,7 @@ import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.utils.ClassUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnsupportedFileSystemException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.iceberg.BaseMetadataTable;
@@ -89,6 +91,7 @@ import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 import org.apache.iceberg.view.BaseView;
 import org.apache.iceberg.view.View;
 import org.apache.iceberg.view.ViewMetadata;
+import org.apache.iceberg.view.ViewMetadataParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -243,7 +246,23 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   public LoadTableResponse registerTable(Namespace namespace, RegisterTableRequest request) {
+    request.validate();
     validateTableLocation(request.metadataLocation());
+    TableMetadata metadata =
+        request instanceof RegisterTableRequestWithMetadata
+            ? ((RegisterTableRequestWithMetadata) request).tableMetadata()
+            : loadTableMetadataFromLocation(request.metadataLocation());
+    validateTableLocation(metadata.location());
+    validateStorageProperties(metadata.properties());
+    Catalog loadedCatalog = getCatalog();
+    // Subclasses can enforce additional registration invariants through the original API.
+    if (loadedCatalog.getClass() == JdbcCatalogWithMetadataLocationSupport.class) {
+      TableIdentifier identifier = TableIdentifier.of(namespace, request.name());
+      getMetadataCache().invalidate(identifier);
+      ((JdbcCatalogWithMetadataLocationSupport) loadedCatalog)
+          .registerTableWithMetadata(identifier, metadata, request.overwrite());
+      return LoadTableResponse.builder().withTableMetadata(metadata).build();
+    }
     try {
       return CatalogHandlers.registerTable(getCatalog(), namespace, request);
     } catch (NotFoundException e) {
@@ -270,6 +289,8 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     request.validate();
     validateTableDefinition(request);
     validateTableLocation(request.location());
+    validateStorageProperties(request.properties());
+    validateInheritedLocation(namespace, request.location());
     Catalog loadedCatalog = getCatalog();
     LoadTableResponse loadTableResponse;
     try {
@@ -428,6 +449,34 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     return Optional.empty();
   }
 
+  /**
+   * Returns potential overlapping standard-layout table pointers without reading table metadata.
+   *
+   * @param location requested table location
+   * @return candidate pointers, or empty when the backend has no bulk pointer lookup
+   */
+  public Optional<Map<TableIdentifier, String>> getTableMetadataLocationCandidates(
+      String location) {
+    return getTableMetadataLocationCandidates(location, null);
+  }
+
+  /**
+   * Returns overlapping standard-layout pointers and an exact registration source pointer.
+   *
+   * @param location requested table location
+   * @param metadataLocation requested metadata pointer, or null outside registration
+   * @return candidate pointers, or empty when bulk lookup is unsupported
+   */
+  public Optional<Map<TableIdentifier, String>> getTableMetadataLocationCandidates(
+      String location, @Nullable String metadataLocation) {
+    Catalog loadedCatalog = getCatalog();
+    if (loadedCatalog instanceof SupportsMetadataLocation) {
+      return ((SupportsMetadataLocation) loadedCatalog)
+          .metadataLocationCandidates(location, metadataLocation);
+    }
+    return Optional.empty();
+  }
+
   public boolean tableExists(TableIdentifier tableIdentifier) {
     return getCatalog().tableExists(tableIdentifier);
   }
@@ -456,11 +505,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public LoadTableResponse updateTable(
       TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest) {
-    for (MetadataUpdate update : updateTableRequest.updates()) {
-      if (update instanceof MetadataUpdate.SetLocation) {
-        validateTableLocation(((MetadataUpdate.SetLocation) update).location());
-      }
-    }
+    validateStorageUpdates(updateTableRequest);
     getMetadataCache().invalidate(tableIdentifier);
     validateDefaultSpecAndSortOrder(tableIdentifier, updateTableRequest);
     LoadTableResponse loadTableResponse;
@@ -477,20 +522,66 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     return loadTableResponse;
   }
 
+  /**
+   * Commits an already built table change and reloads the table metadata.
+   *
+   * <p>This method does not establish an impersonation context for the earlier table load or
+   * transaction construction. Callers that require Kerberos impersonation must build changes inside
+   * {@link #buildAndUpdateTable(Function)} on the proxied wrapper instead of building them with
+   * {@link #getCatalog()} before calling this method.
+   *
+   * @param icebergTableChange the table change to commit
+   * @return the response after committing the table change
+   */
   public LoadTableResponse updateTable(IcebergTableChange icebergTableChange) {
     Transaction transaction = icebergTableChange.getTransaction();
-    transaction.commitTransaction();
+    try {
+      transaction.commitTransaction();
+    } finally {
+      // A load during the commit can cache old metadata, even if the commit ultimately fails.
+      getMetadataCache().invalidate(icebergTableChange.getTableIdentifier());
+    }
     return loadTable(icebergTableChange.getTableIdentifier());
+  }
+
+  /**
+   * Builds an {@link IcebergTableChange} and commits it within a single proxied call. When this
+   * wrapper is behind the {@link KerberosAwareIcebergCatalogProxy}, the entire operation, including
+   * the metadata.json read triggered by {@code loadTable()} inside the builder, runs under the
+   * impersonated user's UGI context.
+   *
+   * <p>The catalog passed to the builder is the same underlying instance returned by {@link
+   * #getCatalog()}; it is not itself proxied. The builder must execute inside this wrapper method
+   * so that table loading and transaction construction remain within the proxy's Kerberos boundary.
+   * Moving the builder call outside this method would bypass impersonation even when using the same
+   * catalog.
+   *
+   * @param builder a function that uses the underlying catalog to build an {@link
+   *     IcebergTableChange}
+   * @return the response after committing the table change
+   */
+  public LoadTableResponse buildAndUpdateTable(Function<Catalog, IcebergTableChange> builder) {
+    IcebergTableChange change = builder.apply(getCatalog());
+    return updateTable(change);
   }
 
   public LoadViewResponse createView(Namespace namespace, CreateViewRequest request) {
     request.validate();
+    validateTableLocation(request.location());
+    validateStorageProperties(request.properties());
+    validateInheritedLocation(namespace, request.location());
     return CatalogHandlers.createView(getViewCatalog(), namespace, request);
   }
 
   public LoadViewResponse registerView(Namespace namespace, RegisterViewRequest request) {
     request.validate();
+    validateTableLocation(request.metadataLocation());
     try {
+      if (hasRemoteWarehouse() || S3FileIO.class.getName().equals(fileIOImpl())) {
+        ViewMetadata metadata = loadViewMetadataFromLocation(request.metadataLocation());
+        validateTableLocation(metadata.location());
+        validateStorageProperties(metadata.properties());
+      }
       return CatalogHandlers.registerView(getViewCatalog(), namespace, request);
     } catch (NotFoundException e) {
       // As in registerTable: the metadata location comes from the request.
@@ -502,6 +593,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public LoadViewResponse updateView(TableIdentifier viewIdentifier, UpdateTableRequest request) {
     request.validate();
+    validateStorageUpdates(request);
     return CatalogHandlers.updateView(getViewCatalog(), viewIdentifier, request);
   }
 
@@ -601,6 +693,13 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     }
   }
 
+  @VisibleForTesting
+  ViewMetadata loadViewMetadataFromLocation(String metadataLocation) {
+    try (FileIO fileIO = CatalogUtil.loadFileIO(fileIOImpl(), fileIOProperties(), null)) {
+      return ViewMetadataParser.read(fileIO.newInputFile(metadataLocation));
+    }
+  }
+
   private TableMetadataCache loadTableMetadataCache(IcebergConfig config, Catalog catalog) {
     String impl = config.get(IcebergConfig.TABLE_METADATA_CACHE_IMPL);
     if (StringUtils.isBlank(impl)) {
@@ -667,7 +766,16 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   private void validateTableLocation(@Nullable String location) {
-    if (location == null || !S3FileIO.class.getName().equals(fileIOImpl())) {
+    if (location == null) {
+      return;
+    }
+    if (hasRemoteWarehouse() && isLocalLocation(location)) {
+      throw new BadRequestException(
+          "Invalid storage location '%s': a catalog with a remote warehouse cannot access the"
+              + " server's local filesystem",
+          location);
+    }
+    if (!S3FileIO.class.getName().equals(fileIOImpl())) {
       return;
     }
     String[] parts = location.split("://", 2);
@@ -677,6 +785,50 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       throw new BadRequestException(
           "Invalid table location '%s': this catalog requires an S3 location", location);
     }
+  }
+
+  private void validateStorageProperties(@Nullable Map<String, String> properties) {
+    if (properties != null) {
+      validateTableLocation(properties.get(TableProperties.WRITE_METADATA_LOCATION));
+      validateTableLocation(properties.get(TableProperties.WRITE_DATA_LOCATION));
+    }
+  }
+
+  private void validateStorageUpdates(UpdateTableRequest request) {
+    for (MetadataUpdate update : request.updates()) {
+      if (update instanceof MetadataUpdate.SetLocation) {
+        validateTableLocation(((MetadataUpdate.SetLocation) update).location());
+      } else if (update instanceof MetadataUpdate.SetProperties) {
+        validateStorageProperties(((MetadataUpdate.SetProperties) update).updated());
+      }
+    }
+  }
+
+  private void validateInheritedLocation(Namespace namespace, @Nullable String location) {
+    if (location == null && hasRemoteWarehouse()) {
+      // Existing namespaces may already have a local location. Check it before an implicit
+      // create uses it, as well as rejecting new local namespace locations.
+      SupportsNamespaces namespaceCatalog = getNamespaceCatalog();
+      if (namespaceCatalog != null) {
+        validateTableLocation(
+            namespaceCatalog.loadNamespaceMetadata(namespace).get(IcebergConstants.LOCATION));
+      }
+    }
+  }
+
+  private boolean hasRemoteWarehouse() {
+    String warehouse = icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE);
+    return StringUtils.isNotBlank(warehouse) && !isLocalLocation(warehouse);
+  }
+
+  private static boolean isLocalLocation(String location) {
+    if (StringUtils.isBlank(location)) {
+      return true;
+    }
+    // Use Hadoop's path parsing, matching ResolvingFileIO's local fallback. This also handles
+    // file:/ paths and paths without a scheme, rather than checking only the file:// prefix.
+    String scheme = new Path(location).toUri().getScheme();
+    return scheme == null || "file".equalsIgnoreCase(scheme);
   }
 
   /**
@@ -742,6 +894,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     if (properties == null) {
       return;
     }
+    validateTableLocation(properties.get(IcebergConstants.LOCATION));
     if (getCatalog() instanceof JdbcCatalog) {
       properties.forEach(
           (key, value) ->

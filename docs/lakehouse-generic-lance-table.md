@@ -123,6 +123,21 @@ them: 2.2 for `lance.blob` and 2.1 for `lance.blob.legacy`. A table cannot have 
 column to an existing dataset fails with a clear error if the dataset's file format version does not
 support it.
 
+A table created without blob columns uses Lance's own default file format version, 2.2 as of
+`lance-core` 12.0.0, and there is no property to override it. Such a table accepts a later
+`lance.blob` column but rejects `lance.blob.legacy`; tables created by earlier releases, whose
+Lance default was below 2.2, behave the other way round and keep their stored version.
+
+Any Lance client can **read** such a table. **Writing** to it needs a client that writes at the
+dataset's own file format version rather than at its own default. `lance-spark` 0.2.0 does not: it
+passes no data storage version to Lance, so every write goes out at `lance-core` 2.0.0's default of
+2.0 and the commit is refused with `All data files must have the same version.  Detected both 2.2
+and 2.0` — or, while the dataset is still empty, `The operation added files with version 2.0.
+However, the data storage version is 2.2.` This is not specific to version 2.2: earlier Gravitino
+releases pinned the same tables at 2.1 and refused the same write. `lance-spark` 0.4.0 and later
+read the dataset's version before writing and are unaffected, as are tables created *through* a
+connector — that path uses `DeclareTable`, and the connector writes the dataset at its own version.
+
 Only the blob marker is recognized. Other blob metadata, such as
 `lance-encoding:blob-dedicated-size-threshold`, is not shown in the Gravitino type, and columns created
 through Gravitino use Lance's defaults. A blob field in any other layout, for example a blob v2 struct
@@ -139,6 +154,20 @@ version change. Until a refresh happens, blob v2 columns still appear as a plain
 blob columns stored as `External(arrow_field_json_str)` keep that form instead of
 `External("lance.blob.legacy")`.
 :::
+
+### Ownership with `EXIST_OK`
+
+You can use `lance.creation-mode=EXIST_OK` with the Gravitino table API and with Lance REST.
+
+- If the table already exists, Gravitino returns it and keeps its owner. This is also true when
+  the table has no owner.
+- If another request is still creating the table, the `EXIST_OK` request does not set the owner.
+  The creator sets it.
+- If the request creates a new table, the caller becomes the owner when authorization is enabled.
+
+Gravitino creates the table and sets the owner in two separate steps. If the table is created but
+setting the owner fails, a repeated `EXIST_OK` request does not fix the owner. Fix the cause, then
+set the owner explicitly.
 
 ### Table Properties
 
@@ -472,4 +501,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```
 
-If you need to override storage on a single table, `lance.storage.*` table properties are still supported.
+A table can add `lance.storage.*` table properties for keys that the catalog does not set. If the
+catalog sets a key, the catalog value is used, and the table value is ignored. This prevents a table
+creator from sending the catalog credentials to another endpoint. Put tables that need a different
+endpoint or credentials in a separate catalog.

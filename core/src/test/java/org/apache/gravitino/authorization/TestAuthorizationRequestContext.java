@@ -52,6 +52,80 @@ import org.junit.jupiter.api.Test;
 
 public class TestAuthorizationRequestContext {
 
+  /** Tests policy-existence lookup reuse across concurrent workers of one request. */
+  @Test
+  public void testEnabledAccessPolicyCheckRunsOncePerMetalake() throws Exception {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    AtomicInteger reads = new AtomicInteger();
+    CountDownLatch entered = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    CountDownLatch secondStarted = new CountDownLatch(1);
+    ExecutorService workers = Executors.newFixedThreadPool(2);
+    try {
+      Callable<Boolean> lookup =
+          () ->
+              context.hasEnabledAccessPolicies(
+                  "metalake",
+                  () -> {
+                    reads.incrementAndGet();
+                    entered.countDown();
+                    try {
+                      assertTrue(release.await(5, TimeUnit.SECONDS));
+                    } catch (InterruptedException e) {
+                      Thread.currentThread().interrupt();
+                      throw new IllegalStateException(e);
+                    }
+                    return false;
+                  });
+      Future<Boolean> first = workers.submit(lookup);
+      assertTrue(entered.await(5, TimeUnit.SECONDS));
+      Future<Boolean> second =
+          workers.submit(
+              () -> {
+                secondStarted.countDown();
+                return lookup.call();
+              });
+      assertTrue(secondStarted.await(5, TimeUnit.SECONDS));
+      // A concurrent check must wait for the in-flight lookup instead of running another query.
+      assertThrows(TimeoutException.class, () -> second.get(200, TimeUnit.MILLISECONDS));
+      release.countDown();
+      assertFalse(first.get(5, TimeUnit.SECONDS));
+      assertFalse(second.get(5, TimeUnit.SECONDS));
+      assertFalse(context.hasEnabledAccessPolicies("metalake", () -> true));
+      assertEquals(1, reads.get());
+      assertTrue(context.hasEnabledAccessPolicies("another", () -> true));
+      assertTrue(
+          new AuthorizationRequestContext().hasEnabledAccessPolicies("metalake", () -> true));
+    } finally {
+      release.countDown();
+      workers.shutdownNow();
+      assertTrue(workers.awaitTermination(5, TimeUnit.SECONDS));
+    }
+  }
+
+  /** Tests that lookup failures are retained only for the current request. */
+  @Test
+  public void testEnabledAccessPolicyCheckRetainsFailure() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    RuntimeException failure = new IllegalStateException("policy listing failed");
+    assertSame(
+        failure,
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                context.hasEnabledAccessPolicies(
+                    "metalake",
+                    () -> {
+                      throw failure;
+                    })));
+    assertSame(
+        failure,
+        assertThrows(
+            IllegalStateException.class,
+            () -> context.hasEnabledAccessPolicies("metalake", () -> true)));
+    assertTrue(new AuthorizationRequestContext().hasEnabledAccessPolicies("metalake", () -> true));
+  }
+
   @Test
   public void testLoadRoleRunsOnceEvenWhenInvokedConcurrently() throws Exception {
     AuthorizationRequestContext context = new AuthorizationRequestContext();

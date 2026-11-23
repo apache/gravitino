@@ -26,6 +26,26 @@ import org.junit.jupiter.api.Test;
 public class TestIcebergCatalogCapability {
 
   @Test
+  void testExistingLongNamespacesRemainAddressableWithoutRelaxingCreate() {
+    IcebergCatalogCapability capability = new IcebergCatalogCapability(":");
+    for (int length : new int[] {65, 100}) {
+      String name = "n".repeat(length);
+      Assertions.assertTrue(
+          capability.specificationOnExistingName(Capability.Scope.SCHEMA, name).supported());
+      Assertions.assertTrue(
+          capability
+              .specificationOnExistingName(Capability.Scope.SCHEMA, "parent:" + name)
+              .supported());
+      Assertions.assertFalse(
+          capability.specificationOnName(Capability.Scope.SCHEMA, name).supported());
+      Assertions.assertFalse(
+          capability.specificationOnExistingName(Capability.Scope.TABLE, name).supported());
+    }
+    Assertions.assertFalse(
+        capability.specificationOnExistingName(Capability.Scope.SCHEMA, "a::b").supported());
+  }
+
+  @Test
   public void testSchemaNameSupportsConfiguredSeparator() {
     IcebergCatalogCapability capability = new IcebergCatalogCapability(":");
 
@@ -96,6 +116,35 @@ public class TestIcebergCatalogCapability {
     IcebergCatalogCapability capability = new IcebergCatalogCapability(":");
 
     Assertions.assertTrue(capability.supportsHierarchicalSchema().supported());
+  }
+
+  @Test
+  public void testHiveBackendFoldsSchemaTableAndViewNamesOnly() {
+    IcebergCatalogCapability capability = new IcebergCatalogCapability(":", true);
+
+    Assertions.assertFalse(capability.caseSensitiveOnName(Capability.Scope.SCHEMA).supported());
+    Assertions.assertFalse(capability.caseSensitiveOnName(Capability.Scope.TABLE).supported());
+    Assertions.assertFalse(capability.caseSensitiveOnName(Capability.Scope.VIEW).supported());
+    Assertions.assertEquals("schema", capability.normalizeName(Capability.Scope.SCHEMA, "Schema"));
+    Assertions.assertEquals("table", capability.normalizeName(Capability.Scope.TABLE, "Table"));
+    Assertions.assertEquals("view", capability.normalizeName(Capability.Scope.VIEW, "View"));
+
+    Assertions.assertTrue(capability.caseSensitiveOnName(Capability.Scope.COLUMN).supported());
+    Assertions.assertEquals("Column", capability.normalizeName(Capability.Scope.COLUMN, "Column"));
+  }
+
+  @Test
+  public void testNonHiveBackendKeepsEntityNameCase() {
+    IcebergCatalogCapability capability = new IcebergCatalogCapability(":", false);
+
+    Assertions.assertTrue(capability.caseSensitiveOnName(Capability.Scope.SCHEMA).supported());
+    Assertions.assertTrue(capability.caseSensitiveOnName(Capability.Scope.TABLE).supported());
+    Assertions.assertTrue(capability.caseSensitiveOnName(Capability.Scope.VIEW).supported());
+    Assertions.assertTrue(capability.caseSensitiveOnName(Capability.Scope.COLUMN).supported());
+    Assertions.assertEquals("Schema", capability.normalizeName(Capability.Scope.SCHEMA, "Schema"));
+    Assertions.assertEquals("Table", capability.normalizeName(Capability.Scope.TABLE, "Table"));
+    Assertions.assertEquals("View", capability.normalizeName(Capability.Scope.VIEW, "View"));
+    Assertions.assertEquals("Column", capability.normalizeName(Capability.Scope.COLUMN, "Column"));
   }
 
   @Test

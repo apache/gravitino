@@ -34,8 +34,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 class TestManifestRewritePolicyDTO {
   @Test
   void testPolicyAndCreateRequestRoundTrip() throws Exception {
-    IcebergRewriteManifestsContent content =
-        PolicyContents.icebergRewriteManifests(900L, 200L, 4096L, 3, false);
+    IcebergRewriteManifestsContent content = PolicyContents.icebergRewriteManifests(900L, 3, false);
     String persisted = JsonUtils.anyFieldMapper().writeValueAsString(content);
     Assertions.assertEquals(
         content,
@@ -68,12 +67,9 @@ class TestManifestRewritePolicyDTO {
     "spec_id,2147483648",
     "spec_id,true",
     "spec_id,\"1\"",
-    "manifest_count_critical,500.5",
-    "manifest_count_critical,9223372036854775808",
-    "manifest_count_warning,100.5",
-    "manifest_count_warning,false",
-    "avg_manifest_size_threshold_bytes,4096.5",
-    "avg_manifest_size_threshold_bytes,\"4096\"",
+    "manifest_count_threshold,500.5",
+    "manifest_count_threshold,9223372036854775808",
+    "manifest_count_threshold,\"100\"",
     "minIntervalMs,1.5",
     "minIntervalMs,\"100\"",
     "commitTrigger,1",
@@ -115,8 +111,7 @@ class TestManifestRewritePolicyDTO {
                 PolicyContentDTO.IcebergRewriteManifestsContentDTO.class);
     dto.validate();
     Assertions.assertEquals(
-        PolicyContents.icebergRewriteManifests(null, null, null, null, useCaching),
-        DTOConverters.fromDTO(dto));
+        PolicyContents.icebergRewriteManifests(null, null, useCaching), DTOConverters.fromDTO(dto));
   }
 
   @Test
@@ -124,16 +119,15 @@ class TestManifestRewritePolicyDTO {
     PolicyContentDTO.IcebergRewriteManifestsContentDTO bounds =
         JsonUtils.objectMapper()
             .readValue(
-                "{\"spec_id\":2147483647,\"manifest_count_critical\":9223372036854775807}",
+                "{\"spec_id\":2147483647,\"manifest_count_threshold\":9223372036854775807}",
                 PolicyContentDTO.IcebergRewriteManifestsContentDTO.class);
     bounds.validate();
     Assertions.assertEquals(Integer.MAX_VALUE, bounds.specId());
-    Assertions.assertEquals(Long.MAX_VALUE, bounds.manifestCountCritical());
+    Assertions.assertEquals(Long.MAX_VALUE, bounds.manifestCountThreshold());
     PolicyContentDTO.IcebergRewriteManifestsContentDTO defaults =
         JsonUtils.objectMapper()
             .readValue(
-                "{\"spec_id\":null,\"manifest_count_critical\":null,\"manifest_count_warning\":null,"
-                    + "\"avg_manifest_size_threshold_bytes\":null,\"use_caching\":null}",
+                "{\"spec_id\":null,\"manifest_count_threshold\":null,\"use_caching\":null}",
                 PolicyContentDTO.IcebergRewriteManifestsContentDTO.class);
     defaults.validate();
     Assertions.assertEquals(

@@ -20,16 +20,80 @@ package org.apache.gravitino.catalog.mysql.converter;
 
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class TestMysqlColumnDefaultValueConverter {
   private final MysqlColumnDefaultValueConverter converter = new MysqlColumnDefaultValueConverter();
+
+  @ParameterizedTest
+  @CsvSource({
+    "DATE, 0000-00-00",
+    "DATE, 0000-01-01",
+    "DATETIME, 0000-01-01 00:00:00",
+    "TIME, 838:59:59",
+    "TIME, -01:00:00",
+    "TIME, -838:59:59.123456",
+    "DATE, 2024-00-00",
+    "DATE, 2024-00-31",
+    "DATE, 2024-12-00",
+    "TIMESTAMP, 0000-00-00 00:00:00",
+    "DATETIME, 0000-00-00 00:00:00",
+    "DATETIME, 0000-00-00 12:34:56",
+    "DATETIME, 2024-00-00 12:34:56",
+    "DATETIME, 2024-00-31 23:59:59.123456",
+    "DATETIME, 2024-12-00 12:34:56.123",
+    "TIMESTAMP, 0000-00-00 00:00:00.0",
+    "DATETIME, 0000-00-00 00:00:00.000",
+    "TIMESTAMP, 0000-00-00 00:00:00.000000",
+    "DATETIME, 0000-00-00 00:00:00.123456"
+  })
+  void testUnrepresentableTemporalDefaultsArePreserved(String typeName, String value) {
+    JdbcTypeConverter.JdbcTypeBean type = new JdbcTypeConverter.JdbcTypeBean(typeName);
+    Expression result = converter.toGravitino(type, value, false, false);
+    String sql = "'" + value + "'";
+    Assertions.assertEquals(UnparsedExpression.of(sql), result);
+    Assertions.assertEquals(sql, converter.fromGravitino(result));
+    Assertions.assertEquals(result, converter.toGravitino(type, value, false, true));
+  }
+
+  @Test
+  void testTemporalFallbackEscapesQuotesAndRejectsRawSqlOnWrite() {
+    JdbcTypeConverter.JdbcTypeBean type = new JdbcTypeConverter.JdbcTypeBean("DATE");
+    Expression result = converter.toGravitino(type, "invalid'date", false, false);
+    Assertions.assertEquals(UnparsedExpression.of("'invalid''date'"), result);
+    Assertions.assertThrows(IllegalArgumentException.class, () -> converter.fromGravitino(result));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> converter.fromGravitino(UnparsedExpression.of("'0000-00-00' OR 1=1")));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"TIMESTAMP", "DATETIME"})
+  void testValidTemporalDefaults(String typeName) {
+    JdbcTypeConverter.JdbcTypeBean type = new JdbcTypeConverter.JdbcTypeBean(typeName);
+    Assertions.assertEquals(
+        Literals.timestampLiteral("2024-01-02T03:04:05.123456"),
+        converter.toGravitino(type, "2024-01-02 03:04:05.123456", false, false));
+    Assertions.assertEquals(
+        Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP,
+        converter.toGravitino(type, "CURRENT_TIMESTAMP(6)", false, false));
+  }
+
+  @Test
+  void testValidDateDefault() {
+    JdbcTypeConverter.JdbcTypeBean type = new JdbcTypeConverter.JdbcTypeBean("DATE");
+    Assertions.assertEquals(
+        Literals.dateLiteral("2024-01-02"),
+        converter.toGravitino(type, "2024-01-02", false, false));
+  }
 
   @ParameterizedTest
   @ValueSource(strings = {"true", "TRUE", "1"})

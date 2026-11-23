@@ -220,6 +220,24 @@ It adds the OAuth client settings when `oauth` is among the authenticators. Trea
 through `visibleConfigs` as public, and only add properties that a client needs before it can
 authenticate.
 
+Set `gravitino.server.visibleConfigs` when a Web UI or another client needs extra server
+configuration, for example to use the server's session timeout settings rather than local UI
+defaults. Set both the property values and the comma-separated list of keys in
+`conf/gravitino.conf`, then restart the server:
+
+```properties
+gravitino.ui.sessionIdleTimeoutMs = 1800000
+gravitino.ui.sessionMaxDurationMs = 28800000
+gravitino.server.visibleConfigs = gravitino.ui.sessionIdleTimeoutMs,gravitino.ui.sessionMaxDurationMs
+```
+
+Clients can then read those values from `GET http://localhost:8090/configs`. A key with no
+explicitly configured value is omitted. Leave the list empty when clients do not need additional
+settings; the fixed configuration keys are still returned. This setting controls configuration
+visibility, not access to catalogs or other metadata. Never include passwords, tokens, client
+secrets, or administrator lists. See [Web UI session settings](webui-v2.md#session-timeout-configuration) for the
+UI's configuration lookup order.
+
 Two further groups of `gravitino.server.webserver.*` properties are documented elsewhere, because
 they belong to features rather than to the web server itself. TLS, key stores, trust stores, and
 client certificate authentication are in [HTTPS](security/how-to-use-https.md). The CORS filter
@@ -722,8 +740,10 @@ catalog configuration file supplies defaults for every catalog of that provider,
 wins. Neither affects schema or table properties.
 
 A catalog property is one of three kinds. Gravitino defines some itself, as the settings a catalog
-needs to work. Anything prefixed `gravitino.bypass.` passes straight through to the underlying
-system untouched. Anything else Gravitino simply stores for you to use as you like.
+needs to work. Gravitino forwards `gravitino.bypass.` properties to the underlying system unless
+the catalog rejects them. Anything else Gravitino simply stores for you to use as you like. For
+example, the Kafka catalog rejects the Kafka config provider properties, see
+[Kafka catalog properties](kafka-catalog.md#catalog-properties).
 
 Passing credentials, tokens, or access keys through `gravitino.bypass.` exposes them: bypassed
 properties are not managed by Gravitino and can come back in plaintext from the REST API. Where an

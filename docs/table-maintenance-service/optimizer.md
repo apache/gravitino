@@ -25,11 +25,16 @@ Confirm your environment matches this list before starting an evaluation against
   rewrite data files (compaction), rewrite manifests, expire snapshots, and remove orphan files.
   Scheduling and `minIntervalMs` stay outside strategy evaluation. Sort and cluster maintenance
   still need custom strategies.
-- Compaction's **policy/strategy** path prefers identity partitions (time/bucket filters can fail
-  Spark translation). Direct `builtin-iceberg-rewrite-data-files` with an empty `where_clause`
-  covers broader layouts such as `PARTITIONED BY (p, days(ts))`; see
-  [Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures). The other three jobs
-  are not limited by that partition caveat.
+- Compaction's **policy/strategy** path generates Iceberg Spark system-function predicates (for
+  example `catalog.system.days(ts) = DATE 'yyyy-MM-dd'`,
+  `catalog.system.years|months|hours(ts) = N`, `catalog.system.bucket(16, id) = V`) for
+  non-identity partitions, and single-quoted typed literals for identity `DATE`/`TIMESTAMP`
+  columns (`dt = DATE 'yyyy-MM-dd'`). Day-transform partition values must be ISO `yyyy-MM-dd`
+  (as built-in `update-stats` stores); non-ISO values fail while building `where_clause`—see
+  [Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures) for recovery when an
+  imported epoch-day row remains after refresh. Direct
+  `builtin-iceberg-rewrite-data-files` with an empty `where_clause` still covers whole-table
+  rewrite on broader layouts.
 - The in-process service, `timeTrigger`, and the cron path are documented in [Service](./service.md). The rest of this page is the manual CLI workflow.
 
 ## How It Works
@@ -340,6 +345,8 @@ Compaction and other rewrites create snapshots; without expiry, metadata accumul
 
 - Direct path: `POST .../jobs/runs` with `jobTemplateName` `builtin-iceberg-expire-snapshots`,
   plus `catalog_name`, `table_identifier`, and the shared Spark/catalog `jobConf` keys.
+- Policy path: `system_iceberg_snapshot_expiration`
+  ([Iceberg snapshot expiration policy](../iceberg-snapshot-expiration-policy.md)).
 - Policy handler wiring:
   [Snapshot expiration](./optimizer-configuration.md#snapshot-expiration).
 
@@ -356,8 +363,9 @@ See [Expire Snapshots](./optimizer-cli-reference.md#expire-snapshots).
 
 **Submit**
 
-- Policy path: `system_iceberg_orphan_file_removal` and the handler in
-  [Orphan cleanup](./optimizer-configuration.md#orphan-cleanup).
+- Policy path: `system_iceberg_orphan_file_removal`
+  ([Iceberg orphan file removal policy](../iceberg-orphan-file-removal-policy.md)) and the handler
+  in [Orphan cleanup](./optimizer-configuration.md#orphan-cleanup).
   Each explicit optimizer invocation evaluates the enabled policy at table level; it does not
   require partition statistics or configure a periodic schedule.
 - Direct path: `POST .../jobs/runs` with `jobTemplateName` `builtin-iceberg-remove-orphan-files`.
@@ -379,4 +387,7 @@ See [Remove Orphan Files](./optimizer-cli-reference.md#remove-orphan-files) and
 - [CLI Reference](./optimizer-cli-reference.md) for every command and the built-in job templates
 - [Troubleshooting](./optimizer-troubleshooting.md) when something above does not behave
 - [Extension Guide](./optimizer-extension-guide.md) for custom strategies and providers
-- [Iceberg Compaction Policy](../iceberg-compaction-policy.md) for tuning the built-in strategy
+- [Iceberg Compaction Policy](../iceberg-compaction-policy.md)
+- [Iceberg Manifest Rewrite Policy](../iceberg-rewrite-manifests-policy.md)
+- [Iceberg Snapshot Expiration Policy](../iceberg-snapshot-expiration-policy.md)
+- [Iceberg Orphan File Removal Policy](../iceberg-orphan-file-removal-policy.md)

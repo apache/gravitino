@@ -15,7 +15,7 @@ jobs:
       - uses: ./.github/actions/setup-java-toolchains
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
 
       - name: Check required command
         run: dev/ci/check_commands.sh
@@ -35,8 +35,8 @@ jobs:
             -x :flink-connector:flink-runtime-2.1:build \
             -x :flink-connector:flink-2.2:build \
             -x :flink-connector:flink-runtime-2.2:build \
-            -x :spark-connector:spark-3.5:build -x :spark-connector:spark-4.0:build \
-            -x :spark-connector:spark-runtime-3.5:build -x :spark-connector:spark-runtime-4.0:build \
+            -x :spark-connector:spark-3.5:build -x :spark-connector:spark-4.0:build -x :spark-connector:spark-4.1:build \
+            -x :spark-connector:spark-runtime-3.5:build -x :spark-connector:spark-runtime-4.0:build -x :spark-connector:spark-runtime-4.1:build \
             -x :mcp-server:build -x :lineage:build \
             -x :maintenance:optimizer:build -x :maintenance:jobs:build \
             -x :lance:lance-common:build -x :lance:lance-rest-server:build

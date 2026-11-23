@@ -36,10 +36,12 @@ import javax.annotation.Nullable;
 public final class RelationQuery {
 
   private final SupportsRelationOperations.Type relationType;
-  private final NameIdentifier anchorIdentifier;
+  @Nullable private final NameIdentifier anchorIdentifier;
   private final Entity.EntityType anchorEntityType;
   private final boolean allFields;
   @Nullable private final String relationValue;
+  @Nullable private final Long anchorId;
+  @Nullable private final String anchorMetalake;
 
   private RelationQuery(
       SupportsRelationOperations.Type relationType,
@@ -47,11 +49,24 @@ public final class RelationQuery {
       Entity.EntityType anchorEntityType,
       boolean allFields,
       @Nullable String relationValue) {
+    this(relationType, anchorIdentifier, anchorEntityType, allFields, relationValue, null, null);
+  }
+
+  private RelationQuery(
+      SupportsRelationOperations.Type relationType,
+      @Nullable NameIdentifier anchorIdentifier,
+      Entity.EntityType anchorEntityType,
+      boolean allFields,
+      @Nullable String relationValue,
+      @Nullable Long anchorId,
+      @Nullable String anchorMetalake) {
     this.relationType = relationType;
     this.anchorIdentifier = anchorIdentifier;
     this.anchorEntityType = anchorEntityType;
     this.allFields = allFields;
     this.relationValue = relationValue;
+    this.anchorId = anchorId;
+    this.anchorMetalake = anchorMetalake;
   }
 
   /**
@@ -78,6 +93,45 @@ public final class RelationQuery {
   }
 
   /**
+   * Creates a metadata-object lookup by stable tag ID, without a tag name.
+   *
+   * @param metalake The metalake containing the tag.
+   * @param tagId The stable tag ID.
+   * @param value The exact assignment value, or null to match all assignments.
+   * @return A query anchored by tag ID.
+   */
+  public static RelationQuery forTagId(String metalake, long tagId, @Nullable String value) {
+    Preconditions.checkArgument(
+        metalake != null && !metalake.isEmpty(), "metalake must not be empty");
+    return new RelationQuery(
+        SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+        null,
+        Entity.EntityType.TAG,
+        true,
+        value,
+        tagId,
+        metalake);
+  }
+
+  /**
+   * Returns the metalake of a tag ID lookup.
+   *
+   * @return The metalake, or empty for a name-addressed query.
+   */
+  public Optional<String> anchorMetalake() {
+    return Optional.ofNullable(anchorMetalake);
+  }
+
+  /**
+   * Returns the stable anchor ID, when name resolution must be bypassed.
+   *
+   * @return The anchor ID, or empty for a name-addressed query.
+   */
+  public Optional<Long> anchorId() {
+    return Optional.ofNullable(anchorId);
+  }
+
+  /**
    * @return The type of relation.
    */
   public SupportsRelationOperations.Type relationType() {
@@ -86,8 +140,10 @@ public final class RelationQuery {
 
   /**
    * @return The anchor entity identifier.
+   * @throws IllegalStateException If this query is anchored by ID instead of name.
    */
   public NameIdentifier anchorIdentifier() {
+    Preconditions.checkState(anchorIdentifier != null, "An ID query has no name identifier");
     return anchorIdentifier;
   }
 

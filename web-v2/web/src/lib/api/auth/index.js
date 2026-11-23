@@ -21,9 +21,12 @@ import { defHttp } from '@/lib/utils/axios'
 import { ContentTypeEnum } from '@/lib/enums/httpEnum'
 
 export const getAuthConfigsApi = () => {
-  return defHttp.get({
-    url: '/configs'
-  })
+  return defHttp.get(
+    {
+      url: '/configs'
+    },
+    { withToken: false }
+  )
 }
 
 export const getAuthMeApi = () => {

@@ -53,6 +53,126 @@ import org.opentest4j.AssertionFailedError;
 public class TestSQLScripts extends TestJDBCBackend {
 
   @TestTemplate
+  void testReimportedIdentifiersWithFreshAndUpgradedSchemas() throws SQLException, IOException {
+    Path scripts = upgradeScriptDirectory();
+    String suffix = "-" + backendType.toLowerCase(Locale.ROOT) + ".sql";
+    File upgrade = scripts.resolve("upgrade-1.3.0-to-2.0.0" + suffix).toFile();
+    List<String> inserts = externalEntityInsertStatements();
+    for (String initialVersion : List.of("1.3.0", "2.0.0")) {
+      dropAllTables();
+      executeScript(scripts.resolve("schema-" + initialVersion + suffix).toFile());
+      executeStatements(inserts, "initial registrations");
+      if (initialVersion.equals("1.3.0")) {
+        executeScript(upgrade);
+      }
+      for (int generation = 1; generation <= 2; generation++) {
+        for (String entity : List.of("schema", "table", "topic", "view")) {
+          executeStatements(
+              List.of(
+                  "UPDATE "
+                      + entity
+                      + "_meta SET deleted_at = "
+                      + generation
+                      + " WHERE deleted_at = 0"),
+              "retire registration");
+        }
+        executeStatements(inserts, "reimport the same external IDs");
+        try (SqlSession session =
+                SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+            Connection connection = session.getConnection();
+            Statement statement = connection.createStatement()) {
+          for (String insert : inserts) {
+            String conflictingPath =
+                insert
+                    .replace("'schema'", "'other_schema'")
+                    .replace("'table'", "'other_table'")
+                    .replace("'topic'", "'other_topic'")
+                    .replace("'view'", "'other_view'")
+                    .replace(", 2,", ", 3,");
+            Assertions.assertThrows(
+                SQLException.class,
+                () -> statement.executeUpdate(conflictingPath),
+                "A duplicate active identity must still fail");
+          }
+        }
+        if (initialVersion.equals("1.3.0")) {
+          executeScript(upgrade);
+        }
+        for (String entity : List.of("schema", "table", "topic", "view")) {
+          String table = entity + "_meta";
+          assertExternalIdentityPrimaryKey(table, entity + "_id");
+          try (SqlSession session =
+                  SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+              Connection connection = session.getConnection();
+              Statement statement = connection.createStatement();
+              ResultSet result =
+                  statement.executeQuery(
+                      "SELECT COUNT(*), SUM(CASE WHEN deleted_at = 0 THEN 1 ELSE 0 END) FROM "
+                          + table)) {
+            Assertions.assertTrue(result.next());
+            Assertions.assertEquals(
+                generation + 1, result.getInt(1), "History must remain after a migration retry");
+            Assertions.assertEquals(1, result.getInt(2), "Only one registration can be active");
+          }
+        }
+      }
+    }
+  }
+
+  @TestTemplate
+  void testUpgradeEarlierTwoZeroIdentifierKeys() throws SQLException, IOException {
+    Path scripts = upgradeScriptDirectory();
+    String suffix = "-" + backendType.toLowerCase(Locale.ROOT) + ".sql";
+    File upgrade = scripts.resolve("upgrade-1.3.0-to-2.0.0" + suffix).toFile();
+    dropAllTables();
+    executeScript(scripts.resolve("schema-2.0.0" + suffix).toFile());
+    for (String entity : List.of("schema", "table", "topic", "view")) {
+      String table = entity + "_meta";
+      String dropPrimaryKey =
+          backendType.equalsIgnoreCase("postgresql")
+              ? " DROP CONSTRAINT " + table + "_pkey"
+              : " DROP PRIMARY KEY";
+      executeStatements(
+          List.of(
+              "ALTER TABLE " + table + dropPrimaryKey,
+              "ALTER TABLE " + table + " ADD PRIMARY KEY (" + entity + "_id)"),
+          "simulate the earlier 2.0 identifier-only primary keys");
+    }
+    executeStatements(externalEntityInsertStatements(), "live 2.0 registrations");
+    seedExternalGovernance(1);
+    for (int attempt = 0; attempt < 2; attempt++) {
+      executeScript(upgrade);
+      assertExternalGovernanceCount(4);
+      for (String entity : List.of("schema", "table", "topic", "view")) {
+        assertExternalIdentityPrimaryKey(entity + "_meta", entity + "_id");
+      }
+    }
+  }
+
+  @TestTemplate
+  void testUpgradeClearsRetiredGovernanceAndPreservesReimportedGovernance()
+      throws SQLException, IOException {
+    Path scripts = upgradeScriptDirectory();
+    String suffix = "-" + backendType.toLowerCase(Locale.ROOT) + ".sql";
+    File upgrade = scripts.resolve("upgrade-1.3.0-to-2.0.0" + suffix).toFile();
+    dropAllTables();
+    executeScript(scripts.resolve("schema-1.3.0" + suffix).toFile());
+    executeStatements(externalEntityInsertStatements(), "legacy registrations");
+    seedExternalGovernance(1);
+    for (String entity : List.of("schema", "table", "topic", "view")) {
+      executeStatements(
+          List.of("UPDATE " + entity + "_meta SET deleted_at = 42"), "retire legacy registrations");
+    }
+    executeScript(upgrade);
+    assertExternalGovernanceCount(0);
+
+    executeStatements(externalEntityInsertStatements(), "reimport external IDs");
+    seedExternalGovernance(2);
+    executeScript(upgrade);
+    assertExternalGovernanceCount(4);
+  }
+
+  @TestTemplate
   public void testSQLScripts() throws SQLException, IOException {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     Assertions.assertNotNull(gravitinoHome, "GRAVITINO_HOME environment variable is not set");
@@ -73,12 +193,16 @@ public class TestSQLScripts extends TestJDBCBackend {
             "(?:iceberg|optimizer)-metrics-schema-([\\d.]+)-"
                 + backendType.toLowerCase()
                 + "\\.sql");
+    Pattern icebergJdbcPattern =
+        Pattern.compile("iceberg-jdbc-schema-" + backendType.toLowerCase() + "\\.sql");
 
     Map<String, List<File>> versionScrips = new HashMap<>();
+    List<File> icebergJdbcScripts = new ArrayList<>();
     for (File scriptFile : scriptFiles) {
       Matcher schemaMatcher = schemaPattern.matcher(scriptFile.getName());
       Matcher upgradeMatcher = upgradePattern.matcher(scriptFile.getName());
       Matcher metricsMatcher = metricsPattern.matcher(scriptFile.getName());
+      Matcher icebergJdbcMatcher = icebergJdbcPattern.matcher(scriptFile.getName());
 
       if (schemaMatcher.matches()) {
         String version = schemaMatcher.group(1);
@@ -93,6 +217,9 @@ public class TestSQLScripts extends TestJDBCBackend {
         String version = metricsMatcher.group(1);
         versionScrips.computeIfAbsent(version, k -> new ArrayList<>()).add(scriptFile);
 
+      } else if (icebergJdbcMatcher.matches()) {
+        icebergJdbcScripts.add(scriptFile);
+
       } else {
         Assertions.fail("Unrecognized script file name: " + scriptFile.getName());
       }
@@ -106,7 +233,16 @@ public class TestSQLScripts extends TestJDBCBackend {
       if ("2.0.0".equals(versionScripts.getKey())) {
         assertCleanupIndexes("schema " + versionScripts.getKey());
         assertNameColumnWidths("schema " + versionScripts.getKey());
+        assertIdempotencySchema("schema " + versionScripts.getKey());
       }
+    }
+
+    Assertions.assertFalse(
+        icebergJdbcScripts.isEmpty(),
+        "No standalone Iceberg JDBC schema script found for " + backendType);
+    for (File scriptFile : icebergJdbcScripts) {
+      dropAllTables();
+      executeScript(scriptFile);
     }
   }
 
@@ -140,6 +276,7 @@ public class TestSQLScripts extends TestJDBCBackend {
       if ("2.0.0".equals(upgradeMatcher.group(2))) {
         assertCleanupIndexes(upgradeScript.getName());
         assertNameColumnWidths(upgradeScript.getName());
+        assertIdempotencySchema(upgradeScript.getName());
       }
     }
   }
@@ -607,6 +744,86 @@ public class TestSQLScripts extends TestJDBCBackend {
     }
   }
 
+  private void seedExternalGovernance(int generation) throws SQLException {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement()) {
+      Map<Long, String> objects = Map.of(11L, "SCHEMA", 12L, "TABLE", 13L, "TOPIC", 14L, "VIEW");
+      for (Map.Entry<Long, String> object : objects.entrySet()) {
+        long id = object.getKey();
+        String type = object.getValue();
+        statement.executeUpdate(
+            String.format(
+                "INSERT INTO owner_meta (metalake_id, owner_id, owner_type, metadata_object_id, metadata_object_type, audit_info) VALUES (1, 101, 'USER', %d, '%s', '{}')",
+                id, type));
+        statement.executeUpdate(
+            String.format(
+                "INSERT INTO role_meta_securable_object (role_id, metadata_object_id, type, privilege_names, privilege_conditions) VALUES (101, %d, '%s', '[]', '[]')",
+                id, type));
+        statement.executeUpdate(
+            String.format(
+                "INSERT INTO tag_relation_meta (tag_id, metadata_object_id, metadata_object_type, audit_info) VALUES (102, %d, '%s', '{}')",
+                id, type));
+        statement.executeUpdate(
+            String.format(
+                "INSERT INTO statistic_meta (statistic_id, statistic_name, metalake_id, statistic_value, metadata_object_id, metadata_object_type, audit_info) VALUES (%d, 'row_count', 1, '{}', %d, '%s', '{}')",
+                id + generation * 1000L, id, type));
+      }
+    }
+  }
+
+  private void assertExternalGovernanceCount(int expected) throws SQLException {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement()) {
+      for (String table :
+          List.of(
+              "owner_meta", "role_meta_securable_object", "tag_relation_meta", "statistic_meta")) {
+        try (ResultSet result =
+            statement.executeQuery(
+                "SELECT COUNT(*) FROM "
+                    + table
+                    + " WHERE deleted_at = 0 AND metadata_object_id IN (11, 12, 13, 14)")) {
+          Assertions.assertTrue(result.next());
+          Assertions.assertEquals(expected, result.getInt(1), table);
+        }
+      }
+    }
+  }
+
+  private List<String> externalEntityInsertStatements() {
+    return List.of(
+        "INSERT INTO schema_meta (schema_id, schema_name, metalake_id, catalog_id, audit_info) VALUES (11, 'schema', 1, 2, '{}')",
+        "INSERT INTO table_meta (table_id, table_name, metalake_id, catalog_id, schema_id, audit_info) VALUES (12, 'table', 1, 2, 11, '{}')",
+        "INSERT INTO topic_meta (topic_id, topic_name, metalake_id, catalog_id, schema_id, audit_info) VALUES (13, 'topic', 1, 2, 11, '{}')",
+        "INSERT INTO view_meta (view_id, view_name, metalake_id, catalog_id, schema_id, audit_info) VALUES (14, 'view', 1, 2, 11, '{}')");
+  }
+
+  private void assertExternalIdentityPrimaryKey(String table, String idColumn) throws SQLException {
+    String actualTable =
+        readSchemaColumns().keySet().stream()
+            .filter(name -> name.equalsIgnoreCase(table))
+            .findFirst()
+            .orElseThrow();
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        ResultSet keys =
+            connection
+                .getMetaData()
+                .getPrimaryKeys(connection.getCatalog(), connection.getSchema(), actualTable)) {
+      Map<Short, String> columns = new TreeMap<>();
+      while (keys.next()) {
+        columns.put(
+            keys.getShort("KEY_SEQ"), keys.getString("COLUMN_NAME").toLowerCase(Locale.ROOT));
+      }
+      Assertions.assertEquals(
+          List.of(idColumn, "deleted_at"), new ArrayList<>(columns.values()), table);
+    }
+  }
+
   /**
    * Verifies the fileset storage location name and model version URI name columns are 256
    * characters wide on every backend, both on a fresh install and after the 2.0.0 upgrade.
@@ -638,6 +855,45 @@ public class TestSQLScripts extends TestJDBCBackend {
         }
       }
     }
+  }
+
+  private void assertIdempotencySchema(String source) throws SQLException {
+    Map<String, Set<String>> columns = readSchemaColumns();
+    String counterTable =
+        columns.keySet().stream()
+            .filter(name -> name.equalsIgnoreCase("iceberg_idempotency_generation_meta"))
+            .findFirst()
+            .orElseThrow(
+                () -> new AssertionFailedError("Missing idempotency counters after " + source));
+    Assertions.assertEquals(
+        Set.of("stripe", "generation"),
+        Set.copyOf(
+            columns.get(counterTable).stream().map(name -> name.toLowerCase(Locale.ROOT)).toList()),
+        "Idempotency counter columns after " + source);
+    String table =
+        columns.keySet().stream()
+            .filter(name -> name.equalsIgnoreCase("iceberg_idempotency_meta"))
+            .findFirst()
+            .orElseThrow(
+                () -> new AssertionFailedError("Missing idempotency table after " + source));
+    Assertions.assertEquals(
+        Set.of(
+            "idempotency_key",
+            "http_method",
+            "request_uri",
+            "generation",
+            "http_status",
+            "response_summary",
+            "audit_info",
+            "created_at",
+            "expires_at"),
+        Set.copyOf(columns.get(table).stream().map(name -> name.toLowerCase(Locale.ROOT)).toList()),
+        "Idempotency columns after " + source);
+    Assertions.assertTrue(
+        readSchemaIndexes(Set.of(table)).stream()
+            .anyMatch(
+                index -> index.equalsIgnoreCase(table + ":idx_iim_expires:1:expires_at:true")),
+        "Missing idempotency expiry index after " + source);
   }
 
   private void assertCleanupIndexes(String source) throws SQLException {

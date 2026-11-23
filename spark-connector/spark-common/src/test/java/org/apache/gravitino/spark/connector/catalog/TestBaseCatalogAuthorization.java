@@ -31,14 +31,18 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableSet;
 import java.lang.reflect.Field;
 import java.time.OffsetDateTime;
+import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.rel.View;
+import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
@@ -46,7 +50,9 @@ import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.authorization.AuthorizationTable;
+import org.apache.gravitino.spark.connector.hive.GravitinoHiveCatalog;
 import org.apache.spark.SparkConf;
+import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableChange;
@@ -130,6 +136,78 @@ public class TestBaseCatalogAuthorization {
     assertEquals(ImmutableSet.of(Privilege.Name.SELECT_TABLE), deniedTable.requiredPrivileges());
   }
 
+  /**
+   * In a catalog that reads views, a user denied an existing view gets the deny placeholder, as for
+   * a denied table, and the underlying Spark table is not loaded.
+   */
+  @Test
+  void testDeniedViewSurfacesAuthorizationPlaceholder() throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "view_a");
+    ViewCatalog viewCatalog = stubViewFallback(identifier);
+    ForbiddenException denied = new ForbiddenException("denied view");
+    when(viewCatalog.loadView(NameIdentifier.of("schema", "view_a"))).thenThrow(denied);
+
+    Table result = viewCapableCatalog(mock(Table.class)).loadTable(identifier);
+
+    assertTrue(result instanceof AuthorizationTable);
+    AuthorizationTable deniedView = (AuthorizationTable) result;
+    assertEquals("null.schema.view_a", deniedView.tableIdentifier());
+    assertEquals(ImmutableSet.of(Privilege.Name.SELECT_VIEW), deniedView.requiredPrivileges());
+    assertSame(
+        denied,
+        AuthorizationTable.aggregateFailure(Collections.singletonList(deniedView))
+            .get()
+            .getCause());
+    Mockito.verifyNoInteractions(sparkCatalog);
+  }
+
+  /**
+   * A catalog that cannot read views keeps reporting a denied view lookup as not found: its server
+   * catalog may have no views, and then the denial says nothing about whether the name exists.
+   */
+  @Test
+  void testDeniedViewInCatalogWithoutViewsThrowsNoSuchTable() throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "view_a");
+    ViewCatalog viewCatalog = stubViewFallback(identifier);
+    when(viewCatalog.loadView(NameIdentifier.of("schema", "view_a")))
+        .thenThrow(new ForbiddenException("denied view"));
+
+    assertThrows(NoSuchTableException.class, () -> catalog.loadTable(identifier));
+  }
+
+  /** A missing view, or a view lookup the catalog cannot perform, raises NoSuchTableException. */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testMissingViewStillThrowsNoSuchTable(boolean lookupUnsupported) throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "view_a");
+    ViewCatalog viewCatalog = stubViewFallback(identifier);
+    when(viewCatalog.loadView(NameIdentifier.of("schema", "view_a")))
+        .thenThrow(
+            lookupUnsupported
+                ? new UnsupportedOperationException("no views")
+                : new NoSuchViewException("no such view"));
+
+    assertThrows(
+        NoSuchTableException.class,
+        () -> viewCapableCatalog(mock(Table.class)).loadTable(identifier));
+  }
+
+  /**
+   * A permitted view still loads through the fallback with its catalog-specific wrapper: the deny
+   * branch must not swallow the success path.
+   */
+  @Test
+  void testPermittedViewLoadsThroughFallback() throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "view_a");
+    ViewCatalog viewCatalog = stubViewFallback(identifier);
+    when(viewCatalog.loadView(NameIdentifier.of("schema", "view_a"))).thenReturn(mock(View.class));
+    when(sparkCatalog.loadTable(identifier)).thenReturn(mock(Table.class));
+    Table viewWrapper = mock(Table.class);
+
+    assertSame(viewWrapper, viewCapableCatalog(viewWrapper).loadTable(identifier));
+    verify(sparkCatalog).loadTable(identifier);
+  }
+
   @Test
   void testDeniedWriteReportsTheWriteTarget() throws Exception {
     Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
@@ -184,7 +262,7 @@ public class TestBaseCatalogAuthorization {
               () ->
                   catalog.alterTable(
                       identifier,
-                      TableChange.updateColumnDefaultValue(
+                      updateColumnDefaultValue(
                           new String[] {"ts"}, "TIMESTAMP_LTZ '2026-11-04 12:34:56.123456'")));
           return null;
         });
@@ -209,7 +287,7 @@ public class TestBaseCatalogAuthorization {
             () ->
                 catalog.alterTable(
                     identifier,
-                    TableChange.updateColumnDefaultValue(new String[] {"ts"}, sql),
+                    updateColumnDefaultValue(new String[] {"ts"}, sql),
                     TableChange.updateColumnType(new String[] {"ts"}, DataTypes.TimestampNTZType)));
     Assertions.assertTrue(error.getMessage().contains("cannot be combined"));
     Mockito.verifyNoInteractions(gravitinoTableCatalog, sparkCatalog);
@@ -229,7 +307,7 @@ public class TestBaseCatalogAuthorization {
             ForbiddenException.class,
             () ->
                 catalog.alterTable(
-                    identifier, TableChange.updateColumnDefaultValue(new String[] {"ts"}, sql))));
+                    identifier, updateColumnDefaultValue(new String[] {"ts"}, sql))));
     verify(gravitinoTableCatalog).loadTable(gravitinoIdentifier);
     Mockito.verifyNoMoreInteractions(gravitinoTableCatalog);
     Mockito.verifyNoInteractions(sparkCatalog);
@@ -252,8 +330,7 @@ public class TestBaseCatalogAuthorization {
               () ->
                   catalog.alterTable(
                       identifier,
-                      TableChange.updateColumnDefaultValue(
-                          new String[] {"ts"}, "DATE '2026-11-04'")));
+                      updateColumnDefaultValue(new String[] {"ts"}, "DATE '2026-11-04'")));
           return null;
         });
     ArgumentCaptor<org.apache.gravitino.rel.TableChange> change =
@@ -281,8 +358,7 @@ public class TestBaseCatalogAuthorization {
             () ->
                 catalog.alterTable(
                     identifier,
-                    TableChange.updateColumnDefaultValue(
-                        new String[] {"ts"}, "'2026-11-04 12:34:56.123456'")));
+                    updateColumnDefaultValue(new String[] {"ts"}, "'2026-11-04 12:34:56.123456'")));
     Assertions.assertTrue(error.getMessage().contains("TIMESTAMP_LTZ or TIMESTAMP_NTZ"));
     verify(gravitinoTableCatalog).loadTable(gravitinoIdentifier);
     Mockito.verifyNoMoreInteractions(gravitinoTableCatalog);
@@ -293,7 +369,7 @@ public class TestBaseCatalogAuthorization {
   void testNumericDefaultDoesNotReadSchema() throws Exception {
     Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
     NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
-    catalog.alterTable(identifier, TableChange.updateColumnDefaultValue(new String[] {"ts"}, "42"));
+    catalog.alterTable(identifier, updateColumnDefaultValue(new String[] {"ts"}, "42"));
     verify(gravitinoTableCatalog, Mockito.never()).loadTable(gravitinoIdentifier);
   }
 
@@ -311,14 +387,47 @@ public class TestBaseCatalogAuthorization {
             });
     catalog.alterTable(
         identifier,
-        TableChange.updateColumnDefaultValue(
-            new String[] {"ts"}, "TIMESTAMP_NTZ '2026-11-04 12:34:00'"),
-        TableChange.updateColumnDefaultValue(
-            new String[] {"ts"}, "TIMESTAMP_NTZ '2026-11-04 00:00:00'"),
-        TableChange.updateColumnDefaultValue(new String[] {"ts"}, "DATE '2026-11-04'"),
-        TableChange.updateColumnDefaultValue(new String[] {"label"}, "'label'"));
+        updateColumnDefaultValue(new String[] {"ts"}, "TIMESTAMP_NTZ '2026-11-04 12:34:00'"),
+        updateColumnDefaultValue(new String[] {"ts"}, "TIMESTAMP_NTZ '2026-11-04 00:00:00'"),
+        updateColumnDefaultValue(new String[] {"ts"}, "DATE '2026-11-04'"),
+        updateColumnDefaultValue(new String[] {"label"}, "'label'"));
     verify(gravitinoTableCatalog).loadTable(gravitinoIdentifier);
     verify(table).columns();
+  }
+
+  /** The Hive catalog, the one that reads views, reports denied views as denied. */
+  @Test
+  void testHiveCatalogSupportsSparkViews() {
+    BaseCatalog hiveCatalog = new GravitinoHiveCatalog();
+    assertTrue(hiveCatalog.supportsSparkViews());
+  }
+
+  /** Stubs the table load to miss so that loadTable falls back to the returned view catalog. */
+  private ViewCatalog stubViewFallback(Identifier identifier) {
+    NameIdentifier gravitinoIdentifier =
+        NameIdentifier.of(identifier.namespace()[0], identifier.name());
+    when(gravitinoTableCatalog.loadTable(
+            eq(gravitinoIdentifier), eq(ImmutableSet.of(Privilege.Name.SELECT_TABLE))))
+        .thenThrow(new org.apache.gravitino.exceptions.NoSuchTableException("not a table"));
+    ViewCatalog viewCatalog = mock(ViewCatalog.class);
+    when(gravitinoCatalog.asViewCatalog()).thenReturn(viewCatalog);
+    return viewCatalog;
+  }
+
+  /** Returns a catalog that reads views, wrapping each loaded view as {@code viewWrapper}. */
+  private TestCatalog viewCapableCatalog(Table viewWrapper) {
+    return new TestCatalog(gravitinoCatalog, sparkCatalog) {
+      @Override
+      protected boolean supportsSparkViews() {
+        return true;
+      }
+
+      @Override
+      protected Table createSparkView(
+          Identifier ident, View gravitinoView, Table underlyingSparkTable) {
+        return viewWrapper;
+      }
+    };
   }
 
   private static class TestCatalog extends BaseCatalog {
@@ -368,5 +477,13 @@ public class TestBaseCatalogAuthorization {
     protected SparkTransformConverter getSparkTransformConverter() {
       return mock(SparkTransformConverter.class);
     }
+  }
+
+  // Spark 4.1 deprecates the String form of updateColumnDefaultValue; the DefaultValue form that
+  // replaces it does not exist on Spark 3.5 or 4.0. Scoped to this helper so the rest of the class
+  // keeps the -Werror deprecation gate.
+  @SuppressWarnings("deprecation")
+  private static TableChange updateColumnDefaultValue(String[] fieldNames, String sql) {
+    return TableChange.updateColumnDefaultValue(fieldNames, sql);
   }
 }

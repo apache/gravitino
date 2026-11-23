@@ -47,9 +47,13 @@ import io.trino.spi.session.PropertyMetadata;
 import io.trino.spi.transaction.IsolationLevel;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoAdminClient;
@@ -76,6 +80,10 @@ public class GravitinoConnector implements Connector {
   private final CatalogConnectorMetadata connectorMetadata;
   private final boolean forwardUser;
   private final Cache<String, UserSession> perUserSessionCache;
+  // Keyed by handle identity: GravitinoTransactionHandle has no equals, and each beginTransaction
+  // creates a new handle.
+  private final Map<GravitinoTransactionHandle, TransactionState> transactions =
+      new ConcurrentHashMap<>();
 
   /**
    * Constructs a new GravitinoConnector with the specified catalog identifier and catalog connector
@@ -106,7 +114,10 @@ public class GravitinoConnector implements Connector {
     Preconditions.checkArgument(
         internalTransactionHandler != null, "Transaction handler must not be null");
 
-    return new GravitinoTransactionHandle(internalTransactionHandler);
+    GravitinoTransactionHandle transactionHandle =
+        new GravitinoTransactionHandle(internalTransactionHandler);
+    transactions.put(transactionHandle, new TransactionState());
+    return transactionHandle;
   }
 
   @Override
@@ -120,9 +131,23 @@ public class GravitinoConnector implements Connector {
     Preconditions.checkArgument(internalMetadata != null, "Internal metadata must not be null");
 
     CatalogConnectorMetadata metadata =
-        forwardUser ? resolveSessionMetadata(session) : connectorMetadata;
-    return createGravitinoMetadata(
-        metadata, catalogConnectorContext.getMetadataAdapter(), internalMetadata);
+        forwardUser ? leaseSessionMetadata(session, gravitinoTransactionHandle) : connectorMetadata;
+    GravitinoMetadata gravitinoMetadata =
+        createGravitinoMetadata(
+            metadata, catalogConnectorContext.getMetadataAdapter(), internalMetadata);
+    TransactionState state =
+        transactions.computeIfPresent(
+            gravitinoTransactionHandle,
+            (handle, current) -> {
+              current.metadata.add(gravitinoMetadata);
+              return current;
+            });
+    if (state == null) {
+      // The transaction has already ended, or did not come from beginTransaction. Mark the metadata
+      // ended so that its beginCreateTable creates no table.
+      gravitinoMetadata.dropCreatedTables();
+    }
+    return gravitinoMetadata;
   }
 
   /**
@@ -228,16 +253,27 @@ public class GravitinoConnector implements Connector {
   public void commit(ConnectorTransactionHandle transactionHandle) {
     GravitinoTransactionHandle gravitinoTransactionHandle =
         (GravitinoTransactionHandle) transactionHandle;
-    Connector internalConnector = catalogConnectorContext.getInternalConnector();
-    internalConnector.commit(gravitinoTransactionHandle.getInternalHandle());
+    boolean committed = false;
+    try {
+      Connector internalConnector = catalogConnectorContext.getInternalConnector();
+      internalConnector.commit(gravitinoTransactionHandle.getInternalHandle());
+      committed = true;
+    } finally {
+      // Trino does not roll back a transaction whose commit failed.
+      endTransaction(gravitinoTransactionHandle, !committed);
+    }
   }
 
   @Override
   public void rollback(ConnectorTransactionHandle transactionHandle) {
     GravitinoTransactionHandle gravitinoTransactionHandle =
         (GravitinoTransactionHandle) transactionHandle;
-    Connector internalConnector = catalogConnectorContext.getInternalConnector();
-    internalConnector.rollback(gravitinoTransactionHandle.getInternalHandle());
+    try {
+      Connector internalConnector = catalogConnectorContext.getInternalConnector();
+      internalConnector.rollback(gravitinoTransactionHandle.getInternalHandle());
+    } finally {
+      endTransaction(gravitinoTransactionHandle, true);
+    }
   }
 
   @Override
@@ -263,6 +299,8 @@ public class GravitinoConnector implements Connector {
     if (forwardUser) {
       perUserSessionCache.invalidateAll();
     }
+    // Keep the tables of transactions still open: one of them may be committing.
+    transactions.keySet().forEach(handle -> endTransaction(handle, false));
     Connector internalConnector = catalogConnectorContext.getInternalConnector();
     internalConnector.shutdown();
     catalogConnectorContext.close();
@@ -270,68 +308,8 @@ public class GravitinoConnector implements Connector {
 
   @VisibleForTesting
   CatalogConnectorMetadata resolveSessionMetadata(ConnectorSession session) {
-    String authType =
-        catalogConnectorContext
-            .getConfig()
-            .getClientConfig()
-            .getOrDefault(GravitinoAuthProvider.AUTH_TYPE_KEY, "simple");
-    String credentialKey =
-        catalogConnectorContext
-            .getConfig()
-            .getClientConfig()
-            .getOrDefault(
-                GravitinoAuthProvider.USER_TOKEN_CREDENTIAL_KEY,
-                GravitinoAuthProvider.DEFAULT_USER_TOKEN_CREDENTIAL_KEY);
-    String token = session.getIdentity().getExtraCredentials().get(credentialKey);
-    // Password-authenticated sessions have no OAuth token. Reuse the configured service
-    // identity in that case; failures with a supplied token must still propagate.
-    if (GravitinoAuthProvider.parseAuthType(authType) == GravitinoAuthProvider.AuthType.OAUTH2
-        && StringUtils.isBlank(token)) {
-      return connectorMetadata;
-    }
-    String credKey = sessionCacheKey(authType, session.getUser(), token);
-    try {
-      return perUserSessionCache.get(
-              credKey,
-              () -> {
-                GravitinoAdminClient userClient;
-                try {
-                  userClient = buildAuthClient(session);
-                } catch (IllegalArgumentException | UnsupportedOperationException e) {
-                  // buildAuthClient raises these for an invalid or unsupported credential.
-                  throw new TrinoException(
-                      PERMISSION_DENIED,
-                      "Failed to authenticate user '"
-                          + session.getUser()
-                          + "' with Gravitino: "
-                          + e.getMessage(),
-                      e);
-                }
-                GravitinoMetalake userMetalake =
-                    userClient.loadMetalake(catalogConnectorContext.getMetalake().name());
-                return new UserSession(
-                    userClient,
-                    new CatalogConnectorMetadata(
-                        userMetalake, catalogIdentifier, catalogConnectorContext.getConfig()));
-              })
-          .metadata;
-    } catch (ExecutionException | UncheckedExecutionException e) {
-      Throwable cause = e.getCause() == null ? e : e.getCause();
-      LOG.warn(
-          cause, "Failed to create per-user Gravitino client for user '%s'", session.getUser());
-      if (cause instanceof Exception) {
-        throw GravitinoErrorCode.toTrinoException(
-            (Exception) cause,
-            "Failed to create per-user Gravitino client for user '" + session.getUser() + "'");
-      }
-      throw new TrinoException(
-          GENERIC_INTERNAL_ERROR,
-          "Unexpected error while creating per-user Gravitino client for user '"
-              + session.getUser()
-              + "': "
-              + cause.getMessage(),
-          cause);
-    }
+    UserSession userSession = resolveUserSession(session);
+    return userSession == null ? connectorMetadata : userSession.metadata;
   }
 
   /**
@@ -354,6 +332,112 @@ public class GravitinoConnector implements Connector {
     return authType + ":" + user + tokenPart;
   }
 
+  private CatalogConnectorMetadata leaseSessionMetadata(
+      ConnectorSession session, GravitinoTransactionHandle transactionHandle) {
+    while (true) {
+      UserSession userSession = resolveUserSession(session);
+      if (userSession == null) {
+        return connectorMetadata;
+      }
+      // A session retired after the lookup is no longer in the cache, so the next lookup returns
+      // a different session.
+      if (userSession.tryLease()) {
+        TransactionState leased =
+            transactions.computeIfPresent(
+                transactionHandle,
+                (handle, state) -> {
+                  state.leases.add(userSession);
+                  return state;
+                });
+        if (leased == null) {
+          // The transaction has already ended, or did not come from beginTransaction.
+          userSession.release();
+        }
+        return userSession.metadata;
+      }
+    }
+  }
+
+  private void endTransaction(GravitinoTransactionHandle transactionHandle, boolean failed) {
+    TransactionState state = transactions.remove(transactionHandle);
+    if (state == null) {
+      return;
+    }
+    try {
+      if (failed) {
+        state.metadata.forEach(GravitinoMetadata::dropCreatedTables);
+      }
+    } finally {
+      state.leases.forEach(UserSession::release);
+    }
+  }
+
+  /** Returns the cached per-user session, or null when the service identity serves the session. */
+  @Nullable
+  private UserSession resolveUserSession(ConnectorSession session) {
+    String authType =
+        catalogConnectorContext
+            .getConfig()
+            .getClientConfig()
+            .getOrDefault(GravitinoAuthProvider.AUTH_TYPE_KEY, "simple");
+    String credentialKey =
+        catalogConnectorContext
+            .getConfig()
+            .getClientConfig()
+            .getOrDefault(
+                GravitinoAuthProvider.USER_TOKEN_CREDENTIAL_KEY,
+                GravitinoAuthProvider.DEFAULT_USER_TOKEN_CREDENTIAL_KEY);
+    String token = session.getIdentity().getExtraCredentials().get(credentialKey);
+    // Password-authenticated sessions have no OAuth token. Reuse the configured service
+    // identity in that case; failures with a supplied token must still propagate.
+    if (GravitinoAuthProvider.parseAuthType(authType) == GravitinoAuthProvider.AuthType.OAUTH2
+        && StringUtils.isBlank(token)) {
+      return null;
+    }
+    String credKey = sessionCacheKey(authType, session.getUser(), token);
+    try {
+      return perUserSessionCache.get(
+          credKey,
+          () -> {
+            GravitinoAdminClient userClient;
+            try {
+              userClient = buildAuthClient(session);
+            } catch (IllegalArgumentException | UnsupportedOperationException e) {
+              // buildAuthClient raises these for an invalid or unsupported credential.
+              throw new TrinoException(
+                  PERMISSION_DENIED,
+                  "Failed to authenticate user '"
+                      + session.getUser()
+                      + "' with Gravitino: "
+                      + e.getMessage(),
+                  e);
+            }
+            GravitinoMetalake userMetalake =
+                userClient.loadMetalake(catalogConnectorContext.getMetalake().name());
+            return new UserSession(
+                userClient,
+                new CatalogConnectorMetadata(
+                    userMetalake, catalogIdentifier, catalogConnectorContext.getConfig()));
+          });
+    } catch (ExecutionException | UncheckedExecutionException e) {
+      Throwable cause = e.getCause() == null ? e : e.getCause();
+      LOG.warn(
+          cause, "Failed to create per-user Gravitino client for user '%s'", session.getUser());
+      if (cause instanceof Exception) {
+        throw GravitinoErrorCode.toTrinoException(
+            (Exception) cause,
+            "Failed to create per-user Gravitino client for user '" + session.getUser() + "'");
+      }
+      throw new TrinoException(
+          GENERIC_INTERNAL_ERROR,
+          "Unexpected error while creating per-user Gravitino client for user '"
+              + session.getUser()
+              + "': "
+              + cause.getMessage(),
+          cause);
+    }
+  }
+
   private Cache<String, UserSession> buildSessionCache(GravitinoConfig config) {
     Map<String, String> clientConfig = config.getClientConfig();
     String authTypeStr = clientConfig.get(GravitinoAuthProvider.AUTH_TYPE_KEY);
@@ -371,32 +455,71 @@ public class GravitinoConnector implements Connector {
               + authTypeStr);
     }
 
+    long maxSize = config.getSessionCacheMaxSize();
+    long expireAfterAccessSeconds = config.getSessionCacheExpireAfterAccessSeconds();
+    if (maxSize < 1 || expireAfterAccessSeconds < 1) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+          GravitinoAuthProvider.SESSION_CACHE_MAX_SIZE_KEY
+              + " and "
+              + GravitinoAuthProvider.SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY
+              + " must be positive, got "
+              + maxSize
+              + " and "
+              + expireAfterAccessSeconds);
+    }
+
     return CacheBuilder.newBuilder()
-        .maximumSize(config.getSessionCacheMaxSize())
-        .expireAfterAccess(config.getSessionCacheExpireAfterAccessSeconds(), TimeUnit.SECONDS)
+        .maximumSize(maxSize)
+        .expireAfterAccess(expireAfterAccessSeconds, TimeUnit.SECONDS)
         .removalListener(
             (RemovalNotification<String, UserSession> notification) -> {
               UserSession session = notification.getValue();
               if (session != null) {
-                session.close();
+                session.retire();
               }
             })
         .build();
   }
 
-  /** Holds a per-user {@link GravitinoAdminClient} together with its derived metadata. */
-  private static final class UserSession {
+  /**
+   * Holds a per-user {@link GravitinoAdminClient} together with its derived metadata. The client is
+   * closed once the session is retired from the cache and no transaction leases it.
+   */
+  @VisibleForTesting
+  static final class UserSession {
     final GravitinoAdminClient client;
     final CatalogConnectorMetadata metadata;
-    private volatile boolean closed = false;
+    private int leases = 0;
+    private boolean retired = false;
+    private boolean closed = false;
 
     UserSession(GravitinoAdminClient client, CatalogConnectorMetadata metadata) {
       this.client = client;
       this.metadata = metadata;
     }
 
-    void close() {
-      if (closed) {
+    /** Returns false if the session is retired, in which case it can no longer be leased. */
+    synchronized boolean tryLease() {
+      if (retired) {
+        return false;
+      }
+      leases++;
+      return true;
+    }
+
+    synchronized void release() {
+      leases--;
+      closeIfUnused();
+    }
+
+    synchronized void retire() {
+      retired = true;
+      closeIfUnused();
+    }
+
+    private void closeIfUnused() {
+      if (!retired || leases > 0 || closed) {
         return;
       }
       closed = true;
@@ -406,5 +529,11 @@ public class GravitinoConnector implements Connector {
         LOG.warn(e, "Failed to close GravitinoAdminClient");
       }
     }
+  }
+
+  /** The per-user sessions a transaction leases and the metadata it uses. */
+  private static final class TransactionState {
+    final Queue<UserSession> leases = new ConcurrentLinkedQueue<>();
+    final Queue<GravitinoMetadata> metadata = new ConcurrentLinkedQueue<>();
   }
 }

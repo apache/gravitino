@@ -25,7 +25,9 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretReference;
 
@@ -89,4 +91,17 @@ public interface SchemaDispatcher extends SupportsSchemas {
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     throw new UnsupportedOperationException("Creating a schema with secrets is not supported");
   }
+
+  /**
+   * Imports an externally created schema into Gravitino, or returns the already imported entity.
+   * Catalog-reported audit fields take precedence over the supplied audit. Existing nonempty
+   * creation fields are preserved; missing creation fields may be filled after a competing import.
+   * This operation does not create the schema in the underlying catalog.
+   *
+   * @param ident the identifier of the existing external schema
+   * @param auditInfo fallback creation audit used when the catalog reports no creator
+   * @return the imported schema
+   * @throws NoSuchSchemaException if the external schema does not exist
+   */
+  Schema importSchema(NameIdentifier ident, AuditInfo auditInfo) throws NoSuchSchemaException;
 }

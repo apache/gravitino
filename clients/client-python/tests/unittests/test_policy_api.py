@@ -296,15 +296,12 @@ class TestIcebergOrphanFileRemovalContent(unittest.TestCase):
 class TestIcebergRewriteManifestsContent(unittest.TestCase):
     def test_defaults_and_rules(self) -> None:
         content = PolicyContents.iceberg_rewrite_manifests()
-        self.assertEqual(500, content.manifest_count_critical())
-        self.assertEqual(100, content.manifest_count_warning())
-        self.assertEqual(8388608, content.avg_manifest_size_threshold_bytes())
+        self.assertEqual(100, content.manifest_count_threshold())
         self.assertIsNone(content.spec_id())
         self.assertIsNone(content.use_caching())
         rules = content.rules()
-        self.assertEqual(500, rules["manifest_count_critical"])
-        self.assertEqual(100, rules["manifest_count_warning"])
-        self.assertEqual(8388608, rules["avg_manifest_size_threshold_bytes"])
+        self.assertEqual(100, rules["manifest_count_threshold"])
+        self.assertIn("trigger-expr", rules)
         self.assertNotIn("spec_id", rules)
         self.assertNotIn("use_caching", rules)
         content.validate()
@@ -317,15 +314,7 @@ class TestIcebergRewriteManifestsContent(unittest.TestCase):
     def test_validation_failures(self) -> None:
         with self.assertRaises(IllegalArgumentException):
             PolicyContents.iceberg_rewrite_manifests(
-                manifest_count_warning=0
-            ).validate()
-        with self.assertRaises(IllegalArgumentException):
-            PolicyContents.iceberg_rewrite_manifests(
-                manifest_count_critical=50, manifest_count_warning=100
-            ).validate()
-        with self.assertRaises(IllegalArgumentException):
-            PolicyContents.iceberg_rewrite_manifests(
-                avg_manifest_size_threshold_bytes=0
+                manifest_count_threshold=0
             ).validate()
         with self.assertRaises(IllegalArgumentException):
             PolicyContents.iceberg_rewrite_manifests(spec_id=-1).validate()

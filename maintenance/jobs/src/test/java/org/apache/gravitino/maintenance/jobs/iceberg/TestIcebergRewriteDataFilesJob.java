@@ -30,6 +30,9 @@ import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.spark.sql.Row;
+import org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergRewriteDataFilesJob {
@@ -118,6 +121,7 @@ public class TestIcebergRewriteDataFilesJob {
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.type"));
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.uri"));
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.warehouse"));
+    assertEquals("{{catalog_name}}", configs.get("spark.sql.defaultCatalog"));
 
     // Verify Iceberg extensions
     assertTrue(configs.containsKey("spark.sql.extensions"));
@@ -411,10 +415,10 @@ public class TestIcebergRewriteDataFilesJob {
         IcebergRewriteDataFilesJob.buildProcedureCall(
             "iceberg_prod", "db.sample", null, null, whereClause, null);
 
-    // Single quotes in the WHERE clause should be escaped
+    // WHERE uses Spark CALL escaping (' → \'), not SQL-standard ''.
     assertTrue(
         sql.contains(
-            "where => 'year = 2024 AND month >= 1 AND month <= 12 AND status = ''active'''"));
+            "where => 'year = 2024 AND month >= 1 AND month <= 12 AND status = \\'active\\''"));
   }
 
   @Test
@@ -438,8 +442,8 @@ public class TestIcebergRewriteDataFilesJob {
         IcebergRewriteDataFilesJob.buildProcedureCall(
             "iceberg_catalog", maliciousTable, null, null, null, null);
 
-    // Verify single quotes are escaped (becomes '')
-    assertTrue(sql.contains("db.table'' OR ''1''=''1"));
+    // CALL table => '...' uses Spark escaping (' → \')
+    assertTrue(sql.contains("db.table\\' OR \\'1\\'=\\'1"));
     assertFalse(sql.contains("' OR '1'='1"));
 
     // Test SQL injection attempt in where clause
@@ -448,7 +452,7 @@ public class TestIcebergRewriteDataFilesJob {
         IcebergRewriteDataFilesJob.buildProcedureCall(
             "iceberg_catalog", "db.table", null, null, maliciousWhere, null);
 
-    assertTrue(sql.contains("year = 2024'' OR ''1''=''1"));
+    assertTrue(sql.contains("year = 2024\\' OR \\'1\\'=\\'1"));
 
     // Test SQL injection attempt in catalog name
     String maliciousCatalog = "catalog`; DROP TABLE users; --";
@@ -468,11 +472,12 @@ public class TestIcebergRewriteDataFilesJob {
 
     // Catalog name should be quoted as an identifier
     assertTrue(sql.contains("`cat'alog`"));
-    // All single quotes in string literals should be escaped
-    assertTrue(sql.contains("db''.table"));
-    assertTrue(sql.contains("sort''"));
-    assertTrue(sql.contains("id'' DESC"));
-    assertTrue(sql.contains("year'' = 2024"));
+    // CALL named-arg strings (table/strategy/sort_order/where) use Spark escaping (' → \')
+    assertTrue(sql.contains("db\\'.table"));
+    assertTrue(sql.contains("sort\\'"));
+    assertTrue(sql.contains("id\\' DESC"));
+    assertTrue(sql.contains("year\\' = 2024"));
+    // options map('k','v') still uses SQL-standard ''
     assertTrue(sql.contains("key''"));
     assertTrue(sql.contains("val''ue"));
   }
@@ -542,7 +547,7 @@ public class TestIcebergRewriteDataFilesJob {
   public void testCompactionMetricsSchemaForTms() {
     Map<String, Object> metrics =
         IcebergRewriteDataFilesJob.aggregatePartitionCompactionMetrics(new Row[0]);
-    assertEquals(5, metrics.size());
+    assertEquals(6, metrics.size());
     assertEquals(
         0D,
         ((Number) metrics.get(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC)).doubleValue());
@@ -557,5 +562,48 @@ public class TestIcebergRewriteDataFilesJob {
         ((Number) metrics.get(IcebergDataCompactionContent.TOTAL_FILE_SIZE_METRIC)).longValue());
     assertEquals(
         0L, ((Number) metrics.get(IcebergDataCompactionContent.FILE_NUMBER_METRIC)).longValue());
+    assertEquals(
+        0L,
+        ((Number) metrics.get(IcebergDataCompactionContent.SMALL_FILE_NUMBER_METRIC)).longValue());
+    assertFalse(metrics.containsKey(IcebergDataCompactionContent.DATA_MSE_RATIO_METRIC));
+  }
+
+  @Test
+  public void testAggregatePartitionCompactionMetricsSumsSmallFiles() {
+    StructType schema =
+        new StructType()
+            .add("data-file-mse", DataTypes.DoubleType)
+            .add("delete-file-number", DataTypes.LongType)
+            .add("avg-file-size", DataTypes.DoubleType)
+            .add("total-file-size", DataTypes.LongType)
+            .add("file-number", DataTypes.LongType)
+            .add("small-file-number", DataTypes.LongType);
+    Row[] partitions =
+        new Row[] {
+          new GenericRowWithSchema(new Object[] {10.0D, 1L, 100.0D, 200L, 2L, 2L}, schema),
+          new GenericRowWithSchema(new Object[] {30.0D, 3L, 50.0D, 150L, 3L, 1L}, schema)
+        };
+
+    Map<String, Object> metrics =
+        IcebergRewriteDataFilesJob.aggregatePartitionCompactionMetrics(partitions);
+
+    assertEquals(
+        30.0D,
+        ((Number) metrics.get(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC)).doubleValue());
+    assertEquals(
+        4L,
+        ((Number) metrics.get(IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC)).longValue());
+    assertEquals(
+        70.0D,
+        ((Number) metrics.get(IcebergDataCompactionContent.AVG_FILE_SIZE_METRIC)).doubleValue());
+    assertEquals(
+        350L,
+        ((Number) metrics.get(IcebergDataCompactionContent.TOTAL_FILE_SIZE_METRIC)).longValue());
+    assertEquals(
+        5L, ((Number) metrics.get(IcebergDataCompactionContent.FILE_NUMBER_METRIC)).longValue());
+    assertEquals(
+        3L,
+        ((Number) metrics.get(IcebergDataCompactionContent.SMALL_FILE_NUMBER_METRIC)).longValue());
+    assertFalse(metrics.containsKey(IcebergDataCompactionContent.DATA_MSE_RATIO_METRIC));
   }
 }

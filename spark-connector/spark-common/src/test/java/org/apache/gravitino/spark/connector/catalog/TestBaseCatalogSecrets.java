@@ -26,7 +26,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Stream;
@@ -42,7 +41,6 @@ import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
-import org.apache.gravitino.secret.SecretMaterial;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.secret.SupportsSecrets;
@@ -104,15 +102,15 @@ public class TestBaseCatalogSecrets {
     try (SecretManager sm = memorySecretManager()) {
       Map<String, String> entityProps = new HashMap<>();
       entityProps.put("custom-token", "placeholder");
-      List<SecretMaterial> writes =
-          sm.assembleSecretMaterials(
+      Map<String, String> plaintexts =
+          sm.assembleSecretPlaintexts(
               Map.of(),
               entityProps,
               "catalog",
               1L,
               Map.of("custom-token", new SecretBinding("memory", "from-memory")),
               Map.of());
-      sm.writeSecrets(writes);
+      sm.stageSecrets(null, entityProps, "catalog", 1L, plaintexts);
       Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
 
       setUpCatalog(

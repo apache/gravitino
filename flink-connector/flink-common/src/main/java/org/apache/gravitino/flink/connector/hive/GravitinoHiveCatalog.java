@@ -146,6 +146,12 @@ public abstract class GravitinoHiveCatalog extends BaseCatalog {
     return hiveCatalog;
   }
 
+  /** {@inheritDoc} */
+  @Override
+  protected boolean supportsGenericTables() {
+    return true;
+  }
+
   @Override
   public void createTable(ObjectPath tablePath, CatalogBaseTable table, boolean ignoreIfExists)
       throws TableAlreadyExistException, DatabaseNotExistException, CatalogException {

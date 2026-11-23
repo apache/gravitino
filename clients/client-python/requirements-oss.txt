@@ -15,4 +15,4 @@
 # specific language governing permissions and limitations
 # under the License.
 
-ossfs==2025.5.0
+ossfs>=2025.5.0

@@ -27,10 +27,13 @@ import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
+import org.apache.gravitino.storage.relational.mapper.provider.MetadataObjectSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.SecurableObjectBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.ibatis.annotations.Param;
@@ -100,36 +103,61 @@ public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLPro
         + SchemaMetaMapper.TABLE_NAME
         + " st WHERE st.catalog_id = #{catalogId} AND"
         + " st.schema_id = sect.metadata_object_id AND sect.type = 'SCHEMA'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            SchemaMetaMapper.TABLE_NAME, "schema_id", "st")
         + " UNION"
         + " SELECT tt.catalog_id FROM "
         + TopicMetaMapper.TABLE_NAME
         + " tt WHERE tt.catalog_id = #{catalogId} AND "
         + " tt.topic_id = sect.metadata_object_id AND sect.type = 'TOPIC'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(TopicMetaMapper.TABLE_NAME, "topic_id", "tt")
         + " UNION"
         + " SELECT tat.catalog_id FROM "
         + TableMetaMapper.TABLE_NAME
         + " tat WHERE tat.catalog_id = #{catalogId} AND"
         + " tat.table_id = sect.metadata_object_id AND sect.type = 'TABLE'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            TableMetaMapper.TABLE_NAME, "table_id", "tat")
         + " UNION"
         + " SELECT ft.catalog_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
         + " ft WHERE ft.catalog_id = #{catalogId} AND"
         + " ft.fileset_id = sect.metadata_object_id AND sect.type = 'FILESET'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            FilesetMetaMapper.META_TABLE_NAME, "fileset_id", "ft")
         + " UNION"
         + " SELECT mt.catalog_id FROM "
         + ModelMetaMapper.TABLE_NAME
         + " mt WHERE mt.catalog_id = #{catalogId} AND"
         + " mt.model_id = sect.metadata_object_id AND sect.type = 'MODEL'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(ModelMetaMapper.TABLE_NAME, "model_id", "mt")
         + " UNION"
         + " SELECT vt.catalog_id FROM "
         + ViewMetaMapper.TABLE_NAME
         + " vt WHERE vt.catalog_id = #{catalogId} AND"
         + " vt.view_id = sect.metadata_object_id AND sect.type = 'VIEW'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(ViewMetaMapper.TABLE_NAME, "view_id", "vt")
         + " UNION"
         + " SELECT fnt.catalog_id FROM "
         + FunctionMetaMapper.TABLE_NAME
         + " fnt WHERE fnt.catalog_id = #{catalogId} AND"
         + " fnt.function_id = sect.metadata_object_id AND sect.type = 'FUNCTION'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            FunctionMetaMapper.TABLE_NAME, "function_id", "fnt")
+        + " UNION"
+        + " SELECT cot.catalog_id FROM "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " cot WHERE cot.catalog_id = #{catalogId} AND"
+        + " cot.column_id = sect.metadata_object_id AND sect.type = 'COLUMN'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            TableColumnMapper.COLUMN_TABLE_NAME, "column_id", "cot")
+        + " UNION"
+        + " SELECT smt.catalog_id FROM "
+        + SemanticModelMetaMapper.TABLE_NAME
+        + " smt WHERE smt.catalog_id = #{catalogId} AND"
+        + " smt.semantic_model_id = sect.metadata_object_id AND sect.type = 'SEMANTIC_MODEL'"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(
+            SemanticModelMetaMapper.TABLE_NAME, "semantic_model_id", "smt")
         + ")";
   }
 
@@ -156,6 +184,7 @@ public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLPro
         + "#{schemaId}"
         + "</foreach>"
         + " AND tt.topic_id = sect.metadata_object_id AND sect.type = 'TOPIC'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(TopicMetaMapper.TABLE_NAME, "topic_id", "tt")
         + " UNION"
         + " SELECT tat.schema_id FROM "
         + TableMetaMapper.TABLE_NAME
@@ -164,6 +193,7 @@ public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLPro
         + "#{schemaId}"
         + "</foreach>"
         + " AND tat.table_id = sect.metadata_object_id AND sect.type = 'TABLE'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(TableMetaMapper.TABLE_NAME, "table_id", "tat")
         + " UNION"
         + " SELECT ft.schema_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
@@ -172,6 +202,8 @@ public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLPro
         + "#{schemaId}"
         + "</foreach>"
         + " AND ft.fileset_id = sect.metadata_object_id AND sect.type = 'FILESET'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(
+            FilesetMetaMapper.META_TABLE_NAME, "fileset_id", "ft")
         + " UNION"
         + " SELECT mt.schema_id FROM "
         + ModelMetaMapper.TABLE_NAME
@@ -180,6 +212,7 @@ public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLPro
         + "#{schemaId}"
         + "</foreach>"
         + " AND mt.model_id = sect.metadata_object_id AND sect.type = 'MODEL'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(ModelMetaMapper.TABLE_NAME, "model_id", "mt")
         + " UNION"
         + " SELECT vt.schema_id FROM "
         + ViewMetaMapper.TABLE_NAME
@@ -188,6 +221,7 @@ public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLPro
         + "#{schemaId}"
         + "</foreach>"
         + " AND vt.view_id = sect.metadata_object_id AND sect.type = 'VIEW'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(ViewMetaMapper.TABLE_NAME, "view_id", "vt")
         + " UNION"
         + " SELECT fnt.schema_id FROM "
         + FunctionMetaMapper.TABLE_NAME
@@ -196,6 +230,28 @@ public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLPro
         + "#{schemaId}"
         + "</foreach>"
         + " AND fnt.function_id = sect.metadata_object_id AND sect.type = 'FUNCTION'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(
+            FunctionMetaMapper.TABLE_NAME, "function_id", "fnt")
+        + " UNION"
+        + " SELECT cot.schema_id FROM "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " cot WHERE cot.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach> AND"
+        + " cot.column_id = sect.metadata_object_id AND sect.type = 'COLUMN'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(
+            TableColumnMapper.COLUMN_TABLE_NAME, "column_id", "cot")
+        + " UNION"
+        + " SELECT smt.schema_id FROM "
+        + SemanticModelMetaMapper.TABLE_NAME
+        + " smt WHERE smt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach> AND"
+        + " smt.semantic_model_id = sect.metadata_object_id AND sect.type = 'SEMANTIC_MODEL'"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(
+            SemanticModelMetaMapper.TABLE_NAME, "semantic_model_id", "smt")
         + ")"
         + "</script>";
   }

@@ -20,6 +20,7 @@
 package org.apache.gravitino.flink.connector.store;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
@@ -46,6 +47,41 @@ public class GravitinoCatalogStoreFactoryOptions {
           .defaultValue(false)
           .withDescription(
               "Whether to enable support for Flink's session catalog in the Gravitino catalog store");
+
+  /**
+   * Catalog names that are never resolved against Gravitino in the current Flink session. A session
+   * catalog can then be created under the same name as an existing Gravitino catalog without
+   * loading, modifying, or dropping the Gravitino catalog. Only valid when {@link
+   * #GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT} is {@code true}.
+   */
+  public static final ConfigOption<List<String>> GRAVITINO_EXCLUDED_CATALOGS =
+      ConfigOptions.key("gravitino.excludedCatalogs")
+          .stringType()
+          .asList()
+          .defaultValues()
+          .withDescription(
+              "Semicolon-separated catalog names that are never resolved against Gravitino in "
+                  + "this Flink session. Session catalogs can be created under these names even "
+                  + "if Gravitino has catalogs with the same names, and the Gravitino catalogs "
+                  + "are never loaded, modified, or dropped by this session. Only valid when "
+                  + "'gravitino.enableSessionCatalogSupport' is true.");
+
+  /**
+   * Whether a session catalog that a Flink session explicitly creates can shadow a Gravitino
+   * catalog with the same name in that session. The Gravitino catalog is never loaded, modified, or
+   * dropped by the session while it is shadowed. Only valid when {@link
+   * #GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT} is {@code true}.
+   */
+  public static final ConfigOption<Boolean> GRAVITINO_ENABLE_SESSION_CATALOG_SHADOWING =
+      ConfigOptions.key("gravitino.enableSessionCatalogShadowing")
+          .booleanType()
+          .defaultValue(false)
+          .withDescription(
+              "Whether a session catalog created in a Flink session can use the name of a "
+                  + "Gravitino catalog that the session has not accessed yet. The session catalog "
+                  + "shadows the Gravitino catalog in this session only, and the Gravitino "
+                  + "catalog is never loaded, modified, or dropped while it is shadowed. Only "
+                  + "valid when 'gravitino.enableSessionCatalogSupport' is true.");
 
   public static final ConfigOption<Map<String, String>> GRAVITINO_CLIENT_CONFIG =
       ConfigOptions.key("gravitino.client")
