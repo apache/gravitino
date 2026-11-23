@@ -66,6 +66,26 @@ table.catalog-store.gravitino.gravitino.client.oauth2.credential: client-id:clie
 table.catalog-store.gravitino.gravitino.client.oauth2.scope: your-scope
 ```
 
+The `credential` property accepts the following formats:
+
+- `client_secret`: requests the token with the `client_credentials` grant.
+- `client_id:client_secret`: requests the token with the `client_credentials` grant, so the Flink
+  job acts as a service account.
+- `password:client_id:client_secret:username:password`: requests the token with the `password`
+  grant, so the Flink job acts as the given user instead of a service account. Leave `client_id`
+  empty (`password::client_secret:username:password`) if the OAuth2 server does not require a
+  client ID.
+
+The `password:` prefix selects the grant explicitly; credentials without it use the
+`client_credentials` grant and may contain `:` in the client secret. In the password grant format
+the password is the last part and is passed verbatim, so it may contain `:` and leading or trailing
+whitespace, while the client ID, client secret and username must not contain `:`.
+
+:::caution
+The credential is stored in the Flink configuration in plain text. Restrict the permissions of the
+configuration file and do not commit credentials to version control.
+:::
+
 ## Kerberos Mode
 
 In Kerberos mode, use Flink security configurations to obtain a Kerberos ticket for accessing the Gravitino server. Configure `security.kerberos.login.principal` and `security.kerberos.login.keytab` for the Kerberos principal and keytab.

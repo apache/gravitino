@@ -88,9 +88,17 @@ gravitino.client.oauth2.scope=gravitino
 |--------------------------------------|-----------------------------------------------------------------|---------------|-----------------------------|
 | `gravitino.client.authType`          | Authentication type: `simple`, `basic`, `oauth2`, or `kerberos` | (none)        | Yes (to enable OAuth2)      |
 | `gravitino.client.oauth2.serverUri`  | OAuth2 server URI                                               | (none)        | Yes if authType is `oauth2` |
-| `gravitino.client.oauth2.credential` | OAuth2 credentials in format `client_id:client_secret`          | (none)        | Yes if authType is `oauth2` |
+| `gravitino.client.oauth2.credential` | OAuth2 credentials in format `client_secret`, `client_id:client_secret` or `password:client_id:client_secret:username:password` | (none)        | Yes if authType is `oauth2` |
 | `gravitino.client.oauth2.path`       | OAuth2 token endpoint path                                      | (none)        | Yes if authType is `oauth2` |
 | `gravitino.client.oauth2.scope`      | OAuth2 scope                                                    | (none)        | Yes if authType is `oauth2` |
+
+The `password:client_id:client_secret:username:password` format requests the token with the
+`password` grant, so the connector acts as the given user instead of the configured service account.
+The password is the last part of the credential and is passed verbatim, so it may contain `:` and
+leading or trailing whitespace; the client ID, client secret and username must not contain `:`.
+Leave `client_id` empty (`password::client_secret:username:password`) if the OAuth2 server does not
+require a client ID. Credentials without the `password:` prefix use the `client_credentials` grant,
+and an existing `client_id:client_secret` credential may contain `:` in the client secret.
 
 ### Example: Connecting to OAuth-Protected Gravitino Server
 
