@@ -125,8 +125,8 @@ metric over orders and links orders to customers by `customer_id`. The native RE
 definition under `definition`. Its field names include `primaryKey` and `datatype`.
 
 The relationship's `from` and `to` name datasets in the model. Its column lists and the datasets'
-keys use source table column names, even when those columns are not listed in `fields`. Each array
-inside `uniqueKeys` defines one unique key.
+keys name fields declared in `fields` by the referenced datasets, not columns of the source
+tables. Each array inside `uniqueKeys` defines one unique key.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -150,6 +150,18 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
               "dialects": [{"dialect": "ANSI_SQL", "expression": "order_amount"}]
             },
             "datatype": "Decimal"
+          },
+          {
+            "name": "order_id",
+            "expression": {
+              "dialects": [{"dialect": "ANSI_SQL", "expression": "order_id"}]
+            }
+          },
+          {
+            "name": "customer_id",
+            "expression": {
+              "dialects": [{"dialect": "ANSI_SQL", "expression": "customer_id"}]
+            }
           }
         ]
       },
@@ -158,7 +170,20 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
         "source": {"namespace": ["sales", "mart"], "name": "customers"},
         "primaryKey": ["customer_id"],
         "uniqueKeys": [["customer_code"]],
-        "fields": []
+        "fields": [
+          {
+            "name": "customer_id",
+            "expression": {
+              "dialects": [{"dialect": "ANSI_SQL", "expression": "customer_id"}]
+            }
+          },
+          {
+            "name": "customer_code",
+            "expression": {
+              "dialects": [{"dialect": "ANSI_SQL", "expression": "customer_code"}]
+            }
+          }
+        ]
       }
     ],
     "relationships": [
@@ -194,15 +219,33 @@ Expression amountExpression = Expression.builder()
     }).build();
 Field amount = Field.builder().withName("order_amount")
     .withExpression(amountExpression).withDatatype(DataType.DECIMAL).build();
+// Key and join fields only need a name and an expression over the source columns.
+private static Expression keyExpression(String column) {
+  return Expression.builder()
+      .withDialects(new DialectExpression[] {
+          DialectExpression.builder().withDialect(Dialects.ANSI_SQL)
+              .withExpression(column).build()
+      }).build();
+}
+Field orderId = Field.builder().withName("order_id")
+    .withExpression(keyExpression("order_id")).build();
+Field orderCustomer = Field.builder().withName("customer_id")
+    .withExpression(keyExpression("customer_id")).build();
+Field customerId = Field.builder().withName("customer_id")
+    .withExpression(keyExpression("customer_id")).build();
+Field customerCode = Field.builder().withName("customer_code")
+    .withExpression(keyExpression("customer_code")).build();
 Dataset orders = Dataset.builder().withName("orders")
     .withSource(NameIdentifier.of("sales", "mart", "orders"))
     .withPrimaryKey(new String[] {"order_id"})
-    .withFields(new Field[] {amount}).build();
+    .withFields(new Field[] {amount, orderId, orderCustomer})
+    .build();
 Dataset customers = Dataset.builder().withName("customers")
     .withSource(NameIdentifier.of("sales", "mart", "customers"))
     .withPrimaryKey(new String[] {"customer_id"})
     .withUniqueKeys(new String[][] {{"customer_code"}})
-    .withFields(new Field[0]).build();
+    .withFields(new Field[] {customerId, customerCode})
+    .build();
 Relationship ordersToCustomers = Relationship.builder().withName("orders_to_customers")
     .withFrom("orders").withTo("customers")
     .withFromColumns(new String[] {"customer_id"})
@@ -232,17 +275,19 @@ amount = Field(
     "order_amount",
     Expression([DialectExpression(Dialects.ANSI_SQL, "order_amount")]),
     datatype=DataType.DECIMAL)
+def key_field(name):
+    return Field(name, Expression([DialectExpression(Dialects.ANSI_SQL, name)]))
 orders = Dataset(
     "orders",
     NameIdentifier.of("sales", "mart", "orders"),
     primary_key=["order_id"],
-    fields=[amount])
+    fields=[amount, key_field("order_id"), key_field("customer_id")])
 customers = Dataset(
     "customers",
     NameIdentifier.of("sales", "mart", "customers"),
     primary_key=["customer_id"],
     unique_keys=[["customer_code"]],
-    fields=[])
+    fields=[key_field("customer_id"), key_field("customer_code")])
 orders_to_customers = Relationship(
     "orders_to_customers",
     from_dataset="orders",
@@ -633,11 +678,31 @@ datasets:
             - dialect: ANSI_SQL
               expression: order_amount
         datatype: Decimal
+      - name: order_id
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: order_id
+      - name: customer_id
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: customer_id
   - name: customers
     source: sales.mart.customers
     primary_key: [customer_id]
     unique_keys: [[customer_code]]
-    fields: []
+    fields:
+      - name: customer_id
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: customer_id
+      - name: customer_code
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: customer_code
 relationships:
   - name: orders_to_customers
     from: orders

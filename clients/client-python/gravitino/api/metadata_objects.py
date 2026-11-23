@@ -37,6 +37,7 @@ class MetadataObjects:
             MetadataObject.Type.CATALOG,
             MetadataObject.Type.ROLE,
             MetadataObject.Type.TAG,
+            MetadataObject.Type.DOMAIN,
             MetadataObject.Type.POLICY,
             MetadataObject.Type.JOB,
             MetadataObject.Type.JOB_TEMPLATE,
@@ -71,6 +72,10 @@ class MetadataObjects:
         parent: Optional[str] = None,
     ) -> MetadataObject:
         if isinstance(name_or_names, str):
+            Precondition.check_argument(
+                type_ != MetadataObject.Type.DOMAIN or parent is None,
+                "A domain metadata object must not have a parent",
+            )
             name = name_or_names
             full_name = (
                 MetadataObjects.DOT_JOINER.join([parent, name]) if parent else name
@@ -130,6 +135,7 @@ class MetadataObjects:
             MetadataObject.Type.METALAKE,
             MetadataObject.Type.CATALOG,
             MetadataObject.Type.ROLE,
+            MetadataObject.Type.DOMAIN,
         }:
             return None
 
@@ -193,8 +199,8 @@ class MetadataObjects:
         )
 
         parts = full_name.split(MetadataObjects.DOT_SPLITTER)
-        if type_ is MetadataObject.Type.ROLE:
-            return MetadataObjects.of([full_name], MetadataObject.Type.ROLE)
+        if type_ in {MetadataObject.Type.ROLE, MetadataObject.Type.DOMAIN}:
+            return MetadataObjects.of([full_name], type_)
 
         return MetadataObjects.of(parts, type_)
 

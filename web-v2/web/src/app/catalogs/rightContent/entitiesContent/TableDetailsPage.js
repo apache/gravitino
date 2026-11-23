@@ -411,18 +411,6 @@ export default function TableDetailsPage({ ...props }) {
               metadataObjectFullName={`${catalog}.${schema}.${table}.${record.name}`}
             />
           ) : null
-      },
-      {
-        title: 'Policies',
-        dataIndex: 'policies',
-        key: 'policies',
-        render: (_, record) =>
-          record?.node === 'tableColumn' ? (
-            <Policies
-              metadataObjectType={'column'}
-              metadataObjectFullName={`${catalog}.${schema}.${table}.${record.name}`}
-            />
-          ) : null
       }
     ],
     [store.activatedDetails]

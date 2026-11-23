@@ -19,39 +19,32 @@
 package org.apache.gravitino.maintenance.optimizer.recommender.job;
 
 import com.google.common.base.Preconditions;
-import java.time.Clock;
-import java.time.DateTimeException;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionContext;
+import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.OrphanFileLocationUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.orphan.OrphanFileRemovalJobContext;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 
-/** Converts orphan cleanup options to the existing Spark template's configuration. */
+/**
+ * Converts orphan cleanup options to the existing Spark template's configuration.
+ *
+ * <p>{@code older_than} is emitted as a relative day count; the Spark job expands it to a timestamp
+ * at execute time.
+ */
 public class GravitinoOrphanFileRemovalJobAdapter implements GravitinoJobAdapter {
   private static final String TABLE_IDENTIFIER_KEY = "table_identifier";
   private static final String OLDER_THAN_KEY = "older_than";
   private static final String LOCATION_KEY = "location";
   private static final String DRY_RUN_KEY = "dry_run";
-  private static final DateTimeFormatter TIMESTAMP =
-      DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ssXXX").withZone(ZoneOffset.UTC);
-  private final Clock clock;
-
-  /** Creates an adapter using the UTC system clock. */
-  public GravitinoOrphanFileRemovalJobAdapter() {
-    this(Clock.systemUTC());
-  }
-
-  GravitinoOrphanFileRemovalJobAdapter(Clock clock) {
-    this.clock = clock;
-  }
 
   @Override
-  public Map<String, String> jobConfig(JobExecutionContext context) {
+  public Map<String, String> jobConfig(
+      JobExecutionContext context, Map<String, String> submitterConfigs, String schemaSeparator) {
     Preconditions.checkArgument(
         context instanceof OrphanFileRemovalJobContext,
         "jobExecutionContext must be OrphanFileRemovalJobContext");
@@ -82,23 +75,26 @@ public class GravitinoOrphanFileRemovalJobAdapter implements GravitinoJobAdapter
       OrphanFileLocationUtils.validateLocation(orphan.tableLocation(), location);
       location = OrphanFileLocationUtils.normalizeLocation(location).toString();
     }
-    return Map.of(
-        TABLE_IDENTIFIER_KEY,
-        IdentifierUtils.removeCatalogFromIdentifier(orphan.nameIdentifier()).toString(),
-        OLDER_THAN_KEY,
-        cutoff(days),
-        LOCATION_KEY,
-        location,
-        DRY_RUN_KEY,
-        dryRun);
-  }
-
-  private String cutoff(long days) {
-    try {
-      return TIMESTAMP.format(clock.instant().minus(days, ChronoUnit.DAYS));
-    } catch (DateTimeException | ArithmeticException e) {
-      throw new IllegalArgumentException(
-          "olderThanDays cannot be represented as a cleanup timestamp", e);
+    if (submitterConfigs == null) {
+      submitterConfigs = Collections.emptyMap();
     }
+    String catalogName = StringUtils.trimToNull(submitterConfigs.get("catalog_name"));
+    if (catalogName == null) {
+      catalogName = IdentifierUtils.getCatalogNameFromTableIdentifier(orphan.nameIdentifier());
+    }
+    Map<String, String> config = new LinkedHashMap<>();
+    config.putAll(
+        IcebergSparkConfigUtils.resolveTemplateSparkPlaceholders(
+            catalogName,
+            IcebergSparkConfigUtils.parseFlatJsonMap(
+                submitterConfigs.get("spark_conf"), "spark-conf"),
+            submitterConfigs));
+    config.put(
+        TABLE_IDENTIFIER_KEY,
+        IdentifierUtils.toSparkTableIdentifier(orphan.nameIdentifier(), schemaSeparator));
+    config.put(OLDER_THAN_KEY, Long.toString(days));
+    config.put(LOCATION_KEY, location);
+    config.put(DRY_RUN_KEY, dryRun);
+    return Map.copyOf(config);
   }
 }

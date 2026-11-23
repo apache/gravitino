@@ -19,10 +19,8 @@
 package org.apache.gravitino.server.web.rest;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,13 +41,11 @@ import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NotFoundException;
-import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.semantic.Dataset;
-import org.apache.gravitino.semantic.Relationship;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelSource;
 import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
@@ -58,7 +54,7 @@ import org.apache.gravitino.server.authorization.expression.AuthorizationExpress
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Validates source visibility, existence, and explicit column references before model writes. */
+/** Validates source visibility and existence before model writes. */
 public class SemanticModelSourceValidator {
   private final TableDispatcher tables;
   private final ViewDispatcher views;
@@ -112,10 +108,13 @@ public class SemanticModelSourceValidator {
   }
 
   /**
-   * Validates every dataset source and key or relationship column under the current caller.
+   * Validates every dataset source under the current caller.
    *
-   * <p>This method must run even when authorization is disabled. It does not interpret SQL
-   * expressions or validate transitive view dependencies. Connection failures propagate unchanged.
+   * <p>Key and relationship references resolve to fields declared inside the model and are checked
+   * by {@code SemanticModelValidator}; this validator only resolves the datasets' sources against
+   * the catalog. This method must run even when authorization is disabled. It does not interpret
+   * SQL expressions or validate transitive view dependencies. Connection failures propagate
+   * unchanged.
    *
    * @param metalake the request's metalake, also used for cross-catalog source references
    * @param definition the complete definition to validate before persistence
@@ -124,7 +123,6 @@ public class SemanticModelSourceValidator {
   public SemanticModelSourceUpdate validate(String metalake, SemanticModelDefinition definition) {
     AuthorizationRequestContext context = new AuthorizationRequestContext();
     GravitinoAuthorizer currentAuthorizer = authorizer.get();
-    Map<String, Set<String>> datasetColumns = new HashMap<>();
     Map<NameIdentifier, ResolvedSource> resolvedSources = new HashMap<>();
     List<SemanticModelSource> associations = new ArrayList<>();
     for (Dataset dataset : definition.datasets()) {
@@ -138,25 +136,7 @@ public class SemanticModelSourceValidator {
       ResolvedSource resolved =
           resolvedSources.computeIfAbsent(
               ident, key -> loadSource(key, currentAuthorizer, context));
-      Set<String> columns = resolved.columns;
       associations.add(new SemanticModelSource(dataset.name(), resolved.type, resolved.id));
-      datasetColumns.put(dataset.name(), columns);
-      checkColumns(dataset.name(), dataset.primaryKey(), columns);
-      if (dataset.uniqueKeys() != null) {
-        for (String[] key : dataset.uniqueKeys()) {
-          checkColumns(dataset.name(), key, columns);
-        }
-      }
-    }
-    if (definition.relationships() != null) {
-      for (Relationship relationship : definition.relationships()) {
-        checkColumns(
-            relationship.from(),
-            relationship.fromColumns(),
-            datasetColumns.get(relationship.from()));
-        checkColumns(
-            relationship.to(), relationship.toColumns(), datasetColumns.get(relationship.to()));
-      }
     }
     return SemanticModelSourceUpdate.replace(associations);
   }
@@ -188,17 +168,14 @@ public class SemanticModelSourceValidator {
       if (tableAllowed && supported.contains(Entity.EntityType.TABLE)) {
         try {
           Table table = tables.loadTable(ident);
-          Set<String> columns = columnNames(ident, table.columns());
-          return new ResolvedSource(
-              registeredTableId(ident, table), Entity.EntityType.TABLE, columns);
+          return new ResolvedSource(registeredTableId(ident, table), Entity.EntityType.TABLE);
         } catch (NotFoundException missing) {
           // An untyped source can also refer to a view.
         }
       }
       if (viewAllowed && supported.contains(Entity.EntityType.VIEW)) {
         View view = views.loadView(ident);
-        Set<String> columns = columnNames(ident, view.columns());
-        return new ResolvedSource(registeredViewId(ident, view), Entity.EntityType.VIEW, columns);
+        return new ResolvedSource(registeredViewId(ident, view), Entity.EntityType.VIEW);
       }
     } catch (NotFoundException missing) {
       // Do not disclose whether the other, inaccessible object type exists.
@@ -250,12 +227,10 @@ public class SemanticModelSourceValidator {
   private static class ResolvedSource {
     private final long id;
     private final Entity.EntityType type;
-    private final Set<String> columns;
 
-    private ResolvedSource(long id, Entity.EntityType type, Set<String> columns) {
+    private ResolvedSource(long id, Entity.EntityType type) {
       this.id = id;
       this.type = type;
-      this.columns = columns;
     }
   }
 
@@ -269,29 +244,5 @@ public class SemanticModelSourceValidator {
         .evaluate(
             NameIdentifierUtil.splitNameIdentifier(ident.namespace().level(0), type, ident),
             context);
-  }
-
-  private Set<String> columnNames(NameIdentifier ident, Column[] columns) {
-    if (columns == null) {
-      throw new IllegalSemanticModelException(
-          "Column metadata is unavailable for source %s", ident);
-    }
-    Set<String> names = new HashSet<>();
-    Arrays.stream(columns).forEach(column -> names.add(column.name()));
-    return names;
-  }
-
-  private void checkColumns(String dataset, String[] references, Set<String> columns) {
-    if (columns == null) {
-      throw new IllegalSemanticModelException("Unknown dataset %s in relationship", dataset);
-    }
-    if (references != null) {
-      for (String reference : references) {
-        if (!columns.contains(reference)) {
-          throw new IllegalSemanticModelException(
-              "Dataset %s source has no column %s", dataset, reference);
-        }
-      }
-    }
   }
 }

@@ -28,6 +28,11 @@ reactor-netty-core = "1.2.1"
 junit = "5.8.1"
 junit-platform = "1.8.1"
 jackson = "2.15.2"
+# Modules that resolve a newer Jackson line than the project pin above (through Iceberg, Arrow or
+# fabric8) are kept on the latest patch of that line with their own BOM. Do not collapse them into
+# one version: each line is audited separately in dev/release/maven/dependencies.txt.
+jackson218 = "2.18.12"
+jackson221 = "2.21.8"
 snakeyaml = "2.0"
 gson = "2.11.0"
 guava = "32.1.3-jre"
@@ -35,8 +40,8 @@ lombok = "1.18.20"
 slf4j = "2.0.17"
 log4j = "2.25.4"
 arrow = "18.3.0"
-lance = "6.0.0"
-lance-namespace = "0.7.5"
+lance = "12.0.0"
+lance-namespace = "0.11.1"
 delta-kernel = "3.3.0"
 jetty = "9.4.58.v20250814"
 jersey = "2.41"
@@ -59,7 +64,7 @@ httpclient = "4.4.1"
 httpclient5 = "5.4.4"
 # Keep httpcore5 on the same 5.4 line as httpclient5: httpclient5 5.4.x expects httpcore5 5.4.x.
 httpcore5 = "5.4.4"
-micrometer-core = "1.12.2"
+micrometer-core = "1.15.12"
 mockserver = "5.15.0"
 # 7.3.x moves to Jackson 2.19, which isn't audited in dev/release/maven/dependencies.txt yet.
 fabric8-kubernetes = "7.2.0"
@@ -80,6 +85,7 @@ datastrato-iceberg = "1.13.0"
 experimental-iceberg-git-commit = "e6118db078e09d960600c3c302e0f220457cb388"
 iceberg4spark35 = "1.11.0"
 iceberg4spark40 = "1.11.0"
+iceberg4spark41 = "1.11.0"
 paimon = '1.2.0'
 # spark34 is pinned by modules other than the Spark connector for their own tests, so it stays
 # after the connector dropped 3.4; it says nothing about connector support.
@@ -108,7 +114,8 @@ metrics = "4.2.25"
 prometheus = "0.16.0"
 clickhouse = "0.7.1"
 lz4 = "1.8.0"
-snappy-java = "1.1.10.8"
+yawk-lz4-java = "1.11.4"
+snappy-java = "1.1.10.12"
 mysql = "8.0.33"
 postgresql = "42.7.14"
 immutables-value = "2.11.7"
@@ -116,7 +123,7 @@ selenium = "4.33.0"
 rauschig = "1.2.0"
 mybatis = "3.5.6"
 h2db = "2.2.224"
-kafka = "3.4.0"
+kafka = "3.9.2"
 curator = "2.12.0"
 awaitility = "4.2.1"
 servlet = "3.1.0"
@@ -163,7 +170,7 @@ gradle-extensions-plugin = '1.74'
 publish-plugin = '1.2.0'
 rat-plugin = '0.8.0'
 shadow-plugin = "8.1.1"
-kerby = "2.0.3"
+kerby = "2.1.2"
 # Transitive of kerb-admin; raised above the 3.8.8.Final that kerb-admin brings in.
 xnio = "3.8.17.Final"
 # Netty is a transitive dependency of the AWS SDK (Glue catalog); the BOM keeps all modules on one patch.
@@ -177,6 +184,7 @@ woodstox-core = "6.5.1"
 mail = "1.4.1"
 rome = "1.0"
 jettison = "1.5.4"
+org-json = "20260814"
 thrift = "0.12.0"
 derby = "10.14.2.0"
 datanucleus-core = "4.1.17"
@@ -186,7 +194,9 @@ datanucleus-jdo = "3.2.0-m3"
 hudi = "0.15.0"
 google-auth = "1.28.0"
 aliyun-credentials = "0.3.12"
-aliyun-sdk-oss = "3.10.2"
+# Match Hadoop 3.3.6. Iceberg 1.11.0 expects OSS.deleteObject(String, String)
+# to return VoidResult. SDK 3.10.2 returns void and fails to link on delete.
+aliyun-sdk-oss = "3.13.0"
 tencentcloud-sdk-sts = "3.1.1239"
 openlineage = "1.29.0"
 jcstress = "0.8.15"
@@ -216,6 +226,8 @@ azure-identity = { group = "com.azure", name = "azure-identity", version.ref = "
 azure-storage-file-datalake = { group = "com.azure", name = "azure-storage-file-datalake", version.ref = "azure-storage-file-datalake"}
 reactor-netty-http = {group = "io.projectreactor.netty", name = "reactor-netty-http", version.ref = "reactor-netty-http"}
 reactor-netty-core = {group = "io.projectreactor.netty", name = "reactor-netty-core", version.ref = "reactor-netty-core"}
+jackson-bom-v218 = { group = "com.fasterxml.jackson", name = "jackson-bom", version.ref = "jackson218" }
+jackson-bom-v221 = { group = "com.fasterxml.jackson", name = "jackson-bom", version.ref = "jackson221" }
 jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-databind", version.ref = "jackson" }
 jackson-annotations = { group = "com.fasterxml.jackson.core", name = "jackson-annotations", version.ref = "jackson" }
 jackson-datatype-jdk8 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jdk8", version.ref = "jackson" }
@@ -360,6 +372,7 @@ prometheus-dropwizard = { group = "io.prometheus", name = "simpleclient_dropwiza
 prometheus-servlet = { group = "io.prometheus", name = "simpleclient_servlet", version.ref = "prometheus" }
 clickhouse-driver = { group = "com.clickhouse", name = "clickhouse-jdbc", version.ref = "clickhouse" }
 lz4-java = { group = "org.lz4", name = "lz4-java", version.ref = "lz4" }
+yawk-lz4-java = { group = "at.yawk.lz4", name = "lz4-java", version.ref = "yawk-lz4-java" }
 snappy-java = { group = "org.xerial.snappy", name = "snappy-java", version.ref = "snappy-java" }
 mysql-driver = { group = "mysql", name = "mysql-connector-java", version.ref = "mysql" }
 postgresql-driver = { group = "org.postgresql", name = "postgresql", version.ref = "postgresql" }
@@ -397,6 +410,7 @@ servlet = { group = "javax.servlet", name = "javax.servlet-api", version.ref = "
 mail = { group = "javax.mail", name = "mail", version.ref = "mail" }
 rome = { group = "rome", name = "rome", version.ref = "rome" }
 jettison = { group = "org.codehaus.jettison", name = "jettison", version.ref = "jettison" }
+org-json = { group = "org.json", name = "json", version.ref = "org-json" }
 
 google-auth-http = { group = "com.google.auth", name = "google-auth-library-oauth2-http", version.ref = "google-auth" }
 google-auth-credentials = { group = "com.google.auth", name = "google-auth-library-credentials", version.ref = "google-auth" }

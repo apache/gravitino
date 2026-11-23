@@ -80,7 +80,7 @@ After the trigger is due, list job runs and look for template `builtin-iceberg-m
 Set the maintenance REST extension in `gravitino.conf`. Client authentication, Iceberg REST auth, and the job executor are in [Configuration](./optimizer-configuration.md#tms-cluster-static-client-auth).
 
 | Configuration item                        | Description                                                                                          |
-|-------------------------------------------|------------------------------------------------------------------------------------------------------|
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `gravitino.server.rest.extensionPackages` | Register the maintenance REST callbacks. Set to `org.apache.gravitino.maintenance.web.rest.feature`. |
 
 A policy `updaterOptions.gravitino_uri` overrides the cluster callback URI. Every other `gravitinoAuth` key from the cluster wins over the same key in the policy.
@@ -88,10 +88,18 @@ A policy `updaterOptions.gravitino_uri` overrides the cluster callback URI. Ever
 Scheduler pool sizes have these defaults:
 
 | Configuration item                              | Default |
-|-------------------------------------------------|---------|
+| ----------------------------------------------- | ------- |
 | `gravitino.maintenance.scheduler.expandThreads` | `4`     |
 | `gravitino.maintenance.scheduler.cronThreads`   | `8`     |
 | `gravitino.maintenance.scheduler.commitThreads` | `4`     |
+
+When `gravitino.authorization.enable=true`, set a TMS submit identity:
+
+| Configuration item                   | Default | Description                                        |
+| ------------------------------------ | ------- | -------------------------------------------------- |
+| `gravitino.maintenance.jobSubmitter` | (none)  | USER principal TMS uses to submit maintenance jobs |
+
+Create that user under every metalake that runs maintenance jobs. Grant the user metalake `RUN_JOB` and `USE_JOB_TEMPLATE` on the Iceberg maintenance job template so `runJob` can succeed; grant any further table or catalog privileges your maintenance Spark jobs need when they call back into Gravitino.
 
 ## Time Trigger
 
@@ -100,7 +108,7 @@ Scheduler pool sizes have these defaults:
 Three objects decide which tables run:
 
 | Object          | What to set                                                                                              |
-|-----------------|----------------------------------------------------------------------------------------------------------|
+| --------------- | -------------------------------------------------------------------------------------------------------- |
 | Policy          | `policyType`, `enabled`, and content fields `timeTrigger`, `commitTrigger`, and `minIntervalMs`.         |
 | Tag association | `POST /api/metalakes/{metalake}/tags/{tag}/policies/{policy}` with selector `ALL_VALUES` or `TAG_VALUE`. |
 | Tag assignment  | Assign the tag to the table, or to a catalog or schema ancestor.                                         |
@@ -110,13 +118,17 @@ Three objects decide which tables run:
 Built-in content types:
 
 | `policyType`                         | Time trigger | Commit trigger |
-|--------------------------------------|--------------|----------------|
+| ------------------------------------ | ------------ | -------------- |
 | `system_iceberg_compaction`          | Yes          | Yes            |
 | `system_iceberg_rewrite_manifests`   | Yes          | Yes            |
 | `system_iceberg_snapshot_expiration` | Yes          | Yes            |
 | `system_iceberg_orphan_file_removal` | Yes          | No             |
 
-Field lists for each type are in [Iceberg compaction policy](../iceberg-compaction-policy.md), [Iceberg rewrite manifests policy](../iceberg-rewrite-manifests-policy.md), and [Manage policies](../manage-policies-in-gravitino.md).
+Field lists for each type are in [Iceberg compaction policy](../iceberg-compaction-policy.md),
+[Iceberg rewrite manifests policy](../iceberg-rewrite-manifests-policy.md),
+[Iceberg snapshot expiration policy](../iceberg-snapshot-expiration-policy.md),
+[Iceberg orphan file removal policy](../iceberg-orphan-file-removal-policy.md), and
+[Manage policies](../manage-policies-in-gravitino.md).
 
 ## Cron Path
 
@@ -139,11 +151,71 @@ On Kubernetes, leave `spark_master` empty. See [Built-in jobs](../k8s-job-execut
 
 These endpoints are for the Spark job, not for operators. Schemas are in the [maintenance OpenAPI definition](../open-api/maintenance/maintenance.yaml). The commit path uses the same callbacks.
 
-| Callback                    | Method and path                                                             |
-|-----------------------------|-----------------------------------------------------------------------------|
-| Before-maintenance metrics  | `POST /api/metalakes/{metalake}/maintenance/actions/{jobId}/metrics/before` |
-| Finish and release the slot | `POST /api/metalakes/{metalake}/maintenance/actions/{jobId}/finish`         |
-| After-maintenance metrics   | `POST /api/metalakes/{metalake}/maintenance/actions/{jobId}/metrics/after`  |
+| Callback                    | Method and path                                                                |
+| --------------------------- | ------------------------------------------------------------------------------ |
+| Before-maintenance metrics  | `POST /api/metalakes/{metalake}/maintenance/actions/{actionId}/metrics/before` |
+| After-maintenance metrics   | `POST /api/metalakes/{metalake}/maintenance/actions/{actionId}/metrics/after`  |
+| Finish and release the slot | `POST /api/metalakes/{metalake}/maintenance/actions/{actionId}/finish`         |
+
+### Validation before and after metrics
+
+Cron and commit paths submit `builtin-iceberg-maintenance-task`, which posts before and after
+metrics through the callbacks above. The UI can show Before, After, and Change (After minus
+Before when both exist). Standalone procedure templates used by the CLI or optimizer
+(`builtin-iceberg-rewrite-data-files`, `builtin-iceberg-rewrite-manifests`,
+`builtin-iceberg-expire-snapshots`, `builtin-iceberg-remove-orphan-files`) do not report these
+metrics.
+
+#### Compaction (`system_iceberg_compaction`)
+
+Before and after inventory comes from Spark SQL on the Iceberg `files` metadata table.
+`custom-data-mse-ratio` is computed in the job as
+`custom-data-file-mse / minDataFileMse` (policy field). It is stored as a JSON number
+(`double`) for display; `minDataFileMse` itself is not stored as a metric.
+
+| Phase            | Key                         | Source                                      |
+| ---------------- | --------------------------- | ------------------------------------------- |
+| Before and After | `custom-data-file-mse`      | File inventory (also drives `trigger-expr`) |
+| Before and After | `custom-delete-file-number` | File inventory                              |
+| Before and After | `custom-avg-file-size`      | File inventory                              |
+| Before and After | `custom-total-file-size`    | File inventory                              |
+| Before and After | `custom-file-number`        | File inventory                              |
+| Before and After | `custom-small-file-number`  | File inventory (files smaller than 32 MiB)  |
+| Before and After | `custom-data-mse-ratio`     | `custom-data-file-mse / minDataFileMse`     |
+
+#### Manifest rewrite (`system_iceberg_rewrite_manifests`)
+
+Before and after inventory comes from the Iceberg Java API (`snapshot.allManifests`) for the
+resolved partition spec, not from Spark SQL.
+
+| Phase  | Key                                | Source                                                                          |
+| ------ | ---------------------------------- | ------------------------------------------------------------------------------- |
+| Before | `custom-manifest-number`           | Manifest inventory for the resolved partition spec (also drives `trigger-expr`) |
+| Before | `custom-avg-manifest-size`         | Manifest inventory for the resolved partition spec                              |
+| Before | `custom-manifest-spec-id`          | Spec id when the table is partitioned (diagnostic only)                         |
+| Before | `custom-manifest-partition-spec`   | Partition fields when the table is partitioned (diagnostic)                     |
+| After  | `custom-manifest-number`           | Manifest inventory re-collected after rewrite                                   |
+| After  | `custom-avg-manifest-size`         | Manifest inventory re-collected after rewrite                                   |
+| After  | `custom-rewritten-manifest-number` | Count returned by the Iceberg `rewrite_manifests` procedure                     |
+| After  | `custom-manifest-spec-id`          | Spec id when the table is partitioned (diagnostic only)                         |
+| After  | `custom-manifest-partition-spec`   | Partition fields when the table is partitioned (diagnostic)                     |
+
+#### Snapshot expiration (`system_iceberg_snapshot_expiration`)
+
+| Phase  | Key                              | Source                                                                   |
+| ------ | -------------------------------- | ------------------------------------------------------------------------ |
+| Before | `custom-snapshot-number`         | Snapshot count before expire                                             |
+| After  | `custom-snapshot-number`         | Snapshot count after expire (re-counted, not before minus expired)       |
+| After  | `custom-expired-snapshot-number` | Snapshots that existed before expire and are gone afterward              |
+| After  | `custom-expired-file-size`       | Bytes of content files that existed before expire and are gone afterward |
+
+#### Orphan file removal (`system_iceberg_orphan_file_removal`)
+
+| Phase  | Key                          | Source                                       |
+| ------ | ---------------------------- | -------------------------------------------- |
+| Before | —                            | Not collected                                |
+| After  | `custom-removed-file-number` | Removed-file count from the procedure result |
+| After  | `custom-removed-file-size`   | Removed-file bytes measured with FileIO      |
 
 ## Commit Trigger
 
@@ -170,4 +242,7 @@ Without the listener, time triggers still run. Commit-triggered maintenance does
 - [Configuration](./optimizer-configuration.md) for client authentication, Iceberg REST auth, and the job executor
 - [Table Maintenance Service](./optimizer.md) for the manual CLI workflow
 - [CLI Reference](./optimizer-cli-reference.md) for every command and the built-in job templates
-- [Iceberg Compaction Policy](../iceberg-compaction-policy.md) for tuning the built-in compaction strategy
+- [Iceberg Compaction Policy](../iceberg-compaction-policy.md)
+- [Iceberg Manifest Rewrite Policy](../iceberg-rewrite-manifests-policy.md)
+- [Iceberg Snapshot Expiration Policy](../iceberg-snapshot-expiration-policy.md)
+- [Iceberg Orphan File Removal Policy](../iceberg-orphan-file-removal-policy.md)

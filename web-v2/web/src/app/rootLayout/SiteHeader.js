@@ -67,8 +67,14 @@ export function SiteHeader() {
         return params.toString()
       }
 
-      // If we're not on the metalakes list page and metalake is missing, fill it
-      if (!['/', '/ui', '/metalakes', '/ui/metalakes', '/login', '/ui/login'].includes(pathname) && !metalakeParam) {
+      // If we're not on the metalakes list page and metalake is missing, fill it.
+      // The MCP pages belong to no metalake.
+      const isMcpPage = /^(\/ui)?\/mcp(\/|$)/.test(pathname)
+      if (
+        !['/', '/ui', '/metalakes', '/ui/metalakes', '/login', '/ui/login'].includes(pathname) &&
+        !isMcpPage &&
+        !metalakeParam
+      ) {
         const first = store.metalakes[0].name || ''
         if (first) {
           const qs = makeNewSearch({ metalake: first })

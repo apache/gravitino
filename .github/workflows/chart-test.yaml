@@ -169,10 +169,10 @@ jobs:
           registry: true
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - uses: actions/setup-java@v4
         with:
@@ -204,7 +204,11 @@ jobs:
             CONTEXT_DIR="${{ github.workspace }}/dev/docker/${FOLDER_NAME}/"
             . ${CONTEXT_DIR}/${FOLDER_NAME}-dependency.sh
             docker build -t ${KIND_REGISTRY}/${REPO_NAME}:${tag} "${CONTEXT_DIR}"
-            docker push ${KIND_REGISTRY}/${REPO_NAME}:${tag}
+            # With the containerd image store (ubuntu-26.04), Docker pushes to ${KIND_REGISTRY} over HTTPS
+            # and fails, but uses plain HTTP for localhost. Both names reach the registry the cluster pulls from.
+            PUSH_IMAGE="localhost:${KIND_REGISTRY##*:}/${REPO_NAME}:${tag}"
+            docker tag ${KIND_REGISTRY}/${REPO_NAME}:${tag} "${PUSH_IMAGE}"
+            docker push "${PUSH_IMAGE}"
             )
           done
 

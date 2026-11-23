@@ -206,7 +206,7 @@ public class GravitinoCatalogManager {
       return getGravitinoCatalogInfo(currentIdentity(), name);
     } catch (Exception e) {
       LOG.error(String.format("Load catalog %s failed", name), e);
-      throw new RuntimeException(e);
+      throw new RuntimeException(String.format("Failed to load catalog %s", name), e);
     }
   }
 
@@ -248,29 +248,46 @@ public class GravitinoCatalogManager {
   }
 
   /**
+   * Loads the current catalog metadata from Gravitino and replaces the cached value.
+   *
+   * <p>Connectors whose source clients keep connection settings after initialization use this
+   * method to detect an unsafe catalog change before accessing the source.
+   *
+   * @param identity the identity used to load the catalog
+   * @param name the catalog name
+   * @return the freshly loaded catalog
+   */
+  Catalog refreshGravitinoCatalogInfo(GravitinoIdentity identity, String name) {
+    Preconditions.checkState(!isClosed, "GravitinoCatalogManager is already closed");
+    GravitinoClient client = getClient(identity);
+    Catalog catalog = loadCatalog(client, identity, name);
+    gravitinoCatalogs.put(cacheKey(identity, name), new CachedCatalog(client, catalog));
+    return catalog;
+  }
+
+  /**
    * Loads the relational catalogs visible to the application identity. This runs at driver init,
    * before any Spark session exists, so it never consults session state.
    */
   public void loadRelationalCatalogs() {
     GravitinoIdentity identity = applicationIdentity();
     GravitinoClient client = getClient(identity);
-    Catalog[] catalogs = client.listCatalogsInfo();
+    Catalog[] catalogs = client.listCatalogsInfo(false);
     Map<String, Catalog> relationalCatalogs =
         Arrays.stream(catalogs)
             .filter(catalog -> Catalog.Type.RELATIONAL.equals(catalog.type()))
             .collect(
                 Collectors.toMap(Catalog::name, catalog -> catalog, (first, second) -> second));
-    relationalCatalogs.forEach(
-        (name, catalog) ->
-            gravitinoCatalogs.put(cacheKey(identity, name), new CachedCatalog(client, catalog)));
     this.applicationCatalogs = ImmutableMap.copyOf(relationalCatalogs);
   }
 
   /**
-   * Returns the catalogs loaded by {@link #loadRelationalCatalogs()}, that is, the catalogs the
-   * application identity can see.
+   * Returns lightweight descriptors loaded by {@link #loadRelationalCatalogs()} for the catalogs
+   * the application identity can see. These descriptors retain only the {@code in-use} property;
+   * complete catalog information is loaded through {@link #getGravitinoCatalogInfo(String)} on
+   * first use.
    *
-   * @return the catalogs registered at driver startup, keyed by catalog name
+   * @return the lightweight catalog descriptors registered at driver startup, keyed by catalog name
    */
   public Map<String, Catalog> getCatalogs() {
     return applicationCatalogs;
@@ -329,7 +346,7 @@ public class GravitinoCatalogManager {
     Catalog catalog = client.loadCatalog(catalogName);
     Preconditions.checkArgument(
         Catalog.Type.RELATIONAL.equals(catalog.type()), "Only support relational catalog");
-    LOG.info("Load catalog {} from Gravitino successfully for {}.", catalogName, identity);
+    LOG.debug("Load catalog {} from Gravitino successfully for {}.", catalogName, identity);
     return catalog;
   }
 

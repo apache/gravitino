@@ -18,13 +18,13 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 
 ## Requirement
 
-* Spark 3.5 or 4.0
+* Spark 3.5, 4.0 or 4.1
 * Scala 2.12 or 2.13 on Spark 3.5; Spark 4 is Scala 2.13 only
 * JDK 8, 11 or 17 on Spark 3.5; Spark 4 requires JDK 17
 
 ## Usage
 
-1. [Build](../how-to-build.md) or download the package matching your Spark minor version and Scala version ([gravitino-spark-connector-runtime-3.5_2.12](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.5_2.12), [gravitino-spark-connector-runtime-3.5_2.13](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.5_2.13), [gravitino-spark-connector-runtime-4.0_2.13](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-4.0_2.13)), and place it to the classpath of Spark.
+1. [Build](../how-to-build.md) or download the package matching your Spark minor version and Scala version ([gravitino-spark-connector-runtime-3.5_2.12](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.5_2.12), [gravitino-spark-connector-runtime-3.5_2.13](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.5_2.13), [gravitino-spark-connector-runtime-4.0_2.13](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-4.0_2.13), [gravitino-spark-connector-runtime-4.1_2.13](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-4.1_2.13)), and place it to the classpath of Spark.
 2. Configure the Spark session to use the Gravitino spark connector.
 
 | Property                                         | Type    | Default Value | Description                                                                                                                                                              | Required |
@@ -32,12 +32,14 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 | spark.plugins                                    | string  | (none)        | Gravitino spark plugin name, `org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin`                                                                          | Yes      |
 | spark.sql.gravitino.metalake                     | string  | (none)        | The metalake name that spark connector used to request to Gravitino.                                                                                                     | Yes      |
 | spark.sql.gravitino.uri                          | string  | (none)        | The uri of Gravitino server address.                                                                                                                                     | Yes      |
+| spark.sql.gravitino.failFast                     | boolean | `false`       | Set to `true` to fail Spark startup if connector configuration, client creation or catalog discovery fails.                                                              | No       |
 | spark.sql.gravitino.enableIcebergSupport         | string  | `false`       | Set to `true` to use Iceberg catalog.                                                                                                                                    | No       |
 | spark.sql.gravitino.enablePaimonSupport          | string  | `false`       | Set to `true` to use Paimon catalog.                                                                                                                                     | No       |
+| spark.sql.gravitino.enableDorisSupport           | boolean | `false`       | Set to `true` to use the specialized, read-only governed Doris path for `jdbc-doris` catalogs.                                                                           | No       |
 | spark.sql.gravitino.client.                      | string  | (none)        | The configuration key prefix for the Gravitino client config.                                                                                                            | No       |
 | spark.sql.gravitino.authType                     | string  | `simple`      | The authentication type, one of `simple`, `basic`, `oauth2`, `kerberos`, `token`.                                                                                        | No       |
 | spark.sql.gravitino.token.value                  | string  | (none)        | The bearer token to present to Gravitino, used when `authType` is `token`.                                                                                               | No       |
-| spark.sql.gravitino.token.file                   | string  | (none)        | Path to a file holding the bearer token. Takes precedence over `token.value` and is re-read per request.                                                                 | No       |
+| spark.sql.gravitino.token.file                   | string  | (none)        | Path to a file holding the bearer token. Wins over a `token.value` set in the same session or application configuration, and is re-read per request.                     | No       |
 | spark.sql.gravitino.token.principalFields        | string  | `sub`         | Comma separated, ordered JWT claim names used to identify the caller in `token` mode.                                                                                    | No       |
 | spark.sql.gravitino.clientCacheMaxSize           | int     | `100`         | The maximum number of Gravitino clients cached, one per identity.                                                                                                        | No       |
 | spark.sql.gravitino.clientCacheTtlSec            | long    | `3600`        | Evicts a cached Gravitino client this many seconds after it was last used.                                                                                               | No       |
@@ -47,18 +49,30 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 | spark.sql.gravitino.iceberg.reuseOAuth2          | boolean | `true`        | Reuses the Gravitino OAuth2 client configuration for routed Iceberg REST catalogs. Explicit IRC OAuth2 properties override individual reused values.                     | No       |
 | spark.sql.gravitino.iceberg.rest.                | string  | (none)        | The configuration key prefix for the Iceberg REST client config (e.g. `rest.auth.type`), applied when a catalog is routed through the Gravitino Iceberg REST server.     | No       |
 
+The URI and metalake settings are required to register Gravitino catalogs. By default, if configuration
+validation, client creation or catalog discovery fails, the connector logs a warning and skips
+registering its catalogs and SQL extensions. Spark jobs that do not use Gravitino catalogs can
+continue. Set `spark.sql.gravitino.failFast=true` to fail Spark startup instead. The `failFast` setting
+itself must be a valid boolean.
+
 To configure the Gravitino client, use properties prefixed with `spark.sql.gravitino.client.`. These properties will be passed to the Gravitino client after removing the `spark.sql.` prefix.
 
 **Example:** Setting `spark.sql.gravitino.client.socketTimeoutMs` is equivalent to setting `gravitino.client.socketTimeoutMs` for the Gravitino client.
 
-**Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](../how-to-use-gravitino-client.md#java-client-configuration) for more support client configuration.
+**Note:** Invalid client configuration properties are handled according to `spark.sql.gravitino.failFast`
+during initialization. Please see [Gravitino Java client configurations](../how-to-use-gravitino-client.md#java-client-configuration)
+for supported client configuration.
 
 ### Per-user identity in `token` mode
 
-When `spark.sql.gravitino.authType` is `token`, the connector presents the bearer token found in
-`spark.sql.gravitino.token.file`, or failing that `spark.sql.gravitino.token.value`, resolving it again on
-every request and reading the active Spark session's configuration in preference to the
-application's. The identity of the caller is taken from the JWT claim named by
+When `spark.sql.gravitino.authType` is `token`, the connector presents a bearer token and resolves it
+again on every request. A token that the active Spark session sets, through
+`spark.sql.gravitino.token.file` or `spark.sql.gravitino.token.value`, wins over the application's.
+If the session sets both, or the application sets both, `token.file` wins over `token.value`.
+Spark copies the application's configuration into every session, so a session setting equal to the
+application's counts as the application's; a session that wants its own token must set a token file
+or token value different from the application's. The identity of the caller is taken from the JWT
+claim named by
 `spark.sql.gravitino.token.principalFields`, which should be set to match the server's
 `gravitino.authenticator.oauth.principalFields` so that the connector and the server agree on who
 is asking. The claim is read without verifying the signature, because validating the token remains
@@ -170,7 +184,7 @@ could return different results:
 - Date parts other than year, quarter, month, day, hour, and minute, such as `second()` or
   `weekofyear()`. The source can compute them differently.
 - Filters with a `TIMESTAMP_NTZ` literal, when the JDBC dialect cannot write it in SQL. The
-  PostgreSQL dialect in Spark 3.5 has this limit. Spark 4.0 does not.
+  PostgreSQL dialect in Spark 3.5 has this limit. Spark 4 does not.
 - Value-dependent aggregates on timestamp columns whose JDBC reader type differs from the type Spark shows. An
   example is PostgreSQL `timestamptz` on Spark 3.5 with `preferTimestampNTZ=true`.
 
