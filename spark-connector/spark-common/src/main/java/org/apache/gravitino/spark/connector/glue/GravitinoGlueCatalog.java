@@ -237,10 +237,37 @@ public class GravitinoGlueCatalog extends BaseCatalog {
     return GluePropertiesConverter.getInstance();
   }
 
-  /** {@inheritDoc} Returns a transform converter with identity partition support disabled. */
+  /**
+   * {@inheritDoc} Returns the converter for Hive-format tables: a Spark bucket transform becomes
+   * bucketing (a hash distribution), which Hive stores, rather than a partition, which the server
+   * rejects for them. Every other transform is a partition as usual. It is also the catalog-wide
+   * converter for every Gravitino-to-Spark translation, including the table createTable returns;
+   * only the Spark-to-Gravitino translation of a CREATE TABLE's transforms picks a converter per
+   * table format.
+   */
   @Override
   protected SparkTransformConverter getSparkTransformConverter() {
     return new SparkTransformConverter(false);
+  }
+
+  /**
+   * {@inheritDoc} A table about to be created resolves its converter by table format: for an
+   * Iceberg-format table a Spark bucket transform is an Iceberg bucket partition (the server builds
+   * the bucket spec and drops distributions, so leaving it a distribution would silently create an
+   * unpartitioned table), while for a Hive-format table it stays bucketing, which Hive stores
+   * correctly and identity-only partitioning would reject. A sorted bucket is rejected for an
+   * Iceberg-format table: Iceberg has no sorted bucket, and as a distribution the server kept only
+   * its sort order, leaving the table unbucketed.
+   *
+   * @param gravitinoTableProperties the Gravitino properties of the table being created
+   * @return the converter to translate this table's transforms
+   */
+  @Override
+  protected SparkTransformConverter getSparkTransformConverter(
+      Map<String, String> gravitinoTableProperties) {
+    return isIcebergFormat(gravitinoTableProperties)
+        ? new SparkTransformConverter(true)
+        : getSparkTransformConverter();
   }
 
   /** {@inheritDoc} Returns the Hive-compatible type converter used for Glue tables. */
@@ -255,15 +282,26 @@ public class GravitinoGlueCatalog extends BaseCatalog {
    */
   @Override
   protected SparkTypeConverter getSparkTypeConverter(Map<String, String> gravitinoTableProperties) {
+    return isIcebergFormat(gravitinoTableProperties)
+        ? ICEBERG_TYPE_CONVERTER
+        : super.getSparkTypeConverter(gravitinoTableProperties);
+  }
+
+  /**
+   * Returns whether a table about to be created is in Iceberg format: its own {@code table-format}
+   * decides, and a table created without one follows the catalog's {@code default-table-format}.
+   *
+   * @param gravitinoTableProperties the Gravitino properties of the table being created
+   * @return true if the table is in Iceberg format
+   */
+  private boolean isIcebergFormat(Map<String, String> gravitinoTableProperties) {
     String tableFormat =
         gravitinoTableProperties.getOrDefault(
             GlueConstants.TABLE_FORMAT,
             catalogProperties == null
                 ? null
                 : catalogProperties.get(GlueConstants.DEFAULT_TABLE_FORMAT));
-    return GlueConstants.TABLE_FORMAT_ICEBERG.equalsIgnoreCase(tableFormat)
-        ? ICEBERG_TYPE_CONVERTER
-        : super.getSparkTypeConverter(gravitinoTableProperties);
+    return GlueConstants.TABLE_FORMAT_ICEBERG.equalsIgnoreCase(tableFormat);
   }
 
   /**
