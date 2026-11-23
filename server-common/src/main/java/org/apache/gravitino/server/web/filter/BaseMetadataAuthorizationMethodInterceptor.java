@@ -131,6 +131,19 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
      * @return the access entity type this handler authorizes against
      */
     Entity.EntityType entityType();
+
+    /**
+     * Applies request-specific authorization to the operation's result before it is returned.
+     *
+     * <p>The default preserves the result. Implementations can filter a successful response when
+     * the caller may receive only part of it.
+     *
+     * @param response the result of the authorized operation
+     * @return the authorized response
+     */
+    default Object processResponse(Object response) {
+      return response;
+    }
   }
 
   /** Invokes the protocol operation after authorization succeeds. */
@@ -286,6 +299,7 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
     // The object and expression a denial is recorded against, set as authorization proceeds.
     NameIdentifier deniedObject = null;
     String deniedExpression = "";
+    AuthorizationHandler responseHandler = null;
     try {
       Parameter[] parameters = method.getParameters();
       AuthorizationExpression expressionAnnotation =
@@ -360,6 +374,7 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
         if (!skipStandardCheck && handler.isPresent()) {
           AuthorizationHandler authzHandler = handler.get();
           authzHandler.process(nameIdentifierMap);
+          responseHandler = authzHandler;
           skipStandardCheck = authzHandler.authorizationCompleted();
         }
 
@@ -414,7 +429,8 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
       return toErrorResponse(method, args, new RuntimeException(errorMessage, ex));
     }
     try {
-      return methodInvoker.proceed();
+      Object response = methodInvoker.proceed();
+      return responseHandler == null ? response : responseHandler.processResponse(response);
     } catch (Throwable e) {
       return toErrorResponse(method, args, e);
     }

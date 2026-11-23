@@ -59,6 +59,7 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizationExecutor;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutorFactory;
 import org.apache.gravitino.server.web.rest.BulkOperations;
@@ -183,6 +184,7 @@ public class GravitinoInterceptionService implements InterceptionService {
 
       try (AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
         AuthorizationExecutor executor = null;
+        Optional<AuthorizationHandler> handler = Optional.empty();
         if (expressionAnnotation != null) {
           String expression = expressionAnnotation.expression();
           Object[] args = methodInvocation.getArguments();
@@ -265,7 +267,13 @@ public class GravitinoInterceptionService implements InterceptionService {
             }
           }
 
-          if (executor != null) {
+          handler =
+              createAuthorizationHandler(
+                  extractAuthorizationRequestTypeFromParameters(parameters), entityType);
+          if (handler.isPresent()) {
+            handler.get().process(metadataContext);
+          }
+          if (executor != null && (handler.isEmpty() || !handler.get().authorizationCompleted())) {
             boolean authorizeResult;
             try {
               authorizeResult = executor.execute(authorizationRequestContext);
@@ -311,7 +319,8 @@ public class GravitinoInterceptionService implements InterceptionService {
           }
           scope.bindIfRead(method, metalakeIdent, authorizationRequestContext);
         }
-        return methodInvocation.proceed();
+        Object response = methodInvocation.proceed();
+        return handler.isPresent() ? handler.get().processResponse(response) : response;
       } catch (BadRequestException ex) {
         LOG.warn("Invalid authorization request", ex);
         return Utils.illegalArguments(ex.getMessage(), ex);
@@ -334,6 +343,15 @@ public class GravitinoInterceptionService implements InterceptionService {
         return Utils.internalError(
             "Authorization failed due to system internal error. Please contact administrator.", ex);
       }
+    }
+
+    private Optional<AuthorizationHandler> createAuthorizationHandler(
+        AuthorizationRequest.RequestType requestType, Optional<String> entityType) {
+      if (requestType == AuthorizationRequest.RequestType.GET_CREDENTIALS
+          && entityType.filter(Entity.EntityType.CATALOG.name()::equals).isPresent()) {
+        return Optional.of(new CatalogCredentialAuthzHandler());
+      }
+      return Optional.empty();
     }
 
     private Optional<Response> validateCurrentUserAndActiveRoles(

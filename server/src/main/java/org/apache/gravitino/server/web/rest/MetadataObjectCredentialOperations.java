@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
@@ -46,13 +45,13 @@ import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.responses.CredentialResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
-import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -87,7 +86,10 @@ public class MetadataObjectCredentialOperations {
   public Response getCredentials(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("type") @AuthorizationObjectType String type,
+      @PathParam("type")
+          @AuthorizationObjectType
+          @AuthorizationRequest(type = AuthorizationRequest.RequestType.GET_CREDENTIALS)
+          String type,
       @PathParam("fullName") @AuthorizationFullName String fullName) {
     LOG.info(
         "Received get credentials request for object type: {}, full name: {} under metalake: {}",
@@ -132,28 +134,6 @@ public class MetadataObjectCredentialOperations {
                 credentialOperationDispatcher.getCredentials(identifier, privilege);
             if (credentials == null) {
               return Utils.ok(new CredentialResponse(new CredentialDTO[0]));
-            }
-            // Metadata access permits token vending, but must not expose the catalog account's
-            // long-lived credentials. Filter mixed results before converting them to DTOs.
-            if (object.type() == MetadataObject.Type.CATALOG
-                && !credentials.isEmpty()
-                && (!MetadataAuthzHelper.checkAccess(
-                        identifier,
-                        entityType,
-                        AuthorizationExpressionConstants.FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION)
-                    || !MetadataAuthzHelper.checkAccess(
-                        identifier,
-                        entityType,
-                        AuthorizationExpressionConstants
-                            .FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION))) {
-              credentials =
-                  credentials.stream()
-                      .filter(credential -> credential.expireTimeInMs() > 0)
-                      .collect(Collectors.toList());
-              if (credentials.isEmpty()) {
-                throw new ForbiddenException(
-                    "Catalog credentials require USE_SECRETS and INCLUDE_CREDENTIAL_SECRETS");
-              }
             }
             return Utils.ok(
                 new CredentialResponse(

@@ -78,7 +78,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 /** Tests for {@link BaseMetadataAuthorizationMethodInterceptor}. */
 public class TestBaseMetadataAuthorizationMethodInterceptor {
@@ -309,6 +311,74 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
 
     assertEquals("authorized by handler", interceptor.invoke(invocation));
     verify(authorizer, never()).authorize(any(), any(), any(), any(), any());
+  }
+
+  /**
+   * Checks that response processing follows authorization and invocation.
+   *
+   * @param completed whether the handler completes authorization
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testHandlerProcessesResponse(boolean completed) throws Throwable {
+    when(authorizer.authorize(any(), any(), any(), any(), any())).thenReturn(true);
+    TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
+    BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler handler =
+        mock(BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler.class);
+    when(handler.entityType()).thenReturn(Entity.EntityType.SCHEMA);
+    when(handler.authorizationCompleted()).thenReturn(completed);
+    when(handler.processResponse("original")).thenReturn("filtered");
+    interceptor.handler = Optional.of(handler);
+    TestInvocation invocation = invocation("canAccessMetadata", "original");
+
+    assertEquals("filtered", interceptor.invoke(invocation));
+    InOrder order = Mockito.inOrder(handler, invocation);
+    order.verify(handler).process(any());
+    order.verify(invocation).proceed();
+    order.verify(handler).processResponse("original");
+  }
+
+  /**
+   * Checks that denied or proxied requests never run response authorization.
+   *
+   * @param skipAuthorization whether the request is a proxy that bypasses local authorization
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testResponseHandlerIsNotAppliedWithoutLocalAuthorization(boolean skipAuthorization)
+      throws Throwable {
+    TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
+    interceptor.skipAuthorization = skipAuthorization;
+    BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler handler =
+        mock(BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler.class);
+    when(handler.entityType()).thenReturn(Entity.EntityType.SCHEMA);
+    interceptor.handler = Optional.of(handler);
+    TestInvocation invocation = invocation("alwaysDenied", "proxied");
+
+    Object response = interceptor.invoke(invocation);
+    if (skipAuthorization) {
+      assertEquals("proxied", response);
+      verify(handler, never()).process(any());
+    } else {
+      assertInstanceOf(ForbiddenException.class, response);
+      verify(invocation, never()).proceed();
+    }
+    verify(handler, never()).processResponse(any());
+  }
+
+  /** Checks that response handler failures use the protocol's error mapping. */
+  @Test
+  public void testResponseHandlerFailureUsesProtocolMapper() throws Throwable {
+    TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
+    BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler handler =
+        mock(BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler.class);
+    when(handler.entityType()).thenReturn(Entity.EntityType.SCHEMA);
+    when(handler.authorizationCompleted()).thenReturn(true);
+    IllegalStateException failure = new IllegalStateException("response authorization failed");
+    when(handler.processResponse(any())).thenThrow(failure);
+    interceptor.handler = Optional.of(handler);
+
+    assertSame(failure, interceptor.invoke(invocation("alwaysDenied", "original")));
   }
 
   @Test
