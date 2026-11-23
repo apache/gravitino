@@ -27,10 +27,14 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.DefaultParser;
@@ -39,6 +43,9 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.Role;
+import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.cli.FullName;
@@ -103,6 +110,37 @@ class TestRolePrivilegeCommands {
     verify(grant).exitWithError("Unknown entity type: " + name);
     verify(revoke).exitWithError("Unknown entity type: " + name);
     verifyNoInteractions(client);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testRevokeAllSelectsCatalogWhenMetalakeHasTheSameName(boolean hasCatalogGrant)
+      throws ParseException {
+    CommandLine line = parse("--metalake", "lake", "--name", "lake", "--all");
+    RevokeAllPrivileges revoke =
+        spy(
+            new RevokeAllPrivileges(
+                new CommandContext(line), "lake", "editor", new FullName(line)));
+    GravitinoClient client = mock(GravitinoClient.class);
+    doReturn(client).when(revoke).buildClient("lake");
+    Role role = mock(Role.class);
+    when(client.getRole("editor")).thenReturn(role);
+    Privilege catalogGrant = Privileges.allow("USE_CATALOG");
+    SecurableObject lake =
+        SecurableObjects.ofMetalake("lake", List.of(Privileges.allow("VIEW_DEFINITION")));
+    SecurableObject catalog = SecurableObjects.ofCatalog("lake", List.of(catalogGrant));
+    when(role.securableObjects())
+        .thenReturn(hasCatalogGrant ? List.of(lake, catalog) : List.of(lake));
+
+    revoke.validate().handle();
+
+    verify(client).getRole("editor");
+    verify(client, times(hasCatalogGrant ? 1 : 0))
+        .revokePrivilegesFromRole(
+            "editor",
+            MetadataObjects.of(null, "lake", MetadataObject.Type.CATALOG),
+            Set.of(catalogGrant));
+    verifyNoMoreInteractions(client);
   }
 
   @Test

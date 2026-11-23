@@ -126,9 +126,9 @@ public final class GlossaryManager {
     return SqlSessions.readSnapshot(
         () -> {
           NameIdentifier ident = NameIdentifierUtil.ofGlossaryTerm(metalake, name);
-          ScopedTerm snapshot = relationRoot(ident);
-          GlossaryTermEntity root = snapshot.term();
+          long lake = termReadMetalakeId(ident);
           GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
+          GlossaryTermEntity root = loadRootForView(ident, lake, access);
           Predicate<GlossaryTermEntity> visible =
               term ->
                   (status == null || status == term.status())
@@ -137,7 +137,6 @@ public final class GlossaryManager {
           if (!visible.test(root)) {
             throw missingRelationRoot(ident);
           }
-          long lake = snapshot.metalakeId();
           List<GlossaryTermEntity> result = new ArrayList<>();
           Set<Long> seen = new HashSet<>(Set.of(root.id()));
           Set<Long> frontier = Set.of(root.id());
@@ -216,8 +215,10 @@ public final class GlossaryManager {
     }
     return SqlSessions.readSnapshot(
         () -> {
-          GlossaryTermEntity term = relationRoot(ident).term();
-          if (!GlossaryAccess.forRequest(metalake, true).canRead(term)) {
+          long lake = termReadMetalakeId(ident);
+          GlossaryAccess access = GlossaryAccess.forRequest(metalake, true);
+          GlossaryTermEntity term = loadRootForView(ident, lake, access);
+          if (!access.canRead(term)) {
             throw missingRelationRoot(ident);
           }
           return term;
@@ -499,6 +500,26 @@ public final class GlossaryManager {
       return terms.list(NamespaceUtil.ofGlossaryTerm(metalake));
     } catch (NoSuchEntityException e) {
       throw new NoSuchMetalakeException(e, "Metalake %s does not exist", metalake);
+    }
+  }
+
+  private static long termReadMetalakeId(NameIdentifier ident) {
+    try {
+      return MetalakeMetaService.getInstance().getMetalakeIdByName(ident.namespace().level(0));
+    } catch (NoSuchEntityException missing) {
+      throw missingRelationRoot(ident);
+    }
+  }
+
+  private GlossaryTermEntity loadRootForView(
+      NameIdentifier ident, long metalakeId, GlossaryAccess access) {
+    if (!access.canView()) {
+      throw missingRelationRoot(ident);
+    }
+    try {
+      return terms.get(ident, metalakeId);
+    } catch (NoSuchEntityException missing) {
+      throw missingRelationRoot(ident);
     }
   }
 

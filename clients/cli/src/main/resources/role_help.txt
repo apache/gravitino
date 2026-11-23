@@ -4,9 +4,9 @@ Please set the metalake in the Gravitino configuration file or the environment v
 
 When granting or revoking privileges the following privileges can be used.
 
-create_catalog, use_catalog, create_schema, use_schema, create_table, modify_table, select_table, create_fileset, write_fileset, read_fileset, create_topic, produce_topic, consume_topic, manage_users, create_role, manage_grants
+create_catalog, use_catalog, create_schema, use_schema, create_table, modify_table, select_table, create_fileset, write_fileset, read_fileset, create_topic, produce_topic, consume_topic, manage_users, create_role, manage_grants, view_definition, create_definition, manage_definitions
 
-Note that some are only valid for certain entities.
+Glossary privileges apply to the selected metalake. Omit --name when granting or revoking them by name. Revoking with --all requires an explicit entity name.
 
 Example commands
 

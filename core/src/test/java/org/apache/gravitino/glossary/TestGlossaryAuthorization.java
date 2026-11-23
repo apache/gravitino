@@ -366,7 +366,7 @@ class TestGlossaryAuthorization extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testMissingWriteScopeIsReportedBeforePrivilegeLookup() throws Exception {
+  void testMissingMetalakeIsReportedBeforePrivilegeLookup() throws Exception {
     GravitinoAuthorizer observed = Mockito.mock(GravitinoAuthorizer.class);
     env.setGravitinoAuthorizer(observed);
     String absent = "absent";
@@ -379,6 +379,16 @@ class TestGlossaryAuthorization extends TestJDBCBackend {
           NoSuchTermException.class,
           () -> as("writer", () -> manager.alterTerm(absent, "term", change)));
     }
+    assertThrows(
+        NoSuchTermException.class, () -> as("viewer", () -> manager.getTerm(absent, "term")));
+    assertThrows(
+        NoSuchTermException.class,
+        () ->
+            as(
+                "viewer",
+                () ->
+                    manager.listRelations(
+                        absent, "term", GlossaryManager.Direction.BROADER, true, null)));
     Mockito.verifyNoInteractions(observed);
   }
 
@@ -395,6 +405,51 @@ class TestGlossaryAuthorization extends TestJDBCBackend {
     assertThrows(
         NoSuchMetalakeException.class, () -> as("denied", () -> scoped.listTerms("absent")));
     Mockito.verifyNoInteractions(definitions);
+  }
+
+  @TestTemplate
+  void testTermAndRelationReadsCheckViewBeforeLoadingDefinitions() throws Exception {
+    IllegalStateException failure = new IllegalStateException("Definition store unavailable");
+    GlossaryTermMetaService definitions =
+        Mockito.mock(
+            GlossaryTermMetaService.class,
+            invocation -> {
+              throw failure;
+            });
+    GlossaryManager scoped;
+    try (MockedStatic<GlossaryTermMetaService> services =
+        Mockito.mockStatic(GlossaryTermMetaService.class)) {
+      services.when(GlossaryTermMetaService::getInstance).thenReturn(definitions);
+      scoped = new GlossaryManager(() -> 7L, true);
+    }
+
+    for (String lake : List.of(LAKE, "absent")) {
+      assertThrows(
+          NoSuchTermException.class, () -> as("denied", () -> scoped.getTerm(lake, "term")));
+      assertThrows(
+          NoSuchTermException.class,
+          () ->
+              as(
+                  "denied",
+                  () ->
+                      scoped.listRelations(
+                          lake, "term", GlossaryManager.Direction.BROADER, true, null)));
+    }
+    Mockito.verifyNoInteractions(definitions);
+    assertSame(
+        failure,
+        assertThrows(
+            IllegalStateException.class, () -> as("viewer", () -> scoped.getTerm(LAKE, "term"))));
+    assertSame(
+        failure,
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                as(
+                    "viewer",
+                    () ->
+                        scoped.listRelations(
+                            LAKE, "term", GlossaryManager.Direction.BROADER, true, null))));
   }
 
   @TestTemplate
