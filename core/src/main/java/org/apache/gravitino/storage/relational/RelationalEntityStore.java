@@ -128,6 +128,12 @@ public class RelationalEntityStore
   private final ConcurrentHashMap<String, AtomicInteger> pendingHierarchyPrefixes =
       new ConcurrentHashMap<>();
 
+  // Keys being published into the cache under the key lock. Unlocked readers ({@link #exists},
+  // {@link #batchGet}, {@link CachedEntityIdResolver}) must not observe the entry until publication
+  // finishes, including when a raced invalidation rolls the put back.
+  private final ConcurrentHashMap<EntityCacheKey, AtomicInteger> publishingWrites =
+      new ConcurrentHashMap<>();
+
   // Non-null only for a LOCAL_PER_NODE cache, which needs cross-node invalidation. SHARED and NONE
   // caches have no per-node copy to invalidate, so no listener is registered.
   @Nullable private EntityCacheChangeLogListener entityCacheChangeLogListener;
@@ -161,7 +167,10 @@ public class RelationalEntityStore
     if (config.get(Configs.CACHE_ENABLED)) {
       this.cache = CacheFactory.getEntityCache(config);
       EntityIdService.initialize(
-          new CachedEntityIdResolver(cache, new RelationalEntityStoreIdResolver()));
+          new CachedEntityIdResolver(
+              cache,
+              new RelationalEntityStoreIdResolver(),
+              (ident, type) -> !isCacheObservationBlocked(ident, type)));
     } else {
       this.cache = new NoOpsCache(config);
       EntityIdService.initialize(new RelationalEntityStoreIdResolver());
@@ -285,32 +294,46 @@ public class RelationalEntityStore
 
   @Override
   public boolean exists(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
-    return (!isPendingWrite(ident, entityType) && cache.contains(ident, entityType))
+    return (!isCacheObservationBlocked(ident, entityType) && cache.contains(ident, entityType))
         || backend.exists(ident, entityType);
   }
 
   @Override
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
-    long epochBeforeWrite = cacheInvalidationEpoch.get();
+    NameIdentifier ident = e.nameIdentifier();
+    Entity.EntityType type = e.type();
     try {
       if (overwritten) {
         // Drop the cache and block refill before the overwrite commits. Do not publish {@code e}:
         // the database may keep the identity and version of the row it already had.
-        beginPendingWrite(e.nameIdentifier(), e.type());
+        beginPendingWrite(ident, type);
         try {
           backend.insert(e, true);
         } finally {
-          endPendingWrite(e.nameIdentifier(), e.type());
+          endPendingWrite(ident, type);
         }
       } else {
-        backend.insert(e, false);
+        // Clear any same-key stale row (for example a peer-dropped identity still cached here)
+        // before insert, but keep the pre-insert epoch so a concurrent ancestor delete during
+        // insert still fences publication.
+        beginPendingWrite(ident, type);
+        long epochBeforeInsert = cacheInvalidationEpoch.get();
+        try {
+          backend.insert(e, false);
+        } finally {
+          // Release without endPendingWrite's post-commit invalidate/epoch bumps so the insert
+          // epoch fence below stays meaningful. Exact-key pending is enough to drop the stale row.
+          releasePendingWrite(EntityCacheKey.of(ident, type), ident, type);
+        }
+        cacheIfEpochUnchanged(e, epochBeforeInsert);
+        if (cacheInvalidationEpoch.get() != epochBeforeInsert) {
+          // Publication was fenced; make sure the key stays empty for SHARED peer fills too.
+          invalidateCache(ident, type);
+        }
       }
     } catch (RuntimeException re) {
-      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, e.type(), e.nameIdentifier());
-    }
-    if (!overwritten) {
-      cacheIfEpochUnchanged(e, epochBeforeWrite);
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, type, ident);
     }
   }
 
@@ -343,10 +366,14 @@ public class RelationalEntityStore
         throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
       }
     } finally {
-      if (renamedTo[0] != null) {
-        endPendingWrite(renamedTo[0], entityType);
+      // Release rename target even if ending the old name fails (or the reverse).
+      try {
+        if (renamedTo[0] != null) {
+          endPendingWrite(renamedTo[0], entityType);
+        }
+      } finally {
+        endPendingWrite(ident, entityType);
       }
-      endPendingWrite(ident, entityType);
     }
   }
 
@@ -358,7 +385,7 @@ public class RelationalEntityStore
         cache.withCacheLock(
             EntityCacheKey.of(ident, entityType),
             () ->
-                isPendingWrite(ident, entityType)
+                isCacheObservationBlocked(ident, entityType)
                     ? Optional.empty()
                     : cache.getIfPresent(ident, entityType));
     if (cached.isPresent()) {
@@ -383,7 +410,7 @@ public class RelationalEntityStore
             .filter(
                 ident -> {
                   Optional<E> entity =
-                      isPendingWrite(ident, entityType)
+                      isCacheObservationBlocked(ident, entityType)
                           ? Optional.empty()
                           : cache.getIfPresent(ident, entityType);
                   entity.ifPresent(allEntities::add);
@@ -904,16 +931,27 @@ public class RelationalEntityStore
       cache.put(entity);
       return;
     }
-    if (isPendingWrite(entity.nameIdentifier(), entity.type())
-        || cacheInvalidationEpoch.get() != epoch) {
+    NameIdentifier ident = entity.nameIdentifier();
+    Entity.EntityType type = entity.type();
+    if (isPendingWrite(ident, type) || cacheInvalidationEpoch.get() != epoch) {
       return;
     }
-    cache.put(entity);
-    // The key lock excludes same-key invalidation, but an ancestor can advance the epoch while put
-    // runs on another segment. Drop a raced publication before releasing the lock.
-    if (isPendingWrite(entity.nameIdentifier(), entity.type())
-        || cacheInvalidationEpoch.get() != epoch) {
-      cache.invalidate(entity.nameIdentifier(), entity.type());
+    EntityCacheKey key = EntityCacheKey.of(ident, type);
+    // Block unlocked observers before the entry is visible, so exists/batchGet/ID resolution cannot
+    // see a put that a later epoch/pending check may still roll back.
+    retainPublishingWrite(key);
+    try {
+      if (isPendingWrite(ident, type) || cacheInvalidationEpoch.get() != epoch) {
+        return;
+      }
+      cache.put(entity);
+      // The key lock excludes same-key invalidation, but an ancestor can advance the epoch while
+      // put runs on another segment. Drop a raced publication before releasing the lock.
+      if (isPendingWrite(ident, type) || cacheInvalidationEpoch.get() != epoch) {
+        cache.invalidate(ident, type);
+      }
+    } finally {
+      releasePublishingWrite(key);
     }
   }
 
@@ -928,32 +966,35 @@ public class RelationalEntityStore
    * Marks {@code ident} and its hierarchy prefixes pending, then invalidates. Register pending
    * before dropping the cache so a concurrent descendant read sees the block before it can
    * republish.
+   *
+   * <p>Does not hold the cache key lock across {@link EntityCache#invalidate}: the SPI does not
+   * require {@code invalidate} to reenter that lock, and Caffeine acquires it internally.
    */
   private void beginPendingWrite(NameIdentifier ident, Entity.EntityType entityType) {
     EntityCacheKey key = EntityCacheKey.of(ident, entityType);
-    cache.withCacheLock(
-        key,
-        () -> {
-          retainPendingWrite(key, ident, entityType);
-          try {
-            invalidateCache(ident, entityType);
-          } catch (RuntimeException | Error e) {
-            // Retain already bumped refcounts; roll them back so a failed begin cannot leak
-            // pending state (for example rename sets renamedTo only after begin returns).
-            releasePendingWrite(key, ident, entityType);
-            throw e;
-          }
-        });
+    retainPendingWrite(key, ident, entityType);
+    try {
+      invalidateCache(ident, entityType);
+    } catch (RuntimeException | Error e) {
+      // Retain already bumped refcounts; roll them back so a failed begin cannot leak pending
+      // state (for example rename sets renamedTo only after begin returns).
+      releasePendingWrite(key, ident, entityType);
+      throw e;
+    }
   }
 
+  /**
+   * Ends a pending write without taking the interruptible cache key lock, so a writer interrupted
+   * after backend commit cannot leak registrations. Advances the epoch before releasing prefixes so
+   * a reader that loads under a pending ancestor cannot publish against the old epoch once the
+   * prefix is gone. Invalidates again after release so a {@link Coherence#SHARED} cache drops
+   * entries another store may have published while this write was pending.
+   */
   private void endPendingWrite(NameIdentifier ident, Entity.EntityType entityType) {
     EntityCacheKey key = EntityCacheKey.of(ident, entityType);
-    cache.withCacheLock(
-        key,
-        () -> {
-          releasePendingWrite(key, ident, entityType);
-          cacheInvalidationEpoch.incrementAndGet();
-        });
+    cacheInvalidationEpoch.incrementAndGet();
+    releasePendingWrite(key, ident, entityType);
+    invalidateCache(ident, entityType);
   }
 
   private void retainPendingWrite(
@@ -1010,22 +1051,59 @@ public class RelationalEntityStore
     if (pendingHierarchyPrefixes.isEmpty()) {
       return false;
     }
-    for (Map.Entry<String, AtomicInteger> entry : pendingHierarchyPrefixes.entrySet()) {
-      AtomicInteger count = entry.getValue();
-      if (count != null
-          && count.get() > 0
-          && CaffeineEntityCache.isUnderHierarchyPrefix(ident, entry.getKey())) {
+    // Look up this key's ancestor prefixes (O(name depth)) instead of scanning every active write.
+    for (String prefix : CaffeineEntityCache.ancestorHierarchyPrefixes(ident)) {
+      AtomicInteger count = pendingHierarchyPrefixes.get(prefix);
+      if (count != null && count.get() > 0) {
         return true;
       }
     }
     return false;
   }
 
+  private boolean isPublishingWrite(EntityCacheKey key) {
+    AtomicInteger count = publishingWrites.get(key);
+    return count != null && count.get() > 0;
+  }
+
+  /**
+   * Returns whether cache hits must be ignored for {@code ident}: an in-flight mutation, a
+   * hierarchy ancestor mutation, or a publication that may still be rolled back.
+   */
+  private boolean isCacheObservationBlocked(NameIdentifier ident, Entity.EntityType entityType) {
+    return isPendingWrite(ident, entityType)
+        || isPublishingWrite(EntityCacheKey.of(ident, entityType));
+  }
+
+  private void retainPublishingWrite(EntityCacheKey key) {
+    publishingWrites.compute(
+        key,
+        (ignored, count) -> {
+          if (count == null) {
+            return new AtomicInteger(1);
+          }
+          count.incrementAndGet();
+          return count;
+        });
+  }
+
+  private void releasePublishingWrite(EntityCacheKey key) {
+    publishingWrites.compute(
+        key,
+        (ignored, count) -> {
+          if (count == null) {
+            return null;
+          }
+          return count.decrementAndGet() == 0 ? null : count;
+        });
+  }
+
   @VisibleForTesting
   void clearCache() {
+    // Advance the epoch and drop cache entries only. In-flight writers own pending/publishing
+    // registrations and must release them themselves; clearing those maps would let concurrent
+    // readers refill while a standalone delete/update is still committing.
     cacheInvalidationEpoch.incrementAndGet();
-    pendingWrites.clear();
-    pendingHierarchyPrefixes.clear();
     cache.clear();
   }
 }

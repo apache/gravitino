@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.cache;
 
+import java.util.function.BiPredicate;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
@@ -29,14 +30,34 @@ public class CachedEntityIdResolver implements EntityIdResolver {
 
   private final EntityCache entityCache;
   private final EntityIdResolver underlyingResolver;
+  private final BiPredicate<NameIdentifier, Entity.EntityType> cacheReadable;
 
   public CachedEntityIdResolver(EntityCache entityCache, EntityIdResolver underlyingResolver) {
+    this(entityCache, underlyingResolver, (ident, type) -> true);
+  }
+
+  /**
+   * Creates a resolver that skips the cache when {@code cacheReadable} returns {@code false}, for
+   * example while a store is publishing an entry that may still be rolled back.
+   *
+   * @param entityCache The entity cache.
+   * @param underlyingResolver Resolver used on a cache miss or when the cache is not readable.
+   * @param cacheReadable Whether a cache hit may be used for the given key.
+   */
+  public CachedEntityIdResolver(
+      EntityCache entityCache,
+      EntityIdResolver underlyingResolver,
+      BiPredicate<NameIdentifier, Entity.EntityType> cacheReadable) {
     this.entityCache = entityCache;
     this.underlyingResolver = underlyingResolver;
+    this.cacheReadable = cacheReadable;
   }
 
   @Override
   public NamespacedEntityId getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type) {
+    if (!cacheReadable.test(nameIdentifier, type)) {
+      return underlyingResolver.getEntityIds(nameIdentifier, type);
+    }
     return entityCache
         .getIfPresent(nameIdentifier, type)
         .map(
@@ -56,6 +77,9 @@ public class CachedEntityIdResolver implements EntityIdResolver {
 
   @Override
   public Long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type) {
+    if (!cacheReadable.test(nameIdentifier, type)) {
+      return underlyingResolver.getEntityId(nameIdentifier, type);
+    }
     return entityCache
         .getIfPresent(nameIdentifier, type)
         .map(HasIdentifier::id)

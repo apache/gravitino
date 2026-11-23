@@ -25,8 +25,10 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -86,8 +88,10 @@ public class TestRelationalEntityStore {
   void testUncachedInsertStillInvokesRelatedInvalidationAfterEpochChanges() throws Exception {
     BaseEntityCache cache = Mockito.mock(BaseEntityCache.class);
     FieldUtils.writeField(store, "cache", cache, true);
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "model");
     ModelEntity entity = Mockito.mock(ModelEntity.class);
     Mockito.when(entity.type()).thenReturn(Entity.EntityType.MODEL);
+    Mockito.when(entity.nameIdentifier()).thenReturn(ident);
     Mockito.doAnswer(
             invocation -> {
               store.clearCache();
@@ -96,7 +100,9 @@ public class TestRelationalEntityStore {
         .when(backend)
         .insert(entity, false);
     store.put(entity, false);
-    Mockito.verify(cache).put(entity);
+    // Epoch advanced during insert, so publication is fenced; related invalidation still ran via
+    // beginPendingWrite / the final invalidateCache path.
+    Mockito.verify(cache, Mockito.atLeastOnce()).invalidate(ident, Entity.EntityType.MODEL);
   }
 
   @Test
@@ -220,6 +226,90 @@ public class TestRelationalEntityStore {
   }
 
   @Test
+  void testClearCacheKeepsPendingRegistrations() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog");
+    EntityCacheKey key = EntityCacheKey.of(ident, Entity.EntityType.CATALOG);
+    @SuppressWarnings("unchecked")
+    Map<EntityCacheKey, AtomicInteger> pendingWrites =
+        (Map<EntityCacheKey, AtomicInteger>) FieldUtils.readField(store, "pendingWrites", true);
+    @SuppressWarnings("unchecked")
+    Map<String, AtomicInteger> pendingHierarchyPrefixes =
+        (Map<String, AtomicInteger>) FieldUtils.readField(store, "pendingHierarchyPrefixes", true);
+    pendingWrites.put(key, new AtomicInteger(1));
+    for (String prefix : CaffeineEntityCache.descendantPrefixes(ident, Entity.EntityType.CATALOG)) {
+      pendingHierarchyPrefixes.put(prefix, new AtomicInteger(1));
+    }
+
+    store.clearCache();
+
+    Assertions.assertEquals(1, pendingWrites.get(key).get());
+    Assertions.assertFalse(pendingHierarchyPrefixes.isEmpty());
+  }
+
+  @Test
+  void testExistsAndBatchGetSkipCacheWhilePublishing() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "topic");
+    EntityCacheKey key = EntityCacheKey.of(ident, Entity.EntityType.TOPIC);
+    TopicEntity cached = Mockito.mock(TopicEntity.class);
+    Mockito.when(cached.nameIdentifier()).thenReturn(ident);
+    Mockito.when(cached.type()).thenReturn(Entity.EntityType.TOPIC);
+
+    EntityCache cache = Mockito.mock(EntityCache.class);
+    FieldUtils.writeField(store, "cache", cache, true);
+    Mockito.when(cache.contains(ident, Entity.EntityType.TOPIC)).thenReturn(true);
+    Mockito.when(cache.getIfPresent(ident, Entity.EntityType.TOPIC))
+        .thenReturn(Optional.of(cached));
+    Mockito.when(backend.exists(ident, Entity.EntityType.TOPIC)).thenReturn(false);
+    Mockito.when(backend.batchGet(List.of(ident), Entity.EntityType.TOPIC)).thenReturn(List.of());
+
+    @SuppressWarnings("unchecked")
+    Map<EntityCacheKey, AtomicInteger> publishingWrites =
+        (Map<EntityCacheKey, AtomicInteger>) FieldUtils.readField(store, "publishingWrites", true);
+    publishingWrites.put(key, new AtomicInteger(1));
+
+    Assertions.assertFalse(store.exists(ident, Entity.EntityType.TOPIC));
+    Assertions.assertTrue(
+        store.batchGet(List.of(ident), Entity.EntityType.TOPIC, TopicEntity.class).isEmpty());
+    Mockito.verify(backend).exists(ident, Entity.EntityType.TOPIC);
+    Mockito.verify(backend).batchGet(List.of(ident), Entity.EntityType.TOPIC);
+  }
+
+  @Test
+  void testEndPendingWriteAdvancesEpochBeforeReleasingPrefixes() throws Exception {
+    NameIdentifier schema = NameIdentifier.of("metalake", "catalog", "schema");
+    NameIdentifier table = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    EntityCacheKey schemaKey = EntityCacheKey.of(schema, Entity.EntityType.SCHEMA);
+    @SuppressWarnings("unchecked")
+    Map<EntityCacheKey, AtomicInteger> pendingWrites =
+        (Map<EntityCacheKey, AtomicInteger>) FieldUtils.readField(store, "pendingWrites", true);
+    @SuppressWarnings("unchecked")
+    Map<String, AtomicInteger> pendingHierarchyPrefixes =
+        (Map<String, AtomicInteger>) FieldUtils.readField(store, "pendingHierarchyPrefixes", true);
+    AtomicLong epoch = (AtomicLong) FieldUtils.readField(store, "cacheInvalidationEpoch", true);
+
+    pendingWrites.put(schemaKey, new AtomicInteger(1));
+    for (String prefix : CaffeineEntityCache.descendantPrefixes(schema, Entity.EntityType.SCHEMA)) {
+      pendingHierarchyPrefixes.put(prefix, new AtomicInteger(1));
+    }
+    long epochBefore = epoch.get();
+    Assertions.assertTrue(
+        (boolean)
+            org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+                store, true, "isPendingWrite", table, Entity.EntityType.TABLE));
+
+    org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+        store, true, "endPendingWrite", schema, Entity.EntityType.SCHEMA);
+
+    Assertions.assertTrue(epoch.get() > epochBefore);
+    Assertions.assertFalse(pendingWrites.containsKey(schemaKey));
+    Assertions.assertTrue(pendingHierarchyPrefixes.isEmpty());
+    Assertions.assertFalse(
+        (boolean)
+            org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+                store, true, "isPendingWrite", table, Entity.EntityType.TABLE));
+  }
+
+  @Test
   void testGetDoesNotPublishWhileWritePending() throws Exception {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "topic");
     EntityCacheKey key = EntityCacheKey.of(ident, Entity.EntityType.TOPIC);
@@ -292,6 +382,63 @@ public class TestRelationalEntityStore {
     Assertions.assertTrue(pendingDuringBackend.get());
     Assertions.assertFalse(pendingWrites.containsKey(key));
     Mockito.verify(cache, Mockito.never()).put(topic);
+  }
+
+  @Test
+  void testNonOverwritePutDropsStaleCacheBeforeInsertAndPublishesAfter()
+      throws IOException, EntityAlreadyExistsException, IllegalAccessException {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "topic");
+    EntityCacheKey key = EntityCacheKey.of(ident, Entity.EntityType.TOPIC);
+    TopicEntity created = Mockito.mock(TopicEntity.class);
+    Mockito.when(created.nameIdentifier()).thenReturn(ident);
+    Mockito.when(created.type()).thenReturn(Entity.EntityType.TOPIC);
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    @SuppressWarnings("unchecked")
+    Map<EntityCacheKey, AtomicInteger> pendingWrites =
+        (Map<EntityCacheKey, AtomicInteger>) FieldUtils.readField(store, "pendingWrites", true);
+    AtomicBoolean invalidatedBeforeBackend = new AtomicBoolean(false);
+    AtomicBoolean pendingDuringBackend = new AtomicBoolean(false);
+
+    Mockito.doAnswer(
+            invocation -> {
+              Mockito.verify(cache).invalidate(ident, Entity.EntityType.TOPIC);
+              invalidatedBeforeBackend.set(true);
+              AtomicInteger count = pendingWrites.get(key);
+              pendingDuringBackend.set(count != null && count.get() > 0);
+              return null;
+            })
+        .when(backend)
+        .insert(created, false);
+
+    store.put(created, false);
+
+    Assertions.assertTrue(invalidatedBeforeBackend.get());
+    Assertions.assertTrue(pendingDuringBackend.get());
+    Assertions.assertFalse(pendingWrites.containsKey(key));
+    Mockito.verify(cache).put(created);
+  }
+
+  @Test
+  void testIsPendingWriteLooksUpAncestorPrefixes() throws Exception {
+    NameIdentifier catalog = NameIdentifier.of("metalake", "catalog");
+    NameIdentifier table = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    NameIdentifier other = NameIdentifier.of("metalake", "other", "schema", "table");
+    @SuppressWarnings("unchecked")
+    Map<String, AtomicInteger> pendingHierarchyPrefixes =
+        (Map<String, AtomicInteger>) FieldUtils.readField(store, "pendingHierarchyPrefixes", true);
+    for (String prefix :
+        CaffeineEntityCache.descendantPrefixes(catalog, Entity.EntityType.CATALOG)) {
+      pendingHierarchyPrefixes.put(prefix, new AtomicInteger(1));
+    }
+
+    Assertions.assertTrue(
+        (boolean)
+            org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+                store, true, "isPendingWrite", table, Entity.EntityType.TABLE));
+    Assertions.assertFalse(
+        (boolean)
+            org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+                store, true, "isPendingWrite", other, Entity.EntityType.TABLE));
   }
 
   @Test

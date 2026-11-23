@@ -442,4 +442,23 @@ public class TestCaffeineEntityCacheInvalidation {
         CaffeineEntityCache.isUnderHierarchyPrefix(
             NameIdentifier.of("metalake", "catalog", "schema", "table"), prefixes.get(0)));
   }
+
+  @Test
+  void testAncestorHierarchyPrefixesCoverDescendantRegistrations() {
+    NameIdentifier catalog = NameIdentifier.of("metalake", "catalog");
+    NameIdentifier schema = NameIdentifier.of("metalake", "catalog", "schema");
+    NameIdentifier table = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    java.util.List<String> ancestors = CaffeineEntityCache.ancestorHierarchyPrefixes(table);
+
+    Assertions.assertTrue(
+        ancestors.containsAll(
+            CaffeineEntityCache.descendantPrefixes(catalog, Entity.EntityType.CATALOG)));
+    Assertions.assertTrue(
+        ancestors.contains(
+            CaffeineEntityCache.descendantPrefixes(schema, Entity.EntityType.SCHEMA).get(0)));
+    Assertions.assertFalse(
+        ancestors.containsAll(
+            CaffeineEntityCache.descendantPrefixes(
+                NameIdentifier.of("metalake", "catalog10"), Entity.EntityType.CATALOG)));
+  }
 }

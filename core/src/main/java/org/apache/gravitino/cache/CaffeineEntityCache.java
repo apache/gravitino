@@ -418,6 +418,46 @@ public class CaffeineEntityCache extends BaseEntityCache {
   }
 
   /**
+   * Returns the hierarchy prefixes an ancestor may have registered that would match {@code ident}.
+   *
+   * <p>Each value is a boundary-terminated prefix of {@link #indexText(NameIdentifier)} (name-level
+   * {@code .} or the schema separator). Looking these up in a pending-prefix map is O(depth)
+   * instead of scanning every active write.
+   *
+   * @param ident The identifier to test.
+   * @return Candidate prefixes, nearest ancestors last; never includes {@code ident} itself.
+   */
+  public static List<String> ancestorHierarchyPrefixes(NameIdentifier ident) {
+    String text = indexText(ident);
+    String schemaSeparator = HierarchicalSchemaUtil.schemaSeparator();
+    List<String> prefixes = Lists.newArrayList();
+    for (int i = 0; i < text.length(); i++) {
+      char c = text.charAt(i);
+      if (c == INDEX_ESCAPE) {
+        // Skip the escaped character so a literal '.' inside a level is not a boundary.
+        i++;
+        continue;
+      }
+      if (c == NAME_LEVEL_BOUNDARY.charAt(0)) {
+        prefixes.add(text.substring(0, i + 1));
+        continue;
+      }
+      if (schemaSeparator.isEmpty()) {
+        continue;
+      }
+      if (schemaSeparator.length() == 1) {
+        if (c == schemaSeparator.charAt(0)) {
+          prefixes.add(text.substring(0, i + 1));
+        }
+      } else if (text.startsWith(schemaSeparator, i)) {
+        prefixes.add(text.substring(0, i + schemaSeparator.length()));
+        i += schemaSeparator.length() - 1;
+      }
+    }
+    return prefixes;
+  }
+
+  /**
    * Appends a level to prefix-index text, prefixing {@code "."} and the escape character with the
    * escape character.
    */
