@@ -68,6 +68,7 @@ public class MetadataObjectUtil {
           .put(MetadataObject.Type.VIEW, Entity.EntityType.VIEW)
           .put(MetadataObject.Type.SEMANTIC_MODEL, Entity.EntityType.SEMANTIC_MODEL)
           .put(MetadataObject.Type.FUNCTION, Entity.EntityType.FUNCTION)
+          .put(MetadataObject.Type.GLOSSARY_TERM, Entity.EntityType.GLOSSARY_TERM)
           .put(MetadataObject.Type.DOMAIN, Entity.EntityType.DOMAIN)
           .build();
 
@@ -140,6 +141,8 @@ public class MetadataObjectUtil {
         return NameIdentifierUtil.ofJob(metalakeName, metadataObject.name());
       case JOB_TEMPLATE:
         return NameIdentifierUtil.ofJobTemplate(metalakeName, metadataObject.name());
+      case GLOSSARY_TERM:
+        return NameIdentifierUtil.ofGlossaryTerm(metalakeName, metadataObject.name());
       case DOMAIN:
         String domainName = metadataObject.fullName();
         NameValidationUtils.validateName("domain", domainName);

@@ -19,10 +19,34 @@ import unittest
 
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
+from gravitino.dto.authorization.securable_object_dto import SecurableObjectDTO
+from gravitino.dto.metadata_object_dto import MetadataObjectDTO
 from gravitino.exceptions.base import IllegalArgumentException
+from gravitino.rest.rest_utils import encode_metadata_object_name
 
 
 class TestMetadataObjects(unittest.TestCase):
+    def test_dotted_glossary_term_is_one_name(self):
+        name = "finance.net.revenue"
+        term_type = MetadataObject.Type.GLOSSARY_TERM
+        for obj in (
+            MetadataObjects.of(name, term_type),
+            MetadataObjectDTO(term_type, name),
+            SecurableObjectDTO(_full_name=name, _type=term_type),
+        ):
+            self.assertEqual(name, obj.name())
+            self.assertIsNone(obj.parent())
+            self.assertIsNone(MetadataObjects.parent(obj))
+        self.assertEqual(
+            "a.b%2Fc",
+            encode_metadata_object_name(MetadataObjects.of("a.b/c", term_type)),
+        )
+        for invalid in [".", "..", "   "]:
+            with self.subTest(name=invalid), self.assertRaises(IllegalArgumentException):
+                encode_metadata_object_name(MetadataObjectDTO(term_type, invalid))
+        with self.assertRaises(IllegalArgumentException):
+            MetadataObjects.of(name, term_type, "finance")
+
     def test_of_with_string_name(self):
         obj = MetadataObjects.of("catalog1", MetadataObject.Type.CATALOG)
         self.assertEqual("catalog1", obj.name())

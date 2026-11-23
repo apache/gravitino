@@ -67,6 +67,7 @@ import org.apache.gravitino.cache.GravitinoCache;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.glossary.GlossaryAccess;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.server.authorization.DomainAuthzHelper;
@@ -408,6 +409,15 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
+  public boolean canAccessGlossaryTerm(
+      Principal principal,
+      String metalake,
+      MetadataObject object,
+      AuthorizationRequestContext context) {
+    return GlossaryAccess.canRead(this, principal, metalake, object, context);
+  }
+
+  @Override
   public boolean canAccessDomain(
       Principal principal,
       String metalake,
@@ -482,6 +492,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       return false;
     }
 
+    if (metadataObject.type() == MetadataObject.Type.GLOSSARY_TERM) {
+      return ownerMatchesUserOrGroups(
+          lookups.currentGlossaryTermOwner(metalake, metadataObject.name()),
+          principal,
+          metalake,
+          requestContext);
+    }
+
     if (metadataObject.type() == MetadataObject.Type.SCHEMA) {
       // We support hierarchical schema, so a schema may have ancestor schemas. The principal is
       // treated as the owner if it owns the schema itself or any of its ancestor schemas, hence we
@@ -524,6 +542,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     Optional<OwnerInfo> owner =
         lookups.resolveOwnerId(metadataId.get(), metadataObject.type(), requestContext);
     return ownerMatchesUserOrGroups(owner, principal, metalake, requestContext);
+  }
+
+  @Override
+  public boolean isGlossaryTermOwner(
+      Principal principal, String metalake, long termId, AuthorizationRequestContext context) {
+    return ownerMatchesUserOrGroups(
+        lookups.currentGlossaryTermOwner(termId), principal, metalake, context);
   }
 
   @Override
@@ -2243,6 +2268,32 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             new String[] {
               roleId, type.name(), String.valueOf(metadataId), action, AuthConstants.ALLOW
             });
+      }
+      // Expand only allowed glossary grants, before Casbin combines policies from all roles.
+      // A deny on MANAGE must not discard the same grant's independent CREATE and VIEW allows.
+      if (type == MetadataObject.Type.METALAKE
+          && privilege.condition() == Privilege.Condition.ALLOW) {
+        if (privilege.name() == Privilege.Name.MANAGE_DEFINITIONS) {
+          allowRows.add(
+              new String[] {
+                roleId,
+                type.name(),
+                String.valueOf(metadataId),
+                Privilege.Name.CREATE_DEFINITION.name(),
+                AuthConstants.ALLOW
+              });
+        }
+        if (privilege.name() == Privilege.Name.MANAGE_DEFINITIONS
+            || privilege.name() == Privilege.Name.CREATE_DEFINITION) {
+          allowRows.add(
+              new String[] {
+                roleId,
+                type.name(),
+                String.valueOf(metadataId),
+                Privilege.Name.VIEW_DEFINITION.name(),
+                AuthConstants.ALLOW
+              });
+        }
       }
       allowRows.add(
           new String[] {

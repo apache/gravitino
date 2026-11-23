@@ -78,6 +78,9 @@ class MetadataObject(ABC):
         DOMAIN = "domain"
         """A business grouping of leaf metadata objects."""
 
+        GLOSSARY_TERM = "glossary_term"
+        """A glossary term identified by its name within a metalake."""
+
         TAG = "tag"
         """A tag is used to help manage other metadata object."""
 

@@ -119,9 +119,14 @@ public class RESTUtils {
    * @return The encoded path segment.
    */
   public static String encodeDomainPathSegment(String name) {
+    return encodeLiteralPathSegment(name, "domain");
+  }
+
+  private static String encodeLiteralPathSegment(String name, String type) {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name) && !".".equals(name) && !"..".equals(name),
-        "Unsafe domain path segment: %s",
+        "Unsafe %s path segment: %s",
+        type,
         name);
     return encodeString(name);
   }
@@ -133,6 +138,9 @@ public class RESTUtils {
    * @return The encoded path segment.
    */
   public static String encodeMetadataObjectName(MetadataObject object) {
+    if (object.type() == MetadataObject.Type.GLOSSARY_TERM) {
+      return encodeLiteralPathSegment(object.fullName(), "glossary term");
+    }
     return object.type() == MetadataObject.Type.DOMAIN
         ? encodeDomainPathSegment(object.fullName())
         : encodeString(object.fullName());

@@ -22,7 +22,6 @@ package org.apache.gravitino.storage.relational.mapper;
 import java.util.Collection;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.gravitino.storage.relational.mapper.provider.base.GlossaryTermRelSQLProvider;
 import org.apache.gravitino.storage.relational.po.GlossaryTermRelPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
@@ -34,24 +33,30 @@ import org.apache.ibatis.annotations.UpdateProvider;
 
 /** Glossary edges and hierarchy locks in the caller transaction. */
 public interface GlossaryTermRelMapper {
+  /** Table containing glossary term relations. */
+  String TABLE_NAME = "glossary_term_rel";
+
+  /** Table containing the hierarchy lock for each metalake. */
+  String HIERARCHY_LOCK_TABLE_NAME = "glossary_hierarchy_lock";
+
   /** Creates the mutex row safely on first use. */
-  @InsertProvider(type = GlossaryTermRelSQLProvider.class, method = "ensureLock")
+  @InsertProvider(type = GlossaryTermRelSQLProviderFactory.class, method = "ensureLock")
   void ensureLock(@Param("metalakeId") long metalakeId);
 
   /** Locks the existing hierarchy mutex in the caller transaction. */
   @Nullable
   @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
-  @SelectProvider(type = GlossaryTermRelSQLProvider.class, method = "lockHierarchy")
+  @SelectProvider(type = GlossaryTermRelSQLProviderFactory.class, method = "lockHierarchy")
   Long lockHierarchy(@Param("metalakeId") long metalakeId);
 
   /** Locks a live term in this metalake, or returns null. */
   @Nullable
   @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
-  @SelectProvider(type = GlossaryTermRelSQLProvider.class, method = "lockTerm")
+  @SelectProvider(type = GlossaryTermRelSQLProviderFactory.class, method = "lockTerm")
   Long lockTerm(@Param("metalakeId") long metalakeId, @Param("termId") long termId);
 
   /** Inserts a live canonical edge under the hierarchy mutex. */
-  @InsertProvider(type = GlossaryTermRelSQLProvider.class, method = "insert")
+  @InsertProvider(type = GlossaryTermRelSQLProviderFactory.class, method = "insert")
   int insert(
       @Param("metalakeId") long metalakeId,
       @Param("fromId") long fromId,
@@ -60,7 +65,7 @@ public interface GlossaryTermRelMapper {
 
   /** Counts matching live edges. */
   @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
-  @SelectProvider(type = GlossaryTermRelSQLProvider.class, method = "exists")
+  @SelectProvider(type = GlossaryTermRelSQLProviderFactory.class, method = "exists")
   int exists(
       @Param("metalakeId") long metalakeId,
       @Param("fromId") long fromId,
@@ -68,7 +73,7 @@ public interface GlossaryTermRelMapper {
       @Param("type") String type);
 
   /** Soft-deletes the matching live edge. */
-  @UpdateProvider(type = GlossaryTermRelSQLProvider.class, method = "remove")
+  @UpdateProvider(type = GlossaryTermRelSQLProviderFactory.class, method = "remove")
   int remove(
       @Param("metalakeId") long metalakeId,
       @Param("fromId") long fromId,
@@ -78,27 +83,27 @@ public interface GlossaryTermRelMapper {
 
   /** Returns the greatest retained deletion timestamp, or zero. */
   @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
-  @SelectProvider(type = GlossaryTermRelSQLProvider.class, method = "lastDeletedAt")
+  @SelectProvider(type = GlossaryTermRelSQLProviderFactory.class, method = "lastDeletedAt")
   long lastDeletedAt(@Param("metalakeId") long metalakeId);
 
   /** Retires all edges touching a deleted term. */
-  @UpdateProvider(type = GlossaryTermRelSQLProvider.class, method = "removeTerm")
+  @UpdateProvider(type = GlossaryTermRelSQLProviderFactory.class, method = "removeTerm")
   void removeTerm(
       @Param("metalakeId") long metalakeId,
       @Param("termId") long termId,
       @Param("deletedAt") long deletedAt);
 
   /** Retires all edges of a deleted metalake. */
-  @UpdateProvider(type = GlossaryTermRelSQLProvider.class, method = "dropMetalake")
+  @UpdateProvider(type = GlossaryTermRelSQLProviderFactory.class, method = "dropMetalake")
   void dropMetalake(@Param("metalakeId") long metalakeId, @Param("deletedAt") long deletedAt);
 
   /** Removes the mutex under the exclusive metalake deletion fence. */
-  @DeleteProvider(type = GlossaryTermRelSQLProvider.class, method = "dropLock")
+  @DeleteProvider(type = GlossaryTermRelSQLProviderFactory.class, method = "dropLock")
   void dropLock(@Param("metalakeId") long metalakeId);
 
   /** Reads one nonempty frontier batch with live endpoints in a single statement. */
   @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
-  @SelectProvider(type = GlossaryTermRelSQLProvider.class, method = "listEdges")
+  @SelectProvider(type = GlossaryTermRelSQLProviderFactory.class, method = "listEdges")
   List<GlossaryTermRelPO> listEdges(
       @Param("metalakeId") long metalakeId,
       @Param("ids") Collection<Long> ids,
@@ -107,10 +112,10 @@ public interface GlossaryTermRelMapper {
 
   /** Selects a bounded batch of expired generations. */
   @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
-  @SelectProvider(type = GlossaryTermRelSQLProvider.class, method = "expired")
+  @SelectProvider(type = GlossaryTermRelSQLProviderFactory.class, method = "expired")
   List<GlossaryTermRelPO> expired(@Param("cutoff") long cutoff, @Param("limit") int limit);
 
   /** Deletes the exact expired generation, not the live replacement. */
-  @DeleteProvider(type = GlossaryTermRelSQLProvider.class, method = "purge")
-  int purge(@Param("p") GlossaryTermRelPO p);
+  @DeleteProvider(type = GlossaryTermRelSQLProviderFactory.class, method = "purge")
+  int purge(@Param("relation") GlossaryTermRelPO relation);
 }

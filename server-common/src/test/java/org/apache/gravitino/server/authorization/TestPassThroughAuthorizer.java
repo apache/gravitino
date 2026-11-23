@@ -17,6 +17,7 @@
 
 package org.apache.gravitino.server.authorization;
 
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -31,6 +32,7 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -78,6 +80,19 @@ public class TestPassThroughAuthorizer {
       Assertions.assertTrue(
           passThroughAuthorizer.hasMetadataPrivilegePermission(
               "metalake", "type", "fullName", new AuthorizationRequestContext()));
+    }
+  }
+
+  @Test
+  public void testGlossaryVisibilityDefaults() throws IOException {
+    Principal user = new UserPrincipal("reader");
+    MetadataObject term = MetadataObjects.of(null, "cost.net", MetadataObject.Type.GLOSSARY_TERM);
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    GravitinoAuthorizer custom = mock(GravitinoAuthorizer.class, CALLS_REAL_METHODS);
+    Assertions.assertFalse(custom.canAccessGlossaryTerm(user, "lake", term, context));
+    try (PassThroughAuthorizer passThrough = new PassThroughAuthorizer()) {
+      Assertions.assertTrue(passThrough.canAccessGlossaryTerm(user, "lake", term, context));
+      Assertions.assertTrue(passThrough.isGlossaryTermOwner(user, "lake", 7L, context));
     }
   }
 

@@ -225,8 +225,11 @@ public class TestOwnerManager {
     // Test not-existed metadata object
     MetadataObject notExistObject =
         MetadataObjects.of(Lists.newArrayList("not-exist"), MetadataObject.Type.CATALOG);
-    Assertions.assertThrows(
-        NoSuchMetadataObjectException.class, () -> ownerManager.getOwner(METALAKE, notExistObject));
+    NoSuchMetadataObjectException missing =
+        Assertions.assertThrows(
+            NoSuchMetadataObjectException.class,
+            () -> ownerManager.getOwner(METALAKE, notExistObject));
+    Assertions.assertInstanceOf(NoSuchEntityException.class, missing.getCause());
 
     // Test to set the user as the owner
     ownerManager.setOwner(METALAKE, metalakeObject, USER, Owner.Type.USER);

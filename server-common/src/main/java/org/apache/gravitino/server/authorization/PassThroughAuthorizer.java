@@ -59,6 +59,21 @@ public class PassThroughAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
+  public boolean canAccessGlossaryTerm(
+      Principal principal,
+      String metalake,
+      MetadataObject object,
+      AuthorizationRequestContext context) {
+    return true;
+  }
+
+  @Override
+  public boolean isGlossaryTermOwner(
+      Principal principal, String metalake, long termId, AuthorizationRequestContext context) {
+    return true;
+  }
+
+  @Override
   public boolean deny(
       Principal principal,
       String metalake,

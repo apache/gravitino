@@ -26,6 +26,7 @@ import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.cache.GravitinoCache;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.meta.GlossaryTermNames;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
@@ -38,14 +39,15 @@ import org.slf4j.LoggerFactory;
 /**
  * Two-tier metadata-id and owner resolution for {@link JcasbinAuthorizer}.
  *
- * <p>Each lookup is deduplicated within a single request via {@link AuthorizationRequestContext},
- * falls back to a shared {@link GravitinoCache} on a request miss, and finally issues a single DB
- * query on a cache miss. A successful DB fetch populates both tiers so subsequent calls — in this
- * request and later ones — hit the cache. The two underlying caches are invalidated externally by
- * the global entity change log poller, {@link JcasbinChangeListener} (owner changes), and by the
- * {@link org.apache.gravitino.authorization.GravitinoAuthorizer#handleMetadataOwnerChange} / {@link
+ * <p>Each cached lookup is deduplicated within a single request via {@link
+ * AuthorizationRequestContext}, falls back to a shared {@link GravitinoCache} on a request miss,
+ * and finally issues a single DB query on a cache miss. A successful DB fetch populates both tiers
+ * so subsequent calls — in this request and later ones — hit the cache. The two underlying caches
+ * are invalidated externally by the global entity change log poller, {@link JcasbinChangeListener}
+ * (owner changes), and by the {@link
+ * org.apache.gravitino.authorization.GravitinoAuthorizer#handleMetadataOwnerChange} / {@link
  * org.apache.gravitino.authorization.GravitinoAuthorizer#handleEntityNameIdMappingChange} hooks
- * (local mutations).
+ * (local mutations). Glossary ownership is read directly so transfers are visible across nodes.
  */
 public class JcasbinAuthorizationLookups {
 
@@ -159,6 +161,22 @@ public class JcasbinAuthorizationLookups {
     } catch (NotFoundException e) {
       return new MetadataIdResolution(Optional.empty(), false);
     }
+  }
+
+  Optional<OwnerInfo> currentGlossaryTermOwner(String metalake, String name) {
+    return Optional.ofNullable(
+        SessionUtils.getWithoutCommitFresh(
+            OwnerMetaMapper.class,
+            mapper -> mapper.selectGlossaryTermOwner(metalake, GlossaryTermNames.key(name))));
+  }
+
+  Optional<OwnerInfo> currentGlossaryTermOwner(long termId) {
+    return Optional.ofNullable(
+        SessionUtils.getWithoutCommitFresh(
+            OwnerMetaMapper.class,
+            mapper ->
+                mapper.selectOwnerByMetadataObjectIdAndType(
+                    termId, MetadataObject.Type.GLOSSARY_TERM.name())));
   }
 
   private static Long loadMetadataId(MetadataObject metadataObject, String metalake) {

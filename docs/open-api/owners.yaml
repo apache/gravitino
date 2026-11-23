@@ -30,6 +30,11 @@ paths:
         - access control
       summary: Set owner
       operationId: setOwner
+      description: >-
+        For a glossary term, the default authorizer allows the current term owner or the metalake
+        owner to transfer ownership. A term owner can transfer even after an explicit deny of
+        VIEW_DEFINITION or loss of CREATE_DEFINITION. Reading and editing the definition require
+        the corresponding glossary privileges.
       requestBody:
         content:
           application/json:
@@ -44,6 +49,8 @@ paths:
           description: Returns the set operation result
           $ref: "./openapi.yaml#/components/responses/SetResponse"
 
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "404":
           description: Not Found - The specified owner or metadata object does not exist in the specified metalake
           content:
@@ -62,7 +69,9 @@ paths:
         - access control
       summary: Get owner
       operationId: getOwner
-      description: Returns the specified owner information in the specified metalake
+      description: >-
+        Returns the owner of a visible object, or a null owner if none is assigned.
+        The default authorizer returns 403 for both a missing glossary term and one hidden from the caller.
       responses:
         "200":
           description: Returns the owner object
@@ -73,8 +82,10 @@ paths:
               examples:
                 OwnerResponse:
                   $ref: "#/components/examples/OwnerResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "404":
-          description: Not Found - The specified owner does not exist in the specified metalake
+          description: Not Found - The specified metadata object does not exist in the specified metalake
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -178,13 +189,14 @@ components:
     metadataObjectTypeOfOwner:
       name: metadataObjectType
       in: path
-      description: The type of the metadata object. DOMAIN ownership applies to the domain and its current subdomains; encode its literal name as one path segment.
+      description: The type of the metadata object. DOMAIN ownership applies to the domain and its current subdomains; encode its literal name as one path segment. A GLOSSARY_TERM name is also a single segment and may contain literal dots. New glossary term names cannot be a single or double dot. Existing terms with either name must be renamed before using this path.
       required: true
       schema:
         type: string
         enum:
           - "METALAKE"
           - "DOMAIN"
+          - "GLOSSARY_TERM"
           - "CATALOG"
           - "SCHEMA"
           - "TABLE"

@@ -149,6 +149,10 @@ final class TermEdits {
     Preconditions.checkArgument(
         !MetadataObjects.METADATA_OBJECT_RESERVED_NAME.equals(display),
         "A glossary term cannot use the reserved metadata object name '*'");
+    Preconditions.checkArgument(
+        !".".equals(display) && !"..".equals(display),
+        "A glossary term cannot use the reserved path segment '%s'",
+        display);
     return display;
   }
 

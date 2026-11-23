@@ -29,6 +29,7 @@ import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.FunctionEntity;
+import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
@@ -69,6 +70,7 @@ public class EntityClassMapper {
           .put(Entity.EntityType.ROLE, RoleEntity.class)
           .put(Entity.EntityType.POLICY, PolicyEntity.class)
           .put(Entity.EntityType.JOB_TEMPLATE, JobTemplateEntity.class)
+          .put(Entity.EntityType.GLOSSARY_TERM, GlossaryTermEntity.class)
           .put(Entity.EntityType.DOMAIN, DomainEntity.class)
           .put(Entity.EntityType.JOB, JobEntity.class)
           .put(Entity.EntityType.SEMANTIC_MODEL, SemanticModelEntity.class)

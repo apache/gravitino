@@ -99,6 +99,7 @@ public class AuthorizationUtils {
           MetadataObject.Type.JOB_TEMPLATE,
           MetadataObject.Type.TAG,
           MetadataObject.Type.DOMAIN,
+          MetadataObject.Type.GLOSSARY_TERM,
           MetadataObject.Type.POLICY,
           MetadataObject.Type.VIEW,
           // Semantic models live only in Gravitino, underlying connectors know nothing about
@@ -136,7 +137,10 @@ public class AuthorizationUtils {
           Privilege.Name.USE_SEMANTIC_MODEL,
           Privilege.Name.MODIFY_SEMANTIC_MODEL,
           Privilege.Name.MANAGE_DOMAIN,
-          Privilege.Name.USE_DOMAIN);
+          Privilege.Name.USE_DOMAIN,
+          Privilege.Name.VIEW_DEFINITION,
+          Privilege.Name.CREATE_DEFINITION,
+          Privilege.Name.MANAGE_DEFINITIONS);
 
   private AuthorizationUtils() {}
 

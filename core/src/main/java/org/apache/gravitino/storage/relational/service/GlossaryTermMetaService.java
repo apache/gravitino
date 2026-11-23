@@ -141,13 +141,16 @@ public final class GlossaryTermMetaService {
    * @throws NoSuchEntityException if the term or its parent metalake does not exist
    */
   public ScopedTerm getWithMetalakeId(NameIdentifier ident) {
-    Namespace ns = ident.namespace();
-    List<GlossaryTermSnapshotPO> rows = readRows(ns, GlossaryTermNames.key(ident.name()));
-    List<GlossaryTermEntity> terms = definitions(ns, rows);
-    if (terms.isEmpty()) {
-      throw new NoSuchEntityException("Glossary term %s does not exist", ident);
-    }
-    return new ScopedTerm(rows.get(0).getMetalakeId(), terms.get(0));
+    return readTerm(ident, null);
+  }
+
+  /**
+   * Loads a term from the metalake identity resolved in the caller's snapshot.
+   *
+   * @throws NoSuchEntityException if the term or its parent metalake does not exist
+   */
+  public GlossaryTermEntity get(NameIdentifier ident, long metalakeId) {
+    return readTerm(ident, metalakeId).term();
   }
 
   /** Resolves term and metalake identities without row locks. */
@@ -169,7 +172,12 @@ public final class GlossaryTermMetaService {
 
   /** Lists definitions and synonyms from one statement snapshot without row locks. */
   public List<GlossaryTermEntity> list(Namespace ns) {
-    return definitions(ns, readRows(ns, null));
+    return definitions(ns, readRows(ns, null, null));
+  }
+
+  /** Reads all definitions for the metalake identity resolved in the caller's snapshot. */
+  public List<GlossaryTermEntity> list(Namespace ns, long metalakeId) {
+    return definitions(ns, readRows(ns, metalakeId, null));
   }
 
   /**
@@ -405,11 +413,25 @@ public final class GlossaryTermMetaService {
         });
   }
 
-  private List<GlossaryTermSnapshotPO> readRows(Namespace ns, @Nullable String key) {
+  private ScopedTerm readTerm(NameIdentifier ident, @Nullable Long metalakeId) {
+    Namespace ns = ident.namespace();
+    List<GlossaryTermSnapshotPO> rows =
+        readRows(ns, metalakeId, GlossaryTermNames.key(ident.name()));
+    List<GlossaryTermEntity> terms = definitions(ns, rows);
+    if (terms.isEmpty()) {
+      throw new NoSuchEntityException("Glossary term %s does not exist", ident);
+    }
+    return new ScopedTerm(rows.get(0).getMetalakeId(), terms.get(0));
+  }
+
+  private List<GlossaryTermSnapshotPO> readRows(
+      Namespace ns, @Nullable Long metalakeId, @Nullable String key) {
     validateNamespace(ns);
     return SessionUtils.getWithoutCommit(
         GlossaryTermMetaMapper.class,
-        mapper -> mapper.snapshot(metalake(ns).getMetalakeId(), ns.level(0), key));
+        mapper ->
+            mapper.snapshot(
+                metalakeId != null ? metalakeId : metalake(ns).getMetalakeId(), ns.level(0), key));
   }
 
   /**

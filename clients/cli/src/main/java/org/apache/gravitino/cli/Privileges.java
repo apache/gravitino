@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli;
 
 import java.util.HashSet;
+import java.util.Locale;
 import org.apache.gravitino.authorization.Privilege;
 
 /**
@@ -60,6 +61,13 @@ public class Privileges {
   /** Represents the privilege to manage grants. */
   public static final String MANAGE_GRANTS = "manage_grants";
 
+  /** The privilege to view glossary definitions. */
+  public static final String VIEW_DEFINITION = "view_definition";
+  /** The privilege to create glossary definitions. */
+  public static final String CREATE_DEFINITION = "create_definition";
+  /** The privilege to manage glossary definitions. */
+  public static final String MANAGE_DEFINITIONS = "manage_definitions";
+
   private static final HashSet<String> VALID_PRIVILEGES = new HashSet<>();
 
   static {
@@ -79,6 +87,9 @@ public class Privileges {
     VALID_PRIVILEGES.add(MANAGE_USERS);
     VALID_PRIVILEGES.add(CREATE_ROLE);
     VALID_PRIVILEGES.add(MANAGE_GRANTS);
+    VALID_PRIVILEGES.add(VIEW_DEFINITION);
+    VALID_PRIVILEGES.add(CREATE_DEFINITION);
+    VALID_PRIVILEGES.add(MANAGE_DEFINITIONS);
   }
 
   /**
@@ -95,45 +106,13 @@ public class Privileges {
    * Converts a string representation of a privilege to the corresponding {@link Privilege.Name}.
    *
    * @param privilege the privilege to be converted.
-   * @return the corresponding {@link Privilege.Name} constant, or nullif the privilege is unknown.
+   * @return the corresponding {@link Privilege.Name} constant, or null if the privilege is unknown.
    */
   public static Privilege.Name toName(String privilege) {
-    switch (privilege) {
-      case CREATE_CATALOG:
-        return Privilege.Name.CREATE_CATALOG;
-      case USE_CATALOG:
-        return Privilege.Name.USE_CATALOG;
-      case CREATE_SCHEMA:
-        return Privilege.Name.CREATE_SCHEMA;
-      case USE_SCHEMA:
-        return Privilege.Name.USE_SCHEMA;
-      case CREATE_TABLE:
-        return Privilege.Name.CREATE_TABLE;
-      case MODIFY_TABLE:
-        return Privilege.Name.MODIFY_TABLE;
-      case SELECT_TABLE:
-        return Privilege.Name.SELECT_TABLE;
-      case CREATE_FILESET:
-        return Privilege.Name.CREATE_FILESET;
-      case WRITE_FILESET:
-        return Privilege.Name.WRITE_FILESET;
-      case READ_FILESET:
-        return Privilege.Name.READ_FILESET;
-      case CREATE_TOPIC:
-        return Privilege.Name.CREATE_TOPIC;
-      case PRODUCE_TOPIC:
-        return Privilege.Name.PRODUCE_TOPIC;
-      case CONSUME_TOPIC:
-        return Privilege.Name.CONSUME_TOPIC;
-      case MANAGE_USERS:
-        return Privilege.Name.MANAGE_USERS;
-      case CREATE_ROLE:
-        return Privilege.Name.CREATE_ROLE;
-      case MANAGE_GRANTS:
-        return Privilege.Name.MANAGE_GRANTS;
-      default:
-        System.err.println(ErrorMessages.UNKNOWN_PRIVILEGE + " " + privilege);
-        return null;
+    if (isValid(privilege)) {
+      return Privilege.Name.valueOf(privilege.toUpperCase(Locale.ROOT));
     }
+    System.err.println(ErrorMessages.UNKNOWN_PRIVILEGE + " " + privilege);
+    return null;
   }
 }

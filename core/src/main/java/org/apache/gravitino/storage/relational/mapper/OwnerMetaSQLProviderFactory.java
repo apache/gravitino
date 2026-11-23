@@ -234,6 +234,12 @@ public class OwnerMetaSQLProviderFactory {
     return getProvider().selectOwnerByMetadataObjectIdAndType(metadataObjectId, metadataObjectType);
   }
 
+  /** Returns the current owner of the live term identified by metalake and normalized name. */
+  public static String selectGlossaryTermOwner(
+      @Param("metalake") String metalake, @Param("key") String key) {
+    return getProvider().selectGlossaryTermOwner(metalake, key);
+  }
+
   public static String selectChangedOwners(
       @Param("lastConsumedUpdatedAt") long lastConsumedUpdatedAt,
       @Param("lastConsumedUpdatedAtId") long lastConsumedUpdatedAtId) {

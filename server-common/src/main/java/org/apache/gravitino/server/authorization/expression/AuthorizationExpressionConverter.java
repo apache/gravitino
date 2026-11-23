@@ -188,6 +188,7 @@ public class AuthorizationExpressionConverter {
               ( entityType == 'COLUMN' && (%s)) ||
               ( entityType == 'FUNCTION' && (%s)) ||
               ( entityType == 'SEMANTIC_MODEL' && (%s)) ||
+              ( entityType == 'GLOSSARY_TERM' && (authorizer.canAccessGlossaryTerm(principal,METALAKE_NAME,GLOSSARY_TERM,authorizationContext))) ||
               ( entityType == 'DOMAIN' && (authorizer.canAccessDomain(principal,METALAKE_NAME,DOMAIN,authorizationContext))))
               """
             .formatted(

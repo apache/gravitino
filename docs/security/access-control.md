@@ -13,8 +13,8 @@ checks every request before the operation runs and rejects it if the caller is n
 
 Two things decide the answer:
 
-- **Ownership** comes with creation. Whoever creates an object owns it, and owning it carries the
-  right to alter it, drop it, and hand it to someone else. Ownership reaches down, so owning a
+- **Ownership** comes with creation. Whoever creates an object owns it. For most object types, the owner can
+  alter, drop, or transfer it. Glossary terms have [additional privilege checks](#glossary-privileges). Ownership reaches down, so owning a
   catalog means administrative control over the schemas and tables inside it.
 - **Privileges** are named permissions, each authorizing one kind of operation: `SELECT_TABLE` reads
   a table, `CREATE_SCHEMA` creates a schema in a catalog. A privilege is never given to a person
@@ -88,9 +88,7 @@ using it with authorization. When authorization is disabled, existing source obj
 are supported by the connector can still be listed and loaded.
 ::::
 
-Access to an object is controlled by privileges, granted through roles, and by ownership. Ownership
-behaves like a privilege that arrives with the object rather than one you grant, and it carries the
-administrative rights, altering, dropping, and transferring, that no privilege name covers.
+Roles grant privileges. Ownership grants administrative rights specific to the object type.
 
 Everything sits under a metalake, but only the data objects nest below a catalog:
 
@@ -105,6 +103,7 @@ Metalake (top level)
 │       ├── Model
 │       ├── Function
 │       └── Semantic Model
+├── Glossary Term
 ├── Domain
 │   └── Subdomain
 ├── Tag
@@ -144,7 +143,8 @@ catalog, or schema, never to a table. Whoever creates a role owns it, and can al
 
 Ownership can be held by a group as well as a user, in which case every member of that group holds
 it, and it can be transferred at any time. It applies to metalakes, catalogs, schemas, tables, views,
-topics, filesets, models, semantic models, functions, domains, roles, tags, policies, job templates, and jobs.
+topics, filesets, models, semantic models, functions, domains, glossary terms, roles, tags, policies,
+job templates, and jobs.
 
 ### Resolution
 
@@ -184,35 +184,35 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 
 ### Data Object Privileges
 
-| Privilege            | Grantable On                                                                | What It Allows                                                       |
-|----------------------|-----------------------------------------------------------------------------|----------------------------------------------------------------------|
-| `CREATE_CATALOG`     | Metalake                                                                    | Create catalogs                                                      |
-| `USE_CATALOG`        | Metalake, Catalog                                                           | Use any catalog in scope, and reach the objects inside it            |
-| `CREATE_SCHEMA`      | Metalake, Catalog, Schema                                                   | Create schemas or nested schemas in scope                            |
-| `USE_SCHEMA`         | Metalake, Catalog, Schema                                                   | Use any schema in scope, and reach the objects inside it             |
-| `CREATE_TABLE`       | Metalake, Catalog, Schema                                                   | Create tables in any schema in scope                                 |
-| `PROBE_TABLE_LIKE`   | Metalake, Catalog, Schema, Table, View                                      | Probe whether a table-like object exists without reading its data    |
-| `SELECT_TABLE`       | Metalake, Catalog, Schema, Table                                            | Read any table in scope                                              |
-| `MODIFY_TABLE`       | Metalake, Catalog, Schema, Table                                            | Read and write to, and alter the schema of, any table in scope       |
-| `CREATE_VIEW`        | Metalake, Catalog, Schema                                                   | Create views in any schema in scope                                  |
-| `SELECT_VIEW`        | Metalake, Catalog, Schema, View                                             | Read view metadata in scope                                          |
-| `CREATE_TOPIC`       | Metalake, Catalog, Schema                                                   | Create topics in any schema in scope                                 |
-| `CONSUME_TOPIC`      | Metalake, Catalog, Schema, Topic                                            | Consume from any topic in scope                                      |
-| `PRODUCE_TOPIC`      | Metalake, Catalog, Schema, Topic                                            | Consume from, produce to, and alter any topic in scope               |
-| `CREATE_FILESET`     | Metalake, Catalog, Schema                                                   | Create filesets in any schema in scope                               |
-| `READ_FILESET`       | Metalake, Catalog, Schema, Fileset                                          | Read any fileset in scope                                            |
-| `WRITE_FILESET`      | Metalake, Catalog, Schema, Fileset                                          | Read, write, and alter any fileset in scope                          |
-| `REGISTER_MODEL`     | Metalake, Catalog, Schema                                                   | Register models in any schema in scope                               |
-| `LINK_MODEL_VERSION` | Metalake, Catalog, Schema, Model                                            | Link versions to any model in scope                                  |
-| `USE_MODEL`          | Metalake, Catalog, Schema, Model                                            | Read the metadata of, and download versions of, any model in scope   |
-| `USE_SECRETS`                   | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | Call `getSecrets` (cloud access-key pairs omitted unless also granted `INCLUDE_CREDENTIAL_SECRETS`); required with `INCLUDE_CREDENTIAL_SECRETS` for catalog `getCredentials` |
-| `INCLUDE_CREDENTIAL_SECRETS`    | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | With `USE_SECRETS`, include cloud access-key pairs in `getSecrets` and authorize catalog `getCredentials` |
-| `REGISTER_FUNCTION`  | Metalake, Catalog, Schema                                                   | Register functions in any schema in scope                            |
-| `EXECUTE_FUNCTION`   | Metalake, Catalog, Schema, Function                                         | Read the metadata of, and execute, any function in scope             |
-| `MODIFY_FUNCTION`    | Metalake, Catalog, Schema, Function                                         | Alter or drop any function in scope                                  |
-| `CREATE_SEMANTIC_MODEL` | Metalake, Catalog, Schema           | Create semantic models in any schema in scope                      |
-| `USE_SEMANTIC_MODEL` | Metalake, Catalog, Schema, Semantic Model | Discover and load the definition of any semantic model in scope |
-| `MODIFY_SEMANTIC_MODEL` | Metalake, Catalog, Schema, Semantic Model | Rename, and alter the definition and metadata of, any semantic model in scope |
+| Privilege                    | Grantable On                                                  | What It Allows                                                                                                                                                               |
+|------------------------------|---------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `CREATE_CATALOG`             | Metalake                                                      | Create catalogs                                                                                                                                                              |
+| `USE_CATALOG`                | Metalake, Catalog                                             | Use any catalog in scope, and reach the objects inside it                                                                                                                    |
+| `CREATE_SCHEMA`              | Metalake, Catalog, Schema                                     | Create schemas or nested schemas in scope                                                                                                                                    |
+| `USE_SCHEMA`                 | Metalake, Catalog, Schema                                     | Use any schema in scope, and reach the objects inside it                                                                                                                     |
+| `CREATE_TABLE`               | Metalake, Catalog, Schema                                     | Create tables in any schema in scope                                                                                                                                         |
+| `PROBE_TABLE_LIKE`           | Metalake, Catalog, Schema, Table, View                        | Probe whether a table-like object exists without reading its data                                                                                                            |
+| `SELECT_TABLE`               | Metalake, Catalog, Schema, Table                              | Read any table in scope                                                                                                                                                      |
+| `MODIFY_TABLE`               | Metalake, Catalog, Schema, Table                              | Read and write to, and alter the schema of, any table in scope                                                                                                               |
+| `CREATE_VIEW`                | Metalake, Catalog, Schema                                     | Create views in any schema in scope                                                                                                                                          |
+| `SELECT_VIEW`                | Metalake, Catalog, Schema, View                               | Read view metadata in scope                                                                                                                                                  |
+| `CREATE_TOPIC`               | Metalake, Catalog, Schema                                     | Create topics in any schema in scope                                                                                                                                         |
+| `CONSUME_TOPIC`              | Metalake, Catalog, Schema, Topic                              | Consume from any topic in scope                                                                                                                                              |
+| `PRODUCE_TOPIC`              | Metalake, Catalog, Schema, Topic                              | Consume from, produce to, and alter any topic in scope                                                                                                                       |
+| `CREATE_FILESET`             | Metalake, Catalog, Schema                                     | Create filesets in any schema in scope                                                                                                                                       |
+| `READ_FILESET`               | Metalake, Catalog, Schema, Fileset                            | Read any fileset in scope                                                                                                                                                    |
+| `WRITE_FILESET`              | Metalake, Catalog, Schema, Fileset                            | Read, write, and alter any fileset in scope                                                                                                                                  |
+| `REGISTER_MODEL`             | Metalake, Catalog, Schema                                     | Register models in any schema in scope                                                                                                                                       |
+| `LINK_MODEL_VERSION`         | Metalake, Catalog, Schema, Model                              | Link versions to any model in scope                                                                                                                                          |
+| `USE_MODEL`                  | Metalake, Catalog, Schema, Model                              | Read the metadata of, and download versions of, any model in scope                                                                                                           |
+| `USE_SECRETS`                | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | Call `getSecrets` (cloud access-key pairs omitted unless also granted `INCLUDE_CREDENTIAL_SECRETS`); required with `INCLUDE_CREDENTIAL_SECRETS` for catalog `getCredentials` |
+| `INCLUDE_CREDENTIAL_SECRETS` | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | With `USE_SECRETS`, include cloud access-key pairs in `getSecrets` and authorize catalog `getCredentials`                                                                    |
+| `REGISTER_FUNCTION`          | Metalake, Catalog, Schema                                     | Register functions in any schema in scope                                                                                                                                    |
+| `EXECUTE_FUNCTION`           | Metalake, Catalog, Schema, Function                           | Read the metadata of, and execute, any function in scope                                                                                                                     |
+| `MODIFY_FUNCTION`            | Metalake, Catalog, Schema, Function                           | Alter or drop any function in scope                                                                                                                                          |
+| `CREATE_SEMANTIC_MODEL`      | Metalake, Catalog, Schema                                     | Create semantic models in any schema in scope                                                                                                                                |
+| `USE_SEMANTIC_MODEL`         | Metalake, Catalog, Schema, Semantic Model                     | Discover and load the definition of any semantic model in scope                                                                                                              |
+| `MODIFY_SEMANTIC_MODEL`      | Metalake, Catalog, Schema, Semantic Model                     | Rename, and alter the definition and metadata of, any semantic model in scope                                                                                                |
 
 Either `SELECT_TABLE` or `MODIFY_TABLE` is enough to load a table's metadata. Topics and filesets
 have similar read/write privilege pairs. Views do not have a modify privilege: `SELECT_VIEW` reads
@@ -224,22 +224,22 @@ they will be removed in a future release. Use the current names in new roles.
 
 ### Governance and Administrative Privileges
 
-| Privilege               | Grantable On                                                            | What It Allows                                     |
-|-------------------------|-------------------------------------------------------------------------|----------------------------------------------------|
-| `MANAGE_USERS`          | Metalake                                                                | Add and remove users                               |
-| `MANAGE_GROUPS`         | Metalake                                                                | Add and remove groups                              |
-| `CREATE_ROLE`           | Metalake                                                                | Create roles                                       |
+| Privilege               | Grantable On                                                                            | What It Allows                                     |
+|-------------------------|-----------------------------------------------------------------------------------------|----------------------------------------------------|
+| `MANAGE_USERS`          | Metalake                                                                                | Add and remove users                               |
+| `MANAGE_GROUPS`         | Metalake                                                                                | Add and remove groups                              |
+| `CREATE_ROLE`           | Metalake                                                                                | Create roles                                       |
 | `MANAGE_GRANTS`         | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model, Function, Semantic Model | Grant and revoke privileges on any object in scope |
-| `CREATE_TAG`            | Metalake                                                                | Create tags                                        |
-| `VIEW_TAG`              | Metalake, Tag                                                           | Read tag metadata                                  |
-| `APPLY_TAG`             | Metalake, Tag                                                           | Attach tags to metadata objects                    |
-| `CREATE_POLICY`         | Metalake                                                                | Create policies                                    |
-| `VIEW_POLICY`           | Metalake, Policy                                                        | Read policy metadata                               |
-| `APPLY_POLICY`          | Metalake, Policy                                                        | Associate policies with tags                       |
-| `VIEW_SECRET_PROVIDERS` | Metalake                                                                | List configured secrets providers                  |
-| `REGISTER_JOB_TEMPLATE` | Metalake                                                                | Register job templates                             |
-| `USE_JOB_TEMPLATE`      | Metalake, JobTemplate                                                   | Run jobs from a job template                       |
-| `RUN_JOB`               | Metalake                                                                | Run jobs                                           |
+| `CREATE_TAG`            | Metalake                                                                                | Create tags                                        |
+| `VIEW_TAG`              | Metalake, Tag                                                                           | Read tag metadata                                  |
+| `APPLY_TAG`             | Metalake, Tag                                                                           | Attach tags to metadata objects                    |
+| `CREATE_POLICY`         | Metalake                                                                                | Create policies                                    |
+| `VIEW_POLICY`           | Metalake, Policy                                                                        | Read policy metadata                               |
+| `APPLY_POLICY`          | Metalake, Policy                                                                        | Associate policies with tags                       |
+| `VIEW_SECRET_PROVIDERS` | Metalake                                                                                | List configured secrets providers                  |
+| `REGISTER_JOB_TEMPLATE` | Metalake                                                                                | Register job templates                             |
+| `USE_JOB_TEMPLATE`      | Metalake, JobTemplate                                                                   | Run jobs from a job template                       |
+| `RUN_JOB`               | Metalake                                                                                | Run jobs                                           |
 
 `MANAGE_GRANTS` bound to a metalake additionally allows granting and revoking roles for users and
 groups across that metalake. Bound to anything else it covers privilege management only, on that
@@ -259,12 +259,30 @@ Reading a tag requires `VIEW_TAG` or `APPLY_TAG`; reading a policy requires `VIE
 `APPLY_POLICY`. The view privileges do not allow tag assignment or policy-to-tag association.
 List results include only tags and policies the caller can read.
 
+### Glossary Privileges
+
+Glossary privileges apply to a metalake. `VIEW_DEFINITION` grants access to approved and deprecated
+terms. `CREATE_DEFINITION` includes view access and lets callers create terms and edit their own
+terms, including drafts. Ownership can be held directly or through a group. `MANAGE_DEFINITIONS`
+includes both privileges and allows viewing, editing, and deleting any term in the metalake.
+
+An explicit deny of view access hides every term and blocks changes to its definition. An explicit
+deny of create access prevents creation even for a manager. The metalake owner can manage all terms.
+
+The current term owner or the metalake owner can transfer ownership. A term owner keeps this
+authority even if `VIEW_DEFINITION` is denied or `CREATE_DEFINITION` is revoked. After the
+transfer, the new owner's effective glossary privileges determine whether they can read or edit
+the definition.
+
+For grant and revoke examples, see [Glossary Privileges on a Metalake](../cli.md#glossary-privileges-on-a-metalake).
+
 ### Required Privileges
 
 Three rules apply throughout, so they are not repeated below:
 
-- Owning the object, or any ancestor of it, satisfies any check on it. **Owner** in the tables means
-  ownership is the only route, because no privilege grants that operation.
+- Owning the object or an ancestor satisfies the checks in the tables below. For glossary terms,
+  editing and deletion follow the [glossary privilege rules](#glossary-privileges). **Owner** in the
+  tables means that an operation requires ownership.
 - Reaching an object inside a catalog and a schema also requires `USE_CATALOG` and `USE_SCHEMA`.
 - A privilege counts whether it is held on the object itself or on any ancestor.
 
@@ -273,16 +291,16 @@ return only the entries the caller is entitled to see, which for a metalake owne
 
 #### Data Objects
 
-| Object   | Create              | Load                                    | Alter             | Drop  |
-|----------|---------------------|-----------------------------------------|-------------------|-------|
-| Catalog  | `CREATE_CATALOG`    | `USE_CATALOG`                           | Owner             | Owner |
-| Schema   | `CREATE_SCHEMA`     | `USE_SCHEMA`                            | Owner             | Owner |
-| Table    | `CREATE_TABLE`      | `SELECT_TABLE` or `MODIFY_TABLE`        | `MODIFY_TABLE`    | Owner |
-| View     | `CREATE_VIEW`       | `SELECT_VIEW`                           | Owner             | Owner |
-| Topic    | `CREATE_TOPIC`      | `CONSUME_TOPIC` or `PRODUCE_TOPIC`      | `PRODUCE_TOPIC`   | Owner |
-| Fileset  | `CREATE_FILESET`    | `READ_FILESET` or `WRITE_FILESET`       | `WRITE_FILESET`   | Owner |
-| Model    | `REGISTER_MODEL`    | `USE_MODEL`                             | Owner             | Owner |
-| Function | `REGISTER_FUNCTION` | `EXECUTE_FUNCTION` or `MODIFY_FUNCTION` | `MODIFY_FUNCTION` | Owner |
+| Object         | Create                  | Load                                            | Alter                   | Drop  |
+|----------------|-------------------------|-------------------------------------------------|-------------------------|-------|
+| Catalog        | `CREATE_CATALOG`        | `USE_CATALOG`                                   | Owner                   | Owner |
+| Schema         | `CREATE_SCHEMA`         | `USE_SCHEMA`                                    | Owner                   | Owner |
+| Table          | `CREATE_TABLE`          | `SELECT_TABLE` or `MODIFY_TABLE`                | `MODIFY_TABLE`          | Owner |
+| View           | `CREATE_VIEW`           | `SELECT_VIEW`                                   | Owner                   | Owner |
+| Topic          | `CREATE_TOPIC`          | `CONSUME_TOPIC` or `PRODUCE_TOPIC`              | `PRODUCE_TOPIC`         | Owner |
+| Fileset        | `CREATE_FILESET`        | `READ_FILESET` or `WRITE_FILESET`               | `WRITE_FILESET`         | Owner |
+| Model          | `REGISTER_MODEL`        | `USE_MODEL`                                     | Owner                   | Owner |
+| Function       | `REGISTER_FUNCTION`     | `EXECUTE_FUNCTION` or `MODIFY_FUNCTION`         | `MODIFY_FUNCTION`       | Owner |
 | Semantic Model | `CREATE_SEMANTIC_MODEL` | `USE_SEMANTIC_MODEL` or `MODIFY_SEMANTIC_MODEL` | `MODIFY_SEMANTIC_MODEL` | Owner |
 
 Testing a catalog connection follows the catalog row. Testing a catalog before it is created takes
@@ -577,7 +595,8 @@ decisions need no backend read. When privileges or ownership change through the 
 server handling the change invalidates the affected entries immediately. Other nodes in a multi-node
 deployment pick the change up on their next poll, so a revocation can take up to
 `jcasbin.changePollIntervalSecs` to take effect across the cluster. Lower the interval if that window
-is unacceptable for your environment.
+is unacceptable for your environment. The default authorizer reads glossary term ownership from the
+metadata store by term ID, so a request started after an ownership transfer sees the new owner on any node.
 
 ### Authentication
 
@@ -861,10 +880,10 @@ client.setOwner(schema, "analyst", Owner.Type.USER);
 
 Domains have two privileges, bindable to a metalake or a domain:
 
-| Privilege | Operations |
-| --- | --- |
-| `USE_DOMAIN` | Read published domains, list their visible subdomains and accessible members, and discover them from accessible leaf metadata. |
-| `MANAGE_DOMAIN` | Create, alter, delete, publish/unpublish, change parent and change backing tag; also use domains and see drafts. |
+| Privilege       | Operations                                                                                                                     |
+|-----------------|--------------------------------------------------------------------------------------------------------------------------------|
+| `USE_DOMAIN`    | Read published domains, list their visible subdomains and accessible members, and discover them from accessible leaf metadata. |
+| `MANAGE_DOMAIN` | Create, alter, delete, publish/unpublish, change parent and change backing tag; also use domains and see drafts.               |
 
 A top-level domain is created with `MANAGE_DOMAIN` on the metalake. Creating a subdomain requires
 management on both the metalake and parent. Attaching/moving requires management on the child

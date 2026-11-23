@@ -576,7 +576,9 @@ class GravitinoClient(
             Optional[Owner]: The owner of the metadata object, or None if no owner is set.
 
         Raises:
-            NoSuchMetadataObjectException: If the metadata object does not exist.
+            ForbiddenException: If the caller cannot view the owner. The default
+                authorizer also returns this error for a missing glossary term.
+            NoSuchMetadataObjectException: If the server reports the metadata object as missing.
             NotFoundException: If a related resource is not found.
             MetalakeNotInUseException: If the metalake is not in use.
         """
@@ -593,6 +595,7 @@ class GravitinoClient(
             owner_type: The type of the owner (USER or GROUP).
 
         Raises:
+            ForbiddenException: If the caller lacks permission to transfer ownership.
             NoSuchMetadataObjectException: If the metadata object does not exist.
             NotFoundException: If a related resource is not found.
             MetalakeNotInUseException: If the metalake is not in use.

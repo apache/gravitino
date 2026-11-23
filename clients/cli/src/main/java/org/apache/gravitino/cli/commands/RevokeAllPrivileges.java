@@ -19,11 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.MetadataObject;
@@ -37,7 +33,7 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 
-/** Revokes all privileges from a role to an entity or all entities. */
+/** Revokes all privileges from a role on the selected entity. */
 public class RevokeAllPrivileges extends MetadataCommand {
 
   /** The name of the metalake. */
@@ -48,7 +44,7 @@ public class RevokeAllPrivileges extends MetadataCommand {
   protected final FullName entity;
 
   /**
-   * Revokes all privileges from a role to an entity or all entities.
+   * Revokes all privileges from a role on the selected entity.
    *
    * @param context The command context.
    * @param metalake The name of the metalake.
@@ -63,36 +59,39 @@ public class RevokeAllPrivileges extends MetadataCommand {
     this.entity = entity;
   }
 
-  /** Revokes all privileges from a role to an entity or all entities. */
+  /** Revokes all privileges from a role on the selected entity. */
   @Override
   public void handle() {
-    List<SecurableObject> matchedObjects;
-    Map<String, Set<Privilege>> revokedPrivileges = Maps.newHashMap();
-
     try {
       GravitinoClient client = buildClient(metalake);
-      matchedObjects = getMatchedObjects(client);
+      List<SecurableObject> matchedObjects = getMatchedObjects(client);
 
-      for (SecurableObject securableObject : matchedObjects) {
-        String objectFullName = securableObject.fullName();
-        Set<Privilege> privileges = new HashSet<>(securableObject.privileges());
-        MetadataObject metadataObject = constructMetadataObject(entity, client);
-        client.revokePrivilegesFromRole(role, metadataObject, privileges);
-
-        revokedPrivileges.put(objectFullName, privileges);
+      if (!matchedObjects.isEmpty()) {
+        MetadataObject target = constructMetadataObject(entity, client);
+        Set<Privilege> privileges =
+            matchedObjects.stream()
+                .filter(object -> object.type() == target.type())
+                .flatMap(object -> object.privileges().stream())
+                .collect(Collectors.toSet());
+        if (!privileges.isEmpty()) {
+          client.revokePrivilegesFromRole(role, target, privileges);
+          printInformation("Revoked privileges:");
+          printResults(
+              target.fullName()
+                  + ": "
+                  + privileges.stream()
+                      .map(Privilege::simpleString)
+                      .collect(Collectors.joining(", ")));
+          return;
+        }
       }
+      printInformation("No privileges revoked.");
     } catch (NoSuchMetalakeException e) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchRoleException e) {
       exitWithError(ErrorMessages.UNKNOWN_ROLE);
     } catch (Exception e) {
       exitWithError(e.getMessage());
-    }
-
-    if (revokedPrivileges.isEmpty()) {
-      printInformation("No privileges revoked.");
-    } else {
-      outputRevokedPrivileges(revokedPrivileges);
     }
   }
 
@@ -101,21 +100,6 @@ public class RevokeAllPrivileges extends MetadataCommand {
     return gRole.securableObjects().stream()
         .filter(s -> s.fullName().equals(entity.getName()))
         .collect(Collectors.toList());
-  }
-
-  private void outputRevokedPrivileges(Map<String, Set<Privilege>> revokedPrivileges) {
-    List<String> revokedInfoList = Lists.newArrayList();
-
-    for (Map.Entry<String, Set<Privilege>> entry : revokedPrivileges.entrySet()) {
-      List<String> revokedPrivilegesList =
-          entry.getValue().stream().map(Privilege::simpleString).collect(Collectors.toList());
-      revokedInfoList.add(entry.getKey() + ": " + COMMA_JOINER.join(revokedPrivilegesList));
-    }
-
-    printInformation("Revoked privileges:");
-    for (String info : revokedInfoList) {
-      printResults(info);
-    }
   }
 
   /**

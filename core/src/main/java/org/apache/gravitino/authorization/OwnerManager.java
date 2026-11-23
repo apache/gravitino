@@ -20,6 +20,7 @@ package org.apache.gravitino.authorization;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.security.Principal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -30,15 +31,19 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.utils.MetadataObjectUtil;
-import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,47 +74,34 @@ public class OwnerManager implements OwnerDispatcher {
       String metalake, MetadataObject metadataObject, String ownerName, Owner.Type ownerType) {
     NameIdentifier objectIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     try {
-      Optional<Owner> originOwner = getOwner(metalake, metadataObject);
-
-      OwnerImpl newOwner = new OwnerImpl();
-      if (ownerType == Owner.Type.USER) {
-        NameIdentifier ownerIdent = AuthorizationUtils.ofUser(metalake, ownerName);
-        store
-            .relationOperations()
-            .insertRelation(
-                SupportsRelationOperations.Type.OWNER_REL,
-                objectIdent,
-                MetadataObjectUtil.toEntityType(metadataObject),
-                ownerIdent,
-                Entity.EntityType.USER,
-                true);
-
-        newOwner.name = ownerName;
-        newOwner.type = Owner.Type.USER;
-      } else if (ownerType == Owner.Type.GROUP) {
-        NameIdentifier ownerIdent = AuthorizationUtils.ofGroup(metalake, ownerName);
-        store
-            .relationOperations()
-            .insertRelation(
-                SupportsRelationOperations.Type.OWNER_REL,
-                objectIdent,
-                MetadataObjectUtil.toEntityType(metadataObject),
-                ownerIdent,
-                Entity.EntityType.GROUP,
-                true);
-
-        newOwner.name = ownerName;
-        newOwner.type = Owner.Type.GROUP;
+      OwnerImpl newOwner = new OwnerImpl(ownerName, ownerType, null);
+      OwnerImpl originOwner;
+      if (metadataObject.type() == MetadataObject.Type.GLOSSARY_TERM) {
+        // The owner route authorized a name. Recheck the current term and caller under the
+        // term lock so a rename, recreation or transfer cannot change the assignment target.
+        originOwner =
+            GlossaryTermMetaService.getInstance()
+                .withLockedTerm(
+                    objectIdent,
+                    false,
+                    current -> {
+                      if (current.isEmpty()) {
+                        throw new NoSuchMetadataObjectException(
+                            "Glossary term %s does not exist", objectIdent);
+                      }
+                      checkTermOwnerTransfer(metalake, current.get().id());
+                      return replaceOwner(metalake, metadataObject, objectIdent, newOwner);
+                    });
       } else {
-        throw new IllegalArgumentException("Unsupported owner type: " + ownerType);
+        originOwner = replaceOwner(metalake, metadataObject, objectIdent, newOwner);
       }
 
       AuthorizationUtils.callAuthorizationPluginForMetadataObject(
           metalake,
           metadataObject,
           authorizationPlugin ->
-              authorizationPlugin.onOwnerSet(metadataObject, originOwner.orElse(null), newOwner));
-      notifyOwnerChange(originOwner.orElse(null), metalake, metadataObject);
+              authorizationPlugin.onOwnerSet(metadataObject, originOwner, newOwner));
+      notifyOwnerChange(originOwner, metalake, metadataObject);
     } catch (NoSuchEntityException nse) {
       // The object existed when getOwner ran, so it can have been dropped since then. This
       // owner-exists check is a heuristic: if the owner is also removed between the failure and
@@ -122,13 +114,6 @@ public class OwnerManager implements OwnerDispatcher {
           "Metadata object {} or owner {} is not found", metadataObject.fullName(), ownerName, nse);
       throw new NotFoundException(
           nse, "Metadata object %s or owner %s is not found", metadataObject.fullName(), ownerName);
-    } catch (IOException ioe) {
-      LOG.info(
-          "Failed to set the owner {} of metadata object {}",
-          ownerName,
-          metadataObject.fullName(),
-          ioe);
-      throw new RuntimeException(ioe);
     }
   }
 
@@ -143,35 +128,37 @@ public class OwnerManager implements OwnerDispatcher {
       return;
     }
 
-    List<Optional<Owner>> originOwners = new ArrayList<>(metadataObjects.size());
-    for (MetadataObject mo : metadataObjects) {
-      originOwners.add(getOwner(metalake, mo));
-    }
-
     Entity.EntityType objectType = MetadataObjectUtil.toEntityType(metadataObjects.get(0));
     for (int i = 1; i < metadataObjects.size(); i++) {
       Preconditions.checkArgument(
           MetadataObjectUtil.toEntityType(metadataObjects.get(i)) == objectType,
           "All metadata objects in setOwners must share the same type");
     }
+    if (objectType == Entity.EntityType.GLOSSARY_TERM) {
+      // Each transfer must check the current owner while holding that term's row lock.
+      OwnerDispatcher.super.setOwners(metalake, metadataObjects, ownerName, ownerType);
+      return;
+    }
+
+    List<OwnerImpl> originOwners = new ArrayList<>(metadataObjects.size());
+    for (MetadataObject mo : metadataObjects) {
+      originOwners.add(readOwner(metalake, mo));
+    }
+
     List<NameIdentifier> owned =
         metadataObjects.stream()
             .map(mo -> MetadataObjectUtil.toEntityIdent(metalake, mo))
             .collect(Collectors.toList());
 
-    OwnerImpl newOwner = new OwnerImpl();
+    OwnerImpl newOwner = new OwnerImpl(ownerName, ownerType, null);
     NameIdentifier ownerIdent;
     Entity.EntityType ownerEntityType;
     if (ownerType == Owner.Type.USER) {
       ownerIdent = AuthorizationUtils.ofUser(metalake, ownerName);
       ownerEntityType = Entity.EntityType.USER;
-      newOwner.name = ownerName;
-      newOwner.type = Owner.Type.USER;
     } else if (ownerType == Owner.Type.GROUP) {
       ownerIdent = AuthorizationUtils.ofGroup(metalake, ownerName);
       ownerEntityType = Entity.EntityType.GROUP;
-      newOwner.name = ownerName;
-      newOwner.type = Owner.Type.GROUP;
     } else {
       throw new IllegalArgumentException("Unsupported owner type: " + ownerType);
     }
@@ -191,14 +178,13 @@ public class OwnerManager implements OwnerDispatcher {
       // abort the remaining notifications and leave the batch half-notified.
       for (int i = 0; i < metadataObjects.size(); i++) {
         MetadataObject mo = metadataObjects.get(i);
-        Optional<Owner> originOwner = originOwners.get(i);
+        OwnerImpl originOwner = originOwners.get(i);
         try {
           AuthorizationUtils.callAuthorizationPluginForMetadataObject(
               metalake,
               mo,
-              authorizationPlugin ->
-                  authorizationPlugin.onOwnerSet(mo, originOwner.orElse(null), newOwner));
-          notifyOwnerChange(originOwner.orElse(null), metalake, mo);
+              authorizationPlugin -> authorizationPlugin.onOwnerSet(mo, originOwner, newOwner));
+          notifyOwnerChange(originOwner, metalake, mo);
         } catch (RuntimeException re) {
           LOG.warn(
               "Failed to notify authorization plugin for metadata object {} during batch setOwners",
@@ -220,26 +206,13 @@ public class OwnerManager implements OwnerDispatcher {
   }
 
   private void notifyOwnerChange(
-      @Nullable Owner oldOwner, String metalake, MetadataObject metadataObject) {
+      @Nullable OwnerImpl oldOwner, String metalake, MetadataObject metadataObject) {
     GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
     if (gravitinoAuthorizer == null) {
       return;
     }
 
-    Long oldOwnerId;
-    try {
-      oldOwnerId = oldOwner == null ? null : getOwnerId(metalake, oldOwner);
-    } catch (IOException e) {
-      LOG.warn(
-          "Failed to resolve previous owner id for {} (metalake={}, oldOwner={}); "
-              + "cache invalidation for this change may be skipped on this node",
-          metadataObject.fullName(),
-          metalake,
-          oldOwner,
-          e);
-      return;
-    }
-
+    Long oldOwnerId = oldOwner == null ? null : oldOwner.id;
     try {
       gravitinoAuthorizer.handleMetadataOwnerChange(
           metalake,
@@ -257,34 +230,30 @@ public class OwnerManager implements OwnerDispatcher {
     }
   }
 
-  private Long getOwnerId(String metalake, Owner owner) throws IOException {
-    if (owner.type() == Owner.Type.USER) {
-      UserEntity userEntity =
-          GravitinoEnv.getInstance()
-              .entityStore()
-              .get(
-                  NameIdentifierUtil.ofUser(metalake, owner.name()),
-                  Entity.EntityType.USER,
-                  UserEntity.class);
-      return userEntity.id();
-    } else if (owner.type() == Owner.Type.GROUP) {
-      GroupEntity groupEntity =
-          GravitinoEnv.getInstance()
-              .entityStore()
-              .get(
-                  NameIdentifierUtil.ofGroup(metalake, owner.name()),
-                  Entity.EntityType.GROUP,
-                  GroupEntity.class);
-      return groupEntity.id();
-    } else {
-      throw new IllegalArgumentException("Unsupported owner type: " + owner.type());
-    }
-  }
-
   @Override
   public Optional<Owner> getOwner(String metalake, MetadataObject metadataObject) {
+    if (metadataObject.type() == MetadataObject.Type.GLOSSARY_TERM) {
+      // Visibility and the returned owner must refer to the same generation of this name.
+      return SqlSessions.readSnapshot(
+          () -> {
+            if (!GravitinoEnv.getInstance()
+                .gravitinoAuthorizer()
+                .canAccessGlossaryTerm(
+                    PrincipalUtils.getCurrentPrincipal(),
+                    metalake,
+                    metadataObject,
+                    new AuthorizationRequestContext())) {
+              throw new ForbiddenException("Current user cannot get this object's owner");
+            }
+            return Optional.ofNullable(readOwner(metalake, metadataObject));
+          });
+    }
+    return Optional.ofNullable(readOwner(metalake, metadataObject));
+  }
+
+  @Nullable
+  private OwnerImpl readOwner(String metalake, MetadataObject metadataObject) {
     NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
-    OwnerImpl owner = new OwnerImpl();
     try {
       List<? extends Entity> entities =
           store
@@ -295,36 +264,73 @@ public class OwnerManager implements OwnerDispatcher {
                   MetadataObjectUtil.toEntityType(metadataObject));
 
       if (entities.isEmpty()) {
-        return Optional.empty();
+        return null;
       }
-
       if (entities.size() != 1) {
         throw new IllegalStateException(
             String.format("The size of the owner's name %s must be 1", metadataObject.fullName()));
       }
-
       Entity entity = entities.get(0);
-      if (!(entity instanceof UserEntity) && !(entity instanceof GroupEntity)) {
-        throw new IllegalArgumentException(
-            String.format(
-                "Doesn't support owner entity class %s", entities.get(0).getClass().getName()));
+      if (entity instanceof UserEntity user) {
+        return new OwnerImpl(user.name(), Owner.Type.USER, user.id());
       }
-
-      if (entities.get(0) instanceof UserEntity) {
-        UserEntity user = (UserEntity) entities.get(0);
-        owner.name = user.name();
-        owner.type = Owner.Type.USER;
-      } else if (entities.get(0) instanceof GroupEntity) {
-        GroupEntity group = (GroupEntity) entities.get(0);
-        owner.name = group.name();
-        owner.type = Owner.Type.GROUP;
+      if (entity instanceof GroupEntity group) {
+        return new OwnerImpl(group.name(), Owner.Type.GROUP, group.id());
       }
-      return Optional.of(owner);
+      throw new IllegalArgumentException(
+          "Unsupported owner entity class: " + entity.getClass().getName());
     } catch (NoSuchEntityException nse) {
       throw new NoSuchMetadataObjectException(
-          "The metadata object of %s isn't found", metadataObject.fullName());
+          nse, "The metadata object of %s isn't found", metadataObject.fullName());
     } catch (IOException ioe) {
       LOG.info("Failed to get the owner of entity {}", metadataObject.fullName(), ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  private void checkTermOwnerTransfer(String metalake, long termId) {
+    GravitinoAuthorizer authorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    Principal principal = PrincipalUtils.getCurrentPrincipal();
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    MetadataObject lake = MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE);
+    if (!authorizer.isOwner(principal, metalake, lake, context)
+        && !authorizer.isGlossaryTermOwner(principal, metalake, termId, context)) {
+      throw new ForbiddenException("Current user cannot set this object's owner");
+    }
+  }
+
+  @Nullable
+  private OwnerImpl replaceOwner(
+      String metalake, MetadataObject object, NameIdentifier objectIdent, OwnerImpl newOwner) {
+    OwnerImpl previous = readOwner(metalake, object);
+    NameIdentifier ownerIdent;
+    Entity.EntityType ownerType;
+    if (newOwner.type == Owner.Type.USER) {
+      ownerIdent = AuthorizationUtils.ofUser(metalake, newOwner.name);
+      ownerType = Entity.EntityType.USER;
+    } else if (newOwner.type == Owner.Type.GROUP) {
+      ownerIdent = AuthorizationUtils.ofGroup(metalake, newOwner.name);
+      ownerType = Entity.EntityType.GROUP;
+    } else {
+      throw new IllegalArgumentException("Unsupported owner type: " + newOwner.type);
+    }
+    try {
+      store
+          .relationOperations()
+          .insertRelation(
+              SupportsRelationOperations.Type.OWNER_REL,
+              objectIdent,
+              MetadataObjectUtil.toEntityType(object),
+              ownerIdent,
+              ownerType,
+              true);
+      return previous;
+    } catch (IOException ioe) {
+      LOG.info(
+          "Failed to set the owner {} of metadata object {}",
+          newOwner.name,
+          object.fullName(),
+          ioe);
       throw new RuntimeException(ioe);
     }
   }
@@ -340,10 +346,16 @@ public class OwnerManager implements OwnerDispatcher {
     }
   }
 
-  private static class OwnerImpl implements Owner {
+  private static final class OwnerImpl implements Owner {
+    private final String name;
+    private final Type type;
+    @Nullable private final Long id;
 
-    private String name;
-    private Type type;
+    private OwnerImpl(String name, Type type, @Nullable Long id) {
+      this.name = name;
+      this.type = type;
+      this.id = id;
+    }
 
     @Override
     public String name() {
