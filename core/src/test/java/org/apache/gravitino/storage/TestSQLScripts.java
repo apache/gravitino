@@ -225,6 +225,7 @@ public class TestSQLScripts extends TestJDBCBackend {
       }
       if ("2.0.0".equals(versionScripts.getKey())) {
         assertCleanupIndexes("schema " + versionScripts.getKey());
+        assertLiveRowIndexes("schema " + versionScripts.getKey());
         assertNameColumnWidths("schema " + versionScripts.getKey());
       }
     }
@@ -259,6 +260,7 @@ public class TestSQLScripts extends TestJDBCBackend {
       executeScript(upgradeScript);
       if ("2.0.0".equals(upgradeMatcher.group(2))) {
         assertCleanupIndexes(upgradeScript.getName());
+        assertLiveRowIndexes(upgradeScript.getName());
         assertNameColumnWidths(upgradeScript.getName());
       }
     }
@@ -868,6 +870,47 @@ public class TestSQLScripts extends TestJDBCBackend {
         }
         Assertions.assertTrue(
             indexed, "No index leading with " + column + " on " + table + " after " + source);
+      }
+    }
+  }
+
+  private void assertLiveRowIndexes(String source) throws SQLException {
+    if (!"postgresql".equals(backendType)) {
+      return;
+    }
+    Map<String, List<String>> expectedKeys =
+        Map.of(
+            "user_meta", List.of("metalake_id"),
+            "role_meta", List.of("metalake_id"),
+            "tag_meta", List.of("metalake_id"),
+            "policy_meta", List.of("metalake_id"),
+            "role_meta_securable_object", List.of("metadata_object_id", "type"),
+            "tag_relation_meta", List.of("metadata_object_id", "metadata_object_type"),
+            "user_role_rel", List.of("role_id"),
+            "policy_tag_relation_meta", List.of("tag_id"));
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection()) {
+      for (Map.Entry<String, List<String>> entry : expectedKeys.entrySet()) {
+        String table = entry.getKey();
+        String index = "idx_" + table + "_live";
+        List<String> keys = new ArrayList<>();
+        try (ResultSet rows =
+            connection
+                .getMetaData()
+                .getIndexInfo(
+                    connection.getCatalog(), connection.getSchema(), table, false, false)) {
+          while (rows.next()) {
+            if (index.equals(rows.getString("INDEX_NAME"))) {
+              Assertions.assertEquals(
+                  "(deleted_at = 0)",
+                  rows.getString("FILTER_CONDITION"),
+                  index + " after " + source);
+              keys.add(rows.getString("COLUMN_NAME"));
+            }
+          }
+        }
+        Assertions.assertEquals(entry.getValue(), keys, index + " after " + source);
       }
     }
   }
