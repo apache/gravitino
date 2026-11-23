@@ -62,10 +62,11 @@ effect for every consumer immediately:
 2. **Rollback and unpublish**: Making an older revision active again, or withdrawing a publication.
    To roll back, save the old definition as a new revision. The design does not assume that active
    is latest or only moves forward: under a deferred policy it already trails latest, and reads,
-   retention, metric identities, and source ranges resolve any retained `active_version`. Only the
-   publication operation is limited to latest, so a later rollback can point `active_version` at a
-   retained older revision without a schema or read-path change; it would add its own record of who
-   rolled back.
+   retention, and source ranges resolve any retained `active_version`; metric identities would be
+   reconciled on activation as on publication, keeping relations only for metrics in active or
+   latest. Only the publication operation is limited to latest, so a later rollback can point
+   `active_version` at a retained older revision without a schema or read-path change; it would add
+   its own record of who rolled back.
 3. **Diff and impact analysis**: Gravitino exposes revisions for comparison but does not compute
    differences, and dataset lookup by source answers which published definitions use a source, not
    which unpublished ones would.
@@ -407,14 +408,14 @@ on a duplicate, as today. Replacing the definition of an existing model goes thr
 
 ### Operations
 
-| Operation                                 | Effect                                                                                                                                                                                                                                                                                                        |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Create or import                          | Inserts r1 and the identity row with `current_version = 1`. The policy decides the publication columns; under the default, `active_version = 1`.                                                                                                                                                              |
-| Alter definition, comment, or properties  | Inserts a snapshot, applies the policy, and advances `current_version` if it is still the value read (or `expectedRevision`, when given). If the policy publishes, `active_version` advances in the same transaction; otherwise it is left as is, including a value set by a concurrent publication.          |
-| Rename                                    | Updates `semantic_model_name` and `audit_info` on the identity row only, conditional on `current_version` (and `expectedRevision`, when given). Creates no revision and changes neither pointer.                                                                                                              |
-| Publish revision *n* (internal)           | In one transaction: set `publication_status = 'PUBLISHED_EXPLICITLY'`, `published_by`, and `published_at` on snapshot *n*, and set `active_version = n` on the condition `current_version = n`; then reconcile metric identities. Repeating it on the published latest returns the existing record unchanged. |
-| Owner, grant, tag, policy, Domain changes | Use their existing stores. Create no revision.                                                                                                                                                                                                                                                                |
-| Drop                                      | Unchanged: soft-deletes the model and all revisions.                                                                                                                                                                                                                                                          |
+| Operation                                 | Effect                                                                                                                                                                                                                                                                                                                                                                           |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Create or import                          | Inserts r1 and the identity row with `current_version = 1`. The policy decides the publication columns; under the default, `active_version = 1`.                                                                                                                                                                                                                                 |
+| Alter definition, comment, or properties  | Inserts a snapshot, applies the policy, and advances `current_version` if it and the name are still the values read (or `current_version` equals `expectedRevision`, when given). Never writes `semantic_model_name`. If the policy publishes, `active_version` advances in the same transaction; otherwise it is left as is, including a value set by a concurrent publication. |
+| Rename                                    | Updates `semantic_model_name` and `audit_info` on the identity row only, conditional on the name read and `current_version` (and `expectedRevision`, when given). Creates no revision and changes neither pointer.                                                                                                                                                               |
+| Publish revision *n* (internal)           | In one transaction: set `publication_status = 'PUBLISHED_EXPLICITLY'`, `published_by`, and `published_at` on snapshot *n*, and set `active_version = n` on the condition `current_version = n`; then reconcile metric identities. Repeating it on the published latest returns the existing record unchanged.                                                                    |
+| Owner, grant, tag, policy, Domain changes | Use their existing stores. Create no revision.                                                                                                                                                                                                                                                                                                                                   |
+| Drop                                      | Unchanged: soft-deletes the model and all revisions.                                                                                                                                                                                                                                                                                                                             |
 
 ### Rename
 
@@ -427,6 +428,14 @@ A rename must be the only change in its request; a request that mixes it with ot
 under a deferred policy — in when they take effect: the rename would apply immediately while the
 definition stayed a draft. Keeping them apart gives every request one meaning under every policy.
 Relaxing this later is compatible; tightening it after release would not be.
+
+Because a rename no longer advances `current_version`, the version check alone cannot detect it.
+Every write to the identity row is therefore also conditional on the name it read, and only a
+rename writes the name. When an alter and a rename race, the first commit wins: an alter that
+addressed the old name fails with `404`, as for a model renamed during an update today, and a
+rename that read an older `current_version` fails with `409`. A rename back to the original name
+before the alter commits is harmless, because the alter then applies to the same model, name, and
+base revision.
 
 ### Derived indexes
 
@@ -450,7 +459,8 @@ Forward queries read snapshots; reverse indexes track revision ranges.
   revision at or below the cutoff is soft-deleted only if `version <> active_version` and
   `publication_status` is not `PUBLISHED_EXPLICITLY`. Under the default policy active is latest, so
   behavior is unchanged.
-- Source ranges that cover neither the active revision nor latest are soft-deleted in the same job.
+- Source ranges that cover no retained revision are soft-deleted in the same job, so every
+  retained snapshot keeps its associations.
 - Model and parent deletion use the existing soft-delete and purge paths; all new columns live on
   existing rows.
 - A collected revision returns `404 NoSuchSemanticModelRevisionException` on explicit reads.
@@ -778,7 +788,8 @@ a test policy that returns `false` and exercises publication end to end.
 - [ ] Override the internal `semanticModelExists` with an identity-row lookup; switch the REST alter
       preflight to `LATEST`
 - [ ] Add `expectedRevision` to alter in the store and REST, required for definition replacement;
-      split rename from snapshot writes and reject mixed requests
+      split rename from snapshot writes, reject mixed requests, and guard identity writes on the
+      name read
 - [ ] Add `SemanticModelPublicationPolicy`, its `ServiceLoader` loading with the built-in default,
       and apply it in create, import, and alter
 - [ ] Add `publishSemanticModelRevision` to the dispatcher chain and store, with events
@@ -810,8 +821,10 @@ a test policy that returns `false` and exercises publication end to end.
 | Set a property or comment without `expectedRevision`      | Commits on top of latest, as today.                                                                                                                                                                                         |
 | Import with an existing model name                        | `SemanticModelAlreadyExistsException`; the model and its history are unchanged.                                                                                                                                             |
 | Rename alone                                              | No revision is created; all reads use the new name; the old name returns `404`.                                                                                                                                             |
+| Alter and rename race on two servers                      | The first commit wins. A losing alter returns `404` and the model keeps the new name; a losing rename returns `409`.                                                                                                        |
 | Rename combined with other changes                        | `400`; nothing changes.                                                                                                                                                                                                     |
 | Sources change A → B → A                                  | Ranges record A, B, and A at their revisions; lookup returns the dataset for the active revision only.                                                                                                                      |
+| Sources change A → B with r1 explicitly published         | After retention runs, r1's range for A is kept while r1 is retained; lookup still returns the dataset for the active revision only.                                                                                         |
 | More saves than the retention count                       | Older revisions are collected and return `404` on explicit reads; active (latest) survives.                                                                                                                                 |
 | Existing read clients                                     | Load, list, and export work with their original request shapes.                                                                                                                                                             |
 
