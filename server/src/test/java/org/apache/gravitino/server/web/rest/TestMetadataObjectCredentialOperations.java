@@ -19,7 +19,10 @@
 package org.apache.gravitino.server.web.rest;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -28,8 +31,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
@@ -37,6 +42,7 @@ import org.apache.gravitino.dto.responses.CredentialResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
@@ -99,7 +105,7 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
     String message = unsupported.readEntity(ErrorResponse.class).getMessage();
     Assertions.assertTrue(message.contains("catalog.schema.table"));
     Assertions.assertTrue(message.contains("TABLE"));
-    when(credentialOperationDispatcher.getCredentials(any(), any()))
+    when(credentialOperationDispatcher.getCredentials(any(), any(), anyBoolean()))
         .thenThrow(new IllegalArgumentException("Invalid provider"));
     Response invalid =
         target(basePath(metalake))
@@ -119,6 +125,22 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
     testGetCredentialsForObject(MetadataObjects.parse("catalog", MetadataObject.Type.CATALOG));
   }
 
+  /** Checks that the resource passes the handler's provider restriction to the dispatcher. */
+  @Test
+  public void testForwardsProviderRestriction() throws Exception {
+    NameIdentifier identifier = NameIdentifier.of(metalake, "catalog");
+    MetadataObjectCredentialOperations operations =
+        new MetadataObjectCredentialOperations(credentialOperationDispatcher);
+    FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
+    try (AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
+      AuthorizationRequestScope.requireDynamicCredentials(identifier);
+      try (Response response = operations.getCredentials(metalake, "catalog", "catalog")) {
+        Assertions.assertEquals(200, response.getStatus());
+        verify(credentialOperationDispatcher).getCredentials(eq(identifier), any(), eq(true));
+      }
+    }
+  }
+
   @Test
   public void testGetCredentialsForFileset() {
     testGetCredentialsForObject(
@@ -128,7 +150,7 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
   @Test
   public void testInvalidCredentialLocationResponse() {
     String path = "wasbs://container@account.blob.core.windows.net/warehouse/table";
-    when(credentialOperationDispatcher.getCredentials(any(), any()))
+    when(credentialOperationDispatcher.getCredentials(any(), any(), anyBoolean()))
         .thenThrow(
             new IllegalArgumentException(
                 "adls-token requires an abfs or abfss location; unsupported location: " + path));
@@ -152,7 +174,7 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
 
     S3SecretKeyCredential credential = new S3SecretKeyCredential("access-id", "secret-key");
     // Test return one credential
-    when(credentialOperationDispatcher.getCredentials(any(), any()))
+    when(credentialOperationDispatcher.getCredentials(any(), any(), anyBoolean()))
         .thenReturn(Arrays.asList(credential));
     Response response =
         target(basePath(metalake))
@@ -175,7 +197,7 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
     Assertions.assertEquals(0, credentialToTest.expireTimeInMs());
 
     // Test doesn't return credential
-    when(credentialOperationDispatcher.getCredentials(any(), any())).thenReturn(null);
+    when(credentialOperationDispatcher.getCredentials(any(), any(), anyBoolean())).thenReturn(null);
     response =
         target(basePath(metalake))
             .path(metadataObject.type().toString())

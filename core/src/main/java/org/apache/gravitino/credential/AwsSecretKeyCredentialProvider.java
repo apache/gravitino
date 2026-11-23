@@ -24,7 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
 /** Generates static AWS access-key credentials for Glue API authentication. */
-public class AwsSecretKeyCredentialProvider implements CredentialProvider {
+public class AwsSecretKeyCredentialProvider implements SupportsStaticCredential {
 
   private String accessKeyId;
   private String secretAccessKey;

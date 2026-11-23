@@ -21,7 +21,9 @@ package org.apache.gravitino.server.authorization;
 
 import java.lang.reflect.Method;
 import java.security.Principal;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 import javax.annotation.Nullable;
 import javax.ws.rs.GET;
 import org.apache.gravitino.NameIdentifier;
@@ -29,13 +31,16 @@ import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
- * Makes entry authorization state available to list filtering during a synchronous read request.
+ * Makes entry authorization state available during a synchronous read request.
  *
  * <p>The interceptor opens a scope around the REST method, binds the context it built for entry
  * authorization when the method is a read, and closes the scope when the method returns. {@link
  * #getOrCreate(String)} then hands that context to {@code MetadataAuthzHelper.filterByExpression}
  * on the same thread. Filter workers receive the context explicitly; this thread-local scope is not
  * inherited by them.
+ *
+ * <p>Credential handlers can also restrict a catalog request to dynamic providers. The resource
+ * passes that restriction to the dispatcher, so static providers are skipped before generation.
  *
  * <p>This is separate from {@link org.apache.gravitino.utils.RequestContext} because it is bound to
  * the intercepted method, not to the servlet request, and is closed together with it.
@@ -46,6 +51,7 @@ public final class AuthorizationRequestScope implements AutoCloseable {
   @Nullable private Principal principal;
   @Nullable private String metalake;
   @Nullable private AuthorizationRequestContext context;
+  private final Set<NameIdentifier> dynamicCredentialCatalogs = new HashSet<>();
 
   private AuthorizationRequestScope() {}
 
@@ -107,6 +113,28 @@ public final class AuthorizationRequestScope implements AutoCloseable {
       return scope.context;
     }
     return new AuthorizationRequestContext();
+  }
+
+  /**
+   * Restricts credential retrieval for a catalog to dynamic providers during this invocation.
+   *
+   * @param catalog the catalog authorized by the credential handler
+   */
+  public static void requireDynamicCredentials(NameIdentifier catalog) {
+    Objects.requireNonNull(CURRENT.get(), "No active authorization scope")
+        .dynamicCredentialCatalogs
+        .add(catalog);
+  }
+
+  /**
+   * Returns whether credential retrieval for the catalog is restricted to dynamic providers.
+   *
+   * @param catalog the catalog whose credentials are requested
+   * @return whether only dynamic providers may be invoked
+   */
+  public static boolean dynamicCredentialsOnly(NameIdentifier catalog) {
+    AuthorizationRequestScope scope = CURRENT.get();
+    return scope != null && scope.dynamicCredentialCatalogs.contains(catalog);
   }
 
   /** Removes the scope when the invocation completes. */

@@ -22,12 +22,12 @@ package org.apache.gravitino.s3.credential;
 import java.util.Map;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialContext;
-import org.apache.gravitino.credential.CredentialProvider;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.credential.SupportsStaticCredential;
 import org.apache.gravitino.credential.config.S3CredentialConfig;
 
 /** Generate S3 access key and secret key to access S3 data. */
-public class S3SecretKeyProvider implements CredentialProvider {
+public class S3SecretKeyProvider implements SupportsStaticCredential {
 
   private String accessKey;
   private String secretKey;

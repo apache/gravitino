@@ -54,23 +54,45 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
   }
 
   public List<Credential> getCredentials(NameIdentifier identifier, CredentialPrivilege privilege) {
+    return getCredentials(identifier, privilege, false);
+  }
+
+  /**
+   * Retrieves credentials from the providers permitted by the request's authorization.
+   *
+   * @param identifier the metadata object whose credentials are requested
+   * @param privilege the requested storage privilege
+   * @param dynamicOnly whether providers supporting static credentials must be skipped
+   * @return the credentials returned by the permitted providers
+   */
+  public List<Credential> getCredentials(
+      NameIdentifier identifier, CredentialPrivilege privilege, boolean dynamicOnly) {
     return doWithCatalog(
         NameIdentifierUtil.getCatalogIdentifier(identifier),
         catalogWrapper ->
             catalogWrapper.doWithCredentialOps(
-                baseCatalog -> getCredentials(baseCatalog, identifier, privilege)),
+                baseCatalog -> getCredentials(baseCatalog, identifier, privilege, dynamicOnly)),
         NoSuchCatalogException.class);
   }
 
   List<Credential> getCredentials(
       BaseCatalog baseCatalog, NameIdentifier nameIdentifier, CredentialPrivilege privilege) {
+    return getCredentials(baseCatalog, nameIdentifier, privilege, false);
+  }
+
+  List<Credential> getCredentials(
+      BaseCatalog baseCatalog,
+      NameIdentifier nameIdentifier,
+      CredentialPrivilege privilege,
+      boolean dynamicOnly) {
     Map<String, CredentialContext> contexts =
         getCredentialContexts(baseCatalog, nameIdentifier, privilege);
     List<Credential> credentials = new ArrayList<>();
     for (Map.Entry<String, CredentialContext> entry : contexts.entrySet()) {
       Optional<CredentialProvider> providerOptional =
           baseCatalog.catalogCredentialManager().getCredentialProvider(entry.getKey());
-      if (!providerOptional.isPresent()) {
+      if (!providerOptional.isPresent()
+          || (dynamicOnly && providerOptional.get() instanceof SupportsStaticCredential)) {
         continue;
       }
 

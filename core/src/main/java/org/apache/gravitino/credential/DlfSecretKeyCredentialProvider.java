@@ -24,7 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
 /** Generates static DLF access-key credentials for Paimon DLF catalogs. */
-public class DlfSecretKeyCredentialProvider implements CredentialProvider {
+public class DlfSecretKeyCredentialProvider implements SupportsStaticCredential {
 
   private String accessKeyId;
   private String accessKeySecret;

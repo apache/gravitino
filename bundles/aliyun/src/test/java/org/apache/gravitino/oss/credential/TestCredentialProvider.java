@@ -21,6 +21,7 @@ package org.apache.gravitino.oss.credential;
 
 import org.apache.gravitino.credential.OSSSecretKeyCredential;
 import org.apache.gravitino.credential.OSSTokenCredential;
+import org.apache.gravitino.credential.SupportsStaticCredential;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -29,10 +30,12 @@ public class TestCredentialProvider {
   @Test
   void testCredentialProviderType() {
     OSSTokenProvider ossTokenProvider = new OSSTokenProvider();
+    Assertions.assertFalse(ossTokenProvider instanceof SupportsStaticCredential);
     Assertions.assertEquals(
         OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE, ossTokenProvider.credentialType());
 
     OSSSecretKeyProvider ossSecretKeyProvider = new OSSSecretKeyProvider();
+    Assertions.assertInstanceOf(SupportsStaticCredential.class, ossSecretKeyProvider);
     Assertions.assertEquals(
         OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE,
         ossSecretKeyProvider.credentialType());

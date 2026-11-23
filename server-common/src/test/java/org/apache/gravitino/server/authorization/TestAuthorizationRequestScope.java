@@ -18,11 +18,14 @@
 package org.apache.gravitino.server.authorization;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
@@ -31,6 +34,29 @@ import org.junit.jupiter.api.Test;
 
 /** Tests security boundaries and lifetime of read-request context reuse. */
 public class TestAuthorizationRequestScope {
+  /** Checks that credential restrictions apply only to this catalog and invocation. */
+  @Test
+  public void testDynamicCredentialRestrictionLifetime() {
+    NameIdentifier catalog = NameIdentifier.of("metalake", "catalog");
+    assertFalse(AuthorizationRequestScope.dynamicCredentialsOnly(catalog));
+    try (AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
+      AuthorizationRequestScope.requireDynamicCredentials(catalog);
+      assertTrue(AuthorizationRequestScope.dynamicCredentialsOnly(catalog));
+      assertFalse(
+          AuthorizationRequestScope.dynamicCredentialsOnly(NameIdentifier.of("metalake", "other")));
+      assertFalse(
+          AuthorizationRequestScope.dynamicCredentialsOnly(
+              NameIdentifier.of("metalake", "catalog", "schema", "fileset")));
+      assertFalse(
+          CompletableFuture.supplyAsync(
+                  () -> AuthorizationRequestScope.dynamicCredentialsOnly(catalog))
+              .join());
+    }
+    assertFalse(AuthorizationRequestScope.dynamicCredentialsOnly(catalog));
+    try (AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
+      assertFalse(AuthorizationRequestScope.dynamicCredentialsOnly(catalog));
+    }
+  }
   /** A scope must not share role loading or cached decisions across security identities. */
   @Test
   public void testSecurityBoundaries() throws Exception {

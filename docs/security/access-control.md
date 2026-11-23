@@ -205,8 +205,8 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 | `REGISTER_MODEL`     | Metalake, Catalog, Schema                                                   | Register models in any schema in scope                               |
 | `LINK_MODEL_VERSION` | Metalake, Catalog, Schema, Model                                            | Link versions to any model in scope                                  |
 | `USE_MODEL`          | Metalake, Catalog, Schema, Model                                            | Read the metadata of, and download versions of, any model in scope   |
-| `USE_SECRETS`                   | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | Call `getSecrets` (cloud access-key pairs omitted unless also granted `INCLUDE_CREDENTIAL_SECRETS`); required with `INCLUDE_CREDENTIAL_SECRETS` for non-expiring catalog credentials |
-| `INCLUDE_CREDENTIAL_SECRETS`    | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | With `USE_SECRETS`, include cloud access-key pairs in `getSecrets` and non-expiring credentials in catalog `getCredentials` |
+| `USE_SECRETS`                   | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | Call `getSecrets` (cloud access-key pairs omitted unless also granted `INCLUDE_CREDENTIAL_SECRETS`); required with `INCLUDE_CREDENTIAL_SECRETS` for static catalog credentials |
+| `INCLUDE_CREDENTIAL_SECRETS`    | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | With `USE_SECRETS`, include cloud access-key pairs in `getSecrets` and static credentials in catalog `getCredentials` |
 | `REGISTER_FUNCTION`  | Metalake, Catalog, Schema                                                   | Register functions in any schema in scope                            |
 | `EXECUTE_FUNCTION`   | Metalake, Catalog, Schema, Function                                         | Read the metadata of, and execute, any function in scope             |
 | `MODIFY_FUNCTION`    | Metalake, Catalog, Schema, Function                                         | Alter or drop any function in scope                                  |
@@ -295,12 +295,17 @@ writing them takes `MODIFY_TABLE`. Model versions follow the model: `USE_MODEL` 
 alter or delete. Fetching plaintext secrets (`getSecrets`) requires owning the metalake or holding
 `USE_SECRETS`. Cloud access-key pairs are included only when the caller is the metalake owner or also
 holds `INCLUDE_CREDENTIAL_SECRETS`. Catalog credential vending (`getCredentials`) requires metadata
-access. Short-lived vended tokens do not require secret privileges. Non-expiring credentials
+access. Short-lived vended tokens do not require secret privileges. Static credentials
 additionally require both `USE_SECRETS` and `INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership.
 Callers missing either privilege receive only tokens from mixed-provider catalogs, or a forbidden
-error if only non-expiring credentials are available. Catalogs with no credentials return an empty
+error if only static providers are configured. Catalogs with no credentials return an empty
 result. Fileset credential vending retains its path-based authorization. Callers who can load the
 object but lack `USE_SECRETS` receive an empty `getSecrets` result rather than a forbidden error.
+
+Credential providers that return stored passwords, access keys, or other static credentials must
+implement `org.apache.gravitino.credential.SupportsStaticCredential`. Providers without this marker
+retain the existing credential-vending behavior. Provider authorization happens before credentials
+are generated, including for mixed-provider catalogs.
 
 The View row applies to metadata operations through both the native Gravitino REST API and the
 Iceberg REST Catalog when authorization is enabled. Listing first requires access to the schema and

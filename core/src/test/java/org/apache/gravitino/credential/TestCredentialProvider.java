@@ -27,6 +27,16 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestCredentialProvider {
+  /** Checks that built-in stored credential providers declare the static capability. */
+  @Test
+  public void testStaticCredentialProviders() {
+    Assertions.assertInstanceOf(SupportsStaticCredential.class, new JdbcCredentialProvider());
+    Assertions.assertInstanceOf(
+        SupportsStaticCredential.class, new AwsSecretKeyCredentialProvider());
+    Assertions.assertInstanceOf(
+        SupportsStaticCredential.class, new DlfSecretKeyCredentialProvider());
+  }
+
   @Test
   void testCredentialProvider() {
     Map<String, String> catalogProperties = ImmutableMap.of("a", "b");

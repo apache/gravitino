@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.ServiceLoader;
 import java.util.Set;
 import org.apache.gravitino.credential.CredentialProvider;
+import org.apache.gravitino.credential.SupportsStaticCredential;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -34,6 +35,13 @@ import org.junit.jupiter.api.Test;
  * the regression cannot slip past CI.
  */
 public class TestCOSCredentialProviderSpi {
+
+  /** Checks which providers declare static credential support. */
+  @Test
+  public void testStaticCredentialCapability() {
+    Assertions.assertFalse(new COSTokenProvider() instanceof SupportsStaticCredential);
+    Assertions.assertInstanceOf(SupportsStaticCredential.class, new COSSecretKeyProvider());
+  }
 
   @Test
   void testCredentialProviderSpiRegistersBothCosProviders() {

@@ -19,33 +19,28 @@
 
 package org.apache.gravitino.server.web.filter;
 
-import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
-import javax.ws.rs.core.Response;
+import java.util.Set;
 import org.apache.gravitino.Entity.EntityType;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.dto.credential.CredentialDTO;
-import org.apache.gravitino.dto.responses.CredentialResponse;
+import org.apache.gravitino.credential.CredentialUtils;
+import org.apache.gravitino.credential.SupportsStaticCredential;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler;
-import org.apache.gravitino.server.web.rest.ExceptionHandlers;
-import org.apache.gravitino.server.web.rest.OperationType;
 
 /** Authorizes static catalog credentials while allowing short-lived token vending. */
 public class CatalogCredentialAuthzHandler implements AuthorizationHandler {
-
-  private String catalogName;
-  private boolean includeStaticCredentials;
 
   @Override
   public void process(Map<EntityType, NameIdentifier> nameIdentifierMap) {
     NameIdentifier identifier =
         Objects.requireNonNull(nameIdentifierMap.get(EntityType.CATALOG), "catalog identifier");
-    catalogName = identifier.name();
-    includeStaticCredentials =
+    boolean includeStaticCredentials =
         MetadataAuthzHelper.checkAccess(
                 identifier,
                 EntityType.CATALOG,
@@ -55,6 +50,35 @@ public class CatalogCredentialAuthzHandler implements AuthorizationHandler {
                 EntityType.CATALOG,
                 AuthorizationExpressionConstants
                     .FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION);
+    if (includeStaticCredentials) {
+      return;
+    }
+    boolean dynamicProvidersAvailable =
+        GravitinoEnv.getInstance()
+            .catalogManager()
+            .doWithCatalog(
+                identifier,
+                catalog -> {
+                  Set<String> providers =
+                      CredentialUtils.getCredentialProvidersByOrder(
+                          catalog::propertiesWithCredentialProviders);
+                  return providers.isEmpty()
+                      || providers.stream()
+                          .anyMatch(
+                              type ->
+                                  catalog
+                                      .catalogCredentialManager()
+                                      .getCredentialProvider(type)
+                                      .filter(
+                                          provider ->
+                                              !(provider instanceof SupportsStaticCredential))
+                                      .isPresent());
+                });
+    if (!dynamicProvidersAvailable) {
+      throw new ForbiddenException(
+          "Catalog credentials require USE_SECRETS and INCLUDE_CREDENTIAL_SECRETS");
+    }
+    AuthorizationRequestScope.requireDynamicCredentials(identifier);
   }
 
   @Override
@@ -66,33 +90,5 @@ public class CatalogCredentialAuthzHandler implements AuthorizationHandler {
   @Override
   public EntityType entityType() {
     return EntityType.CATALOG;
-  }
-
-  @Override
-  public Object processResponse(Object response) {
-    if (includeStaticCredentials || !(response instanceof Response)) {
-      return response;
-    }
-    Response restResponse = (Response) response;
-    if (restResponse.getStatus() != Response.Status.OK.getStatusCode()
-        || !(restResponse.getEntity() instanceof CredentialResponse)) {
-      return response;
-    }
-    CredentialDTO[] credentials = ((CredentialResponse) restResponse.getEntity()).getCredentials();
-    CredentialDTO[] tokens =
-        Arrays.stream(credentials)
-            .filter(credential -> credential.expireTimeInMs() > 0)
-            .toArray(CredentialDTO[]::new);
-    if (tokens.length == credentials.length) {
-      return response;
-    }
-    if (tokens.length == 0) {
-      return ExceptionHandlers.handleCredentialException(
-          OperationType.GET,
-          catalogName,
-          new ForbiddenException(
-              "Catalog credentials require USE_SECRETS and INCLUDE_CREDENTIAL_SECRETS"));
-    }
-    return Response.fromResponse(restResponse).entity(new CredentialResponse(tokens)).build();
   }
 }

@@ -22,12 +22,12 @@ package org.apache.gravitino.oss.credential;
 import java.util.Map;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialContext;
-import org.apache.gravitino.credential.CredentialProvider;
 import org.apache.gravitino.credential.OSSSecretKeyCredential;
+import org.apache.gravitino.credential.SupportsStaticCredential;
 import org.apache.gravitino.credential.config.OSSCredentialConfig;
 
 /** Generate OSS access key and secret key to access OSS data. */
-public class OSSSecretKeyProvider implements CredentialProvider {
+public class OSSSecretKeyProvider implements SupportsStaticCredential {
 
   private String accessKey;
   private String secretKey;

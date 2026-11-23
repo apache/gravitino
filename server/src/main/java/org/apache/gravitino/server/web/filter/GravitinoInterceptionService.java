@@ -48,6 +48,7 @@ import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
@@ -181,6 +182,7 @@ public class GravitinoInterceptionService implements InterceptionService {
       Parameter[] parameters = method.getParameters();
       AuthorizationExpression expressionAnnotation =
           method.getAnnotation(AuthorizationExpression.class);
+      NameIdentifier handlerTarget = null;
 
       try (AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
         AuthorizationExecutor executor = null;
@@ -267,13 +269,7 @@ public class GravitinoInterceptionService implements InterceptionService {
             }
           }
 
-          handler =
-              createAuthorizationHandler(
-                  extractAuthorizationRequestTypeFromParameters(parameters), entityType);
-          if (handler.isPresent()) {
-            handler.get().process(metadataContext);
-          }
-          if (executor != null && (handler.isEmpty() || !handler.get().authorizationCompleted())) {
+          if (executor != null) {
             boolean authorizeResult;
             try {
               authorizeResult = executor.execute(authorizationRequestContext);
@@ -318,9 +314,24 @@ public class GravitinoInterceptionService implements InterceptionService {
             }
           }
           scope.bindIfRead(method, metalakeIdent, authorizationRequestContext);
+          handler =
+              createAuthorizationHandler(
+                  extractAuthorizationRequestTypeFromParameters(parameters), entityType);
+          if (handler.isPresent()) {
+            handlerTarget = metadataContext.get(handler.get().entityType());
+            handler.get().process(metadataContext);
+          }
         }
-        Object response = methodInvocation.proceed();
-        return handler.isPresent() ? handler.get().processResponse(response) : response;
+        return methodInvocation.proceed();
+      } catch (ForbiddenException ex) {
+        dispatchAuthzDenialEvent(
+            PrincipalUtils.getCurrentUserName(),
+            handlerTarget,
+            method.getName(),
+            expressionAnnotation == null ? "" : expressionAnnotation.expression());
+        return Utils.forbidden(ex.getMessage(), ex);
+      } catch (NoSuchCatalogException ex) {
+        return Utils.notFound(ex.getMessage(), ex);
       } catch (BadRequestException ex) {
         LOG.warn("Invalid authorization request", ex);
         return Utils.illegalArguments(ex.getMessage(), ex);

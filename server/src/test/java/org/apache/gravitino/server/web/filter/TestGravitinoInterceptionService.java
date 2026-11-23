@@ -41,8 +41,11 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
@@ -61,12 +64,14 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
-import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.S3SecretKeyCredential;
-import org.apache.gravitino.credential.S3TokenCredential;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.credential.CatalogCredentialManager;
+import org.apache.gravitino.credential.CredentialProvider;
+import org.apache.gravitino.credential.SupportsStaticCredential;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
 import org.apache.gravitino.dto.requests.JobRunRequest;
@@ -78,11 +83,10 @@ import org.apache.gravitino.dto.requests.SemanticModelCreateRequest;
 import org.apache.gravitino.dto.requests.SemanticModelUpdatesRequest;
 import org.apache.gravitino.dto.requests.TagValuesAssociateRequest;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
-import org.apache.gravitino.dto.responses.CredentialResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
-import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
@@ -133,6 +137,7 @@ import org.apache.gravitino.server.web.rest.ViewOperations;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.RequestContext;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LogEvent;
@@ -197,27 +202,26 @@ public class TestGravitinoInterceptionService {
   }
 
   /**
-   * Checks handler registration and filtering through the real interception pipeline.
+   * Checks that provider authorization is decided before invoking the resource.
    *
-   * @param useSecrets whether the caller can use secrets
-   * @param includeSecrets whether the caller can receive static credential secrets
+   * @param useSecrets whether the caller may use secrets
+   * @param includeSecrets whether the caller may receive static credential secrets
    */
   @ParameterizedTest
   @CsvSource({"false,false", "false,true", "true,false", "true,true"})
-  public void testCatalogCredentialResponseHandler(boolean useSecrets, boolean includeSecrets)
+  public void testCatalogCredentialHandler(boolean useSecrets, boolean includeSecrets)
       throws Throwable {
-    Method method =
-        MetadataObjectCredentialOperations.class.getMethod(
-            "getCredentials", String.class, String.class, String.class);
-    MethodInvocation invocation = mock(MethodInvocation.class);
-    when(invocation.getMethod()).thenReturn(method);
-    when(invocation.getArguments())
-        .thenReturn(new Object[] {"testMetalake", "catalog", "testCatalog"});
-    Credential token = new S3TokenCredential("id", "key", "token", Long.MAX_VALUE);
-    Credential[] credentials = {new S3SecretKeyCredential("id", "key"), token};
-    try (Response original = Utils.ok(new CredentialResponse(DTOConverters.toDTO(credentials)));
-        MockedStatic<MetadataAuthzHelper> auth = mockStatic(MetadataAuthzHelper.class)) {
-      when(invocation.proceed()).thenReturn(original);
+    MethodInvocation invocation = credentialInvocation("catalog");
+    NameIdentifier catalog = NameIdentifier.of("testMetalake", "testCatalog");
+    when(invocation.proceed())
+        .thenAnswer(
+            ignored -> {
+              assertEquals(
+                  !(useSecrets && includeSecrets),
+                  AuthorizationRequestScope.dynamicCredentialsOnly(catalog));
+              return Utils.ok("ok");
+            });
+    try (MockedStatic<MetadataAuthzHelper> auth = mockStatic(MetadataAuthzHelper.class)) {
       auth.when(
               () ->
                   MetadataAuthzHelper.checkAccess(
@@ -238,53 +242,87 @@ public class TestGravitinoInterceptionService {
           .thenReturn(includeSecrets);
       try (Response response =
           invokeWithAuthorizer(
-              catalogConnectionAuthorizer(true, false), mock(EventBus.class), invocation)) {
+              catalogConnectionAuthorizer(true, false),
+              mock(EventBus.class),
+              invocation,
+              credentialCatalogManager("custom-session,custom-stored"))) {
         assertEquals(200, response.getStatus());
-        CredentialResponse result = (CredentialResponse) response.getEntity();
-        assertEquals(useSecrets && includeSecrets ? 2 : 1, result.getCredentials().length);
-        assertEquals(
-            token.toProperties(),
-            result.getCredentials()[result.getCredentials().length - 1].toProperties());
       }
     }
+    Assertions.assertFalse(AuthorizationRequestScope.dynamicCredentialsOnly(catalog));
+  }
+
+  /** Checks that static-only requests are denied before the resource is invoked. */
+  @Test
+  public void testStaticCredentialsDeniedBeforeInvocation() throws Throwable {
+    MethodInvocation invocation = credentialInvocation("catalog");
+    try (MockedStatic<MetadataAuthzHelper> auth = mockStatic(MetadataAuthzHelper.class);
+        Response response =
+            invokeWithAuthorizer(
+                catalogConnectionAuthorizer(true, false),
+                mock(EventBus.class),
+                invocation,
+                credentialCatalogManager("custom-stored"))) {
+      assertEquals(403, response.getStatus());
+      Assertions.assertTrue(
+          ((ErrorResponse) response.getEntity()).getMessage().contains("USE_SECRETS"));
+      verify(invocation, never()).proceed();
+    }
+    Assertions.assertFalse(
+        AuthorizationRequestScope.dynamicCredentialsOnly(
+            NameIdentifier.of("testMetalake", "testCatalog")));
   }
 
   /**
-   * Checks that catalog-only filtering does not affect fileset credentials or failed responses.
+   * Checks that the handler leaves filesets and operation errors unchanged.
    *
    * @param type the requested metadata object type
-   * @param status the operation's response status
+   * @param status the operation response status
    */
   @ParameterizedTest
   @CsvSource({"catalog,200", "fileset,200", "catalog,400", "catalog,500"})
   public void testCredentialHandlerScopeAndErrors(String type, int status) throws Throwable {
-    Method method =
-        MetadataObjectCredentialOperations.class.getMethod(
-            "getCredentials", String.class, String.class, String.class);
-    MethodInvocation invocation = mock(MethodInvocation.class);
-    when(invocation.getMethod()).thenReturn(method);
-    when(invocation.getArguments())
-        .thenReturn(
-            new Object[] {
-              "testMetalake",
-              type,
-              "catalog".equals(type) ? "testCatalog" : "testCatalog.schema.fileset"
-            });
-    Credential[] credentials = {new S3SecretKeyCredential("id", "key")};
+    MethodInvocation invocation = credentialInvocation(type);
     GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
     when(authorizer.authorize(any(), any(), any(), any(), any())).thenReturn(true);
-    try (Response original =
-            Response.status(status)
-                .entity(new CredentialResponse(DTOConverters.toDTO(credentials)))
-                .build();
+    try (Response original = Response.status(status).entity("unchanged").build();
         MockedStatic<MetadataAuthzHelper> auth = mockStatic(MetadataAuthzHelper.class)) {
-      when(invocation.proceed()).thenReturn(original);
-      try (Response response = invokeWithAuthorizer(authorizer, mock(EventBus.class), invocation)) {
-        assertEquals("catalog".equals(type) && status == 200 ? 403 : status, response.getStatus());
-        if ("fileset".equals(type) || status != 200) {
-          Assertions.assertSame(original, response);
-        }
+      when(invocation.proceed())
+          .thenAnswer(
+              ignored -> {
+                assertEquals(
+                    "catalog".equals(type),
+                    AuthorizationRequestScope.dynamicCredentialsOnly(
+                        NameIdentifier.of("testMetalake", "testCatalog")));
+                return original;
+              });
+      try (Response response =
+          invokeWithAuthorizer(
+              authorizer,
+              mock(EventBus.class),
+              invocation,
+              credentialCatalogManager("custom-session"))) {
+        Assertions.assertSame(original, response);
       }
+    }
+  }
+
+  /** Checks that a catalog disappearing during authorization is still reported as not found. */
+  @Test
+  public void testMissingCredentialCatalogReturnsNotFound() throws Throwable {
+    CatalogManager manager = mock(CatalogManager.class);
+    when(manager.doWithCatalog(any(), any()))
+        .thenThrow(new NoSuchCatalogException("Catalog missing"));
+    MethodInvocation invocation = credentialInvocation("catalog");
+    try (MockedStatic<MetadataAuthzHelper> auth = mockStatic(MetadataAuthzHelper.class);
+        Response response =
+            invokeWithAuthorizer(
+                catalogConnectionAuthorizer(true, false),
+                mock(EventBus.class),
+                invocation,
+                manager)) {
+      assertEquals(404, response.getStatus());
+      verify(invocation, never()).proceed();
     }
   }
 
@@ -2320,8 +2358,53 @@ public class TestGravitinoInterceptionService {
     return authorizer;
   }
 
+  private MethodInvocation credentialInvocation(String type) throws NoSuchMethodException {
+    Method method =
+        MetadataObjectCredentialOperations.class.getMethod(
+            "getCredentials", String.class, String.class, String.class);
+    MethodInvocation invocation = mock(MethodInvocation.class);
+    when(invocation.getMethod()).thenReturn(method);
+    when(invocation.getArguments())
+        .thenReturn(
+            new Object[] {
+              "testMetalake",
+              type,
+              "catalog".equals(type) ? "testCatalog" : "testCatalog.schema.fileset"
+            });
+    return invocation;
+  }
+
+  private CatalogManager credentialCatalogManager(String providers) {
+    CatalogManager manager = mock(CatalogManager.class);
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    when(catalog.propertiesWithCredentialProviders())
+        .thenReturn(Map.of("credential-providers", providers));
+    CatalogCredentialManager credentials = mock(CatalogCredentialManager.class);
+    when(catalog.catalogCredentialManager()).thenReturn(credentials);
+    when(credentials.getCredentialProvider("custom-session"))
+        .thenReturn(Optional.of(mock(CredentialProvider.class)));
+    when(credentials.getCredentialProvider("custom-stored"))
+        .thenReturn(Optional.of(mock(SupportsStaticCredential.class)));
+    when(manager.doWithCatalog(any(), any()))
+        .thenAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog, ?> operation = invocation.getArgument(1);
+              return operation.apply(catalog);
+            });
+    return manager;
+  }
+
   private Response invokeWithAuthorizer(
       GravitinoAuthorizer authorizer, EventBus eventBus, MethodInvocation invocation)
+      throws Throwable {
+    return invokeWithAuthorizer(authorizer, eventBus, invocation, null);
+  }
+
+  private Response invokeWithAuthorizer(
+      GravitinoAuthorizer authorizer,
+      EventBus eventBus,
+      MethodInvocation invocation,
+      @Nullable CatalogManager catalogManager)
       throws Throwable {
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> authorizerMocked =
@@ -2347,6 +2430,7 @@ public class TestGravitinoInterceptionService {
       GravitinoEnv mockEnv = mock(GravitinoEnv.class);
       envMocked.when(GravitinoEnv::getInstance).thenReturn(mockEnv);
       when(mockEnv.eventBus()).thenReturn(eventBus);
+      when(mockEnv.catalogManager()).thenReturn(catalogManager);
 
       // Use the real resource method so its annotations drive the authorization executor.
       MethodInterceptor interceptor =

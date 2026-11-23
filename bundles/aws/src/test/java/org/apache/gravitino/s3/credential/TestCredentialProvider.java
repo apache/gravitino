@@ -21,6 +21,7 @@ package org.apache.gravitino.s3.credential;
 
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.S3TokenCredential;
+import org.apache.gravitino.credential.SupportsStaticCredential;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -29,10 +30,14 @@ public class TestCredentialProvider {
   @Test
   void testCredentialProviderType() {
     S3TokenProvider s3TokenProvider = new S3TokenProvider();
+    Assertions.assertFalse(s3TokenProvider instanceof SupportsStaticCredential);
     Assertions.assertEquals(
         S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE, s3TokenProvider.credentialType());
 
+    Assertions.assertFalse(new AwsIrsaCredentialProvider() instanceof SupportsStaticCredential);
+
     S3SecretKeyProvider s3SecretKeyProvider = new S3SecretKeyProvider();
+    Assertions.assertInstanceOf(SupportsStaticCredential.class, s3SecretKeyProvider);
     Assertions.assertEquals(
         S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE, s3SecretKeyProvider.credentialType());
   }
