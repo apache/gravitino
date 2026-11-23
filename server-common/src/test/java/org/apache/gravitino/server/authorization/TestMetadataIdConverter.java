@@ -56,6 +56,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.EntityIdResolver;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
@@ -65,6 +66,7 @@ import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -433,18 +435,18 @@ public class TestMetadataIdConverter {
 
   @Test
   void testNormalizedTableIdLookupDoesNotLoadEntity() throws IOException {
-    EntityStore store = mock(EntityStore.class);
+    RelationalEntityStore store = mock(RelationalEntityStore.class);
     GravitinoEnv env = mock(GravitinoEnv.class);
     when(env.entityStore()).thenReturn(store);
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
-    when(store.getEntityId(ident, Entity.EntityType.TABLE)).thenReturn(42L);
+    when(store.getTableId(ident)).thenReturn(42L);
     MetadataObject object =
         MetadataObjects.parse("catalog.schema.table", MetadataObject.Type.TABLE);
     try (MockedStatic<GravitinoEnv> mocked = mockStatic(GravitinoEnv.class)) {
       mocked.when(GravitinoEnv::getInstance).thenReturn(env);
       Assertions.assertEquals(
           Optional.of(42L), MetadataIdConverter.getIdForNormalizedObject(object, "metalake"));
-      Mockito.verify(store).getEntityId(ident, Entity.EntityType.TABLE);
+      Mockito.verify(store).getTableId(ident);
       Mockito.verifyNoMoreInteractions(store);
       Mockito.verify(env, Mockito.never()).catalogManager();
     }
@@ -471,13 +473,13 @@ public class TestMetadataIdConverter {
 
   @Test
   void testTableIdLookupMissingAndStorageFailure() throws IOException {
-    EntityStore store = mock(EntityStore.class);
+    RelationalEntityStore store = mock(RelationalEntityStore.class);
     GravitinoEnv env = mock(GravitinoEnv.class);
     when(env.entityStore()).thenReturn(store);
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
     MetadataObject object =
         MetadataObjects.parse("catalog.schema.table", MetadataObject.Type.TABLE);
-    when(store.getEntityId(ident, Entity.EntityType.TABLE))
+    when(store.getTableId(ident))
         .thenThrow(new NoSuchEntityException("Missing table"))
         .thenThrow(new IOException("Storage unavailable"));
     try (MockedStatic<GravitinoEnv> mocked = mockStatic(GravitinoEnv.class)) {
@@ -491,6 +493,30 @@ public class TestMetadataIdConverter {
       Assertions.assertInstanceOf(IOException.class, failure.getCause());
     }
   }
+
+  @Test
+  void testStoreCanAlsoImplementExistingEntityIdResolver() throws IOException {
+    StoreWithIdResolver store = mock(StoreWithIdResolver.class);
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    when(store.getEntityId(ident, Entity.EntityType.TABLE)).thenReturn(42L);
+    TableEntity table = mock(TableEntity.class);
+    when(table.id()).thenReturn(43L);
+    when(store.get(ident, Entity.EntityType.TABLE, TableEntity.class)).thenReturn(table);
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    when(env.entityStore()).thenReturn(store);
+    try (MockedStatic<GravitinoEnv> mocked = mockStatic(GravitinoEnv.class)) {
+      mocked.when(GravitinoEnv::getInstance).thenReturn(env);
+      Assertions.assertEquals(
+          Optional.of(43L),
+          MetadataIdConverter.getIdForNormalizedObject(
+              MetadataObjects.parse("catalog.schema.table", MetadataObject.Type.TABLE),
+              "metalake"));
+      Mockito.verify(store, Mockito.never()).getEntityId(ident, Entity.EntityType.TABLE);
+    }
+  }
+
+  // Compiling this combination guards the existing boxed-Long resolver contract.
+  private abstract static class StoreWithIdResolver implements EntityStore, EntityIdResolver {}
 
   private void initTestNameIdentifier() {
     ident1 = NameIdentifier.of("metalake");
@@ -532,7 +558,7 @@ public class TestMetadataIdConverter {
     when(mockStore.get(ident1, Entity.EntityType.METALAKE, BaseMetalake.class)).thenReturn(entity1);
     when(mockStore.get(ident2, Entity.EntityType.CATALOG, CatalogEntity.class)).thenReturn(entity2);
     when(mockStore.get(ident3, Entity.EntityType.SCHEMA, SchemaEntity.class)).thenReturn(entity3);
-    when(mockStore.getEntityId(ident4, Entity.EntityType.TABLE)).thenReturn(entity4.id());
+    when(mockStore.get(ident4, Entity.EntityType.TABLE, TableEntity.class)).thenReturn(entity4);
     when(mockStore.get(ident5, Entity.EntityType.MODEL, ModelEntity.class)).thenReturn(entity5);
     when(mockStore.get(ident6, Entity.EntityType.FILESET, FilesetEntity.class)).thenReturn(entity6);
     when(mockStore.get(ident7, Entity.EntityType.TOPIC, TopicEntity.class)).thenReturn(entity7);

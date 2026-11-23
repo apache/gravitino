@@ -53,6 +53,7 @@ import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsDomainOperations;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.SupportsTableIdLookup;
 import org.apache.gravitino.cache.BaseEntityCache;
 import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
@@ -73,7 +74,6 @@ import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
-import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.Executable;
@@ -95,6 +95,7 @@ import org.slf4j.LoggerFactory;
  */
 public class RelationalEntityStore
     implements EntityStore,
+        SupportsTableIdLookup,
         SupportsRelationOperations,
         SupportsDomainOperations,
         SupportsEntityChangeLog {
@@ -331,19 +332,15 @@ public class RelationalEntityStore
   }
 
   @Override
-  public long getEntityId(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
-    if (entityType != Entity.EntityType.TABLE) {
-      return EntityStore.super.getEntityId(ident, entityType);
-    }
+  public long getTableId(NameIdentifier ident) throws IOException {
+    Entity.EntityType entityType = Entity.EntityType.TABLE;
 
     return cache.withCacheLock(
         EntityCacheKey.of(ident, entityType),
         () -> {
           Optional<TableEntity> cached = cache.getIfPresent(ident, entityType);
           // Do not publish a partial TableEntity or introduce a separate name-to-ID cache.
-          return cached.isPresent()
-              ? cached.get().id()
-              : TableMetaService.getInstance().getTableIdByIdentifier(ident);
+          return cached.isPresent() ? cached.get().id() : backend.getTableId(ident);
         });
   }
 

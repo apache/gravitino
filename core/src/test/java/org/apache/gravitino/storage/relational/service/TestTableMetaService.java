@@ -225,14 +225,13 @@ public class TestTableMetaService extends TestJDBCBackend {
             AUDIT_INFO);
     backend.insert(table, false);
     TableMetaService tables = TableMetaService.getInstance();
-    Assertions.assertEquals(table.id(), tables.getTableIdByIdentifier(table.nameIdentifier()));
+    Assertions.assertEquals(table.id(), backend.getTableId(table.nameIdentifier()));
     // A full read still returns its columns after an ID-only lookup.
     Assertions.assertEquals(
         table.columns().size(),
         tables.getTableByIdentifier(table.nameIdentifier()).columns().size());
     backend.delete(table.nameIdentifier(), Entity.EntityType.TABLE, false);
-    assertThrows(
-        NoSuchEntityException.class, () -> tables.getTableIdByIdentifier(table.nameIdentifier()));
+    assertThrows(NoSuchEntityException.class, () -> backend.getTableId(table.nameIdentifier()));
   }
 
   @TestTemplate

@@ -39,6 +39,7 @@ import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.BaseEntityCache;
+import org.apache.gravitino.cache.CaffeineEntityCache;
 import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.NoOpsCache;
@@ -51,13 +52,11 @@ import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
-import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
-import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestRelationalEntityStore {
@@ -100,17 +99,12 @@ public class TestRelationalEntityStore {
   @Test
   void testColdTableIdLookupDoesNotLoadOrCacheFullEntity() throws Exception {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
-    TableMetaService tables = Mockito.mock(TableMetaService.class);
-    Mockito.when(tables.getTableIdByIdentifier(ident)).thenReturn(42L);
+    Mockito.when(backend.getTableId(ident)).thenReturn(42L);
     NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
-    try (MockedStatic<TableMetaService> mocked = Mockito.mockStatic(TableMetaService.class)) {
-      mocked.when(TableMetaService::getInstance).thenReturn(tables);
-      Assertions.assertEquals(42L, store.getEntityId(ident, Entity.EntityType.TABLE));
-      Mockito.verify(tables).getTableIdByIdentifier(ident);
-      Mockito.verifyNoMoreInteractions(tables);
-      Mockito.verifyNoInteractions(backend);
-      Mockito.verify(cache, Mockito.never()).put(any());
-    }
+    Assertions.assertEquals(42L, store.getTableId(ident));
+    Mockito.verify(backend).getTableId(ident);
+    Mockito.verifyNoMoreInteractions(backend);
+    Mockito.verify(cache, Mockito.never()).put(any());
   }
 
   @Test
@@ -120,37 +114,60 @@ public class TestRelationalEntityStore {
     Mockito.when(table.id()).thenReturn(42L);
     NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
     Mockito.doReturn(Optional.of(table)).when(cache).getIfPresent(ident, Entity.EntityType.TABLE);
-    try (MockedStatic<TableMetaService> mocked = Mockito.mockStatic(TableMetaService.class)) {
-      Assertions.assertEquals(42L, store.getEntityId(ident, Entity.EntityType.TABLE));
-      mocked.verifyNoInteractions();
-      Mockito.verifyNoInteractions(backend);
-    }
+    Assertions.assertEquals(42L, store.getTableId(ident));
+    Mockito.verifyNoInteractions(backend);
   }
 
   @Test
-  void testTableIdLookupPropagatesMissingTable() throws Exception {
+  void testTableIdLookupPropagatesMissingTableAndStorageFailure() throws Exception {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "missing");
-    TableMetaService tables = Mockito.mock(TableMetaService.class);
-    Mockito.when(tables.getTableIdByIdentifier(ident))
-        .thenThrow(new NoSuchEntityException("Missing table"));
-    try (MockedStatic<TableMetaService> mocked = Mockito.mockStatic(TableMetaService.class)) {
-      mocked.when(TableMetaService::getInstance).thenReturn(tables);
-      Assertions.assertThrows(
-          NoSuchEntityException.class, () -> store.getEntityId(ident, Entity.EntityType.TABLE));
-      Mockito.verifyNoInteractions(backend);
-    }
+    Mockito.when(backend.getTableId(ident))
+        .thenThrow(new NoSuchEntityException("Missing table"))
+        .thenThrow(new IOException("Storage unavailable"));
+    Assertions.assertThrows(NoSuchEntityException.class, () -> store.getTableId(ident));
+    Assertions.assertThrows(IOException.class, () -> store.getTableId(ident));
   }
 
   @Test
-  void testOtherEntityIdLookupRetainsFullRead() throws Exception {
-    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "topic");
-    TopicEntity topic = Mockito.mock(TopicEntity.class);
-    Mockito.when(topic.id()).thenReturn(43L);
-    Mockito.when(topic.type()).thenReturn(Entity.EntityType.TOPIC);
-    Mockito.when(topic.nameIdentifier()).thenReturn(ident);
-    Mockito.when(backend.get(ident, Entity.EntityType.TOPIC)).thenReturn(topic);
-    Assertions.assertEquals(43L, store.getEntityId(ident, Entity.EntityType.TOPIC));
-    Mockito.verify(backend).get(ident, Entity.EntityType.TOPIC);
+  void testOfflineTableIdLookupUsesInjectedBackendWithFullReadFallback() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    RelationalBackend injected = Mockito.mock(RelationalBackend.class);
+    TableEntity table = Mockito.mock(TableEntity.class);
+    Mockito.when(table.id()).thenReturn(42L);
+    Mockito.when(table.type()).thenReturn(Entity.EntityType.TABLE);
+    Mockito.when(table.nameIdentifier()).thenReturn(ident);
+    Mockito.when(injected.get(ident, Entity.EntityType.TABLE)).thenReturn(table);
+    Mockito.when(injected.getTableId(ident)).thenCallRealMethod();
+    RelationalEntityStore offline =
+        RelationalEntityStore.forOfflineMigration(injected, new Config(false) {});
+    Assertions.assertEquals(
+        offline.get(ident, Entity.EntityType.TABLE, TableEntity.class).id(),
+        offline.getTableId(ident));
+    Mockito.verify(injected, Mockito.times(2)).get(ident, Entity.EntityType.TABLE);
+    Mockito.verify(injected).getTableId(ident);
+    Mockito.verifyNoMoreInteractions(injected);
+  }
+
+  @Test
+  void testTableIdLookupAfterInvalidationReadsReplacementId() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    TableEntity table = Mockito.mock(TableEntity.class);
+    Mockito.when(table.id()).thenReturn(42L);
+    Mockito.when(table.type()).thenReturn(Entity.EntityType.TABLE);
+    Mockito.when(table.nameIdentifier()).thenReturn(ident);
+    CaffeineEntityCache cache = new CaffeineEntityCache(new Config(false) {});
+    try {
+      FieldUtils.writeField(store, "cache", cache, true);
+      cache.put(table);
+      Mockito.when(backend.getTableId(ident)).thenReturn(43L);
+      Assertions.assertEquals(42L, store.getTableId(ident));
+      Mockito.verifyNoInteractions(backend);
+      store.clearCache();
+      Assertions.assertEquals(43L, store.getTableId(ident));
+      Mockito.verify(backend).getTableId(ident);
+    } finally {
+      cache.clear();
+    }
   }
 
   @Test

@@ -127,7 +127,6 @@ public class TestJcasbinMetadataIdCacheNormalization {
         .when(catalogs)
         .doWithCatalog(any(), any());
     store = mock(EntityStore.class);
-    when(store.getEntityId(any(), any())).thenCallRealMethod();
     when(store.get(any(), any(), any()))
         .thenAnswer(
             invocation -> {

@@ -31,6 +31,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.storage.relational.JDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -72,7 +73,7 @@ public class TestTableIdLookup {
                 Function<TableMetaMapper, TablePO> query = invocation.getArgument(1);
                 return query.apply(mapper);
               });
-      Assertions.assertEquals(42L, TableMetaService.getInstance().getTableIdByIdentifier(ident));
+      Assertions.assertEquals(42L, new JDBCBackend().getTableId(ident));
       if (cacheEnabled) {
         verify(mapper).selectTableMetaBySchemaIdAndName(3L, "table");
       } else {
@@ -83,8 +84,7 @@ public class TestTableIdLookup {
       when(mapper.selectTableByFullQualifiedName("metalake", "catalog", "schema", "table"))
           .thenReturn(null);
       Assertions.assertThrows(
-          NoSuchEntityException.class,
-          () -> TableMetaService.getInstance().getTableIdByIdentifier(ident));
+          NoSuchEntityException.class, () -> new JDBCBackend().getTableId(ident));
     }
   }
 }

@@ -31,8 +31,6 @@ import static org.mockito.Mockito.when;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.function.Function;
-import org.apache.gravitino.Entity;
-import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -45,6 +43,7 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
+import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -58,12 +57,12 @@ public class TestJcasbinAuthorizationLookups {
 
   @Test
   void testTableIdColdWarmAndInvalidatedCacheAvoidFullReads() throws Exception {
-    EntityStore store = mock(EntityStore.class);
+    RelationalEntityStore store = mock(RelationalEntityStore.class);
     GravitinoEnv env = mock(GravitinoEnv.class);
     when(env.entityStore()).thenReturn(store);
     NameIdentifier ident = NameIdentifier.of("ml", "cat", "sch", "tbl");
     MetadataObject table = MetadataObjects.parse("cat.sch.tbl", MetadataObject.Type.TABLE);
-    when(store.getEntityId(ident, Entity.EntityType.TABLE)).thenReturn(42L, 43L);
+    when(store.getTableId(ident)).thenReturn(42L, 43L);
     try (CaffeineGravitinoCache<String, Long> ids = new CaffeineGravitinoCache<>(60_000L, 100L);
         CaffeineGravitinoCache<Long, Optional<OwnerInfo>> owners =
             new CaffeineGravitinoCache<>(60_000L, 100L);
@@ -81,12 +80,12 @@ public class TestJcasbinAuthorizationLookups {
       Assertions.assertEquals(
           Optional.of(42L),
           lookups.resolveMetadataId(table, "ml", new AuthorizationRequestContext()));
-      verify(store, times(1)).getEntityId(ident, Entity.EntityType.TABLE);
+      verify(store, times(1)).getTableId(ident);
       ids.invalidateAll();
       Assertions.assertEquals(
           Optional.of(43L),
           lookups.resolveMetadataId(table, "ml", new AuthorizationRequestContext()));
-      verify(store, times(2)).getEntityId(ident, Entity.EntityType.TABLE);
+      verify(store, times(2)).getTableId(ident);
       verifyNoMoreInteractions(store);
     }
   }
