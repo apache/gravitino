@@ -70,6 +70,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -198,12 +199,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   // their identifier, so they are cached by the configuration without it. Otherwise that entry is
   // empty, and the settings are cached by the whole configuration.
   @VisibleForTesting
-  final AsyncCache<Map<String, String>, Optional<Map<String, String>>>
-      sharedHdfsLoginSettingsCache =
-          Caffeine.newBuilder().maximumSize(1000).expireAfterWrite(1, TimeUnit.HOURS).buildAsync();
+  final AsyncCache<ConfKey, Optional<Map<String, String>>> sharedHdfsLoginSettingsCache =
+      Caffeine.newBuilder().maximumSize(1000).expireAfterWrite(1, TimeUnit.HOURS).buildAsync();
 
   @VisibleForTesting
-  final AsyncCache<Map<String, String>, Map<String, String>> hdfsLoginSettingsCache =
+  final AsyncCache<ConfKey, Map<String, String>> hdfsLoginSettingsCache =
       Caffeine.newBuilder().maximumSize(1000).expireAfterWrite(1, TimeUnit.HOURS).buildAsync();
 
   @VisibleForTesting
@@ -233,7 +233,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           Math.max(2, Math.min(Runtime.getRuntime().availableProcessors(), 4)),
           5L,
           TimeUnit.SECONDS,
-          new ArrayBlockingQueue<>(100),
+          new ArrayBlockingQueue<>(1000),
           new ThreadFactoryBuilder()
               .setDaemon(true)
               .setNameFormat("fileset-login-settings-pool-%d")
@@ -327,6 +327,86 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   }
 
   /**
+   * A configuration as a key of the login settings caches, without the identifier of its entity if
+   * asked to. It wraps the configuration as it is, so a lookup copies nothing; a key that a cache
+   * keeps holds a copy.
+   */
+  static final class ConfKey {
+    private final Map<String, String> conf;
+    private final boolean withoutIdentifier;
+    private final int hashCode;
+
+    private ConfKey(Map<String, String> conf, boolean withoutIdentifier) {
+      this.conf = conf;
+      this.withoutIdentifier = withoutIdentifier;
+      int hash = conf.hashCode();
+      if (withoutIdentifier && conf.containsKey(StringIdentifier.ID_KEY)) {
+        // The hash code of a map is the sum of those of its entries.
+        hash -=
+            StringIdentifier.ID_KEY.hashCode()
+                ^ Objects.hashCode(conf.get(StringIdentifier.ID_KEY));
+      }
+      this.hashCode = hash;
+    }
+
+    static ConfKey of(Map<String, String> conf) {
+      return new ConfKey(conf, false);
+    }
+
+    // Filesets that inherit all other properties have configurations that differ only in their
+    // identifiers.
+    static ConfKey withoutIdentifier(Map<String, String> conf) {
+      return new ConfKey(conf, true);
+    }
+
+    ConfKey copy() {
+      return new ConfKey(Collections.unmodifiableMap(new HashMap<>(conf)), withoutIdentifier);
+    }
+
+    private boolean ignores(String key) {
+      return withoutIdentifier && StringIdentifier.ID_KEY.equals(key);
+    }
+
+    private int size() {
+      return withoutIdentifier && conf.containsKey(StringIdentifier.ID_KEY)
+          ? conf.size() - 1
+          : conf.size();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof ConfKey)) {
+        return false;
+      }
+      ConfKey that = (ConfKey) o;
+      if (withoutIdentifier != that.withoutIdentifier
+          || hashCode != that.hashCode
+          || size() != that.size()) {
+        return false;
+      }
+      for (Map.Entry<String, String> entry : conf.entrySet()) {
+        if (ignores(entry.getKey())) {
+          continue;
+        }
+        String value = that.conf.get(entry.getKey());
+        if (!Objects.equals(entry.getValue(), value)
+            || (value == null && !that.conf.containsKey(entry.getKey()))) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    @Override
+    public int hashCode() {
+      return hashCode;
+    }
+  }
+
+  /**
    * The result of a task on a pool, which fails at a deadline. Caffeine logs every entry whose load
    * fails with an exception other than a timeout, so a task that fails completes with null, which
    * removes an entry silently, and keeps its failure here.
@@ -372,6 +452,10 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           (result, e) -> {
             if (e != null) {
               running.cancel(true);
+              // A task that has not started leaves the queue, so that it takes no room from others.
+              if (executor instanceof ThreadPoolExecutor && running instanceof Runnable) {
+                ((ThreadPoolExecutor) executor).remove((Runnable) running);
+              }
             }
           });
       return timed;
@@ -418,15 +502,30 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         BiFunction<? super K, Executor, CompletableFuture<V>> load,
         long deadlineNanos)
         throws InterruptedException, ExecutionException, TimeoutException {
+      return awaitEntry(cache, key, null, load, deadlineNanos);
+    }
+
+    // As above, but a miss inserts the key that storedKey returns, which equals the given key, and
+    // passes it to load.
+    static <K, V> V awaitEntry(
+        AsyncCache<K, V> cache,
+        K key,
+        @Nullable Supplier<K> storedKey,
+        BiFunction<? super K, Executor, CompletableFuture<V>> load,
+        long deadlineNanos)
+        throws InterruptedException, ExecutionException, TimeoutException {
       while (true) {
         AtomicBoolean started = new AtomicBoolean();
-        CompletableFuture<V> entry =
-            cache.get(
-                key,
-                (k, executor) -> {
-                  started.set(true);
-                  return load.apply(k, executor);
-                });
+        CompletableFuture<V> entry = storedKey == null ? null : cache.getIfPresent(key);
+        if (entry == null) {
+          entry =
+              cache.get(
+                  storedKey == null ? key : storedKey.get(),
+                  (k, executor) -> {
+                    started.set(true);
+                    return load.apply(k, executor);
+                  });
+        }
         try {
           return await(entry, deadlineNanos);
         } catch (TimeoutException e) {
@@ -1706,13 +1805,12 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           deadlineNanos);
     }
 
-    Map<String, String> hdfsConf = Collections.unmodifiableMap(new HashMap<>(conf));
-    FileSystem fs = getHdfsFileSystemWithCache(path, hdfsConf, scheme, authority, deadlineNanos);
+    FileSystem fs = getHdfsFileSystemWithCache(path, conf, scheme, authority, deadlineNanos);
     if (fs == null) {
       // The config.resources files changed after their login settings were cached.
-      sharedHdfsLoginSettingsCache.synchronous().invalidate(withoutIdentifier(hdfsConf));
-      hdfsLoginSettingsCache.synchronous().invalidate(hdfsConf);
-      fs = getHdfsFileSystemWithCache(path, hdfsConf, scheme, authority, deadlineNanos);
+      sharedHdfsLoginSettingsCache.synchronous().invalidate(ConfKey.withoutIdentifier(conf));
+      hdfsLoginSettingsCache.synchronous().invalidate(ConfKey.of(conf));
+      fs = getHdfsFileSystemWithCache(path, conf, scheme, authority, deadlineNanos);
     }
     if (fs == null) {
       throw new GravitinoRuntimeException(
@@ -1753,10 +1851,12 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           key,
           (cacheKey, executor) -> {
             fileSystemProvider(path);
+            // The creation may outlive this caller, whose configuration is not copied on a hit.
+            Map<String, String> keptConf = new HashMap<>(conf);
             // Create the file system for the user it is cached under.
             return TimedTask.start(
                 fileSystemExecutor,
-                () -> getFileSystem(path, conf, cacheKey.currentUser, expectedSettings),
+                () -> getFileSystem(path, keptConf, cacheKey.currentUser, expectedSettings),
                 deadlineNanos);
           },
           deadlineNanos);
@@ -1779,9 +1879,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             path,
             conf,
             sharedHdfsLoginSettingsCache,
-            withoutIdentifier(conf),
-            () -> {
-              HdfsLogin login = resolveHdfsLogin(conf);
+            ConfKey.withoutIdentifier(conf),
+            keptConf -> {
+              HdfsLogin login = resolveHdfsLogin(keptConf);
               if (login.expandsVariables) {
                 resolved.set(login.settings);
                 return Optional.empty();
@@ -1793,27 +1893,17 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       return shared.get();
     }
     if (resolved.get() != null) {
-      hdfsLoginSettingsCache.put(conf, CompletableFuture.completedFuture(resolved.get()));
+      hdfsLoginSettingsCache.put(
+          ConfKey.of(conf).copy(), CompletableFuture.completedFuture(resolved.get()));
       return resolved.get();
     }
     return awaitLoginSettings(
         path,
         conf,
         hdfsLoginSettingsCache,
-        conf,
-        () -> resolveHdfsLogin(conf).settings,
+        ConfKey.of(conf),
+        keptConf -> resolveHdfsLogin(keptConf).settings,
         deadlineNanos);
-  }
-
-  // Filesets that inherit all other properties have configurations that differ only in their
-  // identifiers.
-  private static Map<String, String> withoutIdentifier(Map<String, String> conf) {
-    if (!conf.containsKey(StringIdentifier.ID_KEY)) {
-      return conf;
-    }
-    Map<String, String> shared = new HashMap<>(conf);
-    shared.remove(StringIdentifier.ID_KEY);
-    return Collections.unmodifiableMap(shared);
   }
 
   // Reading the config.resources files may hang, so the login is resolved on a pool under the
@@ -1821,15 +1911,19 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   private <T> T awaitLoginSettings(
       Path path,
       Map<String, String> conf,
-      AsyncCache<Map<String, String>, T> cache,
-      Map<String, String> key,
-      Callable<T> resolve,
+      AsyncCache<ConfKey, T> cache,
+      ConfKey key,
+      Function<Map<String, String>, T> resolve,
       long deadlineNanos) {
     try {
+      // The load resolves a copy of the configuration, never the caller's map.
       return TimedTask.awaitEntry(
           cache,
           key,
-          (k, executor) -> TimedTask.start(loginSettingsExecutor, resolve, deadlineNanos),
+          key::copy,
+          (keptKey, executor) ->
+              TimedTask.start(
+                  loginSettingsExecutor, () -> resolve.apply(keptKey.conf), deadlineNanos),
           deadlineNanos);
     } catch (RejectedExecutionException e) {
       // The pool is full, or closed with the catalog.

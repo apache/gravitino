@@ -3777,6 +3777,90 @@ public class TestFilesetCatalogOperations {
   }
 
   @Test
+  @Timeout(60)
+  public void testFileSystemCacheQueuesABurstOfLoginSettingsResolutions() throws Exception {
+    Path path = new Path("hdfs://localhost:8020/cache_key");
+    CountDownLatch blocked = new CountDownLatch(1);
+    ExecutorService callers = Executors.newFixedThreadPool(120);
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER)) {
+      // As if config.resources reads were slow, holding every thread that resolves settings.
+      int threads = ops.loginSettingsExecutor.getCorePoolSize();
+      CountDownLatch started = new CountDownLatch(threads);
+      for (int i = 0; i < threads; i++) {
+        ops.loginSettingsExecutor.execute(
+            () -> {
+              started.countDown();
+              Uninterruptibles.awaitUninterruptibly(blocked);
+            });
+      }
+      try {
+        Assertions.assertTrue(started.await(10, TimeUnit.SECONDS));
+        // A resolution that its lookup gave up on leaves the queue.
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class,
+            () ->
+                ops.getFileSystemWithCache(
+                    path,
+                    withSetting(
+                        filesetConf("svc-late@A.COM", "1"),
+                        FILESYSTEM_CONNECTION_TIMEOUT_SECONDS,
+                        "1")));
+        long removed = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (!ops.loginSettingsExecutor.getQueue().isEmpty()) {
+          Assertions.assertTrue(System.nanoTime() < removed, "the resolution stayed queued");
+          Thread.sleep(10);
+        }
+
+        // A burst of cold lookups of different settings, as after a restart, waits in the queue.
+        List<Future<FileSystem>> lookups = new ArrayList<>();
+        for (int i = 0; i < 120; i++) {
+          Map<String, String> conf =
+              withSetting(
+                  filesetConf("svc-" + i + "@A.COM", "1"),
+                  FILESYSTEM_CONNECTION_TIMEOUT_SECONDS,
+                  "30");
+          lookups.add(callers.submit(() -> ops.getFileSystemWithCache(path, conf)));
+        }
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (ops.loginSettingsExecutor.getQueue().size() < 120) {
+          for (Future<FileSystem> lookup : lookups) {
+            if (lookup.isDone()) {
+              lookup.get();
+            }
+          }
+          Assertions.assertTrue(System.nanoTime() < deadline, "the lookups never queued");
+          Thread.sleep(10);
+        }
+        blocked.countDown();
+        for (Future<FileSystem> lookup : lookups) {
+          Assertions.assertNotNull(lookup.get(30, TimeUnit.SECONDS));
+        }
+      } finally {
+        blocked.countDown();
+        callers.shutdownNow();
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"svc@EXAMPLE.COM", "svc-${gravitino.identifier}@EXAMPLE.COM"})
+  public void testFileSystemCacheKeepsLoginSettingsWhenTheCallerChangesItsConfiguration(
+      String principal) throws Exception {
+    Path path = new Path("hdfs://localhost:8020/cache_key");
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER)) {
+      // Settings without variables are in the shared cache, the others in the cache by the whole
+      // configuration.
+      Map<String, String> conf = new HashMap<>(filesetConf(principal, "1"));
+      FileSystem fs = ops.getFileSystemWithCache(path, conf);
+      // A lookup does not copy the configuration on a hit, so the caches keep their own copy.
+      conf.put(HADOOP_SECURITY_PRINCIPAL, "other@EXAMPLE.COM");
+      Mockito.clearInvocations(ops);
+      Assertions.assertSame(fs, ops.getFileSystemWithCache(path, filesetConf(principal, "1")));
+      Mockito.verify(ops, never()).resolveHdfsLogin(any());
+    }
+  }
+
+  @Test
   public void testFileSystemCacheReportsPathOfUnreadableLoginSettings() throws Exception {
     File resource = new File(UNFORMALIZED_TEST_ROOT_PATH, "cache_key/malformed-site.xml");
     FileUtils.writeStringToFile(resource, "<configuration>", StandardCharsets.UTF_8);
