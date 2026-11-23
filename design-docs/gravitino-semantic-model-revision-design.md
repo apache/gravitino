@@ -90,7 +90,8 @@ effect for every consumer immediately:
 **1. Explain a number.** An agent answers a revenue question from model `orders`. The load response
 says `revision: 7`, and the agent records it with the answer. Weeks later, an analyst questions the
 number, reads revision 7 through `GET model/revisions/7`, and sees the filter that was in effect —
-as long as revision 7 is still retained (see [Retention](#retention-and-garbage-collection)).
+as long as revision 7 is still retained; each model keeps its newest 100 revisions by default (see
+[Retention](#retention-and-garbage-collection)).
 
 **2. Review history and roll back.** An author suspects a recent change broke a dashboard. They list
 the revisions of `orders`, export revisions 6 and 7 as Ossie documents, and compare them with their
@@ -260,11 +261,11 @@ for `tag_value`, an empty string means no principal.
 
 PostgreSQL uses signed types and `COMMENT ON COLUMN`; H2 uses the MySQL definitions.
 
-| `publication_status`   | Public status | Written by                            | `published_by` and `published_at`      | Retention                   |
-| ---------------------- | ------------- | ------------------------------------- | -------------------------------------- | --------------------------- |
-| `DRAFT`                | `DRAFT`       | A save under a deferred policy        | Empty and `0`                          | Normal retention count      |
-| `PUBLISHED_ON_SAVE`    | `PUBLISHED`   | A save under a publish-on-save policy | The writer and the save time           | Normal retention count      |
-| `PUBLISHED_EXPLICITLY` | `PUBLISHED`   | The publication operation             | The publisher and the publication time | Kept while the model exists |
+| `publication_status`   | Public status | Written by                            | `published_by` and `published_at`      | Retention                      |
+| ---------------------- | ------------- | ------------------------------------- | -------------------------------------- | ------------------------------ |
+| `DRAFT`                | `DRAFT`       | A save under a deferred policy        | Empty and `0`                          | Semantic Model retention count |
+| `PUBLISHED_ON_SAVE`    | `PUBLISHED`   | A save under a publish-on-save policy | The writer and the save time           | Semantic Model retention count |
+| `PUBLISHED_EXPLICITLY` | `PUBLISHED`   | The publication operation             | The publisher and the publication time | Kept while the model exists    |
 
 The two published values are separate because they need different retention: under the default
 policy every revision is published, so protecting all published revisions would disable retention.
@@ -474,20 +475,28 @@ Forward queries read snapshots; reverse indexes track revision ranges.
 
 ### Retention and garbage collection
 
-- Version retention uses the [existing cutoff][retention], computed from `current_version`. A
+- Version retention uses the [existing cutoff][retention], computed per model from
+  `current_version`, with its own count:
+  `gravitino.entity.store.semanticModel.versionRetentionCount` (default 100, 1–1000) is the number
+  of newest revisions each Semantic Model keeps, and replaces
+  `gravitino.entity.store.versionRetentionCount` (default 1, at most 10) for Semantic Models. A
   revision at or below the cutoff is soft-deleted only if `version <> active_version` and
-  `publication_status` is not `PUBLISHED_EXPLICITLY`. Under the default policy active is latest, so
-  behavior is unchanged.
+  `publication_status` is not `PUBLISHED_EXPLICITLY`.
 - Source ranges that cover no retained revision are soft-deleted in the same job, so every
   retained snapshot keeps its associations.
 - Model and parent deletion use the existing soft-delete and purge paths; all new columns live on
   existing rows.
-- A collected revision returns `404 NoSuchSemanticModelRevisionException` on explicit reads.
-  Because revisions are numbered contiguously, a missing revision at or below latest was collected,
-  and the exception message says it was removed by version retention. A draft hidden from the
-  caller gets the same message as a revision that never existed. Deployments that rely on reading
-  past revisions, as in [User Journey 1](#user-journeys), should raise
-  `gravitino.entity.store.versionRetentionCount` accordingly.
+- A collected revision returns `404 NoSuchSemanticModelRevisionException` on explicit reads. Because
+  revisions are numbered contiguously, a missing revision at or below latest was collected, and the
+  exception message says it was removed by version retention. A draft hidden from the caller gets
+  the same message as a revision that never existed. Deployments whose models are edited often, such
+  as by agents, raise the count.
+
+**Design choice.** Revision history is the point of this design, so it cannot depend on the shared
+count, whose default keeps only latest and whose cap of 10 is too small to read a revision weeks
+later. The count is server-wide rather than a model property, because properties are revision
+content: a retention change would itself be a draft, and authors could grow storage that operators
+pay for.
 
 ---
 
@@ -833,6 +842,8 @@ a test policy that returns `false` and exercises publication end to end.
       latest
 - [ ] Add source ranges, the range-based lookup, and range cleanup in GC; protect active and
       explicitly published revisions in retention
+- [ ] Add `gravitino.entity.store.semanticModel.versionRetentionCount` and use it for Semantic Model
+      version retention
 - [ ] Add `Status`, `revision()`, `publishedBy()`, `publishedAt()`, `SemanticModelRevision`, the
       catalog methods, and `NoSuchSemanticModelRevisionException` in `api`; DTOs and requests in
       `common`
@@ -862,7 +873,7 @@ a test policy that returns `false` and exercises publication end to end.
 | Rename combined with other changes                        | `400`; nothing changes.                                                                                                                                                                                                     |
 | Sources change A → B → A                                  | Ranges record A, B, and A at their revisions; lookup returns the dataset for the active revision only.                                                                                                                      |
 | Sources change A → B with r1 explicitly published         | After retention runs, r1's range for A is kept while r1 is retained; lookup still returns the dataset for the active revision only.                                                                                         |
-| More saves than the retention count                       | Older revisions are collected and return `404` on explicit reads; active (latest) survives.                                                                                                                                 |
+| More saves than the Semantic Model retention count        | Older revisions are collected and return `404` on explicit reads; active (latest) survives.                                                                                                                                 |
 | Existing read clients                                     | Load, list, and export work with their original request shapes.                                                                                                                                                             |
 
 ### Acceptance criteria: extension contract (test policy)
