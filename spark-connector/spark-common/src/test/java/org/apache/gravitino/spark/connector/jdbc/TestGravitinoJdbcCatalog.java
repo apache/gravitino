@@ -35,6 +35,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.credential.SupportsCredentials;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
@@ -159,7 +160,9 @@ public class TestGravitinoJdbcCatalog {
       IllegalStateException exception =
           Assertions.assertThrows(
               IllegalStateException.class,
-              () -> catalog.loadSparkTable(Identifier.of(new String[] {"db"}, "table")));
+              () ->
+                  catalog.loadSparkTable(
+                      Identifier.of(new String[] {"db"}, "table"), mock(Table.class)));
 
       Assertions.assertTrue(exception.getMessage().contains("Restart the Spark session"));
     }
@@ -182,7 +185,9 @@ public class TestGravitinoJdbcCatalog {
       IllegalStateException exception =
           Assertions.assertThrows(
               IllegalStateException.class,
-              () -> catalog.loadSparkTable(Identifier.of(new String[] {"db"}, "table")));
+              () ->
+                  catalog.loadSparkTable(
+                      Identifier.of(new String[] {"db"}, "table"), mock(Table.class)));
 
       Assertions.assertTrue(exception.getMessage().contains("Restart the Spark session"));
     }

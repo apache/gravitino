@@ -34,13 +34,27 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsDomainOperations;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.SupportsTableIdLookup;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.semantic.SemanticModelMetric;
 
 /** Interface defining the operations for a Relation Backend. */
 public interface RelationalBackend
-    extends Closeable, SupportsRelationOperations, SupportsDomainOperations {
+    extends Closeable, SupportsRelationOperations, SupportsDomainOperations, SupportsTableIdLookup {
+
+  /**
+   * Resolves a table ID, retaining full reads for backends without a lightweight implementation.
+   *
+   * @param identifier the full table identifier
+   * @return the active table ID
+   * @throws NoSuchEntityException if the table does not exist
+   * @throws IOException if the lookup fails
+   */
+  @Override
+  default long getTableId(NameIdentifier identifier) throws IOException {
+    return get(identifier, Entity.EntityType.TABLE).id();
+  }
 
   /**
    * Reads metric identifiers in a schema without loading complete Semantic Models.

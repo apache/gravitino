@@ -142,6 +142,33 @@ Replace database-1.***.***.rds.amazonaws.com with your actual MySQL host. \
 Change admin and admin123 to your actual MySQL username and password. \
 Ensure the target MySQL database (gravitino) exists before deployment._
 
+### Schema migration Job (MySQL / PostgreSQL)
+
+For install and upgrade, you can run entity-store schema SQL once per revision in a
+regular Kubernetes Job instead of per-pod init containers (avoids rolling-update
+races). Enable it with `schema.migrate.enabled=true`. The Job and its ConfigMap are
+created together in the same release; Gravitino Pods wait on
+`gravitino_schema_migration` before starting (so bundled databases can come up first).
+
+The migrate script records the current schema version and applies the full
+`upgrade-*-to-*-*.sql` chain from that version to the image version. For an
+existing database that has no recorded version, set `schema.baselineVersion`
+(`X.Y.Z`) to the Gravitino version that created it (or to the image version to
+only record and skip DDL). The Job validates that shape only when baseline is
+actually used; a stale value is ignored once `gravitino_schema_migration`
+already has a row. Automatic inference only treats a snapshot as current when
+`upgrade-*-to-<version>` scripts add distinguishable columns; index-only
+upgrades that share the same table set require an explicit baseline. The Job
+uses the same `nodeSelector` / `affinity` / `tolerations` as the Gravitino
+Deployment. The `entity.jdbcUser` (or in-chart DB admin) needs rights to create
+and alter entity-store tables and to read `gravitino_schema_migration`.
+
+For external MySQL or PostgreSQL, set `schema.migrate.existingSecret` to a Secret
+that holds the `entity.jdbcUser` password. Optional `schema.dbHost`, `schema.dbPort`,
+and `schema.dbName` override JDBC URL parsing. For PostgreSQL `currentSchema` and
+TLS, use `schema.currentSchema`, `schema.sslMode`, and `schema.ssl.existingSecret`
+as needed.
+
 ### Deploy Gravitino with GCS as Object Store
 
 If your catalog uses Google Cloud Storage (GCS) as the object store, you need to set the `GOOGLE_APPLICATION_CREDENTIALS` environment variable in the container and mount the service account key file.
