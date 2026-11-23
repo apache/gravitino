@@ -78,7 +78,15 @@ public class CachedEntityIdResolver implements EntityIdResolver {
    */
   private Optional<NamespacedEntityId> tryCachedEntityIds(
       NameIdentifier nameIdentifier, Entity.EntityType type) {
-    Optional<Long> cachedId = cachedEntityId(nameIdentifier, type);
+    Optional<Long> cachedId =
+        entityCache.withCacheLock(
+            EntityCacheKey.of(nameIdentifier, type),
+            () -> {
+              if (!allowCacheRead.test(nameIdentifier, type)) {
+                return Optional.empty();
+              }
+              return entityCache.getIfPresent(nameIdentifier, type).map(HasIdentifier::id);
+            });
     if (cachedId.isEmpty()) {
       return Optional.empty();
     }
@@ -90,16 +98,5 @@ public class CachedEntityIdResolver implements EntityIdResolver {
             NameIdentifierUtil.parentNameIdentifier(nameIdentifier, type),
             NameIdentifierUtil.parentEntityType(type));
     return parents.map(p -> new NamespacedEntityId(cachedId.get(), p.fullIds()));
-  }
-
-  private Optional<Long> cachedEntityId(NameIdentifier nameIdentifier, Entity.EntityType type) {
-    return entityCache.withCacheLock(
-        EntityCacheKey.of(nameIdentifier, type),
-        () -> {
-          if (!allowCacheRead.test(nameIdentifier, type)) {
-            return Optional.empty();
-          }
-          return entityCache.getIfPresent(nameIdentifier, type).map(HasIdentifier::id);
-        });
   }
 }
