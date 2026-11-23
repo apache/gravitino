@@ -65,7 +65,10 @@ public class CachedEntityIdResolver implements EntityIdResolver {
 
   @Override
   public Long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type) {
-    return cachedEntityId(nameIdentifier, type)
+    // Same all-or-nothing gate as getEntityIds: an ancestor pending/publishing blocks the leaf
+    // cache hit so the two entry points stay consistent.
+    return tryCachedEntityIds(nameIdentifier, type)
+        .map(NamespacedEntityId::entityId)
         .orElseGet(() -> underlyingResolver.getEntityId(nameIdentifier, type));
   }
 

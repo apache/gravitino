@@ -44,7 +44,6 @@ import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.BaseEntityCache;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
-import org.apache.gravitino.cache.CaffeineEntityCache;
 import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.EntityCacheKey;
@@ -87,6 +86,17 @@ public class TestRelationalEntityStore {
     FieldUtils.writeField(store, "cache", Mockito.spy(new NoOpsCache(config)), true);
   }
 
+  @SuppressWarnings("unchecked")
+  private Map<String, AtomicInteger> cacheBlocks() throws IllegalAccessException {
+    return (Map<String, AtomicInteger>) FieldUtils.readField(store, "cacheBlocks", true);
+  }
+
+  private boolean writeBlocked(NameIdentifier ident, Entity.EntityType type)
+      throws IllegalAccessException {
+    AtomicInteger count = cacheBlocks().get(RelationalEntityStore.writeBlockKey(ident, type));
+    return count != null && count.get() > 0;
+  }
+
   @Test
   void testUncachedInsertStillInvokesRelatedInvalidationAfterEpochChanges() throws Exception {
     BaseEntityCache cache = Mockito.mock(BaseEntityCache.class);
@@ -113,11 +123,7 @@ public class TestRelationalEntityStore {
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException,
           IllegalAccessException {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog");
-    EntityCacheKey key = EntityCacheKey.of(ident, Entity.EntityType.CATALOG);
     NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
-    @SuppressWarnings("unchecked")
-    Map<EntityCacheKey, AtomicInteger> pendingWrites =
-        (Map<EntityCacheKey, AtomicInteger>) FieldUtils.readField(store, "pendingWrites", true);
     AtomicBoolean invalidatedBeforeBackend = new AtomicBoolean(false);
     AtomicBoolean pendingDuringBackend = new AtomicBoolean(false);
 
@@ -128,8 +134,7 @@ public class TestRelationalEntityStore {
             invocation -> {
               Mockito.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
               invalidatedBeforeBackend.set(true);
-              AtomicInteger count = pendingWrites.get(key);
-              pendingDuringBackend.set(count != null && count.get() > 0);
+              pendingDuringBackend.set(writeBlocked(ident, Entity.EntityType.CATALOG));
               @SuppressWarnings("unchecked")
               Function<CatalogEntity, CatalogEntity> updater = invocation.getArgument(2);
               return updater.apply(updated);
@@ -141,7 +146,7 @@ public class TestRelationalEntityStore {
 
     Assertions.assertTrue(invalidatedBeforeBackend.get());
     Assertions.assertTrue(pendingDuringBackend.get());
-    Assertions.assertFalse(pendingWrites.containsKey(key));
+    Assertions.assertFalse(writeBlocked(ident, Entity.EntityType.CATALOG));
   }
 
   @Test
@@ -150,15 +155,11 @@ public class TestRelationalEntityStore {
           IllegalAccessException {
     NameIdentifier oldIdent = NameIdentifier.of("metalake", "catalog", "schema", "old");
     NameIdentifier newIdent = NameIdentifier.of("metalake", "catalog", "schema", "new");
-    EntityCacheKey newKey = EntityCacheKey.of(newIdent, Entity.EntityType.TOPIC);
     TopicEntity renamed = Mockito.mock(TopicEntity.class);
     Mockito.when(renamed.nameIdentifier()).thenReturn(newIdent);
     Mockito.when(renamed.type()).thenReturn(Entity.EntityType.TOPIC);
 
     NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
-    @SuppressWarnings("unchecked")
-    Map<EntityCacheKey, AtomicInteger> pendingWrites =
-        (Map<EntityCacheKey, AtomicInteger>) FieldUtils.readField(store, "pendingWrites", true);
     AtomicBoolean newPendingBeforeReturn = new AtomicBoolean(false);
     AtomicBoolean newInvalidatedBeforeReturn = new AtomicBoolean(false);
 
@@ -167,8 +168,7 @@ public class TestRelationalEntityStore {
               @SuppressWarnings("unchecked")
               Function<TopicEntity, TopicEntity> updater = invocation.getArgument(2);
               TopicEntity result = updater.apply(renamed);
-              AtomicInteger count = pendingWrites.get(newKey);
-              newPendingBeforeReturn.set(count != null && count.get() > 0);
+              newPendingBeforeReturn.set(writeBlocked(newIdent, Entity.EntityType.TOPIC));
               Mockito.verify(cache).invalidate(newIdent, Entity.EntityType.TOPIC);
               newInvalidatedBeforeReturn.set(true);
               return result;
@@ -181,9 +181,8 @@ public class TestRelationalEntityStore {
 
     Assertions.assertTrue(newPendingBeforeReturn.get());
     Assertions.assertTrue(newInvalidatedBeforeReturn.get());
-    Assertions.assertFalse(pendingWrites.containsKey(newKey));
-    Assertions.assertFalse(
-        pendingWrites.containsKey(EntityCacheKey.of(oldIdent, Entity.EntityType.TOPIC)));
+    Assertions.assertFalse(writeBlocked(newIdent, Entity.EntityType.TOPIC));
+    Assertions.assertFalse(writeBlocked(oldIdent, Entity.EntityType.TOPIC));
   }
 
   @Test
@@ -192,17 +191,10 @@ public class TestRelationalEntityStore {
           IllegalAccessException {
     NameIdentifier oldIdent = NameIdentifier.of("metalake", "catalog", "schema", "old");
     NameIdentifier newIdent = NameIdentifier.of("metalake", "catalog", "schema", "new");
-    EntityCacheKey newKey = EntityCacheKey.of(newIdent, Entity.EntityType.TOPIC);
     TopicEntity renamed = Mockito.mock(TopicEntity.class);
     Mockito.when(renamed.nameIdentifier()).thenReturn(newIdent);
 
     NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
-    @SuppressWarnings("unchecked")
-    Map<EntityCacheKey, AtomicInteger> pendingWrites =
-        (Map<EntityCacheKey, AtomicInteger>) FieldUtils.readField(store, "pendingWrites", true);
-    @SuppressWarnings("unchecked")
-    Map<String, AtomicInteger> pendingHierarchyPrefixes =
-        (Map<String, AtomicInteger>) FieldUtils.readField(store, "pendingHierarchyPrefixes", true);
 
     Mockito.doReturn(true).when(cache).invalidate(eq(oldIdent), eq(Entity.EntityType.TOPIC));
     Mockito.doThrow(new RuntimeException("invalidate failed"))
@@ -222,37 +214,26 @@ public class TestRelationalEntityStore {
         RuntimeException.class,
         () -> store.update(oldIdent, null, Entity.EntityType.TOPIC, entity -> renamed));
 
-    Assertions.assertFalse(pendingWrites.containsKey(newKey));
-    Assertions.assertFalse(
-        pendingWrites.containsKey(EntityCacheKey.of(oldIdent, Entity.EntityType.TOPIC)));
-    Assertions.assertTrue(pendingHierarchyPrefixes.isEmpty());
+    Assertions.assertFalse(writeBlocked(newIdent, Entity.EntityType.TOPIC));
+    Assertions.assertFalse(writeBlocked(oldIdent, Entity.EntityType.TOPIC));
+    Assertions.assertTrue(cacheBlocks().isEmpty());
   }
 
   @Test
   void testClearCacheKeepsPendingRegistrations() throws Exception {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog");
-    EntityCacheKey key = EntityCacheKey.of(ident, Entity.EntityType.CATALOG);
-    @SuppressWarnings("unchecked")
-    Map<EntityCacheKey, AtomicInteger> pendingWrites =
-        (Map<EntityCacheKey, AtomicInteger>) FieldUtils.readField(store, "pendingWrites", true);
-    @SuppressWarnings("unchecked")
-    Map<String, AtomicInteger> pendingHierarchyPrefixes =
-        (Map<String, AtomicInteger>) FieldUtils.readField(store, "pendingHierarchyPrefixes", true);
-    pendingWrites.put(key, new AtomicInteger(1));
-    for (String prefix : CaffeineEntityCache.descendantPrefixes(ident, Entity.EntityType.CATALOG)) {
-      pendingHierarchyPrefixes.put(prefix, new AtomicInteger(1));
-    }
+    org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+        store, true, "retainPendingWrite", ident, Entity.EntityType.CATALOG);
 
     store.clearCache();
 
-    Assertions.assertEquals(1, pendingWrites.get(key).get());
-    Assertions.assertFalse(pendingHierarchyPrefixes.isEmpty());
+    Assertions.assertTrue(writeBlocked(ident, Entity.EntityType.CATALOG));
+    Assertions.assertFalse(cacheBlocks().isEmpty());
   }
 
   @Test
   void testExistsAndBatchGetSkipCacheWhilePublishing() throws Exception {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "topic");
-    EntityCacheKey key = EntityCacheKey.of(ident, Entity.EntityType.TOPIC);
     TopicEntity cached = Mockito.mock(TopicEntity.class);
     Mockito.when(cached.nameIdentifier()).thenReturn(ident);
     Mockito.when(cached.type()).thenReturn(Entity.EntityType.TOPIC);
@@ -273,10 +254,10 @@ public class TestRelationalEntityStore {
     Mockito.when(backend.exists(ident, Entity.EntityType.TOPIC)).thenReturn(false);
     Mockito.when(backend.batchGet(List.of(ident), Entity.EntityType.TOPIC)).thenReturn(List.of());
 
-    @SuppressWarnings("unchecked")
-    Map<EntityCacheKey, AtomicInteger> publishingWrites =
-        (Map<EntityCacheKey, AtomicInteger>) FieldUtils.readField(store, "publishingWrites", true);
-    publishingWrites.put(key, new AtomicInteger(1));
+    cacheBlocks()
+        .put(
+            RelationalEntityStore.publishBlockKey(ident, Entity.EntityType.TOPIC),
+            new AtomicInteger(1));
 
     Assertions.assertFalse(store.exists(ident, Entity.EntityType.TOPIC));
     Assertions.assertTrue(
@@ -287,7 +268,8 @@ public class TestRelationalEntityStore {
 
   @Test
   void testCachedEntityIdResolverSkipsCacheWhenGateDisallows() {
-    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "topic");
+    // Root entity: no parent chain, so the gate alone decides cache vs underlying.
+    NameIdentifier ident = NameIdentifier.of("metalake");
     TopicEntity cachedEntity = Mockito.mock(TopicEntity.class);
     Mockito.when(cachedEntity.id()).thenReturn(1L);
     EntityCache cache = Mockito.mock(EntityCache.class);
@@ -299,22 +281,22 @@ public class TestRelationalEntityStore {
               EntityCache.ThrowingSupplier<?, Exception> action = invocation.getArgument(1);
               return action.get();
             });
-    Mockito.when(cache.getIfPresent(ident, Entity.EntityType.TOPIC))
+    Mockito.when(cache.getIfPresent(ident, Entity.EntityType.METALAKE))
         .thenReturn(Optional.of(cachedEntity));
     EntityIdResolver underlying = Mockito.mock(EntityIdResolver.class);
-    Mockito.when(underlying.getEntityId(ident, Entity.EntityType.TOPIC)).thenReturn(99L);
+    Mockito.when(underlying.getEntityId(ident, Entity.EntityType.METALAKE)).thenReturn(99L);
 
     AtomicBoolean allowCache = new AtomicBoolean(false);
     EntityIdResolver resolver =
         new CachedEntityIdResolver(cache, underlying, (id, type) -> allowCache.get());
 
-    Assertions.assertEquals(99L, resolver.getEntityId(ident, Entity.EntityType.TOPIC));
-    Mockito.verify(underlying).getEntityId(ident, Entity.EntityType.TOPIC);
-    Mockito.verify(cache, Mockito.never()).getIfPresent(ident, Entity.EntityType.TOPIC);
+    Assertions.assertEquals(99L, resolver.getEntityId(ident, Entity.EntityType.METALAKE));
+    Mockito.verify(underlying).getEntityId(ident, Entity.EntityType.METALAKE);
+    Mockito.verify(cache, Mockito.never()).getIfPresent(ident, Entity.EntityType.METALAKE);
 
     allowCache.set(true);
-    Assertions.assertEquals(1L, resolver.getEntityId(ident, Entity.EntityType.TOPIC));
-    Mockito.verify(cache).getIfPresent(ident, Entity.EntityType.TOPIC);
+    Assertions.assertEquals(1L, resolver.getEntityId(ident, Entity.EntityType.METALAKE));
+    Mockito.verify(cache).getIfPresent(ident, Entity.EntityType.METALAKE);
   }
 
   @Test
@@ -338,31 +320,24 @@ public class TestRelationalEntityStore {
     EntityIdResolver underlying = Mockito.mock(EntityIdResolver.class);
     NamespacedEntityId fromDb = new NamespacedEntityId(99L, 10L, 20L, 30L);
     Mockito.when(underlying.getEntityIds(topic, Entity.EntityType.TOPIC)).thenReturn(fromDb);
+    Mockito.when(underlying.getEntityId(topic, Entity.EntityType.TOPIC)).thenReturn(99L);
 
     EntityIdResolver resolver = new CachedEntityIdResolver(cache, underlying);
 
     Assertions.assertSame(fromDb, resolver.getEntityIds(topic, Entity.EntityType.TOPIC));
     Mockito.verify(underlying).getEntityIds(topic, Entity.EntityType.TOPIC);
+    Assertions.assertEquals(99L, resolver.getEntityId(topic, Entity.EntityType.TOPIC));
+    Mockito.verify(underlying).getEntityId(topic, Entity.EntityType.TOPIC);
   }
 
   @Test
   void testEndPendingWriteInvalidatesBeforeReleasingPrefixes() throws Exception {
     NameIdentifier schema = NameIdentifier.of("metalake", "catalog", "schema");
     NameIdentifier table = NameIdentifier.of("metalake", "catalog", "schema", "table");
-    EntityCacheKey schemaKey = EntityCacheKey.of(schema, Entity.EntityType.SCHEMA);
     NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
-    @SuppressWarnings("unchecked")
-    Map<EntityCacheKey, AtomicInteger> pendingWrites =
-        (Map<EntityCacheKey, AtomicInteger>) FieldUtils.readField(store, "pendingWrites", true);
-    @SuppressWarnings("unchecked")
-    Map<String, AtomicInteger> pendingHierarchyPrefixes =
-        (Map<String, AtomicInteger>) FieldUtils.readField(store, "pendingHierarchyPrefixes", true);
     AtomicLong epoch = (AtomicLong) FieldUtils.readField(store, "cacheInvalidationEpoch", true);
-
-    pendingWrites.put(schemaKey, new AtomicInteger(1));
-    for (String prefix : CaffeineEntityCache.descendantPrefixes(schema, Entity.EntityType.SCHEMA)) {
-      pendingHierarchyPrefixes.put(prefix, new AtomicInteger(1));
-    }
+    org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+        store, true, "retainPendingWrite", schema, Entity.EntityType.SCHEMA);
     long epochBefore = epoch.get();
     Assertions.assertTrue(
         (boolean)
@@ -373,7 +348,9 @@ public class TestRelationalEntityStore {
     Mockito.doAnswer(
             invocation -> {
               pendingDuringInvalidate.set(
-                  pendingWrites.containsKey(schemaKey) && !pendingHierarchyPrefixes.isEmpty());
+                  (boolean)
+                      org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+                          store, true, "isPendingWrite", table, Entity.EntityType.TABLE));
               return false;
             })
         .when(cache)
@@ -384,8 +361,7 @@ public class TestRelationalEntityStore {
 
     Assertions.assertTrue(pendingDuringInvalidate.get());
     Assertions.assertTrue(epoch.get() > epochBefore);
-    Assertions.assertFalse(pendingWrites.containsKey(schemaKey));
-    Assertions.assertTrue(pendingHierarchyPrefixes.isEmpty());
+    Assertions.assertTrue(cacheBlocks().isEmpty());
     Assertions.assertFalse(
         (boolean)
             org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
@@ -393,19 +369,43 @@ public class TestRelationalEntityStore {
   }
 
   @Test
+  void testEndPendingWriteClearsCacheWhenInvalidateFails() throws Exception {
+    NameIdentifier schema = NameIdentifier.of("metalake", "catalog", "schema");
+    NameIdentifier table = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+        store, true, "retainPendingWrite", schema, Entity.EntityType.SCHEMA);
+    Mockito.doThrow(new IllegalStateException("interrupted invalidate"))
+        .when(cache)
+        .invalidate(schema, Entity.EntityType.SCHEMA);
+
+    Exception thrown =
+        Assertions.assertThrows(
+            Exception.class,
+            () ->
+                org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+                    store, true, "endPendingWrite", schema, Entity.EntityType.SCHEMA));
+    Assertions.assertInstanceOf(IllegalStateException.class, thrown.getCause());
+
+    Mockito.verify(cache).clear();
+    Assertions.assertTrue(cacheBlocks().isEmpty());
+    Assertions.assertFalse(
+        (boolean)
+            org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+                store, true, "isCacheObservationBlocked", table, Entity.EntityType.TABLE));
+  }
+
+  @Test
   void testGetDoesNotPublishWhileWritePending() throws Exception {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "topic");
-    EntityCacheKey key = EntityCacheKey.of(ident, Entity.EntityType.TOPIC);
     TopicEntity entity = Mockito.mock(TopicEntity.class);
     Mockito.when(entity.nameIdentifier()).thenReturn(ident);
     Mockito.when(entity.type()).thenReturn(Entity.EntityType.TOPIC);
     Mockito.when(backend.get(ident, Entity.EntityType.TOPIC)).thenReturn(entity);
 
     NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
-    @SuppressWarnings("unchecked")
-    Map<EntityCacheKey, AtomicInteger> pendingWrites =
-        (Map<EntityCacheKey, AtomicInteger>) FieldUtils.readField(store, "pendingWrites", true);
-    pendingWrites.put(key, new AtomicInteger(1));
+    org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+        store, true, "retainPendingWrite", ident, Entity.EntityType.TOPIC);
 
     Assertions.assertSame(entity, store.get(ident, Entity.EntityType.TOPIC, TopicEntity.class));
     Mockito.verify(cache, Mockito.never()).put(entity);
@@ -421,13 +421,8 @@ public class TestRelationalEntityStore {
     Mockito.when(backend.get(topic, Entity.EntityType.TOPIC)).thenReturn(entity);
 
     NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
-    @SuppressWarnings("unchecked")
-    Map<String, AtomicInteger> pendingHierarchyPrefixes =
-        (Map<String, AtomicInteger>) FieldUtils.readField(store, "pendingHierarchyPrefixes", true);
-    for (String prefix :
-        CaffeineEntityCache.descendantPrefixes(catalog, Entity.EntityType.CATALOG)) {
-      pendingHierarchyPrefixes.put(prefix, new AtomicInteger(1));
-    }
+    org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+        store, true, "retainPendingWrite", catalog, Entity.EntityType.CATALOG);
 
     Assertions.assertSame(entity, store.get(topic, Entity.EntityType.TOPIC, TopicEntity.class));
     Mockito.verify(cache, Mockito.never()).put(entity);
@@ -437,14 +432,10 @@ public class TestRelationalEntityStore {
   void testOverwriteDropsCacheBeforeBackendInsert()
       throws IOException, EntityAlreadyExistsException, IllegalAccessException {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "topic");
-    EntityCacheKey key = EntityCacheKey.of(ident, Entity.EntityType.TOPIC);
     TopicEntity topic = Mockito.mock(TopicEntity.class);
     Mockito.when(topic.nameIdentifier()).thenReturn(ident);
     Mockito.when(topic.type()).thenReturn(Entity.EntityType.TOPIC);
     NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
-    @SuppressWarnings("unchecked")
-    Map<EntityCacheKey, AtomicInteger> pendingWrites =
-        (Map<EntityCacheKey, AtomicInteger>) FieldUtils.readField(store, "pendingWrites", true);
     AtomicBoolean invalidatedBeforeBackend = new AtomicBoolean(false);
     AtomicBoolean pendingDuringBackend = new AtomicBoolean(false);
 
@@ -452,8 +443,7 @@ public class TestRelationalEntityStore {
             invocation -> {
               Mockito.verify(cache).invalidate(ident, Entity.EntityType.TOPIC);
               invalidatedBeforeBackend.set(true);
-              AtomicInteger count = pendingWrites.get(key);
-              pendingDuringBackend.set(count != null && count.get() > 0);
+              pendingDuringBackend.set(writeBlocked(ident, Entity.EntityType.TOPIC));
               return null;
             })
         .when(backend)
@@ -463,7 +453,7 @@ public class TestRelationalEntityStore {
 
     Assertions.assertTrue(invalidatedBeforeBackend.get());
     Assertions.assertTrue(pendingDuringBackend.get());
-    Assertions.assertFalse(pendingWrites.containsKey(key));
+    Assertions.assertFalse(writeBlocked(ident, Entity.EntityType.TOPIC));
     Mockito.verify(cache, Mockito.never()).put(topic);
   }
 
@@ -471,14 +461,10 @@ public class TestRelationalEntityStore {
   void testNonOverwritePutDropsStaleCacheBeforeInsertAndPublishesAfter()
       throws IOException, EntityAlreadyExistsException, IllegalAccessException {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "topic");
-    EntityCacheKey key = EntityCacheKey.of(ident, Entity.EntityType.TOPIC);
     TopicEntity created = Mockito.mock(TopicEntity.class);
     Mockito.when(created.nameIdentifier()).thenReturn(ident);
     Mockito.when(created.type()).thenReturn(Entity.EntityType.TOPIC);
     NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
-    @SuppressWarnings("unchecked")
-    Map<EntityCacheKey, AtomicInteger> pendingWrites =
-        (Map<EntityCacheKey, AtomicInteger>) FieldUtils.readField(store, "pendingWrites", true);
     AtomicBoolean invalidatedBeforeBackend = new AtomicBoolean(false);
     AtomicBoolean pendingDuringBackend = new AtomicBoolean(false);
 
@@ -486,8 +472,7 @@ public class TestRelationalEntityStore {
             invocation -> {
               Mockito.verify(cache).invalidate(ident, Entity.EntityType.TOPIC);
               invalidatedBeforeBackend.set(true);
-              AtomicInteger count = pendingWrites.get(key);
-              pendingDuringBackend.set(count != null && count.get() > 0);
+              pendingDuringBackend.set(writeBlocked(ident, Entity.EntityType.TOPIC));
               return null;
             })
         .when(backend)
@@ -497,7 +482,7 @@ public class TestRelationalEntityStore {
 
     Assertions.assertTrue(invalidatedBeforeBackend.get());
     Assertions.assertTrue(pendingDuringBackend.get());
-    Assertions.assertFalse(pendingWrites.containsKey(key));
+    Assertions.assertFalse(writeBlocked(ident, Entity.EntityType.TOPIC));
     Mockito.verify(cache).put(created);
   }
 
@@ -506,13 +491,8 @@ public class TestRelationalEntityStore {
     NameIdentifier catalog = NameIdentifier.of("metalake", "catalog");
     NameIdentifier table = NameIdentifier.of("metalake", "catalog", "schema", "table");
     NameIdentifier other = NameIdentifier.of("metalake", "other", "schema", "table");
-    @SuppressWarnings("unchecked")
-    Map<String, AtomicInteger> pendingHierarchyPrefixes =
-        (Map<String, AtomicInteger>) FieldUtils.readField(store, "pendingHierarchyPrefixes", true);
-    for (String prefix :
-        CaffeineEntityCache.descendantPrefixes(catalog, Entity.EntityType.CATALOG)) {
-      pendingHierarchyPrefixes.put(prefix, new AtomicInteger(1));
-    }
+    org.apache.commons.lang3.reflect.MethodUtils.invokeMethod(
+        store, true, "retainPendingWrite", catalog, Entity.EntityType.CATALOG);
 
     Assertions.assertTrue(
         (boolean)
@@ -528,11 +508,7 @@ public class TestRelationalEntityStore {
   void testDeleteDropsCacheBeforeBackendDelete()
       throws IOException, NoSuchEntityException, IllegalAccessException {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog");
-    EntityCacheKey key = EntityCacheKey.of(ident, Entity.EntityType.CATALOG);
     NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
-    @SuppressWarnings("unchecked")
-    Map<EntityCacheKey, AtomicInteger> pendingWrites =
-        (Map<EntityCacheKey, AtomicInteger>) FieldUtils.readField(store, "pendingWrites", true);
     AtomicBoolean invalidatedBeforeBackend = new AtomicBoolean(false);
     AtomicBoolean pendingDuringBackend = new AtomicBoolean(false);
 
@@ -540,8 +516,7 @@ public class TestRelationalEntityStore {
             invocation -> {
               Mockito.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
               invalidatedBeforeBackend.set(true);
-              AtomicInteger count = pendingWrites.get(key);
-              pendingDuringBackend.set(count != null && count.get() > 0);
+              pendingDuringBackend.set(writeBlocked(ident, Entity.EntityType.CATALOG));
               return true;
             })
         .when(backend)
@@ -551,7 +526,7 @@ public class TestRelationalEntityStore {
 
     Assertions.assertTrue(invalidatedBeforeBackend.get());
     Assertions.assertTrue(pendingDuringBackend.get());
-    Assertions.assertFalse(pendingWrites.containsKey(key));
+    Assertions.assertFalse(writeBlocked(ident, Entity.EntityType.CATALOG));
   }
 
   @Test
