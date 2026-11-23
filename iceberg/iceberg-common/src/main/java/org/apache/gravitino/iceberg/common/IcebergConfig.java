@@ -484,12 +484,22 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   public static final ConfigEntry<String> ICEBERG_IDEMPOTENCY_STORE_TYPE =
       new ConfigBuilder(IcebergConstants.ICEBERG_IDEMPOTENCY_STORE_TYPE)
           .doc(
-              "The store holding Iceberg idempotency records, either the `in-memory` short name or "
+              "The store holding Iceberg idempotency records, the `in-memory` or `jdbc` short name, or "
                   + "the fully-qualified class name of an `IdempotencyStore` implementation")
           .version(ConfigConstants.VERSION_2_0_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .createWithDefault("in-memory");
+
+  /** Interval between bounded cleanup passes in the JDBC idempotency store. */
+  public static final ConfigEntry<String> ICEBERG_IDEMPOTENCY_CLEANUP_INTERVAL =
+      new ConfigBuilder(IcebergConstants.ICEBERG_IDEMPOTENCY_CLEANUP_INTERVAL)
+          .doc("Interval between JDBC idempotency cleanup passes, as a positive ISO-8601 duration")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .checkValue(
+              IcebergConfig::isPositiveDuration, "The value must be a positive ISO-8601 duration")
+          .createWithDefault("PT5M");
 
   /** Capacity of the in-memory idempotency store. */
   public static final ConfigEntry<Integer> ICEBERG_IDEMPOTENCY_MAX_ENTRIES =

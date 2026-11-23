@@ -29,6 +29,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -39,6 +40,8 @@ import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.TreeLock;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.secret.SecretManager;
@@ -99,18 +102,33 @@ class TestTableExistence {
   }
 
   @Test
+  void testUnsupportedCatalogLoadReturnsNotFound() {
+    when(catalog.ops()).thenReturn(mock(CatalogOperations.class));
+    Assertions.assertThrows(NoSuchTableException.class, () -> dispatcher.loadTable(IDENT));
+  }
+
+  @Test
   void testSupportedCatalogStillLoadsAndImportsTables() {
     when(catalog.ops()).thenReturn(mock(TableCatalogOperations.class));
-    doReturn(mock(Table.class)).when(dispatcher).loadTable(IDENT);
-    Assertions.assertTrue(dispatcher.tableExists(IDENT));
-    verify(dispatcher).loadTable(IDENT);
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    LockManager lockManager = mock(LockManager.class);
+    when(env.lockManager()).thenReturn(lockManager);
+    when(lockManager.createTreeLock(IDENT)).thenReturn(mock(TreeLock.class));
+    try (MockedStatic<GravitinoEnv> mocked = mockStatic(GravitinoEnv.class)) {
+      mocked.when(GravitinoEnv::getInstance).thenReturn(env);
+      doReturn(mock(Table.class)).when(dispatcher).loadTable(IDENT);
+      Assertions.assertTrue(dispatcher.tableExists(IDENT));
+      verify(dispatcher).loadTable(IDENT);
 
-    doThrow(new NoSuchTableException("missing")).when(dispatcher).loadTable(IDENT);
-    Assertions.assertFalse(dispatcher.tableExists(IDENT));
+      doThrow(new NoSuchTableException("missing")).when(dispatcher).loadTable(IDENT);
+      Assertions.assertFalse(dispatcher.tableExists(IDENT));
 
-    doThrow(new UnsupportedOperationException("backend failure")).when(dispatcher).loadTable(IDENT);
-    Assertions.assertThrows(
-        UnsupportedOperationException.class, () -> dispatcher.tableExists(IDENT));
+      doThrow(new UnsupportedOperationException("backend failure"))
+          .when(dispatcher)
+          .loadTable(IDENT);
+      Assertions.assertThrows(
+          UnsupportedOperationException.class, () -> dispatcher.tableExists(IDENT));
+    }
   }
 
   @Test
@@ -131,7 +149,26 @@ class TestTableExistence {
             () -> MetadataObjectUtil.checkMetadataObject("ml", object));
       }
     }
-    verify(dispatcher, never()).loadTable(any());
+    verify(dispatcher).loadTable(IDENT);
+  }
+
+  @Test
+  void testNormalizedColumnBatchesForUnsupportedCatalogReturnNotFound() {
+    when(catalog.ops()).thenReturn(mock(CatalogOperations.class));
+    TableNormalizeDispatcher normalized = new TableNormalizeDispatcher(dispatcher, manager);
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    when(env.internalTableDispatcher()).thenReturn(normalized);
+    MetadataObject table = MetadataObjects.parse("cat.s.t", MetadataObject.Type.TABLE);
+    MetadataObject column = MetadataObjects.parse("cat.s.t.c", MetadataObject.Type.COLUMN);
+    try (MockedStatic<GravitinoEnv> mocked = mockStatic(GravitinoEnv.class)) {
+      mocked.when(GravitinoEnv::getInstance).thenReturn(env);
+      for (List<MetadataObject> objects :
+          List.of(List.of(column), List.of(table, column), List.of(column, table))) {
+        Assertions.assertThrows(
+            NoSuchMetadataObjectException.class,
+            () -> MetadataObjectUtil.checkMetadataObjects("ml", objects));
+      }
+    }
   }
 
   private interface TableCatalogOperations extends CatalogOperations, TableCatalog {}
