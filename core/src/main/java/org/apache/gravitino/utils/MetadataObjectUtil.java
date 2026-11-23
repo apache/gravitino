@@ -44,6 +44,8 @@ import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 
 public class MetadataObjectUtil {
@@ -278,7 +280,13 @@ public class MetadataObjectUtil {
       case COLUMN:
         NameIdentifierUtil.checkColumn(identifier);
         NameIdentifier tableIdent = NameIdentifier.of(identifier.namespace().levels());
-        check(env.internalTableDispatcher().tableExists(tableIdent), exceptionToThrowSupplier);
+        try {
+          // Column IDs must reflect source schema changes even when the table identity is
+          // unchanged.
+          env.internalTableDispatcher().loadTable(tableIdent);
+        } catch (NoSuchTableException | NoSuchSchemaException e) {
+          throw exceptionToThrowSupplier.get();
+        }
         break;
 
       case TOPIC:
@@ -370,7 +378,7 @@ public class MetadataObjectUtil {
   }
 
   /**
-   * Checks metadata objects, checking each distinct table only once for tables and their columns.
+   * Checks metadata objects, probing each table and refreshing its columns at most once per call.
    *
    * <p>Every object's identifier is validated. Successful table checks are shared only within this
    * call. Like {@link #checkMetadataObject(String, MetadataObject)}, this must be called outside
@@ -382,6 +390,7 @@ public class MetadataObjectUtil {
    */
   public static void checkMetadataObjects(String metalake, List<MetadataObject> objects) {
     Set<NameIdentifier> checkedTables = new HashSet<>();
+    Set<NameIdentifier> refreshedTables = new HashSet<>();
     for (MetadataObject object : objects) {
       Preconditions.checkArgument(object != null, "metadataObject cannot be null");
       if (object.type() != MetadataObject.Type.TABLE
@@ -399,7 +408,12 @@ public class MetadataObjectUtil {
         NameIdentifierUtil.checkTable(identifier);
         tableIdentifier = identifier;
       }
-      if (checkedTables.add(tableIdentifier)) {
+      if (object.type() == MetadataObject.Type.COLUMN) {
+        if (refreshedTables.add(tableIdentifier)) {
+          checkMetadataObject(metalake, object);
+          checkedTables.add(tableIdentifier);
+        }
+      } else if (checkedTables.add(tableIdentifier)) {
         checkMetadataObject(metalake, object);
       }
     }

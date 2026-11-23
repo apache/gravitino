@@ -71,6 +71,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.SupportsTableIdentifier;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
@@ -145,12 +146,21 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public boolean tableExists(NameIdentifier ident) {
-    boolean supportsTables =
-        doWithCatalog(
-            getCatalogIdentifier(ident),
-            wrapper -> wrapper.doWithCatalog(catalog -> catalog.ops() instanceof TableCatalog),
-            RuntimeException.class);
-    return supportsTables && TableDispatcher.super.tableExists(ident);
+    if (!supportsTables(ident)) {
+      return false;
+    }
+    try {
+      Boolean exists =
+          TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> probeImportedTable(ident));
+      if (exists != null) {
+        return exists;
+      }
+    } catch (NoSuchTableException | NoSuchSchemaException e) {
+      return false;
+    }
+    // Cold tables, changed identifiers, managed catalogs and connectors without the optional
+    // probe retain the load/import path, including its identity conflict checks.
+    return TableDispatcher.super.tableExists(ident);
   }
 
   /**
@@ -183,6 +193,9 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
+    if (!supportsTables(ident)) {
+      throw new NoSuchTableException("Catalog for table %s does not support tables", ident);
+    }
     return loadAndImportTable(ident, AuditInfo.EMPTY);
   }
 
@@ -540,6 +553,13 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         });
   }
 
+  private boolean supportsTables(NameIdentifier ident) {
+    return doWithCatalog(
+        getCatalogIdentifier(ident),
+        wrapper -> wrapper.doWithCatalog(catalog -> catalog.ops() instanceof TableCatalog),
+        RuntimeException.class);
+  }
+
   private Namespace getNewNamespace(NameIdentifier tableIdent, TableChange... changes) {
     String schemaName = tableIdent.namespace().level(2);
     return Arrays.stream(changes)
@@ -567,6 +587,43 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       throw new GravitinoRuntimeException(
           e, "Failed to read the stored registration for table %s before renaming it", ident);
     }
+  }
+
+  @Nullable
+  private Boolean probeImportedTable(NameIdentifier ident) {
+    return doWithCatalog(
+        getCatalogIdentifier(ident),
+        catalog -> {
+          if (isManagedEntity(catalog, Capability.Scope.TABLE)) {
+            return null;
+          }
+          return catalog.doWithTableOps(
+              ops -> {
+                if (!(ops instanceof SupportsTableIdentifier)) {
+                  return null;
+                }
+                TableEntity stored = getEntity(ident, TABLE, TableEntity.class);
+                if (stored == null) {
+                  return null;
+                }
+                String sourceId = ((SupportsTableIdentifier) ops).loadTableIdentifier(ident);
+                if (sourceId == null) {
+                  // Sources without a persistent identifier use the same name-based identity as
+                  // loadTable.
+                  return true;
+                }
+                try {
+                  return StringIdentifier.fromString(sourceId).id() == stored.id()
+                      ? Boolean.TRUE
+                      : null;
+                } catch (IllegalArgumentException e) {
+                  // Let the ordinary load path handle malformed source identifiers consistently.
+                  return null;
+                }
+              });
+        },
+        NoSuchTableException.class,
+        NoSuchSchemaException.class);
   }
 
   private Table loadAndImportTable(NameIdentifier ident, AuditInfo importAudit)
