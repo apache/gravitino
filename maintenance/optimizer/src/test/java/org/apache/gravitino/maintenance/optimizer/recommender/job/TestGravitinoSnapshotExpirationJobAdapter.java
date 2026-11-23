@@ -18,15 +18,13 @@
  */
 package org.apache.gravitino.maintenance.optimizer.recommender.job;
 
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyHandler.DataRequirement;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyHandlerContext;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.snapshot.SnapshotExpirationJobContext;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.snapshot.SnapshotExpirationStrategyHandler;
 import org.apache.gravitino.maintenance.optimizer.recommender.strategy.GravitinoStrategy;
@@ -42,10 +40,8 @@ import org.mockito.Mockito;
 
 class TestGravitinoSnapshotExpirationJobAdapter {
   private static final String TEMPLATE = IcebergSnapshotExpirationContent.JOB_TEMPLATE_NAME_VALUE;
-  private static final Clock CLOCK =
-      Clock.fixed(Instant.parse("2026-09-27T12:30:00Z"), ZoneOffset.UTC);
   private final GravitinoSnapshotExpirationJobAdapter adapter =
-      new GravitinoSnapshotExpirationJobAdapter(CLOCK);
+      new GravitinoSnapshotExpirationJobAdapter();
 
   @Test
   void policyToSubmissionWorksWithoutPartitionStatistics() {
@@ -76,7 +72,9 @@ class TestGravitinoSnapshotExpirationJobAdapter {
           new OptimizerConfig(
               Map.of(
                   OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX + "catalog_name", "spark_catalog"));
-      Map<String, String> job = GravitinoJobSubmitter.buildJobConfig(config, context, adapter);
+      Map<String, String> job =
+          GravitinoJobSubmitter.buildJobConfig(
+              config, context, adapter, IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
       Assertions.assertEquals("spark_catalog", job.get("catalog_name"));
       Assertions.assertEquals("db.table", job.get("table_identifier"));
       // olderThanDays=5 matches Iceberg default → omit so table properties can apply
@@ -88,40 +86,33 @@ class TestGravitinoSnapshotExpirationJobAdapter {
 
   @Test
   void defaultsFillOptionalPlaceholders() {
-    Map<String, String> job = adapter.jobConfig(context(Map.of()));
+    Map<String, String> job = jobConf(context(Map.of()));
     Assertions.assertEquals("", job.get("older_than"));
     Assertions.assertEquals("", job.get("retain_last"));
     Assertions.assertEquals("false", job.get("stream_results"));
-    Assertions.assertEquals(
-        "2026-09-26 12:30:00Z",
-        adapter.jobConfig(context(Map.of("olderThanDays", "1"))).get("older_than"));
+    Assertions.assertEquals("1", jobConf(context(Map.of("olderThanDays", "1"))).get("older_than"));
   }
 
   @Test
   void rejectsUnsafeOptionsBeforeSubmission() {
     for (String days : new String[] {"0", "-1", "no", "9223372036854775807"}) {
       Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () -> adapter.jobConfig(context(Map.of("olderThanDays", days))));
+          IllegalArgumentException.class, () -> jobConf(context(Map.of("olderThanDays", days))));
     }
     for (String retain : new String[] {"0", "-1", "no"}) {
       Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () -> adapter.jobConfig(context(Map.of("retainLast", retain))));
+          IllegalArgumentException.class, () -> jobConf(context(Map.of("retainLast", retain))));
     }
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> adapter.jobConfig(context(Map.of("streamResults", "yes"))));
+        IllegalArgumentException.class, () -> jobConf(context(Map.of("streamResults", "yes"))));
   }
 
   @Test
-  void validatesRetentionRangeAndReportsTimestampErrors() {
+  void validatesRetentionRange() {
     long maximum = IcebergSnapshotExpirationContent.MAX_OLDER_THAN_DAYS;
     Assertions.assertEquals(
-        "1926-10-22 12:30:00Z",
-        adapter
-            .jobConfig(context(Map.of("olderThanDays", String.valueOf(maximum))))
-            .get("older_than"));
+        Long.toString(maximum),
+        jobConf(context(Map.of("olderThanDays", String.valueOf(maximum)))).get("older_than"));
     for (String days :
         new String[] {
           "0", "-1", "no", String.valueOf(maximum + 1), String.valueOf(Long.MAX_VALUE)
@@ -129,17 +120,13 @@ class TestGravitinoSnapshotExpirationJobAdapter {
       IllegalArgumentException error =
           Assertions.assertThrows(
               IllegalArgumentException.class,
-              () -> adapter.jobConfig(context(Map.of("olderThanDays", days))));
+              () -> jobConf(context(Map.of("olderThanDays", days))));
       Assertions.assertTrue(error.getMessage().contains("olderThanDays"));
     }
-    GravitinoSnapshotExpirationJobAdapter ancient =
-        new GravitinoSnapshotExpirationJobAdapter(Clock.fixed(Instant.MIN, ZoneOffset.UTC));
-    IllegalArgumentException error =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> ancient.jobConfig(context(Map.of("olderThanDays", "2"))));
-    Assertions.assertTrue(error.getMessage().contains("olderThanDays"));
-    Assertions.assertNotNull(error.getCause());
+  }
+
+  private Map<String, String> jobConf(SnapshotExpirationJobContext ctx) {
+    return adapter.jobConfig(ctx, IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
   }
 
   private SnapshotExpirationJobContext context(Map<String, String> options) {

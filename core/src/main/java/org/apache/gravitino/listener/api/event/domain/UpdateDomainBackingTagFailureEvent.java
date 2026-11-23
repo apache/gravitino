@@ -21,13 +21,12 @@ package org.apache.gravitino.listener.api.event.domain;
 import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.event.OperationType;
-import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** The failure event for UpdateDomainBackingTag. */
 @DeveloperApi
 public final class UpdateDomainBackingTagFailureEvent extends DomainFailureEvent {
-  private final @Nullable TagValue backingTag;
+  private final @Nullable String backingTag;
 
   /**
    * Creates the event.
@@ -35,23 +34,19 @@ public final class UpdateDomainBackingTagFailureEvent extends DomainFailureEvent
    * @param user The initiating user.
    * @param metalake The metalake name.
    * @param name The domain name addressed by the operation.
-   * @param backingTag The requested backing tag, or null to remove it.
+   * @param backingTag The name of the requested backing tag, or null to remove it.
    * @param exception The operation failure.
    */
   public UpdateDomainBackingTagFailureEvent(
-      String user,
-      String metalake,
-      String name,
-      @Nullable TagValue backingTag,
-      Exception exception) {
+      String user, String metalake, String name, @Nullable String backingTag, Exception exception) {
     super(user, NameIdentifierUtil.ofDomain(metalake, name), exception);
     this.backingTag = backingTag;
   }
 
   /**
-   * @return The requested backing tag, or null to remove it.
+   * @return The name of the requested backing tag, or null to remove it.
    */
-  public @Nullable TagValue backingTag() {
+  public @Nullable String backingTag() {
     return backingTag;
   }
 

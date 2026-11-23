@@ -233,6 +233,7 @@
    Jackson JAXRS Base
    Jackson JAXRS JSON Provider
    Jackson Module JAXB Annotations
+   JSpecify
    LanceDB Lance Namespace Core
    LanceDB Lance Namespace Apache Client
    Apache Arrow Vector

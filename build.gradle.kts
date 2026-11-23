@@ -27,21 +27,27 @@ import com.github.jk1.license.filter.LicenseBundleNormalizer
 import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
+import groovy.json.JsonSlurper
 import net.ltgt.gradle.errorprone.errorprone
 import org.apache.tools.zip.ZipEntry
 import org.apache.tools.zip.ZipOutputStream
 import org.gradle.api.attributes.java.TargetJvmVersion
+import org.gradle.api.publish.maven.tasks.GenerateMavenPom
+import org.gradle.api.publish.tasks.GenerateModuleMetadata
 import org.gradle.api.services.BuildService
 import org.gradle.api.services.BuildServiceParameters
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.internal.os.OperatingSystem
 import org.gradle.kotlin.dsl.support.serviceOf
+import org.w3c.dom.Element
+import org.w3c.dom.Node
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.util.Locale
 import java.util.Properties
 import java.util.zip.ZipFile
+import javax.xml.parsers.DocumentBuilderFactory
 
 Locale.setDefault(Locale.US)
 
@@ -678,6 +684,7 @@ fun excludePackagesForSparkConnector(project: Project) {
 
 val commonsBeanutilsVersion: String = libs.versions.commons.beanutils.get()
 val httpcore5Version: String = libs.versions.httpcore5.get()
+val jsr305Dependency = libs.jsr305
 
 subprojects {
   // Gravitino Python client project didn't need to apply the java plugin
@@ -741,6 +748,12 @@ subprojects {
     mavenLocal()
   }
 
+  // Guava no longer brings jsr305 transitively since 33.5.0, but the sources use
+  // javax.annotation.Nullable and friends. Keep them on the compile classpath only.
+  dependencies {
+    compileOnly(jsr305Dependency)
+    testCompileOnly(jsr305Dependency)
+  }
   val jdk8CompatibleProjectPathPrefixes = setOf(
     ":api",
     ":common",
@@ -761,7 +774,9 @@ subprojects {
   // though the rest of :spark-connector (3.x) stays on Java 8.
   val jdk17OnlyProjectPaths = setOf(
     ":spark-connector:spark-4.0",
-    ":spark-connector:spark-runtime-4.0"
+    ":spark-connector:spark-runtime-4.0",
+    ":spark-connector:spark-4.1",
+    ":spark-connector:spark-runtime-4.1"
   )
 
   fun compatibleWithJDK8(project: Project): Boolean {
@@ -940,6 +955,7 @@ subprojects {
     ":catalogs:catalog-lakehouse-paimon" to listOf("paimon"),
     ":spark-connector:spark-3.5" to listOf("iceberg"),
     ":spark-connector:spark-4.0" to listOf("iceberg"),
+    ":spark-connector:spark-4.1" to listOf("iceberg"),
     ":server-common" to listOf("hadoop"),
     ":iceberg:iceberg-common" to listOf("iceberg"),
     ":iceberg:iceberg-rest-server" to listOf("iceberg"),
@@ -956,7 +972,8 @@ subprojects {
     // SparkTransformConverter's Iceberg-derived findWidth method is private and absent from Javadoc.
     sourceNotices.set(
       when (project.path) {
-        ":spark-connector:spark-3.5", ":spark-connector:spark-4.0" -> sourceNoticeNames.filterNot { it == "iceberg" }
+        ":spark-connector:spark-3.5", ":spark-connector:spark-4.0", ":spark-connector:spark-4.1" ->
+          sourceNoticeNames.filterNot { it == "iceberg" }
         else -> sourceNoticeNames
       }
     )
@@ -1002,6 +1019,84 @@ subprojects {
     shadowJar.configure {
       dependsOn(bundledLegalFiles)
       transform(LegalFilesTransformer(bundledLegalFiles.get().outputArchive.get().asFile))
+    }
+
+    // A module that declares a `shadedDependencies` configuration packages those inputs into its
+    // shaded jar, so they must not be republished as dependencies: consumers resolving the
+    // coordinate would otherwise download unshaded copies of the classes the jar already contains.
+    // See https://github.com/apache/gravitino/issues/13171
+    afterEvaluate {
+      if (configurations.findByName("shadedDependencies") == null) {
+        return@afterEvaluate
+      }
+      // The plain `jar` is an empty placeholder (classifier `empty`); the actual content lives in
+      // the shaded jar. Point the ordinary Java variants at the shaded jar so consumers resolving
+      // through Gradle module metadata get the implementation classes. Otherwise `runtimeElements`
+      // selects the empty jar and, with the bundled inputs no longer published as dependencies,
+      // consumers receive neither the classes nor the transitive dependencies.
+      listOf("apiElements", "runtimeElements").forEach { variantName ->
+        configurations.named(variantName) {
+          outgoing.artifacts.clear()
+          outgoing.artifact(tasks.named("shadowJar"))
+        }
+      }
+      val generatePom = tasks.named<GenerateMavenPom>("generatePomFileForMavenJavaPublication")
+      val verifyShadedRuntimePom = tasks.register("verifyShadedRuntimePom") {
+        group = "verification"
+        description = "Fails when a self-contained shaded artifact republishes bundled inputs."
+        val pom = generatePom.map { it.destination }
+        dependsOn(generatePom)
+        doLast {
+          val document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(pom.get())
+          val published = document.getElementsByTagName("dependency")
+          check(published.length == 0) {
+            val coordinates =
+              (0 until published.length).joinToString { index ->
+                val element = published.item(index) as Element
+                val children = (0 until element.childNodes.length).map { element.childNodes.item(it) }
+                fun childText(name: String) =
+                  children
+                    .firstOrNull { it.nodeType == Node.ELEMENT_NODE && it.nodeName == name }
+                    ?.textContent
+                "${childText("groupId")}:${childText("artifactId")}"
+              }
+            "${project.path} publishes dependencies its jar already contains: $coordinates"
+          }
+        }
+      }
+      val generateMetadata =
+        tasks.named<GenerateModuleMetadata>("generateMetadataFileForMavenJavaPublication")
+      val shadedJarName = tasks.named<ShadowJar>("shadowJar").flatMap { it.archiveFileName }
+      val verifyShadedRuntimeModuleMetadata =
+        tasks.register("verifyShadedRuntimeModuleMetadata") {
+          group = "verification"
+          description =
+            "Fails when the ordinary Java variants do not expose the shaded jar, or republish bundled dependencies."
+          dependsOn(generateMetadata)
+          val metadataFile = generateMetadata.flatMap { it.outputFile }
+          doLast {
+            @Suppress("UNCHECKED_CAST")
+            val variants =
+              (JsonSlurper().parse(metadataFile.get().asFile) as Map<String, Any>)["variants"]
+                as List<Map<String, Any>>
+            listOf("apiElements", "runtimeElements").forEach { variantName ->
+              val variant = variants.first { it["name"] == variantName }
+
+              @Suppress("UNCHECKED_CAST")
+              val files = (variant["files"] as List<Map<String, String>>).map { it["name"] }
+              check(files == listOf(shadedJarName.get())) {
+                "${project.path} variant $variantName publishes $files instead of the shaded jar ${shadedJarName.get()}"
+              }
+              check((variant["dependencies"] as? List<*>).orEmpty().isEmpty()) {
+                "${project.path} variant $variantName republishes dependencies its jar already contains"
+              }
+            }
+          }
+        }
+      tasks.named("check") {
+        dependsOn(verifyShadedRuntimePom)
+        dependsOn(verifyShadedRuntimeModuleMetadata)
+      }
     }
   }
   if (project.path == ":clients:cli") {
@@ -1423,6 +1518,14 @@ tasks {
           }
         }
         fileMode = 0b111101101
+      }
+
+      copy {
+        from(projectDir.dir("scripts")) {
+          include("**/iceberg-*.sql")
+          into("${rootProject.name}-iceberg-rest-server/scripts")
+        }
+        into(outputDir)
       }
 
       copy {

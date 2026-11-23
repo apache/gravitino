@@ -42,7 +42,7 @@ public abstract class SparkPaimonCatalogFilesystemBackendIT extends SparkPaimonC
   @Test
   @Override
   protected void testCreateAndLoadSchema() {
-    String testDatabaseName = "t_create1";
+    String testDatabaseName = suiteDatabaseName("t_create1");
     dropDatabaseIfExists(testDatabaseName);
     sql("CREATE DATABASE " + testDatabaseName + " WITH DBPROPERTIES (ID=001);");
     Map<String, String> databaseMeta = getDatabaseMetadata(testDatabaseName);
@@ -53,7 +53,7 @@ public abstract class SparkPaimonCatalogFilesystemBackendIT extends SparkPaimonC
   @Test
   @Override
   protected void testAlterSchema() {
-    String testDatabaseName = "t_alter";
+    String testDatabaseName = suiteDatabaseName("t_alter");
     dropDatabaseIfExists(testDatabaseName);
     sql("CREATE DATABASE " + testDatabaseName + " WITH DBPROPERTIES (ID=001);");
     Map<String, String> databaseMeta = getDatabaseMetadata(testDatabaseName);

@@ -20,6 +20,7 @@ package org.apache.gravitino.iceberg.service;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import java.util.Map;
 import javax.ws.rs.NotAcceptableException;
 import javax.ws.rs.NotAllowedException;
 import javax.ws.rs.NotFoundException;
@@ -27,7 +28,11 @@ import javax.ws.rs.NotSupportedException;
 import javax.ws.rs.ProcessingException;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.exceptions.TokenExpiredException;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.server.web.ServerHealth;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.CommitFailedException;
@@ -41,10 +46,13 @@ import org.apache.iceberg.exceptions.NotAuthorizedException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.exceptions.UnprocessableEntityException;
 import org.apache.iceberg.exceptions.ValidationException;
+import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.glassfish.jersey.server.ParamException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
@@ -53,6 +61,44 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 
 public class TestIcebergExceptionMapper {
   private final IcebergExceptionMapper icebergExceptionMapper = new IcebergExceptionMapper();
+
+  @ParameterizedTest
+  @ValueSource(strings = {"file:///tmp/table", "file:/tmp/table", "/tmp/table", "relative/table"})
+  void testRemoteCatalogLocalLocationReturnsBadRequest(String location) throws Exception {
+    IcebergConfig config =
+        new IcebergConfig(
+            Map.of(
+                "catalog-backend",
+                "jdbc",
+                "warehouse",
+                "s3://bucket/warehouse",
+                "uri",
+                "jdbc:invalid"));
+    try (IcebergCatalogWrapper wrapper = new IcebergCatalogWrapper(config)) {
+      for (boolean staged : new boolean[] {false, true}) {
+        CreateTableRequest.Builder builder =
+            CreateTableRequest.builder()
+                .withName("table")
+                .withSchema(new Schema())
+                .withLocation(location);
+        if (staged) {
+          builder.stageCreate();
+        }
+        CreateTableRequest request = builder.build();
+        BadRequestException failure =
+            Assertions.assertThrows(
+                BadRequestException.class,
+                () -> wrapper.createTable(Namespace.of("namespace"), request));
+        try (Response response = icebergExceptionMapper.toResponse(failure)) {
+          Assertions.assertEquals(400, response.getStatus());
+          ErrorResponse error = (ErrorResponse) response.getEntity();
+          Assertions.assertEquals(400, error.code());
+          Assertions.assertEquals("BadRequestException", error.type());
+          Assertions.assertTrue(error.message().contains(location));
+        }
+      }
+    }
+  }
 
   @Test
   public void testIcebergExceptionMapper() {

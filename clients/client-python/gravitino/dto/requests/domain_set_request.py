@@ -64,4 +64,4 @@ class DomainBackingTagSetRequest(RESTRequest):
 
     def validate(self) -> None:
         if self._backing_tag is not None:
-            self._backing_tag.tag_value()
+            self._backing_tag.validate()

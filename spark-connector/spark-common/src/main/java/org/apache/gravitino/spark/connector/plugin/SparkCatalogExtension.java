@@ -23,8 +23,8 @@ package org.apache.gravitino.spark.connector.plugin;
  * java.util.ServiceLoader}.
  *
  * <p>A build that carries no in-tree class for a {@link
- * org.apache.gravitino.spark.connector.catalog.SparkCatalogKind}, such as Paimon on a Scala version
- * Paimon publishes no artifact for, can still support it by shipping a separate jar with a {@code
+ * org.apache.gravitino.spark.connector.catalog.SparkCatalogKind}, or that supports a provider not
+ * built into the connector, can ship a separate jar with a {@code
  * META-INF/services/org.apache.gravitino.spark.connector.plugin.SparkCatalogExtension} entry. See
  * {@link SparkBindings.Builder#build()} for how discovered extensions are merged with the bindings
  * a version module supplies at compile time.
@@ -32,9 +32,10 @@ package org.apache.gravitino.spark.connector.plugin;
 public interface SparkCatalogExtension {
 
   /**
-   * Returns the Gravitino catalog provider this extension serves, such as {@code lakehouse-paimon}.
-   * Resolved to a {@link org.apache.gravitino.spark.connector.catalog.SparkCatalogKind} through
-   * {@link org.apache.gravitino.spark.connector.catalog.SparkCatalogKind#fromProvider(String)}.
+   * Returns the Gravitino catalog provider this extension serves, such as {@code jdbc-clickhouse}.
+   * Providers built into the connector are resolved to a {@link
+   * org.apache.gravitino.spark.connector.catalog.SparkCatalogKind}; other providers are bound
+   * directly by name.
    *
    * @return the Gravitino catalog provider
    */

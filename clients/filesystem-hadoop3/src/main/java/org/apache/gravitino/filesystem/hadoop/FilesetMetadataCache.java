@@ -84,7 +84,10 @@ public class FilesetMetadataCache implements Closeable {
    * @return the fileset catalog.
    */
   public FilesetCatalog getFilesetCatalog(NameIdentifier catalogIdent) {
-    return getCatalog(catalogIdent).asFilesetCatalog();
+    FilesetCatalog filesetCatalog = getCatalog(catalogIdent).asFilesetCatalog();
+    Preconditions.checkArgument(
+        filesetCatalog != null, String.format("Loaded fileset catalog: %s is null.", catalogIdent));
+    return filesetCatalog;
   }
 
   /**
@@ -94,14 +97,15 @@ public class FilesetMetadataCache implements Closeable {
    * @return the fileset.
    */
   public Fileset getFileset(NameIdentifier filesetIdent) {
-    NameIdentifier catalogIdent =
-        NameIdentifier.of(filesetIdent.namespace().level(0), filesetIdent.namespace().level(1));
-    FilesetCatalog filesetCatalog = getFilesetCatalog(catalogIdent);
     return filesetCache.get(
         filesetIdent,
-        ident ->
-            filesetCatalog.loadFileset(
-                NameIdentifier.of(filesetIdent.namespace().level(2), filesetIdent.name())));
+        ident -> {
+          NameIdentifier catalogIdent =
+              NameIdentifier.of(ident.namespace().level(0), ident.namespace().level(1));
+          FilesetCatalog filesetCatalog = getFilesetCatalog(catalogIdent);
+          return filesetCatalog.loadFileset(
+              NameIdentifier.of(ident.namespace().level(2), ident.name()));
+        });
   }
 
   /**
@@ -111,10 +115,13 @@ public class FilesetMetadataCache implements Closeable {
    * @return the schema.
    */
   public Schema getSchema(NameIdentifier schemaIdent) {
-    NameIdentifier catalogIdent =
-        NameIdentifier.of(schemaIdent.namespace().level(0), schemaIdent.namespace().level(1));
     return schemaCache.get(
-        schemaIdent, ident -> getCatalog(catalogIdent).asSchemas().loadSchema(schemaIdent.name()));
+        schemaIdent,
+        ident -> {
+          NameIdentifier catalogIdent =
+              NameIdentifier.of(ident.namespace().level(0), ident.namespace().level(1));
+          return getCatalog(catalogIdent).asSchemas().loadSchema(ident.name());
+        });
   }
 
   private Cache<NameIdentifier, Catalog> newCatalogCache() {

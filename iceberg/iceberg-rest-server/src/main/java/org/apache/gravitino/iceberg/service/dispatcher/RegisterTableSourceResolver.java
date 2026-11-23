@@ -20,8 +20,11 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.common.utils.IcebergTableLocationUtils;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -35,12 +38,10 @@ import org.apache.iceberg.exceptions.NoSuchTableException;
  * authorization interceptor handlers.
  */
 public final class RegisterTableSourceResolver {
-
   private RegisterTableSourceResolver() {}
 
   /**
-   * Finds tables other than {@code target} that share the given metadata file, UUID, or table
-   * location.
+   * Finds tables other than {@code target} whose storage locations overlap the registered table.
    *
    * @param catalogWrapper catalog to scan
    * @param target register destination table
@@ -53,12 +54,57 @@ public final class RegisterTableSourceResolver {
       TableIdentifier target,
       String metadataLocation,
       TableMetadata metadata) {
+    return findOverlappingTables(catalogWrapper, target, metadata.location(), metadataLocation);
+  }
+
+  /**
+   * Finds overlapping tables using a bulk pointer lookup when the backend supports it. Pointer
+   * inference requires the standard {@code <table>/metadata/<file>} layout. Non-JDBC backends
+   * retain namespace discovery. Unreadable metadata propagates the failure instead of bypassing
+   * source authorization.
+   *
+   * @param catalogWrapper catalog to query
+   * @param target destination to exclude
+   * @param location requested table location
+   * @return overlapping live table identities
+   */
+  public static List<TableIdentifier> findOverlappingTables(
+      IcebergCatalogWrapper catalogWrapper, TableIdentifier target, String location) {
+    return findOverlappingTables(catalogWrapper, target, location, null);
+  }
+
+  /** Normalizes path strings so {@code file:/} and {@code file:///} compare equal. */
+  public static String normalizePath(String path) {
+    return IcebergTableLocationUtils.normalize(path);
+  }
+
+  private static List<TableIdentifier> findOverlappingTables(
+      IcebergCatalogWrapper catalogWrapper,
+      TableIdentifier target,
+      String location,
+      @Nullable String metadataLocation) {
     List<TableIdentifier> matches = new ArrayList<>();
-    String uuid = metadata.uuid();
-    String tableLocation = normalizePath(metadata.location());
-    String normalizedMeta = normalizePath(metadataLocation);
+    if (normalizePath(location).isEmpty()) {
+      return matches;
+    }
+    Optional<Map<TableIdentifier, String>> candidates =
+        metadataLocation == null
+            ? catalogWrapper.getTableMetadataLocationCandidates(location)
+            : catalogWrapper.getTableMetadataLocationCandidates(location, metadataLocation);
+    if (candidates.isPresent()) {
+      candidates
+          .get()
+          .forEach(
+              (identifier, pointer) -> {
+                if (!identifier.equals(target)
+                    && matchesPointer(pointer, location, metadataLocation)) {
+                  matches.add(identifier);
+                }
+              });
+      return matches;
+    }
     collectMatchingTables(
-        catalogWrapper, Namespace.empty(), target, uuid, tableLocation, normalizedMeta, matches);
+        catalogWrapper, Namespace.empty(), target, location, metadataLocation, matches);
     return matches;
   }
 
@@ -66,9 +112,8 @@ public final class RegisterTableSourceResolver {
       IcebergCatalogWrapper catalogWrapper,
       Namespace parent,
       TableIdentifier target,
-      String uuid,
       String tableLocation,
-      String metadataLocation,
+      @Nullable String metadataLocation,
       List<TableIdentifier> matches) {
     List<Namespace> children;
     List<TableIdentifier> tables;
@@ -83,13 +128,13 @@ public final class RegisterTableSourceResolver {
     }
     for (Namespace child : children) {
       collectMatchingTables(
-          catalogWrapper, child, target, uuid, tableLocation, metadataLocation, matches);
+          catalogWrapper, child, target, tableLocation, metadataLocation, matches);
     }
     for (TableIdentifier identifier : tables) {
       if (identifier.equals(target)) {
         continue;
       }
-      if (matchesSource(catalogWrapper, identifier, uuid, tableLocation, metadataLocation)) {
+      if (matchesSource(catalogWrapper, identifier, tableLocation, metadataLocation)) {
         matches.add(identifier);
       }
     }
@@ -98,47 +143,28 @@ public final class RegisterTableSourceResolver {
   private static boolean matchesSource(
       IcebergCatalogWrapper catalogWrapper,
       TableIdentifier identifier,
-      String uuid,
       String tableLocation,
-      String metadataLocation) {
+      @Nullable String metadataLocation) {
     Optional<String> currentMeta = catalogWrapper.getTableMetadataLocation(identifier);
-    if (currentMeta.isPresent() && normalizePath(currentMeta.get()).equals(metadataLocation)) {
-      return true;
+    if (currentMeta.isPresent()) {
+      return matchesPointer(currentMeta.get(), tableLocation, metadataLocation);
     }
     try {
       TableMetadata existing = catalogWrapper.loadTableMetadata(identifier);
-      if (uuid != null && uuid.equals(existing.uuid())) {
-        return true;
-      }
-      return tableLocation != null
-          && !tableLocation.isEmpty()
-          && tableLocation.equals(normalizePath(existing.location()));
+      return IcebergTableLocationUtils.overlaps(tableLocation, existing.location());
     } catch (NoSuchTableException e) {
-      // Only a table that no longer exists is unrelated. Any other failure to read its metadata
-      // must not be mistaken for unrelated metadata, which would skip source authorization.
       return false;
     }
   }
 
-  /** Normalizes path strings so {@code file:/} and {@code file:///} compare equal. */
-  public static String normalizePath(String path) {
-    if (path == null) {
-      return "";
+  private static boolean matchesPointer(
+      String pointer, String location, @Nullable String metadataLocation) {
+    if (metadataLocation != null
+        && normalizePath(pointer).equals(normalizePath(metadataLocation))) {
+      return true;
     }
-    String trimmed = path.trim();
-    if (trimmed.startsWith("file:")) {
-      String withoutScheme = trimmed.substring("file:".length());
-      while (withoutScheme.startsWith("//")) {
-        withoutScheme = withoutScheme.substring(1);
-      }
-      if (!withoutScheme.startsWith("/")) {
-        withoutScheme = "/" + withoutScheme;
-      }
-      return "file:" + withoutScheme;
-    }
-    if (trimmed.endsWith("/")) {
-      return trimmed.substring(0, trimmed.length() - 1);
-    }
-    return trimmed;
+    return IcebergTableLocationUtils.tableLocation(pointer)
+        .map(root -> IcebergTableLocationUtils.overlaps(root, location))
+        .orElse(false);
   }
 }

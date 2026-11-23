@@ -19,7 +19,9 @@
 package org.apache.iceberg;
 
 import com.google.common.base.Preconditions;
+import java.util.Objects;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.AlreadyExistsException;
 
 /**
  * Shared helpers for {@link org.apache.iceberg.catalog.Catalog#registerTable(TableIdentifier,
@@ -94,6 +96,45 @@ public class MetastoreRegisterTableUtils {
         ops,
         BaseMetastoreCatalog.fullTableName(catalog.name(), identifier),
         catalog.metricsReporter());
+  }
+
+  /**
+   * Registers a metadata snapshot already read and authorized by the caller, without reopening its
+   * file. Existing destination metadata is still read for an atomic overwrite.
+   *
+   * @param catalog destination catalog
+   * @param identifier destination table
+   * @param metadata snapshot read from the requested metadata file
+   * @param overwrite whether the destination can be replaced
+   * @param metadataLocationOverwrite atomic pointer replacement
+   */
+  public static void registerTableWithMetadata(
+      BaseMetastoreCatalog catalog,
+      TableIdentifier identifier,
+      TableMetadata metadata,
+      boolean overwrite,
+      MetadataLocationOverwrite metadataLocationOverwrite) {
+    Preconditions.checkArgument(
+        identifier != null && catalog.isValidIdentifier(identifier),
+        "Invalid identifier: %s",
+        identifier);
+    Preconditions.checkArgument(
+        metadata.metadataFileLocation() != null,
+        "Registered metadata must retain its file location");
+    TableOperations ops = catalog.newTableOps(identifier);
+    TableMetadata base = ops.current();
+    if (base == null) {
+      ops.commit(null, metadata);
+    } else {
+      if (!overwrite) {
+        throw new AlreadyExistsException("Table already exists: %s", identifier);
+      }
+      Preconditions.checkArgument(
+          Objects.equals(base.uuid(), metadata.uuid()),
+          "Cannot overwrite a table with a different table UUID");
+      metadataLocationOverwrite.overwrite(
+          identifier, base.metadataFileLocation(), metadata.metadataFileLocation());
+    }
   }
 
   private MetastoreRegisterTableUtils() {}

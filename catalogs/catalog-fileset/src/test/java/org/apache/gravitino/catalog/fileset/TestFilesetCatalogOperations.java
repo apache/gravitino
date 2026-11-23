@@ -175,7 +175,6 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretConstants;
 import org.apache.gravitino.secret.SecretManager;
-import org.apache.gravitino.secret.SecretMaterial;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
@@ -924,7 +923,7 @@ public class TestFilesetCatalogOperations {
     Path schemaPath = new Path(catalogPath, schemaName);
     long schemaId = generateTestId();
     SecretUrn urn = writeThroughUrn("schema", schemaId, "schema-sk");
-    secretManager.writeSecrets(List.of(new SecretMaterial(urn, "schema-secret")));
+    seedSecret(urn, "schema-secret");
 
     FileSystem realFileSystem = schemaPath.getFileSystem(new Configuration());
     FileSystem failingFileSystem = Mockito.mock(FileSystem.class);
@@ -1088,7 +1087,7 @@ public class TestFilesetCatalogOperations {
                   SecretConstants.ATTR_ENTITY_TYPE, "fileset",
                   SecretConstants.ATTR_ENTITY_ID, String.valueOf(generateTestId()),
                   SecretConstants.ATTR_PROPERTY_KEY, "test-secret"));
-      secretManager.writeSecrets(List.of(new SecretMaterial(urn, "test-value")));
+      seedSecret(urn, "test-value");
       secrets.add(urn);
       createFileset(
           name,
@@ -1172,7 +1171,7 @@ public class TestFilesetCatalogOperations {
     NameIdentifier schemaIdent = NameIdentifier.of("m1", "c1", schemaName);
     NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, "fileset");
     SecretUrn urn = writeThroughUrn("fileset", generateTestId(), "test-secret");
-    secretManager.writeSecrets(List.of(new SecretMaterial(urn, "test-value")));
+    seedSecret(urn, "test-value");
     Map<String, String> catalogProperties = ImmutableMap.of(LOCATION, catalogPath);
     Fileset fileset =
         createMultiLocationFileset(
@@ -1269,7 +1268,7 @@ public class TestFilesetCatalogOperations {
                 SecretConstants.ATTR_ENTITY_TYPE, "fileset",
                 SecretConstants.ATTR_ENTITY_ID, String.valueOf(remainingId),
                 SecretConstants.ATTR_PROPERTY_KEY, "test-secret"));
-    secretManager.writeSecrets(List.of(new SecretMaterial(urn, "test-value")));
+    seedSecret(urn, "test-value");
     Map<String, String> remainingProperties =
         StringIdentifier.newPropertiesWithId(
             StringIdentifier.fromId(remainingId), Map.of("test-secret", urn.toString()));
@@ -1336,7 +1335,7 @@ public class TestFilesetCatalogOperations {
                 SecretConstants.ATTR_ENTITY_TYPE, "fileset",
                 SecretConstants.ATTR_ENTITY_ID, String.valueOf(generateTestId()),
                 SecretConstants.ATTR_PROPERTY_KEY, "test-secret"));
-    secretManager.writeSecrets(List.of(new SecretMaterial(urn, "test-value")));
+    seedSecret(urn, "test-value");
     Fileset fileset =
         createFileset(
             filesetIdent.name(),
@@ -7086,7 +7085,7 @@ public class TestFilesetCatalogOperations {
                 SecretConstants.ATTR_ENTITY_TYPE, "schema",
                 SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
                 SecretConstants.ATTR_PROPERTY_KEY, "aws-sk"));
-    secretManager.writeSecrets(List.of(new SecretMaterial(urn, "super-secret")));
+    seedSecret(urn, "super-secret");
 
     String schemaName = "schema_secret_" + generateTestId();
     String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
@@ -7118,10 +7117,8 @@ public class TestFilesetCatalogOperations {
     long filesetId = idGenerator.nextId();
     SecretUrn schemaUrn = writeThroughUrn("schema", schemaId, "schema-sk");
     SecretUrn filesetUrn = writeThroughUrn("fileset", filesetId, "fileset-sk");
-    secretManager.writeSecrets(
-        List.of(
-            new SecretMaterial(schemaUrn, "schema-secret"),
-            new SecretMaterial(filesetUrn, "fileset-secret")));
+    seedSecret(schemaUrn, "schema-secret");
+    seedSecret(filesetUrn, "fileset-secret");
 
     String schemaName = "schema_cascade_" + generateTestId();
     String catalogPath = TEST_ROOT_PATH + "/catalog_cascade_" + generateTestId();
@@ -7225,6 +7222,10 @@ public class TestFilesetCatalogOperations {
         Arguments.of(
             new IOException("Cannot initialize filesystem", new TimeoutException()), "timeout"),
         Arguments.of(new IOException("Cannot initialize filesystem"), "probe failed"));
+  }
+
+  private static void seedSecret(SecretUrn urn, String plaintext) {
+    secretManager.getRegistry().getProvider(urn.providerName()).writeSecretVersion(urn, plaintext);
   }
 
   private static SecretUrn writeThroughUrn(String entityType, long entityId, String key) {
