@@ -335,6 +335,10 @@ public final class GlossaryManager {
               locks,
               () -> {
                 GlossaryTermEntity locked = terms.get(ident);
+                // Content-only edits can change visibility while the hierarchy mutex is held.
+                if (!readable.test(locked)) {
+                  return false;
+                }
                 handler.handle(
                     locked,
                     null,
