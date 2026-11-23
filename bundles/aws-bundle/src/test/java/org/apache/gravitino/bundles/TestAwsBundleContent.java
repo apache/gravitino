@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.InputStream;
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -34,6 +35,8 @@ import java.util.Properties;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -146,43 +149,91 @@ class TestAwsBundleContent {
   @Test
   void testS3AFileSystemInitializes() throws Exception {
     try (URLClassLoader loader = newLoader()) {
-      ClassLoader original = Thread.currentThread().getContextClassLoader();
-      Thread.currentThread().setContextClassLoader(loader);
-      try {
-        Class<?> confClass = loader.loadClass("org.apache.hadoop.conf.Configuration");
-        Object conf = confClass.getConstructor(boolean.class).newInstance(false);
-        String[][] settings = {
-          {
-            "fs.s3a.aws.credentials.provider",
-            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider"
-          },
-          {"fs.s3a.access.key", "access-key"},
-          {"fs.s3a.secret.key", "secret-key"},
-          {"fs.s3a.endpoint", "http://127.0.0.1:1"},
-          {"fs.s3a.endpoint.region", "us-east-1"},
-          {"fs.s3a.path.style.access", "true"},
-          {"fs.s3a.connection.ssl.enabled", "false"},
-          {"fs.s3a.bucket.probe", "0"}
-        };
-        for (String[] setting : settings) {
-          confClass
-              .getMethod("set", String.class, String.class)
-              .invoke(conf, setting[0], setting[1]);
-        }
-        Class<?> fsClass = loader.loadClass("org.apache.hadoop.fs.s3a.S3AFileSystem");
-        Object fs = fsClass.getConstructor().newInstance();
-        fsClass
-            .getMethod("initialize", URI.class, confClass)
-            .invoke(fs, URI.create("s3a://bucket/"), conf);
-        try {
-          assertEquals("s3a", fsClass.getMethod("getScheme").invoke(fs));
-        } finally {
-          fsClass.getMethod("close").invoke(fs);
-        }
-      } finally {
-        Thread.currentThread().setContextClassLoader(original);
-      }
+      withS3AFileSystem(
+          loader,
+          new String[0][],
+          (fsClass, fs) -> assertEquals("s3a", fsClass.getMethod("getScheme").invoke(fs)));
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testClientSideEncryptionWithKms(boolean v1Compatibility) throws Exception {
+    // Hadoop 3.3 took the encryption client from the AWS SDK v1 bundle. Hadoop 3.4 needs the S3
+    // encryption client and the KMS module, which hadoop-aws does not bring.
+    String[][] settings = {
+      {"fs.s3a.encryption.algorithm", "CSE-KMS"},
+      {"fs.s3a.encryption.key", "arn:aws:kms:us-east-1:123456789012:key/test-key"},
+      {"fs.s3a.encryption.cse.kms.region", "us-east-1"},
+      {"fs.s3a.encryption.cse.v1.compatibility.enabled", String.valueOf(v1Compatibility)}
+    };
+    try (URLClassLoader loader = newLoader()) {
+      withS3AFileSystem(
+          loader,
+          settings,
+          (fsClass, fs) -> {
+            // The S3 client is created on first use, which builds the KMS keyring and the
+            // encryption client without calling AWS.
+            Object internals = fsClass.getMethod("getS3AInternals").invoke(fs);
+            Object client =
+                loader
+                    .loadClass("org.apache.hadoop.fs.s3a.S3AInternals")
+                    .getMethod("getAmazonS3Client", String.class)
+                    .invoke(internals, "test");
+            assertTrue(
+                loader
+                    .loadClass("software.amazon.encryption.s3.S3EncryptionClient")
+                    .isInstance(client),
+                "Expected the S3 encryption client, got " + client.getClass().getName());
+          });
+    }
+  }
+
+  private static void withS3AFileSystem(
+      URLClassLoader loader, String[][] extraSettings, FileSystemCheck check) throws Exception {
+    ClassLoader original = Thread.currentThread().getContextClassLoader();
+    Thread.currentThread().setContextClassLoader(loader);
+    try {
+      Class<?> confClass = loader.loadClass("org.apache.hadoop.conf.Configuration");
+      Object conf = confClass.getConstructor(boolean.class).newInstance(false);
+      String[][] settings = {
+        {
+          "fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider"
+        },
+        {"fs.s3a.access.key", "access-key"},
+        {"fs.s3a.secret.key", "secret-key"},
+        {"fs.s3a.endpoint", "http://127.0.0.1:1"},
+        {"fs.s3a.endpoint.region", "us-east-1"},
+        {"fs.s3a.path.style.access", "true"},
+        {"fs.s3a.connection.ssl.enabled", "false"},
+        {"fs.s3a.bucket.probe", "0"}
+      };
+      Method set = confClass.getMethod("set", String.class, String.class);
+      for (String[] setting : settings) {
+        set.invoke(conf, setting[0], setting[1]);
+      }
+      for (String[] setting : extraSettings) {
+        set.invoke(conf, setting[0], setting[1]);
+      }
+      Class<?> fsClass = loader.loadClass("org.apache.hadoop.fs.s3a.S3AFileSystem");
+      Object fs = fsClass.getConstructor().newInstance();
+      fsClass
+          .getMethod("initialize", URI.class, confClass)
+          .invoke(fs, URI.create("s3a://bucket/"), conf);
+      try {
+        check.accept(fsClass, fs);
+      } finally {
+        fsClass.getMethod("close").invoke(fs);
+      }
+    } finally {
+      Thread.currentThread().setContextClassLoader(original);
+    }
+  }
+
+  /** A check on an initialized S3AFileSystem, loaded by the bundle class loader. */
+  @FunctionalInterface
+  private interface FileSystemCheck {
+    void accept(Class<?> fsClass, Object fs) throws Exception;
   }
 
   private static URLClassLoader newLoader() throws Exception {

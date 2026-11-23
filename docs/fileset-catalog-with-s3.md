@@ -319,6 +319,17 @@ jar and `gravitino-filesystem-hadoop3-runtime` work with both Hadoop 3.3 (AWS SD
 and later (AWS SDK v2). Gravitino detects the Hadoop version at runtime and vends the credentials
 with the credentials provider of the matching AWS SDK, so no extra configuration is needed.
 
+S3A client-side encryption (`fs.s3a.encryption.algorithm` set to `CSE-KMS` or `CSE-CUSTOM`) needs
+extra jars with Hadoop 3.4 and later. `gravitino-aws-bundle` already contains them. In an existing
+Hadoop 3.4 environment, add `amazon-s3-encryption-client-java-${version}.jar` (4.0.0 for Hadoop
+3.4.3) and the AWS SDK v2 `kms` jar of the SDK version in use, unless the full
+`software.amazon.awssdk:bundle` jar already provides KMS. Hadoop 3.3 takes the encryption client
+from `aws-java-sdk-bundle` and needs no extra jars. Hadoop 3.4 fails to read objects that were
+written without client-side encryption, or by the AWS SDK v1 `AmazonS3EncryptionClient`, unless
+`fs.s3a.encryption.cse.v1.compatibility.enabled` is `true`. See the
+[Hadoop S3A encryption documentation](https://hadoop.apache.org/docs/r3.4.3/hadoop-aws/tools/hadoop-aws/encryption.html)
+before you enable client-side encryption on an existing fileset.
+
 Hadoop 3.4 changed the default of `fs.s3a.directory.marker.retention` from `delete` to `keep`.
 Gravitino keeps the previous default and sets it to `delete` unless you configure it, so that S3A
 clients of Hadoop releases without directory marker support (before 2.10.2, 3.1.4, 3.2.2 and

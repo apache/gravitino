@@ -20,6 +20,8 @@
 antlr = "4.13.2"
 db-scheduler = "16.12.0"
 awssdk = "2.54.17"
+# The S3 encryption client that hadoop-aws 3.4.3 is built with, needed for client-side encryption.
+amazon-s3-encryption-client = "4.0.0"
 # AWS SDK v1 is only needed to compile and test against Hadoop 3.3 (hadoop-aws 3.3.x is built on it).
 awssdk-v1 = "1.12.367"
 azure-identity = "1.13.1"
@@ -229,6 +231,7 @@ aws-kms = { group = "software.amazon.awssdk", name = "kms", version.ref = "awssd
 aws-s3-transfer-manager = { group = "software.amazon.awssdk", name = "s3-transfer-manager", version.ref = "awssdk" }
 aws-apache-client = { group = "software.amazon.awssdk", name = "apache-client", version.ref = "awssdk" }
 aws-netty-nio-client = { group = "software.amazon.awssdk", name = "netty-nio-client", version.ref = "awssdk" }
+aws-s3-encryption-client = { group = "software.amazon.encryption.s3", name = "amazon-s3-encryption-client-java", version.ref = "amazon-s3-encryption-client" }
 aws-v1-core = { group = "com.amazonaws", name = "aws-java-sdk-core", version.ref = "awssdk-v1" }
 azure-identity = { group = "com.azure", name = "azure-identity", version.ref = "azure-identity"}
 azure-storage-file-datalake = { group = "com.azure", name = "azure-storage-file-datalake", version.ref = "azure-storage-file-datalake"}

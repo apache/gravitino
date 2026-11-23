@@ -43,6 +43,11 @@ dependencies {
     exclude("software.amazon.awssdk", "bundle")
   }
   implementation(libs.bundles.hadoop.aws.sdk)
+  // S3A client-side encryption (CSE-KMS, CSE-CUSTOM). Hadoop 3.3 used the encryption client of the
+  // AWS SDK v1 bundle. Hadoop 3.4 needs the S3 encryption client, which hadoop-aws declares as
+  // provided, and the KMS module, which the single SDK modules above do not include.
+  implementation(libs.aws.kms)
+  implementation(libs.aws.s3.encryption.client)
   implementation(libs.aws.iam)
   implementation(libs.aws.policy)
   implementation(libs.aws.sts)
@@ -53,6 +58,7 @@ dependencies {
   implementation(libs.hadoop3.client.runtime)
 
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.slf4j.api)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
