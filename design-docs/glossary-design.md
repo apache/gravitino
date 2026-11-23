@@ -269,9 +269,10 @@ not as an implementation prerequisite.
   lookup results, nested terms, and create/alter responses. A readable term remains readable
   even if some or all of its domains are hidden; its returned domain list can be empty. Filtering
   a response never changes stored membership or reveals a hidden-domain count.
-- `DomainManager#dropDomain` checks the shared table for any live membership under the Domain
-  lock. A remaining member of any type causes 409 `NonEmptyDomainException`. Removing terms
-  silently would change how they are grouped and who manages them in Step 2.
+- `DomainManager#deleteDomain` checks authorization and requires a `DRAFT` Domain with no
+  subdomains. An authorized drop of a `PUBLISHED` Domain returns `400` and asks the caller
+  to unpublish it. After the existing checks pass, check the shared table under the same
+  Domain lock. A remaining live member of any type causes `409 NonEmptyDomainException`.
 - **Clearing a non-empty domain**: the `409` response tells the administrator to detach the
   remaining members explicitly. It reveals that at least one member exists without returning
   names or counts. With effective `MANAGE_DOMAIN`, the administrator can use the shared
@@ -485,15 +486,16 @@ pending-content rules are specified separately below.
   replaced, so `DEPRECATED` keeps it readable, which a delete cannot do. In Step 2, `APPROVED` also records that a reviewer
   accepted the term. A domain or an ontology (#14310) is published as a whole and has no review per
   item, so `DRAFT` / `PUBLISHED` is enough there.
-- **Every API applies the same term-read authorization** (REST, clients, MCP); the new glossary
+- **Term reads apply the same definition authorization** (REST, clients, MCP); the new glossary
   MCP tools additionally exclude non-`APPROVED` terms. If the caller cannot see a term, lists leave
   it out and get returns 404. The same rule applies inside responses. The `broader`,
   `narrower` and `related` lists of a term, the terms of an object, and the terms of a domain all
   leave out terms the caller cannot see. So a hidden draft never shows up as a relation.
 - **Known leaks**: hiding a term does not make it secret. A user can still find out that it exists
-  through a same-name create (409), a synonym equal to its name (400), or dropping a domain that
-  contains hidden member terms (409). The last response discloses non-emptiness, not member names
-  or counts; clearing the membership requires the authorized callers described in Domain membership.
+  through a same-name create (409), a synonym equal to its name (400), or dropping a draft Domain
+  that contains hidden member terms (409). The last response discloses non-emptiness, not
+  member names or counts; clearing the membership requires the authorized callers described
+  in Domain membership.
   Lookup-work errors expose a coarse cost limit being reached, but return no exact candidate or
   hidden counts. Binding-page continuation also reveals that a scan may have more work, not that
   another authorized binding exists. This is not a claim that errors, cursors or timing reveal
@@ -586,12 +588,13 @@ In Step 1, the three privileges are granted on the metalake:
   `METALAKE` only. The role APIs return 400 when these privileges are granted on any other object,
   or when anything is granted on `GLOSSARY_TERM`. Step 2 adds `DOMAIN`.
 - **Deny** works as for other privileges. Expand grant implications and apply explicit denies
-  to each required capability. Glossary operations require effective VIEW except for the
-  Domain-only detach endpoint, which uses the Domain management check. Creating requires
+  to each required capability. Ordinary Term operations require effective VIEW. Creating requires
   effective CREATE; editing uses effective MANAGE or the owner-with-effective-CREATE path;
   deleting requires effective MANAGE. A deny on MANAGE removes the all-term path, but leaves
   effective CREATE usable on own terms. The metalake owner always passes these privilege checks;
   Step 2 workflow conditions still apply.
+- **Domain management**: the Domain definition member list and Step 1 detach use only the
+  Domain management check. Both require effective `MANAGE_DOMAIN` on the requested Domain.
 - **Bindings** are written on the object, by the object admin (`APPROVED` terms only) or by the
   term editor. See Bindings.
 - **Owner** (a user or a group), set through `/owners/glossary_term/{term}`. When a group owns a
@@ -660,6 +663,11 @@ updates in one transaction, and hold the locks until commit or rollback. If a re
 the plan needs an earlier lock or an additional term row that would break ID order, roll back
 and rebuild the plan before writing.
 
+For Step 1 detach, recheck `MANAGE_DOMAIN` in the write transaction after locking the Domain.
+Use its current parent relationship to evaluate inherited privileges, as in existing Domain
+mutations. Hold the Domain lock through commit so a concurrent move cannot change the applicable
+scope between the check and the membership write.
+
 | Operation                                           | Locks                                                                                                                 | Conflict it prevents                                    |
 | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
 | Create, including initial relations and domains     | metalake (shared) -> hierarchy lock -> referenced terms (exclusive, ID order) -> domains (shared)                     | name/synonym conflict; invalid relations; endpoint drop |
@@ -727,8 +735,9 @@ All paths are under `/api/metalakes/{metalake}`. They follow the Tag, Policy and
 | Owner                  | existing `/owners/glossary_term/{term}`                                          |                                                                          |
 | Tags                   | existing `/objects/glossary_term/{term}/tags`                                    |                                                                          |
 
-For the Step 1 detach endpoint, resolve the Domain and check `MANAGE_DOMAIN` first. A successful
-detach, missing Term or absent membership all return HTTP `200` with `{"code":0}`.
+For the Domain definition member list and Step 1 detach, resolve the Domain and check
+`MANAGE_DOMAIN` before looking up members. A successful detach, missing Term or absent
+membership all return HTTP `200` with `{"code":0}`.
 
 The Domain definition member list uses `limit=20` and `offset=0` by default, with limits
 from 1 to 1,000 and nonnegative offsets. Resolve live names from `domain_member_rel` by member
@@ -1227,8 +1236,10 @@ and their hierarchies as the metalake owner, and checks rules 2, 4 and 5.
 The design does not say these things. The tests use the answers below. If a reviewer wants a
 different answer, change it here first.
 
-1. **Order of checks**: if the caller cannot see the term, 404. If the caller can see it but has
-   no privilege for the action, 403. For example, CREATE dropping its own term gets 403 in every
+1. **Order of checks**: the Domain definition member list and Step 1 detach check Domain
+   management before resolving the member. For ordinary Term operations, if the caller cannot
+   see the term, 404. If the caller can see it but has no privilege for the action, 403. For
+   example, CREATE dropping its own term gets 403 in every
    status, while MANAGE can delete it in every status. If the caller has the privilege but the
    change breaks a rule, 400 or 409. Binding uses the two-path checks in Bindings: a hidden draft
    gets 404; a visible `DEPRECATED` term gets 400 through the object-admin-only path, but a term
@@ -1506,12 +1517,15 @@ The users for these cases:
   Create returns 403 without creating a Term. A mixed alter also fails without changing any field.
 - T7.3 `domain=Sales` returns the terms of Sales and of its subdomains that the caller can see. It
   leaves out the terms of hidden subdomains.
-- T7.4 Dropping a domain with terms fails with 409 (`NonEmptyDomainException`). After a Term
-  editor with `MANAGE_DOMAIN` uses `removeDomain`, the drop works if no other live member remains.
+- T7.4 An authorized caller drops a `PUBLISHED` Domain with a Term member and no subdomains.
+  Verify `400` with an instruction to unpublish first. Unpublish the Domain and verify the
+  same drop now fails with `409 NonEmptyDomainException`. After a Term editor with
+  `MANAGE_DOMAIN` uses `removeDomain`, the drop works if no other live member remains.
   When testing shared membership with another member type, verify its row survives Term removal
-  and still blocks the domain drop. **(guard)**
-- T7.5 Race: one thread adds a term to a domain while another drops the domain. Either the term is
-  added and the drop fails with 409, or the drop wins and the add fails with 404.
+  and still blocks the drop. **(guard)**
+- T7.5 Race: one thread adds a Term to a `DRAFT` Domain with no subdomains while another drops
+  it. Either the add commits and the drop fails with `409`, or the drop wins and the add fails
+  with `404`.
 - T7.6 Under the selected explicit-relation design, a tag on a term never changes its domains,
   even if the tag backs a domain.
 - T7.7 Extend T5.16 with `addDomain` in the mixed alter and domains in the create. Domain rows
@@ -1522,13 +1536,19 @@ The users for these cases:
   the term stays readable and its domain list is empty. Returned data contains no hidden-domain
   name, ID or count; stored membership stays intact, and reads do not change the revision.
   Endpoint wiring is covered by T8.8, T12.8 and T13.12. **(guard)**
-- T7.9 A Domain admin with no Glossary privileges gets 409 when dropping a Domain with a hidden
-  draft member. The error returns no Term name or count. Use the Domain member list to obtain
-  the draft's type and name, and verify ordinary Term reads still apply definition permissions.
+- T7.9 A Domain admin with no Glossary privileges gets `409` when dropping a `DRAFT` Domain
+  with a hidden draft Term. The error returns no Term name or count. Use the same caller to
+  obtain the draft's type and name from the Domain member list and verify a direct Term read
+  returns `404`.
   Detach the Term explicitly. Verify `200` with `{"code":0}` on success, retry and for an absent Term.
   Verify the draft, other memberships and bindings remain intact, the revision advances once,
   and the now-empty Domain can be dropped.
   The same caller cannot use the ordinary alter to edit or add membership. **(guard)**
+- T7.10 Use published Domains Finance, Risk and Trading, with Trading initially under Finance.
+  Give the caller `MANAGE_DOMAIN` on Finance only. Pause a detach from Trading after its
+  initial management check. In another session, move Trading under Risk and commit before
+  the detach obtains the Domain lock. Verify the locked check returns `403` for the original
+  caller and preserves the membership and Term revision. **(guard)**
 
 **T8. REST**
 
@@ -1812,7 +1832,7 @@ and PostgreSQL.
    Also try a cycle and a `RELATED` link between a term and its ancestor. Expected: each invalid
    write fails with 400, leaving data and revisions unchanged. Then two servers add the two
    links of T5.8 at the same time, 20 rounds: exactly one succeeds each round.
-7. **Cleanup.** Drop a bound column, a bound table, a domain that has terms, a term with two
+7. **Cleanup.** Drop a bound column, a bound table, a `DRAFT` Domain that has terms, a term with two
    parents and one child (as `admin`, while it is `APPROVED`), and then the metalake. Expected: the
    bindings go away with the objects; the domain drop fails with 409; the child keeps its other
    parent; each surviving term losing bindings or its parent gets one revision increment per
