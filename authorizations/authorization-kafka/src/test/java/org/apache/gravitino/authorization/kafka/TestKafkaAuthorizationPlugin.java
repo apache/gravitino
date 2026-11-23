@@ -1204,6 +1204,7 @@ public class TestKafkaAuthorizationPlugin {
         SecurableObjects.ofTopic(
             otherSchemaObj, "orders", Collections.singletonList(Privileges.ProduceTopic.allow()));
     Role otherCatalogRole = testRole("other_cat_role", otherTopicObj);
+    unresolvedState.grantRoleToUser("alice", otherCatalogRole);
 
     unresolvedPlugin.onGrantedRolesToUser(
         Collections.singletonList(otherCatalogRole), testUser("alice"));
@@ -1388,6 +1389,129 @@ public class TestKafkaAuthorizationPlugin {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> new KafkaAuthorizationPlugin(METALAKE, invalidAdminProps));
+  }
+
+  @Test
+  public void testGrantAndRoleUpdateUsePersistedStateInsteadOfStaleSnapshots() {
+    SecurableObject catalogObj = SecurableObjects.ofCatalog(CATALOG, Collections.emptyList());
+    SecurableObject schemaObj =
+        SecurableObjects.ofSchema(catalogObj, "default", Collections.emptyList());
+    SecurableObject ordersConsume =
+        SecurableObjects.ofTopic(
+            schemaObj, "orders", Collections.singletonList(Privileges.ConsumeTopic.allow()));
+    SecurableObject ordersProduceAndConsume =
+        SecurableObjects.ofTopic(
+            schemaObj,
+            "orders",
+            Arrays.asList(Privileges.ProduceTopic.allow(), Privileges.ConsumeTopic.allow()));
+    SecurableObject ordersProduceOnly =
+        SecurableObjects.ofTopic(
+            schemaObj, "orders", Collections.singletonList(Privileges.ProduceTopic.allow()));
+
+    // Case A: Stale snapshot in onGrantedRolesToUser includes PRODUCE_TOPIC that was concurrently
+    // revoked in EntityStore before the grant callback ran.
+    Role staleRoleSnapshot = testRole("orders_role", ordersProduceAndConsume);
+    Role persistedRole = testRole("orders_role", ordersConsume);
+    stateProvider.grantRoleToUser("alice", persistedRole);
+
+    Assertions.assertTrue(
+        plugin.onGrantedRolesToUser(
+            Collections.singletonList(staleRoleSnapshot), testUser("alice")));
+    Assertions.assertTrue(
+        brokerAcls.contains(
+            acl(
+                ResourceType.TOPIC,
+                "orders",
+                "User:alice",
+                AclOperation.READ,
+                AclPermissionType.ALLOW)));
+    Assertions.assertTrue(
+        brokerAcls.contains(
+            acl(
+                ResourceType.TOPIC,
+                "orders",
+                "User:alice",
+                AclOperation.DESCRIBE,
+                AclPermissionType.ALLOW)));
+    Assertions.assertTrue(
+        brokerAcls.contains(
+            acl(
+                ResourceType.GROUP,
+                "*",
+                "User:alice",
+                AclOperation.READ,
+                AclPermissionType.ALLOW)));
+    Assertions.assertFalse(
+        brokerAcls.contains(
+            acl(
+                ResourceType.TOPIC,
+                "orders",
+                "User:alice",
+                AclOperation.WRITE,
+                AclPermissionType.ALLOW)));
+    Assertions.assertFalse(
+        brokerAcls.contains(
+            acl(
+                ResourceType.CLUSTER,
+                Resource.CLUSTER_NAME,
+                "User:alice",
+                AclOperation.IDEMPOTENT_WRITE,
+                AclPermissionType.ALLOW)));
+
+    // Case B: Unbound user or group snapshot does not materialize ACLs; enabled group push-down
+    // also reconciles against persisted stateProvider roles.
+    Assertions.assertTrue(
+        plugin.onGrantedRolesToUser(
+            Collections.singletonList(staleRoleSnapshot), testUser("unbound_user")));
+    Assertions.assertFalse(
+        brokerAcls.stream().anyMatch(b -> "User:unbound_user".equals(b.entry().principal())));
+
+    KafkaAuthorizationProperties groupProps =
+        new KafkaAuthorizationProperties(
+            ImmutableMap.of(
+                "bootstrap.servers",
+                "localhost:9092",
+                BaseAuthorization.CATALOG_ID,
+                "1",
+                KafkaAuthorizationProperties.GROUP_ACL_ENABLED,
+                "true"));
+    groupProps.validate();
+    KafkaAuthorizationPlugin groupPlugin =
+        new KafkaAuthorizationPlugin(METALAKE, groupProps, adminClient, stateProvider, null);
+    stateProvider.grantRoleToGroup("eng", persistedRole);
+    Assertions.assertTrue(
+        groupPlugin.onGrantedRolesToGroup(
+            Collections.singletonList(staleRoleSnapshot), testGroup("eng")));
+    Assertions.assertTrue(
+        brokerAcls.contains(
+            acl(
+                ResourceType.TOPIC,
+                "orders",
+                "Group:eng",
+                AclOperation.READ,
+                AclPermissionType.ALLOW)));
+    Assertions.assertFalse(
+        brokerAcls.contains(
+            acl(
+                ResourceType.TOPIC,
+                "orders",
+                "Group:eng",
+                AclOperation.WRITE,
+                AclPermissionType.ALLOW)));
+
+    // Case C: Delayed onRoleUpdated AddSecurableObject must not recreate a concurrently revoked
+    // privilege absent from persisted EntityStore state.
+    Assertions.assertTrue(
+        plugin.onRoleUpdated(
+            persistedRole, RoleChange.addSecurableObject(persistedRole.name(), ordersProduceOnly)));
+    Assertions.assertFalse(
+        brokerAcls.contains(
+            acl(
+                ResourceType.TOPIC,
+                "orders",
+                "User:alice",
+                AclOperation.WRITE,
+                AclPermissionType.ALLOW)));
   }
 
   private static AclBinding acl(

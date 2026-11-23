@@ -258,7 +258,8 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
     }
     synchronized (aclSyncLock) {
       String principal = properties.formatUserPrincipal(user.name());
-      createAcls(bindingsForRoles(roles, principal));
+      List<Role> persistedRoles = resolvePersistedGrantedRoles(Owner.Type.USER, user.name(), roles);
+      createAcls(bindingsForRoles(persistedRoles, principal));
     }
     return Boolean.TRUE;
   }
@@ -290,13 +291,18 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
     }
     synchronized (aclSyncLock) {
       if (!properties.isGroupAclEnabled()) {
-        if (!bindingsForRoles(roles, GROUP_PROBE_PRINCIPAL).isEmpty()) {
+        List<Role> persistedRoles =
+            resolvePersistedGrantedRoles(Owner.Type.GROUP, group.name(), roles);
+        List<Role> probeRoles = persistedRoles.isEmpty() ? roles : persistedRoles;
+        if (!bindingsForRoles(probeRoles, GROUP_PROBE_PRINCIPAL).isEmpty()) {
           logGroupAclDisabled("granting roles to group '" + group.name() + "'");
         }
         return Boolean.TRUE;
       }
       String principal = properties.formatGroupPrincipal(group.name());
-      createAcls(bindingsForRoles(roles, principal));
+      List<Role> persistedRoles =
+          resolvePersistedGrantedRoles(Owner.Type.GROUP, group.name(), roles);
+      createAcls(bindingsForRoles(persistedRoles, principal));
     }
     return Boolean.TRUE;
   }
@@ -517,6 +523,13 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
     Set<AclBinding> candidateRemovals =
         new LinkedHashSet<>(Sets.difference(delta.beforeBindings, delta.afterBindings));
 
+    // Guard against delayed update callbacks recreating privileges concurrently revoked or deleted.
+    if (!addedBindings.isEmpty()) {
+      Set<AclBinding> currentRoleBindings =
+          computeRoleBindingsForPrincipal(
+              principalType, principalName, kafkaPrincipal, Collections.emptySet(), null);
+      addedBindings.retainAll(currentRoleBindings);
+    }
     createAcls(addedBindings);
 
     // PermissionManager commits the full post-update role to EntityStore before invoking
@@ -664,15 +677,40 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
     }
     Set<AclBinding> active = new LinkedHashSet<>();
 
+    for (Role role : listActiveStoredRoles(principalType, principalName)) {
+      if (!excludedRoleNames.contains(role.name())) {
+        active.addAll(
+            bindingsForRolesExcludingObject(
+                Collections.singletonList(role), kafkaPrincipal, excludedObject));
+      }
+    }
+    return active;
+  }
+
+  private List<Role> resolvePersistedGrantedRoles(
+      Owner.Type principalType, String principalName, List<Role> grantedRoles) {
+    Set<String> grantedRoleNames = extractRoleNames(grantedRoles);
+    if (grantedRoleNames.isEmpty()) {
+      return Collections.emptyList();
+    }
+    List<Role> persisted = new ArrayList<>();
+    for (Role storedRole : listActiveStoredRoles(principalType, principalName)) {
+      if (grantedRoleNames.contains(storedRole.name())) {
+        persisted.add(storedRole);
+      }
+    }
+    return Collections.unmodifiableList(persisted);
+  }
+
+  private List<Role> listActiveStoredRoles(Owner.Type principalType, String principalName) {
     List<Role> storedRoles =
         principalType == Owner.Type.USER
             ? stateProvider.listRolesForUser(metalake, principalName)
             : stateProvider.listRolesForGroup(metalake, principalName);
+    List<Role> active = new ArrayList<>(storedRoles.size());
     for (Role role : storedRoles) {
-      if (role != null && !excludedRoleNames.contains(role.name()) && !isDeletedRoleEntity(role)) {
-        active.addAll(
-            bindingsForRolesExcludingObject(
-                Collections.singletonList(role), kafkaPrincipal, excludedObject));
+      if (role != null && !isDeletedRoleEntity(role)) {
+        active.add(role);
       }
     }
     return active;
