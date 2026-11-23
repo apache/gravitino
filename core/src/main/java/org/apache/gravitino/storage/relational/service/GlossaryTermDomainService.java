@@ -102,6 +102,19 @@ public final class GlossaryTermDomainService {
     return result;
   }
 
+  /** Returns the live domains of one term as domain ID to name, in ascending name order. */
+  public Map<Long, String> domainsOf(long metalakeId, long termId) {
+    Map<Long, String> result = new LinkedHashMap<>();
+    SessionUtils.doWithoutCommit(
+        GlossaryTermDomainRelMapper.class,
+        mapper -> {
+          for (GlossaryTermDomainRelPO row : mapper.listDomainNames(metalakeId, List.of(termId))) {
+            result.put(row.getDomainId(), row.getDomainName());
+          }
+        });
+    return result;
+  }
+
   /** Returns the live domain IDs of a term. */
   public Set<Long> domainIds(long termId) {
     return new HashSet<>(

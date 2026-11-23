@@ -22,7 +22,10 @@ package org.apache.gravitino.glossary;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import java.security.Principal;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.LongPredicate;
+import java.util.function.Predicate;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -39,22 +42,29 @@ import org.apache.gravitino.utils.PrincipalUtils;
 /** Metalake capabilities for one glossary operation. Term ownership follows the observed ID. */
 public final class GlossaryAccess {
   private static final GlossaryAccess UNRESTRICTED =
-      new GlossaryAccess(true, () -> true, () -> true, id -> true);
+      new GlossaryAccess(true, () -> true, () -> true, id -> true, domain -> true);
   private static final GlossaryAccess DENIED =
-      new GlossaryAccess(false, () -> false, () -> false, id -> false);
+      new GlossaryAccess(false, () -> false, () -> false, id -> false, domain -> false);
 
   private final boolean view;
   private final Supplier<Boolean> create;
   private final Supplier<Boolean> manage;
   private final LongPredicate owns;
+  private final Predicate<String> domains;
+  private final Map<String, Boolean> visibleDomains = new HashMap<>();
 
   private GlossaryAccess(
-      boolean view, Supplier<Boolean> create, Supplier<Boolean> manage, LongPredicate owns) {
+      boolean view,
+      Supplier<Boolean> create,
+      Supplier<Boolean> manage,
+      LongPredicate owns,
+      Predicate<String> domains) {
     this.view = view;
     // A list or hierarchy walk can visit many drafts. Evaluate each required privilege once.
     this.create = Suppliers.memoize(create);
     this.manage = Suppliers.memoize(manage);
     this.owns = owns;
+    this.domains = domains;
   }
 
   boolean canView() {
@@ -116,7 +126,13 @@ public final class GlossaryAccess {
         true,
         () -> effective(authorizer, principal, metalake, lake, Name.CREATE_DEFINITION, context),
         () -> effective(authorizer, principal, metalake, lake, Name.MANAGE_DEFINITIONS, context),
-        id -> authorizer.isGlossaryTermOwner(principal, metalake, id, context));
+        id -> authorizer.isGlossaryTermOwner(principal, metalake, id, context),
+        domain ->
+            authorizer.canAccessDomain(
+                principal,
+                metalake,
+                MetadataObjects.of(null, domain, MetadataObject.Type.DOMAIN),
+                context));
   }
 
   private static boolean effective(
@@ -137,6 +153,19 @@ public final class GlossaryAccess {
   boolean canEdit(GlossaryTermEntity term) {
     // Listing drafts as a creator requires a current owner lookup per draft to observe transfers.
     return manage() || (create.get() && owns.test(term.id()));
+  }
+
+  /**
+   * Whether the caller can see a domain through the ordinary domain-read check: USE_DOMAIN on a
+   * published domain, MANAGE_DOMAIN on a draft. A missing domain is not visible. Each name is
+   * checked once per request.
+   */
+  boolean canUseDomain(String domain) {
+    if (this == UNRESTRICTED || this == DENIED) {
+      // Shared across requests and threads: never cache in these instances.
+      return domains.test(domain);
+    }
+    return visibleDomains.computeIfAbsent(domain, domains::test);
   }
 
   void requireCreate() {

@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.meta.AuditInfo;
@@ -39,7 +40,6 @@ final class TermEdits {
 
   static GlossaryTermEntity create(long id, Namespace namespace, TermSpec spec) {
     Preconditions.checkArgument(spec != null, "Term spec is required");
-    Preconditions.checkArgument(spec.domains().length == 0, "Domain changes are not supported yet");
     String[] synonyms = spec.synonyms();
     Preconditions.checkArgument(synonyms.length <= 100, "At most 100 synonyms are allowed");
     Map<String, String> distinct = synonymsByKey(synonyms);
@@ -61,6 +61,24 @@ final class TermEdits {
         .build();
   }
 
+  /** Returns a copy of a not yet persisted term with the given domain names. */
+  static GlossaryTermEntity withDomains(GlossaryTermEntity term, String[] domains) {
+    return GlossaryTermEntity.builder()
+        .withId(term.id())
+        .withNamespace(term.namespace())
+        .withName(term.name())
+        .withDefinition(term.definition())
+        .withSynonyms(term.synonyms())
+        .withStatus(term.status())
+        .withLinks(term.links())
+        .withProperties(term.properties())
+        .withSourceRef(term.sourceRef())
+        .withAuditInfo(term.auditInfo())
+        .withVersion(term.version())
+        .withDomains(domains)
+        .build();
+  }
+
   static boolean needsHierarchyLock(TermChange[] changes) {
     return Arrays.stream(changes)
         .anyMatch(
@@ -72,6 +90,18 @@ final class TermEdits {
 
   static GlossaryTermEntity apply(
       GlossaryTermEntity current, TermChange[] changes, boolean relationsChanged) {
+    return apply(current, changes, relationsChanged, null);
+  }
+
+  /**
+   * Applies content changes. A non-null domains array is the term's new membership, which counts as
+   * a change; null keeps the current domains.
+   */
+  static GlossaryTermEntity apply(
+      GlossaryTermEntity current,
+      TermChange[] changes,
+      boolean relationsChanged,
+      @Nullable String[] domains) {
     String name = current.name();
     String definition = current.definition();
     GlossaryTerm.Status status = current.status();
@@ -111,6 +141,7 @@ final class TermEdits {
       }
     }
     if (!relationsChanged
+        && domains == null
         && name.equals(current.name())
         && Objects.equals(definition, current.definition())
         && status == current.status()
@@ -132,6 +163,7 @@ final class TermEdits {
         .withLinks(links)
         .withProperties(properties)
         .withSourceRef(sourceRef)
+        .withDomains(domains == null ? current.domains() : domains)
         .withAuditInfo(
             AuditInfo.builder()
                 .withCreator(current.auditInfo().creator())
