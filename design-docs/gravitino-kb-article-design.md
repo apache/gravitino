@@ -979,9 +979,8 @@ OpenAPI definitions and validation with `./gradlew :docs:build`.
       services for the Article tables and reuse `domain_member_rel` from Glossary T7. Bypass the
       generic entity cache for full Article reads. Add dialect upgrade scripts, atomic writes to
       current rows and relations, transactional storage-extension hooks, soft deletion and
-      parent cleanup. Register the Article type for orphan-relation cleanup. Reuse
-      `SqlSessions.readSnapshot()` when available on `main`, or introduce it as a shared storage
-      helper with the isolation levels in [Read consistency](#read-consistency).
+      parent cleanup. Register the Article type for orphan-relation cleanup. Provide a shared
+      mechanism for consistent reads across multiple queries.
       Depends on: T1 and the shared schema and mapper from Glossary T7.
 
 ### Group B: Core behavior
