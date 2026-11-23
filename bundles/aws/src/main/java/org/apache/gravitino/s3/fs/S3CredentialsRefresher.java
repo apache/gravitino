@@ -54,9 +54,12 @@ class S3CredentialsRefresher {
    * @return the credentials
    */
   S3Credentials getCredentials() {
-    if (credentials == null || System.currentTimeMillis() >= expirationTime) {
+    if (needsRefresh()) {
       synchronized (this) {
-        refresh();
+        // Another thread may have refreshed the credentials while this one waited for the lock.
+        if (needsRefresh()) {
+          refresh();
+        }
       }
     }
     return credentials;
@@ -103,6 +106,10 @@ class S3CredentialsRefresher {
                   ((credential.expireTimeInMs() - System.currentTimeMillis())
                       * EXPIRATION_TIME_FACTOR);
     }
+  }
+
+  private boolean needsRefresh() {
+    return credentials == null || System.currentTimeMillis() >= expirationTime;
   }
 
   /** Immutable S3 credentials, with a session token for temporary credentials only. */

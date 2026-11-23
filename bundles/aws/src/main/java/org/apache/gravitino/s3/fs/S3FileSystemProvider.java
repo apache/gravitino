@@ -139,7 +139,8 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
           validProviders.add(provider);
         } else {
           LOG.warn(
-              "Credential provider {} is not an AWS SDK v1 or v2 credentials provider, skipping",
+              "Credential provider {} is not a credentials provider of the AWS SDK that the S3A "
+                  + "connector uses, skipping",
               provider);
         }
       } catch (ClassNotFoundException e) {

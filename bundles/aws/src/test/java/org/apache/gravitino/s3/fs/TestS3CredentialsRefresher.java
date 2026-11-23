@@ -20,6 +20,11 @@ package org.apache.gravitino.s3.fs;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
 import org.apache.gravitino.credential.Credential;
@@ -37,11 +42,13 @@ public class TestS3CredentialsRefresher {
 
   private static final List<Credential> SERVED = new ArrayList<>();
   private static final AtomicInteger FETCHES = new AtomicInteger();
+  private static volatile long fetchDelayMs;
 
   @BeforeEach
   void setUp() {
     SERVED.clear();
     FETCHES.set(0);
+    fetchDelayMs = 0;
   }
 
   @AfterEach
@@ -120,6 +127,37 @@ public class TestS3CredentialsRefresher {
   }
 
   @Test
+  void testConcurrentCallersFetchOnce() throws Exception {
+    SERVED.add(
+        new S3TokenCredential(
+            "access-key", "secret-key", "token", System.currentTimeMillis() + 3_600_000L));
+    // Keep the first fetch running while the other callers wait for the lock.
+    fetchDelayMs = 200;
+    S3CredentialsRefresher refresher = newRefresher();
+    int callers = 8;
+    CountDownLatch start = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(callers);
+    try {
+      List<Future<S3Credentials>> results = new ArrayList<>();
+      for (int i = 0; i < callers; i++) {
+        results.add(
+            executor.submit(
+                () -> {
+                  start.await();
+                  return refresher.getCredentials();
+                }));
+      }
+      start.countDown();
+      for (Future<S3Credentials> result : results) {
+        Assertions.assertEquals("token", result.get(30, TimeUnit.SECONDS).sessionToken());
+      }
+    } finally {
+      executor.shutdownNow();
+    }
+    Assertions.assertEquals(1, FETCHES.get());
+  }
+
+  @Test
   void testNoSuitableCredential() {
     S3CredentialsRefresher refresher = newRefresher();
 
@@ -142,6 +180,13 @@ public class TestS3CredentialsRefresher {
     @Override
     public Credential[] getCredentials() {
       FETCHES.incrementAndGet();
+      if (fetchDelayMs > 0) {
+        try {
+          Thread.sleep(fetchDelayMs);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+      }
       return SERVED.toArray(new Credential[0]);
     }
 

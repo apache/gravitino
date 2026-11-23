@@ -118,20 +118,34 @@ public class TestS3CredentialsProviderSelection {
 
   @Test
   void testAwsSdkV2ProviderName() {
-    // AWS SDK v2 providers are only usable when the AWS SDK v2 is on the classpath.
-    Assertions.assertEquals(
-        isPresent(V2_INTERFACE) ? V2_ENVIRONMENT : SIMPLE, check(V2_ENVIRONMENT));
+    // Hadoop 3.3 cannot use AWS SDK v2 providers, even when the AWS SDK v2 is on the classpath.
+    Assertions.assertEquals(EXPECT_V2 ? V2_ENVIRONMENT : SIMPLE, check(V2_ENVIRONMENT));
   }
 
   @Test
-  void testProviderOfAnotherSdk() {
-    // The class of an SDK that is not on the classpath cannot be loaded, so it is replaced.
-    String other =
-        EXPECT_V2
-            ? S3FileSystemProvider.S3_CREDENTIALS_PROVIDER_V1
-            : S3FileSystemProvider.S3_CREDENTIALS_PROVIDER_V2;
-    String otherInterface = EXPECT_V2 ? V1_INTERFACE : V2_INTERFACE;
-    Assertions.assertEquals(isPresent(otherInterface) ? other : SIMPLE, check(other));
+  void testVendedProviderOfAnotherSdk() {
+    if (EXPECT_V2) {
+      // Hadoop 3.4+ adapts AWS SDK v1 providers, which needs the AWS SDK v1 on the classpath.
+      Assertions.assertEquals(
+          isPresent(V1_INTERFACE) ? S3FileSystemProvider.S3_CREDENTIALS_PROVIDER_V1 : SIMPLE,
+          check(S3FileSystemProvider.S3_CREDENTIALS_PROVIDER_V1));
+    } else {
+      // Hadoop 3.3 only uses AWS SDK v1 providers.
+      Assertions.assertEquals(SIMPLE, check(S3FileSystemProvider.S3_CREDENTIALS_PROVIDER_V2));
+    }
+  }
+
+  @Test
+  void testExpectedSdkClassesOnClasspath() {
+    // Guards the classpath of each test task, so that the checks above cover what they claim.
+    Assertions.assertEquals(expectedOnClasspath("s3a.sdkV1OnClasspath"), isPresent(V1_INTERFACE));
+    Assertions.assertEquals(expectedOnClasspath("s3a.sdkV2OnClasspath"), isPresent(V2_INTERFACE));
+  }
+
+  private static boolean expectedOnClasspath(String property) {
+    String value = System.getProperty(property);
+    Assertions.assertNotNull(value, property);
+    return Boolean.parseBoolean(value);
   }
 
   @Test

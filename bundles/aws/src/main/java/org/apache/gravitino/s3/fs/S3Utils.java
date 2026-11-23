@@ -68,16 +68,18 @@ public class S3Utils {
   }
 
   /**
-   * Check whether the class is a credentials provider that the S3A connector can use: an AWS SDK v1
-   * or an AWS SDK v2 credentials provider. The SDK interfaces are resolved by name, because only
-   * one of the two SDKs may be on the classpath.
+   * Check whether the class is a credentials provider that the S3A connector on the classpath can
+   * use. Hadoop 3.4 and later accept AWS SDK v2 providers and, through an adapter, AWS SDK v1
+   * providers. Hadoop 3.3 and earlier only accept AWS SDK v1 providers, even if the AWS SDK v2 is
+   * also on the classpath. The SDK interfaces are resolved by name, because only one of the two
+   * SDKs may be on the classpath.
    *
    * @param providerClass The class to check.
-   * @return True if the class implements an AWS SDK v1 or v2 credentials provider interface.
+   * @return True if the S3A connector on the classpath can use the class as a credentials provider.
    */
   static boolean isCredentialsProvider(Class<?> providerClass) {
     return isAssignableTo(providerClass, SDK_V1_CREDENTIALS_PROVIDER)
-        || isAssignableTo(providerClass, SDK_V2_CREDENTIALS_PROVIDER);
+        || (isHadoopAwsSdkV2() && isAssignableTo(providerClass, SDK_V2_CREDENTIALS_PROVIDER));
   }
 
   /**
