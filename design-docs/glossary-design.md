@@ -669,11 +669,12 @@ always in this order:
 3. term rows, in ID order (exclusive);
 4. domain rows, in ID order (shared).
 
-A term write locks its current member domains and the domains named in the request. This keeps
+Creating or altering a term locks its current member domains and the domains named in the request. This keeps
 the domain names used for authorization, the change handler and the returned term stable through
 commit, including when an existing member is being renamed.
 
-Each row is locked only once, in its final mode. Do not process updates one by one and acquire a
+Acquire each row in its final lock mode. A nested store operation can reacquire an existing lock
+in the same mode. Do not process updates one by one and acquire a
 hierarchy lock after a term lock. Once locked, reread and validate the current state, apply all
 updates in one transaction, and hold the locks until commit or rollback. If a reread shows that
 the plan needs an earlier lock or an additional term row that would break ID order, roll back
@@ -691,7 +692,8 @@ and rebuild the plan before writing.
 
 For an alter that combines rows of this table, use the union of locks in the global order. For
 example, rename plus `addBroader` plus `addDomain` takes the metalake fence, hierarchy lock, the
-edited and referenced terms in ID order, then the added domain rows. Create with relations locks
+edited and referenced terms in ID order, then current and requested domain rows in ID order.
+Create with relations locks
 the existing referenced terms before inserting the new term and its relations. Relation cleanup
 finds the affected surviving terms after taking the hierarchy lock; binding cleanup finds them
 after taking the endpoint deletion or alteration locks, which must exclude concurrent binding
