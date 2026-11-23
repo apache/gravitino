@@ -92,6 +92,28 @@ public class TestPropertiesMetadata {
         metadata.getOrDefault(
             Map.of(LANCE_SESSION_INDEX_CACHE_SIZE_BYTES, "67890"),
             LANCE_SESSION_INDEX_CACHE_SIZE_BYTES));
+    Assertions.assertEquals(
+        0L,
+        metadata.getOrDefault(
+            Map.of(LANCE_SESSION_METADATA_CACHE_SIZE_BYTES, "0"),
+            LANCE_SESSION_METADATA_CACHE_SIZE_BYTES));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            metadata.getOrDefault(
+                Map.of(LANCE_SESSION_METADATA_CACHE_SIZE_BYTES, "-1"),
+                LANCE_SESSION_METADATA_CACHE_SIZE_BYTES));
+    Assertions.assertEquals(
+        0L,
+        metadata.getOrDefault(
+            Map.of(LANCE_SESSION_INDEX_CACHE_SIZE_BYTES, "0"),
+            LANCE_SESSION_INDEX_CACHE_SIZE_BYTES));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            metadata.getOrDefault(
+                Map.of(LANCE_SESSION_INDEX_CACHE_SIZE_BYTES, "-1"),
+                LANCE_SESSION_INDEX_CACHE_SIZE_BYTES));
     Assertions.assertFalse(metadata.isImmutableProperty(LANCE_SESSION_METADATA_CACHE_SIZE_BYTES));
     Assertions.assertFalse(metadata.isImmutableProperty(LANCE_SESSION_INDEX_CACHE_SIZE_BYTES));
   }

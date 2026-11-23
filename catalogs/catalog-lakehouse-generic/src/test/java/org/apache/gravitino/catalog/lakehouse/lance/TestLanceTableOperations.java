@@ -2574,33 +2574,50 @@ public class TestLanceTableOperations {
   void testStorageOptionsIsolationWithSession() throws Exception {
     String location1 = tempDir.resolve("storage_iso_1").toString();
     String location2 = tempDir.resolve("storage_iso_2").toString();
-    Column[] cols = {Column.of("id", Types.IntegerType.get())};
-    try (Dataset ignored = lanceTableOps.createDataset(location1, cols, Map.of());
-        Dataset ignored2 = lanceTableOps.createDataset(location2, cols, Map.of())) {}
+    Column[] cols1 = {Column.of("col_a", Types.IntegerType.get())};
+    Column[] cols2 = {Column.of("col_b", Types.StringType.get())};
+    try (Dataset ignored = lanceTableOps.createDataset(location1, cols1, Map.of());
+        Dataset ignored2 = lanceTableOps.createDataset(location2, cols2, Map.of())) {}
 
     Map<String, String> opts1 = Map.of("test.custom.key", "val1");
     Map<String, String> opts2 = Map.of("test.custom.key", "val2");
 
     try (Dataset ds1 = lanceTableOps.openDataset(location1, opts1);
         Dataset ds2 = lanceTableOps.openDataset(location2, opts2);
-        Dataset ds1Again = lanceTableOps.openDataset(location1, opts2)) {
+        Dataset ds1Again = lanceTableOps.openDataset(location1, opts1);
+        Dataset ds1WithOpts2 = lanceTableOps.openDataset(location1, opts2)) {
       Assertions.assertNotNull(ds1);
       Assertions.assertNotNull(ds2);
       Assertions.assertNotNull(ds1Again);
+      Assertions.assertNotNull(ds1WithOpts2);
 
       Assertions.assertEquals(1, ds1.getSchema().getFields().size());
+      Assertions.assertEquals("col_a", ds1.getSchema().getFields().get(0).getName());
+      Assertions.assertEquals(opts1, ds1.getLatestStorageOptions());
+
       Assertions.assertEquals(1, ds2.getSchema().getFields().size());
+      Assertions.assertEquals("col_b", ds2.getSchema().getFields().get(0).getName());
+      Assertions.assertEquals(opts2, ds2.getLatestStorageOptions());
+
       Assertions.assertEquals(1, ds1Again.getSchema().getFields().size());
+      Assertions.assertEquals("col_a", ds1Again.getSchema().getFields().get(0).getName());
+      Assertions.assertEquals(opts1, ds1Again.getLatestStorageOptions());
+
+      Assertions.assertEquals(1, ds1WithOpts2.getSchema().getFields().size());
+      Assertions.assertEquals("col_a", ds1WithOpts2.getSchema().getFields().get(0).getName());
+      Assertions.assertEquals(opts2, ds1WithOpts2.getLatestStorageOptions());
 
       Session session = lanceTableOps.session();
       Assertions.assertNotNull(session);
       Assertions.assertFalse(session.isClosed());
       try (Session s1 = ds1.session();
           Session s2 = ds2.session();
-          Session s3 = ds1Again.session()) {
+          Session s3 = ds1Again.session();
+          Session s4 = ds1WithOpts2.session()) {
         Assertions.assertTrue(session.isSameAs(s1));
         Assertions.assertTrue(session.isSameAs(s2));
         Assertions.assertTrue(session.isSameAs(s3));
+        Assertions.assertTrue(session.isSameAs(s4));
       }
     }
   }
@@ -2713,10 +2730,10 @@ public class TestLanceTableOperations {
               return null;
             });
       }
-      List<Future<Void>> futures = executor.invokeAll(tasks);
+      List<Future<Void>> futures = executor.invokeAll(tasks, 30, TimeUnit.SECONDS);
       for (Future<Void> f : futures) {
         Assertions.assertNotNull(f, "Future task must not be null");
-        f.get(30, TimeUnit.SECONDS);
+        f.get();
       }
     } finally {
       executor.shutdownNow();

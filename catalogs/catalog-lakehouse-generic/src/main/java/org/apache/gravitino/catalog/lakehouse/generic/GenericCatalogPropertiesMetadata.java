@@ -21,7 +21,6 @@ package org.apache.gravitino.catalog.lakehouse.generic;
 
 import static org.apache.gravitino.connector.PropertyEntry.booleanPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.enumPropertyEntry;
-import static org.apache.gravitino.connector.PropertyEntry.longOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyPrefixEntry;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE;
@@ -30,6 +29,7 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SESSI
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SESSION_METADATA_CACHE_SIZE_BYTES;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.util.List;
@@ -94,13 +94,13 @@ public class GenericCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 LanceTableOperations.SchemaRefreshMode.DECLARED_AND_EMPTY,
                 false /* hidden */,
                 false /* reserved */),
-            longOptionalPropertyEntry(
+            nonNegativeLongOptionalPropertyEntry(
                 LANCE_SESSION_METADATA_CACHE_SIZE_BYTES,
                 "The metadata cache size in bytes for the Lance session.",
                 false /* immutable */,
                 Session.DEFAULT_METADATA_CACHE_SIZE_BYTES,
                 false /* hidden */),
-            longOptionalPropertyEntry(
+            nonNegativeLongOptionalPropertyEntry(
                 LANCE_SESSION_INDEX_CACHE_SIZE_BYTES,
                 "The index cache size in bytes for the Lance session.",
                 false /* immutable */,
@@ -113,5 +113,24 @@ public class GenericCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
     return PROPERTIES_METADATA;
+  }
+
+  private static PropertyEntry<Long> nonNegativeLongOptionalPropertyEntry(
+      String name, String description, boolean immutable, long defaultValue, boolean hidden) {
+    return new PropertyEntry.Builder<Long>()
+        .withName(name)
+        .withDescription(description)
+        .withImmutable(immutable)
+        .withJavaType(Long.class)
+        .withDefaultValue(defaultValue)
+        .withHidden(hidden)
+        .withDecoder(
+            value -> {
+              long parsed = Long.parseLong(value.trim());
+              Preconditions.checkArgument(parsed >= 0, "Must be a non negative value");
+              return parsed;
+            })
+        .withEncoder(String::valueOf)
+        .build();
   }
 }
