@@ -20,6 +20,7 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -33,6 +34,8 @@ import org.apache.gravitino.maintenance.jobs.BuiltInJob;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.iceberg.ManifestFile;
+import org.apache.iceberg.PartitionField;
+import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.spark.sql.Row;
@@ -173,11 +176,8 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
       String tableIdentifier,
       @Nullable String useCaching,
       @Nullable String specId) {
-    StringBuilder sql = new StringBuilder();
-    sql.append("CALL ")
-        .append(IcebergJobUtils.escapeSqlIdentifier(catalogName))
-        .append(".system.rewrite_manifests(");
-    sql.append("table => '").append(IcebergJobUtils.escapeSqlString(tableIdentifier)).append("'");
+    StringBuilder sql = IcebergJobUtils.beginSystemProcedureCall(catalogName, "rewrite_manifests");
+    IcebergJobUtils.appendSqlStringTableArg(sql, tableIdentifier);
 
     if (useCaching != null && !useCaching.isEmpty()) {
       sql.append(", use_caching => ").append(Boolean.parseBoolean(useCaching));
@@ -262,9 +262,17 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
 
   @Override
   public TableSnapshotMetrics collectBeforeMetrics(
-      SparkSession spark, String catalogName, String tableIdentifier) {
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      Map<String, String> argsByName) {
     long snapshotId = IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier);
-    Map<String, Object> metrics = collectManifestBeforeMetrics(spark, catalogName, tableIdentifier);
+    String requestedSpecId = IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("spec-id"));
+    String specId = resolveSpecIdArg(spark, catalogName, tableIdentifier, requestedSpecId);
+    // Write the resolved id back so executeAndCollectAfter reuses the same value.
+    argsByName.put("spec-id", specId);
+    Map<String, Object> metrics =
+        collectManifestBeforeMetrics(spark, catalogName, tableIdentifier, specId);
     return TableSnapshotMetrics.of(snapshotId, metrics);
   }
 
@@ -280,13 +288,20 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
       String tableIdentifier,
       Map<String, String> argsByName,
       @Nullable TableSnapshotMetrics before) {
+    // Prefer the id written by collectBeforeMetrics; fall back to resolve if S0 was skipped.
+    String specId =
+        resolveSpecIdArg(
+            spark,
+            catalogName,
+            tableIdentifier,
+            IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("spec-id")));
     List<Row> results =
         execute(
             spark,
             catalogName,
             tableIdentifier,
             IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("use-caching")),
-            IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("spec-id")));
+            specId);
     long rewritten = 0L;
     if (!results.isEmpty()) {
       Row result = results.get(0);
@@ -296,8 +311,12 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
           rewritten,
           ((Number) result.get(1)).longValue());
     }
-    Map<String, Object> metrics = new HashMap<>();
+    Table table = IcebergJobUtils.loadIcebergTable(spark, catalogName, tableIdentifier);
+    int resolvedSpec = Integer.parseInt(specId);
+    Map<String, Object> metrics =
+        new HashMap<>(collectManifestBeforeMetrics(spark, catalogName, tableIdentifier, specId));
     metrics.put(IcebergRewriteManifestsContent.REWRITTEN_MANIFEST_NUMBER_METRIC, rewritten);
+    putPartitionSpecContext(metrics, table, resolvedSpec);
     return TableSnapshotMetrics.of(
         IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier), metrics);
   }
@@ -340,18 +359,34 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
   // -------------------------------------------------------------------------
 
   /**
-   * Collects manifest inventory for TMS S0. Reads the current snapshot's manifests via Iceberg API.
-   * CLI entry points never call this.
+   * Collects manifest inventory for TMS S0 for one resolved partition spec. Matches optimizer
+   * {@code custom-manifest-number-by-spec} semantics: only manifests whose {@code partitionSpecId}
+   * equals the resolved spec are counted. When {@code specId} is null/blank, uses the table's
+   * current default spec. CLI entry points never call this.
+   *
+   * @param spark active Spark session
+   * @param catalogName Iceberg catalog name
+   * @param tableIdentifier fully qualified table name
+   * @param specId optional non-negative partition spec id; null/blank → table default spec
+   * @return S0 metrics map ({@code custom-manifest-number}, {@code custom-avg-manifest-size})
    */
   @VisibleForTesting
   static Map<String, Object> collectManifestBeforeMetrics(
-      SparkSession spark, String catalogName, String tableIdentifier) {
+      SparkSession spark, String catalogName, String tableIdentifier, @Nullable String specId) {
+    validateSpecId(specId);
     Table table = IcebergJobUtils.loadIcebergTable(spark, catalogName, tableIdentifier);
+    int resolvedSpec =
+        specId == null || specId.trim().isEmpty()
+            ? table.spec().specId()
+            : Integer.parseInt(specId.trim());
     Snapshot snapshot = table.currentSnapshot();
     long count = 0L;
     long totalSize = 0L;
     if (snapshot != null) {
       for (ManifestFile manifest : snapshot.allManifests(table.io())) {
+        if (manifest.partitionSpecId() != resolvedSpec) {
+          continue;
+        }
         count++;
         totalSize += manifest.length();
       }
@@ -361,6 +396,59 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
     metrics.put(
         IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC,
         count == 0L ? 0D : (double) totalSize / count);
+    putPartitionSpecContext(metrics, table, resolvedSpec);
     return metrics;
+  }
+
+  /**
+   * Resolves the job {@code spec-id} argument: keep an explicit value, otherwise use the table's
+   * current default partition spec id.
+   */
+  @VisibleForTesting
+  static String resolveSpecIdArg(
+      SparkSession spark, String catalogName, String tableIdentifier, @Nullable String specId) {
+    if (specId != null && !specId.trim().isEmpty()) {
+      validateSpecId(specId);
+      return specId.trim();
+    }
+    int resolved =
+        IcebergJobUtils.loadIcebergTable(spark, catalogName, tableIdentifier).spec().specId();
+    return Integer.toString(resolved);
+  }
+
+  /**
+   * Adds partition-spec observability fields for partitioned specs only. Unpartitioned resolved
+   * specs omit both keys.
+   */
+  @VisibleForTesting
+  static void putPartitionSpecContext(
+      Map<String, Object> metrics, Table table, int resolvedSpecId) {
+    PartitionSpec spec = table.specs().get(resolvedSpecId);
+    if (spec == null || spec.isUnpartitioned()) {
+      return;
+    }
+    metrics.put(IcebergRewriteManifestsContent.MANIFEST_SPEC_ID_METRIC, resolvedSpecId);
+    metrics.put(
+        IcebergRewriteManifestsContent.MANIFEST_PARTITION_SPEC_METRIC, formatPartitionSpec(spec));
+  }
+
+  /**
+   * Formats a partitioned Iceberg {@link PartitionSpec} for metrics display, e.g. {@code
+   * day(event_time)} or {@code identity(id), bucket[8](user_id)}.
+   */
+  @VisibleForTesting
+  static String formatPartitionSpec(PartitionSpec spec) {
+    List<String> parts = new ArrayList<>();
+    for (PartitionField field : spec.fields()) {
+      if (field.transform().isVoid()) {
+        continue;
+      }
+      String source = spec.schema().findColumnName(field.sourceId());
+      if (source == null || source.isEmpty()) {
+        source = field.name();
+      }
+      parts.add(field.transform() + "(" + source + ")");
+    }
+    return String.join(", ", parts);
   }
 }

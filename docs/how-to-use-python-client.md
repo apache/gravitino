@@ -79,6 +79,30 @@ error responses, and bypasses custom error handlers for empty or invalid error r
 Connection failures and timeouts before an HTTP error response retain their existing behavior.
 The client does not retry requests as part of this error handling.
 
+### Runtime dependency ranges
+
+The metadata client and optional storage or Lance integrations use these runtime
+requirements. Development and standard integration-test dependencies are pinned separately.
+
+| Installation | Runtime requirements |
+| --- | --- |
+| Core | `dataclasses-json>=0.6.7,<0.7`, `simplejson>=3.20.1,<5` |
+| GVFS shared | `cachetools>=7.1.4,<8`, `fsspec>=2023.12.1`, `readerwriterlock>=1.0.9,<2` |
+| HDFS | `pyarrow>=17.0.0,<27` |
+| S3 | `s3fs>=2023.12.1` |
+| GCS | `gcsfs>=2023.12.1` |
+| OSS | `ossfs>=2025.5.0` |
+| Azure | `adlfs>=2026.2.0` |
+| Lance | `ray>=2.55.1`, `lance-ray>=0.3.0,<1` |
+
+Backend libraries also constrain their dependencies. For example, s3fs and gcsfs
+2023.12.1 both require fsspec 2023.12.1. The installer selects a compatible combination
+when multiple extras or `[storage]` are requested. The storage profile does not include
+`[lance]`; request both extras when both features are needed.
+
+Python package compatibility also applies. For example, PyArrow 26 requires Python 3.11
+or later. The allowed ranges do not imply that every version combination has been tested.
+
 ### Semantic Model Ossie Import and Export
 
 Use `as_semantic_model_catalog()` on a loaded relational catalog to manage Semantic Models.
@@ -129,6 +153,47 @@ Use any IDE to develop Gravitino Python Client. Directly open the client-python 
 + Python 3.10+
 + Refer to [How to build Gravitino](./how-to-build.md#prerequisites) to have necessary build
   environment ready for building.
+
+### Develop with uv
+
+The Python client also provides an optional [uv](https://docs.astral.sh/uv/) development
+workflow. The existing Gradle build, CI, and release commands continue to use their existing
+environment setup.
+
+Install uv, then run the following commands from `clients/client-python`:
+
+```shell
+uv sync --locked --extra dev --python 3.12
+uv run --locked --extra dev python scripts/generate_version.py
+uv run --locked --extra dev black --check gravitino tests scripts
+uv run --locked --extra dev pylint gravitino tests scripts
+PYTHONPATH="$PWD" uv run --locked --extra dev --directory tests/unittests python -m unittest
+```
+
+The version-generation command is required after a fresh checkout. Configure your IDE to use
+`clients/client-python/.venv/bin/python` (or `.venv/Scripts/python.exe` on Windows).
+For another supported Python version, select it with `--python`. Use a separate environment
+when switching between Python versions or dependency combinations.
+The unit-test command sets `PYTHONPATH` to make the existing shared test helpers importable,
+as the Gradle test task does.
+
+`setup.py` and the existing `requirements*.txt` files continue to declare package metadata
+and dependencies. `uv.lock` records the resolved development environment; SDK users can
+continue installing the published package with pip. After changing a requirement file,
+run `uv lock`, review the lockfile changes, and verify `uv lock --check`. Use
+`uv sync --locked --all-extras` to install all existing optional extras in the
+development environment.
+
+For an independent lock, metadata-equivalence and cache-invalidation check, run:
+
+```shell
+uv run --locked python scripts/check_uv_workflow.py
+```
+
+This lightweight check needs only the core client and the default setuptools development
+tool. It changes README and requirements only in temporary source copies, reuses the uv
+cache, and exits nonzero on failure. The uv commands above do not run integration tests;
+use the existing Gradle commands below with their server or storage prerequisites.
 
 ### Build and Test
 

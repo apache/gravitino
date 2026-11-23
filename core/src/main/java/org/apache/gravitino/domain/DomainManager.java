@@ -198,7 +198,8 @@ public class DomainManager implements DomainDispatcher {
   }
 
   @Override
-  public boolean deleteDomain(String metalake, String name) throws NonEmptyDomainException {
+  public boolean deleteDomain(String metalake, String name)
+      throws IllegalArgumentException, NonEmptyDomainException {
     checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
     try {
       // The row lock fences parent changes until the caller check and deletion complete.
@@ -206,9 +207,12 @@ public class DomainManager implements DomainDispatcher {
           domainOperations()
               .deleteDomain(
                   NameIdentifierUtil.ofDomain(metalake, name),
-                  domain ->
-                      mutationCheck.accept(
-                          new LockedDomainState(domain, null, Collections.emptyList())));
+                  domain -> {
+                    LockedDomainState state =
+                        new LockedDomainState(domain, null, Collections.emptyList());
+                    mutationCheck.accept(state);
+                    checkDelete(state);
+                  });
       return deleted;
     } catch (NonEmptyEntityException e) {
       throw new NonEmptyDomainException(
@@ -419,6 +423,20 @@ public class DomainManager implements DomainDispatcher {
         domain.name(),
         parent.name(),
         parent.name());
+  }
+
+  /**
+   * Checks a delete against the locked domain: only a draft domain can be deleted. The check runs
+   * before the sub-domain check, so a published domain with sub-domains fails here.
+   *
+   * @param state The locked state of the delete.
+   */
+  @VisibleForTesting
+  static void checkDelete(LockedDomainState state) {
+    Preconditions.checkArgument(
+        state.domain().status() == Domain.Status.DRAFT,
+        "Domain %s cannot be deleted while it is published, unpublish it first",
+        state.domain().name());
   }
 
   /**
@@ -651,14 +669,14 @@ public class DomainManager implements DomainDispatcher {
         !Objects.equals(name, parent), "Domain %s cannot be its own parent", name);
   }
 
-  // Checks that the locked backing tag allows the value and that no other domain has a binding of
-  // the tag that conflicts with it: a tag has either one binding without a value, or bindings with
-  // values where each value backs at most one domain.
+  // Checks that the locked backing tag allows the value, if any, and that no other domain has a
+  // binding of the tag that conflicts with it: a tag has either one binding without a value, or
+  // bindings with values where each value backs at most one domain. A binding without a value
+  // matches every assignment of the tag, so it is accepted whatever values the tag allows.
   private static void checkBinding(
       DomainEntity domain, Optional<String> value, LockedDomainState state) {
     TagEntity tag = lockedBackingTag(state);
-    tag.validateAllowedValue(
-        value.map(v -> TagValue.of(tag.name(), v)).orElseGet(() -> TagValue.noValue(tag.name())));
+    value.ifPresent(v -> tag.validateAllowedValue(TagValue.of(tag.name(), v)));
 
     for (DomainEntity bound : state.backingTagBindings()) {
       if (Objects.equals(bound.id(), domain.id())) {

@@ -20,12 +20,17 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.job.SparkJobTemplate;
-import org.apache.gravitino.maintenance.jobs.iceberg.IcebergMaintenanceJob.MaintenanceType;
+import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.policy.IcebergDataCompactionContent;
+import org.apache.gravitino.policy.Policy;
 import org.junit.jupiter.api.Test;
 
 /** Unit tests for {@link IcebergMaintenanceJob} orchestration. */
@@ -36,70 +41,80 @@ public class TestIcebergMaintenanceJob {
     SparkJobTemplate template = new IcebergMaintenanceJob().jobTemplate();
     assertEquals(IcebergMaintenanceJob.NAME, template.name());
     List<String> args = template.arguments();
-    assertTrue(args.contains("--maintenance-types"));
-    assertTrue(args.contains("{{maintenance_types}}"));
-    assertFalse(args.contains("{{maintenance_types:-}}"));
-    assertTrue(args.contains("--policy-ids"));
-    assertTrue(args.contains("{{policy_ids}}"));
-    assertTrue(args.contains("--tables"));
-    assertTrue(args.contains("{{tables}}"));
-    assertTrue(args.contains("--rules"));
-    assertTrue(args.contains("{{rules:-}}"));
-    assertFalse(args.contains("--table-id"));
-    assertFalse(args.contains("--gravitino-job-id"));
-  }
-
-  @Test
-  public void testMaintenanceTypeFromWire() {
-    assertEquals(MaintenanceType.EXPIRE_SNAPSHOTS, MaintenanceType.fromWire("expire_snapshots"));
-    assertEquals(
-        MaintenanceType.REWRITE_DATA_FILES, MaintenanceType.fromWire("REWRITE_DATA_FILES"));
-    assertThrows(IllegalArgumentException.class, () -> MaintenanceType.fromWire("unknown"));
-    assertThrows(IllegalArgumentException.class, () -> MaintenanceType.fromWire(null));
+    assertTrue(args.contains("--tasks"));
+    assertTrue(args.contains("{{tasks}}"));
+    assertFalse(args.contains("{{tasks:-}}"));
+    assertTrue(args.contains("--updater-options"));
+    assertTrue(args.contains("--spark-conf"));
+    assertFalse(args.contains("--maintenance-types"));
+    assertFalse(args.contains("--policy-ids"));
+    assertFalse(args.contains("--tables"));
+    assertFalse(args.contains("--strategy"));
+    // Spark settings come from --spark-conf only; template carries no Spark configs.
+    assertTrue(template.configs().isEmpty());
   }
 
   @Test
   public void testRunRejectsInvalidArgs() {
-    assertEquals(
-        1, IcebergMaintenanceJob.run(new String[] {"--maintenance-types", "expire_snapshots"}));
+    assertEquals(1, IcebergMaintenanceJob.run(new String[] {"--tasks", "[]"}));
     assertEquals(
         1,
         IcebergMaintenanceJob.run(
             new String[] {
-              "--maintenance-types",
-              "expire_snapshots,rewrite_manifests",
-              "--policy-ids",
-              "10",
-              "--tables",
-              "[{\"table_id\":1,\"catalog_name\":\"c\",\"table_identifier\":\"db.t\"}]"
+              "--tasks",
+              "[{\"table_id\":1,\"policy_type\":\"system_iceberg_snapshot_expiration\","
+                  + "\"policy_id\":10,\"action_id\":100,\"params\":{}}]"
             }));
     assertEquals(
         1,
         IcebergMaintenanceJob.run(
             new String[] {
-              "--maintenance-types", "expire_snapshots", "--policy-ids", "10", "--tables", "[]"
+              "--tasks",
+              "[{\"table_id\":1,\"policy_type\":\"system_row_filter\",\"policy_id\":10,"
+                  + "\"action_id\":100,\"params\":{\"catalog_name\":\"c\","
+                  + "\"table_identifier\":\"db.t\"}}]"
             }));
   }
 
   @Test
-  public void testSnapshotDriftGateOnlyForCompactionAndManifest() {
-    assertTrue(IcebergMaintenanceJob.shouldCheckSnapshotDrift(MaintenanceType.REWRITE_DATA_FILES));
-    assertTrue(IcebergMaintenanceJob.shouldCheckSnapshotDrift(MaintenanceType.REWRITE_MANIFESTS));
-    assertFalse(IcebergMaintenanceJob.shouldCheckSnapshotDrift(MaintenanceType.EXPIRE_SNAPSHOTS));
-    assertFalse(
-        IcebergMaintenanceJob.shouldCheckSnapshotDrift(MaintenanceType.REMOVE_ORPHAN_FILES));
+  public void testCompactionMinDataFileMseFromRules() {
+    assertEquals(
+        IcebergDataCompactionContent.DEFAULT_MIN_DATA_FILE_MSE,
+        IcebergMaintenanceJob.compactionMinDataFileMse(null));
+    assertEquals(
+        IcebergDataCompactionContent.DEFAULT_MIN_DATA_FILE_MSE,
+        IcebergMaintenanceJob.compactionMinDataFileMse(Collections.emptyMap()));
+    assertEquals(
+        10L,
+        IcebergMaintenanceJob.compactionMinDataFileMse(
+            Collections.singletonMap(IcebergDataCompactionContent.MIN_DATA_FILE_MSE_KEY, 10)));
   }
 
   @Test
-  public void testMaintenanceActionsWireToJobClasses() {
-    assertTrue(MaintenanceType.REWRITE_DATA_FILES.action() instanceof IcebergRewriteDataFilesJob);
-    assertTrue(MaintenanceType.REWRITE_MANIFESTS.action() instanceof IcebergRewriteManifestsJob);
-    assertTrue(MaintenanceType.EXPIRE_SNAPSHOTS.action() instanceof IcebergExpireSnapshotsJob);
-    assertTrue(MaintenanceType.REMOVE_ORPHAN_FILES.action() instanceof IcebergRemoveOrphanFilesJob);
+  public void testWithCompactionDataMseRatioEnrichesBeforeAndAfterShape() throws Exception {
+    Map<String, Object> inventory = new HashMap<>();
+    inventory.put(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC, 20D);
+    inventory.put(IcebergDataCompactionContent.FILE_NUMBER_METRIC, 3L);
+    TableSnapshotMetrics sample = TableSnapshotMetrics.of(42L, inventory);
 
-    assertTrue(MaintenanceType.REWRITE_DATA_FILES.action().hasBeforeMetrics());
-    assertTrue(MaintenanceType.REWRITE_MANIFESTS.action().hasBeforeMetrics());
-    assertTrue(MaintenanceType.EXPIRE_SNAPSHOTS.action().hasBeforeMetrics());
-    assertFalse(MaintenanceType.REMOVE_ORPHAN_FILES.action().hasBeforeMetrics());
+    TableSnapshotMetrics enriched =
+        IcebergMaintenanceJob.withCompactionDataMseRatio(
+            sample,
+            Policy.BuiltInType.ICEBERG_COMPACTION,
+            Collections.singletonMap(IcebergDataCompactionContent.MIN_DATA_FILE_MSE_KEY, 10));
+
+    Map<String, Object> metrics =
+        JsonUtils.anyFieldMapper()
+            .readValue(enriched.metricsJson(), new TypeReference<Map<String, Object>>() {});
+    assertEquals(42L, enriched.snapshotId());
+    assertEquals(
+        2D,
+        ((Number) metrics.get(IcebergDataCompactionContent.DATA_MSE_RATIO_METRIC)).doubleValue());
+    assertFalse(metrics.containsKey(IcebergDataCompactionContent.MIN_DATA_FILE_MSE_KEY));
+
+    TableSnapshotMetrics skipped =
+        IcebergMaintenanceJob.withCompactionDataMseRatio(
+            sample, Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION, null);
+    assertEquals(sample.metricsJson(), skipped.metricsJson());
   }
 }

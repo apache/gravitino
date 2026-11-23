@@ -248,6 +248,19 @@ public class TestGravitinoCatalogManager {
   }
 
   @Test
+  void testRefreshCatalogBypassesCacheAndReplacesCachedValue() {
+    GravitinoCatalogManager manager = createManager(new SparkConf(false));
+
+    Catalog cached = manager.getGravitinoCatalogInfo(CATALOG_NAME);
+    Catalog refreshed =
+        manager.refreshGravitinoCatalogInfo(manager.currentIdentity(), CATALOG_NAME);
+
+    assertNotSame(cached, refreshed);
+    assertSame(refreshed, manager.getGravitinoCatalogInfo(CATALOG_NAME));
+    assertEquals(2, clientFactory.loadCount());
+  }
+
+  @Test
   void testIcebergRestUriIsCachedAfterSuccessfulDiscovery() {
     AtomicInteger discoveryCalls = new AtomicInteger();
     GravitinoCatalogManager manager =

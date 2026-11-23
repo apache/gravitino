@@ -39,7 +39,7 @@ tests:
           path: data["log4j2.properties"]
       - matchRegex:
           path: data["init.sh"]
-          pattern: "docker-entrypoint\\.sh"
+          pattern: "exec /bin/bash .*/docker-entrypoint\\.sh"
       - matchRegex:
           path: data["gravitino.conf"]
           pattern: "gravitino\\.server\\.webserver\\.httpPort = 8090"

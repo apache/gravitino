@@ -119,11 +119,10 @@ import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.secret.SecretAlterChanges;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
-import org.apache.gravitino.secret.SecretMaterial;
-import org.apache.gravitino.secret.SecretMaterialsHolder;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.secret.SecretVersionChanges;
+import org.apache.gravitino.secret.SecretVersionChangesHolder;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
 import org.apache.gravitino.utils.ClassLoaderKey;
@@ -853,8 +852,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             buildCatalogConf(provider, properties), secretBindings, secretReferences);
     long uid = idGenerator.nextId();
 
-    List<SecretMaterial> secretMaterials =
-        secretManager.assembleSecretMaterials(
+    Map<String, String> secretPlaintexts =
+        secretManager.assembleSecretPlaintexts(
             properties, mergedConfig, "catalog", uid, secretBindings, secretReferences);
 
     StringIdentifier stringId = StringIdentifier.fromId(uid);
@@ -889,8 +888,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             checkOpen();
             checkMetalake(metalakeIdent, store);
             // Initialization resolves secret URNs, but must not publish the entity yet.
-            secretManager.writeSecrets(secretMaterials);
+            secretManager.validateProposedSecrets(mergedConfig, secretPlaintexts);
+            SecretVersionChanges stagedSecrets =
+                secretManager.stageSecrets(null, mergedConfig, "catalog", uid, secretPlaintexts);
             AtomicBoolean entityStored = new AtomicBoolean(false);
+            Catalog info;
             try {
               // Reject known duplicates before contacting the backend; store.put still arbitrates
               // concurrent creates from other server instances.
@@ -904,7 +906,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                     wrapper.tryAcquire(), "A new catalog wrapper cannot be retired");
                 try (CatalogLease lease = new CatalogLease(wrapper)) {
                   // Snapshot construction can also fail; finish it before making the row visible.
-                  Catalog info = toCatalogInfo(lease.wrapper());
+                  info = toCatalogInfo(lease.wrapper());
                   // Initializing outside compute keeps slow backend verification out of cache
                   // locks. Serialize the short store/cache publication with acquireCatalogLease
                   // so a listCatalogsInfo reader cannot build a second wrapper in between them.
@@ -928,7 +930,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                             return wrapper;
                           });
                   published = true;
-                  return info;
                 }
               } finally {
                 if (!published) {
@@ -936,13 +937,15 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                 }
               }
             } catch (RuntimeException re) {
-              rollbackFailedCatalogCreate(ident, secretMaterials, entityStored.get());
+              rollbackFailedCatalogCreate(ident, stagedSecrets, entityStored.get(), re);
               throw re;
             } catch (Exception ex) {
-              rollbackFailedCatalogCreate(ident, secretMaterials, entityStored.get());
+              rollbackFailedCatalogCreate(ident, stagedSecrets, entityStored.get(), ex);
               LOG.error("Failed to create catalog {}", ident, ex);
               throw new RuntimeException(ex);
             }
+            secretManager.commitSecrets(stagedSecrets);
+            return info;
           } finally {
             lifecycleLock.readLock().unlock();
           }
@@ -1327,7 +1330,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private CatalogEntity alterCatalogUnderLock(NameIdentifier ident, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException, IOException {
-    SecretMaterialsHolder writtenSecretMaterials = new SecretMaterialsHolder();
+    SecretVersionChangesHolder stagedSecrets = new SecretVersionChangesHolder();
     boolean alterCommitted = false;
     try (CatalogLease lease = acquireCatalogLease(ident)) {
       CatalogEntity updatedCatalog =
@@ -1371,7 +1374,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                 Pair<CatalogChange[], SecretVersionChanges> secretResult =
                     SecretAlterChanges.prepareCatalogChanges(
                         secretManager, currentProperties, existing.id(), changes);
-                writtenSecretMaterials.set(secretResult.getRight());
+                stagedSecrets.set(secretResult.getRight());
                 return updateEntity(
                         newCatalogBuilder(ident.namespace(), existing),
                         new HashMap<>(currentProperties),
@@ -1379,13 +1382,13 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                     .build();
               });
       alterCommitted = true;
-      secretManager.commitSecrets(writtenSecretMaterials.get());
+      secretManager.commitSecrets(stagedSecrets.get());
       return updatedCatalog;
     } catch (NoSuchEntityException e) {
       throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
     } finally {
       if (!alterCommitted) {
-        secretManager.rollbackSecrets(writtenSecretMaterials.get());
+        secretManager.rollbackSecrets(stagedSecrets.get());
       }
     }
   }
@@ -2383,20 +2386,34 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   }
 
   /**
-   * Rolls back secrets written for a catalog create attempt and, when {@code store.put} succeeded,
-   * removes the catalog entity left behind by a failed publication.
+   * Cleans up a failed catalog create by rolling back its staged secrets. When {@code store.put}
+   * succeeded, the stored catalog entity is removed first; if it cannot be removed, its secrets are
+   * kept because it still references them.
+   *
+   * @throws GravitinoRuntimeException if the stored catalog entity cannot be removed, with {@code
+   *     failure} as the cause and the delete failure suppressed
    */
   private void rollbackFailedCatalogCreate(
-      NameIdentifier ident, List<SecretMaterial> secretMaterials, boolean entityStored) {
-    secretManager.rollbackSecrets(secretMaterials);
-    if (!entityStored) {
-      return;
+      NameIdentifier ident,
+      SecretVersionChanges stagedSecrets,
+      boolean entityStored,
+      Exception failure) {
+    if (entityStored) {
+      catalogCache.invalidate(ident);
+      try {
+        store.delete(ident, EntityType.CATALOG, true);
+      } catch (IOException | RuntimeException e) {
+        LOG.error("Failed to clean up catalog {}; keeping the secrets it references", ident, e);
+        GravitinoRuntimeException leftover =
+            new GravitinoRuntimeException(
+                failure,
+                "Failed to create catalog %s, and failed to remove the catalog entity it stored;"
+                    + " drop the catalog with force before creating it again",
+                ident);
+        leftover.addSuppressed(e);
+        throw leftover;
+      }
     }
-    catalogCache.invalidate(ident);
-    try {
-      store.delete(ident, EntityType.CATALOG, true);
-    } catch (IOException e) {
-      LOG.error("Failed to clean up catalog {}", ident, e);
-    }
+    secretManager.rollbackSecrets(stagedSecrets);
   }
 }

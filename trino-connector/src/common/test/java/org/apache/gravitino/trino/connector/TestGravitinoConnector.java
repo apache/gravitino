@@ -29,9 +29,11 @@ import io.trino.testing.MaterializedResult;
 import io.trino.testing.MaterializedRow;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.gravitino.client.GravitinoAdminClient;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
 
 public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorTest {
@@ -167,6 +169,31 @@ public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorT
         .contains("b integer");
 
     // Cleanup
+    dropTestTable(ctasTable);
+    dropTestTable(sourceTable);
+  }
+
+  @Test
+  public void testFailedCreateTableAsSelectLeavesNoTable() throws Exception {
+    String sourceTable = "\"memory\".db_01.tb_src_ctas_fail";
+    String ctasTable = "\"memory\".db_01.tb_ctas_fail";
+    createTestTable(sourceTable);
+    assertUpdate(String.format("insert into %s (a, b) values ('Alice', 1)", sourceTable), 1);
+
+    // The division fails while the query runs, after beginCreateTable has created the table.
+    assertQueryFails(
+        String.format("create table %s as select a, b / 0 as b from %s", ctasTable, sourceTable),
+        ".*Division by zero.*");
+    // Trino can report the failure before the rollback finishes.
+    Awaitility.await()
+        .atMost(30, TimeUnit.SECONDS)
+        .untilAsserted(
+            () ->
+                assertThat(computeActual("show tables from \"memory\".db_01").getOnlyColumnAsSet())
+                    .doesNotContain("tb_ctas_fail"));
+
+    assertUpdate(
+        String.format("create table %s as select a, b from %s", ctasTable, sourceTable), 1);
     dropTestTable(ctasTable);
     dropTestTable(sourceTable);
   }

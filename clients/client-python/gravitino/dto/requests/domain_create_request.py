@@ -32,13 +32,6 @@ class BackingTagCreate(DomainBackingTagDTO):
 
     _create: bool = field(default=False, metadata=config(field_name="create"))
 
-    def validate(self) -> None:
-        tag = self.tag_value()
-        Precondition.check_argument(
-            not self._create or tag.value() is None,
-            "A new backing tag cannot have a value",
-        )
-
 
 @dataclass_json
 @dataclass

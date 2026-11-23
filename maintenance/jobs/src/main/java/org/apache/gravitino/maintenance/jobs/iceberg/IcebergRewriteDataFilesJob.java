@@ -227,13 +227,8 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
       String whereClause,
       String optionsJson) {
 
-    StringBuilder sql = new StringBuilder();
-    sql.append("CALL ")
-        .append(IcebergJobUtils.escapeSqlIdentifier(catalogName))
-        .append(".system.rewrite_data_files(");
-    sql.append("table => '")
-        .append(IcebergJobUtils.escapeSparkCallStringArg(tableIdentifier))
-        .append("'");
+    StringBuilder sql = IcebergJobUtils.beginSystemProcedureCall(catalogName, "rewrite_data_files");
+    IcebergJobUtils.appendSparkCallStringTableArg(sql, tableIdentifier);
 
     if (strategy != null && !strategy.isEmpty()) {
       sql.append(", strategy => '")
@@ -401,7 +396,10 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
 
   @Override
   public TableSnapshotMetrics collectBeforeMetrics(
-      SparkSession spark, String catalogName, String tableIdentifier) {
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      Map<String, String> argsByName) {
     long snapshotId = IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier);
     Map<String, Object> metrics = collectCompactionMetrics(spark, catalogName, tableIdentifier);
     return TableSnapshotMetrics.of(snapshotId, metrics);
@@ -439,7 +437,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
   /**
    * Collects compaction inventory metrics for TMS before/after reporting. Uses the same {@code
    * files} metadata SQL as {@link IcebergUpdateStatsAndMetricsJob}. CLI entry points never call
-   * this.
+   * this. Fragmentation ratio is added by {@link IcebergMaintenanceJob} from policy rules.
    */
   @VisibleForTesting
   static Map<String, Object> collectCompactionMetrics(
@@ -456,7 +454,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
     String sql = IcebergUpdateStatsAndMetricsJob.buildTableStatsSql(catalogName, tableIdentifier);
     Row[] rows = (Row[]) spark.sql(sql).collect();
     if (rows.length == 0) {
-      return compactionMetrics(0D, 0L, 0D, 0L, 0L);
+      return compactionMetrics(0D, 0L, 0D, 0L, 0L, 0L);
     }
     Row row = rows[0];
     return compactionMetrics(
@@ -464,7 +462,8 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
         numberAsLong(row, "delete-file-number"),
         numberAsDouble(row, "avg-file-size"),
         numberAsLong(row, "total-file-size"),
-        numberAsLong(row, "file-number"));
+        numberAsLong(row, "file-number"),
+        numberAsLong(row, "small-file-number"));
   }
 
   @VisibleForTesting
@@ -472,6 +471,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
     double maxMse = 0D;
     long deleteFiles = 0L;
     long fileNumber = 0L;
+    long smallFileNumber = 0L;
     long totalFileSize = 0L;
     double weightedAvgNumerator = 0D;
     for (Row row : rows) {
@@ -479,11 +479,13 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
       deleteFiles += numberAsLong(row, "delete-file-number");
       long partitionFiles = numberAsLong(row, "file-number");
       fileNumber += partitionFiles;
+      smallFileNumber += numberAsLong(row, "small-file-number");
       totalFileSize += numberAsLong(row, "total-file-size");
       weightedAvgNumerator += numberAsDouble(row, "avg-file-size") * partitionFiles;
     }
     double avgFileSize = fileNumber == 0L ? 0D : weightedAvgNumerator / fileNumber;
-    return compactionMetrics(maxMse, deleteFiles, avgFileSize, totalFileSize, fileNumber);
+    return compactionMetrics(
+        maxMse, deleteFiles, avgFileSize, totalFileSize, fileNumber, smallFileNumber);
   }
 
   private static Map<String, Object> compactionMetrics(
@@ -491,13 +493,15 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
       long deleteFileNumber,
       double avgFileSize,
       long totalFileSize,
-      long fileNumber) {
+      long fileNumber,
+      long smallFileNumber) {
     Map<String, Object> metrics = new HashMap<>();
     metrics.put(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC, dataFileMse);
     metrics.put(IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC, deleteFileNumber);
     metrics.put(IcebergDataCompactionContent.AVG_FILE_SIZE_METRIC, avgFileSize);
     metrics.put(IcebergDataCompactionContent.TOTAL_FILE_SIZE_METRIC, totalFileSize);
     metrics.put(IcebergDataCompactionContent.FILE_NUMBER_METRIC, fileNumber);
+    metrics.put(IcebergDataCompactionContent.SMALL_FILE_NUMBER_METRIC, smallFileNumber);
     return metrics;
   }
 
