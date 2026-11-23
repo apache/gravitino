@@ -21,6 +21,7 @@ package org.apache.gravitino.meta;
 
 import com.google.common.base.Preconditions;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -36,7 +37,8 @@ import org.apache.gravitino.glossary.GlossaryTerm.Status;
 import org.apache.gravitino.glossary.TermLink;
 
 /**
- * Persisted glossary definition. Relations and authorized API projections are loaded separately.
+ * Persisted glossary definition with its stored domain names. Relations and authorized API
+ * projections are loaded separately.
  */
 public final class GlossaryTermEntity implements Entity, HasIdentifier, Auditable {
   /** The id field. */
@@ -63,6 +65,9 @@ public final class GlossaryTermEntity implements Entity, HasIdentifier, Auditabl
   /** The version field. */
   public static final Field VERSION =
       Field.required("version", Long.class, "The glossary version.");
+  /** The domains field, with the names of all stored domains, including hidden ones. */
+  public static final Field DOMAINS =
+      Field.required("domains", String[].class, "The glossary domains.");
   /** The auditInfo field. */
   public static final Field AUDIT_INFO =
       Field.required("auditInfo", Audit.class, "The glossary auditInfo.");
@@ -78,6 +83,7 @@ public final class GlossaryTermEntity implements Entity, HasIdentifier, Auditabl
   private Map<String, String> properties;
   private long version;
   private Audit auditInfo;
+  private String[] domains;
 
   private GlossaryTermEntity() {}
   /** Returns the id. */
@@ -133,6 +139,14 @@ public final class GlossaryTermEntity implements Entity, HasIdentifier, Auditabl
   public Audit auditInfo() {
     return auditInfo;
   }
+  /**
+   * Returns the names of the term's domains in ascending order. Storage reads return every stored
+   * domain. Callers must filter hidden domains before returning a term to a user. Definition writes
+   * ignore this value: membership changes only through the glossary term write path.
+   */
+  public String[] domains() {
+    return domains.clone();
+  }
 
   @Override
   public EntityType type() {
@@ -152,6 +166,7 @@ public final class GlossaryTermEntity implements Entity, HasIdentifier, Auditabl
     values.put(PROPERTIES, properties);
     values.put(VERSION, version);
     values.put(AUDIT_INFO, auditInfo);
+    values.put(DOMAINS, domains.clone());
     return Collections.unmodifiableMap(values);
   }
   /** Checks the UTF-8 storage bound for a proposed definition. */
@@ -175,6 +190,7 @@ public final class GlossaryTermEntity implements Entity, HasIdentifier, Auditabl
       value.status = Status.APPROVED;
       value.properties = Collections.emptyMap();
       value.version = 1;
+      value.domains = new String[0];
     }
     /** Sets the id. */
     public Builder withId(Long v) {
@@ -237,6 +253,18 @@ public final class GlossaryTermEntity implements Entity, HasIdentifier, Auditabl
       value.version = v;
       return this;
     }
+    /**
+     * Sets the domain names, which are stored in ascending order.
+     *
+     * @throws IllegalArgumentException if the array is null
+     */
+    public Builder withDomains(String... v) {
+      Preconditions.checkArgument(v != null, "domains cannot be null");
+      String[] domains = v.clone();
+      Arrays.sort(domains);
+      value.domains = domains;
+      return this;
+    }
     /** Sets the auditInfo. */
     public Builder withAuditInfo(Audit v) {
       value.auditInfo = v;
@@ -275,6 +303,7 @@ public final class GlossaryTermEntity implements Entity, HasIdentifier, Auditabl
       copy.properties = value.properties;
       copy.version = value.version;
       copy.auditInfo = value.auditInfo;
+      copy.domains = value.domains.clone();
       return copy;
     }
   }

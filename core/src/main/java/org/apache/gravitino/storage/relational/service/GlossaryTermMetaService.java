@@ -487,8 +487,13 @@ public final class GlossaryTermMetaService {
         values.add(row.getSynonym());
       }
     }
+    // Read membership in the caller's session, so it comes from the same snapshot.
+    Map<Long, List<String>> domains =
+        GlossaryTermDomainService.getInstance()
+            .domainNames(rows.get(0).getMetalakeId(), definitions.keySet());
     List<GlossaryTermEntity> result = new ArrayList<>();
-    definitions.forEach((id, row) -> result.add(fromPO(row, synonyms.get(id), ns)));
+    definitions.forEach(
+        (id, row) -> result.add(fromPO(row, synonyms.get(id), domains.get(id), ns)));
     return result;
   }
 
@@ -544,10 +549,17 @@ public final class GlossaryTermMetaService {
 
   private GlossaryTermEntity fromPO(
       GlossaryTermPO row, GlossaryTermMetaMapper mapper, Namespace ns) {
-    return fromPO(row, mapper.synonyms(row.getTermId()), ns);
+    return fromPO(
+        row,
+        mapper.synonyms(row.getTermId()),
+        GlossaryTermDomainService.getInstance()
+            .domainNames(row.getMetalakeId(), List.of(row.getTermId()))
+            .get(row.getTermId()),
+        ns);
   }
 
-  private GlossaryTermEntity fromPO(GlossaryTermPO row, List<String> synonyms, Namespace ns) {
+  private GlossaryTermEntity fromPO(
+      GlossaryTermPO row, List<String> synonyms, @Nullable List<String> domains, Namespace ns) {
     try {
       List<Map<String, String>> links =
           JsonUtils.anyFieldMapper()
@@ -561,6 +573,7 @@ public final class GlossaryTermMetaService {
           .withSourceRef(row.getSourceRef())
           .withVersion(row.getCurrentVersion())
           .withSynonyms(synonyms.toArray(new String[0]))
+          .withDomains(domains == null ? new String[0] : domains.toArray(new String[0]))
           .withLinks(
               links.stream()
                   .map(link -> TermLink.of(link.get("label"), link.get("url")))

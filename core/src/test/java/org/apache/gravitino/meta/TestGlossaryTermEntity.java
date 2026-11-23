@@ -42,6 +42,19 @@ public class TestGlossaryTermEntity {
   }
 
   @Test
+  public void testDomains() {
+    Assertions.assertArrayEquals(new String[0], builder().build().domains());
+    GlossaryTermEntity term = builder().withDomains("Sales", "Finance").build();
+    Assertions.assertArrayEquals(new String[] {"Finance", "Sales"}, term.domains());
+    term.domains()[0] = "Changed";
+    Assertions.assertArrayEquals(new String[] {"Finance", "Sales"}, term.domains());
+    Assertions.assertArrayEquals(
+        new String[] {"Finance", "Sales"},
+        (String[]) term.fields().get(GlossaryTermEntity.DOMAINS));
+    assertNullArgument("domains", () -> builder().withDomains((String[]) null).build());
+  }
+
+  @Test
   public void testNullArguments() {
     assertNullArgument("id", () -> builder().withId(null).build());
     assertNullArgument("namespace", () -> builder().withNamespace(null).build());
