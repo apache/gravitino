@@ -230,10 +230,10 @@ existing metadata tables (e.g., the `deleted_at` / `timestamp` columns in
 
 ### 3.4 Storage Implementations
 
-| Implementation               | Use Case              | Durability | Multi-Node |
-| ---------------------------- | --------------------- | ---------- | ---------- |
-| `InMemoryIdempotencyStore`   | Dev, testing, single  | No         | No         |
-| `JdbcIdempotencyStore`       | Production            | Yes        | Yes        |
+| Implementation             | Use Case             | Durability | Multi-Node |
+| -------------------------- | -------------------- | ---------- | ---------- |
+| `InMemoryIdempotencyStore` | Dev, testing, single | No         | No         |
+| `JdbcIdempotencyStore`     | Production           | Yes        | Yes        |
 
 The JDBC implementation leverages Gravitino's existing relational backend
 (H2 for dev, MySQL or PostgreSQL for production).
@@ -436,13 +436,13 @@ server. Only `idempotency-key-lifetime` is defined by the Iceberg REST spec and
 advertised to clients; every other key is Gravitino server-side configuration
 and is **not** exposed via `GET /v1/config`.
 
-| Config Key                                       | Default     | Description                                                                                              |
-| ------------------------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------- |
-| `gravitino.iceberg-rest.idempotency-enabled`     | `false`     | Master switch. Disabled by default (matching Polaris). When `false`, the `Idempotency-Key` header is ignored and no lifetime is advertised. |
-| `gravitino.iceberg-rest.idempotency-key-lifetime`| `PT30M`     | Client reuse window (ISO-8601 duration). Advertised to clients as the spec-defined `idempotency-key-lifetime` in `GET /v1/config`. |
-| `gravitino.iceberg-rest.idempotency-store-type`  | `in-memory` | `in-memory` or `jdbc`.                                                                                   |
-| `gravitino.iceberg-rest.idempotency-max-entries` | `10000`     | Max cached entries (in-memory store only). See [Section 3.5](#35-in-memory-store-capacity-and-eviction).|
-| `gravitino.iceberg-rest.idempotency-cleanup-interval` | `PT5M` | Interval for the background task that purges expired records (jdbc store).                               |
+| Config Key                                            | Default     | Description                                                                                                                                 |
+| ----------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gravitino.iceberg-rest.idempotency-enabled`          | `false`     | Master switch. Disabled by default (matching Polaris). When `false`, the `Idempotency-Key` header is ignored and no lifetime is advertised. |
+| `gravitino.iceberg-rest.idempotency-key-lifetime`     | `PT30M`     | Client reuse window (ISO-8601 duration). Advertised to clients as the spec-defined `idempotency-key-lifetime` in `GET /v1/config`.          |
+| `gravitino.iceberg-rest.idempotency-store-type`       | `in-memory` | `in-memory` or `jdbc`.                                                                                                                      |
+| `gravitino.iceberg-rest.idempotency-max-entries`      | `10000`     | Max cached entries (in-memory store only). See [Section 3.5](#35-in-memory-store-capacity-and-eviction).                                    |
+| `gravitino.iceberg-rest.idempotency-cleanup-interval` | `PT5M`      | Interval for the background task that purges expired records (jdbc store).                                                                  |
 
 ### 6.1 Iceberg Spec Configuration
 
@@ -488,13 +488,13 @@ for clock synchronization, cleanup limits, and deployment requirements.
 
 ## 7. Comparison with Polaris
 
-| Aspect              | Polaris (PR #3205)              | This Design                                     |
-| ------------------- | ------------------------------- | ----------------------------------------------- |
-| Storage             | Postgres-specific               | Gravitino relational backend (H2/MySQL/PG)      |
-| Heartbeat           | Yes (long-running ops)          | No; requires bounded mutation duration and clock skew |
-| Reconciliation      | Yes (crash recovery)            | TTL-based expiry; retain reservations on response-storage failure |
-| Executor ownership  | Yes (multi-worker)              | No (single-owner per key via DB constraint)     |
-| Response storage    | Minimal summary + pointer       | Full response body (mutation responses are small)|
+| Aspect             | Polaris (PR #3205)        | This Design                                                       |
+| ------------------ | ------------------------- | ----------------------------------------------------------------- |
+| Storage            | Postgres-specific         | Gravitino relational backend (H2/MySQL/PG)                        |
+| Heartbeat          | Yes (long-running ops)    | No; requires bounded mutation duration and clock skew             |
+| Reconciliation     | Yes (crash recovery)      | TTL-based expiry; retain reservations on response-storage failure |
+| Executor ownership | Yes (multi-worker)        | No (single-owner per key via DB constraint)                       |
+| Response storage   | Minimal summary + pointer | Full response body (mutation responses are small)                 |
 
 This design uses a fixed reuse window rather than heartbeat-based ownership.
 It therefore requires the duration and clock-skew bounds in Section 5.4 and
