@@ -476,10 +476,11 @@ MySQL, and PostgreSQL and has no separate `idempotency-jdbc-*` connection
 settings. Multiple replicas must connect to the same shared MySQL or PostgreSQL
 database. The store does not own or close the shared pool.
 
-Standalone Iceberg REST servers cannot use this backend. The implementation
-lives in the Iceberg REST server JAR, which must be visible to the auxiliary
-service's class loader; `iceberg-common` resolves the `jdbc` alias at creation
-time. Apply the schema or upgrade scripts before enabling the store. See the
+Standalone Iceberg REST servers cannot use this backend. The Iceberg REST
+server JAR contains the store interface, factory, and both built-in
+implementations. The factory resolves the `in-memory` and `jdbc` aliases to
+those implementations. The configuration keys live in `iceberg-common`.
+Apply the schema or upgrade scripts before enabling the store. See the
 [JDBC operations guidance](../docs/iceberg-rest-service.md#jdbc-idempotency-storage)
 for clock synchronization, cleanup limits, and deployment requirements.
 
@@ -508,8 +509,7 @@ running catalog mutation.
 
 ### Phase 1: SPI and In-Memory Store
 
-- Define `IdempotencyStore` interface and `IdempotencyRecord` in
-  `iceberg/iceberg-common`.
+- Define the `IdempotencyStore` interface and `IdempotencyRecord`.
 - Implement `InMemoryIdempotencyStore` using Caffeine cache.
 - Wire into endpoint operations with `@HeaderParam("Idempotency-Key")`.
 - Advertise `idempotency-key-lifetime` in `GET /v1/config`.
@@ -519,6 +519,7 @@ running catalog mutation.
 
 - Add `iceberg_idempotency_meta` table schema for H2, MySQL, and PostgreSQL.
 - Implement `JdbcIdempotencyStore` using Gravitino's existing connection pool.
+- Package the store interface, implementations, and factory in `iceberg/iceberg-rest-server`.
 - Background cleanup task for expired records.
 - Integration tests with testcontainers.
 

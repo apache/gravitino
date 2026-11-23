@@ -28,7 +28,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.apache.gravitino.iceberg.common.idempotency.IdempotencyRecord;
+import org.apache.gravitino.iceberg.service.idempotency.IdempotencyRecord;
 import org.apache.gravitino.iceberg.service.idempotency.mapper.IcebergIdempotencyKeyMapper;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;

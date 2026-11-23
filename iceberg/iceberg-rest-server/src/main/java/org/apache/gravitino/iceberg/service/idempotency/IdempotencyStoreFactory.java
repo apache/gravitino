@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.iceberg.common.idempotency;
+package org.apache.gravitino.iceberg.service.idempotency;
 
 import com.google.common.collect.ImmutableMap;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -37,7 +37,7 @@ public class IdempotencyStoreFactory {
           "in-memory",
           InMemoryIdempotencyStore.class.getCanonicalName(),
           "jdbc",
-          "org.apache.gravitino.iceberg.service.idempotency.JdbcIdempotencyStore");
+          JdbcIdempotencyStore.class.getCanonicalName());
 
   private IdempotencyStoreFactory() {}
 

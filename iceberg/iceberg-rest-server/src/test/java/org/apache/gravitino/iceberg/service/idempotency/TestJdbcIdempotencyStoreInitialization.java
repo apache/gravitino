@@ -22,7 +22,6 @@ package org.apache.gravitino.iceberg.service.idempotency;
 import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.idempotency.IdempotencyStoreFactory;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

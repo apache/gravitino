@@ -22,6 +22,7 @@ package org.apache.gravitino.iceberg.service.idempotency;
 import static org.awaitility.Awaitility.await;
 
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,10 +40,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.idempotency.IdempotencyRecord;
-import org.apache.gravitino.iceberg.common.idempotency.IdempotencyStore;
-import org.apache.gravitino.iceberg.common.idempotency.IdempotencyStoreFactory;
 import org.apache.gravitino.iceberg.service.idempotency.mapper.IcebergIdempotencyKeyMapper;
 import org.apache.gravitino.iceberg.service.idempotency.po.IcebergIdempotencyKeyPO;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -124,6 +123,21 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
   public void closeIdempotencyStore() {
     store.close();
     peer.close();
+  }
+
+  @TestTemplate
+  void testFactoryCreatesInitializedJdbcStore() throws IOException {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.ICEBERG_IDEMPOTENCY_STORE_TYPE, "jdbc",
+                IcebergConstants.ICEBERG_IDEMPOTENCY_CLEANUP_INTERVAL, "PT1H"));
+    try (IdempotencyStore configured = IdempotencyStoreFactory.create(config)) {
+      Assertions.assertInstanceOf(JdbcIdempotencyStore.class, configured);
+      long generation = configured.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
+      configured.finalizeRecord(KEY, generation, 200, "{}");
+      Assertions.assertEquals(BINDING, peer.load(KEY).orElseThrow().operationBinding());
+    }
   }
 
   @TestTemplate

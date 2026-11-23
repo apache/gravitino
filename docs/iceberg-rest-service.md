@@ -222,10 +222,6 @@ REST servers cannot use it. It reuses Gravitino's connection pool and supports H
 PostgreSQL. For multiple replicas, use the same shared MySQL or PostgreSQL database; separate local
 H2 databases do not provide cross-replica deduplication.
 
-The `jdbc` implementation is packaged in the Iceberg REST server JAR, which must be available to
-the auxiliary service's class loader. The `iceberg-common` JAR alone is insufficient: resolving the
-`jdbc` alias then fails at store creation with a `ClassNotFoundException` cause.
-
 Create one store instance per Iceberg REST service instance and share it across requests. Each
 store starts its own cleanup scheduler; creating stores per request adds redundant purge work and
 database lock contention. Close the store when stopping the service to shut down its scheduler.
@@ -246,8 +242,11 @@ When switching from an earlier development build that used `iceberg_idempotency_
 the schema. Update all replicas to the current request binding format together. On MySQL, the
 current `request_uri` column uses `MEDIUMTEXT` to accommodate long request targets.
 
-Custom stores built against the earlier development interface must update `reserve` to return the
-store's fencing token, or an empty result for a duplicate key.
+The store interface and record type are in `org.apache.gravitino.iceberg.service.idempotency` in
+the Iceberg REST server JAR. Rebuild custom stores from earlier development versions against this
+package and update `reserve` to return the store's fencing token, or an empty result for a
+duplicate key. If an earlier configuration names the built-in in-memory store by its old class
+name, use the `in-memory` alias.
 
 Reservations are atomic across replicas. The database assigns a new generation even when the
 previous reservation for the same key was released or purged. Finalization and release match that
