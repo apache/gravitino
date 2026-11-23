@@ -20,7 +20,6 @@ package org.apache.gravitino.maintenance.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.apache.gravitino.rest.RESTRequest;
@@ -30,7 +29,8 @@ import org.apache.gravitino.rest.RESTRequest;
  * metrics.
  *
  * <p>Use when a maintenance type does not sample metrics, or when metrics were already reported and
- * only occupancy release remains.
+ * only occupancy release remains. Iceberg snapshot ids stay on {@code table_snapshot_metrics}; this
+ * request does not carry them.
  */
 @Getter
 @EqualsAndHashCode
@@ -42,27 +42,9 @@ public class MaintenanceActionFinishRequest implements RESTRequest {
   @JsonProperty("policyId")
   private final Long policyId;
 
-  /**
-   * Optional Iceberg snapshot id to store as {@code after_snapshot_id}. Omit or null when releasing
-   * without an S1 (for example skipped work with no rewrite).
-   */
-  @Nullable
-  @JsonProperty("afterSnapshotId")
-  private final Long afterSnapshotId;
-
   /** Default constructor for Jackson. */
   public MaintenanceActionFinishRequest() {
-    this(null, null, null);
-  }
-
-  /**
-   * Creates a finish request that leaves {@code after_snapshot_id} null.
-   *
-   * @param tableId table entity id bound to the job
-   * @param policyId policy entity id bound to the job
-   */
-  public MaintenanceActionFinishRequest(Long tableId, Long policyId) {
-    this(tableId, policyId, null);
+    this(null, null);
   }
 
   /**
@@ -70,13 +52,10 @@ public class MaintenanceActionFinishRequest implements RESTRequest {
    *
    * @param tableId table entity id bound to the job
    * @param policyId policy entity id bound to the job
-   * @param afterSnapshotId terminal snapshot id, or null
    */
-  public MaintenanceActionFinishRequest(
-      Long tableId, Long policyId, @Nullable Long afterSnapshotId) {
+  public MaintenanceActionFinishRequest(Long tableId, Long policyId) {
     this.tableId = tableId;
     this.policyId = policyId;
-    this.afterSnapshotId = afterSnapshotId;
   }
 
   @Override

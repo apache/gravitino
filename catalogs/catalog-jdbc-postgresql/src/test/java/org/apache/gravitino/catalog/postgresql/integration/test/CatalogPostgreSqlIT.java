@@ -136,7 +136,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
     clearTableAndSchema();
     String[] schemaNames = catalog.asSchemas().listSchemas();
     for (String schemaName : schemaNames) {
-      catalog.asSchemas().dropSchema(schemaName, true);
+      clearTableAndSchema(schemaName);
     }
     metalake.disableCatalog(catalogName);
     metalake.dropCatalog(catalogName);
@@ -152,6 +152,12 @@ public class CatalogPostgreSqlIT extends BaseIT {
   }
 
   private void clearTableAndSchema() {
+    clearTableAndSchema(schemaName);
+  }
+
+  private void clearTableAndSchema(String schemaName) {
+    // PostgreSQL schema drops are restrictive even when cascade is requested. Remove the test
+    // tables explicitly before dropping each schema, including schemas created outside the fixture.
     NameIdentifier[] nameIdentifiers =
         catalog.asTableCatalog().listTables(Namespace.of(schemaName));
     for (NameIdentifier nameIdentifier : nameIdentifiers) {
@@ -458,18 +464,15 @@ public class CatalogPostgreSqlIT extends BaseIT {
     SupportsSchemas schemas = catalog.asSchemas();
     String schemaName = RandomNameUtils.genRandomName("ct_db");
 
-    // should throw an exception with string that might contain SQL injection
+    // Creation rejects SQL-looking names. Drops address existing native identifiers, so a
+    // nonexistent name within PostgreSQL's byte limit returns false instead of executing SQL.
     String sqlInjection = schemaName + "; DROP TABLE important_table; -- ";
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> {
           schemas.createSchema(sqlInjection, null, null);
         });
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> {
-          schemas.dropSchema(sqlInjection, false);
-        });
+    Assertions.assertFalse(schemas.dropSchema(sqlInjection, false));
 
     String sqlInjection1 = schemaName + "; SELECT pg_sleep(10);";
     Assertions.assertThrows(
@@ -477,11 +480,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
         () -> {
           schemas.createSchema(sqlInjection1, null, null);
         });
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> {
-          schemas.dropSchema(sqlInjection1, false);
-        });
+    Assertions.assertFalse(schemas.dropSchema(sqlInjection1, false));
 
     String sqlInjection2 =
         schemaName + "`; UPDATE Users SET password = 'newpassword' WHERE username = 'admin'; -- ";
@@ -516,11 +515,29 @@ public class CatalogPostgreSqlIT extends BaseIT {
         () -> {
           schemas.createSchema(invalidInput2, null, null);
         });
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> {
-          schemas.dropSchema(invalidInput2, false);
-        });
+    Assertions.assertFalse(schemas.dropSchema(invalidInput2, false));
+  }
+
+  @Test
+  void testDropNativeSchemaNameTreatsSqlAsIdentifier() {
+    SupportsSchemas schemas = catalog.asSchemas();
+    String survivor = RandomNameUtils.genRandomName("keep");
+    String nativeName = "native\"; DROP SCHEMA " + survivor + "; --";
+    String quotedName = "\"" + nativeName.replace("\"", "\"\"") + "\"";
+    schemas.createSchema(survivor, null, Collections.emptyMap());
+    try {
+      postgreSqlService.executeQuery("CREATE SCHEMA " + quotedName);
+      Assertions.assertEquals(nativeName, schemas.loadSchema(nativeName).name());
+      Assertions.assertTrue(schemas.dropSchema(nativeName, false));
+      Assertions.assertFalse(schemas.dropSchema(nativeName, false));
+      Assertions.assertEquals(survivor, schemas.loadSchema(survivor).name());
+      Assertions.assertThrows(
+          NoSuchSchemaException.class,
+          () -> postgreSqlService.loadSchema(NameIdentifier.of(nativeName)));
+    } finally {
+      postgreSqlService.executeQuery("DROP SCHEMA IF EXISTS " + quotedName);
+      schemas.dropSchema(survivor, false);
+    }
   }
 
   @Test
@@ -1088,12 +1105,11 @@ public class CatalogPostgreSqlIT extends BaseIT {
           Assertions.assertEquals(Literals.varcharLiteral(200, "curdate()"), column.defaultValue());
           break;
         case "varchar200_col_2":
-          Assertions.assertEquals(
-              Literals.varcharLiteral(200, "CURRENT_DATE"), column.defaultValue());
+          // An expression default must not be mistaken for a string literal of the same text.
+          Assertions.assertEquals(UnparsedExpression.of("CURRENT_DATE"), column.defaultValue());
           break;
         case "varchar200_col_3":
-          Assertions.assertEquals(
-              Literals.varcharLiteral(200, "CURRENT_TIMESTAMP"), column.defaultValue());
+          Assertions.assertEquals(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, column.defaultValue());
           break;
         case "date_col_1":
           Assertions.assertEquals(UnparsedExpression.of("CURRENT_DATE"), column.defaultValue());

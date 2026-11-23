@@ -380,6 +380,8 @@ export const providerBase = {
         label: 'AWS Glue Catalog ID',
         key: 'aws-glue-catalog-id',
         value: '',
+        alwaysVisible: true,
+        immutable: true,
         description: "12-digit AWS account ID; defaults to caller's account"
       },
       {
@@ -398,6 +400,7 @@ export const providerBase = {
         label: 'AWS Glue Endpoint',
         key: 'aws-glue-endpoint',
         value: '',
+        alwaysVisible: true,
         description: 'Custom endpoint URL, e.g. http://localhost:4566 for LocalStack'
       },
       {
@@ -405,12 +408,14 @@ export const providerBase = {
         key: 'default-table-format',
         value: 'hive',
         select: ['hive', 'iceberg'],
+        alwaysVisible: true,
         description: 'Default format for createTable()'
       },
       {
         label: 'Table Format Filter',
         key: 'table-format-filter',
         value: 'all',
+        alwaysVisible: true,
         description: 'Comma-separated formats exposed by listTables()'
       }
     ]

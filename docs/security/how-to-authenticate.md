@@ -163,18 +163,53 @@ bounds reuse when available. Tokens with no usable expiry, a non-positive lifeti
 already-expired numeric expiry are rejected. JWT payload decoding only schedules renewal;
 the server remains responsible for validation and supported token formats.
 
+Opaque tokens with a usable `expires_in` are accepted by the client. When neither expiry
+source is usable, construction raises `GravitinoRuntimeException`. For an opaque token with
+omitted `expires_in`, construction used to succeed and `get_token_data()` returned `None`.
+No lifetime is inferred when expiry metadata is unavailable.
+
 Renewal happens synchronously on the first call within `min(30 seconds, 10% of the remaining
 lifetime at receipt)` of expiry. This margin allows short-lived tokens to be reused and
 reduces expiry during transport, without guaranteeing validity when a request reaches the
 server. An instance lock permits only one active acquisition per shared provider; after a
-successful renewal, waiting callers reuse the new token. This does not make the entire
-client thread-safe or coordinate separate providers or processes.
+successful renewal, waiting callers reuse the new token. Other callers sharing the provider
+wait while the token-endpoint request runs under the lock; the request uses the underlying
+HTTP client timeout (10 seconds by default). This does not make the entire client thread-safe
+or coordinate separate providers or processes.
 
 Acquisition failures are reported without returning the old token or automatically replaying
 the metadata request. Existing validation and OAuth exception categories are retained; new
 expiry failures raise `GravitinoRuntimeException`. A later call can retry acquisition, so
 concurrent callers may make sequential attempts after failure. Renewal obtains another
 access token using client credentials; it does not use a refresh-token grant.
+
+#### OAuth2 Client Authentication Method
+
+By default, the Java OAuth2 token provider uses `client_secret_post`, which sends the client credentials in the request body. To use HTTP Basic authentication, configure the provider with `OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC`:
+
+```java
+DefaultOAuth2TokenProvider authDataProvider = DefaultOAuth2TokenProvider.builder()
+    .withUri("oauth server uri")
+    .withCredential("yy:xx")
+    .withPath("oauth/token")
+    .withScope("test")
+    .withClientAuthenticationMethod(
+        OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+    .build();
+```
+
+The Java GVFS Hadoop integration supports the configuration property `fs.gravitino.client.oauth2.authenticationMethod`, with `client_secret_post` as the default. The Python GVFS integration supports `oauth2_client_authentication_method`, also defaulting to `client_secret_post`.
+
+Canonical config values are the RFC 6749 style strings `client_secret_post` and `client_secret_basic` (case-insensitive) on both Java and Python GVFS.
+
+**Current limitation:** Several built-in OAuth2 bootstrap paths do not yet expose a configuration option for selecting the client authentication method and continue to use `client_secret_post`, including:
+
+- Spark, Flink, and Trino connectors
+- Java CLI (`Command`)
+- Lance namespace wrapper
+- Iceberg `DynamicIcebergConfigProvider`
+- Maintenance optimizer `GravitinoAuthSettings`
+
 
 ### Kerberos Mode
 

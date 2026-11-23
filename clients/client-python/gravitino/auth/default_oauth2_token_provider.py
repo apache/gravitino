@@ -15,18 +15,23 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import time
-import json
 import base64
+import json
 import math
+import time
 from dataclasses import dataclass, field
 from threading import Lock
 from typing import Optional
+from urllib.parse import quote_plus
+
+from gravitino.auth.oauth2_client_authentication_method import (
+    OAuth2ClientAuthenticationMethod,
+)
 from gravitino.auth.oauth2_token_provider import OAuth2TokenProvider
-from gravitino.dto.responses.oauth2_token_response import OAuth2TokenResponse
 from gravitino.dto.requests.oauth2_client_credential_request import (
     OAuth2ClientCredentialRequest,
 )
+from gravitino.dto.responses.oauth2_token_response import OAuth2TokenResponse
 from gravitino.exceptions.base import (
     GravitinoRuntimeException,
     IllegalArgumentException,
@@ -68,6 +73,7 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
     _scope: Optional[str]
     _path: Optional[str]
     _token: _TokenState
+    _authentication_method: OAuth2ClientAuthenticationMethod
 
     def __init__(
         self,
@@ -75,12 +81,15 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
         credential: str = None,
         scope: str = None,
         path: str = None,
+        *,
+        authentication_method: OAuth2ClientAuthenticationMethod = OAuth2ClientAuthenticationMethod.CLIENT_SECRET_POST,
     ):
         super().__init__(uri)
 
         self._credential = credential
         self._scope = scope
         self._path = path
+        self._authentication_method = authentication_method
         self._lock = Lock()
 
         self.validate()
@@ -126,18 +135,47 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
     def _fetch_token(self) -> _TokenState:
         client_id, client_secret = self._parse_credential()
 
-        client_credential_request = OAuth2ClientCredentialRequest(
-            grant_type=CLIENT_CREDENTIALS,
-            client_id=client_id,
-            client_secret=client_secret,
-            scope=self._scope,
-        )
+        headers = {}
 
+        if (
+            self._authentication_method
+            == OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC
+        ):
+            if not client_id or not client_id.strip():
+                raise IllegalArgumentException(
+                    "client_id must be set when using client_secret_basic authentication"
+                )
+
+            encoded_client_id = quote_plus(client_id, safe="*").replace("~", "%7E")
+            encoded_client_secret = quote_plus(client_secret, safe="*").replace(
+                "~", "%7E"
+            )
+            encoded_credentials = base64.b64encode(
+                f"{encoded_client_id}:{encoded_client_secret}".encode("utf-8")
+            ).decode("utf-8")
+
+            headers["Authorization"] = f"Basic {encoded_credentials}"
+
+            client_credential_request = OAuth2ClientCredentialRequest(
+                grant_type=CLIENT_CREDENTIALS,
+                client_id=None,
+                client_secret=None,
+                scope=self._scope,
+            )
+
+        else:
+            client_credential_request = OAuth2ClientCredentialRequest(
+                grant_type=CLIENT_CREDENTIALS,
+                client_id=client_id,
+                client_secret=client_secret,
+                scope=self._scope,
+            )
         failure: Optional[Exception] = None
         try:
             resp = self._client.post_form(
                 self._path,
                 data=client_credential_request,
+                headers=headers,
                 error_handler=OAUTH_ERROR_HANDLER,
             )
             received_at = time.monotonic()
@@ -155,7 +193,11 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
             GravitinoRuntimeException,
             UnknownError,
         ) as error:
-            failure = type(error)("OAuth2 token acquisition failed")
+            try:
+                failure = type(error)("OAuth2 token acquisition failed")
+            except TypeError:
+                # A subclass may require additional constructor arguments.
+                failure = GravitinoRuntimeException("OAuth2 token acquisition failed")
         # This boundary must sanitize even unexpected parsing/transport failures.
         except Exception:  # pylint: disable=broad-exception-caught
             failure = GravitinoRuntimeException("OAuth2 token acquisition failed")

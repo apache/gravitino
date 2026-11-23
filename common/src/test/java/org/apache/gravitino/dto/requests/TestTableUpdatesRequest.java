@@ -27,6 +27,7 @@ import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.TableChange.DeleteIndex;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
@@ -34,6 +35,49 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestTableUpdatesRequest {
+  @Test
+  void testAlterDefaultDtosNormalizeNullWithoutChangingStringNull() throws JsonProcessingException {
+    for (String literal :
+        new String[] {
+          "{\"type\":\"literal\",\"dataType\":\"null\",\"value\":\"NULL\"}",
+          "{\"type\":\"literal\",\"dataType\":\"integer\",\"value\":null}"
+        }) {
+      TableUpdateRequest update =
+          JsonUtils.objectMapper()
+              .readValue(
+                  "{\"@type\":\"updateColumnDefaultValue\",\"fieldName\":[\"c\"],\"newDefaultValue\":"
+                      + literal
+                      + "}",
+                  TableUpdateRequest.class);
+      update.validate();
+      Assertions.assertSame(
+          Literals.NULL,
+          ((TableChange.UpdateColumnDefaultValue) update.tableChange()).getNewDefaultValue());
+      TableUpdateRequest add =
+          JsonUtils.objectMapper()
+              .readValue(
+                  "{\"@type\":\"addColumn\",\"fieldName\":[\"c\"],\"type\":\"integer\",\"nullable\":true,\"defaultValue\":"
+                      + literal
+                      + "}",
+                  TableUpdateRequest.class);
+      add.validate();
+      Assertions.assertSame(
+          Literals.NULL, ((TableChange.AddColumn) add.tableChange()).getDefaultValue());
+    }
+    TableUpdateRequest update =
+        new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(
+            new String[] {"c"},
+            LiteralDTO.builder().withDataType(Types.StringType.get()).withValue("NULL").build());
+    Assertions.assertEquals(
+        Literals.stringLiteral("NULL"),
+        ((TableChange.UpdateColumnDefaultValue) update.tableChange()).getNewDefaultValue());
+    TableUpdateRequest add =
+        new TableUpdateRequest.AddTableColumnRequest(
+            new String[] {"c"}, Types.StringType.get(), null);
+    Assertions.assertSame(
+        DEFAULT_VALUE_NOT_SET, ((TableChange.AddColumn) add.tableChange()).getDefaultValue());
+  }
+
   @Test
   public void testTableUpdatesRequest() throws JsonProcessingException {
     List<TableUpdateRequest> updates =

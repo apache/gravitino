@@ -25,6 +25,9 @@ from unittest.mock import patch
 
 from gravitino.auth.default_oauth2_token_provider import DefaultOAuth2TokenProvider
 from gravitino.auth.oauth2_token_provider import OAuth2TokenProvider
+from gravitino.auth.oauth2_client_authentication_method import (
+    OAuth2ClientAuthenticationMethod,
+)
 from gravitino.exceptions.base import (
     BadRequestException,
     GravitinoRuntimeException,
@@ -43,6 +46,11 @@ OAUTH_PORT = 1082
 class _StructuredRESTException(RESTException):
     def __init__(self, status, method, endpoint, reason):
         super().__init__("%s %s %s %s", status, method, endpoint, reason)
+
+
+class _StructuredRuntimeException(GravitinoRuntimeException):
+    def __init__(self, code, detail):
+        super().__init__("%s %s", code, detail)
 
 
 class _TestOAuth2TokenProvider(OAuth2TokenProvider):
@@ -130,6 +138,83 @@ class TestOAuth2TokenProvider(unittest.TestCase):
 
         self.assertTrue(token_provider.has_token_data())
         self.assertEqual(b"Bearer 1", token_provider.get_token_data())
+
+    @patch(
+        "gravitino.utils.http_client.HTTPClient.post_form",
+        return_value=mock_base.mock_authentication_with_basic_jwt(),
+    )
+    def test_client_secret_basic_authentication(self, mock_post_form):
+        token_provider = DefaultOAuth2TokenProvider(
+            uri=f"http://127.0.0.1:{OAUTH_PORT}",
+            credential="clientId:clientSecret",
+            path="oauth/token",
+            scope="test",
+            authentication_method=(
+                OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC
+            ),
+        )
+
+        self.assertTrue(token_provider.has_token_data())
+        _, kwargs = mock_post_form.call_args
+        self.assertIsNone(kwargs["data"].client_id)
+        self.assertIsNone(kwargs["data"].client_secret)
+
+        self.assertEqual(
+            kwargs["headers"]["Authorization"],
+            "Basic Y2xpZW50SWQ6Y2xpZW50U2VjcmV0",
+        )
+
+    def test_client_secret_basic_requires_client_id(self):
+        with self.assertRaises(IllegalArgumentException):
+            DefaultOAuth2TokenProvider(
+                uri=f"http://127.0.0.1:{OAUTH_PORT}",
+                credential=":clientSecret",
+                path="oauth/token",
+                scope="test",
+                authentication_method=(
+                    OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC
+                ),
+            )
+
+    def test_from_value_accepts_rfc_style_names(self):
+        self.assertEqual(
+            OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC,
+            OAuth2ClientAuthenticationMethod.from_value("client_secret_basic"),
+        )
+        self.assertEqual(
+            OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC,
+            OAuth2ClientAuthenticationMethod.from_value("CLIENT_SECRET_BASIC"),
+        )
+        self.assertEqual(
+            OAuth2ClientAuthenticationMethod.CLIENT_SECRET_POST,
+            OAuth2ClientAuthenticationMethod.from_value("client_secret_post"),
+        )
+        with self.assertRaises(ValueError):
+            OAuth2ClientAuthenticationMethod.from_value("basic")
+        with self.assertRaises(ValueError):
+            OAuth2ClientAuthenticationMethod.from_value("")
+
+    @patch(
+        "gravitino.utils.http_client.HTTPClient.post_form",
+        return_value=mock_base.mock_authentication_with_basic_jwt(),
+    )
+    def test_client_secret_basic_encodes_reserved_characters(self, mock_post_form):
+        DefaultOAuth2TokenProvider(
+            uri=f"http://127.0.0.1:{OAUTH_PORT}",
+            credential="client*@id:s ecret:/+?~",
+            path="oauth/token",
+            scope="test",
+            authentication_method=(
+                OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC
+            ),
+        )
+
+        _, kwargs = mock_post_form.call_args
+
+        self.assertEqual(
+            kwargs["headers"]["Authorization"],
+            "Basic Y2xpZW50KiU0MGlkOnMrZWNyZXQlM0ElMkYlMkIlM0YlN0U=",
+        )
 
 
 class TestOAuth2TokenExpiry(unittest.TestCase):
@@ -251,6 +336,12 @@ class TestOAuth2TokenExpiry(unittest.TestCase):
         cases.append(
             (_StructuredRESTException(502, "POST", "auth", "secret"), RESTException)
         )
+        cases.append(
+            (
+                _StructuredRuntimeException(500, "client:secret"),
+                GravitinoRuntimeException,
+            )
+        )
         for index, (response, error_type) in enumerate(cases):
             with self.subTest(case=index):
                 with self.assertRaises(error_type) as caught:
@@ -273,6 +364,11 @@ class TestOAuth2TokenExpiry(unittest.TestCase):
             (
                 token_response("old", token_type="client:secret"),
                 IllegalArgumentException,
+                54,
+            ),
+            (
+                _StructuredRuntimeException(500, "client:secret"),
+                GravitinoRuntimeException,
                 54,
             ),
             (OSError("client:secret"), GravitinoRuntimeException, 54),

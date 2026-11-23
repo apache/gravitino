@@ -62,7 +62,7 @@ class MetadataObjectTagOperations implements SupportsTags {
             "api/metalakes/%s/objects/%s/%s/tags",
             RESTUtils.encodeString(metalakeName),
             metadataObject.type().name().toLowerCase(Locale.ROOT),
-            RESTUtils.encodeString(metadataObject.fullName()));
+            RESTUtils.encodeMetadataObjectName(metadataObject));
   }
 
   @Override

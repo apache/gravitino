@@ -18,9 +18,16 @@
  */
 package org.apache.gravitino.catalog.postgresql.converter;
 
+import com.google.common.collect.ImmutableSet;
 import java.sql.SQLException;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
+import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -35,6 +42,8 @@ public class PostgreSqlExceptionConverter extends JdbcExceptionConverter {
   private static final String INVALID_SCHEMA_NAME = "3D000";
   private static final String INVALID_SCHEMA = "3F000";
   private static final String UNDEFINED_TABLE = "42P01";
+  private static final String INSUFFICIENT_PRIVILEGE = "42501";
+  private static final String DEPENDENT_OBJECTS_STILL_EXIST = "2BP01";
 
   /**
    * SQLSTATE '08' is the class code of connection exceptions See <a
@@ -43,34 +52,68 @@ public class PostgreSqlExceptionConverter extends JdbcExceptionConverter {
    */
   private static final String CONNECTION_EXCEPTION = "08";
 
-  @SuppressWarnings("FormatStringAnnotation")
+  /** SQLSTATE '28' is the class code of invalid authorization specification, a rejected login. */
+  private static final String INVALID_AUTHORIZATION = "28";
+
+  /**
+   * SQLSTATE classes of requests that PostgreSQL refuses because of the request itself: '22' data
+   * exception, '23' integrity constraint violation and '42' syntax error or access rule violation.
+   */
+  private static final Set<String> INVALID_REQUEST_CLASSES = ImmutableSet.of("22", "23", "42");
+
   @Override
   public GravitinoRuntimeException toGravitinoException(SQLException se) {
-    if (null != se.getSQLState()) {
-      switch (se.getSQLState()) {
-        case DUPLICATE_DATABASE:
-        case DUPLICATE_SCHEMA:
-          return new SchemaAlreadyExistsException(se.getMessage(), se);
-        case DUPLICATE_TABLE:
-          return new TableAlreadyExistsException(se.getMessage(), se);
-        case INVALID_SCHEMA_NAME:
-        case INVALID_SCHEMA:
-          return new NoSuchSchemaException(se.getMessage(), se);
-        case UNDEFINED_TABLE:
-          return new NoSuchTableException(se.getMessage(), se);
-        default:
-          {
-            if (se.getSQLState().startsWith(CONNECTION_EXCEPTION)) {
-              return new ConnectionFailedException(se.getMessage(), se);
-            }
-            return new GravitinoRuntimeException(se.getMessage(), se);
-          }
+    // A pool wraps the driver's exception, for example DBCP's "Cannot create
+    // PoolableConnectionFactory", so the SQLSTATE that names the cause can be on a nested
+    // exception. Track visited exceptions by identity so a cause cycle (A -> B -> A) ends the walk.
+    Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+    for (Throwable t = se; t != null && visited.add(t); t = t.getCause()) {
+      if (t instanceof SQLException) {
+        GravitinoRuntimeException converted =
+            convertBySqlState(se, ((SQLException) t).getSQLState());
+        if (converted != null) {
+          return converted;
+        }
       }
-    } else {
-      if (se.getMessage() != null && se.getMessage().contains("password authentication failed")) {
-        return new ConnectionFailedException(se.getMessage(), se);
-      }
-      return new GravitinoRuntimeException(se.getMessage(), se);
+    }
+
+    if (se.getMessage() != null && se.getMessage().contains("password authentication failed")) {
+      return new ConnectionFailedException(se, "%s", se.getMessage());
+    }
+    return new GravitinoRuntimeException(se, "%s", se.getMessage());
+  }
+
+  @Nullable
+  private static GravitinoRuntimeException convertBySqlState(
+      SQLException se, @Nullable String sqlState) {
+    if (sqlState == null) {
+      return null;
+    }
+
+    switch (sqlState) {
+      case INSUFFICIENT_PRIVILEGE:
+        return new ForbiddenException(se, "%s", se.getMessage());
+      case DUPLICATE_DATABASE:
+      case DUPLICATE_SCHEMA:
+        return new SchemaAlreadyExistsException(se, "%s", se.getMessage());
+      case DUPLICATE_TABLE:
+        return new TableAlreadyExistsException(se, "%s", se.getMessage());
+      case INVALID_SCHEMA_NAME:
+      case INVALID_SCHEMA:
+        return new NoSuchSchemaException(se, "%s", se.getMessage());
+      case UNDEFINED_TABLE:
+        return new NoSuchTableException(se, "%s", se.getMessage());
+      case DEPENDENT_OBJECTS_STILL_EXIST:
+        return new BadRequestException(se, "%s", se.getMessage());
+      default:
+        if (sqlState.startsWith(CONNECTION_EXCEPTION)
+            || sqlState.startsWith(INVALID_AUTHORIZATION)) {
+          return new ConnectionFailedException(se, "%s", se.getMessage());
+        }
+        if (sqlState.length() >= 2 && INVALID_REQUEST_CLASSES.contains(sqlState.substring(0, 2))) {
+          return new BadRequestException(se, "%s", se.getMessage());
+        }
+        return null;
     }
   }
 }

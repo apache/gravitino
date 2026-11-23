@@ -26,6 +26,9 @@ plugins {
 
 dependencies {
   implementation(project(":bundles:tencent"))
+  // cos-sts-java 3.0.8 (from hadoop-cos) pulls in org.json:json 20180130. Declare it directly so
+  // that both the shaded jar and the published POM resolve the version in the catalog.
+  implementation(libs.org.json)
 
   implementation(libs.commons.collections3)
   implementation(libs.commons.io)

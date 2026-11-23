@@ -27,13 +27,30 @@ import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.ibatis.annotations.Param;
 
 public class TopicMetaPostgreSQLProvider extends TopicMetaBaseSQLProvider {
+  /**
+   * Soft-deletes an observed topic registration in the same catalog lifetime.
+   *
+   * @param topicId the stable external identity
+   * @param currentVersion the observed row version
+   * @param catalogId the observed parent catalog identity
+   * @param schemaId the observed parent schema identity
+   * @param topicName the observed topic name
+   * @return the guarded soft-delete SQL
+   */
   @Override
-  public String softDeleteTopicMetasByTopicId(Long topicId, Long currentVersion) {
+  public String softDeleteTopicMetasByTopicId(
+      Long topicId,
+      Long currentVersion,
+      Long catalogId,
+      @Param("schemaId") Long schemaId,
+      @Param("topicName") String topicName) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
         + " WHERE topic_id = #{topicId}"
+        + " AND catalog_id = #{catalogId}"
+        + " AND schema_id = #{schemaId} AND topic_name = #{topicName}"
         + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
@@ -124,7 +141,7 @@ public class TopicMetaPostgreSQLProvider extends TopicMetaBaseSQLProvider {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "
         + TABLE_NAME
-        + " WHERE topic_id IN (SELECT topic_id FROM "
+        + " WHERE ctid IN (SELECT ctid FROM "
         + TABLE_NAME
         + " WHERE deleted_at != 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }

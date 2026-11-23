@@ -49,15 +49,16 @@ public class TestSecretPropertyUtils {
           Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
       Map<String, String> entityProps =
           SecretPropertyUtils.copyEntityProperties(properties, bindings, Map.of());
-      List<SecretMaterial> writes =
-          sm.assembleSecretMaterials(properties, entityProps, "catalog", 42L, bindings, Map.of());
-      sm.writeSecrets(writes);
+      Map<String, String> plaintexts =
+          sm.assembleSecretPlaintexts(properties, entityProps, "catalog", 42L, bindings, Map.of());
+      sm.stageSecrets(null, entityProps, "catalog", 42L, plaintexts);
 
       Assertions.assertEquals("root", entityProps.get("jdbc-user"));
       Assertions.assertTrue(
           SecretPropertyUtils.isSecretProperty("jdbc-password", entityProps.get("jdbc-password")));
-      Assertions.assertEquals(1, writes.size());
-      Assertions.assertEquals("s3cr3t", sm.readSecret(writes.get(0).urn()));
+      Assertions.assertEquals(Map.of("jdbc-password", "s3cr3t"), plaintexts);
+      Assertions.assertEquals(
+          "s3cr3t", sm.readSecret(SecretUrn.parse(entityProps.get("jdbc-password"))));
     }
   }
 
@@ -83,10 +84,9 @@ public class TestSecretPropertyUtils {
   void testEmptySecretsNoOp() {
     try (SecretManager sm = memorySecretManager()) {
       Map<String, String> entityProps = new HashMap<>(Map.of("jdbc-user", "root"));
-      List<SecretMaterial> writes =
-          sm.assembleSecretMaterials(entityProps, entityProps, "schema", 1L, Map.of(), Map.of());
-      sm.writeSecrets(writes);
-      Assertions.assertTrue(writes.isEmpty());
+      Map<String, String> plaintexts =
+          sm.assembleSecretPlaintexts(entityProps, entityProps, "schema", 1L, Map.of(), Map.of());
+      Assertions.assertTrue(plaintexts.isEmpty());
       Assertions.assertEquals("root", entityProps.get("jdbc-user"));
     }
   }
@@ -105,15 +105,15 @@ public class TestSecretPropertyUtils {
               new SecretBinding("memory", "custom-value"),
               "s3-secret-access-key",
               new SecretBinding("memory", "s3-secret-value"));
-      List<SecretMaterial> writes =
-          sm.assembleSecretMaterials(
+      Map<String, String> plaintexts =
+          sm.assembleSecretPlaintexts(
               Map.of("jdbc-url", "jdbc:mysql://localhost/db", "jdbc-user", "root"),
               entityProps,
               "catalog",
               42L,
               bindings,
               Map.of());
-      sm.writeSecrets(writes);
+      sm.stageSecrets(null, entityProps, "catalog", 42L, plaintexts);
 
       entityProps.put("s3-access-key-id", "AKIA");
       entityProps.put("visible", "ok");
@@ -191,9 +191,9 @@ public class TestSecretPropertyUtils {
       entityProps.put("jdbc-password", "inline-secret");
       Map<String, SecretBinding> bindings =
           Map.of("custom-secret", new SecretBinding("memory", "custom-value"));
-      List<SecretMaterial> writes =
-          sm.assembleSecretMaterials(Map.of(), entityProps, "catalog", 42L, bindings, Map.of());
-      sm.writeSecrets(writes);
+      Map<String, String> plaintexts =
+          sm.assembleSecretPlaintexts(Map.of(), entityProps, "catalog", 42L, bindings, Map.of());
+      sm.stageSecrets(null, entityProps, "catalog", 42L, plaintexts);
 
       Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps, null);
       Assertions.assertEquals("custom-value", secrets.get("custom-secret"));
@@ -298,9 +298,9 @@ public class TestSecretPropertyUtils {
   @Test
   void testAssembleWithNullTargetWhenNoSecrets() {
     try (SecretManager sm = memorySecretManager()) {
-      List<SecretMaterial> writes =
-          sm.assembleSecretMaterials(null, null, "schema", 1L, null, null);
-      Assertions.assertTrue(writes.isEmpty());
+      Map<String, String> plaintexts =
+          sm.assembleSecretPlaintexts(null, null, "schema", 1L, null, null);
+      Assertions.assertTrue(plaintexts.isEmpty());
     }
   }
 

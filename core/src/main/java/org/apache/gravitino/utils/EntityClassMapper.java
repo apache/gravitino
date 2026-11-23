@@ -26,6 +26,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.GroupEntity;
@@ -68,6 +69,7 @@ public class EntityClassMapper {
           .put(Entity.EntityType.ROLE, RoleEntity.class)
           .put(Entity.EntityType.POLICY, PolicyEntity.class)
           .put(Entity.EntityType.JOB_TEMPLATE, JobTemplateEntity.class)
+          .put(Entity.EntityType.DOMAIN, DomainEntity.class)
           .put(Entity.EntityType.JOB, JobEntity.class)
           .put(Entity.EntityType.SEMANTIC_MODEL, SemanticModelEntity.class)
           .build();

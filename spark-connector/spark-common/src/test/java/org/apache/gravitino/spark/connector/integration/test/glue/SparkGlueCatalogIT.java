@@ -512,7 +512,7 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
   @Test
   @Override
   protected void testCreateAndLoadSchema() {
-    String testDatabaseName = "t_create1";
+    String testDatabaseName = suiteDatabaseName("t_create1");
     dropDatabaseIfExists(testDatabaseName);
     sql("CREATE DATABASE " + testDatabaseName + " WITH DBPROPERTIES (ID=001);");
     Map<String, String> databaseMeta = getDatabaseMetadata(testDatabaseName);
@@ -520,7 +520,7 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
     String properties = databaseMeta.get("Properties");
     Assertions.assertTrue(properties.contains("(ID,001)"));
 
-    testDatabaseName = "t_create2";
+    testDatabaseName = suiteDatabaseName("t_create2");
     dropDatabaseIfExists(testDatabaseName);
     String testDatabaseLocation = warehouse + "/" + testDatabaseName;
     sql(
@@ -558,7 +558,7 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
   @Test
   @Override
   protected void testAlterSchema() {
-    String testDatabaseName = "t_alter";
+    String testDatabaseName = suiteDatabaseName("t_alter");
     dropDatabaseIfExists(testDatabaseName);
     sql("CREATE DATABASE " + testDatabaseName + " WITH DBPROPERTIES (ID=001);");
     Assertions.assertTrue(
@@ -582,7 +582,7 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
   @Test
   @Override
   protected void testDropSchema() {
-    String testDatabaseName = "t_drop";
+    String testDatabaseName = suiteDatabaseName("t_drop");
     dropDatabaseIfExists(testDatabaseName);
     Set<String> databases = getDatabases();
     Assertions.assertFalse(databases.contains(testDatabaseName));
@@ -614,7 +614,7 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
     Assertions.assertTrue(tables.contains(table1));
     Assertions.assertTrue(tables.contains(table2));
 
-    String database = "db_list";
+    String database = suiteDatabaseName("db_list");
     String table3 = "list3";
     String table4 = "list4";
     createDatabaseIfNotExists(database, getProvider());

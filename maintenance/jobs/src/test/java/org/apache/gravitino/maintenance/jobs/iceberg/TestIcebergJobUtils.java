@@ -142,4 +142,22 @@ public class TestIcebergJobUtils {
         ImmutableMap.of("spark.executor.memory", "2g"),
         IcebergJobUtils.filterCustomSparkConfigs(configs, new SparkConf(false)));
   }
+
+  @Test
+  public void testFormatCliUsageIncludesSharedSparkConfNote() {
+    String usage =
+        IcebergJobUtils.formatCliUsage(
+            "DemoJob",
+            java.util.Collections.singletonList("  --catalog <name>"),
+            IcebergJobUtils.withSparkConfUsage("  --dry-run <bool>"),
+            java.util.Collections.singletonList("  --catalog c --table db.t"));
+    assertTrue(usage.startsWith("Usage: DemoJob [OPTIONS]"));
+    assertTrue(usage.contains("Required Options:"));
+    assertTrue(usage.contains("Optional Options:"));
+    assertTrue(usage.contains("--dry-run <bool>"));
+    assertTrue(usage.contains("--spark-conf <json>"));
+    assertTrue(usage.contains("spark.kubernetes.*"));
+    assertTrue(usage.contains("Examples:"));
+    assertTrue(!usage.contains("Cannot override catalog"));
+  }
 }

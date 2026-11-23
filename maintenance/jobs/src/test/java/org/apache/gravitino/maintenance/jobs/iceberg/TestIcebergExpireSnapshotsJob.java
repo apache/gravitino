@@ -25,10 +25,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
+import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergExpireSnapshotsJob {
@@ -115,6 +119,7 @@ public class TestIcebergExpireSnapshotsJob {
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.type"));
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.uri"));
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.warehouse"));
+    assertEquals("{{catalog_name}}", configs.get("spark.sql.defaultCatalog"));
 
     // Verify Iceberg extensions
     assertTrue(configs.containsKey("spark.sql.extensions"));
@@ -133,7 +138,7 @@ public class TestIcebergExpireSnapshotsJob {
     assertTrue(customFields.containsKey(JobTemplateProvider.PROPERTY_VERSION_KEY));
 
     String version = customFields.get(JobTemplateProvider.PROPERTY_VERSION_KEY);
-    assertEquals("v3", version);
+    assertEquals("v1", version);
     assertTrue(version.matches(JobTemplateProvider.VERSION_VALUE_PATTERN));
   }
 
@@ -257,6 +262,11 @@ public class TestIcebergExpireSnapshotsJob {
         "CALL `iceberg_prod`.system.expire_snapshots(table => 'db.sample', "
             + "older_than => TIMESTAMP '2024-01-01 00:00:00')",
         sql);
+    Clock fixed = Clock.fixed(Instant.parse("2024-06-15T12:00:00Z"), ZoneOffset.UTC);
+    assertEquals("2024-06-08 12:00:00Z", IcebergJobUtils.normalizeOlderThan("7", fixed));
+    assertEquals("2024-06-08 12:00:00Z", IcebergJobUtils.normalizeOlderThan("7d", fixed));
+    assertEquals(
+        "2024-01-01 00:00:00", IcebergJobUtils.normalizeOlderThan("2024-01-01 00:00:00", fixed));
   }
 
   @Test
@@ -323,6 +333,19 @@ public class TestIcebergExpireSnapshotsJob {
     // Test null and empty
     assertEquals(null, IcebergJobUtils.escapeSqlString(null));
     assertEquals("", IcebergJobUtils.escapeSqlString(""));
+  }
+
+  @Test
+  public void testEscapeSparkCallStringArg() {
+    // Doubles backslashes first, then encodes ' as \' (Spark CALL where => '...').
+    assertEquals(
+        "region = \\'a\"b\\\\\\\\c\\'",
+        IcebergJobUtils.escapeSparkCallStringArg("region = 'a\"b\\\\c'"));
+    assertEquals(
+        "(region = \\'O\\\\\\'Brien\\')",
+        IcebergJobUtils.escapeSparkCallStringArg("(region = 'O\\'Brien')"));
+    assertEquals(null, IcebergJobUtils.escapeSparkCallStringArg(null));
+    assertEquals("", IcebergJobUtils.escapeSparkCallStringArg(""));
   }
 
   @Test
@@ -499,5 +522,40 @@ public class TestIcebergExpireSnapshotsJob {
         IcebergExpireSnapshotsJob.parseStreamResults(
             IcebergJobUtils.parseArguments(new String[] {"--stream-results"})
                 .get("stream-results")));
+  }
+
+  @Test
+  public void testExpireSetDifferenceIgnoresConcurrentAdds() {
+    java.util.Set<Long> beforeSnapshots = new java.util.HashSet<>();
+    beforeSnapshots.add(1L);
+    beforeSnapshots.add(2L);
+    beforeSnapshots.add(3L);
+    java.util.Set<Long> afterSnapshots = new java.util.HashSet<>();
+    afterSnapshots.add(2L);
+    afterSnapshots.add(3L);
+    afterSnapshots.add(99L);
+    assertEquals(1L, IcebergExpireSnapshotsJob.snapshotsCleared(beforeSnapshots, afterSnapshots));
+
+    java.util.Map<String, Long> beforeFiles = new java.util.HashMap<>();
+    beforeFiles.put("a.parquet", 100L);
+    beforeFiles.put("b.parquet", 200L);
+    java.util.Map<String, Long> afterFiles = new java.util.HashMap<>();
+    afterFiles.put("b.parquet", 200L);
+    afterFiles.put("c.parquet", 500L);
+    assertEquals(100L, IcebergExpireSnapshotsJob.bytesReclaimed(beforeFiles, afterFiles));
+
+    String sql = IcebergExpireSnapshotsJob.buildReachableContentFilesSql("cat", "db.tbl");
+    assertTrue(sql.contains("FROM `cat`.`db`.`tbl`.`all_files`"));
+    assertTrue(sql.contains("GROUP BY file_path"));
+  }
+
+  @Test
+  public void testExpireMetricNames() {
+    assertEquals("custom-snapshot-number", IcebergSnapshotExpirationContent.SNAPSHOT_NUMBER_METRIC);
+    assertEquals(
+        "custom-expired-snapshot-number",
+        IcebergSnapshotExpirationContent.EXPIRED_SNAPSHOT_NUMBER_METRIC);
+    assertEquals(
+        "custom-expired-file-size", IcebergSnapshotExpirationContent.EXPIRED_FILE_SIZE_METRIC);
   }
 }

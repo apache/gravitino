@@ -70,6 +70,9 @@ public class GlueTable extends BaseTable {
   /** Database (schema) this table belongs to. */
   private String dbName;
 
+  /** Whether the Glue table is an Iceberg table, as its {@code table_type} parameter says. */
+  private boolean icebergTable;
+
   private GlueTable() {}
 
   /**
@@ -96,8 +99,21 @@ public class GlueTable extends BaseTable {
     return new GlueTableOperations(glueClient, catalogId, dbName, name, partColNames);
   }
 
+  /**
+   * Returns the Glue partition operations of a Hive-format table. Iceberg tables keep their
+   * partitions in Iceberg manifests, not in Glue, so they have none.
+   *
+   * @throws UnsupportedOperationException for an Iceberg-format table
+   */
   @Override
   public SupportsPartitions supportPartitions() throws UnsupportedOperationException {
+    if (icebergTable) {
+      throw new UnsupportedOperationException(
+          String.format(
+              "Partition operations are not supported for Iceberg-format table %s; its"
+                  + " partitions are kept in Iceberg metadata, not in Glue",
+              name));
+    }
     return (SupportsPartitions) ops();
   }
 
@@ -175,6 +191,12 @@ public class GlueTable extends BaseTable {
     if (glueTable.hasParameters()) {
       properties.putAll(glueTable.parameters());
     }
+    // The format of a table is told by its native table_type parameter; table-format only chooses
+    // the format at create, so it is reported from table_type and never taken from storage.
+    boolean iceberg = GlueIcebergTableHelper.isIcebergTable(glueTable);
+    properties.put(
+        GlueConstants.TABLE_FORMAT,
+        iceberg ? GlueConstants.TABLE_FORMAT_ICEBERG : GlueConstants.TABLE_FORMAT_HIVE);
 
     if (sd != null) {
       putIfNotBlank(properties, LOCATION, sd.location());
@@ -198,16 +220,19 @@ public class GlueTable extends BaseTable {
             .withLastModifiedTime(glueTable.updateTime())
             .build();
 
-    return GlueTable.builder()
-        .withName(glueTable.name())
-        .withComment(glueTable.description())
-        .withColumns(columns.toArray(new Column[0]))
-        .withProperties(properties)
-        .withPartitioning(partitioning)
-        .withDistribution(distribution)
-        .withSortOrders(sortOrders)
-        .withAuditInfo(auditInfo)
-        .build();
+    GlueTable table =
+        GlueTable.builder()
+            .withName(glueTable.name())
+            .withComment(glueTable.description())
+            .withColumns(columns.toArray(new Column[0]))
+            .withProperties(properties)
+            .withPartitioning(partitioning)
+            .withDistribution(distribution)
+            .withSortOrders(sortOrders)
+            .withAuditInfo(auditInfo)
+            .build();
+    table.icebergTable = iceberg;
+    return table;
   }
 
   private static void putIfNotBlank(Map<String, String> map, String key, String value) {

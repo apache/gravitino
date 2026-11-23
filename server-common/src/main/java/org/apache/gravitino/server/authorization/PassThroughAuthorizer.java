@@ -50,6 +50,15 @@ public class PassThroughAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
+  public boolean canAccessDomain(
+      Principal principal,
+      String metalake,
+      MetadataObject object,
+      AuthorizationRequestContext requestContext) {
+    return true;
+  }
+
+  @Override
   public boolean deny(
       Principal principal,
       String metalake,

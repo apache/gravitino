@@ -20,6 +20,7 @@ Spark clients use a different Iceberg version than the Gravitino server (1.11.0)
 |---------------|----------------|-----------------|---------------------------------------------------------|-----------------------------------------------------------------------------------|
 | 3.5           | 2.12 or 2.13   | 1.11.0          | `iceberg-spark-runtime-3.5_${scala-version}-1.11.0.jar` | `gravitino-spark-connector-runtime-3.5_${scala-version}-${gravitino-version}.jar` |
 | 4.0           | 2.13           | 1.11.0          | `iceberg-spark-runtime-4.0_2.13-1.11.0.jar`             | `gravitino-spark-connector-runtime-4.0_2.13-${gravitino-version}.jar`             |
+| 4.1           | 2.13           | 1.11.0          | `iceberg-spark-runtime-4.1_2.13-1.11.0.jar`             | `gravitino-spark-connector-runtime-4.1_2.13-${gravitino-version}.jar`             |
 
 Replace `${scala-version}` with `2.12` or `2.13`, and `${gravitino-version}` with your Gravitino release version.
 
@@ -260,7 +261,12 @@ a `NoClassDefFoundError` that does not identify the missing bundle directly.
 
 ### OSS
 
-Please downloading the [Aliyun OSS SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip) and copy `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` in the classpath of Spark.
+Download the [Aliyun OSS SDK](https://repo1.maven.org/maven2/com/aliyun/oss/aliyun-sdk-oss/3.18.5/aliyun-sdk-oss-3.18.5.jar)
+version that matches the Iceberg runtime from the table above (3.18.5 for Iceberg 1.11.0), together with
+[jdom2](https://repo1.maven.org/maven2/org/jdom/jdom2/2.0.6.1/jdom2-2.0.6.1.jar), and place
+`aliyun-sdk-oss-3.18.5.jar` and `jdom2-2.0.6.1.jar` on the Spark driver and executor classpaths.
+Iceberg 1.11.0 expects `OSS#deleteObject(String, String)` to return `VoidResult`, which is only true
+from SDK 3.12.0 onward; with 3.10.2 every OSS delete fails with `NoSuchMethodError`.
 
 ### GCS
 

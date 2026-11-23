@@ -14,13 +14,60 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+import os
+import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 from urllib.error import URLError
 
-from gravitino.exceptions.base import NotFoundException, RESTException
+from gravitino.api.file.fileset import Fileset
+from gravitino.dto.audit_dto import AuditDTO
+from gravitino.dto.fileset_dto import FilesetDTO
+from gravitino.exceptions.base import (
+    ForbiddenException,
+    NotFoundException,
+    RESTException,
+)
+from gravitino.filesystem.gvfs import GravitinoVirtualFileSystem
+from gravitino.filesystem.gvfs_config import GVFSConfig
 from gravitino.filesystem.gvfs_default_operations import DefaultGVFSOperations
+from gravitino.filesystem.gvfs_storage_handler import S3StorageHandler
 from gravitino.name_identifier import NameIdentifier
+
+
+class _CustomGetFilesetOperations(DefaultGVFSOperations):
+    """Test operations subclass overriding _get_fileset with the legacy 1-arg signature."""
+
+    custom_fileset = None
+
+    def _get_fileset(self, fileset_ident: NameIdentifier):
+        if self.custom_fileset is not None:
+            return self.custom_fileset
+        return super()._get_fileset(fileset_ident)
+
+
+class _CustomGetFilesetCatalogOperations(DefaultGVFSOperations):
+    """Test operations subclass overriding _get_fileset_catalog with the legacy 1-arg signature."""
+
+    custom_catalog = None
+
+    def _get_fileset_catalog(self, catalog_ident: NameIdentifier):
+        if self.custom_catalog is not None:
+            return self.custom_catalog
+        return super()._get_fileset_catalog(catalog_ident)
+
+
+class _CustomMergePropertiesOperations(DefaultGVFSOperations):
+    """Test operations subclass overriding _merge_fileset_properties with 2 args."""
+
+    def _merge_fileset_properties(
+        self,
+        fileset_ident: NameIdentifier,
+        actual_location: str,
+    ):
+        props = super()._merge_fileset_properties(fileset_ident, actual_location)
+        props["custom-location"] = actual_location
+        return props
 
 
 # pylint: disable=protected-access
@@ -80,6 +127,101 @@ class TestGVFSMergeSecrets(unittest.TestCase):
         self.assertEqual(merged["s-secret"], "ss")
         self.assertEqual(merged["f-vis"], "3")
         self.assertEqual(merged["f-secret"], "fs")
+
+    def test_metadata_cache_avoids_repeated_metadata_loads(self):
+        operations = DefaultGVFSOperations(
+            server_uri="http://localhost:8090",
+            metalake_name="ml",
+            options={GVFSConfig.GVFS_FILESYSTEM_ENABLE_FILESET_METADATA_CACHE: True},
+        )
+
+        catalog = MagicMock()
+        schema = MagicMock()
+        fileset = MagicMock()
+        catalog.properties.return_value = {"c-vis": "1"}
+        catalog.get_secrets.return_value = {"c-secret": "cs"}
+        catalog.as_schemas.return_value.load_schema.return_value = schema
+        schema.properties.return_value = {"s-vis": "2"}
+        schema.get_secrets.return_value = {"s-secret": "ss"}
+        catalog.as_fileset_catalog.return_value.load_fileset.return_value = fileset
+        fileset.properties.return_value = {"f-vis": "3"}
+        fileset.get_secrets.return_value = {"f-secret": "fs"}
+
+        client = MagicMock()
+        client.load_catalog.return_value = catalog
+        fileset_ident = NameIdentifier.of("ml", "catalog", "schema", "fs")
+
+        with patch.object(operations, "_get_gravitino_client", return_value=client):
+            with patch.object(operations, "_get_user_defined_configs", return_value={}):
+                first = operations._merge_fileset_properties(
+                    fileset_ident, "file:///tmp/data"
+                )
+                second = operations._merge_fileset_properties(
+                    fileset_ident, "file:///tmp/data"
+                )
+
+        self.assertEqual(first["f-secret"], "fs")
+        self.assertEqual(first, second)
+        # The second merge must come from the metadata cache: no repeated loads.
+        client.load_catalog.assert_called_once_with("catalog")
+        catalog.as_schemas.return_value.load_schema.assert_called_once_with("schema")
+        catalog.as_fileset_catalog.return_value.load_fileset.assert_called_once_with(
+            NameIdentifier.of("schema", "fs")
+        )
+        # Secrets are not cached and are fetched on every merge.
+        self.assertEqual(catalog.get_secrets.call_count, 2)
+        self.assertEqual(schema.get_secrets.call_count, 2)
+        self.assertEqual(fileset.get_secrets.call_count, 2)
+
+    def test_removed_fileset_secret_falls_back_to_catalog_secret_with_cache(self):
+        operations = DefaultGVFSOperations(
+            server_uri="http://localhost:8090",
+            metalake_name="ml",
+            options={GVFSConfig.GVFS_FILESYSTEM_ENABLE_FILESET_METADATA_CACHE: True},
+        )
+
+        catalog = MagicMock()
+        schema = MagicMock()
+        fileset = MagicMock()
+        catalog.properties.return_value = {
+            "s3_access_key_id": "******",
+            "s3_secret_access_key": "******",
+        }
+        catalog.get_secrets.return_value = {
+            "s3_access_key_id": "catalog-key-id",
+            "s3_secret_access_key": "catalog-secret",
+        }
+        catalog.support_credentials.return_value.get_credentials.return_value = []
+        catalog.as_schemas.return_value.load_schema.return_value = schema
+        schema.properties.return_value = {}
+        schema.get_secrets.return_value = {}
+        catalog.as_fileset_catalog.return_value.load_fileset.return_value = fileset
+        # The cached fileset keeps the masked override after it is removed on the server.
+        fileset.properties.return_value = {"s3_secret_access_key": "******"}
+        fileset.get_secrets.return_value = {"s3_secret_access_key": "fileset-secret"}
+
+        client = MagicMock()
+        client.load_catalog.return_value = catalog
+        fileset_ident = NameIdentifier.of("ml", "catalog", "schema", "fs")
+
+        with patch.object(operations, "_get_gravitino_client", return_value=client):
+            with patch.object(operations, "_get_user_defined_configs", return_value={}):
+                first = operations._merge_fileset_properties(
+                    fileset_ident, "s3://bucket/data"
+                )
+                fileset.get_secrets.return_value = {}
+                second = operations._merge_fileset_properties(
+                    fileset_ident, "s3://bucket/data"
+                )
+
+        catalog.as_fileset_catalog.return_value.load_fileset.assert_called_once()
+        self.assertEqual(first["s3_secret_access_key"], "fileset-secret")
+        handler = S3StorageHandler()
+        with patch.object(handler, "get_filesystem") as get_filesystem:
+            handler.get_filesystem_with_expiration([], second, "s3://bucket/data")
+        get_filesystem.assert_called_once()
+        self.assertEqual(get_filesystem.call_args.kwargs["key"], "catalog-key-id")
+        self.assertEqual(get_filesystem.call_args.kwargs["secret"], "catalog-secret")
 
     def test_secret_override(self):
         operations = DefaultGVFSOperations(
@@ -230,6 +372,7 @@ class TestGVFSMergeSecrets(unittest.TestCase):
 
     def test_get_credentials_failures_do_not_abort_merge(self):
         for exc in (
+            ForbiddenException("catalog credentials denied"),
             NotFoundException("credentials endpoint missing"),
             URLError("connection refused"),
         ):
@@ -250,6 +393,52 @@ class TestGVFSMergeSecrets(unittest.TestCase):
                 merged = self._merge_with_catalog(operations, catalog)
                 self.assertEqual(merged["s3-endpoint"], "http://s3.example.com")
                 self.assertNotIn("s3-access-key-id", merged)
+
+    def test_catalog_denial_preserves_fileset_credential_authorization(self):
+        operations = DefaultGVFSOperations(
+            server_uri="http://localhost:8090", metalake_name="ml", options={}
+        )
+        catalog = MagicMock()
+        catalog.properties.return_value = {"s3-endpoint": "http://s3.example.com"}
+        catalog.get_secrets.return_value = {}
+        catalog.support_credentials.return_value.get_credentials.side_effect = (
+            ForbiddenException("catalog denied")
+        )
+        schema = catalog.as_schemas.return_value.load_schema.return_value
+        schema.properties.return_value = {}
+        schema.get_secrets.return_value = {}
+        fileset = catalog.as_fileset_catalog.return_value.load_fileset.return_value
+        fileset.properties.return_value = {}
+        fileset.get_secrets.return_value = {}
+        fileset.storage_locations.return_value = {"default": "s3://bucket/data"}
+        client = MagicMock()
+        client.load_catalog.return_value = catalog
+        scoped_credentials = [MagicMock()]
+        filesystem = MagicMock()
+        ident = NameIdentifier.of("ml", "catalog", "schema", "fs")
+        with (
+            patch.object(operations, "_get_gravitino_client", return_value=client),
+            patch.object(operations, "_get_fileset", return_value=fileset),
+            patch.object(operations, "_get_user_defined_configs", return_value={}),
+            patch.object(
+                operations,
+                "_get_credentials_with_cache",
+                return_value=scoped_credentials,
+            ) as vend,
+            patch.object(
+                operations, "_get_filesystem", return_value=filesystem
+            ) as create,
+        ):
+            self.assertIs(
+                filesystem,
+                operations._get_actual_filesystem_by_location_name(ident, "default"),
+            )
+            vend.assert_called_once_with(ident, fileset, "default")
+            self.assertIs(create.call_args.args[0], scoped_credentials)
+            vend.side_effect = ForbiddenException("fileset denied")
+            with self.assertRaises(ForbiddenException):
+                operations._get_actual_filesystem_by_location_name(ident, "default")
+            create.assert_called_once()
 
     def test_skips_expiring_credentials(self):
         operations = DefaultGVFSOperations(
@@ -283,6 +472,233 @@ class TestGVFSMergeSecrets(unittest.TestCase):
         self.assertEqual(merged["s3_access_key_id"], "AKIATEST")
         self.assertEqual(merged["s3-secret-access-key"], "static-secret")
         self.assertNotIn("s3-session-token", merged)
+
+    def test_get_actual_filesystem_loads_once_with_credential_vending(self):
+        operations = DefaultGVFSOperations(
+            server_uri="http://localhost:8090",
+            metalake_name="ml",
+            options={GVFSConfig.GVFS_FILESYSTEM_ENABLE_CREDENTIAL_VENDING: True},
+        )
+        client, catalog, fileset = self._build_client_chain(
+            prefix="client",
+            location="s3://bucket/data",
+            target_file_uri="s3://bucket/data/a",
+        )
+        scoped_cred = MagicMock()
+        scoped_cred.expire_time_in_ms.return_value = 0
+        fileset.support_credentials.return_value.get_credentials.return_value = [
+            scoped_cred
+        ]
+        filesystem = MagicMock()
+        ident = NameIdentifier.of("ml", "catalog", "schema", "fs")
+
+        with (
+            patch.object(operations, "_get_gravitino_client", return_value=client),
+            patch.object(operations, "_get_user_defined_configs", return_value={}),
+            patch.object(
+                operations, "_get_filesystem", return_value=filesystem
+            ) as create_fs,
+        ):
+            self.assertIs(
+                filesystem,
+                operations._get_actual_filesystem_by_location_name(ident, "default"),
+            )
+
+        create_fs.assert_called_once()
+        client.load_catalog.assert_called_once_with("catalog")
+        catalog.as_schemas.return_value.load_schema.assert_called_once_with("schema")
+        catalog.as_fileset_catalog.return_value.load_fileset.assert_called_once_with(
+            NameIdentifier.of("schema", "fs")
+        )
+        fileset.support_credentials.return_value.get_credentials.assert_called_once_with()
+
+    def test_exists_loads_catalog_and_fileset_once_when_cache_disabled(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            loc_dir = os.path.join(tmp_dir, "loc")
+            os.makedirs(loc_dir)
+            target_file = os.path.join(loc_dir, "data.txt")
+            with open(target_file, "w", encoding="utf-8") as fp:
+                fp.write("hello")
+
+            client, catalog, _ = self._build_client_chain(
+                prefix="client",
+                location=f"file://{loc_dir}",
+                target_file_uri=f"file://{target_file}",
+            )
+            gvfs = GravitinoVirtualFileSystem(
+                server_uri="http://localhost:8090",
+                metalake_name="ml",
+                options={
+                    GVFSConfig.GVFS_FILESYSTEM_ENABLE_FILESET_METADATA_CACHE: False
+                },
+                skip_instance_cache=True,
+            )
+            with patch.object(
+                gvfs.operations, "_get_gravitino_client", return_value=client
+            ):
+                self.assertTrue(
+                    gvfs.exists("gvfs://fileset/catalog/schema/fs/data.txt")
+                )
+                self.assertEqual(client.load_catalog.call_count, 1)
+                self.assertEqual(
+                    catalog.as_schemas.return_value.load_schema.call_count, 1
+                )
+                self.assertEqual(
+                    catalog.as_fileset_catalog.return_value.load_fileset.call_count, 1
+                )
+
+                # A subsequent operation opens a new scope and performs a fresh load.
+                self.assertTrue(
+                    gvfs.exists("gvfs://fileset/catalog/schema/fs/data.txt")
+                )
+                self.assertEqual(client.load_catalog.call_count, 2)
+                self.assertEqual(
+                    catalog.as_fileset_catalog.return_value.load_fileset.call_count, 2
+                )
+
+    @staticmethod
+    def _build_client_chain(prefix: str, location: str, target_file_uri: str):
+        catalog = MagicMock()
+        catalog.as_fileset_catalog.return_value = catalog
+        schema = MagicMock()
+        fileset = MagicMock()
+
+        catalog.properties.return_value = {"c-prop": f"from-{prefix}"}
+        catalog.get_secrets.return_value = {"c-secret": f"{prefix}-cat-secret"}
+        catalog.as_schemas.return_value.load_schema.return_value = schema
+        schema.properties.return_value = {"s-prop": f"from-{prefix}"}
+        schema.get_secrets.return_value = {"s-secret": f"{prefix}-sch-secret"}
+        catalog.load_fileset.return_value = fileset
+        catalog.get_file_location.return_value = target_file_uri
+        fileset.PROPERTY_DEFAULT_LOCATION_NAME = Fileset.PROPERTY_DEFAULT_LOCATION_NAME
+        fileset.LOCATION_NAME_UNKNOWN = Fileset.LOCATION_NAME_UNKNOWN
+        fileset.properties.return_value = {
+            Fileset.PROPERTY_DEFAULT_LOCATION_NAME: "default",
+            "f-prop": f"from-{prefix}",
+            f"{prefix}-only": "1",
+        }
+        fileset.get_secrets.return_value = {
+            "f-secret": f"{prefix}-secret",
+            f"{prefix}-sec-only": "1",
+        }
+        fileset.storage_locations.return_value = {"default": location}
+
+        client = MagicMock()
+        client.load_catalog.return_value = catalog
+        return client, catalog, fileset
+
+    def _run_hook_exists_check(
+        self,
+        ops_cls,
+        enable_cache: bool,
+        client_location: str,
+        hook_location: str,
+        target_file: str,
+    ):
+        target_uri = f"file://{target_file}"
+        client, _, _ = self._build_client_chain(
+            prefix="client", location=client_location, target_file_uri=target_uri
+        )
+        gvfs = GravitinoVirtualFileSystem(
+            server_uri="http://localhost:8090",
+            metalake_name="ml",
+            options={
+                GVFSConfig.GVFS_FILESYSTEM_ENABLE_FILESET_METADATA_CACHE: enable_cache,
+                GVFSConfig.GVFS_FILESYSTEM_OPERATIONS: (
+                    f"{ops_cls.__module__}.{ops_cls.__name__}"
+                ),
+            },
+            skip_instance_cache=True,
+        )
+        with (
+            patch.object(gvfs.operations, "_get_gravitino_client", return_value=client),
+            patch.object(
+                gvfs.operations,
+                "_get_filesystem",
+                wraps=gvfs.operations._get_filesystem,
+            ) as get_fs_spy,
+        ):
+            self.assertTrue(gvfs.exists("gvfs://fileset/catalog/schema/fs/data.txt"))
+            merged_props, actual_path = get_fs_spy.call_args.args[1:3]
+            if ops_cls in (
+                _CustomGetFilesetOperations,
+                _CustomGetFilesetCatalogOperations,
+            ):
+                self.assertEqual(actual_path, hook_location)
+                self.assertEqual(merged_props.get("c-prop"), "from-client")
+                self.assertEqual(merged_props.get("c-secret"), "client-cat-secret")
+                self.assertEqual(merged_props.get("s-prop"), "from-client")
+                self.assertEqual(merged_props.get("s-secret"), "client-sch-secret")
+                self.assertEqual(merged_props.get("f-prop"), "from-client")
+                self.assertEqual(merged_props.get("f-secret"), "client-secret")
+                self.assertNotIn("hook-only", merged_props)
+                self.assertNotIn("hook-sec-only", merged_props)
+                self.assertNotIn("dto-prop", merged_props)
+            else:
+                self.assertEqual(actual_path, client_location)
+                self.assertEqual(merged_props.get("custom-location"), client_location)
+
+    def test_custom_hooks_keep_client_properties_when_cache_disabled(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            client_dir = os.path.join(tmp_dir, "client-loc")
+            hook_dir = os.path.join(tmp_dir, "hook-loc")
+            os.makedirs(client_dir)
+            os.makedirs(hook_dir)
+            target_file = os.path.join(hook_dir, "data.txt")
+            with open(target_file, "w", encoding="utf-8") as fp:
+                fp.write("hello")
+
+            client_location = f"file://{client_dir}"
+            hook_location = f"file://{hook_dir}"
+
+            _, hook_catalog, hook_fileset = self._build_client_chain(
+                prefix="hook",
+                location=hook_location,
+                target_file_uri=f"file://{target_file}",
+            )
+            dto_fileset = FilesetDTO(
+                _name="fs",
+                _comment="dto",
+                _type=Fileset.Type.MANAGED,
+                _properties={
+                    Fileset.PROPERTY_DEFAULT_LOCATION_NAME: "default",
+                    "dto-prop": "1",
+                },
+                _storage_locations={"default": hook_location},
+                _audit=AuditDTO(_creator="test"),
+            )
+
+            try:
+                for hook_fs in (hook_fileset, dto_fileset):
+                    _CustomGetFilesetOperations.custom_fileset = hook_fs
+                    self._run_hook_exists_check(
+                        _CustomGetFilesetOperations,
+                        False,
+                        client_location,
+                        hook_location,
+                        target_file,
+                    )
+
+                _CustomGetFilesetCatalogOperations.custom_catalog = hook_catalog
+                self._run_hook_exists_check(
+                    _CustomGetFilesetCatalogOperations,
+                    False,
+                    client_location,
+                    hook_location,
+                    target_file,
+                )
+
+                for enable_cache in (False, True):
+                    self._run_hook_exists_check(
+                        _CustomMergePropertiesOperations,
+                        enable_cache,
+                        client_location,
+                        hook_location,
+                        target_file,
+                    )
+            finally:
+                _CustomGetFilesetOperations.custom_fileset = None
+                _CustomGetFilesetCatalogOperations.custom_catalog = None
 
 
 if __name__ == "__main__":
