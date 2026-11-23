@@ -143,13 +143,13 @@ TermBinding  { termId, targetId, targetType, audit_info }
 TermVersion  { termId, version, state, snapshot, audit_info }   // Step 2 only; schema defined then
 ```
 
-| Table                      | Unique key                                                                     | Other index                              |
-| -------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------- |
-| `glossary_term_meta`       | `(metalake_id, name_key, deleted_at)`, `(metalake_id, source_ref, deleted_at)` |                                          |
-| `glossary_term_synonym`    | `(term_id, synonym_key, deleted_at)`                                           | `(metalake_id, synonym_key, deleted_at)` |
-| `glossary_term_rel`        | `(from_term_id, to_term_id, rel_type, deleted_at)`                             | `(to_term_id, rel_type)`                 |
-| `glossary_term_domain_rel` | `(term_id, domain_id, deleted_at)`                                             | `(domain_id)`                            |
-| `glossary_term_binding`    | `(term_id, target_type, target_id, deleted_at)`                                | `(target_type, target_id)`               |
+| Table                   | Unique key                                                                     | Other index                                                                    |
+| ----------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `glossary_term_meta`    | `(metalake_id, name_key, deleted_at)`, `(metalake_id, source_ref, deleted_at)` |                                                                                |
+| `glossary_term_synonym` | `(term_id, synonym_key, deleted_at)`                                           | `(metalake_id, synonym_key, deleted_at)`                                       |
+| `glossary_term_rel`     | `(from_term_id, to_term_id, rel_type, deleted_at)`                             | `(to_term_id, rel_type)`                                                       |
+| `domain_member_rel`     | `(member_type, member_id, domain_id, deleted_at)`                              | `(domain_id, deleted_at, member_type, member_id)`, `(metalake_id, deleted_at)` |
+| `glossary_term_binding` | `(term_id, target_type, target_id, deleted_at)`                                | `(target_type, target_id)`                                                     |
 
 - The tables are added to the H2, MySQL and PostgreSQL schemas and to the `upgrade-1.3.0-to-2.0.0`
   scripts.
@@ -249,9 +249,12 @@ not as an implementation prerequisite.
 
 **Selected design: explicit relation (Option A)**
 
-- A table `glossary_term_domain_rel (term_id, domain_id)`. Only the term API changes it: `domains`
-  on create, `addDomain` and `removeDomain`. These changes go through `TermChangeHandler`, like any
-  term change.
+- Use the shared `domain_member_rel` table for explicit membership. Rows store `id`, `metalake_id`,
+  `domain_id`, `member_type` and `member_id`, plus common store metadata. Each row references a
+  real Domain and a member in the same metalake. Glossary uses `GLOSSARY_TERM` and the stable
+  term ID. Term reads, writes and cleanup match both member type and ID.
+- Only the term API changes term memberships through `domains` on create, `addDomain` and
+  `removeDomain`. These changes go through `TermChangeHandler`, like any term change.
 - To add a term to a domain, the caller needs the edit privilege on the term, and must be able to
   see the domain (`USE_DOMAIN`). In Step 2, the caller also needs `CREATE_DEFINITION` on that
   domain, so nobody can move a term into a domain where they cannot write.
@@ -262,9 +265,9 @@ not as an implementation prerequisite.
   lookup results, nested terms, and create/alter responses. A readable term remains readable
   even if some or all of its domains are hidden; its returned domain list can be empty. Filtering
   a response never changes stored membership or reveals a hidden-domain count.
-- Dropping a domain that still has terms fails with 409 `NonEmptyDomainException`. This is the same
-  as a domain with subdomains. Removing the terms silently would change how they are grouped, and in
-  Step 2 who manages them. The change is one more check in `DomainManager#dropDomain`.
+- `DomainManager#dropDomain` checks the shared table for any live membership under the Domain
+  lock. A remaining member of any type causes 409 `NonEmptyDomainException`. Removing terms
+  silently would change how they are grouped and who manages them in Step 2.
 - **Clearing a non-empty domain**: the caller dropping it may not be able to see every member
   term. A current term owner with effective CREATE and the required domain access can remove
   its own membership; a caller with MANAGE and domain access can clear the remaining terms.
@@ -1131,9 +1134,8 @@ tag. The second case cannot be blocked without changing how tags work.
 
 ## Open Questions and Decisions
 
-1. **Domain membership (decided)**: use explicit `glossary_term_domain_rel` relations (Option A),
-   as agreed in the November 9 review. Option B is an alternative, not a pending choice or a
-   prerequisite for T7.
+1. **Domain membership (decided)**: use explicit `domain_member_rel` relations (Option A).
+   Glossary T7 introduces the shared schema and mapper for other definition types to reuse.
 2. **Draft visibility (decided)**: only the owner with `CREATE_DEFINITION`, or a caller with
    `MANAGE_DEFINITIONS`, can read a draft. This is fixed for Step 1 (see Access control).
 3. **Default read access**: everyone should be able to read terms by default. But Gravitino has no
@@ -1490,7 +1492,9 @@ The users for these cases:
 - T7.3 `domain=Sales` returns the terms of Sales and of its subdomains that the caller can see. It
   leaves out the terms of hidden subdomains.
 - T7.4 Dropping a domain with terms fails with 409 (`NonEmptyDomainException`). After
-  `removeDomain`, the drop works. **(guard)**
+  `removeDomain`, the drop works if no other live member remains. When testing shared
+  membership with another member type, verify its row survives Term removal and still
+  blocks the domain drop. **(guard)**
 - T7.5 Race: one thread adds a term to a domain while another drops the domain. Either the term is
   added and the drop fails with 409, or the drop wins and the add fails with 404.
 - T7.6 Under the selected explicit-relation design, a tag on a term never changes its domains,
@@ -1853,9 +1857,9 @@ parallel once the tasks they depend on are merged.
       shared glossary authorization checks, grant implications and deny precedence; owner checks
       for CREATE edits and draft reads; MANAGE-only deletion in every status; filtering of hidden
       terms inside relation lists. No Step 1 approval capability. Depends on: T4.
-- [ ] **T7. Add domain membership** (`core/`). Explicit `glossary_term_domain_rel` storage
-      (selected Option A), add and remove domains on create and alter, and the 409 check on
-      domain drop.
+- [ ] **T7. Add domain membership** (`core/`, `scripts/`). Introduce the shared `domain_member_rel`
+      schema and mapper as a standalone storage change for reuse by Article T2. Add and remove
+      term memberships on create and alter. Check all live member types on domain drop.
       Shared domain filtering on term results and mixed relation/domain lock-order tests.
       Depends on: T4, T5, T6, prerequisites.
 
