@@ -297,6 +297,14 @@ public final class GlossaryManager {
                 GlossaryTermEntity created =
                     domains.changed() ? TermEdits.withDomains(term, domains.names()) : term;
                 terms.checkTermNames(created);
+                // The hierarchy lock fences concurrent creates, renames and deletes. Reject a
+                // duplicate without waiting on its term row while holding requested domain locks.
+                if (!terms
+                    .getIdsByKeys(lake, Set.of(GlossaryTermNames.key(created.name())))
+                    .isEmpty()) {
+                  throw new TermAlreadyExistsException(
+                      "Term name or source reference already exists");
+                }
                 handler.handle(
                     null, created, () -> persistNewTerm(metalake, created, plan, domains));
                 return visibleDomains(created, access);

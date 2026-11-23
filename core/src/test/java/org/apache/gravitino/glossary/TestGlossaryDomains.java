@@ -63,6 +63,7 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.apache.gravitino.exceptions.NonEmptyDomainException;
+import org.apache.gravitino.exceptions.TermAlreadyExistsException;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.server.authorization.DomainAuthzHelper;
@@ -70,8 +71,10 @@ import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
+import org.apache.gravitino.storage.relational.po.GlossaryTermPO;
 import org.apache.gravitino.storage.relational.service.GlossaryDomainFixtures;
 import org.apache.gravitino.storage.relational.service.GlossaryInvariants;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
@@ -379,6 +382,17 @@ class TestGlossaryDomains extends TestJDBCBackend {
             call -> {
               Object mapper = call.callRealMethod();
               if (call.getMethod().getName().equals("getMapper")) {
+                if (call.getArgument(0) == GlossaryTermMetaMapper.class) {
+                  return Mockito.mock(
+                      GlossaryTermMetaMapper.class,
+                      lookup -> {
+                        Object row = AdditionalAnswers.delegatesTo(mapper).answer(lookup);
+                        if (lookup.getMethod().getName().equals("getForUpdate") && row != null) {
+                          locks.add(((GlossaryTermPO) row).getTermId());
+                        }
+                        return row;
+                      });
+                }
                 if (call.getArgument(0) == GlossaryTermRelMapper.class) {
                   return observeLock(GlossaryTermRelMapper.class, mapper, "lockTerm", 1, locks);
                 }
@@ -415,6 +429,28 @@ class TestGlossaryDomains extends TestJDBCBackend {
       assertEquals(
           List.of(parent.id(), before.id(), sales),
           locks.stream().filter(id -> !id.equals(created.id())).distinct().toList());
+      locks.clear();
+      assertThrows(
+          TermAlreadyExistsException.class,
+          () ->
+              as(
+                  "lakeOwner",
+                  () ->
+                      manager.createTerm(
+                          LAKE,
+                          TermSpec.builder("Mixed")
+                              .withRelated("Parent")
+                              .withDomains("Sales")
+                              .build())));
+      assertEquals(List.of(parent.id(), sales), locks.stream().distinct().toList());
+      assertThrows(
+          NoSuchDomainException.class,
+          () ->
+              as(
+                  "lakeOwner",
+                  () ->
+                      manager.createTerm(
+                          LAKE, TermSpec.builder("Mixed").withDomains("NoSuch").build())));
     }
     GlossaryTermEntity after = as("lakeOwner", () -> manager.getTerm(LAKE, "Mixed"));
     assertEquals("mixed", after.definition());

@@ -101,9 +101,11 @@ public final class GlossaryTermMetaService {
           entity.namespace(),
           (mapper, metalakeId) -> {
             GlossaryTermPO old =
-                mapper.getForUpdate(metalakeId, GlossaryTermNames.key(entity.name()));
+                overwritten
+                    ? mapper.getForUpdate(metalakeId, GlossaryTermNames.key(entity.name()))
+                    : null;
             GlossaryTermPO row = toPO(entity, metalakeId);
-            if (overwritten && old != null) {
+            if (old != null) {
               Preconditions.checkArgument(
                   Objects.equals(old.getTermId(), entity.id()),
                   "Cannot overwrite glossary term %s with ID %s; load and retain existing ID %s",
