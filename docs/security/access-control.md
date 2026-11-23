@@ -295,12 +295,15 @@ writing them takes `MODIFY_TABLE`. Model versions follow the model: `USE_MODEL` 
 alter or delete. Fetching plaintext secrets (`getSecrets`) requires owning the metalake or holding
 `USE_SECRETS`. Cloud access-key pairs are included only when the caller is the metalake owner or also
 holds `INCLUDE_CREDENTIAL_SECRETS`. Catalog credential vending (`getCredentials`) requires metadata
-access. Short-lived vended tokens do not require secret privileges. Static credentials
-additionally require both `USE_SECRETS` and `INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership.
-Callers missing either privilege receive only tokens from mixed-provider catalogs, or a forbidden
-error if only static providers are configured. Catalogs with no credentials return an empty
-result. Fileset credential vending retains its path-based authorization. Callers who can load the
-object but lack `USE_SECRETS` receive an empty `getSecrets` result rather than a forbidden error.
+access. If any configured provider supplies static credentials, the catalog request additionally
+requires both `USE_SECRETS` and `INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership. Mixed static
+and dynamic configurations follow the same rule; catalog requests do not partially return credentials.
+Catalog requests carry no storage path. Built-in path-only token providers therefore return no
+catalog credentials, and a token-only catalog probe succeeds with an empty result. Tokens are
+generated through the existing path-based fileset and Iceberg REST vending flows, with the
+authorized paths and storage privileges. Catalogs with no credentials also return an empty result.
+Callers who can load the object but lack `USE_SECRETS` receive an empty `getSecrets` result rather
+than a forbidden error.
 
 Credential providers that return stored passwords, access keys, or other static credentials must
 implement `org.apache.gravitino.credential.SupportsStaticCredential`. Providers without this marker

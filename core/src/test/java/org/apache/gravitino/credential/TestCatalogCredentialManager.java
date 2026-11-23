@@ -38,7 +38,7 @@ public class TestCatalogCredentialManager {
    */
   @ParameterizedTest
   @CsvSource({"false,false", "false,true", "true,false", "true,true"})
-  public void testHasOnlyStaticCredentialProviders(boolean dynamic, boolean stored) {
+  public void testHasStaticCredentialProviders(boolean dynamic, boolean stored) {
     List<String> providers = new ArrayList<>();
     if (dynamic) {
       providers.add(DummyCredentialProvider.CREDENTIAL_TYPE);
@@ -52,7 +52,7 @@ public class TestCatalogCredentialManager {
             JdbcCredential.GRAVITINO_JDBC_USER, "user",
             JdbcCredential.GRAVITINO_JDBC_PASSWORD, "password");
     try (CatalogCredentialManager manager = new CatalogCredentialManager("catalog", properties)) {
-      Assertions.assertEquals(stored && !dynamic, manager.hasOnlyStaticCredentialProviders());
+      Assertions.assertEquals(stored, manager.hasStaticCredentialProviders());
     }
   }
 

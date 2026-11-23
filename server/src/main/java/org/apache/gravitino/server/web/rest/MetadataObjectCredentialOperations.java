@@ -46,7 +46,6 @@ import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.responses.CredentialResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
-import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
@@ -137,10 +136,7 @@ public class MetadataObjectCredentialOperations {
                     ? CredentialPrivilege.WRITE
                     : CredentialPrivilege.READ;
             List<Credential> credentials =
-                credentialOperationDispatcher.getCredentials(
-                    identifier,
-                    privilege,
-                    AuthorizationRequestScope.dynamicCredentialsOnly(identifier));
+                credentialOperationDispatcher.getCredentials(identifier, privilege);
             if (credentials == null) {
               return Utils.ok(new CredentialResponse(new CredentialDTO[0]));
             }

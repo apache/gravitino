@@ -31,8 +31,6 @@ import org.apache.gravitino.connector.credential.PathContext;
 import org.apache.gravitino.connector.credential.SupportsPathBasedCredentials;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 public class TestCredentialOperationDispatcher extends TestOperationDispatcher {
@@ -155,51 +153,6 @@ public class TestCredentialOperationDispatcher extends TestOperationDispatcher {
 
     Assertions.assertEquals(1, credentials.size());
     Assertions.assertSame(validCredential, credentials.get(0));
-  }
-
-  /**
-   * Checks provider capability before credential generation, including custom provider names.
-   *
-   * @param dynamicOnly whether static providers must be skipped
-   */
-  @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  public void testDynamicProviderFilteringBeforeGeneration(boolean dynamicOnly) {
-    CredentialProvider dynamicProvider = Mockito.mock(CredentialProvider.class);
-    CredentialProvider staticProvider = Mockito.mock(SupportsStaticCredential.class);
-    Credential dynamicCredential = Mockito.mock(Credential.class);
-    Credential staticCredential = Mockito.mock(Credential.class);
-    CatalogCredentialManager manager = Mockito.mock(CatalogCredentialManager.class);
-    Mockito.when(manager.getCredentialProvider("custom-session"))
-        .thenReturn(Optional.of(dynamicProvider));
-    Mockito.when(manager.getCredentialProvider("custom-stored"))
-        .thenReturn(Optional.of(staticProvider));
-    Mockito.when(manager.getCredential(Mockito.eq("custom-session"), Mockito.any()))
-        .thenReturn(Optional.of(dynamicCredential));
-    Mockito.when(manager.getCredential(Mockito.eq("custom-stored"), Mockito.any()))
-        .thenReturn(Optional.of(staticCredential));
-    BaseCatalog<?> baseCatalog = Mockito.mock(BaseCatalog.class);
-    Mockito.when(baseCatalog.propertiesWithCredentialProviders())
-        .thenReturn(Map.of("credential-providers", "custom-session,custom-stored,missing"));
-    Mockito.when(baseCatalog.catalogCredentialManager()).thenReturn(manager);
-    CredentialOperationDispatcher dispatcher =
-        new CredentialOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
-
-    List<Credential> credentials =
-        dispatcher.getCredentials(
-            baseCatalog,
-            NameIdentifier.of(metalake, catalog),
-            CredentialPrivilege.READ,
-            dynamicOnly);
-
-    Assertions.assertTrue(credentials.contains(dynamicCredential));
-    Assertions.assertEquals(dynamicOnly ? 1 : 2, credentials.size());
-    if (dynamicOnly) {
-      Mockito.verify(manager, Mockito.never())
-          .getCredential(Mockito.eq("custom-stored"), Mockito.any());
-    } else {
-      Assertions.assertTrue(credentials.contains(staticCredential));
-    }
   }
 
   private static CredentialProvider mockCredentialProvider(String credentialType) {

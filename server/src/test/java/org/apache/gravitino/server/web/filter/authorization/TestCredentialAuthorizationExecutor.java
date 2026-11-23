@@ -31,9 +31,11 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.catalog.CatalogManager;
-import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.credential.CatalogCredentialManager;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -44,23 +46,31 @@ public class TestCredentialAuthorizationExecutor {
   /**
    * Checks that an unconfigured secondary expression never grants access to static providers.
    *
-   * @param staticOnly whether the catalog has only static providers
+   * @param hasStatic whether the catalog contains static providers
    * @throws Exception if authorization fails unexpectedly
    */
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
-  public void testUnconfiguredStaticPrivilegeExpression(boolean staticOnly) throws Exception {
+  public void testUnconfiguredStaticPrivilegeExpression(boolean hasStatic) throws Exception {
     NameIdentifier catalog = NameIdentifier.of("metalake", "catalog");
     GravitinoAuthorizerProvider provider = mock(GravitinoAuthorizerProvider.class);
     when(provider.getGravitinoAuthorizer()).thenReturn(mock(GravitinoAuthorizer.class));
     CatalogManager manager = mock(CatalogManager.class);
-    when(manager.doWithCatalog(any(), any())).thenReturn(!staticOnly);
+    CatalogCredentialManager credentials = mock(CatalogCredentialManager.class);
+    when(credentials.hasStaticCredentialProviders()).thenReturn(hasStatic);
+    BaseCatalog<?> baseCatalog = mock(BaseCatalog.class);
+    when(baseCatalog.catalogCredentialManager()).thenReturn(credentials);
+    when(manager.doWithCatalog(any(), any()))
+        .thenAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog, ?> operation = invocation.getArgument(1);
+              return operation.apply(baseCatalog);
+            });
     GravitinoEnv env = mock(GravitinoEnv.class);
     when(env.catalogManager()).thenReturn(manager);
     try (MockedStatic<GravitinoAuthorizerProvider> providers =
             mockStatic(GravitinoAuthorizerProvider.class);
-        MockedStatic<GravitinoEnv> environments = mockStatic(GravitinoEnv.class);
-        AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
+        MockedStatic<GravitinoEnv> environments = mockStatic(GravitinoEnv.class)) {
       providers.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
       environments.when(GravitinoEnv::getInstance).thenReturn(env);
       CredentialAuthorizationExecutor executor =
@@ -72,9 +82,7 @@ public class TestCredentialAuthorizationExecutor {
               "false",
               ExpressionCondition.NEVER);
 
-      Assertions.assertEquals(!staticOnly, executor.execute(new AuthorizationRequestContext()));
-      Assertions.assertTrue(AuthorizationRequestScope.dynamicCredentialsOnly(catalog));
+      Assertions.assertEquals(!hasStatic, executor.execute(new AuthorizationRequestContext()));
     }
-    Assertions.assertFalse(AuthorizationRequestScope.dynamicCredentialsOnly(catalog));
   }
 }

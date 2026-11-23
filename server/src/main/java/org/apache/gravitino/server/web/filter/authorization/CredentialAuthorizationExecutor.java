@@ -26,7 +26,6 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
-import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 
@@ -72,12 +71,10 @@ public class CredentialAuthorizationExecutor extends CommonAuthorizerExecutor {
     }
     NameIdentifier catalog = metadataContext.get(Entity.EntityType.CATALOG);
     context.setOriginalAuthorizationExpression(staticCredentialExpression);
-    AuthorizationRequestScope.requireDynamicCredentials(catalog);
     return GravitinoEnv.getInstance()
         .catalogManager()
         .doWithCatalog(
             catalog,
-            baseCatalog ->
-                !baseCatalog.catalogCredentialManager().hasOnlyStaticCredentialProviders());
+            baseCatalog -> !baseCatalog.catalogCredentialManager().hasStaticCredentialProviders());
   }
 }
