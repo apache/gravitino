@@ -43,6 +43,16 @@ public class S3CredentialsProvider implements AWSCredentialsProvider {
    * @param conf The Hadoop configuration that carries the Gravitino credential provider settings.
    */
   public S3CredentialsProvider(final URI uri, final Configuration conf) {
+    this(conf);
+  }
+
+  /**
+   * Creates the provider. The S3A connector of Hadoop 3.2 and earlier only looks up this signature,
+   * Hadoop 3.3 prefers {@link #S3CredentialsProvider(URI, Configuration)}.
+   *
+   * @param conf The Hadoop configuration that carries the Gravitino credential provider settings.
+   */
+  public S3CredentialsProvider(final Configuration conf) {
     this.refresher = new S3CredentialsRefresher(conf);
   }
 
