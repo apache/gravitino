@@ -25,6 +25,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.security.PrivilegedExceptionAction;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -72,12 +75,14 @@ import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper
 import org.apache.gravitino.storage.relational.service.GlossaryDomainFixtures;
 import org.apache.gravitino.storage.relational.service.GlossaryInvariants;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
@@ -272,6 +277,42 @@ class TestGlossaryDomains extends TestJDBCBackend {
         ForbiddenException.class,
         () ->
             as("writer", () -> manager.alterTerm(LAKE, "Churn", TermChange.addDomain("Finance"))));
+  }
+
+  @TestTemplate
+  void testBatchReportsHiddenAndMissingDomainInTheSameOrder() throws Exception {
+    as("writer", () -> manager.createTerm(LAKE, TermSpec.builder("Churn").build()));
+    for (String name : List.of("DraftX", "Absent")) {
+      for (String other : List.of("NoSuch", "Finance")) {
+        NoSuchDomainException createFailure =
+            assertThrows(
+                NoSuchDomainException.class,
+                () ->
+                    as(
+                        "writer",
+                        () ->
+                            manager.createTerm(
+                                LAKE,
+                                TermSpec.builder("Denied").withDomains(other, name).build())));
+        NoSuchDomainException alterFailure =
+            assertThrows(
+                NoSuchDomainException.class,
+                () ->
+                    as(
+                        "writer",
+                        () ->
+                            manager.alterTerm(
+                                LAKE,
+                                "Churn",
+                                TermChange.addDomain(other),
+                                TermChange.removeDomain(name))));
+        assertEquals("Domain " + name + " does not exist", createFailure.getMessage());
+        assertEquals(createFailure.getMessage(), alterFailure.getMessage());
+      }
+    }
+    assertEquals(1, as("writer", () -> manager.getTerm(LAKE, "Churn")).version());
+    assertThrows(
+        NoSuchTermException.class, () -> as("lakeOwner", () -> manager.getTerm(LAKE, "Denied")));
   }
 
   /** Review focus: a content edit by a caller who cannot see a domain keeps that domain. */
@@ -560,7 +601,7 @@ class TestGlossaryDomains extends TestJDBCBackend {
 
   @TestTemplate
   void testDomainFilterOnHiddenDomain() throws Exception {
-    for (String hidden : List.of("DraftX", "NoSuch")) {
+    for (String hidden : List.of("DraftX", "NoSuch", "Sales ")) {
       assertThrows(
           NoSuchDomainException.class, () -> as("writer", () -> manager.listTerms(LAKE, hidden)));
     }
@@ -636,7 +677,10 @@ class TestGlossaryDomains extends TestJDBCBackend {
   void testAddDomainRacesDomainDrop() throws Exception {
     for (boolean dropFirst : List.of(false, true)) {
       String domain = dropFirst ? "DropFirst" : "AddFirst";
-      GlossaryDomainFixtures.insertDomain(LAKE, domain, Domain.Status.PUBLISHED, null, AUDIT_INFO);
+      long domainId =
+          GlossaryDomainFixtures.insertDomain(
+              LAKE, domain, Domain.Status.PUBLISHED, null, AUDIT_INFO);
+      assertTrue(canLockDomain(domainId));
       GlossaryTermEntity before = create(domain);
       CountDownLatch locked = new CountDownLatch(1);
       CountDownLatch release = new CountDownLatch(1);
@@ -693,6 +737,9 @@ class TestGlossaryDomains extends TestJDBCBackend {
                           return null;
                         }));
         await(started);
+        // An independent session touches only the domain row. The metalake fence cannot
+        // satisfy this assertion, even on H2 where its shared lock is exclusive.
+        assertFalse(canLockDomain(domainId));
         release.countDown();
         first.get(20, TimeUnit.SECONDS);
         second.get(20, TimeUnit.SECONDS);
@@ -708,6 +755,23 @@ class TestGlossaryDomains extends TestJDBCBackend {
       } finally {
         release.countDown();
         workers.shutdownNow();
+      }
+    }
+  }
+
+  private static boolean canLockDomain(long id) throws SQLException {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession();
+        PreparedStatement query =
+            session
+                .getConnection()
+                .prepareStatement(
+                    "SELECT domain_id FROM domain_meta WHERE domain_id=? FOR UPDATE SKIP LOCKED")) {
+      query.setLong(1, id);
+      try (ResultSet rows = query.executeQuery()) {
+        return rows.next();
+      } finally {
+        session.rollback(true);
       }
     }
   }

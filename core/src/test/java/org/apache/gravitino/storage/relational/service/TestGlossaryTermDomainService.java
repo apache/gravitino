@@ -110,20 +110,20 @@ public class TestGlossaryTermDomainService extends TestJDBCBackend {
   public void testLockDomainRejectsMissingAndDeleted() throws Exception {
     setup();
     DomainPO locked =
-        read(() -> service.lockDomains(LAKE_ID, Set.of(), Set.of("Sales"))).get(sales);
+        read(() -> service.lockDomains(LAKE_ID, Set.of(), Set.of("Sales"), row -> {})).get(sales);
     Assertions.assertEquals(sales, locked.domainId());
     Assertions.assertThrows(
         NoSuchDomainException.class,
-        () -> read(() -> service.lockDomains(LAKE_ID, Set.of(), Set.of("NoSuch"))));
+        () -> read(() -> service.lockDomains(LAKE_ID, Set.of(), Set.of("NoSuch"), row -> {})));
     Assertions.assertThrows(
         NoSuchDomainException.class,
-        () -> read(() -> service.lockDomains(999L, Set.of(), Set.of("Sales"))));
+        () -> read(() -> service.lockDomains(999L, Set.of(), Set.of("Sales"), row -> {})));
     Assertions.assertTrue(
         DomainMetaService.getInstance()
             .deleteDomain(NameIdentifier.of(NamespaceUtil.ofDomain(LAKE), "Finance")));
     Assertions.assertThrows(
         NoSuchDomainException.class,
-        () -> read(() -> service.lockDomains(LAKE_ID, Set.of(), Set.of("Finance"))));
+        () -> read(() -> service.lockDomains(LAKE_ID, Set.of(), Set.of("Finance"), row -> {})));
   }
 
   @TestTemplate

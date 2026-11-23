@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
@@ -57,38 +58,48 @@ public final class GlossaryTermDomainService {
   /**
    * Locks existing member domains and domains named by an edit in ascending ID order. Existing
    * memberships follow a rename. A request naming a domain that disappears or changes name before
-   * its row is locked must fail, even if another domain has taken that name.
+   * its row is locked must fail, even if another domain has taken that name. After locking, missing
+   * names and authorization failures are reported in the same name order.
+   *
+   * @param metalakeId The live metalake ID.
+   * @param members The current member domain IDs of the locked term.
+   * @param requestedNames The names supplied by the caller.
+   * @param checkRequested The authorization check for each requested live domain.
+   * @return The locked domain rows by ID.
    */
   public Map<Long, DomainPO> lockDomains(
-      long metalakeId, Set<Long> members, Set<String> requestedNames) {
+      long metalakeId,
+      Set<Long> members,
+      Set<String> requestedNames,
+      Consumer<DomainPO> checkRequested) {
     return SessionUtils.getWithoutCommit(
         DomainMetaMapper.class,
         mapper -> {
-          Map<Long, String> requested = new HashMap<>();
+          Map<String, Long> observedIds = new HashMap<>();
           Set<Long> ids = new TreeSet<>(members);
           for (String name : requestedNames) {
-            DomainPO observed = mapper.selectDomainMetaByMetalakeIdAndName(metalakeId, name);
-            if (observed == null
-                || !name.equals(observed.domainName())
-                || requested.put(observed.domainId(), name) != null) {
-              throw new NoSuchDomainException("Domain %s does not exist", name);
+            DomainPO row = mapper.selectDomainMetaByMetalakeIdAndName(metalakeId, name);
+            if (row != null && name.equals(row.domainName())) {
+              observedIds.put(name, row.domainId());
+              ids.add(row.domainId());
             }
-            ids.add(observed.domainId());
           }
           Map<Long, DomainPO> locked = new LinkedHashMap<>();
           for (long id : ids) {
             DomainPO row = mapper.selectDomainMetaByIdForShare(id);
-            String name = requested.get(id);
-            if (row == null
-                || row.deletedAt() != 0
-                || row.metalakeId() != metalakeId
-                || (name != null && !name.equals(row.domainName()))) {
-              if (name != null) {
-                throw new NoSuchDomainException("Domain %s does not exist", name);
-              }
-              throw new IllegalStateException("A glossary membership refers to a missing domain");
+            if (row != null && row.deletedAt() == 0 && row.metalakeId() == metalakeId) {
+              locked.put(id, row);
+            } else {
+              Preconditions.checkState(
+                  !members.contains(id), "A glossary membership refers to a missing domain");
             }
-            locked.put(id, row);
+          }
+          for (String name : new TreeSet<>(requestedNames)) {
+            DomainPO row = locked.get(observedIds.get(name));
+            if (row == null || !name.equals(row.domainName())) {
+              throw new NoSuchDomainException("Domain %s does not exist", name);
+            }
+            checkRequested.accept(row);
           }
           return locked;
         });

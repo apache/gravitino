@@ -90,8 +90,9 @@ public interface GlossaryOperations {
    * {@link GlossaryTerm.Status#APPROVED}; this does not mean that a human reviewed the term.
    *
    * <p>The caller needs effective {@code VIEW_DEFINITION}, effective {@code CREATE_DEFINITION}, and
-   * read access to each requested domain ({@code USE_DOMAIN}) and referenced broader or related
-   * term. Returned domains and relations follow the same visibility rules as reads.
+   * read access to each requested domain ({@code USE_DOMAIN} for published domains, {@code
+   * MANAGE_DOMAIN} for drafts) and referenced broader or related term. Returned domains and
+   * relations follow the same visibility rules as reads.
    *
    * @param spec The content of the term.
    * @return The created term.
@@ -99,7 +100,8 @@ public interface GlossaryOperations {
    *     already exists.
    * @throws NoSuchTermException If a broader or related term does not exist or is not visible to
    *     the caller.
-   * @throws NotFoundException If a requested domain does not exist.
+   * @throws NotFoundException If a requested domain is missing or is a draft hidden from the
+   *     caller.
    * @throws ForbiddenException If the caller lacks the required creation or domain privilege.
    * @throws IllegalArgumentException If a synonym is the name of another term, or a relation is not
    *     allowed.

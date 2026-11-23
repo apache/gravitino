@@ -30,7 +30,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -610,30 +609,27 @@ public final class GlossaryManager {
   private TermDomains planDomains(
       long lake, GlossaryTermEntity term, List<TermDomains.Edit> edits, GlossaryAccess access) {
     Set<Long> members = term.domains().length == 0 ? Set.of() : DOMAINS.domainIds(term.id());
-    Set<String> requested = new TreeSet<>();
+    Set<String> requested = new HashSet<>();
     for (TermDomains.Edit edit : edits) {
       requested.add(edit.domain());
     }
     if (members.isEmpty() && requested.isEmpty()) {
       return new TermDomains(lake, term.id(), Map.of());
     }
-    Map<Long, DomainPO> locked = DOMAINS.lockDomains(lake, members, requested);
-    Map<Long, String> current = new HashMap<>();
     Map<String, DomainPO> targets = new HashMap<>();
-    for (DomainPO domain : locked.values()) {
-      String name = domain.domainName();
-      if (members.contains(domain.domainId())) {
-        current.put(domain.domainId(), name);
-      }
-      if (requested.contains(name)) {
-        if (!access.canUseDomain(name)) {
-          if (Domain.Status.DRAFT.name().equals(domain.status())) {
-            throw new NoSuchDomainException("Domain %s does not exist", name);
-          }
-          throw new ForbiddenException("Cannot use domain %s", name);
-        }
-        targets.put(name, domain);
-      }
+    Map<Long, DomainPO> locked =
+        DOMAINS.lockDomains(
+            lake,
+            members,
+            requested,
+            domain -> {
+              String name = domain.domainName();
+              requireVisibleDomain(name, domain, access);
+              targets.put(name, domain);
+            });
+    Map<Long, String> current = new HashMap<>();
+    for (long id : members) {
+      current.put(id, locked.get(id).domainName());
     }
     TermDomains plan = new TermDomains(lake, term.id(), current);
     for (TermDomains.Edit edit : edits) {
@@ -650,23 +646,30 @@ public final class GlossaryManager {
   private Set<Long> domainScope(
       String metalake, long metalakeId, String name, GlossaryAccess access) {
     DomainPO domain = DOMAINS.findDomain(metalakeId, name);
-    boolean visible = domain != null && access.canUseDomain(name);
-    if (!visible && (domain == null || Domain.Status.DRAFT.name().equals(domain.status()))) {
-      throw new NoSuchDomainException("Domain %s does not exist", name);
-    }
-    if (!visible) {
-      throw new ForbiddenException("Cannot use domain %s", name);
-    }
+    requireVisibleDomain(name, domain, access);
     Set<Long> scope = new HashSet<>();
     scope.add(domain.domainId());
     for (DomainEntity child :
         DomainRelService.getInstance()
             .listSubDomains(NameIdentifierUtil.ofDomain(metalake, domain.domainName()))) {
-      if (access.canUseDomain(child.name())) {
+      if (access.canUseDomain(child)) {
         scope.add(child.id());
       }
     }
     return scope;
+  }
+
+  private static void requireVisibleDomain(
+      String name, @Nullable DomainPO domain, GlossaryAccess access) {
+    if (domain == null || !name.equals(domain.domainName())) {
+      throw new NoSuchDomainException("Domain %s does not exist", name);
+    }
+    if (!access.canUseDomain(name)) {
+      if (Domain.Status.DRAFT.name().equals(domain.status())) {
+        throw new NoSuchDomainException("Domain %s does not exist", name);
+      }
+      throw new ForbiddenException("Cannot use domain %s", name);
+    }
   }
 
   /** Returns the term with only the domains the caller can see. Stored membership is unchanged. */
