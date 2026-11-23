@@ -69,6 +69,8 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
@@ -114,6 +116,7 @@ import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.utils.POConverters;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -202,6 +205,82 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
       }
     } finally {
       FieldUtils.writeField(base, "ops", original, true);
+    }
+  }
+
+  /**
+   * Column validation refreshes external schema changes without disabling table probes.
+   *
+   * @param order the order of table and column validation
+   * @throws Exception if setup or validation fails
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"single", "table-first", "column-first"})
+  public void testColumnValidationRefreshesExternalChanges(String order) throws Exception {
+    NameIdentifier schema = NameIdentifier.of(metalake, catalog, "column_refresh_" + order);
+    schemaOperationDispatcher.createSchema(schema, "comment", Map.of("k1", "v1", "k2", "v2"));
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, schema.name(), "t");
+    createTable(ident);
+    TestCatalog base =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations original = (TestCatalogOperations) base.ops();
+    TestCatalogOperations source =
+        mock(
+            TestCatalogOperations.class,
+            withSettings()
+                .extraInterfaces(SupportsTableIdentifier.class)
+                .defaultAnswer(delegatesTo(original)));
+    doReturn(original.loadTable(ident).properties().get(ID_KEY))
+        .when((SupportsTableIdentifier) source)
+        .loadTableIdentifier(ident);
+    MetadataObject table =
+        MetadataObjects.of(catalog + "." + schema.name(), "t", MetadataObject.Type.TABLE);
+    MetadataObject column =
+        MetadataObjects.of(table.fullName(), "external", MetadataObject.Type.COLUMN);
+    List<MetadataObject> batch =
+        "table-first".equals(order)
+            ? List.of(table, column, column)
+            : List.of(column, column, table);
+    GravitinoEnv env = GravitinoEnv.getInstance();
+    Object previous = FieldUtils.readField(env, "internalTableDispatcher", true);
+    FieldUtils.writeField(base, "ops", source, true);
+    FieldUtils.writeField(env, "internalTableDispatcher", tableOperationDispatcher, true);
+    try {
+      original.alterTable(
+          ident, TableChange.addColumn(new String[] {"external"}, Types.StringType.get()));
+      Assertions.assertTrue(tableOperationDispatcher.tableExists(ident));
+      Assertions.assertTrue(
+          entityStore.get(ident, TABLE, TableEntity.class).columns().stream()
+              .noneMatch(c -> c.name().equals("external")));
+      verify(source, never()).loadTable(ident);
+      clearInvocations(source);
+      if ("single".equals(order)) {
+        MetadataObjectUtil.checkMetadataObject(metalake, column);
+      } else {
+        MetadataObjectUtil.checkMetadataObjects(metalake, batch);
+      }
+      ColumnEntity added =
+          entityStore.get(ident, TABLE, TableEntity.class).columns().stream()
+              .filter(c -> c.name().equals("external"))
+              .findFirst()
+              .orElseThrow();
+      Assertions.assertTrue(added.id() > 0);
+      verify(source, times(1)).loadTable(ident);
+      original.alterTable(ident, TableChange.deleteColumn(new String[] {"external"}, false));
+      clearInvocations(source);
+      if ("single".equals(order)) {
+        MetadataObjectUtil.checkMetadataObject(metalake, column);
+      } else {
+        MetadataObjectUtil.checkMetadataObjects(metalake, batch);
+      }
+      Assertions.assertTrue(
+          entityStore.get(ident, TABLE, TableEntity.class).columns().stream()
+              .noneMatch(c -> c.name().equals("external")));
+      verify(source, times(1)).loadTable(ident);
+    } finally {
+      FieldUtils.writeField(base, "ops", original, true);
+      FieldUtils.writeField(env, "internalTableDispatcher", previous, true);
     }
   }
 
