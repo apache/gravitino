@@ -633,6 +633,7 @@ public class CatalogsPageTest extends BaseWebIT {
   @Test
   @Order(21)
   public void testCreateFilesetSchema() throws InterruptedException {
+    String schemaComment = "fileset schema comment";
     // Switch to fileset tab first
     catalogsPage.clickSelectType("fileset");
     Thread.sleep(1000); // Wait for tab switch
@@ -644,11 +645,19 @@ public class CatalogsPageTest extends BaseWebIT {
     // 2. click create schema button
     clickAndWait(catalogsPage.createSchemaBtn);
     catalogsPage.setSchemaNameField(SCHEMA_NAME_FILESET);
-    catalogsPage.setCatalogCommentField("fileset schema comment");
+    catalogsPage.setSchemaCommentField(schemaComment);
     clickAndWait(catalogsPage.handleSubmitSchemaBtn);
     // 3. verify show table title、 schema name and tree node
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME_FILESET, false));
+    Assertions.assertEquals(
+        schemaComment,
+        gravitinoClient
+            .loadMetalake(METALAKE_NAME)
+            .loadCatalog(FILESET_CATALOG_NAME)
+            .asSchemas()
+            .loadSchema(SCHEMA_NAME_FILESET)
+            .comment());
     // Tree view only shows catalogs of current type (fileset)
     List<String> treeNodes = Arrays.asList(FILESET_CATALOG_NAME, SCHEMA_NAME_FILESET);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
