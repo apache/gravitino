@@ -122,6 +122,20 @@ public class TableMetaService {
     return metalake == null ? null : metalake.getMetalakeName();
   }
 
+  /**
+   * Resolve a table ID without reading its column snapshot.
+   *
+   * @param identifier the full table identifier
+   * @return the ID of the active table
+   * @throws NoSuchEntityException if the table or its namespace does not exist
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getTableIdByIdentifier")
+  public long getTableIdByIdentifier(NameIdentifier identifier) {
+    return getTablePOByIdentifier(identifier).getTableId();
+  }
+
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getTableByIdentifier")
