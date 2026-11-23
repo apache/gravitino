@@ -53,8 +53,8 @@ history and grants on domains. Implementation Steps lists what each step contain
    Column bindings in Step 1 support table columns only; views themselves can be bound. A term
    lists its objects, and an object lists its terms. A binding never gives access to data.
 4. **Domains**: a term belongs to zero or more domains. A domain is optional when a term is
-   created. In Step 1, domains group and filter terms. They do not change who can see or manage a
-   term.
+   created. In Step 1, domains group and filter terms. Read and content-edit access still depend
+   on metalake definition privileges and term ownership. Domain administrators control membership.
 5. **Status**: `DRAFT`, `APPROVED` or `DEPRECATED`. New terms are `APPROVED`. Anyone who can edit a
    term can set its status, in the create or update call. There are no transition rules. Glossary
    queries for agents return only readable `APPROVED` terms. Step 1 has no approval decision;
@@ -108,8 +108,8 @@ CSV remains planned, with its scope tracked in S2.6.
 
 ## Usage Scenario
 
-1. An admin with `MANAGE_DEFINITIONS` on the metalake creates term `Customer` in domain Sales. New
-   terms are `APPROVED`, so users with `VIEW_DEFINITION` can see it at once.
+1. An admin with `MANAGE_DEFINITIONS` on the metalake and `MANAGE_DOMAIN` on Sales creates term
+   `Customer` in Sales. New terms are `APPROVED`, so users with `VIEW_DEFINITION` can see it at once.
 2. An analyst with `CREATE_DEFINITION` on the metalake creates `Active Customer` with status
    `DRAFT`, so agents do not use it yet. Its broader term is `Customer` and its synonym is
    `active user`. The analyst links it to column `dw.sales.customers.is_active` (Implemented by).
@@ -253,11 +253,15 @@ not as an implementation prerequisite.
   `domain_id`, `member_type` and `member_id`, plus common store metadata. Each row references a
   real Domain and a member in the same metalake. Glossary uses `GLOSSARY_TERM` and the stable
   term ID. Term reads, writes and cleanup match both member type and ID.
-- Only the term API changes term memberships through `domains` on create, `addDomain` and
-  `removeDomain`. These changes go through `TermChangeHandler`, like any term change.
-- To add a term to a domain, the caller needs the edit privilege on the term, and must be able to
-  see the domain (`USE_DOMAIN`). In Step 2, the caller also needs `CREATE_DEFINITION` on that
-  domain, so nobody can move a term into a domain where they cannot write.
+- The term API changes memberships through `domains` on create, `addDomain`, `removeDomain`
+  and the Domain detach endpoint. All changes go through `TermChangeHandler`.
+- Creating a term with Domains or changing membership in an alter requires the usual term
+  create or edit authority and effective `MANAGE_DOMAIN` on each changed Domain. In Step 2,
+  adding a membership also requires `CREATE_DEFINITION` on the destination Domain.
+- In Step 1, a Domain administrator with effective `MANAGE_DOMAIN` may explicitly detach a
+  named Term without term edit permission. The operation changes only the named membership.
+  An effective detach advances the term revision once and records the actor. A missing
+  membership is a no-op. In Step 2, the review workflow applies before any detach takes effect.
 - **Terms of a domain** (`GET /terms?domain=`) use the same scope as the Domain design: terms in
   the domain, and terms in its subdomains that the caller can see.
 - **Domains in a response**: every `TermDTO.domains` contains only domains the caller can see
@@ -268,14 +272,12 @@ not as an implementation prerequisite.
 - `DomainManager#dropDomain` checks the shared table for any live membership under the Domain
   lock. A remaining member of any type causes 409 `NonEmptyDomainException`. Removing terms
   silently would change how they are grouped and who manages them in Step 2.
-- **Clearing a non-empty domain**: the caller dropping it may not be able to see every member
-  term. A current term owner with effective CREATE and the required domain access can remove
-  its own membership; a caller with MANAGE and domain access can clear the remaining terms.
-  The metalake owner can coordinate both operations. A domain admin without glossary rights
-  must ask such a caller to clear membership. The 409 message gives this remedy without term
-  names or counts. It reveals that at least one member exists, as documented in Known leaks.
-  `MANAGE_DOMAIN` alone does not grant term editing or silent detachment. In Step 2, proposed
-  membership removals must be approved before dropping the domain succeeds.
+- **Clearing a non-empty domain**: the `409` response tells the administrator to detach the
+  remaining members explicitly. It reveals that at least one member exists without returning
+  names or counts. When a member is hidden, the administrator may need its name from someone
+  allowed to read it. An absent Term or membership gets the same empty detach response
+  as successful removals. In Step 2, proposed detachments must be approved before the Domain
+  can be dropped.
 - **Descriptive tags** on terms use the existing tag APIs and `APPLY_TAG`. A tag on a term never
   changes its domains, even when the tag backs a domain.
 
@@ -581,9 +583,9 @@ In Step 1, the three privileges are granted on the metalake:
 - **Registration**: three new `Privilege.Name` values. In Step 1 their `canBindTo` accepts
   `METALAKE` only. The role APIs return 400 when these privileges are granted on any other object,
   or when anything is granted on `GLOSSARY_TERM`. Step 2 adds `DOMAIN`.
-- **Deny** works as for other privileges: expand the allowed grant implications above, then
-  apply explicit denies to each required capability. Every glossary operation requires effective
-  VIEW, so denying VIEW blocks both reads and writes, even for a term owner. Creating requires
+- **Deny** works as for other privileges. Expand grant implications and apply explicit denies
+  to each required capability. Glossary operations require effective VIEW except for the
+  Domain-only detach endpoint, which uses the Domain management check. Creating requires
   effective CREATE; editing uses effective MANAGE or the owner-with-effective-CREATE path;
   deleting requires effective MANAGE. A deny on MANAGE removes the all-term path, but leaves
   effective CREATE usable on own terms. The metalake owner always passes these privilege checks;
@@ -594,7 +596,7 @@ In Step 1, the three privileges are granted on the metalake:
   term, all its members count as the owner. Transfers retain the existing owner API's current-owner
   or metalake-owner checks. MANAGE_DEFINITIONS and MANAGE_GRANTS do not replace that check.
   For glossary terms, resolve ownership from the store rather than shared owner/name caches.
-- **Create** needs `CREATE_DEFINITION` on the metalake, and `USE_DOMAIN` on each domain in the
+- **Create** needs `CREATE_DEFINITION` on the metalake, and `MANAGE_DOMAIN` on each Domain in the
   request. The creator becomes the owner.
 - **Implementation**: add shared glossary authorization checks for effective VIEW, CREATE and
   MANAGE on the metalake, and for reading, editing and deleting a term using the rules above.
@@ -656,15 +658,15 @@ updates in one transaction, and hold the locks until commit or rollback. If a re
 the plan needs an earlier lock or an additional term row that would break ID order, roll back
 and rebuild the plan before writing.
 
-| Operation                                       | Locks                                                                                                               | Conflict it prevents                                    |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| Create, including initial relations and domains | metalake (shared) -> hierarchy lock -> referenced terms (exclusive, ID order) -> domains (shared)                   | name/synonym conflict; invalid relations; endpoint drop |
-| Rename or change synonyms                       | metalake (shared) -> hierarchy lock -> term (exclusive)                                                             | name/synonym conflict; concurrent edits                 |
-| Edit other content, status or domains           | metalake (shared) -> term (exclusive) -> added domains (shared)                                                     | concurrent edits; endpoint drop                         |
-| Add or remove a relation                        | metalake (shared) -> hierarchy lock -> all referenced terms (exclusive, ID order) -> added domains (shared), if any | a cycle or overlap; endpoint drop; mixed alters         |
-| Bind / unbind                                   | object chain (`lockLiveEndpoint`, shared) -> terms (exclusive, ID order)                                            | object drop; concurrent term edits                      |
-| Delete a term                                   | metalake (shared) -> hierarchy lock -> deleted and affected surviving terms (exclusive, ID order)                   | new links; lost cleanup revisions                       |
-| Object, column or metric cleanup                | endpoint locks in the deleting or altering operation's final mode -> affected surviving terms (exclusive, ID order) | new bindings; lost cleanup revisions                    |
+| Operation                                           | Locks                                                                                                                 | Conflict it prevents                                    |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Create, including initial relations and domains     | metalake (shared) -> hierarchy lock -> referenced terms (exclusive, ID order) -> domains (shared)                     | name/synonym conflict; invalid relations; endpoint drop |
+| Rename or change synonyms                           | metalake (shared) -> hierarchy lock -> term (exclusive)                                                               | name/synonym conflict; concurrent edits                 |
+| Edit content or status, or change Domain membership | metalake (shared) -> term (exclusive) -> changed Domains (shared)                                                     | concurrent edits; endpoint drop                         |
+| Add or remove a relation                            | metalake (shared) -> hierarchy lock -> all referenced terms (exclusive, ID order) -> changed Domains (shared), if any | a cycle or overlap; endpoint drop; mixed alters         |
+| Bind / unbind                                       | object chain (`lockLiveEndpoint`, shared) -> terms (exclusive, ID order)                                              | object drop; concurrent term edits                      |
+| Delete a term                                       | metalake (shared) -> hierarchy lock -> deleted and affected surviving terms (exclusive, ID order)                     | new links; lost cleanup revisions                       |
+| Object, column or metric cleanup                    | endpoint locks in the deleting or altering operation's final mode -> affected surviving terms (exclusive, ID order)   | new bindings; lost cleanup revisions                    |
 
 For an alter that combines rows of this table, use the union of locks in the global order. For
 example, rename plus `addBroader` plus `addDomain` takes the metalake fence, hierarchy lock, the
@@ -702,7 +704,7 @@ All paths are under `/api/metalakes/{metalake}`. They follow the Tag, Policy and
 - a top-level `/terms` collection (there is no glossary container, so no `/glossary` level);
 - `?details=` on lists;
 - `PUT` with a list of updates to alter, including the status;
-- `DropResponse` on delete;
+- `DropResponse` on Term deletion;
 - bindings are written on the object.
 
 | Operation              | Endpoint                                                                         | Request -> response                                                      |
@@ -712,6 +714,7 @@ All paths are under `/api/metalakes/{metalake}`. They follow the Tag, Policy and
 | Get                    | `GET /terms/{term}?status=`                                                      | -> `TermResponse`                                                        |
 | Alter                  | `PUT /terms/{term}`                                                              | `TermUpdatesRequest` -> `TermResponse`                                   |
 | Drop                   | `DELETE /terms/{term}`                                                           | -> `DropResponse`                                                        |
+| Detach from a Domain   | `DELETE /terms/{term}/domains/{domain}`                                          | No body -> `204`                                                         |
 | Hierarchy              | `GET /terms/{term}/hierarchy?direction=BROADER\|NARROWER&status=`                | -> `TermTreeResponse`                                                    |
 | Bindings of a term     | `GET /terms/{term}/objects?kind=&types=&status=&pageSize=&pageToken=`            | -> `TermBindingListResponse`                                             |
 | Terms of an object     | `GET /objects/{type}/{fullName}/terms?details=&children=&status=`                | -> `NameListResponse` / `ObjectTermsResponse`                            |
@@ -720,6 +723,9 @@ All paths are under `/api/metalakes/{metalake}`. They follow the Tag, Policy and
 | Bind / unbind a metric | `POST /objects/semantic_model/{fullName}/metrics/{metric}/terms`                 | `TermsAssociateRequest` -> `NameListResponse`                            |
 | Owner                  | existing `/owners/glossary_term/{term}`                                          |                                                                          |
 | Tags                   | existing `/objects/glossary_term/{term}/tags`                                    |                                                                          |
+
+For the Step 1 detach endpoint, resolve the Domain and check `MANAGE_DOMAIN` first. A successful
+detach, missing Term or absent membership all return `204` without exposing Term details.
 
 ```
 TermCreateRequest     { name, definition, synonyms, status?, domains, broader, related, links,
@@ -838,7 +844,8 @@ TermsAssociateRequest { termsToAdd: [name], termsToRemove: [name] }
 - **Clients** (Java, Python):
   - `GlossaryOperations` on `GravitinoMetalake`: `listTerms`, `listTermsInfo`, `getTerm`,
     `createTerm`, `alterTerm` (also sets the status), its optional-expected-revision-token overload,
-    `dropTerm`, and `matchTerms(words, domain)` with an optional `includeBindings` variant.
+    `dropTerm`, `detachTermDomain`, and `matchTerms(words, domain)` with an optional
+    `includeBindings` variant.
     Lookup returns approved terms with bindings by default; callers can request definitions
     without binding expansion. It is also usable by agents that do not use MCP.
   - On a `Term`: `broader()`, `narrower()`, `listBindings(kind, pageSize, pageToken)` returning
@@ -1487,14 +1494,15 @@ The users for these cases:
 
 **T7. Domain membership**
 
-- T7.1 Create with two domains the caller can read. Get returns both.
-- T7.2 Create in a domain without `USE_DOMAIN` on it fails with 403, and no term is created.
+- T7.1 Create with two Domains the caller can manage. Get returns both.
+- T7.2 A caller with Term create or edit rights and only `USE_DOMAIN` cannot add a membership.
+  Create returns 403 without creating a Term. A mixed alter also fails without changing any field.
 - T7.3 `domain=Sales` returns the terms of Sales and of its subdomains that the caller can see. It
   leaves out the terms of hidden subdomains.
-- T7.4 Dropping a domain with terms fails with 409 (`NonEmptyDomainException`). After
-  `removeDomain`, the drop works if no other live member remains. When testing shared
-  membership with another member type, verify its row survives Term removal and still
-  blocks the domain drop. **(guard)**
+- T7.4 Dropping a domain with terms fails with 409 (`NonEmptyDomainException`). After a Term
+  editor with `MANAGE_DOMAIN` uses `removeDomain`, the drop works if no other live member remains.
+  When testing shared membership with another member type, verify its row survives Term removal
+  and still blocks the domain drop. **(guard)**
 - T7.5 Race: one thread adds a term to a domain while another drops the domain. Either the term is
   added and the drop fails with 409, or the drop wins and the add fails with 404.
 - T7.6 Under the selected explicit-relation design, a tag on a term never changes its domains,
@@ -1507,11 +1515,11 @@ The users for these cases:
   the term stays readable and its domain list is empty. Returned data contains no hidden-domain
   name, ID or count; stored membership stays intact, and reads do not change the revision.
   Endpoint wiring is covered by T8.8, T12.8 and T13.12. **(guard)**
-- T7.9 A domain admin with no glossary privileges drops a domain containing a hidden draft.
-  It gets 409 with the documented remedy and no term names/counts, and cannot clear membership
-  through MANAGE_DOMAIN alone. An authorized term owner or glossary manager with domain access
-  removes the membership; the admin's retry succeeds. Verify every hidden term still exists
-  independently and was not silently deleted or detached. **(guard)**
+- T7.9 A Domain admin with no Glossary privileges gets 409 when dropping a Domain with a hidden
+  draft member. The error returns no Term name or count. Use the known Term name to detach it
+  explicitly and verify the same empty `204` on retry. Verify the draft, other memberships and
+  bindings remain intact, the revision advances once, and the now-empty Domain can be dropped.
+  The same caller cannot use the ordinary alter to edit or add membership. **(guard)**
 
 **T8. REST**
 
@@ -1859,7 +1867,8 @@ parallel once the tasks they depend on are merged.
       terms inside relation lists. No Step 1 approval capability. Depends on: T4.
 - [ ] **T7. Add domain membership** (`core/`, `scripts/`). Introduce the shared `domain_member_rel`
       schema and mapper as a standalone storage change for reuse by Article T2. Add and remove
-      term memberships on create and alter. Check all live member types on domain drop.
+      term memberships on create and alter with the Domain management check. Support explicit
+      detach by the Domain administrator. Check all live member types on Domain drop.
       Shared domain filtering on term results and mixed relation/domain lock-order tests.
       Depends on: T4, T5, T6, prerequisites.
 
