@@ -142,10 +142,20 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
               "Credential provider {} is not an AWS SDK v1 or v2 credentials provider, skipping",
               provider);
         }
-      } catch (Exception | LinkageError e) {
+      } catch (ClassNotFoundException e) {
         LOG.warn(
             "Credential provider {} not found in the Hadoop runtime, falling back to default",
-            provider);
+            provider,
+            e);
+        configs.put(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
+        return;
+      } catch (Exception | LinkageError e) {
+        // The class exists, but it or a class it depends on cannot be loaded or initialized, for
+        // example because of an incompatible AWS SDK or Hadoop version on the classpath.
+        LOG.warn(
+            "Credential provider {} cannot be loaded in the Hadoop runtime, falling back to default",
+            provider,
+            e);
         configs.put(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
         return;
       }

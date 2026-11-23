@@ -25,8 +25,12 @@ import org.apache.gravitino.credential.AwsIrsaCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.S3TokenCredential;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class S3Utils {
+
+  private static final Logger LOG = LoggerFactory.getLogger(S3Utils.class);
 
   /**
    * A class that only exists in Hadoop 3.4 and later, whose S3A connector is built on the AWS SDK
@@ -95,7 +99,10 @@ public class S3Utils {
   private static Class<?> loadClass(String className) {
     try {
       return Class.forName(className, false, S3Utils.class.getClassLoader());
-    } catch (ClassNotFoundException | LinkageError e) {
+    } catch (ClassNotFoundException e) {
+      return null;
+    } catch (LinkageError e) {
+      LOG.warn("Class {} is present but cannot be loaded, treating it as absent", className, e);
       return null;
     }
   }

@@ -141,6 +141,15 @@ public class TestS3CredentialsProviderSelection {
   }
 
   @Test
+  void testProviderThatFailsToInitializeFallsBackToDefault() {
+    // The class exists, but initializing it throws an ExceptionInInitializerError (a LinkageError),
+    // like a provider that depends on an incompatible library.
+    String broken = BrokenProvider.class.getName();
+    Assertions.assertEquals(SIMPLE, check(broken));
+    Assertions.assertEquals(SIMPLE, check(SIMPLE + "," + broken));
+  }
+
+  @Test
   void testClassThatIsNotAProviderFallsBackToDefault() {
     Assertions.assertEquals(SIMPLE, check("java.lang.String"));
   }
@@ -166,5 +175,14 @@ public class TestS3CredentialsProviderSelection {
     configs.put(CREDENTIAL_KEY, providers);
     provider.checkAndSetCredentialProvider(configs);
     return configs.get(CREDENTIAL_KEY);
+  }
+
+  /** A class whose static initializer always fails. */
+  static class BrokenProvider {
+    static {
+      if (System.nanoTime() != 0) {
+        throw new IllegalStateException("Broken on purpose");
+      }
+    }
   }
 }
