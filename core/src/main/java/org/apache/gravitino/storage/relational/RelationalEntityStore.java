@@ -128,8 +128,8 @@ public class RelationalEntityStore
   private final ConcurrentHashMap<String, AtomicInteger> pendingHierarchyPrefixes =
       new ConcurrentHashMap<>();
 
-  // Keys being published into the cache under the key lock. Unlocked readers ({@link #exists},
-  // {@link #batchGet}, {@link CachedEntityIdResolver}) must not observe the entry until publication
+  // Keys being published into the cache under the key lock. Unlocked store readers ({@link
+  // #exists}, {@link #batchGet}, {@link #get}) must not observe the entry until publication
   // finishes, including when a raced invalidation rolls the put back.
   private final ConcurrentHashMap<EntityCacheKey, AtomicInteger> publishingWrites =
       new ConcurrentHashMap<>();
@@ -167,10 +167,7 @@ public class RelationalEntityStore
     if (config.get(Configs.CACHE_ENABLED)) {
       this.cache = CacheFactory.getEntityCache(config);
       EntityIdService.initialize(
-          new CachedEntityIdResolver(
-              cache,
-              new RelationalEntityStoreIdResolver(),
-              (ident, type) -> !isCacheObservationBlocked(ident, type)));
+          new CachedEntityIdResolver(cache, new RelationalEntityStoreIdResolver()));
     } else {
       this.cache = new NoOpsCache(config);
       EntityIdService.initialize(new RelationalEntityStoreIdResolver());
