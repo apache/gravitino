@@ -190,15 +190,16 @@ test('fork pushes resolve the PR base once', async () => {
       getBranch: async () => ({ data: { commit: { sha: B } } }) } }, paginate: async () => [pr()] } });
   assert.equal(output['base-sha'], B); assert.equal(output['base-ref'], 'main'); assert.equal(output.sync, 'true');
 });
-async function discoverBase(main, release) {
+async function discoverBase(main, release, topicBranches = []) {
   const output = {};
   const listBranches = () => {};
   await resolve({ context: context('fork/repo', true), core: coreFor(output), github: {
-    rest: { pulls: { list() {} }, repos: { listBranches,
+    rest: { pulls: { list() {} }, git: { getCommit: async () => ({ data: { parents: [{ sha: B }] } }) }, repos: { listBranches,
       get: async args => ({ data: args.owner === 'fork' ? { fork: true, source: { full_name: 'apache/gravitino' } } : { default_branch: 'main' } }),
-      compareCommitsWithBasehead: async args => ({ data: args.basehead.startsWith('branch-2.0...') ? release : main }),
+      compareCommitsWithBasehead: async args => ({ data: args.basehead.startsWith('branch-2.0...') ? release :
+        args.basehead.startsWith('main...') ? main : { ahead_by: 1, behind_by: 0 } }),
       getBranch: async () => ({ data: { commit: { sha: B } } }) } },
-    paginate: async endpoint => endpoint === listBranches ? [{ name: 'branch-2.0' }] : []
+    paginate: async endpoint => endpoint === listBranches ? [{ name: 'branch-2.0', commit: { sha: C } }, ...topicBranches] : []
   } });
   return output['base-ref'];
 }
@@ -211,6 +212,13 @@ test('pre-PR backports prefer the closer base when both have the same head-only 
 test('pre-PR base discovery keeps the default branch when both distances tie', async () => {
   assert.equal(await discoverBase({ ahead_by: 1, behind_by: 0 }, { ahead_by: 1, behind_by: 0 }), 'main');
 });
+test('a pre-PR push considers a unique upstream topic parent but does not guess between aliases', async () => {
+  const main = { ahead_by: 5, behind_by: 0 }, release = { ahead_by: 10, behind_by: 1 };
+  const topic = { name: 'glossary-term-dev', commit: { sha: B } };
+  assert.equal(await discoverBase(main, release, [topic]), topic.name);
+  assert.equal(await discoverBase(main, release, [topic, { ...topic, name: 'other' }]), 'main');
+});
+
 test('trusted dispatch rejects an arbitrary ref or a non-upstream repository', async () => {
   const ctx = context('fork/repo');ctx.eventName = 'workflow_dispatch';ctx.payload.inputs = { 'pull-request': '7' };
   await assert.rejects(resolve({ context: ctx, core: coreFor({}), github: {} }), /apache/);
@@ -843,6 +851,16 @@ test('a failed fork run reports failure and points the author to re-run it in th
   assert.equal(statuses[0].state, 'failure');
   assert.equal(statuses[0].description, 'Failed: backend / test; re-run it in your fork');
   assert.equal(statuses[0].target_url, url());
+}));
+
+test('the published error names the successful fork base and the actual PR target', async () => withPublisher(async ({ ctx, core }) => {
+  const p = pr();
+  p.base.ref = 'glossary-term-dev';
+  const { github, statuses } = publisherMock({ current: p });
+  github.rest.pulls.get = async () => ({ data: p });
+  await update({ github, context: ctx, core, sleep: async () => {} });
+  assert.equal(statuses[0].state, 'error');
+  assert.equal(statuses[0].description, 'Fork CI needs attention: tested main; PR targets glossary-term-dev. Re-run all jobs in your fork.');
 }));
 
 test('signals queue in order while scheduled sweeps poll in their own group', async () => {

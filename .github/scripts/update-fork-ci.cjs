@@ -99,6 +99,7 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
   }
   // apache/gravitino cannot re-run jobs in a contributor's fork; the status link opens the run.
   function describe(result, mirror) {
+    if (result.description && !mirror.trusted) return result.description;
     const hint = `${result.title}; re-run it in your fork`;
     return mirror.run && !mirror.trusted && ['failure', 'error'].includes(statusState(result)) && hint.length <= 140
       ? hint : result.title;

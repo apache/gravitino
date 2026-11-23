@@ -67,6 +67,14 @@ async function resolve({ github, context, core }) {
         const releases = branches.map(b => b.name).filter(n => /^branch-\d+\.\d+$/.test(n))
           .sort((a, b) => a.localeCompare(b, 'en', { numeric: true })).slice(-3);
         const candidates = [...new Set([upstream.default_branch, ...releases])];
+        // A topic branch can be the intended upstream base too. A unique first-parent
+        // match is concrete evidence without comparing every upstream branch.
+        const { data: commit } = await github.rest.git.getCommit({ ...context.repo, commit_sha: headSha });
+        const parent = commit.parents[0]?.sha;
+        const parentBranches = branches.filter(branch => parent && branch.commit.sha === parent);
+        if (parentBranches.length === 1 && !candidates.includes(parentBranches[0].name)) {
+          candidates.push(parentBranches[0].name);
+        }
         let fewestAhead = Infinity;
         let fewestBehind = Infinity;
         for (const candidate of candidates) {
@@ -83,7 +91,8 @@ async function resolve({ github, context, core }) {
             baseRef = candidate;
           }
         }
-        core.notice(`No open PR: testing against ${baseRef}; results require a matching PR base.`);
+        core.notice(`No open PR: testing against ${baseRef}. If the PR targets another branch, ` +
+          'the next push to the open PR or a full rerun will resolve its target.');
       }
       const { data: base } = await github.rest.repos.getBranch({ owner: 'apache', repo: 'gravitino', branch: baseRef });
       baseSha = base.commit.sha;
