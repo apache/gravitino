@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.cache;
 
+import java.util.function.BiPredicate;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
@@ -29,30 +30,32 @@ public class CachedEntityIdResolver implements EntityIdResolver {
 
   private final EntityCache entityCache;
   private final EntityIdResolver underlyingResolver;
-  private final CacheReadGate cacheReadGate;
+  private final BiPredicate<NameIdentifier, Entity.EntityType> allowCacheRead;
 
   public CachedEntityIdResolver(EntityCache entityCache, EntityIdResolver underlyingResolver) {
-    this(entityCache, underlyingResolver, CacheReadGate.ALWAYS_ALLOW);
+    this(entityCache, underlyingResolver, (ident, type) -> true);
   }
 
   /**
-   * Creates a resolver that consults {@code cacheReadGate} before using a cache hit.
+   * Creates a resolver that consults {@code allowCacheRead} before using a cache hit.
    *
    * @param entityCache The entity cache.
-   * @param underlyingResolver Resolver used on a cache miss or when the gate disallows a cache
+   * @param underlyingResolver Resolver used on a cache miss or when the predicate disallows a cache
    *     read.
-   * @param cacheReadGate Whether a cache hit may be used for the given key.
+   * @param allowCacheRead Whether a cache hit may be used for the given key.
    */
   public CachedEntityIdResolver(
-      EntityCache entityCache, EntityIdResolver underlyingResolver, CacheReadGate cacheReadGate) {
+      EntityCache entityCache,
+      EntityIdResolver underlyingResolver,
+      BiPredicate<NameIdentifier, Entity.EntityType> allowCacheRead) {
     this.entityCache = entityCache;
     this.underlyingResolver = underlyingResolver;
-    this.cacheReadGate = cacheReadGate;
+    this.allowCacheRead = allowCacheRead;
   }
 
   @Override
   public NamespacedEntityId getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type) {
-    if (!cacheReadGate.allowCacheRead(nameIdentifier, type)) {
+    if (!allowCacheRead.test(nameIdentifier, type)) {
       return underlyingResolver.getEntityIds(nameIdentifier, type);
     }
     return entityCache
@@ -74,7 +77,7 @@ public class CachedEntityIdResolver implements EntityIdResolver {
 
   @Override
   public Long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type) {
-    if (!cacheReadGate.allowCacheRead(nameIdentifier, type)) {
+    if (!allowCacheRead.test(nameIdentifier, type)) {
       return underlyingResolver.getEntityId(nameIdentifier, type);
     }
     return entityCache

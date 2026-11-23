@@ -43,7 +43,6 @@ import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.BaseEntityCache;
-import org.apache.gravitino.cache.CacheReadGate;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
 import org.apache.gravitino.cache.CaffeineEntityCache;
 import org.apache.gravitino.cache.Coherence;
@@ -297,8 +296,8 @@ public class TestRelationalEntityStore {
     Mockito.when(underlying.getEntityId(ident, Entity.EntityType.TOPIC)).thenReturn(99L);
 
     AtomicBoolean allowCache = new AtomicBoolean(false);
-    CacheReadGate gate = (id, type) -> allowCache.get();
-    EntityIdResolver resolver = new CachedEntityIdResolver(cache, underlying, gate);
+    EntityIdResolver resolver =
+        new CachedEntityIdResolver(cache, underlying, (id, type) -> allowCache.get());
 
     Assertions.assertEquals(99L, resolver.getEntityId(ident, Entity.EntityType.TOPIC));
     Mockito.verify(underlying).getEntityId(ident, Entity.EntityType.TOPIC);
