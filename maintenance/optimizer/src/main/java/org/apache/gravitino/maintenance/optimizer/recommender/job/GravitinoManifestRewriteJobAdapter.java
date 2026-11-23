@@ -19,9 +19,11 @@
 package org.apache.gravitino.maintenance.optimizer.recommender.job;
 
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionContext;
+import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.ManifestRewriteJobContext;
 
@@ -34,10 +36,20 @@ public final class GravitinoManifestRewriteJobAdapter implements GravitinoJobAda
         context instanceof ManifestRewriteJobContext,
         "jobExecutionContext must be ManifestRewriteJobContext");
     ManifestRewriteJobContext rewrite = (ManifestRewriteJobContext) context;
-    Map<String, String> config = new LinkedHashMap<>(rewrite.jobOptions());
-    config.put(
-        "catalog_name",
-        IdentifierUtils.getCatalogNameFromTableIdentifier(rewrite.nameIdentifier()));
+    String catalogName =
+        IdentifierUtils.getCatalogNameFromTableIdentifier(rewrite.nameIdentifier());
+    if (submitterConfigs == null) {
+      submitterConfigs = Collections.emptyMap();
+    }
+    Map<String, String> config = new LinkedHashMap<>();
+    config.putAll(
+        IcebergSparkConfigUtils.resolveTemplateSparkPlaceholders(
+            catalogName,
+            IcebergSparkConfigUtils.parseFlatJsonMap(
+                submitterConfigs.get("spark_conf"), "spark-conf"),
+            submitterConfigs));
+    config.putAll(rewrite.jobOptions());
+    config.put("catalog_name", catalogName);
     config.put(
         "table_identifier",
         IdentifierUtils.toSparkTableIdentifier(rewrite.nameIdentifier(), schemaSeparator));

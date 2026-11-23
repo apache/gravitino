@@ -30,6 +30,8 @@ import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.utils.GravitinoTableInfoHelper;
 import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.connector.catalog.index.TableIndex;
+import org.apache.spark.sql.connector.expressions.NamedReference;
 import org.apache.spark.sql.connector.write.LogicalWriteInfo;
 import org.apache.spark.sql.connector.write.WriteBuilder;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCScanBuilder;
@@ -50,6 +52,8 @@ public class SparkJdbcTable extends SparkJdbcTableBase {
   private final StructType sparkSchema;
   private final SparkJdbcPushDownPolicy pushDownPolicy;
 
+  private final Runnable validateConnection;
+
   public SparkJdbcTable(
       Identifier identifier,
       Table gravitinoTable,
@@ -58,7 +62,26 @@ public class SparkJdbcTable extends SparkJdbcTableBase {
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter,
       SparkTypeConverter sparkTypeConverter) {
+    this(
+        identifier,
+        gravitinoTable,
+        jdbcTable,
+        propertiesConverter,
+        sparkTransformConverter,
+        sparkTypeConverter,
+        () -> {});
+  }
+
+  SparkJdbcTable(
+      Identifier identifier,
+      Table gravitinoTable,
+      JDBCTable jdbcTable,
+      PropertiesConverter propertiesConverter,
+      SparkTransformConverter sparkTransformConverter,
+      SparkTypeConverter sparkTypeConverter,
+      Runnable validateConnection) {
     super(identifier, jdbcTable);
+    this.validateConnection = validateConnection;
     this.gravitinoTable = gravitinoTable;
     this.gravitinoTableInfoHelper =
         new GravitinoTableInfoHelper(
@@ -86,6 +109,7 @@ public class SparkJdbcTable extends SparkJdbcTableBase {
    */
   @Override
   public JDBCScanBuilder newScanBuilder(CaseInsensitiveStringMap options) {
+    validateConnection.run();
     // Schema and aggregate typing are fixed by the catalog options, not by individual reads.
     Map<String, String> scanOptions = new HashMap<>(options.asCaseSensitiveMap());
     scanOptions.keySet().removeIf("preferTimestampNTZ"::equalsIgnoreCase);
@@ -101,6 +125,7 @@ public class SparkJdbcTable extends SparkJdbcTableBase {
    */
   @Override
   public WriteBuilder newWriteBuilder(LogicalWriteInfo info) {
+    validateConnection.run();
     if (jdbcOptions().url().toLowerCase(Locale.ROOT).startsWith("jdbc:postgresql:")) {
       for (Column column : gravitinoTable.columns()) {
         if (column.dataType() instanceof Types.UUIDType
@@ -115,6 +140,38 @@ public class SparkJdbcTable extends SparkJdbcTableBase {
       }
     }
     return super.newWriteBuilder(info);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public void createIndex(
+      String indexName,
+      NamedReference[] columns,
+      Map<NamedReference, Map<String, String>> columnProperties,
+      Map<String, String> properties) {
+    validateConnection.run();
+    super.createIndex(indexName, columns, columnProperties, properties);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public boolean indexExists(String indexName) {
+    validateConnection.run();
+    return super.indexExists(indexName);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public void dropIndex(String indexName) {
+    validateConnection.run();
+    super.dropIndex(indexName);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public TableIndex[] listIndexes() {
+    validateConnection.run();
+    return super.listIndexes();
   }
 
   @Override

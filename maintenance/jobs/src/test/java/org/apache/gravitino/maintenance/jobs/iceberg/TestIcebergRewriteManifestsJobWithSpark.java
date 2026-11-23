@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -37,6 +38,7 @@ import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.policy.PolicyDTO;
 import org.apache.gravitino.dto.rel.TableDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.jobs.TemplateArguments;
 import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyHandlerContext;
@@ -45,6 +47,7 @@ import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.ManifestRewriteStrategyHandler;
 import org.apache.gravitino.maintenance.optimizer.recommender.job.GravitinoManifestRewriteJobAdapter;
 import org.apache.gravitino.maintenance.optimizer.recommender.strategy.GravitinoStrategy;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.TableMetadata;
@@ -111,6 +114,97 @@ public class TestIcebergRewriteManifestsJobWithSpark {
     assertEquals(records, records());
   }
 
+  /**
+   * TMS S0 inventory counts only the resolved partition spec, matching optimizer by-spec statistics
+   * (not table-wide totals across evolved specs).
+   */
+  @Test
+  public void testBeforeMetricsCountOnlyResolvedSpec() {
+    assertEquals(3, manifests(0).size());
+    assertEquals(3, manifests(1).size());
+
+    Map<String, Object> defaultSpec =
+        IcebergRewriteManifestsJob.collectManifestBeforeMetrics(
+            spark, "manifest_catalog", "db.events", null);
+    assertEquals(
+        3L,
+        ((Number) defaultSpec.get(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC))
+            .longValue());
+    assertEquals(1, defaultSpec.get(IcebergRewriteManifestsContent.MANIFEST_SPEC_ID_METRIC));
+    assertEquals(
+        "hour(event_time)",
+        defaultSpec.get(IcebergRewriteManifestsContent.MANIFEST_PARTITION_SPEC_METRIC));
+
+    Map<String, Object> oldSpec =
+        IcebergRewriteManifestsJob.collectManifestBeforeMetrics(
+            spark, "manifest_catalog", "db.events", "0");
+    assertEquals(
+        3L,
+        ((Number) oldSpec.get(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC)).longValue());
+    assertEquals(0, oldSpec.get(IcebergRewriteManifestsContent.MANIFEST_SPEC_ID_METRIC));
+    assertEquals(
+        "day(event_time)",
+        oldSpec.get(IcebergRewriteManifestsContent.MANIFEST_PARTITION_SPEC_METRIC));
+
+    Map<String, String> args = new HashMap<>();
+    args.put("spec-id", "0");
+    TableSnapshotMetrics before =
+        new IcebergRewriteManifestsJob()
+            .collectBeforeMetrics(spark, "manifest_catalog", "db.events", args);
+    assertEquals(currentSnapshot(), before.snapshotId());
+    assertTrue(
+        before.metricsJson().contains(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC));
+    assertTrue(before.metricsJson().contains(":3"));
+    assertTrue(
+        before.metricsJson().contains(IcebergRewriteManifestsContent.MANIFEST_SPEC_ID_METRIC));
+    assertTrue(
+        before
+            .metricsJson()
+            .contains(IcebergRewriteManifestsContent.MANIFEST_PARTITION_SPEC_METRIC));
+  }
+
+  /**
+   * TMS S1 after rewrite re-collects inventory for the resolved spec and merges the procedure
+   * rewritten count so Validation Before/After/Change can use the same inventory keys.
+   */
+  @Test
+  public void testAfterMetricsIncludeInventoryAndRewritten() throws Exception {
+    assertEquals(3, manifests(1).size());
+    Map<String, String> args = new HashMap<>();
+    IcebergRewriteManifestsJob job = new IcebergRewriteManifestsJob();
+    TableSnapshotMetrics before =
+        job.collectBeforeMetrics(spark, "manifest_catalog", "db.events", args);
+    Map<String, Object> beforeMetrics =
+        JsonUtils.anyFieldMapper()
+            .readValue(before.metricsJson(), new TypeReference<Map<String, Object>>() {});
+    assertEquals(
+        3L,
+        ((Number) beforeMetrics.get(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC))
+            .longValue());
+
+    TableSnapshotMetrics after =
+        job.executeAndCollectAfter(spark, "manifest_catalog", "db.events", args, before);
+    Map<String, Object> afterMetrics =
+        JsonUtils.anyFieldMapper()
+            .readValue(after.metricsJson(), new TypeReference<Map<String, Object>>() {});
+
+    assertEquals(1, manifests(1).size());
+    assertEquals(
+        1L,
+        ((Number) afterMetrics.get(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC))
+            .longValue());
+    assertTrue(afterMetrics.containsKey(IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC));
+    assertEquals(
+        3L,
+        ((Number) afterMetrics.get(IcebergRewriteManifestsContent.REWRITTEN_MANIFEST_NUMBER_METRIC))
+            .longValue());
+    assertEquals(1, afterMetrics.get(IcebergRewriteManifestsContent.MANIFEST_SPEC_ID_METRIC));
+    assertEquals(
+        "hour(event_time)",
+        afterMetrics.get(IcebergRewriteManifestsContent.MANIFEST_PARTITION_SPEC_METRIC));
+    assertEquals(currentSnapshot(), after.snapshotId());
+  }
+
   /** An explicit old spec is rewritten without migrating it or changing the current spec. */
   @Test
   public void testExplicitOldSpecWithCaching() {
@@ -171,7 +265,7 @@ public class TestIcebergRewriteManifestsJobWithSpark {
             .withPolicyType("system_iceberg_rewrite_manifests")
             .withContent(
                 DTOConverters.toDTO(
-                    PolicyContents.icebergRewriteManifests(3L, 3L, null, resolvedSpecId, false)))
+                    PolicyContents.icebergRewriteManifests(3L, resolvedSpecId, false)))
             .build();
     List<StatisticEntry<?>> measurements =
         IcebergUpdateManifestStatsJob.collectManifestStatistics(
@@ -235,8 +329,7 @@ public class TestIcebergRewriteManifestsJobWithSpark {
             .withName("rewrite")
             .withPolicyType("system_iceberg_rewrite_manifests")
             .withContent(
-                DTOConverters.toDTO(
-                    PolicyContents.icebergRewriteManifests(3L, 3L, null, null, false)))
+                DTOConverters.toDTO(PolicyContents.icebergRewriteManifests(3L, null, false)))
             .build();
     ManifestRewriteStrategyHandler handler = new ManifestRewriteStrategyHandler();
     handler.initialize(

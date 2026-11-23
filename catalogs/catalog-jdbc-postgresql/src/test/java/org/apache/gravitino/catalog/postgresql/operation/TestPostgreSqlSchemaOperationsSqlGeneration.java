@@ -83,4 +83,11 @@ public class TestPostgreSqlSchemaOperationsSqlGeneration {
                 + "FROM pg_catalog.pg_namespace n\nWHERE n.nspname = ?;\n");
     verify(statement).close();
   }
+
+  @Test
+  void testDatabaseExistSqlUsesBindParameter() {
+    Assertions.assertEquals(
+        "SELECT n.datname FROM pg_catalog.pg_database n where n.datname = ?",
+        new PostgreSqlSchemaOperations().generateDatabaseExistSql());
+  }
 }

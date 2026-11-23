@@ -84,6 +84,27 @@ public class TestIcebergSparkConfigUtils {
   }
 
   @Test
+  public void testResolveAndOverlayFlatWinsWithoutInjectingDefaults() {
+    Map<String, String> spark = new HashMap<>();
+    spark.put(IcebergSparkConfigUtils.SPARK_EXECUTOR_MEMORY_KEY, "4g");
+    spark.put(IcebergSparkConfigUtils.SPARK_EXECUTOR_CORES_KEY, "2");
+    Map<String, String> flat = new HashMap<>();
+    flat.put(IcebergSparkConfigUtils.PLACEHOLDER_SPARK_EXECUTOR_MEMORY, "7g");
+    flat.put(IcebergSparkConfigUtils.PLACEHOLDER_CATALOG_TYPE, "rest");
+
+    Map<String, String> placeholders =
+        IcebergSparkConfigUtils.resolveTemplateSparkPlaceholders("iceberg", spark, flat);
+    assertEquals("7g", placeholders.get(IcebergSparkConfigUtils.PLACEHOLDER_SPARK_EXECUTOR_MEMORY));
+    assertEquals("rest", placeholders.get(IcebergSparkConfigUtils.PLACEHOLDER_CATALOG_TYPE));
+
+    IcebergSparkConfigUtils.overlayFlatResourceAndCatalogKeys(spark, flat, "iceberg");
+    assertEquals("7g", spark.get(IcebergSparkConfigUtils.SPARK_EXECUTOR_MEMORY_KEY));
+    assertEquals("2", spark.get(IcebergSparkConfigUtils.SPARK_EXECUTOR_CORES_KEY));
+    assertEquals("rest", spark.get("spark.sql.catalog.iceberg.type"));
+    assertTrue(!spark.containsKey(IcebergSparkConfigUtils.SPARK_EXECUTOR_INSTANCES_KEY));
+  }
+
+  @Test
   public void testParseFlatJsonMap() {
     Map<String, String> parsed =
         IcebergSparkConfigUtils.parseFlatJsonMap(

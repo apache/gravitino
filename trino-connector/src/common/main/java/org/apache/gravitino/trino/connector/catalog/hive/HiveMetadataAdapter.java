@@ -34,6 +34,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.gravitino.catalog.hive.TableType;
 import org.apache.gravitino.catalog.property.PropertyConverter;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
@@ -119,6 +120,14 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
   public Map<String, String> toGravitinoSchemaProperties(Map<String, Object> properties) {
     Map<String, Object> stringMap = schemaConverter.engineToGravitinoProperties(properties);
     return super.toGravitinoSchemaProperties(stringMap);
+  }
+
+  @Override
+  public boolean canDropFailedNewTable(ConnectorTableMetadata tableMetadata) {
+    // Dropping a managed table deletes its directory, which HMS reuses if it already exists.
+    Object tableType = tableMetadata.getProperties().get(HivePropertyMeta.HIVE_TABLE_TYPE);
+    return tableType != null
+        && TableType.EXTERNAL_TABLE.name().equalsIgnoreCase(tableType.toString());
   }
 
   @Override

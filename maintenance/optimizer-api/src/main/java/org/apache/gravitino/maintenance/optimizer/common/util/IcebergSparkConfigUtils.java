@@ -48,7 +48,201 @@ public final class IcebergSparkConfigUtils {
   public static final String ICEBERG_SPARK_EXTENSIONS =
       "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions";
 
+  public static final String SPARK_MASTER_KEY = "spark.master";
+  public static final String SPARK_EXECUTOR_INSTANCES_KEY = "spark.executor.instances";
+  public static final String SPARK_EXECUTOR_CORES_KEY = "spark.executor.cores";
+  public static final String SPARK_EXECUTOR_MEMORY_KEY = "spark.executor.memory";
+  public static final String SPARK_DRIVER_MEMORY_KEY = "spark.driver.memory";
+
+  public static final String PLACEHOLDER_SPARK_MASTER = "spark_master";
+  public static final String PLACEHOLDER_SPARK_EXECUTOR_INSTANCES = "spark_executor_instances";
+  public static final String PLACEHOLDER_SPARK_EXECUTOR_CORES = "spark_executor_cores";
+  public static final String PLACEHOLDER_SPARK_EXECUTOR_MEMORY = "spark_executor_memory";
+  public static final String PLACEHOLDER_SPARK_DRIVER_MEMORY = "spark_driver_memory";
+  public static final String PLACEHOLDER_CATALOG_TYPE = "catalog_type";
+  public static final String PLACEHOLDER_CATALOG_URI = "catalog_uri";
+  public static final String PLACEHOLDER_WAREHOUSE_LOCATION = "warehouse_location";
+
+  private static final String DEFAULT_SPARK_EXECUTOR_INSTANCES = "1";
+  private static final String DEFAULT_SPARK_EXECUTOR_CORES = "1";
+  private static final String DEFAULT_SPARK_EXECUTOR_MEMORY = "1g";
+  private static final String DEFAULT_SPARK_DRIVER_MEMORY = "1g";
+
+  /**
+   * Nested Spark resource keys → flat template placeholder names (update-stats / rewrite
+   * templates).
+   */
+  public static final Map<String, String> SPARK_KEY_TO_PLACEHOLDER =
+      ImmutableMap.of(
+          SPARK_MASTER_KEY,
+          PLACEHOLDER_SPARK_MASTER,
+          SPARK_EXECUTOR_INSTANCES_KEY,
+          PLACEHOLDER_SPARK_EXECUTOR_INSTANCES,
+          SPARK_EXECUTOR_CORES_KEY,
+          PLACEHOLDER_SPARK_EXECUTOR_CORES,
+          SPARK_EXECUTOR_MEMORY_KEY,
+          PLACEHOLDER_SPARK_EXECUTOR_MEMORY,
+          SPARK_DRIVER_MEMORY_KEY,
+          PLACEHOLDER_SPARK_DRIVER_MEMORY);
+
   private IcebergSparkConfigUtils() {}
+
+  /**
+   * Resolves flat SparkJobTemplate placeholders. Priority: {@code flatSubmitterConfigs}, then
+   * nested {@code sparkConfigs}, then defaults. Nested {@code spark.master} is ignored for master
+   * (only flat {@code spark_master} applies).
+   *
+   * @param catalogName Spark catalog alias for catalog_* placeholders
+   * @param sparkConfigs nested spark_conf map (may be empty)
+   * @param flatSubmitterConfigs top-level flat keys (may be empty)
+   * @return placeholder name → value for template expansion
+   */
+  public static Map<String, String> resolveTemplateSparkPlaceholders(
+      String catalogName,
+      Map<String, String> sparkConfigs,
+      Map<String, String> flatSubmitterConfigs) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(catalogName), "catalogName is blank");
+    Map<String, String> spark = sparkConfigs == null ? Collections.emptyMap() : sparkConfigs;
+    Map<String, String> flat =
+        flatSubmitterConfigs == null ? Collections.emptyMap() : flatSubmitterConfigs;
+    Map<String, String> placeholders = new LinkedHashMap<>();
+    String catalogPrefix = SPARK_SQL_CATALOG_PREFIX + catalogName;
+
+    // Empty master leaves it to the job executor; nested spark.master is not used (flat only).
+    placeholders.put(
+        PLACEHOLDER_SPARK_MASTER,
+        firstNonBlank(flat.get(PLACEHOLDER_SPARK_MASTER), flat.get(SPARK_MASTER_KEY)));
+    placeholders.put(
+        PLACEHOLDER_SPARK_EXECUTOR_INSTANCES,
+        firstNonBlank(
+            flat.get(PLACEHOLDER_SPARK_EXECUTOR_INSTANCES),
+            flat.get(SPARK_EXECUTOR_INSTANCES_KEY),
+            spark.get(SPARK_EXECUTOR_INSTANCES_KEY),
+            DEFAULT_SPARK_EXECUTOR_INSTANCES));
+    placeholders.put(
+        PLACEHOLDER_SPARK_EXECUTOR_CORES,
+        firstNonBlank(
+            flat.get(PLACEHOLDER_SPARK_EXECUTOR_CORES),
+            flat.get(SPARK_EXECUTOR_CORES_KEY),
+            spark.get(SPARK_EXECUTOR_CORES_KEY),
+            DEFAULT_SPARK_EXECUTOR_CORES));
+    placeholders.put(
+        PLACEHOLDER_SPARK_EXECUTOR_MEMORY,
+        firstNonBlank(
+            flat.get(PLACEHOLDER_SPARK_EXECUTOR_MEMORY),
+            flat.get(SPARK_EXECUTOR_MEMORY_KEY),
+            spark.get(SPARK_EXECUTOR_MEMORY_KEY),
+            DEFAULT_SPARK_EXECUTOR_MEMORY));
+    placeholders.put(
+        PLACEHOLDER_SPARK_DRIVER_MEMORY,
+        firstNonBlank(
+            flat.get(PLACEHOLDER_SPARK_DRIVER_MEMORY),
+            flat.get(SPARK_DRIVER_MEMORY_KEY),
+            spark.get(SPARK_DRIVER_MEMORY_KEY),
+            DEFAULT_SPARK_DRIVER_MEMORY));
+    placeholders.put(
+        PLACEHOLDER_CATALOG_TYPE,
+        firstNonBlank(flat.get(PLACEHOLDER_CATALOG_TYPE), spark.get(catalogPrefix + ".type")));
+    placeholders.put(
+        PLACEHOLDER_CATALOG_URI,
+        firstNonBlank(flat.get(PLACEHOLDER_CATALOG_URI), spark.get(catalogPrefix + ".uri"), ""));
+    placeholders.put(
+        PLACEHOLDER_WAREHOUSE_LOCATION,
+        firstNonBlank(
+            flat.get(PLACEHOLDER_WAREHOUSE_LOCATION), spark.get(catalogPrefix + ".warehouse"), ""));
+    return placeholders;
+  }
+
+  /**
+   * Applies top-level resource / catalog keys from {@code jobOptions} onto nested {@code sparkConf}
+   * using {@link #resolveTemplateSparkPlaceholders} (flat wins). Only writes keys that {@code
+   * jobOptions} set; does not inject template defaults into {@code sparkConf}.
+   *
+   * @param sparkConf mutable nested spark conf
+   * @param jobOptions policy / submitter map that may carry placeholders or spark.* resource keys
+   * @param catalogName Spark catalog alias
+   */
+  public static void overlayFlatResourceAndCatalogKeys(
+      Map<String, String> sparkConf, Map<String, String> jobOptions, String catalogName) {
+    Preconditions.checkNotNull(sparkConf, "sparkConf");
+    Preconditions.checkArgument(StringUtils.isNotBlank(catalogName), "catalogName is blank");
+    if (jobOptions == null || jobOptions.isEmpty()) {
+      return;
+    }
+    Map<String, String> resolved =
+        resolveTemplateSparkPlaceholders(catalogName, sparkConf, jobOptions);
+    String catalogPrefix = SPARK_SQL_CATALOG_PREFIX + catalogName;
+    if (hasResourceOverride(
+        jobOptions, PLACEHOLDER_SPARK_EXECUTOR_INSTANCES, SPARK_EXECUTOR_INSTANCES_KEY)) {
+      sparkConf.put(
+          SPARK_EXECUTOR_INSTANCES_KEY, resolved.get(PLACEHOLDER_SPARK_EXECUTOR_INSTANCES));
+    }
+    if (hasResourceOverride(
+        jobOptions, PLACEHOLDER_SPARK_EXECUTOR_CORES, SPARK_EXECUTOR_CORES_KEY)) {
+      sparkConf.put(SPARK_EXECUTOR_CORES_KEY, resolved.get(PLACEHOLDER_SPARK_EXECUTOR_CORES));
+    }
+    if (hasResourceOverride(
+        jobOptions, PLACEHOLDER_SPARK_EXECUTOR_MEMORY, SPARK_EXECUTOR_MEMORY_KEY)) {
+      sparkConf.put(SPARK_EXECUTOR_MEMORY_KEY, resolved.get(PLACEHOLDER_SPARK_EXECUTOR_MEMORY));
+    }
+    if (hasResourceOverride(jobOptions, PLACEHOLDER_SPARK_DRIVER_MEMORY, SPARK_DRIVER_MEMORY_KEY)) {
+      sparkConf.put(SPARK_DRIVER_MEMORY_KEY, resolved.get(PLACEHOLDER_SPARK_DRIVER_MEMORY));
+    }
+    if (hasResourceOverride(jobOptions, PLACEHOLDER_SPARK_MASTER, SPARK_MASTER_KEY)) {
+      sparkConf.put(SPARK_MASTER_KEY, resolved.get(PLACEHOLDER_SPARK_MASTER));
+    }
+    if (StringUtils.isNotBlank(jobOptions.get(PLACEHOLDER_CATALOG_TYPE))) {
+      sparkConf.put(catalogPrefix + ".type", resolved.get(PLACEHOLDER_CATALOG_TYPE));
+    }
+    if (StringUtils.isNotBlank(jobOptions.get(PLACEHOLDER_CATALOG_URI))) {
+      sparkConf.put(catalogPrefix + ".uri", resolved.get(PLACEHOLDER_CATALOG_URI));
+    }
+    if (StringUtils.isNotBlank(jobOptions.get(PLACEHOLDER_WAREHOUSE_LOCATION))) {
+      sparkConf.put(catalogPrefix + ".warehouse", resolved.get(PLACEHOLDER_WAREHOUSE_LOCATION));
+    }
+  }
+
+  private static boolean hasResourceOverride(
+      Map<String, String> jobOptions, String placeholderKey, String sparkKey) {
+    return StringUtils.isNotBlank(jobOptions.get(placeholderKey))
+        || StringUtils.isNotBlank(jobOptions.get(sparkKey));
+  }
+
+  /**
+   * @return true when {@code key} is a known flat resource/catalog placeholder or mapped spark.*
+   */
+  public static boolean isFlatResourceOrCatalogKey(String key) {
+    if (key == null) {
+      return false;
+    }
+    if (PLACEHOLDER_SPARK_MASTER.equals(key)
+        || PLACEHOLDER_SPARK_EXECUTOR_INSTANCES.equals(key)
+        || PLACEHOLDER_SPARK_EXECUTOR_CORES.equals(key)
+        || PLACEHOLDER_SPARK_EXECUTOR_MEMORY.equals(key)
+        || PLACEHOLDER_SPARK_DRIVER_MEMORY.equals(key)
+        || PLACEHOLDER_CATALOG_TYPE.equals(key)
+        || PLACEHOLDER_CATALOG_URI.equals(key)
+        || PLACEHOLDER_WAREHOUSE_LOCATION.equals(key)) {
+      return true;
+    }
+    return SPARK_KEY_TO_PLACEHOLDER.containsKey(key);
+  }
+
+  /**
+   * @param candidates values in priority order
+   * @return first non-blank trimmed candidate, or empty string
+   */
+  public static String firstNonBlank(String... candidates) {
+    if (candidates == null) {
+      return "";
+    }
+    for (String candidate : candidates) {
+      if (StringUtils.isNotBlank(candidate)) {
+        return candidate.trim();
+      }
+    }
+    return "";
+  }
 
   /** Build default Spark template configs for Iceberg jobs. */
   public static Map<String, String> buildTemplateSparkConfigs() {

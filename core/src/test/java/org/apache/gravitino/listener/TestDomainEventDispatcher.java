@@ -245,6 +245,28 @@ class TestDomainEventDispatcher {
   }
 
   @Test
+  void testNullBackingTagEmitsFailure() {
+    DomainDispatcher delegate = mock(DomainDispatcher.class);
+    when(delegate.createDomain(metalake, name, comment, properties, null, false))
+        .thenThrow(new IllegalArgumentException("null backing tag"));
+    when(delegate.createSubdomain(metalake, parent, name, comment, properties, null, false))
+        .thenThrow(new IllegalArgumentException("null backing tag"));
+    DomainEventDispatcher events = new DomainEventDispatcher(bus, delegate);
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> events.createDomain(metalake, name, comment, properties, null, false));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> events.createSubdomain(metalake, parent, name, comment, properties, null, false));
+    assertEquals(4, observed.size());
+    for (int i = 0; i < 4; i += 2) {
+      CreateDomainPreEvent pre = (CreateDomainPreEvent) observed.get(i);
+      assertFalse(pre.domainInfo().backingTag().isPresent());
+      assertInstanceOf(CreateDomainFailureEvent.class, observed.get(i + 1));
+    }
+  }
+
+  @Test
   void testCreateDomain() {
     verifyOperation(
         d -> d.createDomain(metalake, name, comment, properties, backingTag, createBackingTag),
@@ -440,6 +462,15 @@ class TestDomainEventDispatcher {
     assertNull(((UpdateDomainBackingTagEvent) observed.get(1)).backingTag());
     assertFalse(
         ((UpdateDomainBackingTagEvent) observed.get(1)).domainInfo().backingTag().isPresent());
+    observed.clear();
+    when(delegate.updateBackingTag(metalake, name, backingTag)).thenReturn(domain);
+    dispatcher.updateBackingTag(metalake, name, backingTag);
+    assertEquals(
+        backingTag.name(), ((UpdateDomainBackingTagPreEvent) observed.get(0)).backingTag());
+    assertEquals(backingTag.name(), ((UpdateDomainBackingTagEvent) observed.get(1)).backingTag());
+    assertEquals(
+        backingTag.name(),
+        ((UpdateDomainBackingTagEvent) observed.get(1)).domainInfo().backingTag().orElse(null));
     observed.clear();
     when(delegate.attachDomain(metalake, name, parent)).thenReturn(domain);
     dispatcher.attachDomain(metalake, name, parent);
@@ -672,7 +703,7 @@ class TestDomainEventDispatcher {
     assertEquals(properties, info.properties());
     assertEquals(status, info.status());
     assertEquals(expectedParent, info.parent().orElse(null));
-    assertEquals(backingTag, info.backingTag().orElse(null));
+    assertEquals(backingTag.name(), info.backingTag().orElse(null));
     assertEquals(audit, info.auditInfo());
   }
 }

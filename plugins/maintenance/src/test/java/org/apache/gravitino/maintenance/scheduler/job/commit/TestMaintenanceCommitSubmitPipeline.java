@@ -85,11 +85,11 @@ class TestMaintenanceCommitSubmitPipeline {
     MaintenanceJobSpec spec =
         new MaintenanceJobSpec(
             List.of(
-                new Task(TABLE_ID, POLICY_ID, "rewrite_data_files", null, params),
+                new Task(TABLE_ID, POLICY_ID, "system_iceberg_compaction", null, params),
                 new Task(
                     TABLE_ID,
                     EXPIRE_POLICY_ID,
-                    "expire_snapshots",
+                    "system_iceberg_snapshot_expiration",
                     null,
                     new LinkedHashMap<>(params))),
             UPDATER,
@@ -101,11 +101,14 @@ class TestMaintenanceCommitSubmitPipeline {
     ArgumentCaptor<Map<String, String>> confCaptor = ArgumentCaptor.forClass(Map.class);
     verify(mgr).submitAndBind(eq("ml"), confCaptor.capture(), eq(claims));
     Map<String, String> conf = confCaptor.getValue();
-    Assertions.assertEquals(
-        "rewrite_data_files,expire_snapshots",
-        conf.get(MaintenanceJobTemplates.MAINTENANCE_TYPES_KEY));
+    Assertions.assertNull(conf.get(MaintenanceJobTemplates.MAINTENANCE_TYPES_KEY));
     Assertions.assertNull(conf.get("table_identifier"));
-    Assertions.assertTrue(conf.get("tables").contains("\"table_id\":" + TABLE_ID));
+    String tasksJson = conf.get(MaintenanceJobTemplates.TASKS_KEY);
+    Assertions.assertTrue(tasksJson.contains("system_iceberg_compaction"));
+    Assertions.assertTrue(tasksJson.contains("system_iceberg_snapshot_expiration"));
+    Assertions.assertTrue(tasksJson.contains("\"table_id\":" + TABLE_ID));
+    // action_id is stamped inside submitAndBind from claims, not in the pre-submit jobConf.
+    Assertions.assertFalse(tasksJson.contains("\"action_id\""));
   }
 
   private static MaintenanceCommitSubmitPipeline pipeline(
@@ -131,7 +134,7 @@ class TestMaintenanceCommitSubmitPipeline {
     Map<String, String> parameters =
         new LinkedHashMap<>(Map.of("catalog_name", "iceberg", "table_identifier", "db.t"));
     return new MaintenanceJobSpec(
-        List.of(new Task(TABLE_ID, POLICY_ID, "rewrite_data_files", null, parameters)),
+        List.of(new Task(TABLE_ID, POLICY_ID, "system_iceberg_compaction", null, parameters)),
         UPDATER,
         null);
   }

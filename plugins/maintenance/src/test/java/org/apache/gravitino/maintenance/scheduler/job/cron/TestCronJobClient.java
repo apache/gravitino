@@ -220,7 +220,7 @@ class TestCronJobClient extends TestJDBCBackend {
                 TaskInstanceId.of(
                     MaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronBatch(0L, 9L)))
             .isPresent(),
-        "auth-mismatched peer must not be cancelled");
+        "auth-mismatched merge candidate must not be cancelled");
     Assertions.assertTrue(
         client
             .getScheduledExecution(
@@ -261,7 +261,7 @@ class TestCronJobClient extends TestJDBCBackend {
     PolicyEntity policy = expirePolicy(9L);
     int cap = 10; // CronJobClient snapshot-expiry batch capacity
 
-    // Full batch at capacity — must not be claimed into a later incomplete peer.
+    // Full batch at capacity — must not be claimed into a later incomplete merge target.
     Assertions.assertEquals(
         1, scheduler.scheduleNow(policy, schemaCandidates(1, cap, policy), 100));
     Assertions.assertEquals(
