@@ -20,6 +20,7 @@ package org.apache.gravitino.glossary;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -54,6 +55,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.domain.DomainChange;
 import org.apache.gravitino.domain.DomainDispatcher;
 import org.apache.gravitino.domain.DomainManager;
 import org.apache.gravitino.exceptions.ForbiddenException;
@@ -363,6 +365,85 @@ class TestGlossaryDomains extends TestJDBCBackend {
     assertEquals("last", after.definition());
     assertEquals(3, after.version());
     assertArrayEquals(new String[] {"Sales"}, after.domains());
+  }
+
+  /** T7.3: the domain filter covers the domain and the subdomains the caller can see. */
+  @TestTemplate
+  void testDomainFilterIncludesVisibleSubdomains() throws Exception {
+    create("A", "Sales");
+    create("B", "Retail");
+    create("C", "HiddenSub");
+    create("D", "Finance");
+    assertEquals(List.of("A", "B"), names(as("writer", () -> manager.listTerms(LAKE, "Sales"))));
+    assertEquals(
+        List.of("A", "B", "C"), names(as("lakeOwner", () -> manager.listTerms(LAKE, "Sales"))));
+    assertEquals(List.of("B"), names(as("writer", () -> manager.listTerms(LAKE, "Retail"))));
+  }
+
+  /** T7.8: hidden domains never appear in returned terms, and reads change nothing. */
+  @TestTemplate
+  void testHiddenDomainsAreFilteredFromResults() throws Exception {
+    GlossaryTermEntity both = create("Both", "Sales", "Finance");
+    create("FinanceOnly", "Finance");
+    as("lakeOwner", () -> manager.alterTerm(LAKE, "FinanceOnly", TermChange.addRelated("Both")));
+    String[] sales = {"Sales"};
+    as(
+        "writer",
+        () -> {
+          assertArrayEquals(sales, manager.getTerm(LAKE, "Both").domains());
+          for (GlossaryTermEntity term : manager.listTerms(LAKE)) {
+            assertFalse(String.join(",", term.domains()).contains("Finance"), term.name());
+          }
+          assertArrayEquals(new String[0], manager.getTerm(LAKE, "FinanceOnly").domains());
+          for (GlossaryTermEntity term :
+              manager.listRelations(
+                  LAKE, "FinanceOnly", GlossaryManager.Direction.RELATED, false, null)) {
+            assertArrayEquals(sales, term.domains());
+          }
+          return null;
+        });
+    as("lakeOwner", () -> transfer(both, "writer"));
+    GlossaryTermEntity altered =
+        as("writer", () -> manager.alterTerm(LAKE, "Both", TermChange.updateDefinition("new")));
+    assertArrayEquals(sales, altered.domains());
+    GlossaryTermEntity stored = as("admin", () -> manager.getTerm(LAKE, "Both"));
+    assertArrayEquals(new String[] {"Finance", "Sales"}, stored.domains());
+    assertEquals(
+        as("admin", () -> manager.getTerm(LAKE, "FinanceOnly")).revisionToken(),
+        as("lakeOwner", () -> manager.getTerm(LAKE, "FinanceOnly")).revisionToken());
+  }
+
+  /** Review focus: membership follows the domain ID across a rename. */
+  @TestTemplate
+  void testDomainRenameFollowsId() throws Exception {
+    create("Churn", "Sales");
+    env.internalDomainDispatcher().alterDomain(LAKE, "Sales", DomainChange.rename("Revenue"));
+    assertArrayEquals(
+        new String[] {"Revenue"}, as("lakeOwner", () -> manager.getTerm(LAKE, "Churn")).domains());
+    assertThrows(
+        NoSuchDomainException.class,
+        () ->
+            as("lakeOwner", () -> manager.alterTerm(LAKE, "Churn", TermChange.addDomain("Sales"))));
+  }
+
+  @TestTemplate
+  void testDomainFilterOnHiddenDomain() throws Exception {
+    for (String hidden : List.of("DraftX", "NoSuch")) {
+      assertThrows(
+          NoSuchDomainException.class, () -> as("writer", () -> manager.listTerms(LAKE, hidden)));
+    }
+    assertThrows(
+        ForbiddenException.class, () -> as("writer", () -> manager.listTerms(LAKE, "Finance")));
+  }
+
+  private GlossaryTermEntity create(String name, String... domains) throws Exception {
+    return as(
+        "lakeOwner",
+        () -> manager.createTerm(LAKE, TermSpec.builder(name).withDomains(domains).build()));
+  }
+
+  private static List<String> names(List<GlossaryTermEntity> terms) {
+    return terms.stream().map(GlossaryTermEntity::name).sorted().toList();
   }
 
   private static TermChange change(boolean add, String domain) {

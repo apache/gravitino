@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermDomainRelMapper;
@@ -77,6 +78,14 @@ public final class GlossaryTermDomainService {
           }
           return locked;
         });
+  }
+
+  /** Returns a live domain by name without locking it, or null. */
+  @Nullable
+  public DomainPO findDomain(long metalakeId, String name) {
+    return SessionUtils.getWithoutCommit(
+        DomainMetaMapper.class,
+        mapper -> mapper.selectDomainMetaByMetalakeIdAndName(metalakeId, name));
   }
 
   /**
