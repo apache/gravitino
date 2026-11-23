@@ -84,6 +84,9 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
                   cl -> authorization.newPlugin(metalake, catalogProvider, pluginConfig));
           plugins.add(authorizationPlugin);
           classLoaders.add(classLoader);
+        } catch (IllegalArgumentException e) {
+          classLoader.close();
+          throw e;
         } catch (Exception e) {
           classLoader.close();
           throw new RuntimeException(e);

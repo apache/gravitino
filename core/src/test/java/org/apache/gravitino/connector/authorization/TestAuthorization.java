@@ -180,4 +180,34 @@ public class TestAuthorization {
     rangerHDFSAuthPlugin.onRoleCreated(null);
     Assertions.assertTrue(testRangerAuthHDFSPlugin.callOnCreateRole2);
   }
+
+  @Test
+  public void testInvalidAuthorizationProviderThrowsIllegalArgumentException() throws Exception {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(5L)
+            .withName("catalog-invalid-authz")
+            .withNamespace(Namespace.of("default"))
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .withAuditInfo(auditInfo)
+            .build();
+
+    ImmutableMap<String, String> invalidConf =
+        ImmutableMap.of(Catalog.AUTHORIZATION_PROVIDER, "nonexistent_provider");
+    TestCatalog catalog = new TestCatalog().withCatalogConf(invalidConf).withCatalogEntity(entity);
+    try (IsolatedClassLoader isolatedClassLoader =
+            new IsolatedClassLoader(
+                Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+        catalog) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> catalog.initAuthorizationPluginInstance(isolatedClassLoader, METALAKE_ID));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> catalog.validateAuthorizationConfiguration(isolatedClassLoader, invalidConf));
+    }
+  }
 }

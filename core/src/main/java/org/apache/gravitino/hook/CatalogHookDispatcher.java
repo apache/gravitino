@@ -32,6 +32,7 @@ import org.apache.gravitino.authorization.FutureGrantManager;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
@@ -173,14 +174,25 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
     if (!dispatcher.catalogExists(ident)) {
       return false;
     }
-    if (!force && AuthorizationUtils.isCatalogInUse(ident)) {
-      return dispatcher.dropCatalog(ident, false);
+    if (!AuthorizationUtils.isMetalakeInUse(ident)
+        || (!force && AuthorizationUtils.isCatalogInUse(ident))) {
+      return dispatcher.dropCatalog(ident, force);
     }
 
     List<String> locations =
         AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.CATALOG);
-    AuthorizationUtils.removeCatalogPrivileges(ident, locations);
+    if (dispatcher instanceof CatalogManager) {
+      // Execute privilege removal only after CatalogManager verifies all drop preconditions
+      // (metalake-in-use, in-use, and non-empty checks) while the live catalog wrapper is still
+      // open prior to metadata deletion.
+      return ((CatalogManager) dispatcher)
+          .dropCatalog(
+              ident,
+              force,
+              catalog -> AuthorizationUtils.removeCatalogPrivileges(catalog, locations));
+    }
 
+    AuthorizationUtils.removeCatalogPrivileges(ident, locations);
     // We should call the authorization plugin before dropping the catalog, because the dropping
     // catalog will close the authorization plugin. Child schema/fileset write-through secrets are
     // cleaned in CatalogManager.dropCatalog / FilesetCatalogOperations.dropSchema.

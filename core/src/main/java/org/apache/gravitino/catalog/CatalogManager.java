@@ -1360,6 +1360,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                     .withClassLoader(
                         cl -> {
                           lease.catalog().validateConfiguration(proposedConfiguration);
+                          lease
+                              .catalog()
+                              .validateAuthorizationConfiguration(
+                                  lease.wrapper().classLoader, proposedConfiguration);
                           return null;
                         },
                         IllegalArgumentException.class);
@@ -1389,6 +1393,25 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Override
   public boolean dropCatalog(NameIdentifier ident, boolean force)
       throws NonEmptyEntityException, CatalogInUseException {
+    return dropCatalog(ident, force, null);
+  }
+
+  /**
+   * Drops a catalog with an optional callback executed after all drop preconditions pass and while
+   * the catalog instance and its authorization plugin remain open prior to metadata deletion.
+   *
+   * @param ident The identifier of the catalog to drop.
+   * @param force Whether to force dropping the catalog even if in use or non-empty.
+   * @param beforeDropHook Optional hook invoked with the live catalog instance after precondition
+   *     checks succeed.
+   * @return {@code true} if the catalog existed and was deleted, {@code false} otherwise.
+   * @throws NonEmptyEntityException If the catalog still contains user-created schemas and {@code
+   *     force} is {@code false}.
+   * @throws CatalogInUseException If the catalog is in use and {@code force} is {@code false}.
+   */
+  public boolean dropCatalog(
+      NameIdentifier ident, boolean force, @Nullable Consumer<BaseCatalog<?>> beforeDropHook)
+      throws NonEmptyEntityException, CatalogInUseException {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
 
     return TreeLockUtils.doWithTreeLock(
@@ -1410,6 +1433,14 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                 store.list(schemaNs, SchemaEntity.class, EntityType.SCHEMA);
             if (!force) {
               checkCatalogSchemasBeforeDrop(ident, schemaEntities, catalogWrapper);
+            }
+
+            if (beforeDropHook != null) {
+              catalogWrapper.doWithCatalog(
+                  catalog -> {
+                    beforeDropHook.accept(catalog);
+                    return null;
+                  });
             }
 
             // Child write-through secrets: capture properties (URNs) from the entity, then

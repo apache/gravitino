@@ -37,6 +37,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -430,6 +431,30 @@ public class KafkaAuthorizationIT extends BaseIT {
                   new ArrayList<>(remaining),
                   "Expected only unmanaged external ACL to remain on dropped topic");
             });
+
+    // 7b. Verify invalid alterCatalog authorization properties fail fast pre-commit (400 / IAE)
+    //     and do not corrupt the catalog in EntityStore or evict a working plugin.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            metalake.alterCatalog(
+                catalogName,
+                CatalogChange.setProperty(KafkaAuthorizationProperties.USER_PRINCIPAL_TYPE, "*")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            metalake.alterCatalog(
+                catalogName,
+                CatalogChange.setProperty(
+                    KafkaAuthorizationProperties.ADMIN_CLIENT_PREFIX + "config.providers",
+                    "file")));
+    Catalog reloadedCatalog = metalake.loadCatalog(catalogName);
+    Assertions.assertNull(
+        reloadedCatalog.properties().get(KafkaAuthorizationProperties.USER_PRINCIPAL_TYPE));
+    Assertions.assertNull(
+        reloadedCatalog
+            .properties()
+            .get(KafkaAuthorizationProperties.ADMIN_CLIENT_PREFIX + "config.providers"));
 
     // 8. Verify group-acl.enabled=true pushes Group:<name> ACLs and dropCatalog cleans up
     //    Gravitino-managed catalog ACLs (including TOPIC:* owner wildcards) without touching

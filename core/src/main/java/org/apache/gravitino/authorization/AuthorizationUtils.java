@@ -44,6 +44,8 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.hive.HiveConstants;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
@@ -291,7 +293,7 @@ public class AuthorizationUtils {
       catalogManager.doWithCatalog(
           catalogIdent,
           catalog -> {
-            if (catalog.entity() != null && !catalog.catalogInUse()) {
+            if (catalog.entity() != null && (!catalog.metalakeInUse() || !catalog.catalogInUse())) {
               return null;
             }
             AuthorizationPlugin authorizationPlugin = catalog.getAuthorizationPlugin();
@@ -300,6 +302,29 @@ public class AuthorizationUtils {
             }
             return null;
           });
+    }
+  }
+
+  public static boolean isMetalakeInUse(NameIdentifier catalogIdent) {
+    org.apache.gravitino.EntityStore store = GravitinoEnv.getInstance().entityStore();
+    if (store == null) {
+      return true;
+    }
+    try {
+      CatalogEntity catalogEntity =
+          store.get(catalogIdent, Entity.EntityType.CATALOG, CatalogEntity.class);
+      if (catalogEntity.getProperties() == null) {
+        return true;
+      }
+      return Boolean.parseBoolean(
+          catalogEntity
+              .getProperties()
+              .getOrDefault(BaseCatalogPropertiesMetadata.PROPERTY_METALAKE_IN_USE, "true"));
+    } catch (NoSuchEntityException e) {
+      return true;
+    } catch (Exception e) {
+      LOG.warn("Failed to inspect metalake in-use state for {}", catalogIdent, e);
+      return true;
     }
   }
 
@@ -329,8 +354,15 @@ public class AuthorizationUtils {
       if (catalogEntity.getProperties() == null) {
         return true;
       }
-      return Boolean.parseBoolean(
-          catalogEntity.getProperties().getOrDefault(Catalog.PROPERTY_IN_USE, "true"));
+      boolean catalogInUse =
+          Boolean.parseBoolean(
+              catalogEntity.getProperties().getOrDefault(Catalog.PROPERTY_IN_USE, "true"));
+      boolean metalakeInUse =
+          Boolean.parseBoolean(
+              catalogEntity
+                  .getProperties()
+                  .getOrDefault(BaseCatalogPropertiesMetadata.PROPERTY_METALAKE_IN_USE, "true"));
+      return catalogInUse && metalakeInUse;
     } catch (NoSuchEntityException e) {
       return true;
     } catch (Exception e) {
@@ -463,14 +495,33 @@ public class AuthorizationUtils {
    */
   public static void removeCatalogPrivileges(NameIdentifier catalogIdent, List<String> locations) {
     callAuthorizationPluginImpl(
-        (authorizationPlugin, catalogName) -> {
-          MetadataObject metadataObject =
-              MetadataObjects.of(null, catalogName, MetadataObject.Type.CATALOG);
-          authorizationPlugin.onMetadataUpdated(
-              MetadataObjectChange.remove(metadataObject, locations));
-        },
+        (authorizationPlugin, catalogName) ->
+            removeCatalogPrivileges(authorizationPlugin, catalogName, locations),
         GravitinoEnv.getInstance().catalogManager(),
         catalogIdent);
+  }
+
+  /**
+   * Removes catalog privileges directly from an already-leased live {@link BaseCatalog} instance.
+   *
+   * @param catalog the leased catalog whose authorization plugin should be notified
+   * @param locations the catalog storage locations
+   */
+  public static void removeCatalogPrivileges(BaseCatalog<?> catalog, List<String> locations) {
+    if (catalog == null) {
+      return;
+    }
+    AuthorizationPlugin authorizationPlugin = catalog.getAuthorizationPlugin();
+    if (authorizationPlugin != null) {
+      removeCatalogPrivileges(authorizationPlugin, catalog.name(), locations);
+    }
+  }
+
+  private static void removeCatalogPrivileges(
+      AuthorizationPlugin authorizationPlugin, String catalogName, List<String> locations) {
+    MetadataObject metadataObject =
+        MetadataObjects.of(null, catalogName, MetadataObject.Type.CATALOG);
+    authorizationPlugin.onMetadataUpdated(MetadataObjectChange.remove(metadataObject, locations));
   }
 
   public static void authorizationPluginRenamePrivileges(

@@ -24,6 +24,8 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.common.config.ConfigException;
 
 /**
  * Authorization provider implementation that synchronizes Apache Gravitino RBAC privileges and
@@ -43,7 +45,20 @@ public class KafkaAuthorization extends BaseAuthorization<KafkaAuthorization> {
   }
 
   @Override
+  public void validateProperties(
+      String metalake, String catalogProvider, Map<String, String> config) {
+    validateAndBuildProperties(metalake, catalogProvider, config);
+  }
+
+  @Override
   public AuthorizationPlugin newPlugin(
+      String metalake, String catalogProvider, Map<String, String> config) {
+    KafkaAuthorizationProperties properties =
+        validateAndBuildProperties(metalake, catalogProvider, config);
+    return new KafkaAuthorizationPlugin(metalake, properties);
+  }
+
+  private static KafkaAuthorizationProperties validateAndBuildProperties(
       String metalake, String catalogProvider, Map<String, String> config) {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(metalake), "Metalake name must not be blank");
@@ -53,11 +68,24 @@ public class KafkaAuthorization extends BaseAuthorization<KafkaAuthorization> {
         catalogProvider);
     KafkaAuthorizationProperties properties = new KafkaAuthorizationProperties(config);
     properties.validate();
-    return new KafkaAuthorizationPlugin(metalake, properties);
+    try {
+      new ValidatingAdminClientConfig(properties.toAdminClientProperties());
+    } catch (ConfigException e) {
+      throw new IllegalArgumentException(
+          "Invalid Kafka authorization AdminClient configuration: " + e.getMessage(), e);
+    }
+    return properties;
   }
 
   @Override
   public void close() throws IOException {
     // No provider-level resources to close; each catalog plugin manages its own AdminClient.
+  }
+
+  private static final class ValidatingAdminClientConfig extends AdminClientConfig {
+
+    private ValidatingAdminClientConfig(Map<?, ?> props) {
+      super(props, false);
+    }
   }
 }

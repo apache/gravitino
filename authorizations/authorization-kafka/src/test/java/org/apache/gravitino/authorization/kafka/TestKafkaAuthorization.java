@@ -55,4 +55,48 @@ public class TestKafkaAuthorization {
       Assertions.assertInstanceOf(KafkaAuthorizationPlugin.class, plugin);
     }
   }
+
+  @Test
+  public void testValidatePropertiesRejectsInvalidKafkaAndAdminConfig() {
+    BaseAuthorization<?> kafkaAuthorization = new KafkaAuthorization();
+
+    kafkaAuthorization.validateProperties(
+        "test_metalake", "kafka", ImmutableMap.of("bootstrap.servers", "localhost:9092"));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            kafkaAuthorization.validateProperties(
+                "test_metalake",
+                "kafka",
+                ImmutableMap.of(
+                    "bootstrap.servers",
+                    "localhost:9092",
+                    KafkaAuthorizationProperties.USER_PRINCIPAL_TYPE,
+                    "*")));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            kafkaAuthorization.validateProperties(
+                "test_metalake",
+                "kafka",
+                ImmutableMap.of(
+                    "bootstrap.servers",
+                    "localhost:9092",
+                    KafkaAuthorizationProperties.ADMIN_CLIENT_PREFIX + "config.providers",
+                    "file")));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            kafkaAuthorization.validateProperties(
+                "test_metalake",
+                "kafka",
+                ImmutableMap.of(
+                    "bootstrap.servers",
+                    "localhost:9092",
+                    KafkaAuthorizationProperties.ADMIN_CLIENT_PREFIX + "security.protocol",
+                    "INVALID_PROTOCOL")));
+  }
 }
