@@ -839,8 +839,7 @@ reads and transactional edits without a historical-content lifecycle.
 ## Testing
 
 Validation covers Article storage, authorization, lifecycle integration and REST/client/MCP
-contracts. The [implementation plan](gravitino-kb-article-implementation.md) contains the per-task
-acceptance cases, test conventions, upgrade/restore checks and performance fixtures.
+contracts.
 
 ### Key invariants
 
@@ -880,9 +879,8 @@ Storage and lifecycle operations preserve the following invariants:
 
 ## Task Breakdown
 
-Tasks are ordered by dependency and link to acceptance cases in the
-[implementation plan](gravitino-kb-article-implementation.md). Independent tasks can proceed in
-parallel. REST tasks include OpenAPI definitions and validation with `./gradlew :docs:build`.
+Tasks are ordered by dependency. Independent tasks can proceed in parallel. REST tasks include
+OpenAPI definitions and validation with `./gradlew :docs:build`.
 
 ### Prerequisites
 
@@ -903,13 +901,12 @@ parallel. REST tasks include OpenAPI definitions and validation with `./gradlew 
       type integration and metalake access point. Add missing shared definition privileges
       in `Privilege.java`, or reuse them if already introduced by
       Glossary. Both features use the same definitions and implication rules from Access control.
-      Depends on: none. Cases: [T1.1–T1.3](gravitino-kb-article-implementation.md#t1-api-contracts).
+      Depends on: none.
 - [ ] **T2. Add Article storage** (`core/`, `scripts/`). Implement entities, POs, mappers and
       services for the Article tables and reuse `domain_member_rel` from Glossary T7. Add dialect
       upgrade scripts, atomic writes to current rows and relations, transactional storage-extension
       hooks, soft deletion and parent cleanup. Register the Article type for orphan-relation cleanup.
       Depends on: T1 and the shared schema and mapper from Glossary T7.
-      Cases: [T2.1–T2.4](gravitino-kb-article-implementation.md#t2-persistence).
 
 ### Group B: Core behavior
 
@@ -917,59 +914,59 @@ parallel. REST tasks include OpenAPI definitions and validation with `./gradlew 
       names, NFC name normalization, bounded name-allocation retries, lock planning, sanitization,
       body-limit configuration and status. Apply atomic writes and the no-op/revision rules.
       Route Article edits and explicit drop through the common policy boundary.
-      Depends on: T2. Cases: [T3.1–T3.6](gravitino-kb-article-implementation.md#t3-manager-and-content).
+      Depends on: T2.
 - [ ] **T4. Add Article authorization and ownership** (`core/`, `server/`). Implement definition
       privilege implications and Deny, shared-authorizer Owner checks, group ownership, draft
       visibility and filtering across all reads; integrate Owner transfer and reject Article
       grant scopes through shared securable-object validation. Verify generic capability
-      boundaries. Depends on: T3. Cases: [T4.1–T4.5](gravitino-kb-article-implementation.md#t4-authorization-and-ownership).
+      boundaries. Depends on: T3.
 - [ ] **T5. Add Domain integration** (`core/`). Implement typed shared membership writes, parent
       filters, current-name resolution, Domain visibility and one nonempty-drop check for all
       live member types. Fence membership changes and verify cross-object lock
-      order. Depends on: T4, Domain prerequisites. Cases: [T5.1–T5.4](gravitino-kb-article-implementation.md#t5-domain-integration).
+      order. Depends on: T4, Domain prerequisites.
 - [ ] **T6. Add bindings and asynchronous cleanup** (`core/`). Resolve structured asset and Term
       targets to stable IDs; implement binding mutation/read/reverse paths, target authorization,
       approved-Term checks, read-time liveness filtering, batched orphan collection through
       `OrphanedMetadataObjectRelationService` and column reconciliation. Preserve external DDL
       failure/recovery limits. Depends on: T4, target-specific prerequisites; coordinate lock
-      ordering with T5 before release. Cases: [T6.1–T6.6](gravitino-kb-article-implementation.md#t6-bindings-and-cleanup).
+      ordering with T5 before release.
 
 ### Group C: REST and events
 
 - [ ] **T7. Add Article REST and OpenAPI** (`common/`, `server/`, `docs/open-api/`). Implement all
       current-resource routes, binding and reverse routes, envelopes, structured identifiers,
       error mapping, bounded offset pages/previews and conditional body edits.
-      Depends on: T5, T6. Cases: [T7.1–T7.5](gravitino-kb-article-implementation.md#t7-rest-and-writes).
+      Depends on: T5, T6.
 - [ ] **T8. Add filtered lists and search** (`core/`, `server/`). Implement escaped case-insensitive
       title/synonym/body matching and optional Domain/status/typed-owner filters,
       SQL visibility filtering, common pagination/hasMore, stable tie-break ordering and bounded,
       batched summary lookups with
       explicit SQL escape clauses. Separate search execution from source storage for future
       document knowledge-base integration; retain editable body formats.
-      Depends on: T7. Cases: [T8.1–T8.4](gravitino-kb-article-implementation.md#t8-lists-and-search).
+      Depends on: T7.
 - [ ] **T9. Add Article events and audit** (`core/`). Integrate lifecycle and binding dispatchers,
       authenticated actors and background-cleanup diagnostics without adding delivery guarantees.
-      Depends on: T6, T7. Cases: [T9.1–T9.2](gravitino-kb-article-implementation.md#t9-events-and-audit).
+      Depends on: T6, T7.
 
 ### Group D: Clients and agents
 
 - [ ] **T10. Add Java client operations** (`clients/client-java/`). Expose CRUD, current content,
       bindings, reverse lookups, filters, conditional body saves and mutation errors.
-      Depends on: T8. Cases: [T10.1–T10.2](gravitino-kb-article-implementation.md#t10-java-client).
+      Depends on: T8.
 - [ ] **T11. Add Python client operations** (`clients/client-python/`). Match the Java/REST
       contracts, identifier components and ordinary alter behavior.
-      Depends on: T8. Cases: [T11.1–T11.2](gravitino-kb-article-implementation.md#t11-python-client).
+      Depends on: T8.
 - [ ] **T12. Add read-only Article MCP tools** (`mcp-server/`). Reuse HTTP/stdio credential handling,
       reads of PUBLISHED Articles, nested visibility, stored body formats and list continuation.
       Document progressive discovery, scoped keyword search and binding-to-data-tool argument mapping.
-      Depends on: T11. Cases: [T12.1–T12.3](gravitino-kb-article-implementation.md#t12-mcp-tools).
+      Depends on: T11.
 
 ### Group E: Release checks and documentation
 
 - [ ] **T13. Add integration and release checks**. Implement the critical journeys, two-node
       races, schema upgrade/restore tests and list/search performance fixtures. Report measured
       results and operating limits for basic discovery and keyword search with and without a Domain.
-      Depends on: T9, T10, T12. Cases: [T13.1–T13.3](gravitino-kb-article-implementation.md#t13-integration-and-release).
+      Depends on: T9, T10, T12.
 - [ ] **T14. Add user documentation** (`docs/`). Document Article lifecycle, metalake grants,
       Domain membership, current content, history limitations, search, clients, MCP,
       ordinary edits, body-limit configuration and external cleanup/recovery limits.
@@ -980,4 +977,4 @@ parallel. REST tasks include OpenAPI definitions and validation with `./gradlew 
       without a token can overwrite an intervening edit and that overwritten content cannot
       be recovered from Gravitino.
       Validate examples against the APIs.
-      Depends on: T10, T12, T13. Cases: [T14.1–T14.2](gravitino-kb-article-implementation.md#t14-user-documentation).
+      Depends on: T10, T12, T13.
