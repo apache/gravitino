@@ -20,6 +20,7 @@
 package org.apache.gravitino.catalog.hadoop.fs;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -41,24 +42,34 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.hash.Hashing;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.lang.reflect.Field;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+import javax.security.auth.kerberos.KerberosPrincipal;
+import javax.security.auth.kerberos.KeyTab;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosAuthUtils;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosClient;
 import org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig;
 import org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.utils.KeytabNames;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -108,11 +119,12 @@ public class TestHDFSFileSystemProxy {
   @Test
   public void testFailedFileSystemCreationAfterLoginStopsKerberosTicketRefresh(
       @TempDir File keytabDir) throws Exception {
-    KerberosClient client = mockLoggedInClient();
+    List<File> keytabs = new ArrayList<>();
+    KerberosClient client = mockLoggedInClient(keytabs);
     try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
         MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
       stubKerberosLogin(clients, client);
-      List<File> keytabs = stubKeytabFetch(authUtils, keytabDir);
+      stubKeytabFetch(authUtils, keytabDir);
 
       // The login succeeds, then FileSystem.newInstance fails on an unknown scheme.
       assertThrows(
@@ -134,11 +146,12 @@ public class TestHDFSFileSystemProxy {
             .putAll(KERBEROS_CONFIG)
             .put("fs.errorfs.impl", ErrorOnInitializeFileSystem.class.getName())
             .build();
-    KerberosClient client = mockLoggedInClient();
+    List<File> keytabs = new ArrayList<>();
+    KerberosClient client = mockLoggedInClient(keytabs);
     try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
         MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
       stubKerberosLogin(clients, client);
-      List<File> keytabs = stubKeytabFetch(authUtils, keytabDir);
+      stubKeytabFetch(authUtils, keytabDir);
 
       assertThrows(
           NoClassDefFoundError.class,
@@ -157,11 +170,12 @@ public class TestHDFSFileSystemProxy {
             .putAll(KERBEROS_CONFIG)
             .put("fs.finalfs.impl", FinalFileSystem.class.getName())
             .build();
-    KerberosClient client = mockLoggedInClient();
+    List<File> keytabs = new ArrayList<>();
+    KerberosClient client = mockLoggedInClient(keytabs);
     try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
         MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
       stubKerberosLogin(clients, client);
-      List<File> keytabs = stubKeytabFetch(authUtils, keytabDir);
+      stubKeytabFetch(authUtils, keytabDir);
       HDFSFileSystemProxy proxy = new HDFSFileSystemProxy(new Path("finalfs:///"), config);
       int closedBefore = FinalFileSystem.CLOSED.get();
 
@@ -208,11 +222,12 @@ public class TestHDFSFileSystemProxy {
             .putAll(KERBEROS_CONFIG)
             .put("fs.failclosefs.impl", FailingCloseFileSystem.class.getName())
             .build();
-    KerberosClient client = mockLoggedInClient();
+    List<File> keytabs = new ArrayList<>();
+    KerberosClient client = mockLoggedInClient(keytabs);
     try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
         MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
       stubKerberosLogin(clients, client);
-      List<File> keytabs = stubKeytabFetch(authUtils, keytabDir);
+      stubKeytabFetch(authUtils, keytabDir);
       HDFSFileSystemProxy proxy = new HDFSFileSystemProxy(new Path("failclosefs:///"), config);
 
       // The wrapping failure stays the thrown exception, unchanged, and the login is released.
@@ -226,11 +241,12 @@ public class TestHDFSFileSystemProxy {
   @Test
   public void testKeytabFilesOfOpenProxiesAreDeletedOnExit(@TempDir File keytabDir)
       throws Exception {
-    KerberosClient client = mockLoggedInClient();
+    List<File> keytabs = new ArrayList<>();
+    KerberosClient client = mockLoggedInClient(keytabs);
     try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
         MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
       stubKerberosLogin(clients, client);
-      List<File> keytabs = stubKeytabFetch(authUtils, keytabDir);
+      stubKeytabFetch(authUtils, keytabDir);
       FileSystem closed = new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy();
       FileSystem open = new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy();
       try {
@@ -256,11 +272,12 @@ public class TestHDFSFileSystemProxy {
   @Test
   public void testKeytabFileRecordedAfterTheCleanerRanIsDeletedOnExit(@TempDir File keytabDir)
       throws Exception {
-    KerberosClient client = mockLoggedInClient();
+    List<File> keytabs = new ArrayList<>();
+    KerberosClient client = mockLoggedInClient(keytabs);
     try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
         MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
       stubKerberosLogin(clients, client);
-      List<File> keytabs = stubKeytabFetch(authUtils, keytabDir);
+      stubKeytabFetch(authUtils, keytabDir);
       FileSystem first = new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy();
       try {
         HDFSFileSystemProxy.keytabCleaner().run();
@@ -286,11 +303,12 @@ public class TestHDFSFileSystemProxy {
         .addShutdownHook(
             argThat(hook -> hook != null && "gravitino-keytab-cleaner".equals(hook.getName())));
     AtomicReference<Thread> cleaner = keytabCleanerReference();
-    KerberosClient client = mockLoggedInClient();
+    List<File> keytabs = new ArrayList<>();
+    KerberosClient client = mockLoggedInClient(keytabs);
     try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
         MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
       stubKerberosLogin(clients, client);
-      List<File> keytabs = stubKeytabFetch(authUtils, keytabDir);
+      stubKeytabFetch(authUtils, keytabDir);
       // Its keytab is in the set when adding the cleaner fails, like that of a concurrent login
       // that lost the race to add it, so only a hand-over of the set registers it.
       try (FileSystem open =
@@ -324,11 +342,12 @@ public class TestHDFSFileSystemProxy {
     boolean lockable = lockedDir.setWritable(false) && !lockedDir.canWrite();
     lockedDir.setWritable(true);
     assumeTrue(lockable, "a directory without write permission does not stop root");
-    KerberosClient client = mockLoggedInClient();
+    List<File> keytabs = new ArrayList<>();
+    KerberosClient client = mockLoggedInClient(keytabs);
     try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
         MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
       stubKerberosLogin(clients, client);
-      List<File> keytabs = stubKeytabFetch(authUtils, lockedDir);
+      stubKeytabFetch(authUtils, lockedDir);
       FileSystem fs = new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy();
       try {
         lockedDir.setWritable(false);
@@ -350,12 +369,18 @@ public class TestHDFSFileSystemProxy {
 
   @Test
   public void testFailedLoginDeletesKeytabFile(@TempDir File keytabDir) throws Exception {
+    List<File> keytabs = new ArrayList<>();
     KerberosClient client = mock(KerberosClient.class);
-    when(client.login(anyString())).thenThrow(new IOException("login failed"));
+    when(client.login(anyString()))
+        .thenAnswer(
+            invocation -> {
+              keytabs.add(new File(invocation.<String>getArgument(0)));
+              throw new IOException("login failed");
+            });
     try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
         MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
       stubKerberosLogin(clients, client);
-      List<File> keytabs = stubKeytabFetch(authUtils, keytabDir);
+      stubKeytabFetch(authUtils, keytabDir);
 
       assertThrows(
           GravitinoRuntimeException.class,
@@ -392,18 +417,162 @@ public class TestHDFSFileSystemProxy {
             "file:///tmp/other.keytab",
             "gravitino.identifier",
             "fileset-reused");
-    KerberosClient client = mockLoggedInClient();
+    List<File> keytabs = new ArrayList<>();
+    KerberosClient client = mockLoggedInClient(keytabs);
     try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
         MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
       stubKerberosLogin(clients, client);
-      List<File> keytabs = stubKeytabFetch(authUtils, keytabDir);
+      stubKeytabFetch(authUtils, keytabDir);
 
       new HDFSFileSystemProxy(new Path("file:///"), config).getProxy().close();
       new HDFSFileSystemProxy(new Path("file:///"), config).getProxy().close();
       assertEquals(keytabs.get(0).getName(), keytabs.get(1).getName());
-      // A file of another keytab never takes that name, so the JDK never reads it as this one.
+      // A file with other keys never takes that name, so the JDK never reads it as this one. The
+      // stub writes the URI into the file.
       new HDFSFileSystemProxy(new Path("file:///"), otherKeytab).getProxy().close();
       assertNotEquals(keytabs.get(0).getName(), keytabs.get(2).getName());
+    }
+  }
+
+  @Test
+  public void testLoginReadsTheKeysOfAReplacedKeytab(
+      @TempDir File keytabDir, @TempDir File sourceDir) throws Exception {
+    File source = new File(sourceDir, "test.keytab");
+    writeKeytab(source, 1);
+    FileTime modified = Files.getLastModifiedTime(source.toPath());
+    // The key versions each login reads from its keytab file with the JDK.
+    List<String> versions = new ArrayList<>();
+    List<Boolean> links = new ArrayList<>();
+    List<File> keytabs = new ArrayList<>();
+    KerberosClient client = mock(KerberosClient.class);
+    when(client.login(anyString()))
+        .thenAnswer(
+            invocation -> {
+              File keytab = new File(invocation.<String>getArgument(0));
+              keytabs.add(keytab);
+              versions.add(keyVersions(keytab));
+              // Renewals of an open proxy still follow a local keytab.
+              links.add(Files.isSymbolicLink(keytab.toPath()));
+              return UserGroupInformation.createRemoteUser("test");
+            });
+    try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
+        MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
+      stubKerberosLogin(clients, client);
+      // A file URI is fetched as a symbolic link to the file.
+      authUtils
+          .when(
+              () ->
+                  KerberosAuthUtils.fetchKeytabFromUri(
+                      anyString(), any(), anyInt(), anyBoolean(), any()))
+          .thenAnswer(
+              invocation -> {
+                File keytab = new File(keytabDir, invocation.<File>getArgument(1).getName());
+                Files.createSymbolicLink(keytab.toPath(), source.toPath());
+                return keytab;
+              });
+
+      new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy().close();
+      // The JDK returns the keys it cached for a path while the file there keeps its modification
+      // time, and also when the file there is not a valid keytab.
+      writeKeytab(source, 2);
+      Files.setLastModifiedTime(source.toPath(), modified);
+      new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy().close();
+      Files.write(source.toPath(), new byte[] {1, 2, 3});
+      new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy().close();
+      assertEquals(Arrays.asList("1", "2", ""), versions);
+
+      // The same keys get the same name again.
+      writeKeytab(source, 1);
+      new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy().close();
+      assertEquals(keytabs.get(0).getName(), keytabs.get(3).getName());
+      assertEquals("1", versions.get(3));
+      // The name tells nothing about the content of the file, which may be any file the server
+      // can read, nor whether two keytab URIs hold the same bytes.
+      byte[] content = Files.readAllBytes(source.toPath());
+      byte[] uri =
+          KERBEROS_CONFIG.get(KerberosConfig.KEY_TAB_URI_KEY).getBytes(StandardCharsets.UTF_8);
+      for (String sha256 :
+          new String[] {
+            Hashing.sha256().hashBytes(content).toString(),
+            Hashing.sha256()
+                .newHasher()
+                .putInt(uri.length)
+                .putBytes(uri)
+                .putBytes(content)
+                .hash()
+                .toString()
+          }) {
+        assertFalse(keytabs.get(3).getName().contains(sha256), keytabs.get(3).getName());
+      }
+      Map<String, String> otherUri =
+          ImmutableMap.<String, String>builder()
+              .putAll(KERBEROS_CONFIG)
+              .put(KerberosConfig.KEY_TAB_URI_KEY, "file:///tmp/other.keytab")
+              .buildKeepingLast();
+      new HDFSFileSystemProxy(new Path("file:///"), otherUri).getProxy().close();
+      assertNotEquals(keytabs.get(3).getName(), keytabs.get(4).getName());
+      assertEquals(Arrays.asList(true, true, true, true, true), links);
+      assertArrayEquals(new String[0], keytabDir.list());
+    }
+  }
+
+  @Test
+  public void testKeytabFileNamesAreReusedAfterACatalogReload(@TempDir File keytabDir)
+      throws Exception {
+    // A catalog class loader loads this class again after the last catalog that used it is
+    // closed, while the JDK keeps the keys of every path it read. The names come from one table
+    // that all of them share.
+    String keytabUri = KERBEROS_CONFIG.get(KerberosConfig.KEY_TAB_URI_KEY);
+    String prefix = KeytabNames.prefix("", keytabUri, keytabUri.getBytes(StandardCharsets.UTF_8));
+    List<File> keytabs = new ArrayList<>();
+    KerberosClient client = mockLoggedInClient(keytabs);
+    try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
+        MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
+      stubKerberosLogin(clients, client);
+      stubKeytabFetch(authUtils, keytabDir);
+      // As if a proxy of an earlier class loader still held the lowest free name.
+      int held = KeytabNames.reserve(prefix);
+      try {
+        new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy().close();
+        assertEquals("gravitino-" + prefix + "-" + (held + 1), keytabs.get(0).getName());
+      } finally {
+        KeytabNames.release(prefix, held);
+      }
+      new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy().close();
+      assertEquals("gravitino-" + prefix + "-" + held, keytabs.get(1).getName());
+    }
+  }
+
+  @Test
+  public void testOversizedKeytabIsNotReadForItsName(
+      @TempDir File keytabDir, @TempDir File sourceDir) throws Exception {
+    // Larger than any array, so reading all of it fails. Most file systems keep it sparse.
+    File source = new File(sourceDir, "huge.keytab");
+    try (RandomAccessFile file = new RandomAccessFile(source, "rw")) {
+      file.setLength(Integer.MAX_VALUE + 1L);
+    }
+    List<File> keytabs = new ArrayList<>();
+    KerberosClient client = mockLoggedInClient(keytabs);
+    try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
+        MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
+      stubKerberosLogin(clients, client);
+      authUtils
+          .when(
+              () ->
+                  KerberosAuthUtils.fetchKeytabFromUri(
+                      anyString(), any(), anyInt(), anyBoolean(), any()))
+          .thenAnswer(
+              invocation -> {
+                File keytab = new File(keytabDir, invocation.<File>getArgument(1).getName());
+                Files.createSymbolicLink(keytab.toPath(), source.toPath());
+                return keytab;
+              });
+
+      new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy().close();
+      new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy().close();
+      // Without reading all of it, the same content cannot be told apart, so no name is reused.
+      assertNotEquals(keytabs.get(0).getName(), keytabs.get(1).getName());
+      assertArrayEquals(new String[0], keytabDir.list());
     }
   }
 
@@ -460,11 +629,12 @@ public class TestHDFSFileSystemProxy {
             .putAll(KERBEROS_CONFIG)
             .put("gravitino.identifier", "fileset-1")
             .build();
-    KerberosClient client = mockLoggedInClient();
+    List<File> keytabs = new ArrayList<>();
+    KerberosClient client = mockLoggedInClient(keytabs);
     try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
         MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
       stubKerberosLogin(clients, client);
-      List<File> keytabs = stubKeytabFetch(authUtils, keytabDir);
+      stubKeytabFetch(authUtils, keytabDir);
 
       FileSystem first = new HDFSFileSystemProxy(new Path("file:///"), config).getProxy();
       FileSystem second = new HDFSFileSystemProxy(new Path("file:///"), config).getProxy();
@@ -607,9 +777,51 @@ public class TestHDFSFileSystemProxy {
             HDFSFileSystemProxy.hadoopConfiguration(fromResource)));
   }
 
+  // A keytab with one AES-128 key of the given version for test@EXAMPLE.COM.
+  private static void writeKeytab(File file, int version) throws IOException {
+    ByteArrayOutputStream entry = new ByteArrayOutputStream();
+    DataOutputStream out = new DataOutputStream(entry);
+    out.writeShort(1);
+    for (String part : new String[] {"EXAMPLE.COM", "test"}) {
+      byte[] bytes = part.getBytes(StandardCharsets.UTF_8);
+      out.writeShort(bytes.length);
+      out.write(bytes);
+    }
+    out.writeInt(1); // KRB5_NT_PRINCIPAL
+    out.writeInt(0); // timestamp
+    out.writeByte(version);
+    out.writeShort(17); // aes128-cts-hmac-sha1-96
+    out.writeShort(16);
+    out.write(new byte[16]);
+    out.writeInt(version);
+    ByteArrayOutputStream keytab = new ByteArrayOutputStream();
+    DataOutputStream header = new DataOutputStream(keytab);
+    header.writeShort(0x0502);
+    header.writeInt(entry.size());
+    header.write(entry.toByteArray());
+    Files.write(file.toPath(), keytab.toByteArray());
+  }
+
+  private static String keyVersions(File keytab) {
+    return Arrays.stream(
+            KeyTab.getInstance(keytab).getKeys(new KerberosPrincipal("test@EXAMPLE.COM")))
+        .map(key -> String.valueOf(key.getVersionNumber()))
+        .collect(Collectors.joining(","));
+  }
+
   private static KerberosClient mockLoggedInClient() throws Exception {
+    return mockLoggedInClient(new ArrayList<>());
+  }
+
+  // Records the keytab file of each login.
+  private static KerberosClient mockLoggedInClient(List<File> keytabs) throws Exception {
     KerberosClient client = mock(KerberosClient.class);
-    when(client.login(anyString())).thenReturn(UserGroupInformation.createRemoteUser("test"));
+    when(client.login(anyString()))
+        .thenAnswer(
+            invocation -> {
+              keytabs.add(new File(invocation.<String>getArgument(0)));
+              return UserGroupInformation.createRemoteUser("test");
+            });
     return client;
   }
 
@@ -639,10 +851,8 @@ public class TestHDFSFileSystemProxy {
     }
   }
 
-  // Writes each fetched keytab into the directory and records it.
-  private static List<File> stubKeytabFetch(
-      MockedStatic<KerberosAuthUtils> authUtils, File keytabDir) {
-    List<File> keytabs = new ArrayList<>();
+  // Writes each fetched keytab into the directory, with its URI as its content.
+  private static void stubKeytabFetch(MockedStatic<KerberosAuthUtils> authUtils, File keytabDir) {
     authUtils
         .when(
             () ->
@@ -651,11 +861,11 @@ public class TestHDFSFileSystemProxy {
         .thenAnswer(
             invocation -> {
               File keytab = new File(keytabDir, invocation.<File>getArgument(1).getName());
-              Files.write(keytab.toPath(), new byte[0]);
-              keytabs.add(keytab);
+              Files.write(
+                  keytab.toPath(),
+                  invocation.<String>getArgument(0).getBytes(StandardCharsets.UTF_8));
               return keytab;
             });
-    return keytabs;
   }
 
   /** A file system that CGLIB cannot subclass, and whose close fails. */

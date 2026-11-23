@@ -27,14 +27,15 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import com.google.common.io.ByteStreams;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Method;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -54,6 +55,7 @@ import org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig;
 import org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.utils.ExceptionMessages;
+import org.apache.gravitino.utils.KeytabNames;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -85,12 +87,9 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
   // keep every name ever used until the JVM exits.
   private static final Set<File> LIVE_KEYTAB_FILES = ConcurrentHashMap.newKeySet();
   private static final AtomicReference<Thread> KEYTAB_CLEANER = new AtomicReference<>();
-  // The JDK caches every keytab path it reads until the JVM exits, so a name is reused once its
-  // file is deleted. The used slots of each identifier and keytab URI, guarded by the map.
-  private static final Map<String, BitSet> KEYTAB_SLOTS = new HashMap<>();
-  // Tells apart the keytab files of each loaded copy of this class: JVMs that share a working
-  // directory, and catalog class loaders, each of which keeps its own slots.
-  private static final String JVM_KEYTAB_TOKEN = UUID.randomUUID().toString().substring(0, 8);
+  // Keytabs are a few KB. A file that is larger, or not a regular file, is not read to name it, and
+  // its name is not reused.
+  private static final int MAX_KEYTAB_NAME_BYTES = 1 << 20;
   // Set once the shutdown hook has handed LIVE_KEYTAB_FILES over, or when the JVM is shutting
   // down and the hook cannot be added. Files recorded after that go to File.deleteOnExit directly.
   private static volatile boolean keytabFilesHandedOver;
@@ -389,41 +388,42 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     }
   }
 
-  // Takes the lowest free name for the identifier and keytab URI. A name is only reused for the
-  // same keytab URI, as the JDK may return the keys it cached for the path when the file it reads
-  // there has the same modification time.
-  private synchronized File reserveKeytabFile(String identifier, String keytabUri) {
-    String prefix =
-        identifier
-            + "-"
-            + JVM_KEYTAB_TOKEN
-            + "-"
-            + UUID.nameUUIDFromBytes(keytabUri.getBytes(StandardCharsets.UTF_8));
-    int slot;
-    synchronized (KEYTAB_SLOTS) {
-      BitSet used = KEYTAB_SLOTS.computeIfAbsent(prefix, p -> new BitSet());
-      slot = used.nextClearBit(0);
-      used.set(slot);
-    }
+  // Takes the lowest free name for the identifier, the keytab URI and its content, and moves the
+  // fetched file there. See KeytabNames for when a name is reused.
+  private synchronized File moveToKeytabName(String identifier, String keytabUri, File fetched)
+      throws IOException {
+    String prefix = keytabNamePrefix(identifier, keytabUri, fetched);
+    int slot = KeytabNames.reserve(prefix);
     keytabSlotPrefix = prefix;
     keytabSlot = slot;
-    File file = new File(String.format(GRAVITINO_KEYTAB_FORMAT, prefix + "-" + slot));
-    // Recorded before the fetch, so that close() also deletes what a failed fetch leaves behind.
+    File file =
+        new File(
+            fetched.getParentFile(),
+            new File(String.format(GRAVITINO_KEYTAB_FORMAT, prefix + "-" + slot)).getName());
+    // Moves a symbolic link itself, so the file still follows a local keytab.
+    Files.move(fetched.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
     recordKeytabFile(file);
     return file;
+  }
+
+  private static String keytabNamePrefix(String identifier, String keytabUri, File fetched)
+      throws IOException {
+    if (Files.isRegularFile(fetched.toPath())) {
+      try (InputStream in = Files.newInputStream(fetched.toPath())) {
+        byte[] content = ByteStreams.toByteArray(ByteStreams.limit(in, MAX_KEYTAB_NAME_BYTES + 1));
+        if (content.length <= MAX_KEYTAB_NAME_BYTES) {
+          return KeytabNames.prefix(identifier, keytabUri, content);
+        }
+      }
+    }
+    return identifier + "-" + KeytabNames.token() + "-" + UUID.randomUUID();
   }
 
   private synchronized void releaseKeytabSlot() {
     if (keytabSlotPrefix == null) {
       return;
     }
-    synchronized (KEYTAB_SLOTS) {
-      BitSet used = KEYTAB_SLOTS.get(keytabSlotPrefix);
-      used.clear(keytabSlot);
-      if (used.isEmpty()) {
-        KEYTAB_SLOTS.remove(keytabSlotPrefix);
-      }
-    }
+    KeytabNames.release(keytabSlotPrefix, keytabSlot);
     keytabSlotPrefix = null;
   }
 
@@ -457,13 +457,21 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
               .build();
       // One file for each open proxy: another proxy for the same entity would rewrite a shared
       // file while this one still renews its ticket from it. close() deletes it.
-      String keytabUri = kerberosConfig.getKeytab();
+      String identifier = properties.getOrDefault(GRAVITINO_ID_KEY, "");
+      // The JDK never reads the file fetched into, so its name is not reused. It is recorded
+      // before the fetch, so that close() also deletes what a failed fetch leaves behind.
       File destination =
-          reserveKeytabFile(properties.getOrDefault(GRAVITINO_ID_KEY, ""), keytabUri);
-      File keytabFile =
+          new File(
+              String.format(
+                  GRAVITINO_KEYTAB_FORMAT,
+                  identifier + "-" + KeytabNames.token() + "-fetch-" + UUID.randomUUID()));
+      recordKeytabFile(destination);
+      String keytabUri = kerberosConfig.getKeytab();
+      File fetched =
           KerberosAuthUtils.fetchKeytabFromUri(
               keytabUri, destination, kerberosConfig.getFetchTimeoutSec(), false, configuration);
-      recordKeytabFile(keytabFile);
+      recordKeytabFile(fetched);
+      File keytabFile = moveToKeytabName(identifier, keytabUri, fetched);
       UserGroupInformation ugi = client.login(keytabFile.getAbsolutePath());
       // login() starts the ticket refresh, so record the client before anything else can fail.
       this.kerberosClient = client;

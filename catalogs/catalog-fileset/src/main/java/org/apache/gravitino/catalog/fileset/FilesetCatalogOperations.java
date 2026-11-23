@@ -31,7 +31,7 @@ import static org.apache.gravitino.file.Fileset.PROPERTY_SCHEMA_PLACEHOLDER;
 import static org.apache.gravitino.metrics.MetricNames.FILESYSTEM_CACHE;
 
 import com.codahale.metrics.caffeine.MetricsStatsCounter;
-import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.AsyncCache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
@@ -39,7 +39,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.Closeable;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -58,7 +57,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
@@ -68,6 +69,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -186,7 +188,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   // TODO: Move the file system cache to the module of hadoop-common and reuse it in the
   // BaseGVFSOperations
-  @VisibleForTesting Cache<FileSystemCacheKey, FileSystem> fileSystemCache;
+  // The caches load their entries on a pool, so that a caller waits for an entry being loaded only
+  // until its own deadline.
+  @VisibleForTesting AsyncCache<FileSystemCacheKey, FileSystem> fileSystemCache;
 
   // Resolving the HDFS login settings parses XML, so the settings are cached.
   // Expiring after write lets edits to the config.resources files reach the key within an hour.
@@ -194,12 +198,13 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   // their identifier, so they are cached by the configuration without it. Otherwise that entry is
   // empty, and the settings are cached by the whole configuration.
   @VisibleForTesting
-  final Cache<Map<String, String>, Optional<Map<String, String>>> sharedHdfsLoginSettingsCache =
-      Caffeine.newBuilder().maximumSize(1000).expireAfterWrite(1, TimeUnit.HOURS).build();
+  final AsyncCache<Map<String, String>, Optional<Map<String, String>>>
+      sharedHdfsLoginSettingsCache =
+          Caffeine.newBuilder().maximumSize(1000).expireAfterWrite(1, TimeUnit.HOURS).buildAsync();
 
   @VisibleForTesting
-  final Cache<Map<String, String>, Map<String, String>> hdfsLoginSettingsCache =
-      Caffeine.newBuilder().maximumSize(1000).expireAfterWrite(1, TimeUnit.HOURS).build();
+  final AsyncCache<Map<String, String>, Map<String, String>> hdfsLoginSettingsCache =
+      Caffeine.newBuilder().maximumSize(1000).expireAfterWrite(1, TimeUnit.HOURS).buildAsync();
 
   @VisibleForTesting
   final ThreadPoolExecutor fileSystemExecutor =
@@ -321,14 +326,121 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     }
   }
 
-  /** The login settings a new HDFS file system must log in with, and when its caller gives up. */
-  static class ExpectedLogin {
-    final Map<String, String> settings;
-    final long deadlineNanos;
+  /**
+   * The result of a task on a pool, which fails at a deadline. Caffeine logs every entry whose load
+   * fails with an exception other than a timeout, so a task that fails completes with null, which
+   * removes an entry silently, and keeps its failure here.
+   */
+  static class TimedTask<T> extends CompletableFuture<T> {
+    private final long deadlineNanos;
+    @Nullable private volatile Throwable failure;
 
-    ExpectedLogin(Map<String, String> settings, long deadlineNanos) {
-      this.settings = settings;
+    private TimedTask(long deadlineNanos) {
       this.deadlineNanos = deadlineNanos;
+    }
+
+    // When the deadline passes first, the task is cancelled, and a result that it returns later is
+    // closed. A login can ignore interrupts.
+    static <T> TimedTask<T> start(ExecutorService executor, Callable<T> task, long deadlineNanos) {
+      TimedTask<T> timed = new TimedTask<>(deadlineNanos);
+      long timeoutNanos = deadlineNanos - System.nanoTime();
+      if (timeoutNanos <= 0) {
+        // The caller has no time left, so it starts no task that it would not wait for.
+        timed.completeExceptionally(new TimeoutException());
+        return timed;
+      }
+      Future<?> running =
+          executor.submit(
+              () -> {
+                T result;
+                try {
+                  result = task.call();
+                } catch (Throwable t) {
+                  timed.failure = t;
+                  timed.complete(null);
+                  return;
+                }
+                if (!timed.complete(result)) {
+                  // cancel(true) or close() may have interrupted this thread, and may still
+                  // interrupt the close of the result.
+                  Thread.interrupted();
+                  closeQuietly(result);
+                }
+              });
+      timed.orTimeout(timeoutNanos, TimeUnit.NANOSECONDS);
+      timed.whenComplete(
+          (result, e) -> {
+            if (e != null) {
+              running.cancel(true);
+            }
+          });
+      return timed;
+    }
+
+    // Waits for the result until the deadline. A task that failed at the deadline of the caller
+    // that started it fails with a timeout here too.
+    static <T> T await(CompletableFuture<T> future, long deadlineNanos)
+        throws InterruptedException, ExecutionException, TimeoutException {
+      T result;
+      try {
+        result = future.get(Math.max(0, deadlineNanos - System.nanoTime()), TimeUnit.NANOSECONDS);
+      } catch (TimeoutException e) {
+        // The task is due too when this caller started it. Failing it now, rather than when its
+        // timer fires, closes a result that comes after this caller gave up instead of caching it.
+        if (future instanceof TimedTask && ((TimedTask<?>) future).deadlineNanos == deadlineNanos) {
+          future.completeExceptionally(new TimeoutException());
+        }
+        throw e;
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw e;
+      } catch (ExecutionException e) {
+        if (e.getCause() instanceof TimeoutException) {
+          throw (TimeoutException) e.getCause();
+        }
+        throw e;
+      }
+      Throwable failure = future instanceof TimedTask ? ((TimedTask<?>) future).failure : null;
+      if (failure != null) {
+        throw new ExecutionException(failure);
+      }
+      return result;
+    }
+
+    // Gets the entry, loading it on a miss, and waits for it until the deadline. An entry that
+    // fails at the earlier deadline of the caller that started it is loaded again with the time
+    // this caller has left. A caller whose wait ends with the failure of a load another caller
+    // started, with that caller's configuration, loads again until it gets a result or its own
+    // failure, as each caller does with a synchronous cache.
+    static <K, V> V awaitEntry(
+        AsyncCache<K, V> cache,
+        K key,
+        BiFunction<? super K, Executor, CompletableFuture<V>> load,
+        long deadlineNanos)
+        throws InterruptedException, ExecutionException, TimeoutException {
+      while (true) {
+        AtomicBoolean started = new AtomicBoolean();
+        CompletableFuture<V> entry =
+            cache.get(
+                key,
+                (k, executor) -> {
+                  started.set(true);
+                  return load.apply(k, executor);
+                });
+        try {
+          return await(entry, deadlineNanos);
+        } catch (TimeoutException e) {
+          if (!entry.isCompletedExceptionally() || deadlineNanos - System.nanoTime() <= 0) {
+            throw e;
+          }
+        } catch (ExecutionException e) {
+          if (started.get() || deadlineNanos - System.nanoTime() <= 0) {
+            throw e;
+          }
+        }
+        // Caffeine removes a failed entry once it completes, maybe after this caller wakes up.
+        cache.asMap().remove(key, entry);
+      }
     }
   }
 
@@ -421,7 +533,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 new MetricsStatsCounter(
                     catalogMetricsSource.getMetricRegistry(), FILESYSTEM_CACHE));
       }
-      this.fileSystemCache = cacheBuilder.build();
+      this.fileSystemCache = cacheBuilder.buildAsync();
     }
 
     try {
@@ -1134,22 +1246,29 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     }
 
     if (fileSystemCache != null) {
+      // Also closes the file systems still being created, once they are.
       fileSystemCache
           .asMap()
+          .values()
           .forEach(
-              (k, v) -> {
-                try {
-                  v.close();
-                } catch (IOException | RuntimeException e) {
-                  // Keep closing the other file systems.
-                  LOG.warn("Failed to close FileSystem instance in cache", e);
-                }
-              });
-      fileSystemCache.cleanUp();
+              entry ->
+                  entry.thenAccept(
+                      fs -> {
+                        if (fs == null) {
+                          return;
+                        }
+                        try {
+                          fs.close();
+                        } catch (IOException | RuntimeException e) {
+                          // Keep closing the other file systems.
+                          LOG.warn("Failed to close FileSystem instance in cache", e);
+                        }
+                      }));
+      fileSystemCache.synchronous().cleanUp();
     }
     // The keys hold the merged configuration, which may carry resolved secrets.
-    sharedHdfsLoginSettingsCache.invalidateAll();
-    hdfsLoginSettingsCache.invalidateAll();
+    sharedHdfsLoginSettingsCache.synchronous().invalidateAll();
+    hdfsLoginSettingsCache.synchronous().invalidateAll();
 
     // Metrics System could be null in UT.
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
@@ -1572,24 +1691,27 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
     String authority =
         provider != null ? provider.getFullAuthority(path, conf) : path.toUri().getAuthority();
+    // Resolving the settings and creating the file system share one connection timeout.
+    long deadlineNanos =
+        System.nanoTime() + TimeUnit.SECONDS.toNanos(connectionTimeoutSeconds(conf));
     // Only an HDFS file system logs in with the settings of the configuration, see
     // createFileSystem.
     String fsScheme = scheme != null ? scheme : defaultFileSystemProvider.scheme();
     if (!SCHEME_HDFS.equals(fsScheme)) {
-      return fileSystemCache.get(
+      return cachedFileSystem(
+          path,
+          conf,
           new FileSystemCacheKey(scheme, authority, Collections.emptyMap()),
-          cacheKey -> newFileSystem(path, conf, cacheKey, null));
+          null,
+          deadlineNanos);
     }
 
     Map<String, String> hdfsConf = Collections.unmodifiableMap(new HashMap<>(conf));
-    // Resolving the settings and creating the file system share one connection timeout.
-    long deadlineNanos =
-        System.nanoTime() + TimeUnit.SECONDS.toNanos(connectionTimeoutSeconds(hdfsConf));
     FileSystem fs = getHdfsFileSystemWithCache(path, hdfsConf, scheme, authority, deadlineNanos);
     if (fs == null) {
       // The config.resources files changed after their login settings were cached.
-      sharedHdfsLoginSettingsCache.invalidate(withoutIdentifier(hdfsConf));
-      hdfsLoginSettingsCache.invalidate(hdfsConf);
+      sharedHdfsLoginSettingsCache.synchronous().invalidate(withoutIdentifier(hdfsConf));
+      hdfsLoginSettingsCache.synchronous().invalidate(hdfsConf);
       fs = getHdfsFileSystemWithCache(path, hdfsConf, scheme, authority, deadlineNanos);
     }
     if (fs == null) {
@@ -1611,39 +1733,76 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       @Nullable String authority,
       long deadlineNanos) {
     Map<String, String> settings = hdfsLoginSettings(path, conf, deadlineNanos);
+    return cachedFileSystem(
+        path, conf, new FileSystemCacheKey(scheme, authority, settings), settings, deadlineNanos);
+  }
+
+  // A miss creates the file system on the pool, under the deadline of this caller. Callers that
+  // find it being created wait for it until their own deadlines.
+  @Nullable
+  private FileSystem cachedFileSystem(
+      Path path,
+      Map<String, String> conf,
+      FileSystemCacheKey key,
+      @Nullable Map<String, String> expectedSettings,
+      long deadlineNanos) {
     // A null result caches nothing; the cache statistics count it as a failed load.
-    return fileSystemCache.get(
-        new FileSystemCacheKey(scheme, authority, settings),
-        cacheKey ->
-            newFileSystem(
-                path, conf, cacheKey, new ExpectedLogin(cacheKey.loginSettings, deadlineNanos)));
+    try {
+      return TimedTask.awaitEntry(
+          fileSystemCache,
+          key,
+          (cacheKey, executor) -> {
+            fileSystemProvider(path);
+            // Create the file system for the user it is cached under.
+            return TimedTask.start(
+                fileSystemExecutor,
+                () -> getFileSystem(path, conf, cacheKey.currentUser, expectedSettings),
+                deadlineNanos);
+          },
+          deadlineNanos);
+    } catch (TimeoutException
+        | InterruptedException
+        | RejectedExecutionException
+        | ExecutionException e) {
+      throw new GravitinoRuntimeException(
+          fileSystemFailure(path, conf, e), "Failed to get FileSystem for fileset: path: %s", path);
+    }
   }
 
   private Map<String, String> hdfsLoginSettings(
       Path path, Map<String, String> conf, long deadlineNanos) {
     // Settings resolved for the shared entry that expand variables, cached for this configuration
-    // after the shared cache's load returns.
+    // after the shared entry is loaded.
     AtomicReference<Map<String, String>> resolved = new AtomicReference<>();
     Optional<Map<String, String>> shared =
-        sharedHdfsLoginSettingsCache.get(
+        awaitLoginSettings(
+            path,
+            conf,
+            sharedHdfsLoginSettingsCache,
             withoutIdentifier(conf),
-            sharedConf -> {
-              HdfsLogin login = resolveHdfsLoginInTime(path, conf, deadlineNanos);
+            () -> {
+              HdfsLogin login = resolveHdfsLogin(conf);
               if (login.expandsVariables) {
                 resolved.set(login.settings);
                 return Optional.empty();
               }
               return Optional.of(login.settings);
-            });
+            },
+            deadlineNanos);
     if (shared.isPresent()) {
       return shared.get();
     }
     if (resolved.get() != null) {
-      hdfsLoginSettingsCache.put(conf, resolved.get());
+      hdfsLoginSettingsCache.put(conf, CompletableFuture.completedFuture(resolved.get()));
       return resolved.get();
     }
-    return hdfsLoginSettingsCache.get(
-        conf, c -> resolveHdfsLoginInTime(path, c, deadlineNanos).settings);
+    return awaitLoginSettings(
+        path,
+        conf,
+        hdfsLoginSettingsCache,
+        conf,
+        () -> resolveHdfsLogin(conf).settings,
+        deadlineNanos);
   }
 
   // Filesets that inherit all other properties have configurations that differ only in their
@@ -1657,14 +1816,21 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     return Collections.unmodifiableMap(shared);
   }
 
-  // Reading the config.resources files may hang, so the login is resolved under the timeout.
-  private HdfsLogin resolveHdfsLoginInTime(
-      Path path, Map<String, String> conf, long deadlineNanos) {
+  // Reading the config.resources files may hang, so the login is resolved on a pool under the
+  // timeout.
+  private <T> T awaitLoginSettings(
+      Path path,
+      Map<String, String> conf,
+      AsyncCache<Map<String, String>, T> cache,
+      Map<String, String> key,
+      Callable<T> resolve,
+      long deadlineNanos) {
     try {
-      return executeFileSystemTask(
-          loginSettingsExecutor,
-          () -> resolveHdfsLogin(path, conf),
-          deadlineNanos - System.nanoTime());
+      return TimedTask.awaitEntry(
+          cache,
+          key,
+          (k, executor) -> TimedTask.start(loginSettingsExecutor, resolve, deadlineNanos),
+          deadlineNanos);
     } catch (RejectedExecutionException e) {
       // The pool is full, or closed with the catalog.
       throw new GravitinoRuntimeException(
@@ -1687,64 +1853,26 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     } catch (InterruptedException e) {
       throw ExceptionMessages.wrap("Interrupted when getting FileSystem for path: " + path, e);
     } catch (ExecutionException e) {
-      // Runtime exceptions are passed on as they are; anything else, such as an Error, is wrapped
-      // as when creating the file system.
-      if (e.getCause() instanceof RuntimeException) {
-        throw (RuntimeException) e.getCause();
-      }
+      // Other filesets may share the settings, so each caller reports its own path.
       throw new GravitinoRuntimeException(
           e.getCause(), "Failed to get FileSystem for fileset: path: %s", path);
     }
   }
 
-  @Nullable
-  private FileSystem newFileSystem(
-      Path path,
-      Map<String, String> conf,
-      FileSystemCacheKey cacheKey,
-      @Nullable ExpectedLogin expectedLogin) {
-    try {
-      // Create the file system for the user it is cached under.
-      return getFileSystem(path, conf, cacheKey.currentUser, expectedLogin);
-    } catch (IOException e) {
-      throw new GravitinoRuntimeException(
-          e, "Failed to get FileSystem for fileset: path: %s", path);
-    }
-  }
-
   // Builds the Hadoop configuration from the config.resources files, and resolves its login
-  // settings.
+  // settings. Reading the files and expanding Hadoop variables can fail; the callers report the
+  // path.
   @VisibleForTesting
-  HdfsLogin resolveHdfsLogin(Path path, Map<String, String> conf) {
-    Configuration hadoopConf = hdfsConfiguration(path, conf);
+  HdfsLogin resolveHdfsLogin(Map<String, String> conf) {
+    Configuration hadoopConf = HDFSFileSystemProxy.hadoopConfiguration(conf);
+    Map<String, String> settings =
+        new HashMap<>(HDFSFileSystemProxy.loginSettings(conf, hadoopConf));
+    // Other settings in these files, such as HA name services, decide which cluster is reached.
+    settings.put(CONFIG_RESOURCES, conf.getOrDefault(CONFIG_RESOURCES, ""));
     return new HdfsLogin(
         hadoopConf,
-        loginSettings(path, conf, hadoopConf),
+        Collections.unmodifiableMap(settings),
         HDFSFileSystemProxy.loginSettingsExpandVariables(hadoopConf));
-  }
-
-  private static Configuration hdfsConfiguration(Path path, Map<String, String> conf) {
-    try {
-      return HDFSFileSystemProxy.hadoopConfiguration(conf);
-    } catch (RuntimeException e) {
-      throw new GravitinoRuntimeException(
-          e, "Failed to get FileSystem for fileset: path: %s", path);
-    }
-  }
-
-  // Reading the Kerberos settings expands Hadoop variables, which can fail.
-  private static Map<String, String> loginSettings(
-      Path path, Map<String, String> conf, Configuration hadoopConf) {
-    try {
-      Map<String, String> settings =
-          new HashMap<>(HDFSFileSystemProxy.loginSettings(conf, hadoopConf));
-      // Other settings in these files, such as HA name services, decide which cluster is reached.
-      settings.put(CONFIG_RESOURCES, conf.getOrDefault(CONFIG_RESOURCES, ""));
-      return Collections.unmodifiableMap(settings);
-    } catch (RuntimeException e) {
-      throw new GravitinoRuntimeException(
-          e, "Failed to get FileSystem for fileset: path: %s", path);
-    }
   }
 
   private String buildGVFSFilePath(
@@ -1757,14 +1885,49 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
     // Read the user here: a pool thread keeps the Subject of the request that started it.
-    return getFileSystem(path, config, PrincipalUtils.getCurrentUserName(), null);
+    String user = PrincipalUtils.getCurrentUserName();
+    fileSystemProvider(path);
+    try {
+      return executeFileSystemTask(
+          fileSystemExecutor,
+          () -> getFileSystem(path, config, user, null),
+          TimeUnit.SECONDS.toNanos(connectionTimeoutSeconds(config)));
+    } catch (TimeoutException
+        | InterruptedException
+        | RejectedExecutionException
+        | ExecutionException e) {
+      throw fileSystemFailure(path, config, e);
+    }
   }
 
-  // With an expected login, returns null if the configuration no longer resolves to its settings.
+  // Creates the file system on this thread. With expected login settings, returns null if the
+  // configuration no longer resolves to them.
   @Nullable
   FileSystem getFileSystem(
-      Path path, Map<String, String> config, String user, @Nullable ExpectedLogin expectedLogin)
+      Path path,
+      Map<String, String> config,
+      String user,
+      @Nullable Map<String, String> expectedSettings)
       throws IOException {
+    FileSystemProvider provider = fileSystemProvider(path);
+    String scheme =
+        path.toUri().getScheme() != null
+            ? path.toUri().getScheme()
+            : defaultFileSystemProvider.scheme();
+    Configuration loginConf = null;
+    if (expectedSettings != null) {
+      // Resolved here, so that reading the config.resources files is under the timeout too. The
+      // file system logs in with the configuration that was checked.
+      HdfsLogin login = resolveHdfsLogin(config);
+      if (!login.settings.equals(expectedSettings)) {
+        return null;
+      }
+      loginConf = login.configuration;
+    }
+    return createFileSystem(path, config, scheme, provider, user, loginConf);
+  }
+
+  private FileSystemProvider fileSystemProvider(Path path) {
     if (path == null) {
       throw new IllegalArgumentException("Path should not be null");
     }
@@ -1781,31 +1944,18 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               "Unsupported scheme: %s, path: %s, all supported schemes: %s and providers: %s",
               scheme, path, fileSystemProvidersMap.keySet(), fileSystemProvidersMap.values()));
     }
+    return provider;
+  }
 
+  // Returns the failure to report for a file system that was not created in time, or throws it.
+  private IOException fileSystemFailure(Path path, Map<String, String> config, Exception e) {
+    String scheme =
+        path.toUri().getScheme() != null
+            ? path.toUri().getScheme()
+            : defaultFileSystemProvider.scheme();
+    FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
     int timeoutSeconds = connectionTimeoutSeconds(config);
-    long timeoutNanos =
-        expectedLogin != null
-            ? expectedLogin.deadlineNanos - System.nanoTime()
-            : TimeUnit.SECONDS.toNanos(timeoutSeconds);
-
-    try {
-      return executeFileSystemTask(
-          fileSystemExecutor,
-          () -> {
-            Configuration loginConf = null;
-            if (expectedLogin != null) {
-              // Resolved here, so that reading the config.resources files is under the timeout
-              // too. The file system logs in with the configuration that was checked.
-              HdfsLogin login = resolveHdfsLogin(path, config);
-              if (!login.settings.equals(expectedLogin.settings)) {
-                return null;
-              }
-              loginConf = login.configuration;
-            }
-            return createFileSystem(path, config, scheme, provider, user, loginConf);
-          },
-          timeoutNanos);
-    } catch (TimeoutException e) {
+    if (e instanceof TimeoutException) {
       LOG.warn(
           "Timeout when getting FileSystem for path: {}, scheme: {}, provider: {} within {} seconds",
           path,
@@ -1814,7 +1964,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           timeoutSeconds,
           e);
 
-      throw new IOException(
+      return new IOException(
           String.format(
               "Failed to get FileSystem for path: %s, scheme: %s, provider: %s within %s "
                   + "seconds, please check the configuration or increase the "
@@ -1825,22 +1975,23 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               timeoutSeconds,
               FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS),
           e);
-    } catch (InterruptedException e) {
+    }
+    if (e instanceof InterruptedException) {
       LOG.warn(
           "Interrupted when getting FileSystem for path: {}, possibly the server is"
               + " shutting down or catalog is been dropped",
           path);
       throw ExceptionMessages.wrap("Interrupted when getting FileSystem for path: " + path, e);
-    } catch (RejectedExecutionException e) {
-      // The pool is full, or closed with the catalog.
-      throw new IOException("Failed to start creating FileSystem for path: " + path, e);
-    } catch (ExecutionException e) {
-      Throwable cause = e.getCause();
-      if (cause instanceof IOException) {
-        throw (IOException) cause;
-      }
-      throw new IOException("Failed to create FileSystem", cause);
     }
+    if (e instanceof RejectedExecutionException) {
+      // The pool is full, or closed with the catalog.
+      return new IOException("Failed to start creating FileSystem for path: " + path, e);
+    }
+    Throwable cause = e.getCause();
+    if (cause instanceof IOException) {
+      return (IOException) cause;
+    }
+    return new IOException("Failed to create FileSystem", cause);
   }
 
   private int connectionTimeoutSeconds(Map<String, String> conf) {
@@ -1853,38 +2004,14 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   private <T> T executeFileSystemTask(ExecutorService executor, Callable<T> task, long timeoutNanos)
       throws InterruptedException, ExecutionException, TimeoutException {
-    if (timeoutNanos <= 0) {
-      // The caller has no time left, so it starts no task that it would not wait for.
-      throw new TimeoutException();
-    }
-    // The task and the caller race to set this, and the one that does not set it owns the result.
-    // A task that loses closes its result, as the caller stopped waiting; a caller that loses
-    // receives the result, or closes it if it has just stopped waiting. A login can ignore
-    // interrupts.
-    AtomicBoolean settled = new AtomicBoolean();
-    Future<T> future =
-        executor.submit(
-            () -> {
-              T result = task.call();
-              if (!settled.compareAndSet(false, true)) {
-                // cancel(true) or close() may have interrupted this thread, and may still interrupt
-                // the close of the result.
-                Thread.interrupted();
-                closeQuietly(result);
-              }
-              return result;
-            });
+    long deadlineNanos = System.nanoTime() + timeoutNanos;
+    TimedTask<T> timed = TimedTask.start(executor, task, deadlineNanos);
     try {
-      return future.get(timeoutNanos, TimeUnit.NANOSECONDS);
+      return TimedTask.await(timed, deadlineNanos);
     } catch (TimeoutException | InterruptedException e) {
-      if (settled.compareAndSet(false, true)) {
-        future.cancel(true);
-      } else {
-        // The task has just handed its result over, so this does not wait.
-        closeQuietly(Uninterruptibles.getUninterruptibly(future));
-      }
-      if (e instanceof InterruptedException) {
-        Thread.currentThread().interrupt();
+      // Nobody else waits for the result. A task that has just returned it hands it over here.
+      if (!timed.cancel(false) && !timed.isCompletedExceptionally()) {
+        closeQuietly(timed.join());
       }
       throw e;
     }
