@@ -87,6 +87,7 @@ The standalone Iceberg REST server package has the following layout:
     |   └── hdfs-site.xml & core-site.xml       # HDFS configuration files.
     |── libs/                                   # Gravitino Iceberg REST server dependencies libraries.
     |── logs/                                   # Gravitino Iceberg REST server logs. Automatically created after the server starts.
+    |── scripts/                                # SQL scripts for database initialization.
 ```
 
 ## Configuration
@@ -248,6 +249,23 @@ Use `gravitino.iceberg-rest.jdbc-user` and `gravitino.iceberg-rest.jdbc-password
 :::caution
 Download the corresponding JDBC driver to the `iceberg-rest-server/libs` directory.
 If you are using multiple JDBC catalog backends, setting `jdbc-initialize` to true may not take effect for RDBMS like `Mysql`, you should create Iceberg meta tables explicitly.
+You can initialize the metadata tables using the scripts provided in the `${GRAVITINO_HOME}/scripts/` directory:
+
+- MySQL: `${GRAVITINO_HOME}/scripts/mysql/iceberg-jdbc-schema-mysql.sql`
+- PostgreSQL: `${GRAVITINO_HOME}/scripts/postgresql/iceberg-jdbc-schema-postgresql.sql`
+- H2: `${GRAVITINO_HOME}/scripts/h2/iceberg-jdbc-schema-h2.sql`
+
+For example:
+
+```bash
+# MySQL
+mysql -h <host> -u <username> -p <database> < ${GRAVITINO_HOME}/scripts/mysql/iceberg-jdbc-schema-mysql.sql
+
+# PostgreSQL
+psql -h <host> -U <username> -d <database> -f ${GRAVITINO_HOME}/scripts/postgresql/iceberg-jdbc-schema-postgresql.sql
+```
+
+When using H2, the JDBC connection URL must include `;DATABASE_TO_LOWER=TRUE` (e.g., `jdbc:h2:<path>;DATABASE_TO_LOWER=TRUE`). By default, H2 converts unquoted identifiers to uppercase, whereas Iceberg looks up metadata in lowercase. Without `DATABASE_TO_LOWER=TRUE`, Iceberg fails to detect existing columns such as `iceberg_type` and attempts an `ALTER TABLE`, which fails if the database user only has DML permissions.
 :::
 
 #### REST Backend Configuration
