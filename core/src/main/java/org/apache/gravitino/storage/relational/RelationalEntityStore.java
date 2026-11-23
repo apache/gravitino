@@ -923,7 +923,8 @@ public class RelationalEntityStore
     }
     // Hide the entry until publish finishes. Rollback invalidate runs outside the segment lock:
     // the SPI does not require that lock to be reentrant.
-    retainPublishingWrite(ident, type);
+    String publishKey = "p\0" + type.name() + "\0" + ident;
+    bumpBlock(publishKey);
     try {
       boolean[] published = new boolean[1];
       cache.withCacheLock(
@@ -939,7 +940,7 @@ public class RelationalEntityStore
         invalidateOrClear(ident, type);
       }
     } finally {
-      releasePublishingWrite(ident, type);
+      dropBlock(publishKey);
     }
   }
 
@@ -998,25 +999,17 @@ public class RelationalEntityStore
   }
 
   private void retainPendingWrite(NameIdentifier ident, Entity.EntityType entityType) {
-    bumpBlock(writeBlockKey(ident, entityType));
+    bumpBlock("w\0" + entityType.name() + "\0" + ident);
     for (String prefix : CaffeineEntityCache.descendantPrefixes(ident, entityType)) {
-      bumpBlock(hierarchyBlockKey(prefix));
+      bumpBlock("h\0" + prefix);
     }
   }
 
   private void releasePendingWrite(NameIdentifier ident, Entity.EntityType entityType) {
-    dropBlock(writeBlockKey(ident, entityType));
+    dropBlock("w\0" + entityType.name() + "\0" + ident);
     for (String prefix : CaffeineEntityCache.descendantPrefixes(ident, entityType)) {
-      dropBlock(hierarchyBlockKey(prefix));
+      dropBlock("h\0" + prefix);
     }
-  }
-
-  private void retainPublishingWrite(NameIdentifier ident, Entity.EntityType entityType) {
-    bumpBlock(publishBlockKey(ident, entityType));
-  }
-
-  private void releasePublishingWrite(NameIdentifier ident, Entity.EntityType entityType) {
-    dropBlock(publishBlockKey(ident, entityType));
   }
 
   private void bumpBlock(String key) {
@@ -1043,11 +1036,13 @@ public class RelationalEntityStore
   }
 
   private boolean isPendingWrite(NameIdentifier ident, Entity.EntityType entityType) {
-    if (blockHeld(writeBlockKey(ident, entityType))) {
+    AtomicInteger exact = cacheBlocks.get("w\0" + entityType.name() + "\0" + ident);
+    if (exact != null && exact.get() > 0) {
       return true;
     }
     for (String prefix : CaffeineEntityCache.ancestorHierarchyPrefixes(ident)) {
-      if (blockHeld(hierarchyBlockKey(prefix))) {
+      AtomicInteger count = cacheBlocks.get("h\0" + prefix);
+      if (count != null && count.get() > 0) {
         return true;
       }
     }
@@ -1059,26 +1054,8 @@ public class RelationalEntityStore
    * publication that may still be rolled back.
    */
   private boolean isCacheObservationBlocked(NameIdentifier ident, Entity.EntityType entityType) {
-    return isPendingWrite(ident, entityType) || blockHeld(publishBlockKey(ident, entityType));
-  }
-
-  private boolean blockHeld(String key) {
-    AtomicInteger count = cacheBlocks.get(key);
-    return count != null && count.get() > 0;
-  }
-
-  @VisibleForTesting
-  static String writeBlockKey(NameIdentifier ident, Entity.EntityType type) {
-    return "w\0" + type.name() + "\0" + ident;
-  }
-
-  @VisibleForTesting
-  static String publishBlockKey(NameIdentifier ident, Entity.EntityType type) {
-    return "p\0" + type.name() + "\0" + ident;
-  }
-
-  private static String hierarchyBlockKey(String prefix) {
-    return "h\0" + prefix;
+    AtomicInteger publishing = cacheBlocks.get("p\0" + entityType.name() + "\0" + ident);
+    return isPendingWrite(ident, entityType) || (publishing != null && publishing.get() > 0);
   }
 
   @VisibleForTesting

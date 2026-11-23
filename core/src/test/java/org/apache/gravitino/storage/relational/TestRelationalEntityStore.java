@@ -93,7 +93,7 @@ public class TestRelationalEntityStore {
 
   private boolean writeBlocked(NameIdentifier ident, Entity.EntityType type)
       throws IllegalAccessException {
-    AtomicInteger count = cacheBlocks().get(RelationalEntityStore.writeBlockKey(ident, type));
+    AtomicInteger count = cacheBlocks().get("w\0" + type.name() + "\0" + ident);
     return count != null && count.get() > 0;
   }
 
@@ -254,10 +254,7 @@ public class TestRelationalEntityStore {
     Mockito.when(backend.exists(ident, Entity.EntityType.TOPIC)).thenReturn(false);
     Mockito.when(backend.batchGet(List.of(ident), Entity.EntityType.TOPIC)).thenReturn(List.of());
 
-    cacheBlocks()
-        .put(
-            RelationalEntityStore.publishBlockKey(ident, Entity.EntityType.TOPIC),
-            new AtomicInteger(1));
+    cacheBlocks().put("p\0" + Entity.EntityType.TOPIC.name() + "\0" + ident, new AtomicInteger(1));
 
     Assertions.assertFalse(store.exists(ident, Entity.EntityType.TOPIC));
     Assertions.assertTrue(
