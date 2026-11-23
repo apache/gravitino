@@ -146,12 +146,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public boolean tableExists(NameIdentifier ident) {
-    boolean supportsTables =
-        doWithCatalog(
-            getCatalogIdentifier(ident),
-            wrapper -> wrapper.doWithCatalog(catalog -> catalog.ops() instanceof TableCatalog),
-            RuntimeException.class);
-    if (!supportsTables) {
+    if (!supportsTables(ident)) {
       return false;
     }
     try {
@@ -198,6 +193,9 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
+    if (!supportsTables(ident)) {
+      throw new NoSuchTableException("Catalog for table %s does not support tables", ident);
+    }
     return loadAndImportTable(ident, AuditInfo.EMPTY);
   }
 
@@ -553,6 +551,13 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           OrphanedSchemaCleanup.cleanUp(this, catalogIdent, schemaIdentifier);
           return droppedFromCatalog;
         });
+  }
+
+  private boolean supportsTables(NameIdentifier ident) {
+    return doWithCatalog(
+        getCatalogIdentifier(ident),
+        wrapper -> wrapper.doWithCatalog(catalog -> catalog.ops() instanceof TableCatalog),
+        RuntimeException.class);
   }
 
   private Namespace getNewNamespace(NameIdentifier tableIdent, TableChange... changes) {
