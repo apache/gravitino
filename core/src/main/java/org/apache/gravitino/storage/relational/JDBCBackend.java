@@ -250,20 +250,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    return update(ident, entityType, updater, ignored -> {});
-  }
-
-  @Override
-  public <E extends Entity & HasIdentifier> E update(
-      NameIdentifier ident,
-      Entity.EntityType entityType,
-      Function<E, E> updater,
-      Consumer<E> beforeCommit)
-      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     if (!BaseEntityCache.isCacheable(entityType)) {
-      E updatedEntity = updateEntity(ident, entityType, updater);
-      beforeCommit.accept(updatedEntity);
-      return updatedEntity;
+      return updateEntity(ident, entityType, updater);
     }
 
     boolean transactionOwner = !SessionUtils.isInTransaction();
@@ -274,8 +262,6 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
     try {
       E updatedEntity = updateEntity(ident, entityType, updater);
       EntityChangeLogWriter.append(ident, entityType, OperateType.ALTER);
-      // Before commit so rename targets are invalidated/pending before the new row is visible.
-      beforeCommit.accept(updatedEntity);
       if (transactionOwner) {
         SessionUtils.commitTransaction();
       }

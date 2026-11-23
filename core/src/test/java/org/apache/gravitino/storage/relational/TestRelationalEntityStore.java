@@ -122,12 +122,11 @@ public class TestRelationalEntityStore {
               AtomicInteger count = pendingWrites.get(key);
               pendingDuringBackend.set(count != null && count.get() > 0);
               @SuppressWarnings("unchecked")
-              Consumer<CatalogEntity> beforeCommit = invocation.getArgument(3);
-              beforeCommit.accept(updated);
-              return updated;
+              Function<CatalogEntity, CatalogEntity> updater = invocation.getArgument(2);
+              return updater.apply(updated);
             })
         .when(backend)
-        .update(eq(ident), eq(Entity.EntityType.CATALOG), any(Function.class), any(Consumer.class));
+        .update(eq(ident), eq(Entity.EntityType.CATALOG), any(Function.class));
 
     store.update(ident, null, Entity.EntityType.CATALOG, entity -> entity);
 
@@ -157,17 +156,16 @@ public class TestRelationalEntityStore {
     Mockito.doAnswer(
             invocation -> {
               @SuppressWarnings("unchecked")
-              Consumer<TopicEntity> beforeCommit = invocation.getArgument(3);
-              beforeCommit.accept(renamed);
+              Function<TopicEntity, TopicEntity> updater = invocation.getArgument(2);
+              TopicEntity result = updater.apply(renamed);
               AtomicInteger count = pendingWrites.get(newKey);
               newPendingBeforeReturn.set(count != null && count.get() > 0);
               Mockito.verify(cache).invalidate(newIdent, Entity.EntityType.TOPIC);
               newInvalidatedBeforeReturn.set(true);
-              return renamed;
+              return result;
             })
         .when(backend)
-        .update(
-            eq(oldIdent), eq(Entity.EntityType.TOPIC), any(Function.class), any(Consumer.class));
+        .update(eq(oldIdent), eq(Entity.EntityType.TOPIC), any(Function.class));
 
     Assertions.assertSame(
         renamed, store.update(oldIdent, null, Entity.EntityType.TOPIC, entity -> renamed));

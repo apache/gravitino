@@ -154,36 +154,6 @@ public interface RelationalBackend
       throws IOException, NoSuchEntityException;
 
   /**
-   * Like {@link #update(NameIdentifier, Entity.EntityType, Function)}, but invokes {@code
-   * beforeCommit} after the update has been applied and before this backend commits a transaction
-   * it owns. Use this to invalidate cache keys that are only known after the updater runs (for
-   * example a rename target) before the new row becomes visible to other connections.
-   *
-   * <p>The default implementation runs {@code beforeCommit} after {@link #update(NameIdentifier,
-   * Entity.EntityType, Function)} returns, which may be after commit. Backends that own a
-   * transaction should override this to call {@code beforeCommit} before committing.
-   *
-   * @param <E> The type of entity to update.
-   * @param ident The identifier of the entity to be updated.
-   * @param entityType The type of the entity.
-   * @param updater A function that takes the current entity and returns the updated instance.
-   * @param beforeCommit Invoked with the updated entity before a backend-owned commit.
-   * @return The entity after updating.
-   * @throws NoSuchEntityException If the entity does not exist.
-   * @throws IOException If the entity fails to update.
-   */
-  default <E extends Entity & HasIdentifier> E update(
-      NameIdentifier ident,
-      Entity.EntityType entityType,
-      Function<E, E> updater,
-      Consumer<E> beforeCommit)
-      throws IOException, NoSuchEntityException {
-    E updated = update(ident, entityType, updater);
-    beforeCommit.accept(updated);
-    return updated;
-  }
-
-  /**
    * Retrieves the entity associated with the identifier and the entity type.
    *
    * @param <E> The type of the entity returned.
