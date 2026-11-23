@@ -80,6 +80,8 @@ dependencies {
     // which Gravitino never enables, so keep it out of the distribution.
     exclude(group = "io.opentelemetry", module = "*")
   }
+  implementation(libs.jedis)
+  implementation(libs.kryo)
   implementation(libs.mybatis)
 
   annotationProcessor(libs.lombok)

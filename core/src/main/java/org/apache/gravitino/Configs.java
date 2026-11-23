@@ -605,6 +605,79 @@ public class Configs {
           .checkValue(value -> value > 0, "Lock segments must be positive.")
           .createWithDefault(16);
 
+  // Redis shared entity cache, used when gravitino.cache.implementation is "redis"
+  public static final ConfigEntry<String> CACHE_REDIS_ADDRESS =
+      new ConfigBuilder("gravitino.cache.redis.address")
+          .doc(
+              "Comma-separated list of Redis 'host:port' addresses. Required when "
+                  + "gravitino.cache.implementation is 'redis'. A standalone deployment lists "
+                  + "exactly one address; a Redis Cluster deployment lists one or more seed nodes "
+                  + "and sets gravitino.cache.redis.cluster to true.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<Boolean> CACHE_REDIS_CLUSTER =
+      new ConfigBuilder("gravitino.cache.redis.cluster")
+          .doc("Whether gravitino.cache.redis.address points at a Redis Cluster.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .booleanConf()
+          .createWithDefault(false);
+
+  public static final ConfigEntry<String> CACHE_REDIS_NAMESPACE =
+      new ConfigBuilder("gravitino.cache.redis.namespace")
+          .doc(
+              "Prefix of every key the Redis entity cache writes, so several Gravitino clusters "
+                  + "can share one Redis deployment. Must not contain '{' or '}', which are "
+                  + "reserved for Redis Cluster hash tags.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .checkValue(
+              value -> value != null && value.matches("[A-Za-z0-9._:-]+"),
+              "The Redis cache namespace must contain only letters, digits and '.', '_', '-', ':'.")
+          .createWithDefault("gravitino");
+
+  public static final ConfigEntry<Boolean> CACHE_REDIS_SSL =
+      new ConfigBuilder("gravitino.cache.redis.ssl")
+          .doc(
+              "Whether the Redis entity cache connects over TLS. The JVM's default trust store "
+                  + "verifies the server certificate.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .booleanConf()
+          .createWithDefault(false);
+
+  public static final ConfigEntry<String> CACHE_REDIS_SERIALIZER =
+      new ConfigBuilder("gravitino.cache.redis.serializer")
+          .doc("Serialization format for cached entities. Only 'kryo' is supported.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .checkValue("kryo"::equals, "Only the 'kryo' serializer is supported.")
+          .createWithDefault("kryo");
+
+  public static final ConfigEntry<Integer> CACHE_REDIS_TIMEOUT_MS =
+      new ConfigBuilder("gravitino.cache.redis.timeoutMs")
+          .doc(
+              "Connection and command timeout in milliseconds for the Redis entity cache. A read "
+                  + "or write that exceeds it is treated as a cache miss.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(1000);
+
+  public static final ConfigEntry<String> CACHE_REDIS_USERNAME =
+      new ConfigBuilder("gravitino.cache.redis.username")
+          .doc("Optional Redis ACL user name for the Redis entity cache.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> CACHE_REDIS_PASSWORD =
+      new ConfigBuilder("gravitino.cache.redis.password")
+          .doc("Optional Redis password for the Redis entity cache.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .create();
+
   public static final ConfigEntry<String> JOB_STAGING_DIR =
       new ConfigBuilder("gravitino.job.stagingDir")
           .doc(
