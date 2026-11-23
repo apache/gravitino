@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -38,6 +39,7 @@ import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.BaseEntityCache;
+import org.apache.gravitino.cache.CaffeineEntityCache;
 import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.NoOpsCache;
@@ -47,6 +49,7 @@ import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -91,6 +94,80 @@ public class TestRelationalEntityStore {
         .insert(entity, false);
     store.put(entity, false);
     Mockito.verify(cache).put(entity);
+  }
+
+  @Test
+  void testColdTableIdLookupDoesNotLoadOrCacheFullEntity() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    Mockito.when(backend.getTableId(ident)).thenReturn(42L);
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    Assertions.assertEquals(42L, store.getTableId(ident));
+    Mockito.verify(backend).getTableId(ident);
+    Mockito.verifyNoMoreInteractions(backend);
+    Mockito.verify(cache, Mockito.never()).put(any());
+  }
+
+  @Test
+  void testWarmTableIdLookupUsesExistingEntityCache() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    TableEntity table = Mockito.mock(TableEntity.class);
+    Mockito.when(table.id()).thenReturn(42L);
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    Mockito.doReturn(Optional.of(table)).when(cache).getIfPresent(ident, Entity.EntityType.TABLE);
+    Assertions.assertEquals(42L, store.getTableId(ident));
+    Mockito.verifyNoInteractions(backend);
+  }
+
+  @Test
+  void testTableIdLookupPropagatesMissingTableAndStorageFailure() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "missing");
+    Mockito.when(backend.getTableId(ident))
+        .thenThrow(new NoSuchEntityException("Missing table"))
+        .thenThrow(new IOException("Storage unavailable"));
+    Assertions.assertThrows(NoSuchEntityException.class, () -> store.getTableId(ident));
+    Assertions.assertThrows(IOException.class, () -> store.getTableId(ident));
+  }
+
+  @Test
+  void testOfflineTableIdLookupUsesInjectedBackendWithFullReadFallback() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    RelationalBackend injected = Mockito.mock(RelationalBackend.class);
+    TableEntity table = Mockito.mock(TableEntity.class);
+    Mockito.when(table.id()).thenReturn(42L);
+    Mockito.when(table.type()).thenReturn(Entity.EntityType.TABLE);
+    Mockito.when(table.nameIdentifier()).thenReturn(ident);
+    Mockito.when(injected.get(ident, Entity.EntityType.TABLE)).thenReturn(table);
+    Mockito.when(injected.getTableId(ident)).thenCallRealMethod();
+    RelationalEntityStore offline =
+        RelationalEntityStore.forOfflineMigration(injected, new Config(false) {});
+    Assertions.assertEquals(
+        offline.get(ident, Entity.EntityType.TABLE, TableEntity.class).id(),
+        offline.getTableId(ident));
+    Mockito.verify(injected, Mockito.times(2)).get(ident, Entity.EntityType.TABLE);
+    Mockito.verify(injected).getTableId(ident);
+    Mockito.verifyNoMoreInteractions(injected);
+  }
+
+  @Test
+  void testTableIdLookupAfterInvalidationReadsReplacementId() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    TableEntity table = Mockito.mock(TableEntity.class);
+    Mockito.when(table.id()).thenReturn(42L);
+    Mockito.when(table.type()).thenReturn(Entity.EntityType.TABLE);
+    Mockito.when(table.nameIdentifier()).thenReturn(ident);
+    CaffeineEntityCache cache = new CaffeineEntityCache(new Config(false) {});
+    try {
+      FieldUtils.writeField(store, "cache", cache, true);
+      cache.put(table);
+      Mockito.when(backend.getTableId(ident)).thenReturn(43L);
+      Assertions.assertEquals(42L, store.getTableId(ident));
+      Mockito.verifyNoInteractions(backend);
+      store.clearCache();
+      Assertions.assertEquals(43L, store.getTableId(ident));
+      Mockito.verify(backend).getTableId(ident);
+    } finally {
+      cache.clear();
+    }
   }
 
   @Test
