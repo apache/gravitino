@@ -875,10 +875,8 @@ public class TestSQLScripts extends TestJDBCBackend {
   }
 
   private void assertLiveRowIndexes(String source) throws SQLException {
-    if (!"postgresql".equals(backendType)) {
-      return;
-    }
-    Map<String, List<String>> expectedKeys =
+    boolean partialIndex = "postgresql".equals(backendType);
+    Map<String, List<String>> lookupColumns =
         Map.of(
             "user_meta", List.of("metalake_id"),
             "role_meta", List.of("metalake_id"),
@@ -891,26 +889,33 @@ public class TestSQLScripts extends TestJDBCBackend {
     try (SqlSession session =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
         Connection connection = session.getConnection()) {
-      for (Map.Entry<String, List<String>> entry : expectedKeys.entrySet()) {
+      DatabaseMetaData metaData = connection.getMetaData();
+      for (Map.Entry<String, List<String>> entry : lookupColumns.entrySet()) {
         String table = entry.getKey();
         String index = "idx_" + table + "_live";
+        String tableName =
+            metaData.storesUpperCaseIdentifiers() ? table.toUpperCase(Locale.ROOT) : table;
+        List<String> expectedKeys = new ArrayList<>(entry.getValue());
+        if (!partialIndex) {
+          expectedKeys.add("deleted_at");
+        }
         List<String> keys = new ArrayList<>();
         try (ResultSet rows =
-            connection
-                .getMetaData()
-                .getIndexInfo(
-                    connection.getCatalog(), connection.getSchema(), table, false, false)) {
+            metaData.getIndexInfo(
+                connection.getCatalog(), connection.getSchema(), tableName, false, false)) {
           while (rows.next()) {
-            if (index.equals(rows.getString("INDEX_NAME"))) {
-              Assertions.assertEquals(
-                  "(deleted_at = 0)",
-                  rows.getString("FILTER_CONDITION"),
-                  index + " after " + source);
-              keys.add(rows.getString("COLUMN_NAME"));
+            if (index.equalsIgnoreCase(rows.getString("INDEX_NAME"))) {
+              if (partialIndex) {
+                Assertions.assertEquals(
+                    "(deleted_at = 0)",
+                    rows.getString("FILTER_CONDITION"),
+                    index + " after " + source);
+              }
+              keys.add(rows.getString("COLUMN_NAME").toLowerCase(Locale.ROOT));
             }
           }
         }
-        Assertions.assertEquals(entry.getValue(), keys, index + " after " + source);
+        Assertions.assertEquals(expectedKeys, keys, index + " after " + source);
       }
     }
   }
