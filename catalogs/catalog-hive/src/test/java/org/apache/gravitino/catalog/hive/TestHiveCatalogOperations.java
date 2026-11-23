@@ -99,6 +99,26 @@ import org.mockito.ArgumentCaptor;
 
 class TestHiveCatalogOperations {
   @Test
+  void testTableIdentifierProbeAvoidsFullTableLoad() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+    CachedClientPool pool = mock(CachedClientPool.class);
+    HiveClient client = mock(HiveClient.class);
+    when(pool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(client);
+            });
+    op.clientPool = pool;
+    when(client.getTableIdentifier(anyString(), eq("db"), eq("t"))).thenReturn("source-identifier");
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "db", "t");
+    Assertions.assertEquals("source-identifier", op.loadTableIdentifier(ident));
+    verify(client).getTableIdentifier(anyString(), eq("db"), eq("t"));
+    verify(client, never()).getTable(anyString(), anyString(), anyString());
+  }
+
+  @Test
   void testDerivedSchemaMetadataAltersPreserveMarkerAndRejectColumnChanges() throws Exception {
     HiveCatalogOperations op = new HiveCatalogOperations();
     op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);

@@ -190,7 +190,7 @@ class TestJdbcCatalogRefresh {
       assertEquals(
           "ID",
           catalog
-              .loadSparkTable(Identifier.of(new String[] {"PUBLIC"}, "FRESH"))
+              .loadSparkTable(Identifier.of(new String[] {"PUBLIC"}, "FRESH"), mock(Table.class))
               .columns()[0]
               .name());
     } finally {
@@ -216,7 +216,9 @@ class TestJdbcCatalogRefresh {
       IllegalStateException error =
           assertThrows(
               IllegalStateException.class,
-              () -> catalog.loadSparkTable(Identifier.of(new String[] {"PUBLIC"}, "T")));
+              () ->
+                  catalog.loadSparkTable(
+                      Identifier.of(new String[] {"PUBLIC"}, "T"), mock(Table.class)));
       assertTrue(error.getMessage().contains("Restart the Spark session"));
     } finally {
       manager.close();
@@ -242,7 +244,9 @@ class TestJdbcCatalogRefresh {
       when(source.properties()).thenReturn(properties("jdbc:h2:mem:changed"));
       assertThrows(
           IllegalStateException.class,
-          () -> catalog.loadSparkTable(Identifier.of(new String[] {"PUBLIC"}, "T")));
+          () ->
+              catalog.loadSparkTable(
+                  Identifier.of(new String[] {"PUBLIC"}, "T"), mock(Table.class)));
       verify(credentials).getCredentials();
     } finally {
       manager.close();
