@@ -500,9 +500,9 @@ public final class GlossaryManager {
       @Nullable TermRelations plan,
       @Nullable TermDomains domains) {
     boolean membership = domains != null && domains.changed();
-    if (domains != null && !membership) {
+    if (domains != null) {
       // A domain may have been renamed between the initial term read and its domain locks.
-      before = TermEdits.withDomains(before, domains.names());
+      before = TermEdits.withDomains(before, domains.originalNames());
     }
     GlossaryTermEntity after =
         TermEdits.apply(

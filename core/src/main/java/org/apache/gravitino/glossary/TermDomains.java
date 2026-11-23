@@ -66,6 +66,11 @@ final class TermDomains {
     return !before.keySet().equals(after.keySet());
   }
 
+  /** Returns the original membership using the names observed under the domain locks. */
+  String[] originalNames() {
+    return new TreeSet<>(before.values()).toArray(new String[0]);
+  }
+
   /** Returns the final domain names in ascending order. */
   String[] names() {
     return new TreeSet<>(after.values()).toArray(new String[0]);

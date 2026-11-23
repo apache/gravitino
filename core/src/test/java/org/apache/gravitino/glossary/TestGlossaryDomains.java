@@ -504,12 +504,26 @@ class TestGlossaryDomains extends TestJDBCBackend {
         .when(observed)
         .isGlossaryTermOwner(
             Mockito.any(), Mockito.eq(LAKE), Mockito.eq(before.id()), Mockito.any());
+    GlossaryManager writer =
+        new GlossaryManager(
+            ids::incrementAndGet,
+            true,
+            (original, updated, persist) -> {
+              assertArrayEquals(new String[] {"Stores"}, original.domains());
+              assertArrayEquals(new String[] {"Sales", "Stores"}, updated.domains());
+              persist.run();
+            });
     GlossaryTermEntity edited =
         as(
             "writer",
-            () -> manager.alterTerm(LAKE, "Churn", TermChange.updateDefinition("changed")));
+            () ->
+                writer.alterTerm(
+                    LAKE,
+                    "Churn",
+                    TermChange.updateDefinition("changed"),
+                    TermChange.addDomain("Sales")));
     assertEquals(before.version() + 1, edited.version());
-    assertArrayEquals(new String[] {"Stores"}, edited.domains());
+    assertArrayEquals(new String[] {"Sales", "Stores"}, edited.domains());
     assertArrayEquals(
         edited.domains(), as("writer", () -> manager.getTerm(LAKE, "Churn")).domains());
   }
