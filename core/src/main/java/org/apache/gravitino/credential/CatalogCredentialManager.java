@@ -68,6 +68,17 @@ public class CatalogCredentialManager implements Closeable {
   }
 
   /**
+   * Returns whether every configured provider supplies static credentials.
+   *
+   * @return true for a nonempty configuration containing only static providers
+   */
+  public boolean hasOnlyStaticCredentialProviders() {
+    return !credentialProviders.isEmpty()
+        && credentialProviders.values().stream()
+            .allMatch(SupportsStaticCredential.class::isInstance);
+  }
+
+  /**
    * Returns whether a credential provider of this catalog supports the scheme of the path.
    *
    * @param path a storage location

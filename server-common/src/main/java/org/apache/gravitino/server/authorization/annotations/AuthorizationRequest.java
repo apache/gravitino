@@ -38,7 +38,7 @@ public @interface AuthorizationRequest {
     LOAD_VIEW,
     CREATE_SCHEMA,
     TEST_CATALOG_CONNECTION,
-    /** Retrieves credentials with provider-specific response authorization. */
+    /** Retrieves credentials with provider-specific authorization. */
     GET_CREDENTIALS
   }
 }

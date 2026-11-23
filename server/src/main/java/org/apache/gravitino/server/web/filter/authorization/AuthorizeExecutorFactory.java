@@ -39,8 +39,15 @@ public class AuthorizeExecutorFactory {
       ExpressionCondition secondaryExpressionCondition,
       String allowCheckExistenceExpression) {
     return switch (requestType) {
-      case COMMON, GET_CREDENTIALS -> new CommonAuthorizerExecutor(
+      case COMMON -> new CommonAuthorizerExecutor(
           expression, metadataContext, pathParams, entityType);
+      case GET_CREDENTIALS -> new CredentialAuthorizationExecutor(
+          expression,
+          metadataContext,
+          pathParams,
+          entityType,
+          secondaryExpression,
+          secondaryExpressionCondition);
       case ASSOCIATE_TAG -> new AssociateTagAuthorizationExecutor(
           expression, parameters, args, metadataContext, pathParams, entityType);
       case RUN_JOB -> new RunJobAuthorizationExecutor(

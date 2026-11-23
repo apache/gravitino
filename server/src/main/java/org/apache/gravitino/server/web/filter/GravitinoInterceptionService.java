@@ -60,7 +60,6 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.web.Utils;
-import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizationExecutor;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutorFactory;
 import org.apache.gravitino.server.web.rest.BulkOperations;
@@ -182,11 +181,9 @@ public class GravitinoInterceptionService implements InterceptionService {
       Parameter[] parameters = method.getParameters();
       AuthorizationExpression expressionAnnotation =
           method.getAnnotation(AuthorizationExpression.class);
-      NameIdentifier handlerTarget = null;
 
       try (AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
         AuthorizationExecutor executor = null;
-        Optional<AuthorizationHandler> handler = Optional.empty();
         if (expressionAnnotation != null) {
           String expression = expressionAnnotation.expression();
           Object[] args = methodInvocation.getArguments();
@@ -314,22 +311,8 @@ public class GravitinoInterceptionService implements InterceptionService {
             }
           }
           scope.bindIfRead(method, metalakeIdent, authorizationRequestContext);
-          handler =
-              createAuthorizationHandler(
-                  extractAuthorizationRequestTypeFromParameters(parameters), entityType);
-          if (handler.isPresent()) {
-            handlerTarget = metadataContext.get(handler.get().entityType());
-            handler.get().process(metadataContext);
-          }
         }
         return methodInvocation.proceed();
-      } catch (ForbiddenException ex) {
-        dispatchAuthzDenialEvent(
-            PrincipalUtils.getCurrentUserName(),
-            handlerTarget,
-            method.getName(),
-            expressionAnnotation == null ? "" : expressionAnnotation.expression());
-        return Utils.forbidden(ex.getMessage(), ex);
       } catch (NoSuchCatalogException ex) {
         return Utils.notFound(ex.getMessage(), ex);
       } catch (BadRequestException ex) {
@@ -354,15 +337,6 @@ public class GravitinoInterceptionService implements InterceptionService {
         return Utils.internalError(
             "Authorization failed due to system internal error. Please contact administrator.", ex);
       }
-    }
-
-    private Optional<AuthorizationHandler> createAuthorizationHandler(
-        AuthorizationRequest.RequestType requestType, Optional<String> entityType) {
-      if (requestType == AuthorizationRequest.RequestType.GET_CREDENTIALS
-          && entityType.filter(Entity.EntityType.CATALOG.name()::equals).isPresent()) {
-        return Optional.of(new CatalogCredentialAuthzHandler());
-      }
-      return Optional.empty();
     }
 
     private Optional<Response> validateCurrentUserAndActiveRoles(

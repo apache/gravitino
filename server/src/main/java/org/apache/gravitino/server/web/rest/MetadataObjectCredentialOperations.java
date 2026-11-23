@@ -53,6 +53,7 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationFullNa
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
+import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -83,7 +84,11 @@ public class MetadataObjectCredentialOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-credentials." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-credentials", absolute = true)
-  @AuthorizationExpression(expression = AuthorizationExpressionConstants.CAN_ACCESS_METADATA)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.CAN_ACCESS_METADATA,
+      secondaryExpression =
+          AuthorizationExpressionConstants.CATALOG_STATIC_CREDENTIALS_AUTHORIZATION_EXPRESSION,
+      secondaryExpressionCondition = ExpressionCondition.CATALOG_CREDENTIALS)
   public Response getCredentials(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
