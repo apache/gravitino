@@ -130,6 +130,33 @@ losing audit context, fixed), [#12758](https://github.com/apache/gravitino/issue
 
 ## Solution Investigations
 
+### Industry precedents
+
+- **Authorization explain.** Snowflake's `EXPLAIN_PRIVILEGES` returns a tree of privileges
+  required by a SQL statement. `missing_only` limits the result to missing privileges, and
+  `for_role` evaluates a specified role. Snowflake requires the caller to be able to resolve
+  the objects named in the statement. Databricks can prefill an access request after an
+  `INSUFFICIENT_PERMISSIONS` error and checks for missing `USE CATALOG` and `USE SCHEMA`
+  privileges when a user requests access. Gravitino's explain API evaluates the rule for a
+  registered catalog REST operation and identifies failed checks and the roles behind explicit
+  denies. [Snowflake explain privileges](https://docs.snowflake.com/en/sql-reference/functions/explain_privileges)
+  · [Databricks access requests](https://docs.databricks.com/aws/en/data-governance/unity-catalog/manage-privileges/access-requests)
+- **Access review.** Snowflake's `SHOW GRANTS` lists privileges granted on an object and can
+  expand the role hierarchy when inspecting a user or role. Databricks Unity Catalog's effective
+  permissions API lists direct and inherited privileges by principal and identifies the parent
+  object for an inherited privilege. Gravitino's access review shows which roles grant or deny
+  a privilege on the object or its ancestors, which users and groups hold those roles, and the
+  results of the catalog and schema usage checks. [Snowflake show grants](https://docs.snowflake.com/en/sql-reference/sql/show-grants)
+  · [Databricks effective permissions](https://docs.databricks.com/api/uc-grants/v1/get-effective-permissions)
+- **Queryable audit.** Snowflake's `ACCESS_HISTORY` records object access and changes, and
+  `QUERY_HISTORY` includes failed statements. Databricks exposes the `system.access.audit` table
+  (Public Preview) with fields for the caller, action and response status. Gravitino's proposed
+  metalake-scoped API queries recorded operations and denials across server nodes. An audit event
+  ID can be passed to explain to evaluate that operation against current grants.
+  [Snowflake access history](https://docs.snowflake.com/en/sql-reference/account-usage/access_history)
+  · [Snowflake query history](https://docs.snowflake.com/en/sql-reference/account-usage/query_history)
+  · [Databricks audit table](https://docs.databricks.com/aws/en/admin/system-tables/audit-logs)
+
 ### Explain
 
 | Approach | Pros | Cons | Decision |
