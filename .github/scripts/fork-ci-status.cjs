@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 'use strict';
-const { TRUSTED_REQUIRED, NEEDS_ATTENTION } = require('./publish-ci-status.cjs');
+const { TRUSTED_REQUIRED, NEEDS_ATTENTION, WRONG_BASE } = require('./publish-ci-status.cjs');
 const { readFileSync } = require('node:fs');
 const path = require('node:path');
 const UPSTREAM = { owner: 'apache', repo: 'gravitino' };
@@ -115,11 +115,10 @@ function evaluateExecution(pr, run, jobs, baseSha) {
     if (!required && run.conclusion === 'success' && gates.length === 1 && gates[0].conclusion === 'success') {
       const match = /^Required CI \/ (.+) \/ [0-9a-f]{40} \/ ([0-9a-f]{40})$/.exec(gates[0].name);
       if (match && match[2] === pr.head.sha && match[1] !== pr.base.ref) {
-        const short = ref => ref.length > 32 ? ref.slice(0, 29) + '...' : ref;
         return { ...requiredAction(`Fork CI tested ${match[1]}, but PR #${pr.number} targets ${pr.base.ref}. ` +
           'This can happen if CI selected its base before the PR opened or the PR was retargeted. ' +
           'A push to the open PR branch or a full Fork CI rerun resolves its current base.'),
-          description: `${NEEDS_ATTENTION}: tested ${short(match[1])}; PR targets ${short(pr.base.ref)}. Re-run all jobs in your fork.` };
+          description: WRONG_BASE };
       }
     }
     return requiredAction('A Required CI record from the same, newer or unknown attempt does not match ' +

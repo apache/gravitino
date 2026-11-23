@@ -853,14 +853,17 @@ test('a failed fork run reports failure and points the author to re-run it in th
   assert.equal(statuses[0].target_url, url());
 }));
 
-test('the published error names the successful fork base and the actual PR target', async () => withPublisher(async ({ ctx, core }) => {
+test('the status fits a short row and the log identifies both branches', async () => withPublisher(async ({ ctx, core }) => {
   const p = pr();
   p.base.ref = 'glossary-term-dev';
+  const messages = [];
+  core.info = message => messages.push(message);
   const { github, statuses } = publisherMock({ current: p });
   github.rest.pulls.get = async () => ({ data: p });
   await update({ github, context: ctx, core, sleep: async () => {} });
   assert.equal(statuses[0].state, 'error');
-  assert.equal(statuses[0].description, 'Fork CI needs attention: tested main; PR targets glossary-term-dev. Re-run all jobs in your fork.');
+  assert.equal(statuses[0].description, 'Wrong base. Re-run all jobs in fork.');
+  assert.ok(messages.some(message => /tested main, but PR #\d+ targets glossary-term-dev/.test(message)));
 }));
 
 test('signals queue in order while scheduled sweeps poll in their own group', async () => {
@@ -2336,20 +2339,31 @@ test('trusted rerun failures stay retryable until the current summary identifies
 });
 
 
-test('trusted verification hint explains the cause and recovery without truncation', async () => withPublisher(async ({ ctx, core }) => {
+test('trusted verification names the actor and action in the short status', async () => withPublisher(async ({ ctx, core }) => {
   const { github, statuses } = publisherMock();
   github.rest.git = serviceMock({ changed: true }).rest.git;
   await update({ github, context: ctx, core });
   assert.equal(statuses[0].state, 'pending');
-  assert.equal(statuses[0].description, 'Fork CI passed; CI files differ from target branch. ' +
-    'Committer: run Fork CI in apache/gravitino on that branch with this PR number.');
-  assert.ok(statuses[0].description.length <= 140);
+  assert.equal(statuses[0].description, 'Committer: run Fork CI upstream.');
+}));
+
+test('a sweep rechecks a wrong-base status even for the same completed attempt', async () => withPublisher(async ({ ctx, core }) => {
+  ctx.eventName = 'schedule'; delete ctx.payload.inputs;
+  const recent = { ...pr(), updated_at: new Date().toISOString() };
+  const { github, statuses } = publisherMock({ latest: forkStatus('error', 'Wrong base. Re-run all jobs in fork.') });
+  const paginate = github.paginate;
+  github.paginate = async (endpoint, args) => endpoint === github.rest.pulls.list ? [recent] : paginate(endpoint, args);
+  github.rest.pulls.get = async () => ({ data: recent });
+  await update({ github, context: ctx, core, sleep: async () => {} });
+  assert.equal(statuses.at(-1).state, 'success');
 }));
 
 test('scheduled probes upgrade the old trust hint without repeatedly rewriting the new hint', async () => withPublisher(async ({ ctx, core }) => {
   ctx.eventName = 'schedule'; delete ctx.payload.inputs;
   const recent = { ...pr(), updated_at: new Date().toISOString() };
-  for (const description of ['Fork CI passed; trusted verification required', TRUSTED_REQUIRED]) {
+  for (const description of ['Fork CI passed; trusted verification required',
+    'Fork CI passed; CI files differ from target branch. ' +
+      'Committer: run Fork CI in apache/gravitino on that branch with this PR number.', TRUSTED_REQUIRED]) {
     const { github, statuses } = publisherMock({ latest: forkStatus('pending', description) });
     github.rest.git = serviceMock({ changed: true }).rest.git;
     const listPulls = github.rest.pulls.list, paginate = github.paginate;

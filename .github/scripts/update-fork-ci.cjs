@@ -14,7 +14,7 @@
  */
 'use strict';
 const { createService } = require('./fork-ci-status.cjs');
-const { NEEDS_ATTENTION, LEGACY_TRUSTED_REQUIRED, latestStatus, parseRunUrl, publishStatus, runUrl, statusCompleted, statusState } = require('./publish-ci-status.cjs');
+const { NEEDS_ATTENTION, WRONG_BASE, LEGACY_TRUST_HINTS, latestStatus, parseRunUrl, publishStatus, runUrl, statusCompleted, statusState } = require('./publish-ci-status.cjs');
 const { retireCancelled } = require('./retire-fork-ci.cjs');
 
 const RECENT_MS = 6 * 60 * 60 * 1000;
@@ -180,7 +180,8 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
         // Incomplete/mismatched jobs may become consistent without another run or attempt.
         // Retry these attention results within the normal sweep budget, while authoritative
         // failures/cancellations and successes retain the cheap settled-run probe.
-        const retry = latest?.state === 'error' && latest.description?.startsWith(NEEDS_ATTENTION);
+        const retry = latest?.state === 'error' &&
+          (latest.description?.startsWith(NEEDS_ATTENTION) || latest.description === WRONG_BASE);
         if (latest && !retry && statusCompleted(latest) && pr.head.repo) {
           const shown = parseRunUrl(latest.target_url);
           // A fork without fork-ci.yml (404) has no run to watch; its status already says so.
@@ -199,7 +200,7 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
           // link restores cheap probing, including after a missed retarget signal.
           const sameBase = shown?.base_sha === pr.base.sha && shown?.base_ref === pr.base.ref;
           // Refresh the old trust hint once so existing pending PRs receive actionable instructions.
-          if (settled && (!shown || sameBase) && latest.description !== LEGACY_TRUSTED_REQUIRED) return;
+          if (settled && (!shown || sameBase) && !LEGACY_TRUST_HINTS.includes(latest.description)) return;
         }
         await refresh(pr);
       });
