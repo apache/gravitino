@@ -57,6 +57,27 @@ If you are using the Gravitino with Trino, you can pass the Trino Iceberg connec
 
 If you are using the Gravitino with Spark, you can pass the Spark Iceberg connector configuration using prefix `spark.bypass.`. For example, using `spark.bypass.io-impl` to pass the `io-impl` to the Spark Iceberg connector in Spark runtime.
 
+#### Identifier Case Behavior
+
+For `catalog-backend=hive`, schema, table, and view identifiers are case-insensitive; you can use any casing.
+
+For `catalog-backend=rest`, always use the same identifier casing that was used when the object was first registered. Loading the same object with different casing is rejected.
+
+:::caution
+After upgrading, if loading an existing mixed-case object reports a retained identifier conflict,
+Gravitino does not support metadata-only unregister of an individual external object. Use this
+catalog-wide recovery procedure:
+
+1. Have an administrator [force-drop the Gravitino catalog](./manage-catalogs-and-schemas.md#drop-a-catalog).
+   This deletes every Gravitino registration and its privileges, tags, and other relationships in
+   the catalog. It does not drop the Iceberg namespaces, tables, views, or physical data.
+2. Recreate the Gravitino catalog and load the objects again. Keep the existing
+   `gravitino.identifier` properties; deleted registrations do not block new imports.
+3. Reapply any privileges, tags, or other governance relationships that the new registrations need.
+
+A source identifier can have only one active Gravitino registration. Coordinate with other
+Gravitino catalogs that share the external source before resetting a catalog.
+:::
 
 #### JDBC Backend
 
@@ -74,6 +95,23 @@ If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to
 :::caution
 Download the corresponding JDBC driver and place it to the `catalogs/lakehouse-iceberg/libs` directory If you are using JDBC backend.
 If you are using multiple JDBC catalog backends, setting `jdbc-initialize` to true may not take effect for RDMS like `Mysql`, you should create Iceberg meta tables explicitly.
+You can initialize the metadata tables using the scripts provided in the `${GRAVITINO_HOME}/scripts/` directory:
+
+- MySQL: `${GRAVITINO_HOME}/scripts/mysql/iceberg-jdbc-schema-mysql.sql`
+- PostgreSQL: `${GRAVITINO_HOME}/scripts/postgresql/iceberg-jdbc-schema-postgresql.sql`
+- H2: `${GRAVITINO_HOME}/scripts/h2/iceberg-jdbc-schema-h2.sql`
+
+For example:
+
+```bash
+# MySQL
+mysql -h <host> -u <username> -p <database> < ${GRAVITINO_HOME}/scripts/mysql/iceberg-jdbc-schema-mysql.sql
+
+# PostgreSQL
+psql -h <host> -U <username> -d <database> -f ${GRAVITINO_HOME}/scripts/postgresql/iceberg-jdbc-schema-postgresql.sql
+```
+
+When using H2, the JDBC connection URL must include `;DATABASE_TO_LOWER=TRUE` (e.g., `jdbc:h2:<path>;DATABASE_TO_LOWER=TRUE`). By default, H2 converts unquoted identifiers to uppercase, whereas Iceberg looks up metadata in lowercase. Without `DATABASE_TO_LOWER=TRUE`, Iceberg fails to detect existing columns such as `iceberg_type` and attempts an `ALTER TABLE`, which fails if the database user only has DML permissions.
 :::
 
 #### REST Catalog Backend
@@ -87,6 +125,12 @@ The following properties tune REST backend behavior:
 | `data-access`                       | Data access mode for REST catalog backend. Supported values are `vended-credentials` and `remote-signing`. | (none)        | No       |
 | `rest-client-connection-timeout-ms` | The HTTP connection timeout in milliseconds for requests to the REST catalog backend.                      | 10000         | No       |
 | `rest-client-socket-timeout-ms`     | The HTTP socket timeout in milliseconds for requests to the REST catalog backend.                          | 60000         | No       |
+| `rest-backend-auth-type`           | How the REST backend authenticates to the remote catalog: `user-token` forwards the calling user's token, `service-account` connects with `rest-backend-token` or `rest-backend-credential` and authorizes every request in Gravitino. | user-token    | No       |
+| `rest-backend-token`               | Static bearer token for a `service-account` connection. Hidden from catalog responses.                     | (none)        | No       |
+| `rest-backend-credential`          | OAuth2 client credential (`client_id:client_secret`) for a `service-account` connection. Hidden from catalog responses. | (none)        | No       |
+| `rest-backend-oauth2-server-uri`   | OAuth2 token endpoint for `rest-backend-credential`.                                                       | (none)        | No       |
+| `rest-backend-scope`               | OAuth2 scope requested with `rest-backend-credential`.                                                     | (none)        | No       |
+| `rest-backend-storage-credential-source`  | Who issues storage credentials through the Iceberg REST service: `remote` passes through the remote catalog's credentials, `local` issues them through this catalog's `credential-providers`. A `service-account` connection always uses `local`, regardless of this setting. | remote        | No       |
 
 - `vended-credentials`: request credential vending from the Iceberg REST server.
 - `remote-signing`: Gravitino doesn't support this mode yet.
@@ -124,6 +168,34 @@ on the URI scheme:
 - ADLS: `abfs`, `abfss`, `wasb`, or `wasbs`
 - To override the default, explicitly configure `io-impl`.
 - Ensure that the corresponding storage bundle is available in the Iceberg catalog classpath.
+
+Catalogs with a remote warehouse reject client-supplied local filesystem locations, including
+`file:` URIs and paths without a scheme, with HTTP 400. This applies to table and view creation
+(including staged table creation), registration, location updates, namespace locations, and the
+`write.metadata.path` and `write.data.path` properties. An existing local namespace location is
+also rejected when a create request inherits it. ResolvingFileIO still permits locations on
+different remote storage systems, such as S3 and GCS, in the same catalog. Catalogs whose warehouse
+is a local path or `file:` URI retain local filesystem support for development and testing.
+
+With Iceberg REST authorization enabled, an explicit table location on create (including staged
+create), registration, or a `set-location` commit requires load access to every existing table
+whose location overlaps it. Equal, parent, and child directories overlap; names such as `table`
+and `table2` do not. Destination create and overwrite privileges are checked first, and denied
+source checks return 403 without disclosing the source table's name. A default-location create
+does not add a source scan. Filesystem dot segments and repeated separators are normalized for
+comparison; object-store keys retain their literal path segments.
+
+For JDBC backends, source discovery uses a single query of current metadata pointers and infers
+locations from the standard `<table-location>/metadata/<file>` layout. This lookup does not read
+other tables' metadata files and does not use a cross-request cache. Custom metadata layouts,
+including arbitrary `write.metadata.path` values, are outside this lookup's supported layout.
+Registration also preserves exact current metadata-pointer matching, including pointers outside
+the standard layout. This identity check does not provide complete overlap detection for custom
+layouts. Source discovery compares storage locations and metadata pointers rather than table
+UUIDs; register-overwrite still preserves the destination table UUID. Backends without bulk
+pointer lookup retain namespace discovery. Metadata read failures on that fallback path are
+propagated; only tables proven to have disappeared are skipped. Database lookup failures are
+also propagated, and destination authorization remains required.
 
 Supports using static access-key-id and secret-access-key to access S3 data.
 
@@ -368,7 +440,19 @@ children: List[str] = catalog.as_schemas().list_schemas(parent_schema="a:b")
 
 ### Table Capabilities
 
-- Doesn't support column default value.
+- For format-version 3 tables, Iceberg column defaults in table metadata are
+  reported when the table is loaded:
+
+  | Iceberg field     | Column field           |
+  |-------------------|------------------------|
+  | `write-default`   | `defaultValue`         |
+  | `initial-default` | `initialDefaultValue`  |
+
+  Iceberg `timestamptz` defaults are exposed as a UTC `LocalDateTime` with
+  Gravitino type `timestamp_tz`. Clients should treat those `LocalDateTime`
+  fields as UTC when recovering the instant.
+
+- Setting column default values through the Gravitino API is not supported yet.
 
 ### Table Partitions
 

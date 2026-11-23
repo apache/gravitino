@@ -32,22 +32,29 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
+import software.amazon.awssdk.core.exception.ApiCallTimeoutException;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.model.AlreadyExistsException;
 import software.amazon.awssdk.services.glue.model.CreateDatabaseRequest;
 import software.amazon.awssdk.services.glue.model.Database;
+import software.amazon.awssdk.services.glue.model.DatabaseIdentifier;
+import software.amazon.awssdk.services.glue.model.DatabaseInput;
 import software.amazon.awssdk.services.glue.model.DeleteDatabaseRequest;
 import software.amazon.awssdk.services.glue.model.EntityNotFoundException;
 import software.amazon.awssdk.services.glue.model.GetDatabaseRequest;
@@ -58,8 +65,10 @@ import software.amazon.awssdk.services.glue.model.GetTablesRequest;
 import software.amazon.awssdk.services.glue.model.GetTablesResponse;
 import software.amazon.awssdk.services.glue.model.GlueException;
 import software.amazon.awssdk.services.glue.model.Table;
+import software.amazon.awssdk.services.glue.model.ThrottlingException;
 import software.amazon.awssdk.services.glue.model.UpdateDatabaseRequest;
 import software.amazon.awssdk.services.glue.model.UpdateDatabaseResponse;
+import software.amazon.awssdk.services.glue.model.ValidationException;
 
 class TestGlueCatalogSchemaOperations {
 
@@ -179,7 +188,7 @@ class TestGlueCatalogSchemaOperations {
     GlueException cause = invalidCredentialsException();
     when(mockClient.getDatabases(any(GetDatabasesRequest.class))).thenThrow(cause);
 
-    RuntimeException ex = assertThrows(RuntimeException.class, () -> ops.listSchemas(ns));
+    ForbiddenException ex = assertThrows(ForbiddenException.class, () -> ops.listSchemas(ns));
 
     assertEquals(cause, ex.getCause());
     assertTrue(ex.getMessage().contains(GlueConstants.AWS_ACCESS_KEY_ID));
@@ -188,14 +197,94 @@ class TestGlueCatalogSchemaOperations {
   }
 
   @Test
-  void testListSchemasRethrowsNonCredentialSdkClientException() {
+  void testListSchemasMapsUnreachableEndpointToConnectionFailure() {
     Namespace ns = Namespace.of("metalake", "catalog");
     SdkClientException cause = SdkClientException.create("connection refused");
     when(mockClient.getDatabases(any(GetDatabasesRequest.class))).thenThrow(cause);
 
-    SdkClientException ex = assertThrows(SdkClientException.class, () -> ops.listSchemas(ns));
+    ConnectionFailedException ex =
+        assertThrows(ConnectionFailedException.class, () -> ops.listSchemas(ns));
 
-    assertEquals(cause, ex);
+    assertEquals(cause, ex.getCause());
+    assertTrue(ex.getMessage().contains("connection refused"), ex.getMessage());
+    assertTrue(ex.getMessage().contains("Failed to reach AWS Glue"), ex.getMessage());
+  }
+
+  @Test
+  void testListSchemasMapsTimeoutToConnectionFailure() {
+    Namespace ns = Namespace.of("metalake", "catalog");
+    when(mockClient.getDatabases(any(GetDatabasesRequest.class)))
+        .thenThrow(ApiCallTimeoutException.create(30_000L));
+
+    ConnectionFailedException ex =
+        assertThrows(ConnectionFailedException.class, () -> ops.listSchemas(ns));
+
+    assertTrue(ex.getMessage().contains("timed out"), ex.getMessage());
+  }
+
+  @Test
+  void testListSchemasMapsRegionMismatchToIllegalArgument() {
+    Namespace ns = Namespace.of("metalake", "catalog");
+    GlueException cause =
+        glueException(
+            "InvalidSignatureException", "Credential should be scoped to a valid region.");
+    when(mockClient.getDatabases(any(GetDatabasesRequest.class))).thenThrow(cause);
+
+    IllegalArgumentException ex =
+        assertThrows(IllegalArgumentException.class, () -> ops.listSchemas(ns));
+
+    assertTrue(ex.getMessage().contains(GlueConstants.AWS_REGION), ex.getMessage());
+    assertTrue(ex.getMessage().contains(GlueConstants.AWS_GLUE_ENDPOINT), ex.getMessage());
+    assertFalse(ex.getMessage().contains(GlueConstants.AWS_SECRET_ACCESS_KEY), ex.getMessage());
+  }
+
+  @Test
+  void testLoadSchemaMapsThrottlingToServiceUnavailable() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "db");
+    when(mockClient.getDatabase(any(GetDatabaseRequest.class)))
+        .thenThrow(
+            ThrottlingException.builder()
+                .message("Rate exceeded")
+                .awsErrorDetails(
+                    AwsErrorDetails.builder()
+                        .errorCode("ThrottlingException")
+                        .errorMessage("Rate exceeded")
+                        .build())
+                .build());
+
+    ServiceUnavailableException ex =
+        assertThrows(ServiceUnavailableException.class, () -> ops.loadSchema(ident));
+
+    assertTrue(ex.getMessage().contains("can be retried"), ex.getMessage());
+  }
+
+  @Test
+  void testCreateSchemaMapsValidationExceptionToIllegalArgumentWithShortMessage() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "db");
+    String longValue = StringUtils.repeat('v', 600_000);
+    String awsMessage =
+        "1 validation error detected: Value '{k="
+            + longValue
+            + "}' at 'database.parameters' failed to satisfy constraint: Map value must satisfy"
+            + " constraint";
+    when(mockClient.createDatabase(any(CreateDatabaseRequest.class)))
+        .thenThrow(
+            ValidationException.builder()
+                .message(awsMessage)
+                .awsErrorDetails(
+                    AwsErrorDetails.builder()
+                        .errorCode("ValidationException")
+                        .errorMessage(awsMessage)
+                        .build())
+                .build());
+
+    IllegalArgumentException ex =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.createSchema(ident, null, Collections.emptyMap()));
+
+    assertTrue(ex.getMessage().length() < 2_000, "message length " + ex.getMessage().length());
+    assertTrue(ex.getMessage().contains("failed to satisfy constraint"), ex.getMessage());
   }
 
   // -------------------------------------------------------------------------
@@ -272,10 +361,7 @@ class TestGlueCatalogSchemaOperations {
             .parameters(Map.of("existing", "val"))
             .createTime(Instant.now())
             .build();
-    when(mockClient.getDatabase(any(GetDatabaseRequest.class)))
-        .thenReturn(GetDatabaseResponse.builder().database(db).build());
-    when(mockClient.updateDatabase(any(UpdateDatabaseRequest.class)))
-        .thenReturn(UpdateDatabaseResponse.builder().build());
+    useFakeGlueDatabase(db);
 
     ArgumentCaptor<UpdateDatabaseRequest> captor =
         ArgumentCaptor.forClass(UpdateDatabaseRequest.class);
@@ -386,6 +472,16 @@ class TestGlueCatalogSchemaOperations {
   }
 
   @Test
+  void testDropSchemaNotFoundWithoutCascadeReturnsFalse() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "missing_db");
+    when(mockClient.getTables(any(GetTablesRequest.class)))
+        .thenThrow(EntityNotFoundException.builder().message("Database not found").build());
+
+    assertFalse(ops.dropSchema(ident, false));
+    verify(mockClient, never()).deleteDatabase(any(DeleteDatabaseRequest.class));
+  }
+
+  @Test
   void testDropSchemaWithCatalogId() {
     ops.catalogId = "123456789012";
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb");
@@ -399,6 +495,121 @@ class TestGlueCatalogSchemaOperations {
 
     verify(mockClient).deleteDatabase(captor.capture());
     assertEquals("123456789012", captor.getValue().catalogId());
+  }
+
+  @Test
+  void testLoadSchemaReportsLocationUri() {
+    useFakeGlueDatabase(
+        Database.builder()
+            .name("mydb")
+            .locationUri("s3://bucket/native_db")
+            .parameters(Map.of("location", "s3://bucket/stale"))
+            .build());
+
+    GlueSchema schema = ops.loadSchema(NameIdentifier.of("metalake", "catalog", "mydb"));
+
+    assertEquals("s3://bucket/native_db", schema.properties().get(GlueConstants.LOCATION));
+  }
+
+  @Test
+  void testCreateSchemaStoresLocationOnlyAsLocationUri() {
+    ArgumentCaptor<CreateDatabaseRequest> captor =
+        ArgumentCaptor.forClass(CreateDatabaseRequest.class);
+
+    GlueSchema created =
+        ops.createSchema(
+            NameIdentifier.of("metalake", "catalog", "mydb"),
+            null,
+            Map.of(GlueConstants.LOCATION, "s3://bucket/mydb", "k", "v"));
+    assertEquals("s3://bucket/mydb", created.properties().get(GlueConstants.LOCATION));
+
+    verify(mockClient).createDatabase(captor.capture());
+    DatabaseInput input = captor.getValue().databaseInput();
+    assertEquals("s3://bucket/mydb", input.locationUri());
+    assertFalse(input.parameters().containsKey(GlueConstants.LOCATION));
+    assertEquals("v", input.parameters().get("k"));
+  }
+
+  @Test
+  void testAlterSchemaKeepsLocationUriAndUnmodeledFields() {
+    useFakeGlueDatabase(
+        Database.builder()
+            .name("mydb")
+            .description("native")
+            .locationUri("s3://bucket/native_db")
+            .parameters(Map.of("k", "v"))
+            .targetDatabase(DatabaseIdentifier.builder().databaseName("shared").build())
+            .build());
+    ArgumentCaptor<UpdateDatabaseRequest> captor =
+        ArgumentCaptor.forClass(UpdateDatabaseRequest.class);
+
+    GlueSchema result =
+        ops.alterSchema(
+            NameIdentifier.of("metalake", "catalog", "mydb"), SchemaChange.setProperty("k2", "v2"));
+
+    verify(mockClient).updateDatabase(captor.capture());
+    DatabaseInput input = captor.getValue().databaseInput();
+    assertEquals("s3://bucket/native_db", input.locationUri());
+    assertEquals("native", input.description());
+    assertEquals("shared", input.targetDatabase().databaseName());
+    assertEquals("s3://bucket/native_db", result.properties().get(GlueConstants.LOCATION));
+  }
+
+  @Test
+  void testAlterSchemaReturnsSubmittedDefinitionWhenReadBackFails() {
+    Database database =
+        Database.builder().name("mydb").locationUri("s3://bucket/native_db").build();
+    when(mockClient.getDatabase(any(GetDatabaseRequest.class)))
+        .thenReturn(GetDatabaseResponse.builder().database(database).build())
+        .thenThrow(ThrottlingException.builder().message("slow down").build());
+
+    GlueSchema result =
+        ops.alterSchema(
+            NameIdentifier.of("metalake", "catalog", "mydb"), SchemaChange.setProperty("k", "v"));
+
+    verify(mockClient).updateDatabase(any(UpdateDatabaseRequest.class));
+    assertEquals("v", result.properties().get("k"));
+    assertEquals("s3://bucket/native_db", result.properties().get(GlueConstants.LOCATION));
+  }
+
+  @Test
+  void testAlterSchemaLocationChangesLocationUri() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb");
+    useFakeGlueDatabase(Database.builder().name("mydb").locationUri("s3://bucket/old").build());
+
+    ops.alterSchema(ident, SchemaChange.setProperty(GlueConstants.LOCATION, "s3://bucket/new"));
+    assertEquals("s3://bucket/new", ops.loadSchema(ident).properties().get(GlueConstants.LOCATION));
+
+    ops.alterSchema(ident, SchemaChange.removeProperty(GlueConstants.LOCATION));
+    assertFalse(ops.loadSchema(ident).properties().containsKey(GlueConstants.LOCATION));
+  }
+
+  /** Makes the mock behave like Glue for one database: updates are visible to later reads. */
+  private void useFakeGlueDatabase(Database initial) {
+    AtomicReference<Database> stored = new AtomicReference<>(initial);
+    when(mockClient.getDatabase(any(GetDatabaseRequest.class)))
+        .thenAnswer(inv -> GetDatabaseResponse.builder().database(stored.get()).build());
+    when(mockClient.updateDatabase(any(UpdateDatabaseRequest.class)))
+        .thenAnswer(
+            inv -> {
+              DatabaseInput in = ((UpdateDatabaseRequest) inv.getArgument(0)).databaseInput();
+              stored.set(
+                  stored.get().toBuilder()
+                      .description(in.description())
+                      .locationUri(in.locationUri())
+                      .parameters(in.parameters())
+                      .build());
+              return UpdateDatabaseResponse.builder().build();
+            });
+  }
+
+  private static GlueException glueException(String code, String message) {
+    return (GlueException)
+        GlueException.builder()
+            .message(message)
+            .awsErrorDetails(
+                AwsErrorDetails.builder().errorCode(code).errorMessage(message).build())
+            .build();
   }
 
   private static GlueException invalidCredentialsException() {

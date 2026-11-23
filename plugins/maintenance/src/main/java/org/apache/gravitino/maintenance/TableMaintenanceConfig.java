@@ -18,13 +18,28 @@
  */
 package org.apache.gravitino.maintenance;
 
+import java.util.Optional;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 
 /** Configuration for table maintenance scheduler pools (§7.2). */
 public final class TableMaintenanceConfig {
+
+  /**
+   * USER principal TMS uses when submitting jobs with authorization enabled. Required when {@link
+   * Configs#ENABLE_AUTHORIZATION} is {@code true}; ignored when authorization is disabled.
+   */
+  public static final ConfigEntry<Optional<String>> JOB_SUBMITTER =
+      new ConfigBuilder("gravitino.maintenance.jobSubmitter")
+          .doc(
+              "USER that TMS uses to submit maintenance jobs when authorization is enabled."
+                  + " Required when gravitino.authorization.enable=true.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .createWithOptional();
 
   public static final ConfigEntry<Integer> SCHEDULER_EXPAND_THREADS =
       new ConfigBuilder("gravitino.maintenance.scheduler.expandThreads")
@@ -74,9 +89,9 @@ public final class TableMaintenanceConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(6);
 
-  public static final ConfigEntry<Integer> EXPAND_ENQUEUE_BATCH_SIZE =
-      new ConfigBuilder("gravitino.maintenance.expand.enqueueBatchSize")
-          .doc("Maximum cron-jobs enqueued per policy-expand pick")
+  public static final ConfigEntry<Integer> EXPAND_SCHEDULE_BATCH_SIZE =
+      new ConfigBuilder("gravitino.maintenance.expand.scheduleBatchSize")
+          .doc("Maximum cron-jobs scheduled per policy-expand pick")
           .version(ConfigConstants.VERSION_2_0_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
@@ -101,7 +116,7 @@ public final class TableMaintenanceConfig {
   private final long pollingIntervalMs;
   private final long heartbeatIntervalMs;
   private final int missedHeartbeatsLimit;
-  private final int expandEnqueueBatchSize;
+  private final int expandScheduleBatchSize;
   private final long claimTimeoutMs;
 
   private TableMaintenanceConfig(
@@ -111,7 +126,7 @@ public final class TableMaintenanceConfig {
       long pollingIntervalMs,
       long heartbeatIntervalMs,
       int missedHeartbeatsLimit,
-      int expandEnqueueBatchSize,
+      int expandScheduleBatchSize,
       long claimTimeoutMs) {
     this.expandThreads = expandThreads;
     this.cronThreads = cronThreads;
@@ -119,7 +134,7 @@ public final class TableMaintenanceConfig {
     this.pollingIntervalMs = pollingIntervalMs;
     this.heartbeatIntervalMs = heartbeatIntervalMs;
     this.missedHeartbeatsLimit = missedHeartbeatsLimit;
-    this.expandEnqueueBatchSize = expandEnqueueBatchSize;
+    this.expandScheduleBatchSize = expandScheduleBatchSize;
     this.claimTimeoutMs = claimTimeoutMs;
   }
 
@@ -137,7 +152,7 @@ public final class TableMaintenanceConfig {
         config.get(SCHEDULER_POLLING_INTERVAL_MS),
         config.get(SCHEDULER_HEARTBEAT_INTERVAL_MS),
         config.get(SCHEDULER_MISSED_HEARTBEATS_LIMIT),
-        config.get(EXPAND_ENQUEUE_BATCH_SIZE),
+        config.get(EXPAND_SCHEDULE_BATCH_SIZE),
         config.get(OCCUPANCY_CLAIM_TIMEOUT_MS));
   }
 
@@ -184,10 +199,10 @@ public final class TableMaintenanceConfig {
   }
 
   /**
-   * @return expand enqueue batch size
+   * @return expand schedule batch size
    */
-  public int expandEnqueueBatchSize() {
-    return expandEnqueueBatchSize;
+  public int expandScheduleBatchSize() {
+    return expandScheduleBatchSize;
   }
 
   /**
@@ -206,7 +221,7 @@ public final class TableMaintenanceConfig {
    * @param pollingIntervalMs poll interval
    * @param heartbeatIntervalMs heartbeat interval
    * @param missedHeartbeatsLimit missed heartbeat limit
-   * @param expandEnqueueBatchSize expand batch size
+   * @param expandScheduleBatchSize expand batch size
    * @return config instance
    */
   public static TableMaintenanceConfig forTest(
@@ -216,7 +231,7 @@ public final class TableMaintenanceConfig {
       long pollingIntervalMs,
       long heartbeatIntervalMs,
       int missedHeartbeatsLimit,
-      int expandEnqueueBatchSize) {
+      int expandScheduleBatchSize) {
     return forTest(
         expandThreads,
         cronThreads,
@@ -224,7 +239,7 @@ public final class TableMaintenanceConfig {
         pollingIntervalMs,
         heartbeatIntervalMs,
         missedHeartbeatsLimit,
-        expandEnqueueBatchSize,
+        expandScheduleBatchSize,
         DEFAULT_CLAIM_TIMEOUT_MS);
   }
 
@@ -237,7 +252,7 @@ public final class TableMaintenanceConfig {
    * @param pollingIntervalMs poll interval
    * @param heartbeatIntervalMs heartbeat interval
    * @param missedHeartbeatsLimit missed heartbeat limit
-   * @param expandEnqueueBatchSize expand batch size
+   * @param expandScheduleBatchSize expand batch size
    * @param claimTimeoutMs unbound claim timeout
    * @return config instance
    */
@@ -248,7 +263,7 @@ public final class TableMaintenanceConfig {
       long pollingIntervalMs,
       long heartbeatIntervalMs,
       int missedHeartbeatsLimit,
-      int expandEnqueueBatchSize,
+      int expandScheduleBatchSize,
       long claimTimeoutMs) {
     return new TableMaintenanceConfig(
         expandThreads,
@@ -257,7 +272,7 @@ public final class TableMaintenanceConfig {
         pollingIntervalMs,
         heartbeatIntervalMs,
         missedHeartbeatsLimit,
-        expandEnqueueBatchSize,
+        expandScheduleBatchSize,
         claimTimeoutMs);
   }
 }

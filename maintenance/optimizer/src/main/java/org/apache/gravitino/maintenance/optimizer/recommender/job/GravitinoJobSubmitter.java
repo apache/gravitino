@@ -125,10 +125,30 @@ public class GravitinoJobSubmitter implements JobSubmitter {
       OptimizerConfig optimizerConfig,
       JobExecutionContext jobExecutionContext,
       GravitinoJobAdapter jobAdapter) {
+    String schemaSeparator =
+        GravitinoClientUtils.fetchSchemaSeparator(
+            optimizerConfig == null
+                ? null
+                : optimizerConfig.get(OptimizerConfig.GRAVITINO_URI_CONFIG));
+    return buildJobConfig(optimizerConfig, jobExecutionContext, jobAdapter, schemaSeparator);
+  }
+
+  /**
+   * Same as {@link #buildJobConfig(OptimizerConfig, JobExecutionContext, GravitinoJobAdapter)} with
+   * an already-resolved schema separator (for tests that do not hit {@code GET /configs}).
+   */
+  @VisibleForTesting
+  static Map<String, String> buildJobConfig(
+      OptimizerConfig optimizerConfig,
+      JobExecutionContext jobExecutionContext,
+      GravitinoJobAdapter jobAdapter,
+      String schemaSeparator) {
     Map<String, String> submitterConfigs =
         optimizerConfig == null ? Map.of() : optimizerConfig.jobSubmitterConfigs();
     Map<String, String> adapterConfigs =
-        jobAdapter == null ? Map.of() : jobAdapter.jobConfig(jobExecutionContext);
+        jobAdapter == null
+            ? Map.of()
+            : jobAdapter.jobConfig(jobExecutionContext, submitterConfigs, schemaSeparator);
 
     Map<String, String> mergedConfigs = new LinkedHashMap<>();
     mergedConfigs.putAll(submitterConfigs);

@@ -21,6 +21,8 @@ from typing import Dict, Optional
 
 from gravitino.api.auditable import Auditable
 from gravitino.api.authorization.supports_roles import SupportsRoles
+from gravitino.api.domain.supports_domains import SupportsDomains
+from gravitino.api.policy.supports_policies import SupportsPolicies
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.exceptions.base import UnsupportedOperationException
 
@@ -220,6 +222,11 @@ class Fileset(Auditable):
     def supports_tags(self) -> SupportsTags:
         raise UnsupportedOperationException("Fileset does not support tag operations.")
 
+    def supports_policies(self) -> SupportsPolicies:
+        raise UnsupportedOperationException(
+            "Fileset does not support policy operations."
+        )
+
     def supports_roles(self) -> SupportsRoles:
         """Return role operations supported by this fileset.
 
@@ -230,3 +237,9 @@ class Fileset(Auditable):
             UnsupportedOperationException: If this fileset does not support role operations.
         """
         raise UnsupportedOperationException("Fileset does not support role operations.")
+
+    def supports_domains(self) -> SupportsDomains:
+        """Return domain lookup operations for this fileset."""
+        raise UnsupportedOperationException(
+            "Fileset does not support domain operations."
+        )

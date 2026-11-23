@@ -78,8 +78,11 @@ public class TestBuiltInJobTemplateProvider {
     List<? extends JobTemplate> templates = provider.jobTemplates();
 
     for (JobTemplate template : templates) {
-      String version = template.customFields().get(JobTemplateProvider.PROPERTY_VERSION_KEY);
-      assertNotNull(version, "Template should have version property: " + template.name());
+      Map<String, String> fields = template.customFields();
+      assertTrue(
+          fields != null && fields.containsKey(JobTemplateProvider.PROPERTY_VERSION_KEY),
+          "Template missing version: " + template.name());
+      String version = fields.get(JobTemplateProvider.PROPERTY_VERSION_KEY);
       assertTrue(
           version.matches(JobTemplateProvider.VERSION_VALUE_PATTERN),
           "Version should match pattern v\\d+: " + version);
@@ -87,11 +90,23 @@ public class TestBuiltInJobTemplateProvider {
   }
 
   @Test
+  public void testIcebergMaintenanceTaskHasVersion() {
+    JobTemplate template =
+        new BuiltInJobTemplateProvider()
+            .jobTemplates().stream()
+                .filter(t -> t.name().equals("builtin-iceberg-maintenance-task"))
+                .findFirst()
+                .orElseThrow();
+    assertEquals("v1", template.customFields().get(JobTemplateProvider.PROPERTY_VERSION_KEY));
+  }
+
+  @Test
   public void testTemplatesOnlyRequireTheParametersTheyHaveTo() {
-    // A built-in template must let a caller run it with the catalog and the table alone, so every
-    // other parameter needs a default value. Catalog and updater connections have no defaults that
-    // fit every deployment, and an empty where clause rewrites a whole table, so those stay
-    // required.
+    // Standalone Iceberg templates must run with catalog + table alone, so every other parameter
+    // needs a default. Catalog and updater connections have no defaults that fit every deployment,
+    // and an empty where clause rewrites a whole table, so those stay required.
+    // builtin-iceberg-maintenance-task carries catalog/table/procedure fields inside each tasks[]
+    // entry, so only the tasks JSON itself is required at the template root.
     Map<String, Set<String>> expected = new HashMap<>();
     Set<String> icebergCatalog =
         ImmutableSet.of(
@@ -111,12 +126,7 @@ public class TestBuiltInJobTemplateProvider {
     expected.put(
         "builtin-iceberg-rewrite-data-files",
         ImmutableSet.<String>builder().addAll(icebergCatalog).add("where_clause").build());
-    expected.put(
-        "builtin-iceberg-maintenance-task",
-        ImmutableSet.<String>builder()
-            .add("catalog_name", "catalog_type", "catalog_uri", "warehouse_location")
-            .add("maintenance_types", "policy_ids", "tables")
-            .build());
+    expected.put("builtin-iceberg-maintenance-task", ImmutableSet.of("tasks"));
 
     for (JobTemplate template : new BuiltInJobTemplateProvider().jobTemplates()) {
       Set<String> required = new JobTemplateResolver(toEntity(template)).requiredParameters();

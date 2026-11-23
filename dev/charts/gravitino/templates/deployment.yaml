@@ -74,7 +74,7 @@ spec:
           volumeMounts:
             - mountPath: /tmp/scripts/
               name: scripts-emptydir
-      {{- if .Values.mysql.enabled }}
+      {{- if eq (include "gravitino.mysqlSchemaInitEnabled" . | trim) "true" }}
         - name: init-mysql
           image: {{ include "init-mysql.image" . }}
           imagePullPolicy: "{{ .Values.image.pullPolicy }}"
@@ -82,7 +82,7 @@ spec:
             - /bin/bash
             - -c
             - |
-              while ! mysql -h {{ .Release.Name }}-mysql -u root -e "SELECT 1"; do
+              while ! mysql -h {{ include "gravitino.mysql.fullname" . }} -u root -e "SELECT 1"; do
                 echo "Waiting for MySQL to be ready..."
                 sleep 2
               done
@@ -104,11 +104,11 @@ spec:
               fi
               echo "Schema file: $schema_file"
               echo "Upgrade file: $upgrade_file"
-              if ! mysql -h {{ .Release.Name }}-mysql -u root -D $GRAVITINO_DB <"$upgrade_file"; then
+              if ! mysql -h {{ include "gravitino.mysql.fullname" . }} -u root -D $GRAVITINO_DB <"$upgrade_file"; then
                 echo "WARNING: Upgrade script failed: $upgrade_file" >&2
                 echo "Continuing with schema script..." >&2
               fi
-              mysql -h {{ .Release.Name }}-mysql -u root -D $GRAVITINO_DB <$schema_file
+              mysql -h {{ include "gravitino.mysql.fullname" . }} -u root -D $GRAVITINO_DB <$schema_file
           resources:
             {{- toYaml .Values.initResources | nindent 12 }}
           securityContext:
@@ -117,7 +117,57 @@ spec:
             - name: MYSQL_PWD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-mysql
+                  name: {{ include "gravitino.mysql.secretName" . }}
+                  key: mysql-root-password
+            - name: GRAVITINO_DB
+              value: {{ .Values.mysql.auth.database }}
+          volumeMounts:
+            - mountPath: /scripts
+              name: scripts-emptydir
+      {{- else if and .Values.mysql.enabled (eq (include "gravitino.schemaWaitEnabled" . | trim) "true") }}
+        - name: init-mysql
+          image: {{ include "init-mysql.image" . }}
+          imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              VERSION=$(cat /scripts/version.txt)
+              if [ -z "$VERSION" ]; then
+                echo "ERROR: Please set VERSION (missing /scripts/version.txt)" >&2
+                exit 1
+              fi
+              echo "Waiting for schema version ${VERSION} (written by the schema-migrate Job)..."
+              {{- include "gravitino.schemaWaitPreamble" . | nindent 14 }}
+              while true; do
+                if [ "$SECONDS" -ge "$deadline" ]; then
+                  echo "ERROR: timed out after ${timeout}s waiting for schema version ${VERSION}" >&2
+                  exit 1
+                fi
+                if mysql -h {{ include "gravitino.mysql.fullname" . }} -u root -e "SELECT 1" >/dev/null 2>&1; then
+                  current=$(mysql -h {{ include "gravitino.mysql.fullname" . }} -u root -D "$GRAVITINO_DB" -sNe "{{ include "gravitino.schemaReadyQuery" "mysql" }}" 2>/dev/null | tr -d '[:space:]' || true)
+                  if [ "$current" = "$VERSION" ]; then
+                    echo "Schema version ${current} is ready."
+                    exit 0
+                  fi
+                  echo "Recorded schema version is '${current:-<none>}'; waiting for ${VERSION}..."
+                else
+                  echo "Waiting for MySQL to be ready..."
+                fi
+                sleep 2
+              done
+          resources:
+            {{- toYaml .Values.initResources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.initContainerSecurityContext | nindent 12 }}
+          env:
+            - name: SCHEMA_WAIT_TIMEOUT
+              value: {{ include "gravitino.schemaWaitTimeoutSeconds" . | quote }}
+            - name: MYSQL_PWD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gravitino.mysql.secretName" . }}
                   key: mysql-root-password
             - name: GRAVITINO_DB
               value: {{ .Values.mysql.auth.database }}
@@ -125,7 +175,17 @@ spec:
             - mountPath: /scripts
               name: scripts-emptydir
       {{- end }}
-      {{- if .Values.postgresql.enabled }}
+      {{- if eq (include "gravitino.postgresqlSchemaInitEnabled" . | trim) "true" }}
+        {{- $_ := include "gravitino.postgresqlInitSslValidate" . }}
+        {{- $pgInitHost := include "gravitino.postgresqlInitHost" . | trim }}
+        {{- $pgInitSecret := include "gravitino.postgresqlInitSecretName" . | trim }}
+        {{- $pgInitSecretKey := .Values.postgresql.init.existingSecretPasswordKey | default "password" }}
+        {{- $pgInitPort := include "gravitino.postgresqlInitPort" . | trim }}
+        {{- $pgInitSslMode := include "gravitino.postgresqlInitSslMode" . | trim }}
+        {{- $pgInitCurrentSchema := include "gravitino.postgresqlInitCurrentSchema" . | trim }}
+        {{- $pgInitSslCaSecret := include "gravitino.postgresqlInitSslCaSecretName" . | trim }}
+        {{- $pgInitWaitTimeout := .Values.postgresql.init.waitTimeoutSeconds | default 300 }}
+        {{- $pgInitConnectTimeout := .Values.postgresql.init.connectTimeoutSeconds | default 5 }}
         - name: init-postgresql
           image: {{ include "init-postgresql.image" . }}
           imagePullPolicy: "{{ .Values.image.pullPolicy }}"
@@ -133,10 +193,46 @@ spec:
             - /bin/bash
             - -c
             - |
-              while ! PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ .Release.Name }}-postgresql -U $POSTGRES_USER -c "SELECT 1"; do
+              set -e
+              timeout={{ $pgInitWaitTimeout }}
+              case "$timeout" in
+                ''|*[!0-9]*) echo "ERROR: waitTimeoutSeconds must be a positive integer" >&2; exit 1 ;;
+              esac
+              if [ "$timeout" -lt 1 ]; then
+                echo "ERROR: waitTimeoutSeconds must be a positive integer" >&2
+                exit 1
+              fi
+              deadline=$((SECONDS + timeout))
+              last_err=""
+              while true; do
+                remaining=$((deadline - SECONDS))
+                if [ "$remaining" -lt 1 ]; then
+                  echo "ERROR: timed out after ${timeout}s waiting for PostgreSQL at {{ $pgInitHost }}:$PGPORT/$GRAVITINO_DB" >&2
+                  echo "$last_err" >&2
+                  exit 1
+                fi
+                set +e
+                err=$(PGPASSWORD="$POSTGRES_PASSWORD" timeout "$remaining" psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -c "SELECT 1" 2>&1)
+                rc=$?
+                set -e
+                if [ "$rc" -eq 0 ]; then
+                  break
+                fi
+                last_err="$err"
+                if [ "$rc" -eq 124 ]; then
+                  echo "ERROR: timed out after ${timeout}s waiting for PostgreSQL at {{ $pgInitHost }}:$PGPORT/$GRAVITINO_DB" >&2
+                  echo "$err" >&2
+                  exit 1
+                fi
                 echo "Waiting for PostgreSQL to be ready..."
                 sleep 2
               done
+              if [ -n "${PG_CURRENT_SCHEMA:-}" ]; then
+                schema_exists=$(PGPASSWORD="$POSTGRES_PASSWORD" psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -v ON_ERROR_STOP=1 -tAc "SELECT 1 FROM pg_namespace WHERE nspname = '${PG_CURRENT_SCHEMA}'")
+                if [ "$schema_exists" != "1" ]; then
+                  PGPASSWORD="$POSTGRES_PASSWORD" psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -v ON_ERROR_STOP=1 -c "CREATE SCHEMA \"${PG_CURRENT_SCHEMA}\""
+                fi
+              fi
               VERSION=$(cat /scripts/version.txt)
               if [ -z "$VERSION" ]; then
                 echo "ERROR:Please set VERSION"
@@ -155,16 +251,92 @@ spec:
               fi
               echo "Schema file: $schema_file"
               echo "Upgrade file: $upgrade_file"
-              if ! PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ .Release.Name }}-postgresql -U $POSTGRES_USER -d $GRAVITINO_DB -f "$upgrade_file"; then
+              if ! PGPASSWORD="$POSTGRES_PASSWORD" psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -f "$upgrade_file"; then
                 echo "WARNING: Upgrade script failed: $upgrade_file" >&2
                 echo "Continuing with schema script..." >&2 
               fi
-              PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ .Release.Name }}-postgresql -U $POSTGRES_USER -d $GRAVITINO_DB -f "$schema_file"
+              PGPASSWORD="$POSTGRES_PASSWORD" psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -v ON_ERROR_STOP=1 -f "$schema_file"
           resources:
             {{- toYaml .Values.initResources | nindent 12 }}
           securityContext:
             {{- toYaml .Values.initContainerSecurityContext | nindent 12 }}
           env:
+            - name: POSTGRES_USER
+              value: {{ include "gravitino.postgresqlInitUsername" . | quote }}
+            - name: GRAVITINO_DB
+              value: {{ include "gravitino.postgresqlInitDatabase" . | quote }}
+            - name: PGPORT
+              value: {{ $pgInitPort | quote }}
+            - name: PGCONNECT_TIMEOUT
+              value: {{ $pgInitConnectTimeout | quote }}
+            {{- if $pgInitSslMode }}
+            - name: PGSSLMODE
+              value: {{ $pgInitSslMode | quote }}
+            {{- end }}
+            {{- if $pgInitCurrentSchema }}
+            - name: PG_CURRENT_SCHEMA
+              value: {{ $pgInitCurrentSchema | quote }}
+            - name: PGOPTIONS
+              value: {{ printf "-c search_path=%s" $pgInitCurrentSchema | quote }}
+            {{- end }}
+            {{- if $pgInitSslCaSecret }}
+            - name: PGSSLROOTCERT
+              value: /db-ssl/ca.crt
+            {{- end }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgInitSecret }}
+                  key: {{ $pgInitSecretKey }}
+          volumeMounts:
+            - mountPath: /scripts
+              name: scripts-emptydir
+            {{- if $pgInitSslCaSecret }}
+            - name: postgresql-init-ssl
+              mountPath: /db-ssl
+              readOnly: true
+            {{- end }}
+      {{- else if and .Values.postgresql.enabled (eq (include "gravitino.schemaWaitEnabled" . | trim) "true") }}
+        {{- $pgSchema := include "gravitino.schemaMigrateCurrentSchema" . | trim }}
+        - name: init-postgresql
+          image: {{ include "init-postgresql.image" . }}
+          imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              VERSION=$(cat /scripts/version.txt)
+              if [ -z "$VERSION" ]; then
+                echo "ERROR: Please set VERSION (missing /scripts/version.txt)" >&2
+                exit 1
+              fi
+              echo "Waiting for schema version ${VERSION} (written by the schema-migrate Job)..."
+              {{- include "gravitino.schemaWaitPreamble" . | nindent 14 }}
+              while true; do
+                if [ "$SECONDS" -ge "$deadline" ]; then
+                  echo "ERROR: timed out after ${timeout}s waiting for schema version ${VERSION}" >&2
+                  exit 1
+                fi
+                if PGPASSWORD="$POSTGRES_PASSWORD" psql -h {{ include "gravitino.postgresql.fullname" . }} -U "$POSTGRES_USER" -d "$GRAVITINO_DB" -c "SELECT 1" >/dev/null 2>&1; then
+                  current=$(PGPASSWORD="$POSTGRES_PASSWORD" psql -h {{ include "gravitino.postgresql.fullname" . }} -U "$POSTGRES_USER" -d "$GRAVITINO_DB" -tAc "{{ include "gravitino.schemaReadyQuery" "postgresql" }}" 2>/dev/null | tr -d '[:space:]' || true)
+                  if [ "$current" = "$VERSION" ]; then
+                    echo "Schema version ${current} is ready."
+                    exit 0
+                  fi
+                  echo "Recorded schema version is '${current:-<none>}'; waiting for ${VERSION}..."
+                else
+                  echo "Waiting for PostgreSQL to be ready..."
+                fi
+                sleep 2
+              done
+          resources:
+            {{- toYaml .Values.initResources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.initContainerSecurityContext | nindent 12 }}
+          env:
+            - name: SCHEMA_WAIT_TIMEOUT
+              value: {{ include "gravitino.schemaWaitTimeoutSeconds" . | quote }}
             - name: POSTGRES_USER
               value: {{ .Values.postgresql.auth.username }}
             - name: GRAVITINO_DB
@@ -172,12 +344,124 @@ spec:
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-postgresql
+                  name: {{ include "gravitino.postgresql.secretName" . }}
                   key: password
+            {{- if $pgSchema }}
+            - name: PGOPTIONS
+              value: {{ printf "-c search_path=%s" $pgSchema | quote }}
+            {{- end }}
           volumeMounts:
             - mountPath: /scripts
               name: scripts-emptydir
-        {{- end }}
+      {{- end }}
+      {{- if and (eq (include "gravitino.schemaWaitEnabled" . | trim) "true") (not .Values.mysql.enabled) (not .Values.postgresql.enabled) }}
+        {{- $engine := include "gravitino.schemaMigrateEngine" . | trim }}
+        {{- $dbHost := include "gravitino.schemaMigrateHost" . | trim }}
+        {{- $dbPort := include "gravitino.schemaMigratePort" . | trim }}
+        {{- $dbName := include "gravitino.schemaMigrateDatabase" . | trim }}
+        {{- $pgSchema := include "gravitino.schemaMigrateCurrentSchema" . | trim }}
+        {{- $pgSslMode := include "gravitino.schemaMigrateSslMode" . | trim }}
+        {{- $sslCaSecret := include "gravitino.schemaMigrateSslCaSecretName" . | trim }}
+        - name: wait-for-schema
+          {{- if eq $engine "mysql" }}
+          image: {{ include "init-mysql.image" . }}
+          {{- else }}
+          image: {{ include "init-postgresql.image" . }}
+          {{- end }}
+          imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              VERSION=$(cat /scripts/version.txt)
+              if [ -z "$VERSION" ]; then
+                echo "ERROR: Please set VERSION (missing /scripts/version.txt)" >&2
+                exit 1
+              fi
+              echo "Waiting for schema version ${VERSION} (written by the schema-migrate Job)..."
+              {{- include "gravitino.schemaWaitPreamble" . | nindent 14 }}
+              while true; do
+                if [ "$SECONDS" -ge "$deadline" ]; then
+                  echo "ERROR: timed out after ${timeout}s waiting for schema version ${VERSION}" >&2
+                  exit 1
+                fi
+                {{- if eq $engine "mysql" }}
+                if mysql -h "$DB_HOST" -P "$DB_PORT" -u "$MYSQL_USER" -e "SELECT 1" >/dev/null 2>&1; then
+                  current=$(mysql -h "$DB_HOST" -P "$DB_PORT" -u "$MYSQL_USER" -D "$GRAVITINO_DB" -sNe "{{ include "gravitino.schemaReadyQuery" "mysql" }}" 2>/dev/null | tr -d '[:space:]' || true)
+                  if [ "$current" = "$VERSION" ]; then
+                    echo "Schema version ${current} is ready."
+                    exit 0
+                  fi
+                  echo "Recorded schema version is '${current:-<none>}'; waiting for ${VERSION}..."
+                else
+                  echo "Waiting for MySQL to be ready..."
+                fi
+                {{- else }}
+                if PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$POSTGRES_USER" -d "$GRAVITINO_DB" -c "SELECT 1" >/dev/null 2>&1; then
+                  current=$(PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$POSTGRES_USER" -d "$GRAVITINO_DB" -tAc "{{ include "gravitino.schemaReadyQuery" "postgresql" }}" 2>/dev/null | tr -d '[:space:]' || true)
+                  if [ "$current" = "$VERSION" ]; then
+                    echo "Schema version ${current} is ready."
+                    exit 0
+                  fi
+                  echo "Recorded schema version is '${current:-<none>}'; waiting for ${VERSION}..."
+                else
+                  echo "Waiting for PostgreSQL to be ready..."
+                fi
+                {{- end }}
+                sleep 2
+              done
+          resources:
+            {{- toYaml .Values.initResources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.initContainerSecurityContext | nindent 12 }}
+          env:
+            - name: SCHEMA_WAIT_TIMEOUT
+              value: {{ include "gravitino.schemaWaitTimeoutSeconds" . | quote }}
+            - name: DB_HOST
+              value: {{ $dbHost | quote }}
+            - name: DB_PORT
+              value: {{ $dbPort | quote }}
+            - name: GRAVITINO_DB
+              value: {{ $dbName | quote }}
+            {{- if eq $engine "mysql" }}
+            - name: MYSQL_USER
+              value: {{ .Values.entity.jdbcUser | quote }}
+            - name: MYSQL_PWD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gravitino.schemaMigrateSecretName" . | trim }}
+                  key: {{ .Values.schema.migrate.existingSecretPasswordKey | default "password" }}
+            {{- else }}
+            - name: POSTGRES_USER
+              value: {{ .Values.entity.jdbcUser | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gravitino.schemaMigrateSecretName" . | trim }}
+                  key: {{ .Values.schema.migrate.existingSecretPasswordKey | default "password" }}
+            {{- if $pgSchema }}
+            - name: PGOPTIONS
+              value: {{ printf "-c search_path=%s" $pgSchema | quote }}
+            {{- end }}
+            {{- if $pgSslMode }}
+            - name: PGSSLMODE
+              value: {{ $pgSslMode | quote }}
+            {{- end }}
+            {{- if $sslCaSecret }}
+            - name: PGSSLROOTCERT
+              value: /db-ssl/ca.crt
+            {{- end }}
+            {{- end }}
+          volumeMounts:
+            - mountPath: /scripts
+              name: scripts-emptydir
+            {{- if and (ne $engine "mysql") $sslCaSecret }}
+            - name: schema-migrate-ssl
+              mountPath: /db-ssl
+              readOnly: true
+            {{- end }}
+      {{- end }}
       containers:
         - name: {{ include "gravitino.name" . }}
           image: {{ include "gravitino.image" . }}
@@ -241,7 +525,26 @@ spec:
           configMap:
             name: {{ include "gravitino.fullname" . }}
         - emptyDir: {}
-          name: scripts-emptydir    
+          name: scripts-emptydir
+        {{- if and (eq (include "gravitino.postgresqlSchemaInitEnabled" . | trim) "true") (include "gravitino.postgresqlInitSslCaSecretName" . | trim) }}
+        - name: postgresql-init-ssl
+          secret:
+            secretName: {{ include "gravitino.postgresqlInitSslCaSecretName" . | trim }}
+            items:
+              - key: {{ include "gravitino.postgresqlInitSslCaKey" . | trim }}
+                path: ca.crt
+        {{- end }}
+        {{- if and (eq (include "gravitino.schemaWaitEnabled" . | trim) "true") (not .Values.mysql.enabled) (not .Values.postgresql.enabled) }}
+        {{- $sslCaSecret := include "gravitino.schemaMigrateSslCaSecretName" . | trim }}
+        {{- if and (eq (include "gravitino.schemaMigrateEngine" . | trim) "postgresql") $sslCaSecret }}
+        - name: schema-migrate-ssl
+          secret:
+            secretName: {{ $sslCaSecret }}
+            items:
+              - key: {{ include "gravitino.schemaMigrateSslCaKey" . | trim }}
+                path: ca.crt
+        {{- end }}
+        {{- end }}
         {{- if not .Values.persistence.enabled }}
         - name: storage
           emptyDir: {}

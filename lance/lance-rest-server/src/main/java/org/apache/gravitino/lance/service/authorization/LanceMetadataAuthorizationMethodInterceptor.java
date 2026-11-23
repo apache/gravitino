@@ -160,13 +160,29 @@ public class LanceMetadataAuthorizationMethodInterceptor
    */
   @Override
   protected Optional<AuthorizationHandler> createAuthorizationHandler(
-      Method method, Parameter[] parameters, Object[] args) {
+      Method method,
+      Parameter[] parameters,
+      Object[] args,
+      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
     String overwriteExpression =
         isTableOperation(method)
             ? LanceAuthorizationExpressions.MODIFY_TABLE_AUTHORIZATION_EXPRESSION
             : LanceAuthorizationExpressions.MODIFY_NAMESPACE_AUTHORIZATION_EXPRESSION;
     return createMode(parameters, args)
-        .map(mode -> new OverwriteAuthzHandler(mode, overwriteExpression));
+        .map(
+            mode ->
+                new OverwriteAuthzHandler(
+                    mode, overwriteExpression, deepestEntityType(nameIdentifierMap)));
+  }
+
+  private static Entity.EntityType deepestEntityType(
+      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
+    if (nameIdentifierMap.containsKey(Entity.EntityType.TABLE)) {
+      return Entity.EntityType.TABLE;
+    }
+    return nameIdentifierMap.containsKey(Entity.EntityType.SCHEMA)
+        ? Entity.EntityType.SCHEMA
+        : Entity.EntityType.CATALOG;
   }
 
   @Override
@@ -213,8 +229,10 @@ public class LanceMetadataAuthorizationMethodInterceptor
 
     private final boolean overwrite;
     private final String authorizationExpression;
+    private final Entity.EntityType entityType;
 
-    private OverwriteAuthzHandler(String mode, String authorizationExpression) {
+    private OverwriteAuthzHandler(
+        String mode, String authorizationExpression, Entity.EntityType entityType) {
       // Read the mode through the same normalization the create operation applies, so a token the
       // operation will act on as an overwrite cannot be authorized as a plain create. Comparing the
       // raw string here would leave a gap: " overwrite " reaches the operation as OVERWRITE but
@@ -222,6 +240,7 @@ public class LanceMetadataAuthorizationMethodInterceptor
       // by somebody else.
       this.overwrite = OVERWRITE_MODE.equals(CommonUtil.normalizeToken(mode));
       this.authorizationExpression = authorizationExpression;
+      this.entityType = entityType;
     }
 
     @Override
@@ -230,7 +249,6 @@ public class LanceMetadataAuthorizationMethodInterceptor
         return;
       }
 
-      Entity.EntityType entityType = deepestEntityType(nameIdentifierMap);
       boolean authorized =
           new AuthorizationExpressionEvaluator(authorizationExpression)
               .evaluate(
@@ -252,14 +270,9 @@ public class LanceMetadataAuthorizationMethodInterceptor
       return overwrite;
     }
 
-    private static Entity.EntityType deepestEntityType(
-        Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
-      if (nameIdentifierMap.containsKey(Entity.EntityType.TABLE)) {
-        return Entity.EntityType.TABLE;
-      }
-      return nameIdentifierMap.containsKey(Entity.EntityType.SCHEMA)
-          ? Entity.EntityType.SCHEMA
-          : Entity.EntityType.CATALOG;
+    @Override
+    public Entity.EntityType entityType() {
+      return entityType;
     }
   }
 

@@ -24,8 +24,8 @@ import org.apache.gravitino.spark.connector.authorization.GravitinoAuthorization
 import org.apache.gravitino.spark.connector.catalog.SparkCatalogKind;
 import org.apache.gravitino.spark.connector.glue.GravitinoGlueCatalogSpark35;
 import org.apache.gravitino.spark.connector.hive.GravitinoHiveCatalogSpark35;
-import org.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalogSpark35;
 import org.apache.gravitino.spark.connector.jdbc.GravitinoJdbcCatalogSpark35;
+import org.apache.gravitino.spark.connector.jdbc.doris.GravitinoDorisCatalogSpark35;
 import org.apache.gravitino.spark.connector.jdbc.postgresql.GravitinoPostgreSqlCatalogSpark35;
 import org.apache.spark.api.plugin.DriverPlugin;
 import org.apache.spark.api.plugin.ExecutorPlugin;
@@ -37,9 +37,9 @@ import org.slf4j.LoggerFactory;
  * The entrypoint for Apache Gravitino Spark connector on Spark 3.5.
  *
  * <p>Every supported Spark version has a class of this name in this package, which is what users
- * name in {@code spark.plugins}. Each one binds the classes its own Spark version needs, as
- * compile-time class references, so a renamed or missing class fails the build rather than the
- * session, and a jar can only bind classes it actually contains.
+ * name in {@code spark.plugins}. Each one binds the classes its own Spark version needs. Adapters
+ * that link optional runtime interfaces are bound by name so unused catalogs do not prevent plugin
+ * startup.
  */
 public class GravitinoSparkPlugin implements SparkPlugin {
 
@@ -70,9 +70,13 @@ public class GravitinoSparkPlugin implements SparkPlugin {
         SparkBindings.builder()
             .authorizationExtension(GravitinoAuthorizationSparkSessionExtensions.class)
             .catalog(SparkCatalogKind.HIVE, GravitinoHiveCatalogSpark35.class)
-            .catalog(SparkCatalogKind.LAKEHOUSE_ICEBERG, GravitinoIcebergCatalogSpark35.class)
+            // Its ProcedureCatalog interface is supplied by the optional Iceberg runtime.
+            .catalog(
+                SparkCatalogKind.LAKEHOUSE_ICEBERG,
+                "org.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalogSpark35")
             .catalog(SparkCatalogKind.GLUE, GravitinoGlueCatalogSpark35.class)
             .catalog(SparkCatalogKind.JDBC, GravitinoJdbcCatalogSpark35.class)
+            .catalog(SparkCatalogKind.DORIS, GravitinoDorisCatalogSpark35.class)
             .catalog(SparkCatalogKind.JDBC_POSTGRESQL, GravitinoPostgreSqlCatalogSpark35.class);
     if (isPresent(PAIMON_CATALOG)) {
       builder.catalog(SparkCatalogKind.LAKEHOUSE_PAIMON, PAIMON_CATALOG);

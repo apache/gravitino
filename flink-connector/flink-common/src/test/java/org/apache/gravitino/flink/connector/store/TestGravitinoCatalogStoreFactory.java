@@ -21,7 +21,11 @@ package org.apache.gravitino.flink.connector.store;
 import static org.apache.flink.table.factories.FactoryUtil.createCatalogStoreFactoryHelper;
 import static org.mockito.Mockito.mock;
 
+import com.google.common.collect.ImmutableSet;
 import java.lang.reflect.Field;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.catalog.CatalogStore;
 import org.apache.flink.table.catalog.GenericInMemoryCatalogStore;
@@ -37,6 +41,11 @@ import org.junit.jupiter.api.Test;
  * CatalogStore} implementation based on the {@code gravitino.enableSessionCatalogSupport} option.
  */
 public class TestGravitinoCatalogStoreFactory {
+
+  private static final String EXCLUDED_CATALOGS_KEY =
+      "table.catalog-store.gravitino.gravitino.excludedCatalogs";
+  private static final String SESSION_CATALOG_SHADOWING_KEY =
+      "table.catalog-store.gravitino.gravitino.enableSessionCatalogShadowing";
 
   /**
    * When {@code gravitino.enableSessionCatalogSupport=true} the factory must return a {@link
@@ -131,6 +140,134 @@ public class TestGravitinoCatalogStoreFactory {
   }
 
   // -------------------------------------------------------------------------
+  // excluded catalogs
+  // -------------------------------------------------------------------------
+
+  @Test
+  void testOptionParsing_excludedCatalogsAbsent_defaultsToEmpty() {
+    List<String> parsed = parseExcludedCatalogsOption(baseConfiguration());
+
+    Assertions.assertTrue(parsed.isEmpty());
+    Assertions.assertEquals(
+        ImmutableSet.of(), GravitinoCatalogStoreFactory.parseExcludedCatalogs(parsed, false));
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testOptionParsing_excludedCatalogs_isReadFromConfig() {
+    Configuration configuration = baseConfiguration();
+    configuration.setString(EXCLUDED_CATALOGS_KEY, "paimon_catalog; hive_catalog;paimon_catalog");
+
+    List<String> parsed = parseExcludedCatalogsOption(configuration);
+
+    Assertions.assertEquals(
+        ImmutableSet.of("paimon_catalog", "hive_catalog"),
+        GravitinoCatalogStoreFactory.parseExcludedCatalogs(parsed, true));
+  }
+
+  @Test
+  void testParseExcludedCatalogs_blankName_throwsIllegalArgumentException() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                GravitinoCatalogStoreFactory.parseExcludedCatalogs(
+                    Arrays.asList("paimon_catalog", " "), true));
+
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(GravitinoCatalogStoreFactoryOptions.GRAVITINO_EXCLUDED_CATALOGS.key()));
+  }
+
+  @Test
+  void testParseExcludedCatalogs_sessionCatalogSupportDisabled_throwsIllegalArgumentException() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                GravitinoCatalogStoreFactory.parseExcludedCatalogs(
+                    Collections.singletonList("paimon_catalog"), false));
+
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                GravitinoCatalogStoreFactoryOptions.GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT
+                    .key()));
+  }
+
+  /**
+   * The real {@link GravitinoCatalogStoreFactory#open} path must reject excluded catalogs when
+   * session catalog support is disabled, before any Gravitino client is created.
+   */
+  @Test
+  @SuppressWarnings("deprecation")
+  void testOpen_excludedCatalogsWithoutSessionCatalogSupport_failsFast() {
+    Configuration configuration = baseConfiguration();
+    configuration.setString(EXCLUDED_CATALOGS_KEY, "paimon_catalog");
+    CatalogStoreFactory.Context context =
+        TableFactoryUtil.buildCatalogStoreFactoryContext(
+            configuration, TestGravitinoCatalogStoreFactory.class.getClassLoader());
+    GravitinoCatalogStoreFactory factory = new GravitinoCatalogStoreFactory();
+
+    Assertions.assertThrows(IllegalArgumentException.class, () -> factory.open(context));
+    Assertions.assertNull(factory.createCatalogStore());
+  }
+
+  // -------------------------------------------------------------------------
+  // session catalog shadowing
+  // -------------------------------------------------------------------------
+
+  @Test
+  void testOptionParsing_sessionCatalogShadowingAbsent_defaultsToFalse() {
+    Assertions.assertFalse(parseSessionCatalogShadowingOption(baseConfiguration()));
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testOptionParsing_sessionCatalogShadowing_isReadFromConfig() {
+    Configuration configuration = baseConfiguration();
+    configuration.setString(SESSION_CATALOG_SHADOWING_KEY, "true");
+    Assertions.assertTrue(parseSessionCatalogShadowingOption(configuration));
+  }
+
+  @Test
+  void testParseSessionCatalogShadowing() {
+    Assertions.assertTrue(GravitinoCatalogStoreFactory.parseSessionCatalogShadowing(true, true));
+    Assertions.assertFalse(GravitinoCatalogStoreFactory.parseSessionCatalogShadowing(false, true));
+    Assertions.assertFalse(GravitinoCatalogStoreFactory.parseSessionCatalogShadowing(false, false));
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> GravitinoCatalogStoreFactory.parseSessionCatalogShadowing(true, false));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                GravitinoCatalogStoreFactoryOptions.GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT
+                    .key()));
+  }
+
+  /**
+   * The real {@link GravitinoCatalogStoreFactory#open} path must reject session catalog shadowing
+   * when session catalog support is disabled, before any Gravitino client is created.
+   */
+  @Test
+  @SuppressWarnings("deprecation")
+  void testOpen_sessionCatalogShadowingWithoutSessionCatalogSupport_failsFast() {
+    Configuration configuration = baseConfiguration();
+    configuration.setString(SESSION_CATALOG_SHADOWING_KEY, "true");
+    CatalogStoreFactory.Context context =
+        TableFactoryUtil.buildCatalogStoreFactoryContext(
+            configuration, TestGravitinoCatalogStoreFactory.class.getClassLoader());
+
+    GravitinoCatalogStoreFactory factory = new GravitinoCatalogStoreFactory();
+    Assertions.assertThrows(IllegalArgumentException.class, () -> factory.open(context));
+    Assertions.assertNull(factory.createCatalogStore());
+  }
+
+  // -------------------------------------------------------------------------
   // helpers
   // -------------------------------------------------------------------------
 
@@ -188,6 +325,28 @@ public class TestGravitinoCatalogStoreFactory {
     return helper
         .getOptions()
         .get(GravitinoCatalogStoreFactoryOptions.GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT);
+  }
+
+  private static List<String> parseExcludedCatalogsOption(Configuration configuration) {
+    CatalogStoreFactory.Context context =
+        TableFactoryUtil.buildCatalogStoreFactoryContext(
+            configuration, TestGravitinoCatalogStoreFactory.class.getClassLoader());
+    FactoryUtil.FactoryHelper<CatalogStoreFactory> helper =
+        createCatalogStoreFactoryHelper(new GravitinoCatalogStoreFactory(), context);
+    helper.validate();
+    return helper.getOptions().get(GravitinoCatalogStoreFactoryOptions.GRAVITINO_EXCLUDED_CATALOGS);
+  }
+
+  private static boolean parseSessionCatalogShadowingOption(Configuration configuration) {
+    CatalogStoreFactory.Context context =
+        TableFactoryUtil.buildCatalogStoreFactoryContext(
+            configuration, TestGravitinoCatalogStoreFactory.class.getClassLoader());
+    FactoryUtil.FactoryHelper<CatalogStoreFactory> helper =
+        createCatalogStoreFactoryHelper(new GravitinoCatalogStoreFactory(), context);
+    helper.validate();
+    return helper
+        .getOptions()
+        .get(GravitinoCatalogStoreFactoryOptions.GRAVITINO_ENABLE_SESSION_CATALOG_SHADOWING);
   }
 
   private static Configuration baseConfiguration() {

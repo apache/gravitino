@@ -106,8 +106,12 @@ public final class LancePropertiesUtils {
   }
 
   /**
-   * Resolves the effective Lance storage options using table properties first and catalog
-   * properties as defaults.
+   * Resolves the effective Lance storage options. A key set in the catalog properties keeps the
+   * catalog value; table properties can only add keys that the catalog does not set.
+   *
+   * <p>Table properties come from the table creator, while catalog storage options usually hold the
+   * server's credentials. If a table could override a catalog key such as the endpoint, the server
+   * would send requests signed with the catalog credentials to a location the table creator chose.
    *
    * @param catalogProperties the catalog properties
    * @param tableProperties the table properties
@@ -117,7 +121,7 @@ public final class LancePropertiesUtils {
       Map<String, String> catalogProperties, Map<String, String> tableProperties) {
     Map<String, String> effectiveStorageOptions =
         new LinkedHashMap<>(getLanceStorageOptions(catalogProperties));
-    effectiveStorageOptions.putAll(getLanceStorageOptions(tableProperties));
+    getLanceStorageOptions(tableProperties).forEach(effectiveStorageOptions::putIfAbsent);
     return effectiveStorageOptions;
   }
 

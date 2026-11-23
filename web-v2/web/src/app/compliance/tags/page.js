@@ -31,8 +31,9 @@ import AssociatedTable from '@/components/AssociatedTable'
 import CreateTagDialog from './CreateTagDialog'
 import { formatToDateTime } from '@/lib/utils'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
-import { use } from 'react'
 import { fetchTags, deleteTag } from '@/lib/store/tags'
+import { fetchPolicies } from '@/lib/store/policies'
+import PolicyTag from '@/components/PolicyTag'
 
 const { Title, Paragraph } = Typography
 const { Search } = Input
@@ -53,7 +54,10 @@ export default function TagsPage() {
   const { anthEnable } = auth
 
   useEffect(() => {
-    currentMetalake && dispatch(fetchTags({ metalake: currentMetalake, details: true }))
+    if (currentMetalake) {
+      dispatch(fetchTags({ metalake: currentMetalake, details: true }))
+      dispatch(fetchPolicies({ metalake: currentMetalake, details: true }))
+    }
   }, [dispatch, currentMetalake])
 
   const tableData = store.tagsData
@@ -170,6 +174,19 @@ export default function TagsPage() {
         key: 'comment',
         ellipsis: true,
         render: comment => <span>{comment || '-'}</span>
+      },
+      {
+        title: 'Policies',
+        dataIndex: 'policies',
+        key: 'policies',
+        width: 260,
+        render: (_, record) => (
+          <PolicyTag
+            key={`tag-${record.name}-policies`}
+            metadataObjectType='tag'
+            metadataObjectFullName={record.name}
+          />
+        )
       },
       {
         title: 'Actions',

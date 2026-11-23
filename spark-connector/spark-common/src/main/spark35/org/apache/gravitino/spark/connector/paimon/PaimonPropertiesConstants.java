@@ -48,4 +48,16 @@ public class PaimonPropertiesConstants {
   static final String GRAVITINO_PAIMON_CATALOG_BACKEND_FILESYSTEM = "filesystem";
 
   public static final String PAIMON_TABLE_LOCATION = "path";
+
+  /** The Spark provider (USING clause) of a Paimon table. */
+  static final String PAIMON_PROVIDER = "paimon";
+
+  /** Paimon table option that selects the table type. */
+  static final String PAIMON_TABLE_TYPE = "type";
+
+  /** Value of {@link #PAIMON_TABLE_TYPE} for a format table. */
+  static final String PAIMON_TABLE_TYPE_FORMAT_TABLE = "format-table";
+
+  /** Paimon table option that holds the file format of the table. */
+  static final String PAIMON_FILE_FORMAT = "file.format";
 }

@@ -932,6 +932,31 @@ class TestRoleMetaService extends TestJDBCBackend {
     assertEquals(Lists.newArrayList(role1, role2), roleEntities);
   }
 
+  /** Reading roles for existing dotted names does not invoke strict write-name conversion. */
+  @TestTemplate
+  void testListRolesForLegacyDottedNames() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    TagEntity tag = createAndInsertTagEntity("legacy.tag", "", METALAKE_NAME);
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "legacy.policy",
+            AUDIT_INFO);
+    backend.insert(policy, false);
+    for (boolean allFields : new boolean[] {false, true}) {
+      assertTrue(
+          RoleMetaService.getInstance()
+              .listRolesByMetadataObject(tag.nameIdentifier(), Entity.EntityType.TAG, allFields)
+              .isEmpty());
+      assertTrue(
+          RoleMetaService.getInstance()
+              .listRolesByMetadataObject(
+                  policy.nameIdentifier(), Entity.EntityType.POLICY, allFields)
+              .isEmpty());
+    }
+  }
+
   @TestTemplate
   void testDeleteMetalake() throws IOException {
     BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);

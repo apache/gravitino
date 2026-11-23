@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.starrocks.utils;
 import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
 import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.unescapeSqlLiteral;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.sql.ResultSet;
@@ -33,6 +34,8 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -95,6 +98,37 @@ public class StarRocksUtils {
   public static final String STATE = "State";
   public static final String DATA_SIZE = "DataSize";
   public static final String IS_IN_MEMORY = "IsInMemory";
+
+  /**
+   * Checks StarRocks-specific restrictions on quoted identifiers. Creation-name and metadata-name
+   * restrictions are checked separately by the catalog capability.
+   *
+   * @param identifier the unquoted identifier
+   * @return unsupported if StarRocks would remove backticks from the identifier
+   */
+  public static CapabilityResult checkIdentifier(String identifier) {
+    // StarRocks 3.3's AstBuilder removes all backticks, including doubled ones. Quoting such a
+    // name would target a different object, so reject it instead of applying MySQL escaping.
+    if (identifier.indexOf('`') >= 0) {
+      return CapabilityResult.unsupported(
+          "StarRocks identifiers must not contain backticks because its SQL parser removes them");
+    }
+    return CapabilityResult.SUPPORTED;
+  }
+
+  /**
+   * Quotes a StarRocks identifier without allowing its embedded delimiters to change the name.
+   *
+   * @param identifier the unquoted identifier
+   * @return the backtick-quoted identifier
+   * @throws IllegalArgumentException if the identifier contains a backtick
+   */
+  public static String quoteIdentifier(String identifier) {
+    CapabilityResult result = checkIdentifier(identifier);
+    Preconditions.checkArgument(
+        result.supported(), "%s. Illegal identifier: %s", result.unsupportedMessage(), identifier);
+    return JdbcConnectorUtils.quoteIdentifier(identifier, '`');
+  }
 
   // convert Map<String, String> properties to SQL String
   public static String generatePropertiesSql(Map<String, String> properties) {
@@ -229,16 +263,16 @@ public class StarRocksUtils {
    * @return The partition sql fragment.
    */
   public static String generatePartitionSqlFragment(Partition partition) {
-    String partitionSqlFragment = "PARTITION `%s` VALUES %s";
+    String partitionSqlFragment = "PARTITION %s VALUES %s";
     if (partition instanceof RangePartition) {
       return String.format(
           partitionSqlFragment,
-          partition.name(),
+          quoteIdentifier(partition.name()),
           generateRangePartitionValues((RangePartition) partition));
     } else if (partition instanceof ListPartition) {
       return String.format(
           partitionSqlFragment,
-          partition.name(),
+          quoteIdentifier(partition.name()),
           generateListPartitionSqlValues((ListPartition) partition));
     } else {
       throw new IllegalArgumentException("Unsupported partition type of StarRocks");

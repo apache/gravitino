@@ -58,23 +58,23 @@ DomainRel { parentId, childId, audit_info }      // one edge per subdomain
 - Domains live under a metalake. A subdomain and its parent are in the same metalake.
 - Domain names are unique within a metalake across both levels: top-level domains and subdomains share one namespace, so a domain is addressed by its name alone. Domain names follow the same constraints as tag names (up to 128 characters) and may contain `/` (see REST API, Encoding).
 - A unique index on `DomainRel (child_id, deleted_at)` keeps one parent per domain. `parent` is not stored on `Domain`; the API derives it. Dropping the index and checks would allow multiple parents later without a data migration.
-- The backing tag is stored on the domain row as the tag's ID and an optional value, with an index on `(metalake_id, backing_tag_id, backing_tag_value, deleted_at)` for the reverse lookup "which domain does this (tag, value) back". `DOMAIN` is not a taggable object type, so the tag code paths are unchanged (see Alternatives considered).
+- The backing tag is stored on the domain row as the tag's ID, with an index on `(metalake_id, backing_tag_id, backing_tag_value, deleted_at)` for the reverse lookup "which domain does this tag back". The `backing_tag_value` column is kept in storage for a possible future extension, but the API never sets it. Domains created by 2.0.0 development builds with a value keep filtering membership by it; to clear the values, bind each domain to its own tag with `PUT /domains/{domain}/backingTag`. When several domains share one tag through different values (for example `department=finance` and `department=risk`), the existing assignments stay on the old tag, so switching to dedicated tags drops every member that carries only the old tag. Copying container assignments can widen membership: with `department=finance` on a schema and `department=risk` on a table beneath it, tagging the schema with Finance's new tag also makes the table a Finance member. To preserve the existing leaf memberships: (1) record each domain's own leaf members with `GET /domains/{domain}/objects?expand=true`, keeping those whose relations include Direct or Inherited; (2) create the dedicated tags and assign each directly to the recorded leaves of its domain; (3) switch the bindings to the dedicated tags; (4) optionally remove the old tag's assignments by name. These steps preserve the set of leaves recorded at conversion time, not container membership: a tagged schema or catalog drops out of the default member listing, its inventoried leaves become direct members, and leaves outside the inventory, including external tables first recorded after the switch, no longer inherit the domain from that container. To keep a container's future leaves, the dedicated tag can also be assigned to the container, but only when every existing leaf that would inherit it is already in that domain's recorded inventory; a leaf whose own old-tag assignment overrode the container's (for example `department=engineering` under a `department=finance` schema, even when no domain is backed by `engineering`) would otherwise gain membership. Different tags resolve independently, so after that change every future leaf under the container inherits the dedicated tag, including one later assigned the old tag with another value, such as `department=risk`. The member list is filtered by object visibility, so the operator needs read and tag-assignment access to every affected object; an object missing from the inventory loses its membership when the binding changes. `DOMAIN` is not a taggable object type, so the tag code paths are unchanged (see Alternatives considered).
 - The binding refers to the tag by ID, and every membership path (member listing, domains of an object) looks up and compares tag IDs, never tag names: if the tag is deleted, the ID stays on the row and matches nothing, and a new tag with the same name does not match it, even if it is recreated while a request is running.
 - Domains, their parent and their backing tag are not cached; every request reads them from the store, so all servers see a move or a backing-tag change at once. Caching them later needs a version bump of the affected domain rows and a changelog entry.
 
 ### Backing tag
 
-Each domain has **at most one** backing tag: an existing tag, optionally with a value (tag values: apache/gravitino#12162). Creating a domain always sets one; a domain has none only after its backing tag is removed or deleted, until a new one is set.
+Each domain has **at most one** backing tag, identified by name in the API and applied with no value. Creating a domain always sets one; a domain has none only after its backing tag is removed or deleted, until a new one is set.
 
 - **Explicit at creation**: every create request names the backing tag; there is no default name derived from the domain. The caller either
   - creates a new tag: a tag without values (`NO_VALUE`) with the given name, owned by the caller, which needs `CREATE_TAG`. If a tag with that name exists, creation fails with 409 `TagAlreadyExistsException`; an existing tag is never adopted implicitly; or
-  - binds an existing (tag, value), such as `dept=finance`. The caller must own the tag or the metalake; a missing tag fails with 404.
+  - binds an existing tag, whatever values it allows. The caller must own the tag or the metalake; a missing tag fails with 404.
 
-  A create request without a backing tag, or one that creates a new tag and also gives a value, fails with 400.
-- **Tag value rules apply as for any assignment**: a tag with a non-empty allowed-values list can only be bound with one of its values; a `NO_VALUE` tag only without a value.
-- **No sharing**: following the tag assignment rules, a tag has either one binding without a value, or bindings with values where each value backs at most one domain; the two are never mixed. A conflicting binding fails with 409 `BackingTagAlreadyBoundException` (a new `AlreadyExistsException` subclass). The reverse lookup is therefore one domain per (tag, value).
-- **Matching** follows the tag lookup semantics (`GET /tags/{tag}/objects`). A backing tag without a value matches every assignment of the tag, with or without values, like a lookup without `value`. A backing tag with a value matches assignments whose values contain it, exact and case-sensitive, like `?value=`; a valueless assignment never matches it. The same rule applies to member listing and domains of an object, always against the object's effective assignment.
-- **Changing it**: `PUT /domains/{domain}/backingTag` replaces or removes it on the server, under the domain and tag row locks. A missing tag fails with 404, a value the tag does not allow with 400, a tag the caller does not own (nor the metalake) with 403, and a binding that conflicts with another domain with 409; setting the current tag is a no-op. Assets carrying only the old tag drop out; nothing is migrated. This endpoint is the only way to change a backing tag: `DOMAIN` is not taggable, so the generic tag association API rejects it.
+  A create request without a backing tag fails with 400.
+- **Any existing tag can be bound**: the binding has no value, so it is not checked against the tag's allowed values.
+- **No sharing**: a tag backs at most one domain. Binding a tag that already backs another domain fails with 409 `BackingTagAlreadyBoundException` (a new `AlreadyExistsException` subclass). The reverse lookup is therefore one domain per tag.
+- **Matching** depends only on the presence of the tag: every assignment of the backing tag matches, with or without values, like `GET /tags/{tag}/objects` without `value`. Any value on an assignment is ignored. The same rule applies to member listing and domains of an object, always against the object's effective assignment.
+- **Changing it**: `PUT /domains/{domain}/backingTag` replaces or removes it on the server, under the domain and tag row locks. A missing tag fails with 404, a tag the caller does not own (nor the metalake) with 403, and a tag that already backs another domain with 409; setting the current tag is a no-op. Assets carrying only the old tag drop out; nothing is migrated. This endpoint is the only way to change a backing tag: `DOMAIN` is not taggable, so the generic tag association API rejects it.
 - **Never renamed**: moving or renaming a domain does not rename its tag; the hierarchy lives in `DomainRel`. A renamed tag keeps backing the domain, since the binding is by tag ID.
 - **Deleting the tag** behaves as for any tag: it is allowed, and the tag's assignments on assets are removed with it. Its domain is left with no backing tag (`backingTag` reads as empty) and no members until a new one is set; the membership cannot be recovered by recreating a tag with the same name. Only the tag deletion event records this.
 - **Separate from domain privileges**: the domain owner and the tag owner are independent. Managing a domain grants no `APPLY_TAG` on its tag, and transferring the domain's ownership does not transfer the tag's.
@@ -96,7 +96,7 @@ C1–C3 keep the hierarchy one level deep and acyclic, so no cycle detection is 
 
 - **Attach / move** re-points the child's single edge in one transaction. Attaching to the current parent is a no-op.
 - **Detach** removes the current edge; the child becomes top-level.
-- **Delete** is refused while the domain has subdomains. Deleting removes the domain row and its own parent edge. The tag and the tags on assets stay.
+- **Delete** requires the domain to be DRAFT: a published domain must be unpublished first. The status is checked before the children, so a published domain with subdomains fails on its status. A draft domain is refused while it has subdomains. Deleting removes the domain row and its own parent edge. The tag and the tags on assets stay.
 - **Membership and scope**: membership comes from backing tags only (see Membership and inheritance), so an asset tagged only `trading` is a member of Trading, not of Finance. A top-level domain's *scope* is its own members plus the members of the subdomains the caller can see; a subdomain's scope is its own members. Member listing and domains of an object report scope, with the relation of each entry; policies follow tags only (see Grants and policies).
 
 ### Locking
@@ -105,7 +105,7 @@ Domain operations use the store's existing locking primitives, in one global ord
 
 | Operation                     | Rows locked                                                    | Conflicts it excludes                                                                                        |
 | :---------------------------- | :------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------- |
-| Create a top-level domain     | metalake (shared) → existing tag (exclusive)                   | metalake drop; two domains binding the same (tag, value)                                                     |
+| Create a top-level domain     | metalake (shared) → existing tag (exclusive)                   | metalake drop; two domains binding the same tag                                                     |
 | Create a subdomain            | metalake (shared) → parent (shared) → existing tag (exclusive) | the parent being attached elsewhere (C2)                                                                     |
 | Attach / move                 | child (exclusive) and new parent (shared), in ID order         | the new parent being attached elsewhere (C2); a subdomain being created under the child (C3); crossing moves |
 | Detach                        | child (exclusive)                                              |                                                                                                              |
@@ -134,11 +134,10 @@ Domain operations use the store's existing locking primitives, in one global ord
 
 ### Membership and inheritance
 
-- **Rule**: an object's effective tags are its own plus its schema's and catalog's; for the same tag the nearest level wins, and different tags accumulate. A leaf object (see Member types) is a member of domain D when its effective tags match D's backing (tag, value). Membership reuses core's `EffectiveTagResolver`, which applies no tag-privilege filtering: domain visibility and object access are applied afterwards, so a caller needs no tag privilege.
+- **Rule**: an object's effective tags are its own plus its schema's and catalog's; for the same tag the nearest level wins, and different tags accumulate. A leaf object (see Member types) is a member of domain D when its effective tags include D's backing tag. Membership reuses core's `EffectiveTagResolver`, which applies no tag-privilege filtering: domain visibility and object access are applied afterwards, so a caller needs no tag privilege.
 - **Different tags accumulate**: with schema `finance` and table `sales`, the table is in both Finance and Sales, and a child cannot leave a domain it inherits.
-- **Values of one tag** backing different domains override each other: with schema `dept=finance` and table `dept=hr`, the table is only in the `dept=hr` domain, unless it uses `dept=[finance, hr]`. This is the one case where a child can leave an inherited domain, and only for bindings with a value; a binding without a value matches every value.
-- **Member types**: leaf objects only: tables, views, filesets, topics, models and semantic models (`DomainMember.SUPPORTED_TYPES`). Catalogs and schemas are never members: one that carries a backing tag passes membership to the leaf objects under it through tag inheritance. Columns and functions are not members either: a column or function carrying a backing tag is not listed. A type that becomes taggable later joins only when it is added to this list. Metrics belong through their semantic model.
-- **Relations**: a leaf object relates to a domain in one of three ways, reported with its source by member listing and by domains of an object:
+- **Member types**: the default listing returns directly tagged catalogs, schemas and leaves. The leaf types are tables, views, filesets, topics, models and semantic models. Expanded listing and object-to-domain lookup support these leaf types. Columns and functions are excluded.
+- **Relations**: expanded listing and object-to-domain lookup report the following relations for a leaf. Direct listing reports Direct and Via subdomain for assignments on the object itself:
 
   | Relation      | Meaning                                                        | Source                                    |
   | :------------ | :------------------------------------------------------------- | :---------------------------------------- |
@@ -146,22 +145,21 @@ Domain operations use the store's existing locking primitives, in one global ord
   | Inherited     | the object inherits the backing tag from its catalog or schema | the nearest catalog or schema carrying it |
   | Via subdomain | a visible subdomain of the domain has the object in its scope  | that subdomain                            |
 
-  Every relation that applies is reported, as a list of (relation, source) pairs, with no precedence: a table whose schema carries `finance` and which itself carries `trading` gets `[Inherited from cat.db, Via subdomain Trading]` under Finance, and an object in two subdomains gets one Via subdomain pair for each. Clients decide how to display them. Relations are always relative to the listed domain. An object is a member of the domain itself when its relations include Direct or Inherited. The relation is an enum; the exact field shape is an implementation choice.
-- **Domains of an object**: for a leaf object, every domain the caller can see whose scope contains the object, each with its relations. An object tagged only `trading` gets Trading (Direct) and Finance (Via subdomain Trading). Catalogs and schemas do not support this lookup, since they are never members; the domain a catalog or schema passes down is visible from its tags.
-- **Removing a member**: membership ends when the object no longer carries the backing tag, by the tag rules. To take an object out of a domain backed by a tag without a value, remove the tag by name (v1 association request), which removes all its values on the object; a v2 request removes one (tag, value) pair. An inherited membership can only be removed on the catalog or schema.
+  In an expanded listing, every relation that applies is reported, as a list of (relation, source) pairs, with no precedence: a table whose schema carries `finance` and which itself carries `trading` gets `[Inherited from cat.db, Via subdomain Trading]` under Finance, and an object in two subdomains gets one Via subdomain pair for each. Clients decide how to display them. Relations are always relative to the listed domain. An object is a member of the domain itself when its relations include Direct or Inherited. The relation is an enum; the exact field shape is an implementation choice.
+- **Domains of an object**: for a leaf object, every domain the caller can see whose scope contains the object, each with its relations. An object tagged only `trading` gets Trading (Direct) and Finance (Via subdomain Trading). This reverse lookup remains limited to leaves even though forward listing can return catalogs and schemas.
+- **Removing a member**: membership ends when the object no longer carries the backing tag, by the tag rules. To take an object out of a domain, remove the tag by name (v1 association request), which removes all its values on the object. An inherited membership can only be removed on the catalog or schema.
 - **Domain filters**: Phase 1 adds no domain filter to other list APIs. When one is added, it matches scope, consistent with member listing.
 
 ### Member listing
 
-`GET /domains/{domain}/objects` lists leaf objects, expanding catalogs and schemas:
+`GET /domains/{domain}/objects` defaults to direct assignments. Look up the selected domains' backing tags by stable ID; assignment values are ignored. A recreated tag with the same name has a different ID and cannot take over the binding.
 
-1. Resolve the backing tags of the domains in the selected scopes (by default the listed domain's whole scope: itself and its visible subdomains).
-2. List the objects carrying them by the bound tag ID and value. The existing lookup by tag name (`listMetadataObjectsForTag`) is not reused, since a tag deleted and recreated with the same name between steps would contribute its objects; this applies to bindings without a value too. Leaf objects are candidates as they are; a tagged catalog or schema is replaced by the leaf objects under it, from Gravitino's store.
-3. Keep the candidates whose effective tags match a selected backing tag by tag ID (the matching rules above, nearest level wins), so a leaf object that overrides an inherited value drops out. Only bindings with a value need this check.
-4. Drop objects the caller cannot access (`filterMetadataObject`), de-duplicate, and record each member's relations and sources.
+Return each accessible matching object once with its relations to the queried domain and its visible subdomains. If a schema and a table under it both carry matching assignments, both appear. A leaf that matches solely through inheritance appears only with `expand=true`.
+
+With `expand=true`, enumerate recorded leaves under each tagged container and check each leaf's effective tags against the selected bindings.
 
 - **A view of recorded objects**: membership is defined by the rule above; the listing shows the objects recorded in Gravitino's store. Objects in an external catalog that Gravitino has not recorded yet are not listed, so an empty listing does not mean an object is not a member.
-- **Cost**: a domain backed by a tag on a large catalog lists every recorded leaf object under it (see Open Questions).
+- **Cost**: expanding a domain backed by a tag on a large catalog visits every recorded leaf object under it (see Open Questions).
 - **Per caller**: the listing depends on the subdomains and objects the caller can see, so its length is not a property of the domain. Paging and counts come in Phase 2; counts follow the listing and depend on the caller too, so they never reveal assets the caller cannot see.
 
 ### Access control
@@ -194,7 +192,7 @@ Domain operations use the store's existing locking primitives, in one global ord
 | Publish, unpublish, edit, delete     | `MANAGE_DOMAIN`                                                                                                                          |
 
 - **Membership is controlled by tag privileges only**: anyone with read access to an asset and `APPLY_TAG` on a backing tag can add the asset, without the asset owner's consent. This is the existing tag behavior; a steward controls membership by controlling `APPLY_TAG` on the backing tag.
-- Browsing without `VIEW_TAG` is safe because only a tag's owner can bind it to a domain: exposing that one (tag, value) to the domain's viewers is the owner's decision, and viewers still see only objects they can access.
+- Browsing without `VIEW_TAG` is safe because only a tag's owner can bind it to a domain: exposing that one tag to the domain's viewers is the owner's decision, and viewers still see only objects they can access.
 - A user with `MANAGE_DOMAIN` but no `APPLY_TAG` on the tag can manage the domain but not add members.
 
 **Implementation**
@@ -215,45 +213,46 @@ Under `/api/metalakes/{metalake}`, following Gravitino conventions: `?details=` 
 | Operation                | Endpoint                                                                      | Request → response                                                                                           |
 | :----------------------- | :---------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------- |
 | List                     | `GET /domains?details=false`                                                  | → `NameListResponse` / `DomainListResponse`                                                                  |
-| Create                   | `POST /domains`                                                               | `DomainCreateRequest{name, comment, properties, backingTag{name, value, create}, parent}` → `DomainResponse` |
+| Create                   | `POST /domains`                                                               | `DomainCreateRequest{name, comment, properties, backingTag{name, create}, parent}` → `DomainResponse` |
 | Get                      | `GET /domains/{domain}`                                                       | → `DomainResponse`                                                                                           |
 | Alter                    | `PUT /domains/{domain}`                                                       | `DomainUpdatesRequest{updates: [rename, updateComment, setProperty, removeProperty]}` → `DomainResponse`     |
 | Publish / unpublish      | `PATCH /domains/{domain}`                                                     | `DomainSetRequest{status}` → `DomainResponse`                                                                |
 | Drop                     | `DELETE /domains/{domain}`                                                    | → `DropResponse` (`false` if absent)                                                                         |
 | Attach / move            | `PUT /domains/{domain}/parent`                                                | `DomainParentSetRequest{parent}` → `DomainResponse`                                                          |
 | Detach                   | `DELETE /domains/{domain}/parent`                                             | → `DomainResponse` (no-op for a top-level domain)                                                            |
-| Set / remove backing tag | `PUT /domains/{domain}/backingTag`                                            | `DomainBackingTagSetRequest{backingTag{name, value}}` (null `backingTag` removes it) → `DomainResponse`      |
+| Set / remove backing tag | `PUT /domains/{domain}/backingTag`                                            | `DomainBackingTagSetRequest{backingTag{name}}` (null `backingTag` removes it) → `DomainResponse`      |
 | List subdomains          | `GET /domains/{domain}/subdomains?details=false`                              | → `NameListResponse` / `DomainListResponse`                                                                  |
 | List members             | `GET /domains/{domain}/objects`                                               | → `DomainMemberListResponse`                                                                                 |
 | Domains of an object     | `GET /objects/{type}/{fullName}/domains?details=false` (leaf types only)      | → `NameListResponse` / `DomainListResponse`                                                                  |
 | Add / remove members     | Existing `POST /objects/{type}/{fullName}/tags` with the domain's backing tag | `TagValuesAssociateRequest` (v2) or `TagsAssociateRequest` (v1)                                              |
 
 ```
-DomainDTO       { name, comment, properties, status, parent, backingTag{name, value}, audit,
+DomainDTO       { name, comment, properties, status, parent, backingTag{name}, audit,
                   relations? }   // [{relation, source?}], only on domains of an object
 DomainMemberDTO { object: MetadataObjectDTO, relations: [{relation, source?}] }
 ```
 
-- **Create**: `backingTag.create = true` creates a new tag with the given name (no `value`); `false` binds the existing (tag, value). Domain, new tag and parent edge are written in one transaction; on any failure nothing is created, and no new tag is left behind.
-- **Membership requests**: adding a member with a value needs the v2 `TagValuesAssociateRequest` (`Content-Type: application/vnd.gravitino.v2+json`), which carries (name, value) pairs. Removing a tag by name with the v1 `TagsAssociateRequest` removes all its values on the object. The Java and Python clients already support both.
+- **Create**: `backingTag.create = true` creates a new tag with the given name; `false` binds the existing tag. Domain, new tag and parent edge are written in one transaction; on any failure nothing is created, and no new tag is left behind.
+- **Membership requests**: a member is added by assigning the backing tag. A valueless assignment, when the tag permits it, works with the v1 `TagsAssociateRequest` or the v2 `TagValuesAssociateRequest`; a tag with an allowed-values list must be assigned one of its allowed values with the v2 `TagValuesAssociateRequest`, since v1 accepts only tag names. Removing a tag by name with the v1 `TagsAssociateRequest` removes all its values on the object. The Java and Python clients already support both.
 - **Parent endpoints** address the child only, matching `Domain#attachToParent` and `Domain#detachFromParent`; detaching needs no parent name.
 - **State changes return the domain**: publish, unpublish, attach, move, detach and backing-tag changes return the updated domain, because the Java API returns a new `Domain` snapshot from them.
 - **Concurrency**: changes apply to the current state on the server and the last write wins, as for other Gravitino metadata operations; there is no version check. Detach removes the current parent edge and removing the backing tag removes the current one, whatever the caller's snapshot shows; detaching a top-level domain is a no-op, not an error. Domains are addressed by name, so if a domain is renamed and a new one takes its old name, later calls with that name act on the new domain.
 - **Member listing parameters**:
   - `domains` (repeatable, `?domains=Tax&domains=Trading`; not comma-separated, since domain names may contain `,`): each name, the listed domain itself or one of its visible subdomains, selects that domain's scope, and the result is the union. On Finance with subdomains Tax and Trading, not setting it or `domains=Finance` lists the whole scope (Finance, Tax and Trading), `domains=Tax` lists only Tax's members, and `domains=Tax&domains=Trading` lists Tax's and Trading's. Names that are neither the domain nor a subdomain visible to the caller are ignored; if all given names are ignored, the result is empty rather than everything, so a typo cannot widen it.
-  - `types` (comma-separated, each a leaf member type) and `nameContains` (case-insensitive, on the full name). Filters apply to the expanded leaf list, so `types=TABLE` finds the tables under a tagged catalog.
+  - `expand` defaults to false. Set it to true to enumerate recorded leaves through inheritance.
+  - `types` accepts comma-separated leaf types and, for direct listing, CATALOG and SCHEMA. With `types=TABLE`, direct listing returns directly tagged tables. Add `expand=true` to include tables that inherit a matching tag. `nameContains` matches the full name case-insensitively.
   - The listed domain's own members are those whose relations include Direct or Inherited.
   - No paging in Phase 1, like the other core list APIs; paging and counts come in Phase 2.
 - **Errors**:
   - 404: `NoSuchDomainException` (missing, or a `DRAFT` domain the caller cannot see); `NoSuchTagException` (a backing tag to bind that does not exist).
   - 409: `DomainAlreadyExistsException` (create, or rename to an existing name); `NonEmptyDomainException` (drop with subdomains); `TagAlreadyExistsException` (a new backing tag whose name exists); `BackingTagAlreadyBoundException` (a binding that conflicts with another domain).
-  - 400: `IllegalArgumentException` (C1–C6, status consistency, a value the tag does not allow, a create request without a backing tag or with both `create` and a value, a `DOMAIN` target on the generic tag association API).
+  - 400: `IllegalArgumentException` (C1–C6, status consistency, a create request without a backing tag, a `DOMAIN` target on the generic tag association API).
   - 403: `ForbiddenException` (binding a tag the caller does not own, nor the metalake; creating a new tag without `CREATE_TAG`).
 - **Encoding**: tag and domain names may contain `/`, which must be URL-encoded (`%2F`) in every path segment: `{tag}`, and `{domain}` in `/domains/{domain}`, `/objects/domain/{domain}/...`, `/owners/domain/{domain}` and `/permissions/roles/{role}/domain/{domain}/grant|revoke`. The Java, Python and MCP clients already encode path segments, and Gravitino's Jetty 9.4 / Jersey stack decodes them into the path parameters. An end-to-end test through the real server, with authentication and authorization enabled, will cover these paths, including filters that read the decoded path. Deployments behind a reverse proxy must pass `%2F` through without decoding it (for example, nginx `proxy_pass` without a URI part), and a later Jetty upgrade must keep ambiguous path separators allowed.
 - **Reused**: owners at `/owners/domain/{domain}`; privileges through the role and permission APIs, with `DOMAIN` as a securable type.
 - **Clients** (Java, Python) mirror the tag clients:
   - `DomainOperations` on `GravitinoMetalake`: list, get, `createDomain` (top-level domains only, with an explicit backing tag), alter and delete.
-  - On a `Domain`, each returning a new `Domain` snapshot: `publish()`, `unpublish()`, `attachToParent(parent)` (attach or move), `detachFromParent()`, and `updateBackingTag(TagValue)` (`null` removes it; maps to `PUT /domains/{domain}/backingTag`). Also on a `Domain`: `createSubdomain(...)` (with an explicit backing tag), `listSubdomains()` / `listSubdomainsInfo()` and `listMembers(DomainMemberFilter)`.
+  - On a `Domain`, each returning a new `Domain` snapshot: `publish()`, `unpublish()`, `attachToParent(parent)` (attach or move), `detachFromParent()`, and `updateBackingTag(String)` (`null` removes it; maps to `PUT /domains/{domain}/backingTag`). Also on a `Domain`: `createSubdomain(...)` (with an explicit backing tag), `listSubdomains()` / `listSubdomainsInfo()` and `listMembers(DomainMemberFilter)`.
   - `SupportsDomains` (`listDomains()`, `listDomainsInfo()`) on tables, views, filesets, topics, models and semantic models; not on catalogs, schemas, columns or functions.
 - **Not included**: a batch lookup of the domains of many objects.
 
@@ -265,10 +264,10 @@ A new read-only `domain` tool category in `mcp-server/`, added to `SUPPORTED_TOO
 | :-------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `list_domains`              | `GET /domains?details=true`; returns name, comment, parent, status and backing tag, so an agent can pick a domain                                                                                                          |
 | `get_domain_by_name`        | `GET /domains/{domain}`                                                                                                                                                                                                    |
-| `list_metadata_by_domain`   | `GET /domains/{domain}/objects`, with `domains` (a list of scopes to include, the domain itself or its subdomains; default the whole scope), `types`, `name_contains`; lets an agent look within a domain by type and name |
+| `list_domain_members`   | `GET /domains/{domain}/objects`, with `domains` (a list of scopes to include, the domain itself or its subdomains; default the whole scope), `types`, `name_contains`, and `expand`; lets an agent look within a domain by type and name |
 | `list_domains_for_metadata` | `GET /objects/{type}/{fullName}/domains`, for leaf objects                                                                                                                                                                 |
 
-Adding members uses the existing `associate_tag_with_metadata` tool. It keeps removing tags by name (v1, all values) and is extended to accept (name, value) pairs and send the v2 request, so value-backed domains work. The MCP server forwards the caller's `Authorization` header, so the server's visibility rules apply; with OAuth client-credentials, the agent sees what that service identity sees.
+Adding members uses the existing `associate_tag_with_metadata` tool. It keeps removing tags by name (v1, all values) and is extended to accept (name, value) pairs and send the v2 request. The MCP server forwards the caller's `Authorization` header, so the server's visibility rules apply; with OAuth client-credentials, the agent sees what that service identity sees.
 
 ### Events and audit
 
@@ -293,7 +292,7 @@ Unity Catalog domains ([Domains and subdomains](https://docs.databricks.com/aws/
 
 ## Open Questions
 
-1. **Cost of expanding large catalogs**: member listing expands a tagged catalog or schema to every recorded leaf object under it. Paging (Phase 2) bounds the response, not the work; is a cheaper strategy needed for very large catalogs?
+1. **Cost of expanding large catalogs**: with `expand=true`, member listing expands a tagged catalog or schema to every recorded leaf object under it. Paging (Phase 2) bounds the response, not the work; is a cheaper strategy needed for very large catalogs?
 2. **Data-access grants on domains**, if wanted later: deny-only grants (tagging can only tighten access), or allow grants that also require grant authority on the asset when tagging. Either works only where Gravitino enforces authorization itself and adds a membership lookup to every check.
 
 ## Task Breakdown
@@ -316,7 +315,7 @@ Unity Catalog domains ([Domains and subdomains](https://docs.databricks.com/aws/
 
 - [ ] Membership resolution in `core/` on `EffectiveTagResolver`, returning the inherited source and matching by tag ID
 - [ ] Lookup of tag relations by tag ID and value (the existing lookup is by tag name)
-- [ ] Member listing: expansion to leaf objects, relation lists, filters; domains of a leaf object
+- [ ] Member listing: direct objects and opt-in expansion to leaves, relation lists, filters; domains of a leaf object
 - [ ] REST endpoints and tests
 
 ### Phase 1c: Clients, MCP and documentation

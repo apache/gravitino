@@ -22,16 +22,20 @@ package org.apache.gravitino.flink.connector.store;
 import static org.apache.flink.table.factories.FactoryUtil.createCatalogStoreFactoryHelper;
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO;
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_CLIENT_CONFIG;
+import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_ENABLE_SESSION_CATALOG_SHADOWING;
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT;
+import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_EXCLUDED_CATALOGS;
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_METALAKE;
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_URI;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.catalog.CatalogStore;
@@ -41,9 +45,13 @@ import org.apache.flink.table.factories.CatalogStoreFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.gravitino.client.GravitinoClientConfiguration;
 import org.apache.gravitino.flink.connector.catalog.GravitinoCatalogManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** The Factory for creating {@link GravitinoCatalogStore}. */
 public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoCatalogStoreFactory.class);
+
   private GravitinoCatalogManager catalogManager;
   private boolean enableSessionCatalogSupport;
   private GravitinoCatalogStore gravitinoCatalogStore;
@@ -71,15 +79,36 @@ public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
         GRAVITINO_URI.key(),
         GRAVITINO_METALAKE.key());
 
+    boolean sessionCatalogSupport = options.get(GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT);
+    // Validate before creating the Gravitino client so that a misconfiguration does not leave an
+    // unused client behind.
+    Set<String> excludedCatalogs =
+        parseExcludedCatalogs(options.get(GRAVITINO_EXCLUDED_CATALOGS), sessionCatalogSupport);
+    boolean sessionCatalogShadowing =
+        parseSessionCatalogShadowing(
+            options.get(GRAVITINO_ENABLE_SESSION_CATALOG_SHADOWING), sessionCatalogSupport);
+
     this.catalogManager =
         GravitinoCatalogManager.create(gravitinoUri, gravitinoName, extractClientConfig(options));
-    this.enableSessionCatalogSupport = options.get(GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT);
+    this.enableSessionCatalogSupport = sessionCatalogSupport;
     this.gravitinoCatalogStore = new GravitinoCatalogStore(catalogManager);
     if (enableSessionCatalogSupport) {
       this.memoryCatalogStore = new GenericInMemoryCatalogStore();
       this.memoryCatalogStore.open();
+      if (!excludedCatalogs.isEmpty()) {
+        LOG.info(
+            "Catalogs {} are excluded from Gravitino in this session; only session catalogs "
+                + "can use these names.",
+            excludedCatalogs);
+      }
+      if (sessionCatalogShadowing) {
+        LOG.info(
+            "Session catalog shadowing is enabled; session catalogs can use the names of "
+                + "Gravitino catalogs that this session has not accessed.");
+      }
       this.catalogStore =
-          new GravitinoSessionCatalogStore(gravitinoCatalogStore, memoryCatalogStore);
+          new GravitinoSessionCatalogStore(
+              gravitinoCatalogStore, memoryCatalogStore, excludedCatalogs, sessionCatalogShadowing);
     } else {
       this.catalogStore = gravitinoCatalogStore;
     }
@@ -107,7 +136,63 @@ public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
 
   @Override
   public Set<ConfigOption<?>> optionalOptions() {
-    return ImmutableSet.of(GRAVITINO_CLIENT_CONFIG, GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT);
+    return ImmutableSet.of(
+        GRAVITINO_CLIENT_CONFIG,
+        GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT,
+        GRAVITINO_EXCLUDED_CATALOGS,
+        GRAVITINO_ENABLE_SESSION_CATALOG_SHADOWING);
+  }
+
+  /**
+   * Validates the session catalog shadowing option.
+   *
+   * @param sessionCatalogShadowing the configured session catalog shadowing option
+   * @param sessionCatalogSupport whether session catalog support is enabled
+   * @return the session catalog shadowing option
+   * @throws IllegalArgumentException if shadowing is enabled while session catalog support is
+   *     disabled
+   */
+  @VisibleForTesting
+  static boolean parseSessionCatalogShadowing(
+      boolean sessionCatalogShadowing, boolean sessionCatalogSupport) {
+    Preconditions.checkArgument(
+        !sessionCatalogShadowing || sessionCatalogSupport,
+        "%s can only be enabled when %s is true",
+        GRAVITINO_ENABLE_SESSION_CATALOG_SHADOWING.key(),
+        GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT.key());
+    return sessionCatalogShadowing;
+  }
+
+  /**
+   * Validates and normalizes the configured excluded catalog names.
+   *
+   * @param catalogNames the configured catalog names
+   * @param sessionCatalogSupport whether session catalog support is enabled
+   * @return the trimmed, de-duplicated catalog names
+   * @throws IllegalArgumentException if a name is blank, or names are configured while session
+   *     catalog support is disabled
+   */
+  @VisibleForTesting
+  static Set<String> parseExcludedCatalogs(
+      List<String> catalogNames, boolean sessionCatalogSupport) {
+    if (catalogNames == null || catalogNames.isEmpty()) {
+      return ImmutableSet.of();
+    }
+    Preconditions.checkArgument(
+        sessionCatalogSupport,
+        "%s can only be set when %s is true",
+        GRAVITINO_EXCLUDED_CATALOGS.key(),
+        GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT.key());
+    ImmutableSet.Builder<String> builder = ImmutableSet.builder();
+    for (String catalogName : catalogNames) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(catalogName),
+          "%s must not contain blank catalog names, but got %s",
+          GRAVITINO_EXCLUDED_CATALOGS.key(),
+          catalogNames);
+      builder.add(catalogName.trim());
+    }
+    return builder.build();
   }
 
   @VisibleForTesting

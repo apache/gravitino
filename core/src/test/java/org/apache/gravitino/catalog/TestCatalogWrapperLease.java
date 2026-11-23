@@ -42,10 +42,13 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogManager.CatalogWrapper;
 import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
@@ -703,6 +706,63 @@ public class TestCatalogWrapperLease {
       continuePublication.countDown();
       executor.shutdownNow();
     }
+  }
+
+  @Test
+  public void testWithCapabilityDefersCleanupUntilCallbackReturns() throws Exception {
+    NameIdentifier ident = createCatalog("capability_with_lease");
+    NameIdentifier tableIdent = NameIdentifier.of(METALAKE, ident.name(), "schema", "table");
+    AtomicReference<CatalogWrapper> usedWrapper = new AtomicReference<>();
+
+    CapabilityResult caseSensitive =
+        CapabilityHelpers.withCapability(
+            tableIdent,
+            catalogManager,
+            capability -> {
+              CatalogWrapper wrapper = catalogManager.getCatalogCache().getIfPresent(ident);
+              Assertions.assertNotNull(wrapper);
+              usedWrapper.set(wrapper);
+              Assertions.assertEquals(1, wrapper.activeOperations());
+
+              // Evict the catalog while the capability is in use, as a cache expiry would.
+              catalogManager.getCatalogCache().invalidate(ident);
+              await().atMost(Duration.ofSeconds(10)).until(wrapper::isRetired);
+
+              // The capability can still load classes: its catalog and ClassLoader stay open.
+              Assertions.assertNotNull(
+                  wrapper.catalog(), "a capability in use must not lose its catalog");
+              return capability.caseSensitiveOnName(Capability.Scope.TABLE);
+            });
+
+    Assertions.assertNotNull(caseSensitive);
+    CatalogWrapper wrapper = usedWrapper.get();
+    Assertions.assertEquals(0, wrapper.activeOperations());
+    Assertions.assertNull(
+        wrapper.catalog(), "the capability call must release the retired catalog when it returns");
+  }
+
+  @Test
+  public void testNormalizeDispatcherCallsBackendOutsideCapabilityLease() throws Exception {
+    NameIdentifier ident = createCatalog("normalize_outside_lease");
+    NameIdentifier tableIdent = NameIdentifier.of(METALAKE, ident.name(), "schema", "table");
+    CatalogWrapper wrapper = catalogManager.getCatalogCache().get(ident, key -> null);
+    Assertions.assertNotNull(wrapper);
+    TableDispatcher backend = Mockito.mock(TableDispatcher.class);
+    AtomicReference<Integer> leasesDuringBackendCall = new AtomicReference<>();
+    Mockito.when(backend.alterTable(Mockito.any(), Mockito.any(TableChange[].class)))
+        .thenAnswer(
+            invocation -> {
+              leasesDuringBackendCall.set(wrapper.activeOperations());
+              return null;
+            });
+
+    new TableNormalizeDispatcher(backend, catalogManager)
+        .alterTable(tableIdent, TableChange.setProperty("k", "v"));
+
+    // The capability is applied under a lease, but the backend call, which can be slow, runs after
+    // the lease is released, so it never holds the catalog open or runs in its ClassLoader.
+    Assertions.assertEquals(0, leasesDuringBackendCall.get());
+    Mockito.verify(backend).alterTable(Mockito.eq(tableIdent), Mockito.any(TableChange[].class));
   }
 
   private NameIdentifier createCatalog(String name) {

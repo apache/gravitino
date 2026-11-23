@@ -27,7 +27,11 @@ const Apis = {
   DELETE: ({ metalake, policy }) =>
     `/api/metalakes/${encodeURIComponent(metalake)}/policies/${encodeURIComponent(policy)}`,
   UPDATE: ({ metalake, policy }) =>
-    `/api/metalakes/${encodeURIComponent(metalake)}/policies/${encodeURIComponent(policy)}`
+    `/api/metalakes/${encodeURIComponent(metalake)}/policies/${encodeURIComponent(policy)}`,
+  TAG_POLICIES: ({ metalake, tag }) =>
+    `/api/metalakes/${encodeURIComponent(metalake)}/tags/${encodeURIComponent(tag)}/policies`,
+  TAG_POLICY: ({ metalake, tag, policy }) =>
+    `/api/metalakes/${encodeURIComponent(metalake)}/tags/${encodeURIComponent(tag)}/policies/${encodeURIComponent(policy)}`
 }
 
 export const getPoliciesApi = ({ metalake, details }) => {
@@ -67,5 +71,25 @@ export const enableOrDisablePolicyApi = ({ metalake, policy, data }) => {
   return defHttp.patch({
     url: `${Apis.UPDATE({ metalake, policy })}`,
     data
+  })
+}
+
+export const getPoliciesForTagApi = ({ metalake, tag }) => {
+  return defHttp.get({
+    url: Apis.TAG_POLICIES({ metalake, tag }),
+    params: { details: true }
+  })
+}
+
+export const addPolicyForTagApi = ({ metalake, tag, policy }) => {
+  return defHttp.post({
+    url: Apis.TAG_POLICY({ metalake, tag, policy }),
+    data: { selector: { type: 'ALL_VALUES' } }
+  })
+}
+
+export const removePolicyFromTagApi = ({ metalake, tag, policy }) => {
+  return defHttp.delete({
+    url: Apis.TAG_POLICY({ metalake, tag, policy })
   })
 }

@@ -45,6 +45,8 @@ The connector provides read access and write access to data and metadata stored 
 - [DROP SCHEMA](https://trino.io/docs/current/sql/drop-schema.html)
 - [COMMENT](https://trino.io/docs/current/sql/comment.html)
 
+When a `CREATE TABLE AS SELECT` statement fails, the connector drops the table that the statement created, except for Hive managed tables (see [Hive catalog](catalog-hive.md#create-table)). If the drop fails, the coordinator logs a warning and the table stays. The table is visible to other queries while the statement runs. If another query writes to it or recreates it and the statement then fails, the connector still drops the table.
+
 ### View Management
 
 - [CREATE VIEW](https://trino.io/docs/current/sql/create-view.html)

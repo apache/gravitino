@@ -20,6 +20,8 @@ package org.apache.gravitino.catalog.glue;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.gravitino.connector.capability.Capability;
@@ -37,11 +39,9 @@ class TestGlueCatalogCapability {
   }
 
   @Test
-  void testColumnNotNullIsUnsupported() {
-    CapabilityResult result = capability.columnNotNull();
-    assertFalse(result.supported(), "Glue does not enforce NOT NULL constraints");
-    assertNotNull(result.unsupportedMessage());
-    assertFalse(result.unsupportedMessage().isEmpty());
+  void testColumnNotNullIsLeftToTableFormat() {
+    // Iceberg tables support NOT NULL; GlueCatalogOperations rejects it on Hive-format tables.
+    assertTrue(capability.columnNotNull().supported());
   }
 
   @Test
@@ -68,8 +68,27 @@ class TestGlueCatalogCapability {
 
   @Test
   void testCaseSensitiveOnColumnIsSupported() {
-    // Column name case folding is not documented in Glue Column API — treated as supported.
+    // Iceberg keeps the case of column names; Hive-format names are folded by the catalog itself.
     CapabilityResult result = capability.caseSensitiveOnName(Capability.Scope.COLUMN);
     assertTrue(result.supported());
+  }
+
+  @Test
+  void testCaseSensitiveOnNameRejectsNullScope() {
+    assertThrows(IllegalArgumentException.class, () -> capability.caseSensitiveOnName(null));
+  }
+
+  @Test
+  void testNoSwitchOnEnumSyntheticClass() {
+    // Verifies that the if/else rewrite eliminated the compiler-generated $1 switch-map class.
+    // If switch-on-enum were still present, javac would produce GlueCatalogCapability$1.class,
+    // which is loaded lazily on the first switch execution by the defining IsolatedClassLoader.
+    // Closing that classloader before the first switch call would then cause a permanent
+    // NoClassDefFoundError. The absence of $1 confirms this trigger is eliminated.
+    String syntheticClassResource =
+        GlueCatalogCapability.class.getName().replace('.', '/') + "$1.class";
+    assertNull(
+        GlueCatalogCapability.class.getClassLoader().getResource(syntheticClassResource),
+        "GlueCatalogCapability$1 switch-map class must not exist after if/else rewrite");
   }
 }

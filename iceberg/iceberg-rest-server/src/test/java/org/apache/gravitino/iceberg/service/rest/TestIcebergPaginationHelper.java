@@ -50,7 +50,7 @@ class TestIcebergPaginationHelper {
             .add(Namespace.of("ns3"))
             .build();
     ListNamespacesResponse result =
-        IcebergPaginationHelper.paginateNamespaces(response, Optional.empty(), Optional.of(2));
+        IcebergPaginationHelper.paginateNamespaces(response, Optional.of(""), Optional.of(2));
     Assertions.assertEquals(2, result.namespaces().size());
     Assertions.assertNotNull(result.nextPageToken());
   }
@@ -65,7 +65,7 @@ class TestIcebergPaginationHelper {
             .build();
     // First page
     ListNamespacesResponse firstPage =
-        IcebergPaginationHelper.paginateNamespaces(response, Optional.empty(), Optional.of(2));
+        IcebergPaginationHelper.paginateNamespaces(response, Optional.of(""), Optional.of(2));
     // Second page using cursor from first page
     ListNamespacesResponse secondPage =
         IcebergPaginationHelper.paginateNamespaces(
@@ -84,7 +84,7 @@ class TestIcebergPaginationHelper {
             .add(Namespace.of("ns2"))
             .build();
     ListNamespacesResponse result =
-        IcebergPaginationHelper.paginateNamespaces(response, Optional.empty(), Optional.of(2));
+        IcebergPaginationHelper.paginateNamespaces(response, Optional.of(""), Optional.of(2));
     List<String> names =
         result.namespaces().stream().map(Namespace::toString).collect(Collectors.toList());
     Assertions.assertEquals(Arrays.asList("ns1", "ns2"), names);
@@ -125,7 +125,7 @@ class TestIcebergPaginationHelper {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
-            IcebergPaginationHelper.paginateNamespaces(response, Optional.empty(), Optional.of(0)));
+            IcebergPaginationHelper.paginateNamespaces(response, Optional.of(""), Optional.of(0)));
   }
 
   @Test
@@ -135,15 +135,14 @@ class TestIcebergPaginationHelper {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
-            IcebergPaginationHelper.paginateNamespaces(
-                response, Optional.empty(), Optional.of(-1)));
+            IcebergPaginationHelper.paginateNamespaces(response, Optional.of(""), Optional.of(-1)));
   }
 
   @Test
   void testPaginateNamespacesEmptyList() {
     ListNamespacesResponse response = ListNamespacesResponse.builder().build();
     ListNamespacesResponse result =
-        IcebergPaginationHelper.paginateNamespaces(response, Optional.empty(), Optional.of(10));
+        IcebergPaginationHelper.paginateNamespaces(response, Optional.of(""), Optional.of(10));
     Assertions.assertEquals(0, result.namespaces().size());
     Assertions.assertNull(result.nextPageToken());
   }
@@ -158,7 +157,7 @@ class TestIcebergPaginationHelper {
             .add(TableIdentifier.of(ns, "t3"))
             .build();
     ListTablesResponse result =
-        IcebergPaginationHelper.paginateTables(response, Optional.empty(), Optional.of(2));
+        IcebergPaginationHelper.paginateTables(response, Optional.of(""), Optional.of(2));
     Assertions.assertEquals(2, result.identifiers().size());
     Assertions.assertNotNull(result.nextPageToken());
   }
@@ -177,7 +176,7 @@ class TestIcebergPaginationHelper {
 
     // Walk all pages with pageSize=2
     ListTablesResponse page1 =
-        IcebergPaginationHelper.paginateTables(response, Optional.empty(), Optional.of(2));
+        IcebergPaginationHelper.paginateTables(response, Optional.of(""), Optional.of(2));
     Assertions.assertEquals(2, page1.identifiers().size());
     Assertions.assertNotNull(page1.nextPageToken());
 
@@ -209,8 +208,70 @@ class TestIcebergPaginationHelper {
             .build();
     // pageSize equals total items
     ListTablesResponse result =
-        IcebergPaginationHelper.paginateTables(response, Optional.empty(), Optional.of(2));
+        IcebergPaginationHelper.paginateTables(response, Optional.of(""), Optional.of(2));
     Assertions.assertEquals(2, result.identifiers().size());
     Assertions.assertNull(result.nextPageToken());
+  }
+
+  @Test
+  void testPageSizeWithoutPageTokenReturnsAllResults() {
+    // The REST spec: without a pageToken parameter the server returns every result and no
+    // next-page token, whatever pageSize says.
+    ListNamespacesResponse namespaces =
+        ListNamespacesResponse.builder()
+            .addAll(Arrays.asList(Namespace.of("c"), Namespace.of("a"), Namespace.of("b")))
+            .build();
+    ListNamespacesResponse all =
+        IcebergPaginationHelper.paginateNamespaces(namespaces, Optional.empty(), Optional.of(1));
+    Assertions.assertEquals(3, all.namespaces().size());
+    Assertions.assertNull(all.nextPageToken());
+
+    ListTablesResponse tables =
+        ListTablesResponse.builder()
+            .add(TableIdentifier.of("db", "t1"))
+            .add(TableIdentifier.of("db", "t2"))
+            .build();
+    ListTablesResponse allTables =
+        IcebergPaginationHelper.paginateTables(tables, Optional.empty(), Optional.of(1));
+    Assertions.assertEquals(2, allTables.identifiers().size());
+    Assertions.assertNull(allTables.nextPageToken());
+
+    // An empty pageToken starts paging.
+    ListNamespacesResponse firstPage =
+        IcebergPaginationHelper.paginateNamespaces(namespaces, Optional.of(""), Optional.of(1));
+    Assertions.assertEquals(1, firstPage.namespaces().size());
+    Assertions.assertEquals("a", firstPage.nextPageToken());
+  }
+
+  @Test
+  void testEmptyPageTokenWithoutPageSizeReturnsAllUnsorted() {
+    ListNamespacesResponse namespaces =
+        ListNamespacesResponse.builder()
+            .addAll(Arrays.asList(Namespace.of("c"), Namespace.of("a"), Namespace.of("b")))
+            .build();
+    ListNamespacesResponse all =
+        IcebergPaginationHelper.paginateNamespaces(namespaces, Optional.of(""), Optional.empty());
+    Assertions.assertEquals(
+        Arrays.asList(Namespace.of("c"), Namespace.of("a"), Namespace.of("b")), all.namespaces());
+    Assertions.assertNull(all.nextPageToken());
+  }
+
+  @Test
+  void testInvalidPageSizeWithoutPageTokenIsRejected() {
+    ListNamespacesResponse namespaces =
+        ListNamespacesResponse.builder().add(Namespace.of("db")).build();
+    ListTablesResponse tables =
+        ListTablesResponse.builder().add(TableIdentifier.of("db", "table")).build();
+    for (int size : new int[] {0, -1}) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              IcebergPaginationHelper.paginateNamespaces(
+                  namespaces, Optional.empty(), Optional.of(size)));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              IcebergPaginationHelper.paginateTables(tables, Optional.empty(), Optional.of(size)));
+    }
   }
 }
