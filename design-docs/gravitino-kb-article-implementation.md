@@ -46,18 +46,14 @@ Every storage mutation test checks the design's
 
 ### T2: Persistence
 
-- **T2.1**: CRUD and unique live keys in the two Article tables and shared membership table on
-  every backend; binary title-key comparison, expanding case conversion, multiple deprecated
-  NULL keys and title-key recalculation on existing membership rows. Term rows have NULL title
-  keys. With equal numeric member IDs of different types, Article reads, writes, deletion and
-  title-key recalculation leave Term rows unchanged. Verify the metalake-prefixed title unique
-  key and zero-ID default rows, including deprecated NULL keys; never create a Domain zero.
+- **T2.1**: exercise CRUD and live keys in the Article tables and shared membership table on
+  every backend. Only real Domains occur in membership rows. With equal numeric member IDs
+  of different types, Article operations leave Term rows intact.
 - **T2.2**: soft deletion, name reuse, target lookup indexes and complete deletion cleanup.
   On every backend, verify binding `metalake_id` on writes, metalake cleanup without an
   Article-table join, and both relation indexes. Reverse lookups exclude soft-deleted bindings.
   Register the Article type for generic orphan cleanup; remove residual Owner relations for
-  deleted Articles while preserving relations to live Articles. Domain-liveness checks preserve
-  default-scope rows; Article deletion and metalake cleanup remove them.
+  deleted Articles while preserving relations to live Articles.
 - **T2.3**: create writes one current row with title/format/body and revision 1. Effective edits
   update that row and advance revision once; no-ops, failed writes, Owner transfer and orphan
   cleanup leave it unchanged. Verify there are no history rows, pointers or retention settings.
@@ -77,14 +73,12 @@ Every storage mutation test checks the design's
   128 normalized code points and reject 129.
   Race two creates for the same generated candidate: the loser retries a new suffix after full
   rollback. Cover random fallback collisions, five-retry exhaustion with `409`, immediate explicit
-  conflicts and no retry for title conflicts or other errors; failed attempts leave no partial rows.
-- **T3.2**: title conflicts ignoring case/spaces within a direct Domain and among unassigned
-  Articles in the same metalake return `409`; equal titles in distinct scopes or different
-  metalakes succeed. Cover title edits, adding the first Domain, removing the last Domain,
-  deprecation releasing claims and restoration reclaiming them. Concurrent create/title change,
-  Domain changes and restoration have one successful claim of the same scope/title key.
-  Conflicts in any destination scope roll back all title keys, Article fields, relations and
-  revision, without exposing hidden Domains. Recheck these constraints on H2, MySQL and PostgreSQL.
+  conflicts and no retry for unrelated errors. Failed attempts leave no partial rows.
+- **T3.2**: create Articles with identical titles and distinct names in the same Domain and
+  without a Domain. Exercise generated-name suffixes and load each Article by `name`.
+  Change a title to match another Article, move it into or out of the Domain, and deprecate
+  and restore it while another Article has the same title. Verify the behavior on H2, MySQL
+  and PostgreSQL.
 - **T3.3**: one revision increment per effective mixed request, including status/property changes;
   no-ops do not increment it. Current content and changed relations commit together.
 - **T3.4**: unchanged Markdown storage, embedded HTML rendered as text, safe rendering of inline,
@@ -112,9 +106,7 @@ Every storage mutation test checks the design's
 
 - **T5.1**: zero/multiple Domains, parent filter, rename and current-name resolution. Shared
   membership queries filter by member type, and reject members or real Domains from another
-  metalake. Default rows yield an empty public Domain list and never enter Domain resolution,
-  authorization, filtering, locks or nonempty checks. First/last-Domain transitions atomically
-  remove/add the default row; hidden real memberships do not trigger a default row.
+  metalake. An unassigned Article has no membership rows and returns an empty Domain list.
 - **T5.2**: hidden/draft Domains are filtered; body-only edits preserve them, while unauthorized
   membership removal fails atomically. Given visible Finance, hidden draft child Tax and an
   otherwise readable published Article belonging only to Tax, a Finance filter excludes that
@@ -123,7 +115,10 @@ Every storage mutation test checks the design's
 - **T5.3**: a Domain containing only Articles, only Terms, or both blocks drop through the shared
   membership check without exposing members. Removing one type leaves the other's guard intact;
   drop succeeds only after all memberships and other Domain lifecycle constraints are cleared.
-  MANAGE_DOMAIN alone cannot detach articles.
+  Once Glossary T7 is available, add the sole Term member through the Glossary API. Verify
+  Domain DELETE returns `409 NonEmptyDomainException`, then detach the Term through the same
+  API and verify the drop succeeds. Use the API to exercise the actual mapper. MANAGE_DOMAIN
+  alone cannot detach articles.
 - **T5.4**: two-server membership-add/drop race and mixed Domain/Article writes obey lock ordering
   without a dangling relation. Backing-tag changes leave Article membership intact.
 
@@ -152,11 +147,22 @@ Every storage mutation test checks the design's
   and mutation previews are bounded and report accurate continuation without hidden counts.
   Cover default 20, limits 1 and 1,000, invalid limits/offsets, and fixed 20-entry mutation previews.
 - **T7.2**: missing or hidden roots return 404; permissions are checked before content conflicts.
-  A failed store CAS returns 409 without partial writes or a success event.
+  Reject malformed `expectedRevision` and its use without `updateBody` with `400`. Return
+  `409 ArticleRevisionConflictException` for a stale token, another Article or metalake's
+  token, or a token for an Article deleted and recreated under the same name and revision.
+  The same checks apply to a request that would otherwise be a no-op. Verify that a rejected
+  mixed edit changes no body, metadata, bindings or revision and emits no success event.
+  Verify the platform mappings for unexpected internal errors (`500`), connection failures
+  to a federated backend (`502`) and temporarily unavailable configured dependencies (`503`).
 - **T7.3**: an effective write advances revision once; a no-op leaves it unchanged and emits no
-  content-change success event. No prior body copy or public content-version field is created.
-- **T7.4**: two different body replacements serialize under the Article lock; both may succeed,
-  each effective save updates the current row, and the last successful save is current.
+  content-change success event. Create, load and alter return `revisionToken` for the returned
+  state. An effective alter returns a new token and a matching no-op returns the same token.
+  Summary and binding page responses omit it. No prior body copy or public content-version
+  field is created.
+- **T7.4**: two callers using independent store sessions read the same token and save different
+  bodies. With the token, only one succeeds. Without it, both may succeed in sequence, and the
+  last successful save is current. A metadata or binding edit also invalidates an older token
+  for the subsequent body save.
   Status/property and binding deltas preserve independent changes. Domain-set replacements run
   sequentially with the later set winning.
 - **T7.5**: create, alter and binding writes apply current fields/relations atomically. Round-trip
@@ -180,8 +186,9 @@ Every storage mutation test checks the design's
   readable result. Cover empty pages, a full final page, a following readable result and hidden
   candidates that must not affect continuation. Term previews contain at most 20 names/statuses
   with `termsHasMore`.
-- **T8.4**: title/name tie-break paging with equal titles across Domains, parent/child searches
-  and a deprecated title reused by another article in the same Domain.
+- **T8.4**: search returns both readable Articles with the same title in the same Domain.
+  Also cover parent/child searches and unassigned Articles with equal titles. Verify stable
+  paging by title and name, and load each result by its name.
 
 ### T9: Events and audit
 
@@ -196,7 +203,8 @@ Every storage mutation test checks the design's
   mapping against REST; preserve limit/offset, page/preview flags and mutation-page responses;
   no public history-read operation.
 - **T10.2**: body replacement mixed with all four Term/asset binding change types,
-  atomic success/failure, no-op/revision behavior and store-conflict mapping;
+  atomic success/failure and no-op behavior. Round-trip `revisionToken` through
+  `expectedRevision` and surface `ArticleRevisionConflictException` without retrying.
   structured dotted-column identifiers; Chinese and mixed-language Article names survive every
   name-addressed operation without double encoding.
 
@@ -224,14 +232,19 @@ Every storage mutation test checks the design's
 
 - **T13.1**: critical journeys below on H2, MySQL and PostgreSQL.
 - **T13.2**: fresh install, upgrade, backup/restore and two-server consistency.
-- **T13.3**: summary browsing and Domain-scoped keyword-search performance at the
-  release data size, with permission filtering and the measured candidate count.
+- **T13.3**: measure summary browsing and keyword search with and without a Domain filter at
+  the release data size, with permission filtering and candidate counts for each case.
 
 ### T14: User documentation
 
 - **T14.1**: executable documentation examples agree with REST and clients; OpenAPI validates.
 - **T14.2**: user docs cover direct publication, draft visibility, current content, ordinary
   edits, configuration, pagination and external cleanup limits; content history is not provided.
+  Verify that the user docs direct users to the metalake owner to reassign ownership through
+  the existing Owner API after the Article owner is removed, and explain the limit of
+  `MANAGE_DEFINITIONS` for ownership transfer.
+  Verify that the docs show how to save with `expectedRevision`, reload and reconcile on
+  conflict, and explain that a tokenless save can overwrite content without recovery.
 
 ## Critical user journeys
 
@@ -255,12 +268,13 @@ on the metalake. Grant Domain/target access separately.
    but not `outsider`. Change title, body and Domains together; reload the complete new current
    state and verify the old body was overwritten without a historical-content copy.
 2. **Draft, deprecate and delete**: create a draft and prove `reader` and another CREATE user
-   cannot read it. Its owner sets PUBLISHED directly. Deprecate it, create a replacement in the
-   same Domain using its old title, and get 409 when restoring the original until it has a
-   different title. The owner with CREATE deletes it directly; current row and relations disappear,
-   targets remain.
-3. **Saving edits**: two callers save different body replacements. Both may succeed sequentially;
-   the last successful save is current. Independent deltas preserve unrelated fields/relations.
+   cannot read it. Its owner sets PUBLISHED directly. Deprecate it, create another Article in
+   the same Domain with the same title, then restore the original. Verify both can be loaded
+   by name. The owner with CREATE deletes the original directly. Its current row and relations
+   disappear, and the other Article and binding targets remain.
+3. **Saving edits**: two callers use the same token to save different bodies. The first succeeds,
+   and the second gets `409`. Repeat without a token and verify both can succeed in sequence.
+   Independent deltas preserve unrelated fields/relations.
    An unchanged save leaves revision unchanged. Inject a storage-extension failure and verify
    complete rollback of the current row, relations and extension writes.
 4. **Term and asset lifecycle**: reject new bindings to `churn` and `gmv`. Deprecate an already
@@ -290,7 +304,7 @@ on the metalake. Grant Domain/target access separately.
 
 ## Upgrade and release checks
 
-- Fresh schemas create the two Article tables and shared membership table once on H2, MySQL
+- Fresh schemas create the Article tables and the shared membership table once on H2, MySQL
   and PostgreSQL; integrating both features reuses the same schema and mappers. Upgrade a 1.3.0 store with
   existing catalogs, tags and policies; that data remains unchanged and Article journeys pass.
   Take a backup before upgrade and rehearse restoring it after an injected failure. Do not
@@ -300,11 +314,10 @@ on the metalake. Grant Domain/target access separately.
   authorization uses the shared authorizer's cache invalidation and refresh behavior.
 - Exercise the default 1 MiB body limit, both valid configuration boundaries, invalid startup
   values and oversized UTF-8 requests on all three databases.
-- On MySQL and PostgreSQL, use 10,000 articles with average body size 10 KB and 1% at 1 MiB.
-  With metalake VIEW and a representative mix of inaccessible drafts and targets, measure list,
-  summary browsing and Domain-scoped keyword-search latency, candidate counts and
-  body reads. Use the results to document supported data sizes and scoped-search operating limits.
-  Verify browsing without `q` does not scan bodies for matching; larger-scale document retrieval uses the future
-  dedicated knowledge-base integration.
+- On MySQL and PostgreSQL, use 10,000 Articles. Give 1% a 1 MiB body and the other 99% an
+  average body size of 10 KB. With metalake VIEW and a representative mix of inaccessible drafts
+  and targets, measure latency, candidate counts and body reads for summary browsing and
+  keyword search with and without a Domain filter. Use the results to document operating
+  limits for both search modes. Verify browsing without `q` skips body matching.
 - Release only after all task cases, critical journeys and upgrade checks pass, including
   MySQL/PostgreSQL Docker tests and `./gradlew :docs:build` for the implemented OpenAPI changes.

@@ -115,9 +115,8 @@ extensions without reserving history-specific columns.
    the owner; the default status is `PUBLISHED`, and its current content takes effect immediately.
 3. The reader searches for a word from the body and loads the article. Its bindings lead to
    the current term and table; each target still requires its own read privilege.
-4. The analyst saves a new body and another binding through one alter request containing
-   `updateBody` and `addObjects`.
-   Current content and changed relations take effect atomically; the response shows that state.
+4. The analyst loads the Article, then sends its `revisionToken` as `expectedRevision` in one
+   alter request with `updateBody` and `addObjects`. The body and new binding take effect together.
 5. An agent acting as the reader calls `search_kb_articles`, then `get_kb_article`. It receives
    the stored body with its format and only the bound objects it can read.
 6. To prepare content privately, the analyst can create or set the article to `DRAFT`. Only its
@@ -140,13 +139,13 @@ under a catalog or schema, because an article can explain data from several cata
 KnowledgeBaseArticle {
   name, title, body: { format: MARKDOWN | HTML, content },
   status: DRAFT | PUBLISHED | DEPRECATED, domains[], comment?, synonyms[],
-  sourceReference?, properties, audit_info
+  sourceReference?, properties, audit_info, revisionToken
 }
 ArticleBinding { articleId, targetType, targetId, audit_info }
 ArticleDomain  { articleId, domainId, audit_info }
 ```
 
-The Article row stores current content. Its `revision` remains an internal CAS counter.
+The Article row stores current content. Its internal `revision` is the basis of the editing token.
 
 - **Identity**: `metalake.articleName`. The name is immutable and unique in the metalake; the
   internal numeric article ID is stable. Add `KNOWLEDGE_BASE_ARTICLE` to `MetadataObject.Type`
@@ -176,16 +175,10 @@ The Article row stores current content. Its `revision` remains an internal CAS c
   fallback), and retry in a new transaction. Allow at most five retries after the initial
   attempt; exhaustion returns `409`. Failed attempts leave no Article, Owner or relation
   rows. Explicit-name conflicts return `409` immediately. Retry only generated Article-name
-  unique-key conflicts, not title conflicts, CAS failures or other errors.
-- **Title**: required, nonblank after trimming, at most 512 characters. Compare titles after
-  trimming and lower-casing with `Locale.ROOT`, independent of database collation. Among articles
-  that are not `DEPRECATED`, titles are unique within each directly assigned Domain. Articles
-  in different Domains may share a title; an article in several Domains claims it in each one.
-  Articles without a Domain share one title-uniqueness scope per metalake, separate from all
-  Domain scopes. Parent and child Domains are separate scopes. Deprecation releases the title
-  in its current scope(s); leaving `DEPRECATED` claims it again. A conflict is `409`, without revealing another article or a hidden Domain. Different
-  titles, or equal titles in separate Domains, can generate the same name, so generated names
-  still need collision suffixes within the metalake.
+  unique-key conflicts. Other failures end the attempt.
+- **Title**: required, nonblank after trimming, at most 512 characters. Articles can share
+  a display title within the same Domain or without a Domain. Use the immutable `name` to
+  address an Article. Generated names from equal titles use the normal collision suffixes.
 - **Owner**: the creator becomes the owner through the existing Owner APIs. Owners may be users
   or groups. Persist the relation in the existing `owner_meta` table: `metadata_object_id` is
   the stable article ID, `metadata_object_type` is `KNOWLEDGE_BASE_ARTICLE`, and `metalake_id`
@@ -239,16 +232,15 @@ MySQL `MEDIUMTEXT` capacity. An invalid setting prevents startup. An oversized r
 
 #### Storage
 
-Persist articles through EntityStore. Use two Article-specific tables and the shared
-`domain_member_rel` table on H2, MySQL and PostgreSQL. Define the shared schema and mappers once
-for Article and Glossary; whichever feature introduces them first supplies them. Use the
-existing Owner and audit storage.
+Persist articles through EntityStore on H2, MySQL and PostgreSQL. Glossary T7 introduces the
+shared `domain_member_rel` schema and mapper as a standalone storage change. Article T2 reuses
+them and supplies the Article tables below. Use the existing Owner and audit storage.
 
-| Table                      | Fields beyond common row metadata                                                                                                                                          | Unique key                                                                                                        | Other index                                                                    |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `kb_article_meta`          | `article_id`, `metalake_id`, `article_name`, `title`, `body_format`, `body_content`, `revision`, `status`, `article_comment`, `synonyms`, `source_reference`, `properties` | `(metalake_id, article_name, deleted_at)`                                                                         | Primary key: `article_id`                                                      |
-| `kb_article_relation_meta` | `id`, `metalake_id`, `article_id`, `target_id`, `target_type`                                                                                                              | `(article_id, target_id, target_type, deleted_at)`                                                                | `(target_id, target_type, deleted_at)`; `(metalake_id, deleted_at)`            |
-| `domain_member_rel`        | `id`, `metalake_id`, `domain_id`, `member_type`, `member_id`, `title_key`                                                                                                  | `(member_type, member_id, domain_id, deleted_at)`; `(metalake_id, domain_id, member_type, title_key, deleted_at)` | `(domain_id, deleted_at, member_type, member_id)`; `(metalake_id, deleted_at)` |
+| Table                      | Fields beyond common row metadata                                                                                                                                          | Unique key                                         | Other index                                                                    |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `kb_article_meta`          | `article_id`, `metalake_id`, `article_name`, `title`, `body_format`, `body_content`, `revision`, `status`, `article_comment`, `synonyms`, `source_reference`, `properties` | `(metalake_id, article_name, deleted_at)`          | Primary key: `article_id`                                                      |
+| `kb_article_relation_meta` | `id`, `metalake_id`, `article_id`, `target_id`, `target_type`                                                                                                              | `(article_id, target_id, target_type, deleted_at)` | `(target_id, target_type, deleted_at)`; `(metalake_id, deleted_at)`            |
+| `domain_member_rel`        | `id`, `metalake_id`, `domain_id`, `member_type`, `member_id`                                                                                                               | `(member_type, member_id, domain_id, deleted_at)`  | `(domain_id, deleted_at, member_type, member_id)`; `(metalake_id, deleted_at)` |
 
 - `kb_article_meta` has one current row per Article. Title, format and body are stored directly
   on that row. Article IDs are stable and never reused, including after same-name recreation.
@@ -256,50 +248,26 @@ existing Owner and audit storage.
 - Use numeric IDs, `audit_info`, `deleted_at`, and `utf8mb4_bin` on MySQL. The Article ID is the
   entity primary key; relation rows have an auto-increment `id`. Relation key columns are non-NULL.
 - `revision` starts at 1 and advances once per effective Article edit, including content,
-  status, descriptive-field and explicit membership/binding changes. It is an internal CAS
-  counter, not a historical version number. Failed writes, no-ops, Owner transfers and background
-  orphan cleanup leave it unchanged. Relation rows retain the usual store metadata columns.
+  status, descriptive-field and explicit membership/binding changes. It tracks writes to the
+  current row. Failed writes, no-ops, Owner transfers and background orphan cleanup leave it
+  unchanged. Relation rows retain the usual store metadata columns.
 - `kb_article_relation_meta.metalake_id` is non-NULL and comes from the owning Article.
   Metalake cleanup uses `(metalake_id, deleted_at)` without joining Article rows. Reverse lookup
   selects live bindings through `(target_id, target_type, deleted_at)`.
 - Names use `VARCHAR(128)` on MySQL/PostgreSQL and `VARCHAR(256)` on H2 to accommodate
   supplementary-plane characters stored as two UTF-16 code units. All APIs still enforce
   1–128 Unicode code points after NFC normalization. Use `VARCHAR(512)` for title,
-  `VARCHAR(256)` for comment,
-  `VARCHAR(1024)` for source reference, `VARCHAR(32)` for status/format, and `VARCHAR(64)` for
-  target/member types. Body, properties and audit JSON use MySQL `MEDIUMTEXT`; synonyms use
+  `VARCHAR(256)` for comment, `VARCHAR(1024)` for source reference, `VARCHAR(32)` for
+  status/format, and `VARCHAR(64)` for target/member types. Body, properties and audit JSON
+  use MySQL `MEDIUMTEXT`; synonyms use
   `TEXT`. Other databases use their native equivalents.
-- Relation rows are the authoritative current Domain memberships and bindings. DTOs resolve
-  real endpoint IDs to current names and apply visibility filtering; omit the internal default
-  scope. No database foreign keys are added; services validate and fence endpoints in the transaction.
-- `domain_member_rel` uses `GLOSSARY_TERM` or `KNOWLEDGE_BASE_ARTICLE` as `member_type`.
-  Member reads, writes and deletion match both `member_type` and `member_id`; numeric ID alone
-  is insufficient. Validate the member and each real Domain against `metalake_id`; the reserved
-  default scope below has no Domain endpoint. Member deletion
-  removes its typed rows; metalake deletion can clean all its rows. Keep `domain_meta`, asset
-  backing-tag membership and feature-specific binding tables unchanged.
-- `domain_member_rel.title_key` stores UTF-8 bytes of the trimmed, `Locale.ROOT`-lowercased current
-  title: `VARBINARY(2048)` on MySQL/H2 and `BYTEA` on PostgreSQL. Binary comparison is collation
-  independent and accommodates expanding case conversions. Set NULL for Term rows and deprecated
-  Articles, allowing multiple NULLs. Term names retain Glossary's metalake-wide uniqueness.
-  The unique key `(metalake_id, domain_id, member_type, title_key, deleted_at)` enforces Article
-  titles per real Domain and per metalake default scope; retain the separate membership unique
-  key. Maintain title claims with the Article row and memberships in one transaction. Recalculate only `title_key` on existing membership
-  rows from the current Article title/status. Bindings and Domain membership remain authoritative
-  in their relation tables and are not inferred from Article text.
-- Reserve `domain_id = 0` in `domain_member_rel` for an Article with no real Domain. All real
-  Domain IDs are positive. Store exactly one live default-scope row for such an Article, using
-  its `metalake_id`, member type/ID and normalized `title_key`; deprecated Articles keep the
-  row with a NULL key. An Article with real Domain memberships has no live default-scope row.
-  Determine this from the complete stored Domain set, including hidden memberships. Adding the
-  first real Domain removes the default row; removing the last adds it. Maintain these rows
-  and all title claims with the Article in one transaction; a conflict rolls back the whole edit.
-  The metalake prefix in the title unique key separates the shared zero ID across metalakes.
-- The default-scope row is internal title bookkeeping, not a Domain resource or actual Domain
-  membership. Return `domains: []`; exclude zero from Domain resolution, filters, access checks,
-  locks and nonempty-Domain checks. Scope internal zero-ID queries by `metalake_id`. Domain
-  liveness cleanup must skip zero; Article/member deletion and metalake cleanup still remove
-  its row normally. Terms do not use zero, and no `domain_meta` row is created.
+- Relation rows hold current Domain memberships and bindings. DTOs resolve endpoint IDs to
+  current names and apply visibility filtering. Services validate and fence endpoints in the
+  transaction without database foreign keys.
+- `domain_member_rel` contains only memberships in real Domains. `member_type` is
+  `GLOSSARY_TERM` or `KNOWLEDGE_BASE_ARTICLE`. Member reads, writes and deletion match both
+  `member_type` and `member_id`. Validate the member and Domain against `metalake_id`.
+  Domain filters and nonempty checks read the membership table.
 - Add schemas and upgrade scripts for all three dialects. Use the 2.0.0 scripts while unreleased;
   otherwise use the next release. `IF NOT EXISTS` does not make a whole upgrade safely rerunnable.
 - Keep one transactional write boundary for current Article fields, relation changes and any
@@ -316,9 +284,8 @@ existing Owner and audit storage.
 | `DEPRECATED`   | Effective VIEW                       | Only with `includeDeprecated=true` | Excluded |
 
 `PUBLISHED` denotes direct publication, matching Domain terminology. New Articles default to it.
-Create and `updateStatus` may set any of the three statuses without an approval step. Leaving
-`DEPRECATED` reclaims titles in all current Domains, or in the unassigned scope when none exist. An Article can be edited or deleted in any
-status with the normal privileges.
+Create and `updateStatus` may set any of the three statuses without an approval step. An Article
+can be edited or deleted in any status with the normal privileges.
 
 An edit updates the current row and changed relation sets atomically. Read the complete stored
 state before applying deltas, preserving unrelated fields and hidden memberships/bindings.
@@ -351,12 +318,6 @@ move an article.
   set and check each changed Domain. An unrelated edit preserves every membership. A caller
   cannot silently remove an unseen membership by submitting only the filtered response.
   Concurrent replacements run sequentially and the later replacement wins; they are not merged.
-- Adding a Domain claims the current title there unless the Article is `DEPRECATED`; removing
-  membership releases that claim. A title change updates all current membership keys, including
-  hidden memberships. Removing the last Domain must also claim the title in the unassigned scope.
-  A conflict in any destination scope rolls back the whole request. Descendant-inclusive
-  Domain searches can return equal titles from separate direct Domains and identify them by
-  Domain and immutable article name.
 - Domain deletion checks `domain_member_rel` for any live member type under the Domain lock,
   using the shared Domain lookup index and fencing concurrent membership additions. Any remaining
   membership returns `409 NonEmptyDomainException`, without member names or counts.
@@ -460,29 +421,25 @@ loading a reverse lookup first checks the Term or object root, then filters the 
 
 ### Locking and writes
 
-Read the latest Article state and `revision` under the Article row lock, then apply the requested
-changes. Every effective write advances `revision` using the store's compare-and-set (CAS)
-check; a failed store CAS returns `409` with `OPTIMISTIC_LOCK_CONFLICT_CODE`. The CAS compares
-the revision read under the lock, not one captured before waiting for it. Ordinary updates
-commit sequentially; updates to different fields and binding additions/removals preserve each
-other. A no-op leaves the store revision unchanged and emits no
-content-change success event. Validate identity and authorization before detecting a no-op.
+Read the latest Article state and `revision` under the Article row lock. Check any supplied
+`expectedRevision` under that lock before applying changes. Each effective write advances
+`revision` once in the same transaction. Writes commit sequentially. Updates to different
+fields and binding additions/removals preserve each other. A no-op leaves the revision unchanged
+and emits no content-change success event. Validate identity and authorization before detecting a no-op.
 Compare persisted values, treating memberships and bindings as sets; updates that cancel out
 are a no-op.
 
 Plan the complete lock set before acquiring locks. Follow the existing endpoint fences and a
 single order: metalake, Domains in ID order, bound target endpoint chains in their established
 order, then Article rows in ID order. Revalidate the resolved identities and relation sets under
-the locks. If planning discovered a stale set, restart lock planning with a bounded retry;
-never retry a failed CAS as an unconditional overwrite.
+the locks. If planning discovers a stale set, restart lock planning with a bounded retry and
+carry the original editing token into each attempt.
 
-- Create, title changes, Domain changes and status changes away from `DEPRECATED` maintain title
-  claims through the shared membership title unique index, including the zero-ID default scope.
-  Write membership keys in Domain ID order; a duplicate key returns `409` and rolls back the complete transaction. Use the existing shared
-  metalake endpoint fence; title claims do not take an exclusive metalake-row lock.
-- A real-Domain membership write holds a shared Domain-row lock until commit; default-scope
-  rows use the metalake fence and Article lock without looking up or locking Domain zero.
-  Domain drop takes its exclusive lock, then checks the latest committed memberships, without taking Article locks
+The metalake endpoint fence uses a shared lock on MySQL and PostgreSQL. H2 uses `FOR UPDATE`,
+so unrelated writes that take the fence can still serialize within a metalake.
+
+- A membership write holds a shared Domain-row lock until commit. Domain drop takes its
+  exclusive lock, then checks the latest committed memberships without taking Article locks
   while holding that exclusive Domain lock. Either the membership commits and drop fails, or
   drop commits and the membership write fails; neither leaves a dangling membership.
 - New bindings use the target's normal endpoint fence and revalidate its identity. Target removal
@@ -493,9 +450,10 @@ never retry a failed CAS as an unconditional overwrite.
   write locks. A read that began before a concurrent commit may return the earlier complete state.
 
 An alter request containing `updateBody` replaces the complete body, including its format.
-Apply the replacement to the latest Article state under the row lock. The last successful save
-wins, even when a caller edited an older body. Previous content is overwritten. Validate the current identity and
-permissions before writes or no-op detection. Failed writes leave all state unchanged.
+With `expectedRevision`, the entire request is conditional on the Article state the caller
+read. When the token is omitted, apply the replacement under the row lock to the latest Article
+state. The last successful save can overwrite someone else's changes, and Gravitino cannot
+restore the overwritten body.
 
 ### REST API
 
@@ -515,7 +473,7 @@ create, load, alter, delete and binding calls. Percent-encoded length is not the
 | `POST /kb-articles`                      | Create fields below                                         | `article`               | Create current content, Owner and relations        |
 | `GET /kb-articles`                       | List filters below                                          | `articles`, `hasMore`   | Read visible summaries only                        |
 | `GET /kb-articles/{article}`             | Binding `limit`, `offset`                                   | `article`               | Read current content with bounded binding previews |
-| `PUT /kb-articles/{article}`             | `updates` array                                             | `article`               | Apply all changes atomically                       |
+| `PUT /kb-articles/{article}`             | `updates` with optional `expectedRevision`                  | `article`               | Apply all changes atomically                       |
 | `DELETE /kb-articles/{article}`          | No body                                                     | Existing `DropResponse` | Soft-delete article and related rows atomically    |
 | `GET /kb-articles/{article}/terms`       | `limit`, `offset`                                           | `terms`, `hasMore`      | Page visible current Term bindings                 |
 | `POST /kb-articles/{article}/terms`      | `termsToAdd`, `termsToRemove`: name arrays                  | `terms`, `hasMore`      | Change bindings; return the first bounded page     |
@@ -557,19 +515,19 @@ mutations return the first 20 readable entries of the updated set and `hasMore`.
 
 #### Create and alter
 
-| Create field      | Type                            | Required | Description                                                                   |
-| ----------------- | ------------------------------- | -------- | ----------------------------------------------------------------------------- |
-| `name`            | string                          | No       | Immutable name; generated when omitted                                        |
-| `title`           | string                          | Yes      | Display title; unique per direct Domain or unassigned scope unless deprecated |
-| `body`            | `{format, content}`             | Yes      | Text body; format-specific handling and byte limit                            |
-| `status`          | string enum                     | No       | Defaults to `PUBLISHED`                                                       |
-| `domains`         | string array                    | No       | Domain names; defaults to an empty set                                        |
-| `terms`           | string array                    | No       | Approved Term names; defaults to an empty set                                 |
-| `objects`         | `ArticleObjectIdentifier` array | No       | Asset identifiers; defaults to an empty set                                   |
-| `comment`         | string                          | No       | Short description                                                             |
-| `synonyms`        | string array                    | No       | Other words for the topic; defaults to empty                                  |
-| `sourceReference` | string                          | No       | Source text, without URL fetching                                             |
-| `properties`      | string map                      | No       | Custom properties; defaults to empty                                          |
+| Create field      | Type                            | Required | Description                                          |
+| ----------------- | ------------------------------- | -------- | ---------------------------------------------------- |
+| `name`            | string                          | No       | Immutable name; generated when omitted               |
+| `title`           | string                          | Yes      | Display title, which may be shared by other Articles |
+| `body`            | `{format, content}`             | Yes      | Text body; format-specific handling and byte limit   |
+| `status`          | string enum                     | No       | Defaults to `PUBLISHED`                              |
+| `domains`         | string array                    | No       | Domain names; defaults to an empty set               |
+| `terms`           | string array                    | No       | Approved Term names; defaults to an empty set        |
+| `objects`         | `ArticleObjectIdentifier` array | No       | Asset identifiers; defaults to an empty set          |
+| `comment`         | string                          | No       | Short description                                    |
+| `synonyms`        | string array                    | No       | Other words for the topic; defaults to empty         |
+| `sourceReference` | string                          | No       | Source text, without URL fetching                    |
+| `properties`      | string map                      | No       | Custom properties; defaults to empty                 |
 
 Example create request:
 
@@ -595,6 +553,10 @@ Term entries contain name and current status; object entries use `ArticleObjectI
 Owner information is resolved through the existing Owner model, stored separately from the Article row. `audit_info`
 follows the standard AuditInfo DTO. These responses expose current content only.
 
+The full `article` includes an opaque string `revisionToken` from the same snapshot as its content.
+The token identifies the metalake, the stable Article ID and its current revision. Summary
+and binding-page responses omit it.
+
 Alter follows the existing `updates` convention. Supported changes are `updateTitle`,
 `updateBody`, `updateDomains`, `updateStatus`, `updateComment`, `updateSynonyms`,
 `updateSourceReference`, `setProperty`, `removeProperty`, `addTerms`, `removeTerms`, `addObjects`
@@ -606,8 +568,20 @@ request to the full stored state and validate all requested changes before persi
 one transaction. An effective change advances revision once. Any validation, authorization or
 storage failure leaves the body, bindings, other fields and revision unchanged.
 
+For a request containing `updateBody`, clients may send the last read's `revisionToken` in the
+top-level `expectedRevision` field. After checking visibility and edit permissions, compare
+the token's identity and revision with the locked Article before writes or no-op detection.
+A malformed token or a condition on an alter without `updateBody` returns `400`. A stale revision,
+a token from another Article or metalake, or a token for a deleted Article replaced under the
+same name returns `409 ArticleRevisionConflictException`. The whole request fails, including
+any accompanying binding or metadata changes. A matching no-op keeps the same token.
+Token checks apply only to alter requests with `updateBody`. Dedicated binding and delete routes
+keep their existing request contracts. A metadata or binding edit that advances the Article's
+revision also invalidates an earlier edit token.
+
 ```json
 {
+  "expectedRevision": "opaque-revision-token-from-load",
   "updates": [
     {
       "@type": "updateBody",
@@ -683,9 +657,9 @@ View columns and individual metrics are outside the supported set.
   drafts the caller may read.
 - `owner` is `user:<name>` or `group:<name>`, matching the direct owner. Group members are not
   expanded. A missing or invalid prefix is `400`.
-- Sort by title, then immutable name. This breaks ties across Domains and when a deprecated
-  article shares a title with its replacement. Offset paging is stable for unchanged data, not
-  a snapshot across independent requests while articles change.
+- Sort by title, then immutable name. Use the name in each result to distinguish Articles
+  that share a title. Offset paging is stable while the data is unchanged. Writes between page
+  requests can shift results.
 - Each `ArticleSummary` contains name, title, status, Domains, owner, the bounded Term preview
   and `termsHasMore` and audit information, without a body. Batch owner and Term
   lookups for the page rather than querying each article separately.
@@ -701,13 +675,15 @@ indexing pipeline. Large-scale document retrieval belongs in the dedicated integ
 
 #### Errors
 
-| HTTP code | Meaning                                                                                  |
-| --------- | ---------------------------------------------------------------------------------------- |
-| `400`     | Invalid fields, type, format, size, status or identifier components                      |
-| `403`     | Visible object, but insufficient privilege for the operation                             |
-| `404`     | Missing or hidden article, Term, asset or Domain                                         |
-| `409`     | Name/title conflict, CAS conflict, nonapproved new Term binding, or nonempty Domain drop |
-| `502`     | Backend failure, following the existing REST error conventions                           |
+| HTTP code | Meaning                                                                                           |
+| --------- | ------------------------------------------------------------------------------------------------- |
+| `400`     | Invalid fields, type, format, size, status or identifier components                               |
+| `403`     | Visible object, but insufficient privilege for the operation                                      |
+| `404`     | Missing or hidden article, Term, asset or Domain                                                  |
+| `409`     | Name conflict, Article edit token mismatch, nonapproved new Term binding, or nonempty Domain drop |
+| `500`     | Unexpected internal error                                                                         |
+| `502`     | Failed connection to a federated backend                                                          |
+| `503`     | Configured dependency temporarily unavailable                                                     |
 
 Check root visibility before action permission, and permissions before content conflicts. An
 unsuccessful mutation leaves the local Article, relations and revision
@@ -725,7 +701,7 @@ KnowledgeBaseArticleOperations
   loadArticle(name, limit = 20, offset = 0): KnowledgeBaseArticle
   createArticle(name?, title, body, domains?, status?, comment?, synonyms?,
                 sourceReference?, properties?, terms?, objects?): KnowledgeBaseArticle
-  alterArticle(name, changes): KnowledgeBaseArticle
+  alterArticle(name, changes, expectedRevision?): KnowledgeBaseArticle
   deleteArticle(name): boolean
   listTermBindings(name, limit = 20, offset = 0): TermBindingPage
   alterTermBindings(name, termsToAdd, termsToRemove): TermBindingPage
@@ -739,10 +715,10 @@ KnowledgeBaseArticleOperations
 `hasMore`. Clients use the common default of 20 and maximum of 1,000, preserve the flags and expose
 limit/offset directly.
 
-Python exposes the equivalent snake_case methods. Both clients follow the same ordinary alter
-semantics as REST, including body changes mixed with `addTerms`, `removeTerms`, `addObjects`
-and `removeObjects`, and surface validation, authorization and store-conflict errors. Clients do
-not automatically retry a failed mutation after a store CAS conflict.
+Python exposes the equivalent snake_case methods. Both clients return the editing token and
+support optional conditional body edits, including mixed field and binding changes. On
+`ArticleRevisionConflictException`, reload the Article, reconcile the edit and explicitly
+resubmit with the new token.
 
 Both clients expose current Article content; content history is outside this API.
 
@@ -874,10 +850,8 @@ Storage and lifecycle operations preserve the following invariants:
    There is no historical-content table or pointer, and same-name recreation gets a new Article ID.
 2. Relation tables hold current bindings and Domain memberships. Reads omit retired or unreadable
    targets; orphan rows can remain until cleanup. Article deletion removes its relations atomically.
-3. Nondeprecated titles are unique in each direct Domain, or among unassigned Articles in the
-   same metalake, after shared normalization. An unassigned Article has exactly one zero-ID
-   default-scope row and no real memberships; assigned Articles have no default row. Title keys
-   match current title/status; deprecated keys are NULL. Distinct scopes may share titles.
+3. Article names are unique within a metalake. Articles may share display titles. Only actual
+   memberships appear in the shared table.
 4. One effective Article edit advances `revision` once. Failed writes, no-ops, Owner transfer
    and background orphan cleanup leave it unchanged.
 5. Unrelated edits preserve full stored relation sets, including unreadable live targets.
@@ -891,8 +865,8 @@ Storage and lifecycle operations preserve the following invariants:
    Readers load current content; one edit atomically updates the row and current relations.
 2. **Draft, publish, deprecate and delete**: an author can change status directly. Visibility
    follows that status; deletion removes the Article and its relations, leaving targets intact.
-3. **Save edits**: body replacements update the current row, with the last successful save
-   becoming current. Independent deltas preserve unrelated fields; a no-op leaves revision unchanged.
+3. **Save edits**: a body replacement with a stale token fails before any write. Without a
+   token, the last successful save becomes current. Independent deltas preserve unrelated fields.
 4. **Follow target lifecycles**: renames preserve stable-ID bindings; reads omit retired targets
    before asynchronous cleanup. Same-name replacements do not inherit old bindings.
 5. **Manage Domains**: readers filter by visible Domains/subdomains. Renames preserve IDs;
@@ -925,24 +899,24 @@ parallel. REST tasks include OpenAPI definitions and validation with `./gradlew 
 
 - [ ] **T1. Add Article APIs** (`api/`, DTO contracts in `common/`). Define Article, body, status,
       current-content and summary contracts, structured object identifiers, operations, changes
-      and errors; add the metadata/entity type integration and metalake access point. Add missing
-      shared definition privileges in `Privilege.java`, or reuse them if already introduced by
+      and errors, including the editing token and conditional body edits. Add the metadata/entity
+      type integration and metalake access point. Add missing shared definition privileges
+      in `Privilege.java`, or reuse them if already introduced by
       Glossary. Both features use the same definitions and implication rules from Access control.
       Depends on: none. Cases: [T1.1–T1.3](gravitino-kb-article-implementation.md#t1-api-contracts).
 - [ ] **T2. Add Article storage** (`core/`, `scripts/`). Implement entities, POs, mappers and
-      services for the two Article tables and shared `domain_member_rel`, with one shared schema
-      and mapper definition for Article and Glossary. Add dialect upgrade scripts, atomic current-row/relation
-      writes, transactional storage-extension hooks, soft deletion and parent cleanup. Register the Article type with generic orphan-relation cleanup.
-      Depends on: T1. Cases: [T2.1–T2.4](gravitino-kb-article-implementation.md#t2-persistence).
+      services for the Article tables and reuse `domain_member_rel` from Glossary T7. Add dialect
+      upgrade scripts, atomic writes to current rows and relations, transactional storage-extension
+      hooks, soft deletion and parent cleanup. Register the Article type for orphan-relation cleanup.
+      Depends on: T1 and the shared schema and mapper from Glossary T7.
+      Cases: [T2.1–T2.4](gravitino-kb-article-implementation.md#t2-persistence).
 
 ### Group B: Core behavior
 
 - [ ] **T3. Add the Article manager and policy boundary** (`core/`). Implement CRUD, generated
-      names, shared name NFC normalization and bounded name-allocation retries, Domain title-key
-      maintenance and lock planning, sanitization and body-limit
-      configuration, status,
-      atomic current-state writes and no-op/revision rules. Route explicit drop and Article
-      edits through the common policy boundaries with immediate defaults.
+      names, NFC name normalization, bounded name-allocation retries, lock planning, sanitization,
+      body-limit configuration and status. Apply atomic writes and the no-op/revision rules.
+      Route Article edits and explicit drop through the common policy boundary.
       Depends on: T2. Cases: [T3.1–T3.6](gravitino-kb-article-implementation.md#t3-manager-and-content).
 - [ ] **T4. Add Article authorization and ownership** (`core/`, `server/`). Implement definition
       privilege implications and Deny, shared-authorizer Owner checks, group ownership, draft
@@ -964,7 +938,7 @@ parallel. REST tasks include OpenAPI definitions and validation with `./gradlew 
 
 - [ ] **T7. Add Article REST and OpenAPI** (`common/`, `server/`, `docs/open-api/`). Implement all
       current-resource routes, binding and reverse routes, envelopes, structured identifiers,
-      error mapping, bounded offset pages/previews and ordinary alter semantics.
+      error mapping, bounded offset pages/previews and conditional body edits.
       Depends on: T5, T6. Cases: [T7.1–T7.5](gravitino-kb-article-implementation.md#t7-rest-and-writes).
 - [ ] **T8. Add filtered lists and search** (`core/`, `server/`). Implement escaped case-insensitive
       title/synonym/body matching and optional Domain/status/typed-owner filters,
@@ -980,7 +954,7 @@ parallel. REST tasks include OpenAPI definitions and validation with `./gradlew 
 ### Group D: Clients and agents
 
 - [ ] **T10. Add Java client operations** (`clients/client-java/`). Expose CRUD, current content,
-      bindings, reverse lookups, filters, ordinary body saves and mutation errors.
+      bindings, reverse lookups, filters, conditional body saves and mutation errors.
       Depends on: T8. Cases: [T10.1–T10.2](gravitino-kb-article-implementation.md#t10-java-client).
 - [ ] **T11. Add Python client operations** (`clients/client-python/`). Match the Java/REST
       contracts, identifier components and ordinary alter behavior.
@@ -994,10 +968,16 @@ parallel. REST tasks include OpenAPI definitions and validation with `./gradlew 
 
 - [ ] **T13. Add integration and release checks**. Implement the critical journeys, two-node
       races, schema upgrade/restore tests and list/search performance fixtures. Report measured
-      results and supported scope for basic discovery and Domain-scoped keyword search.
+      results and operating limits for basic discovery and keyword search with and without a Domain.
       Depends on: T9, T10, T12. Cases: [T13.1–T13.3](gravitino-kb-article-implementation.md#t13-integration-and-release).
 - [ ] **T14. Add user documentation** (`docs/`). Document Article lifecycle, metalake grants,
       Domain membership, current content, history limitations, search, clients, MCP,
       ordinary edits, body-limit configuration and external cleanup/recovery limits.
+      If the Article owner has been removed, ask the metalake owner to reassign ownership
+      through the existing Owner API. `MANAGE_DEFINITIONS` alone does not grant permission
+      to transfer ownership.
+      Show how to save with `expectedRevision` and reconcile a conflict. Explain that saving
+      without a token can overwrite an intervening edit and that overwritten content cannot
+      be recovered from Gravitino.
       Validate examples against the APIs.
       Depends on: T10, T12, T13. Cases: [T14.1–T14.2](gravitino-kb-article-implementation.md#t14-user-documentation).
