@@ -403,6 +403,12 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
             AUDIT_INFO);
     backend.insert(newPolicy, false);
 
+    PolicyEntity policyToUnbind =
+        createAndInsertPolicyEntity("policy_to_unbind", "", newPolicy.content(), METALAKE);
+    RelationEndpoints toUnbind = new RelationEndpoints(tag, policyToUnbind);
+    backend.updateEntityRelations(relationUpdate(toUnbind, null, true));
+    Long bindingId = getRelation(toUnbind).getId();
+
     RelationEdgeTarget newTarget =
         RelationEdgeTarget.of(newPolicy.nameIdentifier(), Entity.EntityType.POLICY, null);
     RelationEdgeTarget existingTarget =
@@ -417,15 +423,19 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
                     tag.nameIdentifier(),
                     Entity.EntityType.TAG,
                     new RelationEdgeTarget[] {newTarget, existingTarget},
-                    new RelationEdgeTarget[0])));
+                    relationUpdate(toUnbind, null, false).targetsToRemove())));
 
     List<RelationalEntity<?>> relations =
         backend.batchListEntitiesByRelation(
             SupportsRelationOperations.Type.POLICY_TAG_REL,
             Collections.singletonList(tag.nameIdentifier()),
             Entity.EntityType.TAG);
-    Assertions.assertEquals(1, relations.size());
-    Assertions.assertEquals("retention", relations.get(0).targetEntity().name());
+    Assertions.assertEquals(
+        Set.of("retention", policyToUnbind.name()),
+        relations.stream()
+            .map(relation -> relation.targetEntity().name())
+            .collect(Collectors.toSet()));
+    Assertions.assertEquals(bindingId, getRelation(toUnbind).getId());
     Assertions.assertNull(
         SessionUtils.getWithoutCommit(
             PolicyTagRelMapper.class,
@@ -524,21 +534,17 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
     Assertions.assertEquals(
         Integer.valueOf(0),
         SessionUtils.doWithCommitAndFetchResult(
-            PolicyTagRelMapper.class, mapper -> mapper.softDeleteByIdAndVersion(replacement)));
+            PolicyTagRelMapper.class, mapper -> mapper.deleteByIdAndVersion(replacement)));
 
     PolicyTagRelPO current = getRelation(endpoints);
     Assertions.assertEquals(
         Integer.valueOf(1),
         SessionUtils.doWithCommitAndFetchResult(
-            PolicyTagRelMapper.class, mapper -> mapper.softDeleteByIdAndVersion(current)));
+            PolicyTagRelMapper.class, mapper -> mapper.deleteByIdAndVersion(current)));
     Assertions.assertEquals(
-        2L,
+        0L,
         queryForLong(
-            "SELECT current_version FROM policy_tag_relation_meta WHERE id = " + observed.getId()));
-    Assertions.assertEquals(
-        2L,
-        queryForLong(
-            "SELECT last_version FROM policy_tag_relation_meta WHERE id = " + observed.getId()));
+            "SELECT COUNT(*) FROM policy_tag_relation_meta WHERE id = " + observed.getId()));
   }
 
   @TestTemplate
@@ -556,7 +562,7 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
     Assertions.assertEquals(
         Integer.valueOf(0),
         SessionUtils.doWithCommitAndFetchResult(
-            PolicyTagRelMapper.class, mapper -> mapper.softDeleteByIdAndVersion(stale)));
+            PolicyTagRelMapper.class, mapper -> mapper.deleteByIdAndVersion(stale)));
 
     PolicyTagRelPO current = getRelation(endpoints);
     Assertions.assertNotNull(current);
@@ -564,7 +570,7 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testDeleteReAddDeleteRetainsHistory() throws Exception {
+  public void testUnbindAfterRebindLeavesNoStoredRows() throws Exception {
     createAndInsertMakeLake(METALAKE);
     RelationEndpoints endpoints = createEndpoints(METALAKE, "domain", "retention");
     backend.updateEntityRelations(relationUpdate(endpoints, null, true));
@@ -572,14 +578,13 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
     backend.updateEntityRelations(relationUpdate(endpoints, null, true));
     backend.updateEntityRelations(relationUpdate(endpoints, null, false));
 
-    String pairPredicate =
-        "policy_id = "
-            + endpoints.policy.id()
-            + " AND tag_id = "
-            + endpoints.tag.id()
-            + " AND deleted_at > 0";
     Assertions.assertEquals(
-        2L, queryForLong("SELECT COUNT(*) FROM policy_tag_relation_meta WHERE " + pairPredicate));
+        0L,
+        queryForLong(
+            "SELECT COUNT(*) FROM policy_tag_relation_meta WHERE policy_id = "
+                + endpoints.policy.id()
+                + " AND tag_id = "
+                + endpoints.tag.id()));
   }
 
   @TestTemplate
@@ -589,9 +594,20 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
     RelationEndpoints second = createEndpoints(METALAKE, "domain_b", "retention_b");
     backend.updateEntityRelations(relationUpdate(first, null, true));
     backend.updateEntityRelations(relationUpdate(second, null, true));
-    backend.updateEntityRelations(relationUpdate(first, null, false));
-    backend.updateEntityRelations(relationUpdate(second, null, false));
-    executeUpdate("UPDATE policy_tag_relation_meta SET deleted_at = 100 WHERE deleted_at > 0");
+    PolicyTagRelPO firstBinding = getRelation(first);
+    // Seed retained rows from before explicit unbinds physically removed their bindings.
+    Assertions.assertEquals(
+        2,
+        executeUpdate(
+            "UPDATE policy_tag_relation_meta SET deleted_at = 100 WHERE id IN ("
+                + firstBinding.getId()
+                + ", "
+                + getRelation(second).getId()
+                + ")"));
+    Assertions.assertEquals(
+        Integer.valueOf(0),
+        SessionUtils.doWithCommitAndFetchResult(
+            PolicyTagRelMapper.class, mapper -> mapper.deleteByIdAndVersion(firstBinding)));
 
     Assertions.assertEquals(
         0, TagMetaService.getInstance().deleteTagMetasByLegacyTimeline(100L, 10));

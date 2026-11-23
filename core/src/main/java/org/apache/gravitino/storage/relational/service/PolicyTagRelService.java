@@ -205,7 +205,7 @@ public class PolicyTagRelService {
       if (existing != null) {
         int deleted =
             SessionUtils.getWithoutCommit(
-                PolicyTagRelMapper.class, mapper -> mapper.softDeleteByIdAndVersion(existing));
+                PolicyTagRelMapper.class, mapper -> mapper.deleteByIdAndVersion(existing));
         if (deleted != 1) {
           throw relationConflict(tagIdentifier);
         }

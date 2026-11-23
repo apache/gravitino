@@ -62,16 +62,10 @@ public class PolicyTagRelBaseSQLProvider {
         + " #{relation.deletedAt})";
   }
 
-  /** Returns SQL for soft-deleting one relation with a version CAS. */
-  public String softDeleteByIdAndVersion(@Param("relation") PolicyTagRelPO relation) {
-    return "UPDATE "
+  /** Returns SQL for deleting one active binding by its observed ID and version. */
+  public String deleteByIdAndVersion(@Param("relation") PolicyTagRelPO relation) {
+    return "DELETE FROM "
         + POLICY_TAG_RELATION_TABLE_NAME
-        // Advance the OCC token in the same statement as the soft delete. Assign last_version
-        // first so MySQL computes both columns from the version observed before this update.
-        + " SET last_version = current_version + 1,"
-        + " current_version = current_version + 1,"
-        + " deleted_at = "
-        + deletedAtNowExpression()
         + " WHERE id = #{relation.id} AND current_version = #{relation.currentVersion}"
         + " AND deleted_at = 0";
   }

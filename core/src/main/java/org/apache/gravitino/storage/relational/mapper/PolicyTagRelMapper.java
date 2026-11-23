@@ -74,13 +74,13 @@ public interface PolicyTagRelMapper {
   int insertIfAbsent(@Param("relation") PolicyTagRelPO relation);
 
   /**
-   * Soft-deletes one active relation and advances its optimistic-concurrency version.
+   * Deletes the observed active binding when a policy is explicitly unbound from a tag.
    *
    * @param relation The observed relation and version.
-   * @return The number of updated rows.
+   * @return The number of deleted rows.
    */
-  @UpdateProvider(type = PolicyTagRelSQLProviderFactory.class, method = "softDeleteByIdAndVersion")
-  int softDeleteByIdAndVersion(@Param("relation") PolicyTagRelPO relation);
+  @DeleteProvider(type = PolicyTagRelSQLProviderFactory.class, method = "deleteByIdAndVersion")
+  int deleteByIdAndVersion(@Param("relation") PolicyTagRelPO relation);
 
   /**
    * Soft-deletes active relations in a metalake.

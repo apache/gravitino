@@ -72,9 +72,9 @@ public class PolicyTagRelSQLProviderFactory {
     return getProvider().insertIfAbsent(relation);
   }
 
-  /** Delegates a relation soft delete. */
-  public static String softDeleteByIdAndVersion(@Param("relation") PolicyTagRelPO relation) {
-    return getProvider().softDeleteByIdAndVersion(relation);
+  /** Delegates a version-checked delete of one active binding. */
+  public static String deleteByIdAndVersion(@Param("relation") PolicyTagRelPO relation) {
+    return getProvider().deleteByIdAndVersion(relation);
   }
 
   /** Delegates metalake deletion cleanup. */
