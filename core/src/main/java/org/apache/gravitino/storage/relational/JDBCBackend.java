@@ -275,6 +275,11 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   }
 
   @Override
+  public long getTableId(NameIdentifier identifier) {
+    return TableMetaService.getInstance().getTableIdByIdentifier(identifier);
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> E get(
       NameIdentifier ident, Entity.EntityType entityType)
       throws NoSuchEntityException, IOException {
