@@ -82,6 +82,9 @@ tasks.withType(ShadowJar::class.java) {
   relocate("io.netty", "org.apache.gravitino.aws.shaded.io.netty")
   relocate("org.apache.commons", "org.apache.gravitino.aws.shaded.org.apache.commons")
   relocate("org.apache.http", "org.apache.gravitino.aws.shaded.org.apache.http")
+  // Apache HTTP client 5, brought by the apache5-client module that the AWS SDK v2 service modules
+  // depend on.
+  relocate("org.apache.hc", "org.apache.gravitino.aws.shaded.org.apache.hc")
   // hadoop-aws links ConfigureShadedAWSSocketFactory against the Apache HTTP client that the
   // software.amazon.awssdk:bundle shades. The bundle is replaced by the single SDK modules, which use
   // org.apache.http, so map the shaded name to the same relocated package to keep

@@ -60,6 +60,10 @@ dependencies {
     exclude(group = "net.java.dev.jets3t")
     exclude(group = "org.apache.avro")
     exclude(group = "org.apache.logging.log4j")
+    // hadoop-common 3.4 declares these, Hadoop 3.3 did not bring them. No Hadoop class on the
+    // metastore client path uses them.
+    exclude(group = "org.bouncycastle", module = "bcprov-jdk18on")
+    exclude(group = "org.codehaus.jettison", module = "jettison")
     exclude(group = "org.eclipse.jetty")
     exclude(group = "org.eclipse.jetty.aggregate", module = "jetty-all")
     exclude(group = "org.eclipse.jetty.orbit", module = "javax.servlet")

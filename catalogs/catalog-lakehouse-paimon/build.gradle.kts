@@ -136,6 +136,10 @@ dependencies {
     exclude("org.eclipse.jetty")
     exclude("ch.qos.reload4j")
     exclude("org.slf4j", "slf4j-reload4j")
+    // hadoop-common 3.4 declares these, Hadoop 3.3 did not bring them. No Hadoop class that the
+    // catalog uses needs them.
+    exclude("org.bouncycastle", "bcprov-jdk18on")
+    exclude("org.codehaus.jettison", "jettison")
   }
   implementation(libs.hadoop3.hdfs) {
     exclude("*")

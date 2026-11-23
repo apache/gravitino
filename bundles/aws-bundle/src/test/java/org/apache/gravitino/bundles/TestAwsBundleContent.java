@@ -82,6 +82,21 @@ class TestAwsBundleContent {
   }
 
   @Test
+  void testApacheHttpClientsAreRelocated() throws Exception {
+    try (JarFile jar = new JarFile(BUNDLE)) {
+      for (String prefix : new String[] {"org/apache/http/", "org/apache/hc/"}) {
+        assertFalse(
+            jar.stream().anyMatch(entry -> entry.getName().startsWith(prefix)),
+            prefix + " must be relocated");
+        String relocated = "org/apache/gravitino/aws/shaded/" + prefix;
+        assertTrue(
+            jar.stream().anyMatch(entry -> entry.getName().startsWith(relocated)),
+            prefix + " must be bundled under " + relocated);
+      }
+    }
+  }
+
+  @Test
   void testNettyVersion() throws Exception {
     assertNotNull(NETTY_VERSION, "nettyVersion");
     List<String> versions = new ArrayList<>();
