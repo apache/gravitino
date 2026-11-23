@@ -189,7 +189,7 @@ components:
     metadataObjectTypeOfOwner:
       name: metadataObjectType
       in: path
-      description: The type of the metadata object. DOMAIN ownership applies to the domain and its current subdomains; encode its literal name as one path segment. A GLOSSARY_TERM name is also a single segment and may contain literal dots. New glossary term names cannot be a single or double dot. Existing terms with either name must be renamed before using this path.
+      description: The type of the metadata object. DOMAIN ownership applies to the domain and its current subdomains; encode its literal name as one path segment. A GLOSSARY_TERM name is also a single segment and may contain literal dots. Glossary term names cannot be a single or double dot, so every term name is a safe path segment.
       required: true
       schema:
         type: string

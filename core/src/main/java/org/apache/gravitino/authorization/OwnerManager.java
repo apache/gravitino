@@ -207,7 +207,7 @@ public class OwnerManager implements OwnerDispatcher {
 
   private void notifyOwnerChange(
       @Nullable OwnerImpl oldOwner, String metalake, MetadataObject metadataObject) {
-    GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    GravitinoAuthorizer gravitinoAuthorizer = authorizer();
     if (gravitinoAuthorizer == null) {
       return;
     }
@@ -232,23 +232,33 @@ public class OwnerManager implements OwnerDispatcher {
 
   @Override
   public Optional<Owner> getOwner(String metalake, MetadataObject metadataObject) {
-    if (metadataObject.type() == MetadataObject.Type.GLOSSARY_TERM) {
+    GravitinoAuthorizer authorizer = authorizer();
+    if (metadataObject.type() == MetadataObject.Type.GLOSSARY_TERM && authorizer != null) {
       // Visibility and the returned owner must refer to the same generation of this name.
       return SqlSessions.readSnapshot(
           () -> {
-            if (!GravitinoEnv.getInstance()
-                .gravitinoAuthorizer()
-                .canAccessGlossaryTerm(
-                    PrincipalUtils.getCurrentPrincipal(),
-                    metalake,
-                    metadataObject,
-                    new AuthorizationRequestContext())) {
+            if (!authorizer.canAccessGlossaryTerm(
+                PrincipalUtils.getCurrentPrincipal(),
+                metalake,
+                metadataObject,
+                new AuthorizationRequestContext())) {
               throw new ForbiddenException("Current user cannot get this object's owner");
             }
             return Optional.ofNullable(readOwner(metalake, metadataObject));
           });
     }
     return Optional.ofNullable(readOwner(metalake, metadataObject));
+  }
+
+  /**
+   * Returns the authorizer, or null when this node runs without one. The server always installs an
+   * authorizer, a pass-through one when authorization is disabled, so a null authorizer only
+   * happens when {@code OwnerManager} is embedded without the authorization provider. Glossary
+   * checks are then skipped, as {@link #notifyOwnerChange} skips cache invalidation.
+   */
+  @Nullable
+  private static GravitinoAuthorizer authorizer() {
+    return GravitinoEnv.getInstance().gravitinoAuthorizer();
   }
 
   @Nullable
@@ -289,7 +299,10 @@ public class OwnerManager implements OwnerDispatcher {
   }
 
   private void checkTermOwnerTransfer(String metalake, long termId) {
-    GravitinoAuthorizer authorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    GravitinoAuthorizer authorizer = authorizer();
+    if (authorizer == null) {
+      return;
+    }
     Principal principal = PrincipalUtils.getCurrentPrincipal();
     AuthorizationRequestContext context = new AuthorizationRequestContext();
     MetadataObject lake = MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE);
