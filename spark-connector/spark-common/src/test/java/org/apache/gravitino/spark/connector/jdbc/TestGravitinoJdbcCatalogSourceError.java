@@ -96,8 +96,13 @@ public class TestGravitinoJdbcCatalogSourceError {
       SupportsCredentials credentials = mock(SupportsCredentials.class);
       when(credentials.getCredentials())
           .thenReturn(new Credential[] {new JdbcCredential(NO_RIGHTS, PASSWORD)});
+      Map<String, String> properties = new HashMap<>();
+      properties.put("jdbc-url", URL);
+      properties.put("jdbc-driver", "org.h2.Driver");
       Catalog source = mock(Catalog.class);
       when(source.provider()).thenReturn("jdbc-h2");
+      when(source.properties()).thenReturn(properties);
+      when(source.supportsSecrets()).thenThrow(new UnsupportedOperationException());
       when(source.supportsCredentials()).thenReturn(credentials);
       GravitinoJdbcCatalog catalog =
           new GravitinoJdbcCatalog() {
@@ -105,11 +110,13 @@ public class TestGravitinoJdbcCatalogSourceError {
             protected Catalog gravitinoCatalog() {
               return source;
             }
+
+            @Override
+            protected Catalog refreshGravitinoCatalog() {
+              return source;
+            }
           };
 
-      Map<String, String> properties = new HashMap<>();
-      properties.put("jdbc-url", URL);
-      properties.put("jdbc-driver", "org.h2.Driver");
       TableCatalog physical =
           catalog.createAndInitSparkCatalog(
               "test", new CaseInsensitiveStringMap(new HashMap<>()), properties);

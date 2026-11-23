@@ -41,7 +41,6 @@ from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.api.domain.domain import Domain
 from gravitino.api.domain.domain_change import DomainChangeVariant
 from gravitino.api.domain.domain_operations import DomainOperations
-from gravitino.api.tag.tag_value import TagValue
 from gravitino.api.tag.tag_operations import TagOperations
 from gravitino.auth.auth_data_provider import AuthDataProvider
 from gravitino.client.gravitino_client_base import GravitinoClientBase
@@ -939,7 +938,7 @@ class GravitinoClient(
         name: str,
         comment: Optional[str],
         properties: Optional[dict[str, str]],
-        backing_tag: TagValue,
+        backing_tag: str,
         create_backing_tag: bool,
     ) -> Domain:
         """Create a draft top-level domain with an explicit new or existing tag."""
@@ -952,5 +951,9 @@ class GravitinoClient(
         return self.get_metalake().alter_domain(name, *changes)
 
     def delete_domain(self, name: str) -> bool:
-        """Delete the named domain while preserving tags."""
+        """Delete the named draft domain while preserving tags.
+
+        Returns False if the domain is absent or is a draft hidden from the
+        caller; a hidden draft is not deleted.
+        """
         return self.get_metalake().delete_domain(name)

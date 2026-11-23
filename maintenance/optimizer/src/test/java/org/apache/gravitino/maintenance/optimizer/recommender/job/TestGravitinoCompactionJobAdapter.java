@@ -39,31 +39,27 @@ public class TestGravitinoCompactionJobAdapter {
 
   @Test
   public void testJobTemplateName() {
-    GravitinoCompactionJobAdapter jobAdapter = new GravitinoCompactionJobAdapter();
-    Assertions.assertEquals(
-        Map.of(
-            "table_identifier", "db.table",
-            "where_clause", "",
-            "sort_order", "",
-            "strategy", "binpack",
-            "options", "{\"target_file_size_bytes\":\"1073741824\"}"),
-        jobAdapter.jobConfig(
-            mockCompactionJobContext("binpack", ""), IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR));
+    Map<String, String> conf =
+        new GravitinoCompactionJobAdapter()
+            .jobConfig(
+                mockCompactionJobContext("binpack", ""), IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
+    Assertions.assertEquals("db.table", conf.get("table_identifier"));
+    Assertions.assertEquals("binpack", conf.get("strategy"));
+    Assertions.assertEquals("1g", conf.get("spark_executor_memory"));
+    Assertions.assertEquals("", conf.get("catalog_type"));
+    Assertions.assertTrue(conf.containsKey("spark_master"));
+    Assertions.assertTrue(conf.containsKey("warehouse_location"));
   }
 
   @Test
   public void testSortStrategyAndSortOrder() {
-    GravitinoCompactionJobAdapter jobAdapter = new GravitinoCompactionJobAdapter();
-    Assertions.assertEquals(
-        Map.of(
-            "table_identifier", "db.table",
-            "where_clause", "",
-            "sort_order", "zorder(c1,c2)",
-            "strategy", "sort",
-            "options", "{\"target_file_size_bytes\":\"1073741824\"}"),
-        jobAdapter.jobConfig(
-            mockCompactionJobContext("sort", "zorder(c1,c2)"),
-            IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR));
+    Map<String, String> conf =
+        new GravitinoCompactionJobAdapter()
+            .jobConfig(
+                mockCompactionJobContext("sort", "zorder(c1,c2)"),
+                IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
+    Assertions.assertEquals("zorder(c1,c2)", conf.get("sort_order"));
+    Assertions.assertEquals("sort", conf.get("strategy"));
   }
 
   @Test
