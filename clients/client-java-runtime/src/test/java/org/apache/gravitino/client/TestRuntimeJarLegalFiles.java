@@ -89,15 +89,12 @@ class TestRuntimeJarLegalFiles {
   @Test
   void testMissingBundledLicensesAreSupplemented() throws IOException {
     try (JarFile jar = artifact()) {
-      for (String name :
-          Arrays.asList(
-              "LICENSE.jsr305-concurrent", "LICENSE.fastdoubleparser-0.9.0", "LICENSE.schubfach")) {
+      for (String name : Arrays.asList("LICENSE.fastdoubleparser-0.9.0", "LICENSE.schubfach")) {
         assertArrayEquals(
             Files.readAllBytes(Paths.get(System.getProperty("legalTemplates"), name)),
             readBytesBySuffix(jar, "/" + name),
             name);
       }
-      assertTrue(readEntry(jar, "META-INF/LICENSE").contains("CC-BY-2.5"));
     }
   }
 

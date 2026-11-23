@@ -16,11 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.iceberg.common.idempotency;
+package org.apache.gravitino.iceberg.service.idempotency;
 
 import java.io.Closeable;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import javax.annotation.Nullable;
 
 /**
@@ -50,14 +51,6 @@ import javax.annotation.Nullable;
  */
 public interface IdempotencyStore extends Closeable {
 
-  /** Outcome of an attempt to claim a key. */
-  enum ReserveResult {
-    /** The key was newly claimed by this caller, which now owns the mutation. */
-    RESERVED,
-    /** A non-expired reservation or finalized record already exists for the key. */
-    DUPLICATE
-  }
-
   /**
    * Initializes the store from the Iceberg REST server configuration.
    *
@@ -69,23 +62,21 @@ public interface IdempotencyStore extends Closeable {
    * Atomically attempts to claim a key. An expired record is treated as absent, so the key can be
    * reserved again without waiting for a purge.
    *
-   * <p>The store retains the operation binding but does not compare it when returning {@link
-   * ReserveResult#DUPLICATE}. The REST handler owns binding checks: when {@link #load} returns a
-   * finalized record, the handler must reject a different binding with {@code 409 Conflict} instead
-   * of replaying it. When the key is still in flight, {@code load} returns empty and the handler
-   * returns the same in-flight {@code 409 Conflict}, regardless of whether the bindings match.
+   * <p>The store retains the operation binding but does not compare it when a reservation already
+   * exists. The REST handler owns binding checks: when {@link #load} returns a finalized record,
+   * the handler must reject a different binding with {@code 409 Conflict} instead of replaying it.
+   * When the key is still in flight, {@code load} returns empty and the handler returns the same
+   * in-flight {@code 409 Conflict}, regardless of whether the bindings match.
    *
    * @param idempotencyKey the client-provided UUIDv7 key
-   * @param operationBinding request identity, for example {@code POST
-   *     /v1/cat1/namespaces/ns1/tables}
-   * @param claim a fencing token identifying this attempt, which the caller must generate afresh
-   *     for every reservation and pass back to {@link #finalizeRecord} and {@link #release}
+   * @param operationBinding request identity, as the HTTP method, a space, and the encoded path. A
+   *     query fingerprint may follow the path, separated by a question mark.
    * @param expiresAtMs time after which the record may be purged, in unix epoch millis
-   * @return {@link ReserveResult#RESERVED} if newly claimed, {@link ReserveResult#DUPLICATE} if a
-   *     non-expired reservation or finalized record for this key already exists
+   * @return a fresh fencing token when the reservation is acquired, or empty if the key is live.
+   *     Tokens must not repeat for a key after release, eviction, or purge, and callers must pass
+   *     the returned token to {@link #finalizeRecord} or {@link #release}.
    */
-  ReserveResult reserve(
-      String idempotencyKey, String operationBinding, long claim, long expiresAtMs);
+  OptionalLong reserve(String idempotencyKey, String operationBinding, long expiresAtMs);
 
   /**
    * Loads a finalized record for replay.

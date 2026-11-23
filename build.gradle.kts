@@ -684,6 +684,7 @@ fun excludePackagesForSparkConnector(project: Project) {
 
 val commonsBeanutilsVersion: String = libs.versions.commons.beanutils.get()
 val httpcore5Version: String = libs.versions.httpcore5.get()
+val jsr305Dependency = libs.jsr305
 
 subprojects {
   // Gravitino Python client project didn't need to apply the java plugin
@@ -747,6 +748,12 @@ subprojects {
     mavenLocal()
   }
 
+  // Guava no longer brings jsr305 transitively since 33.5.0, but the sources use
+  // javax.annotation.Nullable and friends. Keep them on the compile classpath only.
+  dependencies {
+    compileOnly(jsr305Dependency)
+    testCompileOnly(jsr305Dependency)
+  }
   val jdk8CompatibleProjectPathPrefixes = setOf(
     ":api",
     ":common",
@@ -1511,6 +1518,14 @@ tasks {
           }
         }
         fileMode = 0b111101101
+      }
+
+      copy {
+        from(projectDir.dir("scripts")) {
+          include("**/iceberg-*.sql")
+          into("${rootProject.name}-iceberg-rest-server/scripts")
+        }
+        into(outputDir)
       }
 
       copy {

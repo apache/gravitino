@@ -798,7 +798,12 @@ class GravitinoMetalake(
         return GenericDomain(self.name(), result.domain(), self.rest_client)
 
     def delete_domain(self, name: str) -> bool:
-        """Delete a domain, preserving tags; parents with children are rejected."""
+        """Delete a draft domain, preserving tags.
+
+        Published domains (unpublish first) and parents with children are rejected.
+        Returns False if the domain is absent or is a draft hidden from the caller;
+        a hidden draft is not deleted, so False does not mean absent.
+        """
         response = self.rest_client.delete(
             domain_path(self.name(), name),
             error_handler=DOMAIN_ERROR_HANDLER,

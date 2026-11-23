@@ -60,6 +60,16 @@ public abstract class SparkUtilIT extends BaseIT {
     return convertToStringSet(sql("SHOW DATABASES"), 0);
   }
 
+  /**
+   * Lists databases in the specified catalog regardless of the current Spark namespace.
+   *
+   * @param catalog the Spark catalog name
+   * @return the database names visible in the catalog
+   */
+  protected Set<String> getDatabases(String catalog) {
+    return convertToStringSet(sql("SHOW DATABASES IN " + catalog), 0);
+  }
+
   protected Set<String> listTableNames() {
     // the first column is namespace, the second column is table name
     return convertToStringSet(sql("SHOW TABLES"), 1);

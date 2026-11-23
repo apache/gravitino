@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
@@ -49,6 +50,8 @@ import org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.plugin.PluginContext;
+import org.apache.spark.sql.RuntimeConfig;
+import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.internal.StaticSQLConf;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -59,6 +62,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
+import scala.Option;
 
 /**
  * Tests what the plugin does with the bindings it is given. The bindings here are made up, so these
@@ -352,9 +356,11 @@ public class TestGravitinoDriverPlugin {
     assertEquals(PAIMON_CATALOG, classFor(plugin, "lakehouse-paimon"));
     assertEquals(GLUE_CATALOG, classFor(plugin, "glue"));
     assertEquals(POSTGRESQL_CATALOG, classFor(plugin, "jdbc-postgresql"));
-    // Every other JDBC backend shares one catalog.
+    // Supported generic JDBC backends share one catalog.
     assertEquals(JDBC_CATALOG, classFor(plugin, "jdbc-mysql"));
     assertEquals(JDBC_CATALOG, classFor(plugin, "jdbc-doris"));
+    assertEquals(JDBC_CATALOG, classFor(plugin, "jdbc-starrocks"));
+    assertEquals(JDBC_CATALOG, classFor(plugin, "jdbc-oceanbase"));
   }
 
   @Test
@@ -453,7 +459,7 @@ public class TestGravitinoDriverPlugin {
                 .put("my_postgresql", catalogWithProvider("jdbc-postgresql"))
                 // Three shapes that must all be skipped. null and "" stop at the blank-provider
                 // guard, null being the one that pins it since fromProvider rejects null; kafka is
-                // the other shape, a non-blank provider this connector maps to no kind.
+                // a non-blank provider this connector maps to no kind.
                 .put("no_provider", catalogWithProvider(null))
                 .put("blank_provider", catalogWithProvider(""))
                 .put("my_kafka", catalogWithProvider("kafka"))
@@ -494,6 +500,83 @@ public class TestGravitinoDriverPlugin {
             extensions.contains(GravitinoDriverPlugin.PAIMON_SPARK_EXTENSIONS),
             flags + " -> " + extensions);
       }
+    }
+  }
+
+  @Test
+  void testUnknownJdbcProviderFailsRegistration() {
+    SparkConf sparkConf = new SparkConf(false);
+    GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withoutPaimon());
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                plugin.registerGravitinoCatalogs(
+                    sparkConf,
+                    ImmutableMap.of("my_clickhouse", catalogWithProvider("jdbc-clickhouse"))));
+
+    assertEquals(
+        "Catalog my_clickhouse has unsupported JDBC provider jdbc-clickhouse. "
+            + "It may be served by a separate extension jar.",
+        exception.getMessage());
+    assertFalse(sparkConf.contains("spark.sql.catalog.my_clickhouse"));
+  }
+
+  @Test
+  void testExtensionCatalogIsRegisteredForUnknownJdbcProvider() {
+    SparkConf sparkConf = new SparkConf(false);
+    SparkBindings bindings =
+        requiredCatalogs()
+            .extensionCatalog("JDBC-CLICKHOUSE", "org.example.ClickHouseCatalog")
+            .build();
+    GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(bindings);
+
+    plugin.registerGravitinoCatalogs(
+        sparkConf, ImmutableMap.of("my_clickhouse", catalogWithProvider("jdbc-clickhouse")));
+
+    assertEquals("org.example.ClickHouseCatalog", sparkConf.get("spark.sql.catalog.my_clickhouse"));
+  }
+
+  @Test
+  void testExistingSparkCatalogIsPreservedForUnknownJdbcProvider() {
+    SparkConf sparkConf = new SparkConf(false);
+    sparkConf.set("spark.sql.catalog.my_clickhouse", "org.example.ExistingCatalog");
+    GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withoutPaimon());
+
+    plugin.registerGravitinoCatalogs(
+        sparkConf, ImmutableMap.of("my_clickhouse", catalogWithProvider("jdbc-clickhouse")));
+
+    assertEquals("org.example.ExistingCatalog", sparkConf.get("spark.sql.catalog.my_clickhouse"));
+  }
+
+  @Test
+  void testInitClosesCatalogManagerWhenRegistrationFails() {
+    SparkConf sparkConf =
+        new SparkConf(false)
+            .set(GravitinoSparkConfig.GRAVITINO_URI, "http://127.0.0.1:8090")
+            .set(GravitinoSparkConfig.GRAVITINO_METALAKE, "metalake");
+    SparkContext sparkContext = mock(SparkContext.class);
+    when(sparkContext.conf()).thenReturn(sparkConf);
+    when(sparkContext.sparkUser()).thenReturn("user");
+    GravitinoCatalogManager catalogManager = mock(GravitinoCatalogManager.class);
+    Catalog clickhouse = catalogWithProvider("jdbc-clickhouse");
+    when(catalogManager.getCatalogs()).thenReturn(ImmutableMap.of("my_clickhouse", clickhouse));
+    GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withoutPaimon());
+
+    try (MockedStatic<GravitinoCatalogManager> global = mockStatic(GravitinoCatalogManager.class)) {
+      global
+          .when(
+              () ->
+                  GravitinoCatalogManager.create(Mockito.any(), Mockito.anyString(), Mockito.any()))
+          .thenReturn(catalogManager);
+
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> plugin.init(sparkContext, mock(PluginContext.class)));
+      plugin.shutdown();
+
+      Mockito.verify(catalogManager, Mockito.times(1)).close();
     }
   }
 
@@ -609,6 +692,105 @@ public class TestGravitinoDriverPlugin {
     client.close();
   }
 
+  /**
+   * Every new session starts with the application's token file in its configuration. A token the
+   * session sets itself must still win, and a session that sets nothing uses the application's.
+   */
+  @Test
+  void testSessionOwnTokenWinsInRealSparkSession(@TempDir Path tempDir) throws IOException {
+    Path appTokenFile = tempDir.resolve("driver.token");
+    Files.write(appTokenFile, "app-file-token\n".getBytes(StandardCharsets.UTF_8));
+    Path userTokenFile = tempDir.resolve("user.token");
+    Files.write(userTokenFile, "user-file-token\n".getBytes(StandardCharsets.UTF_8));
+    SparkSession root =
+        SparkSession.builder()
+            .master("local[1]")
+            .appName("test-session-token-resolution")
+            .config("spark.ui.enabled", "false")
+            .config("spark.driver.host", "127.0.0.1")
+            .config("spark.driver.bindAddress", "127.0.0.1")
+            .config("spark.sql.warehouse.dir", tempDir.resolve("warehouse").toUri().toString())
+            .config(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.TOKEN_AUTH_TYPE)
+            .config(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE, appTokenFile.toString())
+            .getOrCreate();
+    try {
+      SparkConf sparkConf = root.sparkContext().conf();
+      // A reused SparkContext would not carry the token file.
+      assertEquals(
+          appTokenFile.toString(), sparkConf.get(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE, null));
+
+      SparkSession valueSession = root.newSession();
+      assertEquals(
+          appTokenFile.toString(),
+          valueSession.conf().get(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE));
+      valueSession.conf().set(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE, "session-token");
+      SparkSession.setActiveSession(valueSession);
+      assertEquals("session-token", GravitinoDriverPlugin.resolveToken(sparkConf));
+
+      SparkSession fileSession = root.newSession();
+      fileSession.conf().set(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE, userTokenFile.toString());
+      SparkSession.setActiveSession(fileSession);
+      assertEquals("user-file-token", GravitinoDriverPlugin.resolveToken(sparkConf));
+
+      SparkSession.setActiveSession(root.newSession());
+      assertEquals("app-file-token", GravitinoDriverPlugin.resolveToken(sparkConf));
+    } finally {
+      SparkSession.clearActiveSession();
+      SparkSession.clearDefaultSession();
+      root.stop();
+    }
+  }
+
+  /** Within the session's own configuration the token file wins over the literal token. */
+  @Test
+  void testSessionTokenFileWinsOverSessionTokenValue(@TempDir Path tempDir) throws IOException {
+    Path sessionTokenFile = tempDir.resolve("session.token");
+    Files.write(sessionTokenFile, "session-file-token\n".getBytes(StandardCharsets.UTF_8));
+    SparkConf sparkConf = tokenAuthConf();
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE, "app-value-token");
+
+    try (MockedStatic<SparkSession> sparkSessions =
+        mockActiveSession(sessionTokenFile.toString(), "session-value-token")) {
+      assertEquals("session-file-token", GravitinoDriverPlugin.resolveToken(sparkConf));
+    }
+  }
+
+  /**
+   * The session inherits the application's token file and sets its own literal token, which wins
+   * although the application also sets a literal token. The session's token is trimmed.
+   */
+  @Test
+  void testSessionTokenValueWinsWhenApplicationSetsBothKeys(@TempDir Path tempDir)
+      throws IOException {
+    Path appTokenFile = tempDir.resolve("driver.token");
+    Files.write(appTokenFile, "app-file-token\n".getBytes(StandardCharsets.UTF_8));
+    SparkConf sparkConf = tokenAuthConf();
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE, appTokenFile.toString());
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE, "app-value-token");
+
+    try (MockedStatic<SparkSession> sparkSessions =
+        mockActiveSession(appTokenFile.toString(), " session-token\n")) {
+      assertEquals("session-token", GravitinoDriverPlugin.resolveToken(sparkConf));
+    }
+  }
+
+  /** An empty token file set by the session fails instead of using the application's token. */
+  @Test
+  void testEmptySessionTokenFileFails(@TempDir Path tempDir) throws IOException {
+    Path appTokenFile = tempDir.resolve("driver.token");
+    Files.write(appTokenFile, "app-file-token\n".getBytes(StandardCharsets.UTF_8));
+    Path sessionTokenFile = tempDir.resolve("session.token");
+    Files.write(sessionTokenFile, new byte[0]);
+    SparkConf sparkConf = tokenAuthConf();
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE, appTokenFile.toString());
+
+    try (MockedStatic<SparkSession> sparkSessions =
+        mockActiveSession(sessionTokenFile.toString(), null)) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> GravitinoDriverPlugin.resolveToken(sparkConf));
+    }
+  }
+
   @Test
   void testSkipsCatalogAlreadyConfiguredInSpark() {
     SparkConf sparkConf =
@@ -686,5 +868,25 @@ public class TestGravitinoDriverPlugin {
     SparkConf sparkConf = new SparkConf(false);
     sparkConf.set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.TOKEN_AUTH_TYPE);
     return sparkConf;
+  }
+
+  /** Makes a mocked session with the given token settings the active session. */
+  private static MockedStatic<SparkSession> mockActiveSession(
+      @Nullable String tokenFile, @Nullable String tokenValue) {
+    RuntimeConfig sessionConf = mock(RuntimeConfig.class);
+    when(sessionConf.getOption(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE))
+        .thenReturn(Option.apply(tokenFile));
+    when(sessionConf.getOption(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE))
+        .thenReturn(Option.apply(tokenValue));
+    SparkSession session = mock(SparkSession.class);
+    when(session.conf()).thenReturn(sessionConf);
+    MockedStatic<SparkSession> sparkSessions = Mockito.mockStatic(SparkSession.class);
+    try {
+      sparkSessions.when(SparkSession::getActiveSession).thenReturn(Option.apply(session));
+    } catch (RuntimeException e) {
+      sparkSessions.close();
+      throw e;
+    }
+    return sparkSessions;
   }
 }
