@@ -178,6 +178,48 @@ public class TestRelationalEntityStore {
   }
 
   @Test
+  void testRenameBeginPendingRollsBackWhenInvalidateFails()
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException,
+          IllegalAccessException {
+    NameIdentifier oldIdent = NameIdentifier.of("metalake", "catalog", "schema", "old");
+    NameIdentifier newIdent = NameIdentifier.of("metalake", "catalog", "schema", "new");
+    EntityCacheKey newKey = EntityCacheKey.of(newIdent, Entity.EntityType.TOPIC);
+    TopicEntity renamed = Mockito.mock(TopicEntity.class);
+    Mockito.when(renamed.nameIdentifier()).thenReturn(newIdent);
+
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+    @SuppressWarnings("unchecked")
+    Map<EntityCacheKey, AtomicInteger> pendingWrites =
+        (Map<EntityCacheKey, AtomicInteger>) FieldUtils.readField(store, "pendingWrites", true);
+    @SuppressWarnings("unchecked")
+    Map<String, AtomicInteger> pendingHierarchyPrefixes =
+        (Map<String, AtomicInteger>) FieldUtils.readField(store, "pendingHierarchyPrefixes", true);
+
+    Mockito.doReturn(true).when(cache).invalidate(eq(oldIdent), eq(Entity.EntityType.TOPIC));
+    Mockito.doThrow(new RuntimeException("invalidate failed"))
+        .when(cache)
+        .invalidate(eq(newIdent), eq(Entity.EntityType.TOPIC));
+
+    Mockito.doAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              Function<TopicEntity, TopicEntity> updater = invocation.getArgument(2);
+              return updater.apply(renamed);
+            })
+        .when(backend)
+        .update(eq(oldIdent), eq(Entity.EntityType.TOPIC), any(Function.class));
+
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> store.update(oldIdent, null, Entity.EntityType.TOPIC, entity -> renamed));
+
+    Assertions.assertFalse(pendingWrites.containsKey(newKey));
+    Assertions.assertFalse(
+        pendingWrites.containsKey(EntityCacheKey.of(oldIdent, Entity.EntityType.TOPIC)));
+    Assertions.assertTrue(pendingHierarchyPrefixes.isEmpty());
+  }
+
+  @Test
   void testGetDoesNotPublishWhileWritePending() throws Exception {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "topic");
     EntityCacheKey key = EntityCacheKey.of(ident, Entity.EntityType.TOPIC);

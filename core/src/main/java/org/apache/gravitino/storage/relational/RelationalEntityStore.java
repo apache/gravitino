@@ -935,7 +935,14 @@ public class RelationalEntityStore
         key,
         () -> {
           retainPendingWrite(key, ident, entityType);
-          invalidateCache(ident, entityType);
+          try {
+            invalidateCache(ident, entityType);
+          } catch (RuntimeException | Error e) {
+            // Retain already bumped refcounts; roll them back so a failed begin cannot leak
+            // pending state (for example rename sets renamedTo only after begin returns).
+            releasePendingWrite(key, ident, entityType);
+            throw e;
+          }
         });
   }
 
