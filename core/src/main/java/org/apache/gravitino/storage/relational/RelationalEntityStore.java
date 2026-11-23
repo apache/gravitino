@@ -991,10 +991,11 @@ public class RelationalEntityStore
     if (pendingHierarchyPrefixes.isEmpty()) {
       return false;
     }
-    String text = CaffeineEntityCache.indexText(ident);
     for (Map.Entry<String, AtomicInteger> entry : pendingHierarchyPrefixes.entrySet()) {
       AtomicInteger count = entry.getValue();
-      if (count != null && count.get() > 0 && text.startsWith(entry.getKey())) {
+      if (count != null
+          && count.get() > 0
+          && CaffeineEntityCache.isUnderHierarchyPrefix(ident, entry.getKey())) {
         return true;
       }
     }

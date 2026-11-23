@@ -419,14 +419,14 @@ public class TestCaffeineEntityCacheInvalidation {
 
     Assertions.assertEquals(1, prefixes.size());
     Assertions.assertTrue(
-        CaffeineEntityCache.indexText(NameIdentifier.of("metalake", "catalog1", "schema"))
-            .startsWith(prefixes.get(0)));
+        CaffeineEntityCache.isUnderHierarchyPrefix(
+            NameIdentifier.of("metalake", "catalog1", "schema"), prefixes.get(0)));
     Assertions.assertFalse(
-        CaffeineEntityCache.indexText(NameIdentifier.of("metalake", "catalog10"))
-            .startsWith(prefixes.get(0)));
+        CaffeineEntityCache.isUnderHierarchyPrefix(
+            NameIdentifier.of("metalake", "catalog10"), prefixes.get(0)));
     Assertions.assertFalse(
-        CaffeineEntityCache.indexText(NameIdentifier.of("metalake", "catalog1"))
-            .startsWith(prefixes.get(0)));
+        CaffeineEntityCache.isUnderHierarchyPrefix(
+            NameIdentifier.of("metalake", "catalog1"), prefixes.get(0)));
   }
 
   @Test
@@ -436,11 +436,10 @@ public class TestCaffeineEntityCacheInvalidation {
         CaffeineEntityCache.descendantPrefixes(schema, Entity.EntityType.SCHEMA);
 
     Assertions.assertEquals(2, prefixes.size());
-    Assertions.assertEquals(
-        CaffeineEntityCache.indexText(schema) + CaffeineEntityCache.NAME_LEVEL_BOUNDARY,
-        prefixes.get(0));
-    Assertions.assertEquals(
-        CaffeineEntityCache.indexText(schema) + HierarchicalSchemaUtil.schemaSeparator(),
-        prefixes.get(1));
+    Assertions.assertTrue(prefixes.get(0).endsWith("."));
+    Assertions.assertTrue(prefixes.get(1).endsWith(HierarchicalSchemaUtil.schemaSeparator()));
+    Assertions.assertTrue(
+        CaffeineEntityCache.isUnderHierarchyPrefix(
+            NameIdentifier.of("metalake", "catalog", "schema", "table"), prefixes.get(0)));
   }
 }

@@ -98,7 +98,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * Separates {@link NameIdentifier} levels in a cache key. See {@link
    * #invalidateHierarchy(EntityCacheKey)} for why it is not the only child boundary.
    */
-  public static final String NAME_LEVEL_BOUNDARY = ".";
+  private static final String NAME_LEVEL_BOUNDARY = ".";
 
   /** Escapes {@link #NAME_LEVEL_BOUNDARY} and itself inside a level of an index key. */
   private static final char INDEX_ESCAPE = '\u0001';
@@ -378,11 +378,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * {@link #invalidateHierarchy(EntityCacheKey)} still match exactly the descendants. The schema
    * separator can be neither {@code "."} nor the escape character (see {@link
    * Configs#SCHEMA_SEPARATOR}), so it is kept as is.
-   *
-   * @param ident The identifier to encode.
-   * @return The escaped index text for {@code ident}.
    */
-  public static String indexText(NameIdentifier ident) {
+  private static String indexText(NameIdentifier ident) {
     StringBuilder text = new StringBuilder();
     for (String level : ident.namespace().levels()) {
       appendEscaped(text, level).append(NAME_LEVEL_BOUNDARY);
@@ -407,6 +404,17 @@ public class CaffeineEntityCache extends BaseEntityCache {
       prefixes.add(identifier + HierarchicalSchemaUtil.schemaSeparator());
     }
     return prefixes;
+  }
+
+  /**
+   * Returns whether {@code ident} lies under a hierarchy prefix from {@link #descendantPrefixes}.
+   *
+   * @param ident The identifier to test.
+   * @param prefix A prefix from {@link #descendantPrefixes}.
+   * @return {@code true} if {@code ident} is matched by {@code prefix}.
+   */
+  public static boolean isUnderHierarchyPrefix(NameIdentifier ident, String prefix) {
+    return indexText(ident).startsWith(prefix);
   }
 
   /**
