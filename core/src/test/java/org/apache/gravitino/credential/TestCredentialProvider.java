@@ -27,14 +27,14 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestCredentialProvider {
-  /** Checks that built-in stored credential providers declare the static capability. */
+  /** Checks that unmarked stored credential providers do not opt into metadata-only access. */
   @Test
-  public void testStaticCredentialProviders() {
-    Assertions.assertInstanceOf(SupportsStaticCredential.class, new JdbcCredentialProvider());
-    Assertions.assertInstanceOf(
-        SupportsStaticCredential.class, new AwsSecretKeyCredentialProvider());
-    Assertions.assertInstanceOf(
-        SupportsStaticCredential.class, new DlfSecretKeyCredentialProvider());
+  public void testStoredCredentialProvidersAreNotDynamic() {
+    Assertions.assertFalse(new JdbcCredentialProvider() instanceof SupportsDynamicCredential);
+    Assertions.assertFalse(
+        new AwsSecretKeyCredentialProvider() instanceof SupportsDynamicCredential);
+    Assertions.assertFalse(
+        new DlfSecretKeyCredentialProvider() instanceof SupportsDynamicCredential);
   }
 
   @Test

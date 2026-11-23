@@ -24,7 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
 /** Generate JDBC user and password credentials to access JDBC backend services. */
-public class JdbcCredentialProvider implements SupportsStaticCredential {
+public class JdbcCredentialProvider implements CredentialProvider {
 
   private String jdbcUser;
   private String jdbcPassword;

@@ -46,18 +46,18 @@ public class TestCredentialAuthorizationExecutor {
   /**
    * Checks that an unconfigured secondary expression never grants access to static providers.
    *
-   * @param hasStatic whether the catalog contains static providers
+   * @param onlyDynamic whether all configured providers explicitly support dynamic credentials
    * @throws Exception if authorization fails unexpectedly
    */
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
-  public void testUnconfiguredStaticPrivilegeExpression(boolean hasStatic) throws Exception {
+  public void testUnconfiguredStaticPrivilegeExpression(boolean onlyDynamic) throws Exception {
     NameIdentifier catalog = NameIdentifier.of("metalake", "catalog");
     GravitinoAuthorizerProvider provider = mock(GravitinoAuthorizerProvider.class);
     when(provider.getGravitinoAuthorizer()).thenReturn(mock(GravitinoAuthorizer.class));
     CatalogManager manager = mock(CatalogManager.class);
     CatalogCredentialManager credentials = mock(CatalogCredentialManager.class);
-    when(credentials.hasStaticCredentialProviders()).thenReturn(hasStatic);
+    when(credentials.hasOnlyDynamicCredentialProviders()).thenReturn(onlyDynamic);
     BaseCatalog<?> baseCatalog = mock(BaseCatalog.class);
     when(baseCatalog.catalogCredentialManager()).thenReturn(credentials);
     when(manager.doWithCatalog(any(), any()))
@@ -82,7 +82,7 @@ public class TestCredentialAuthorizationExecutor {
               "false",
               ExpressionCondition.NEVER);
 
-      Assertions.assertEquals(!hasStatic, executor.execute(new AuthorizationRequestContext()));
+      Assertions.assertEquals(onlyDynamic, executor.execute(new AuthorizationRequestContext()));
     }
   }
 }

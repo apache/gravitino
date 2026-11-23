@@ -20,11 +20,14 @@
 package org.apache.gravitino.credential;
 
 /**
- * Marks a provider that returns stored static credentials rather than issuing dynamic credentials.
+ * Marks a provider that issues dynamic credentials without exposing stored source credentials.
  *
- * <p>Catalog credential authorization requires static-secret privileges for these providers.
- * Providers returning source passwords, access keys, or other stored credentials must implement
- * this interface. Providers without this capability retain the existing credential-vending
- * behavior.
+ * <p>Catalog credential requests containing only providers with this capability require metadata
+ * access without static-secret privileges. Implementations must not return stored passwords, access
+ * keys, or other source credentials. Dynamic credentials must respect the authorization context;
+ * providers requiring storage paths must return no credentials for a pathless catalog request.
+ *
+ * <p>Providers without this capability retain the existing catalog secret-privilege checks,
+ * including implementations compiled against an earlier version of the credential provider SPI.
  */
-public interface SupportsStaticCredential extends CredentialProvider {}
+public interface SupportsDynamicCredential extends CredentialProvider {}

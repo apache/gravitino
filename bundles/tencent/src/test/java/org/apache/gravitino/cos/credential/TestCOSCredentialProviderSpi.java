@@ -23,7 +23,7 @@ import java.util.HashSet;
 import java.util.ServiceLoader;
 import java.util.Set;
 import org.apache.gravitino.credential.CredentialProvider;
-import org.apache.gravitino.credential.SupportsStaticCredential;
+import org.apache.gravitino.credential.SupportsDynamicCredential;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -36,11 +36,11 @@ import org.junit.jupiter.api.Test;
  */
 public class TestCOSCredentialProviderSpi {
 
-  /** Checks which providers declare static credential support. */
+  /** Checks that only token providers declare dynamic credential support. */
   @Test
-  public void testStaticCredentialCapability() {
-    Assertions.assertFalse(new COSTokenProvider() instanceof SupportsStaticCredential);
-    Assertions.assertInstanceOf(SupportsStaticCredential.class, new COSSecretKeyProvider());
+  public void testDynamicCredentialCapability() {
+    Assertions.assertInstanceOf(SupportsDynamicCredential.class, new COSTokenProvider());
+    Assertions.assertFalse(new COSSecretKeyProvider() instanceof SupportsDynamicCredential);
   }
 
   @Test

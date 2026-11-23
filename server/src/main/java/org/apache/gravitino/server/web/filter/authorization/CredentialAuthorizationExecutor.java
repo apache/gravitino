@@ -29,7 +29,7 @@ import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 
-/** Authorizes credential retrieval using metadata access and static-provider privileges. */
+/** Authorizes credential retrieval using metadata access and provider capabilities. */
 public class CredentialAuthorizationExecutor extends CommonAuthorizerExecutor {
   private final String staticCredentialExpression;
   @Nullable private final AuthorizationExpressionEvaluator staticCredentialEvaluator;
@@ -75,6 +75,7 @@ public class CredentialAuthorizationExecutor extends CommonAuthorizerExecutor {
         .catalogManager()
         .doWithCatalog(
             catalog,
-            baseCatalog -> !baseCatalog.catalogCredentialManager().hasStaticCredentialProviders());
+            baseCatalog ->
+                baseCatalog.catalogCredentialManager().hasOnlyDynamicCredentialProviders());
   }
 }

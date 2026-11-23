@@ -23,11 +23,11 @@ import java.util.Map;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialContext;
-import org.apache.gravitino.credential.SupportsStaticCredential;
+import org.apache.gravitino.credential.CredentialProvider;
 import org.apache.gravitino.credential.config.AzureCredentialConfig;
 
 /** Generates Azure account key to access data. */
-public class AzureAccountKeyProvider implements SupportsStaticCredential {
+public class AzureAccountKeyProvider implements CredentialProvider {
   private String accountName;
   private String accountKey;
 

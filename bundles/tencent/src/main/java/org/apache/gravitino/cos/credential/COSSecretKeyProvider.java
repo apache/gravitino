@@ -23,11 +23,11 @@ import java.util.Map;
 import org.apache.gravitino.credential.COSSecretKeyCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialContext;
-import org.apache.gravitino.credential.SupportsStaticCredential;
+import org.apache.gravitino.credential.CredentialProvider;
 import org.apache.gravitino.credential.config.COSCredentialConfig;
 
 /** Generate COS access key and secret key to access Tencent Cloud COS data. */
-public class COSSecretKeyProvider implements SupportsStaticCredential {
+public class COSSecretKeyProvider implements CredentialProvider {
 
   private String accessKey;
   private String secretKey;

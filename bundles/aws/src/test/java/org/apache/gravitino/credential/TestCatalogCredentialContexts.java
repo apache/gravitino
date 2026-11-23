@@ -69,7 +69,7 @@ public class TestCatalogCredentialContexts {
       Assertions.assertInstanceOf(
           S3TokenProvider.class,
           fixture.manager.getCredentialProvider(S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE).get());
-      Assertions.assertFalse(fixture.manager.hasStaticCredentialProviders());
+      Assertions.assertTrue(fixture.manager.hasOnlyDynamicCredentialProviders());
       Assertions.assertTrue(
           fixture
               .dispatcher
@@ -83,7 +83,7 @@ public class TestCatalogCredentialContexts {
   @Test
   public void testMixedCatalogProbeReturnsOnlyStaticCredentials() {
     try (Fixture fixture = new Fixture(true)) {
-      Assertions.assertTrue(fixture.manager.hasStaticCredentialProviders());
+      Assertions.assertFalse(fixture.manager.hasOnlyDynamicCredentialProviders());
       List<Credential> credentials =
           fixture.dispatcher.getCredentials(fixture.catalog, CATALOG, CredentialPrivilege.READ);
       Assertions.assertEquals(1, credentials.size());

@@ -21,7 +21,7 @@ package org.apache.gravitino.abs.credential;
 
 import org.apache.gravitino.credential.ADLSTokenCredential;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
-import org.apache.gravitino.credential.SupportsStaticCredential;
+import org.apache.gravitino.credential.SupportsDynamicCredential;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -30,12 +30,12 @@ public class TestCredentialProvider {
   @Test
   void testCredentialProviderType() {
     ADLSTokenProvider adlsTokenProvider = new ADLSTokenProvider();
-    Assertions.assertFalse(adlsTokenProvider instanceof SupportsStaticCredential);
+    Assertions.assertInstanceOf(SupportsDynamicCredential.class, adlsTokenProvider);
     Assertions.assertEquals(
         ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE, adlsTokenProvider.credentialType());
 
     AzureAccountKeyProvider azureAccountKeyProvider = new AzureAccountKeyProvider();
-    Assertions.assertInstanceOf(SupportsStaticCredential.class, azureAccountKeyProvider);
+    Assertions.assertFalse(azureAccountKeyProvider instanceof SupportsDynamicCredential);
     Assertions.assertEquals(
         AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE,
         azureAccountKeyProvider.credentialType());

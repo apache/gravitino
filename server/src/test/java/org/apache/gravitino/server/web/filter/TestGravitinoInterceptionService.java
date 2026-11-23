@@ -43,6 +43,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
@@ -69,7 +70,11 @@ import org.apache.gravitino.catalog.SemanticModelDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.credential.CatalogCredentialContext;
 import org.apache.gravitino.credential.CatalogCredentialManager;
+import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.credential.JdbcCredentialProvider;
+import org.apache.gravitino.credential.SupportsDynamicCredential;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
 import org.apache.gravitino.dto.requests.JobRunRequest;
@@ -156,6 +161,18 @@ import org.mockito.MockedStatic;
 
 /** Test for {@link GravitinoInterceptionService}. */
 public class TestGravitinoInterceptionService {
+
+  /**
+   * Models an existing custom provider that returns stored credentials without a capability marker.
+   */
+  public static class LegacyStaticCredentialProvider extends JdbcCredentialProvider {
+    private static final String CREDENTIAL_TYPE = "legacy-static";
+
+    @Override
+    public String credentialType() {
+      return CREDENTIAL_TYPE;
+    }
+  }
 
   @AfterEach
   public void clearRequestContext() {
@@ -252,6 +269,64 @@ public class TestGravitinoInterceptionService {
             credentialCatalogManager(providers))) {
       assertEquals(200, response.getStatus());
       verify(invocation).proceed();
+    }
+  }
+
+  /**
+   * Checks that a custom provider loaded through the unchanged SPI retains secret protection.
+   *
+   * @param useSecrets whether the caller may use secrets
+   * @param includeSecrets whether the caller may receive credential secrets
+   * @throws Throwable if the intercepted invocation fails unexpectedly
+   */
+  @ParameterizedTest
+  @CsvSource({"false,false", "false,true", "true,false", "true,true"})
+  public void testLegacyStaticProviderRequiresBothSecretPrivileges(
+      boolean useSecrets, boolean includeSecrets) throws Throwable {
+    Map<String, String> properties =
+        Map.of(
+            "credential-providers",
+            LegacyStaticCredentialProvider.CREDENTIAL_TYPE,
+            JdbcCredential.GRAVITINO_JDBC_USER,
+            "legacy-user",
+            JdbcCredential.GRAVITINO_JDBC_PASSWORD,
+            "legacy-password");
+    try (CatalogCredentialManager credentials =
+        spy(new CatalogCredentialManager("testCatalog", properties))) {
+      Assertions.assertInstanceOf(
+          LegacyStaticCredentialProvider.class,
+          credentials.getCredentialProvider(LegacyStaticCredentialProvider.CREDENTIAL_TYPE).get());
+      Assertions.assertFalse(
+          credentials.getCredentialProvider(LegacyStaticCredentialProvider.CREDENTIAL_TYPE).get()
+              instanceof SupportsDynamicCredential);
+      Assertions.assertFalse(credentials.hasOnlyDynamicCredentialProviders());
+      MethodInvocation invocation = credentialInvocation("catalog");
+      when(invocation.proceed())
+          .thenAnswer(
+              ignored -> {
+                JdbcCredential credential =
+                    Assertions.assertInstanceOf(
+                        JdbcCredential.class,
+                        credentials
+                            .getCredential(
+                                LegacyStaticCredentialProvider.CREDENTIAL_TYPE,
+                                new CatalogCredentialContext("tester"))
+                            .get());
+                Assertions.assertEquals("legacy-user", credential.jdbcUser());
+                Assertions.assertEquals("legacy-password", credential.jdbcPassword());
+                return Utils.ok("ok");
+              });
+      boolean authorized = useSecrets && includeSecrets;
+      try (Response response =
+          invokeWithAuthorizer(
+              credentialAuthorizer(useSecrets, includeSecrets),
+              mock(EventBus.class),
+              invocation,
+              credentialCatalogManager(credentials))) {
+        assertEquals(authorized ? 200 : 403, response.getStatus());
+      }
+      verify(invocation, times(authorized ? 1 : 0)).proceed();
+      verify(credentials, times(authorized ? 1 : 0)).getCredential(any(), any());
     }
   }
 
@@ -2432,12 +2507,16 @@ public class TestGravitinoInterceptionService {
   }
 
   private CatalogManager credentialCatalogManager(String providers) {
+    CatalogCredentialManager credentials = mock(CatalogCredentialManager.class);
+    when(credentials.hasOnlyDynamicCredentialProviders())
+        .thenReturn(providers.isEmpty() || providers.equals("custom-session"));
+    return credentialCatalogManager(credentials);
+  }
+
+  private CatalogManager credentialCatalogManager(CatalogCredentialManager credentials) {
     CatalogManager manager = mock(CatalogManager.class);
     BaseCatalog<?> catalog = mock(BaseCatalog.class);
-    CatalogCredentialManager credentials = mock(CatalogCredentialManager.class);
     when(catalog.catalogCredentialManager()).thenReturn(credentials);
-    when(credentials.hasStaticCredentialProviders())
-        .thenReturn(providers.contains("custom-stored"));
     when(manager.doWithCatalog(any(), any()))
         .thenAnswer(
             invocation -> {

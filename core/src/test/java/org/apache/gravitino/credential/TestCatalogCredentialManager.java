@@ -33,12 +33,12 @@ public class TestCatalogCredentialManager {
   /**
    * Checks capability queries against real configured providers, including an empty catalog.
    *
-   * @param dynamic whether an unmarked provider is configured
+   * @param dynamic whether an explicitly dynamic provider is configured
    * @param stored whether a static provider is configured
    */
   @ParameterizedTest
   @CsvSource({"false,false", "false,true", "true,false", "true,true"})
-  public void testHasStaticCredentialProviders(boolean dynamic, boolean stored) {
+  public void testHasOnlyDynamicCredentialProviders(boolean dynamic, boolean stored) {
     List<String> providers = new ArrayList<>();
     if (dynamic) {
       providers.add(DummyCredentialProvider.CREDENTIAL_TYPE);
@@ -52,7 +52,7 @@ public class TestCatalogCredentialManager {
             JdbcCredential.GRAVITINO_JDBC_USER, "user",
             JdbcCredential.GRAVITINO_JDBC_PASSWORD, "password");
     try (CatalogCredentialManager manager = new CatalogCredentialManager("catalog", properties)) {
-      Assertions.assertEquals(stored, manager.hasStaticCredentialProviders());
+      Assertions.assertEquals(!stored, manager.hasOnlyDynamicCredentialProviders());
     }
   }
 

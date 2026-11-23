@@ -295,9 +295,10 @@ writing them takes `MODIFY_TABLE`. Model versions follow the model: `USE_MODEL` 
 alter or delete. Fetching plaintext secrets (`getSecrets`) requires owning the metalake or holding
 `USE_SECRETS`. Cloud access-key pairs are included only when the caller is the metalake owner or also
 holds `INCLUDE_CREDENTIAL_SECRETS`. Catalog credential vending (`getCredentials`) requires metadata
-access. If any configured provider supplies static credentials, the catalog request additionally
-requires both `USE_SECRETS` and `INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership. Mixed static
-and dynamic configurations follow the same rule; catalog requests do not partially return credentials.
+access. Unless every configured provider explicitly implements `SupportsDynamicCredential`, the
+catalog request additionally requires both `USE_SECRETS` and `INCLUDE_CREDENTIAL_SECRETS`, or
+metalake ownership. Unmarked providers retain these checks, including existing custom providers
+and mixed dynamic and unmarked configurations. Catalog requests do not partially return credentials.
 Catalog requests carry no storage path. Built-in path-only token providers therefore return no
 catalog credentials, and a token-only catalog probe succeeds with an empty result. Tokens are
 generated through the existing path-based fileset and Iceberg REST vending flows, with the
@@ -305,10 +306,13 @@ authorized paths and storage privileges. Catalogs with no credentials also retur
 Callers who can load the object but lack `USE_SECRETS` receive an empty `getSecrets` result rather
 than a forbidden error.
 
-Credential providers that return stored passwords, access keys, or other static credentials must
-implement `org.apache.gravitino.credential.SupportsStaticCredential`. Providers without this marker
-retain the existing credential-vending behavior. Provider authorization happens before credentials
-are generated, including for mixed-provider catalogs.
+Credential providers that issue dynamic credentials without returning stored source credentials can
+opt into metadata-only catalog access by implementing
+`org.apache.gravitino.credential.SupportsDynamicCredential`. These providers must respect the
+supplied authorization context. Built-in token providers implement this interface; custom dynamic
+providers must explicitly add it to receive the same exemption. Existing providers without the marker
+continue to load through the unchanged SPI and retain secret-privilege checks. Provider authorization
+happens before credentials are generated, including for mixed-provider catalogs.
 
 The View row applies to metadata operations through both the native Gravitino REST API and the
 Iceberg REST Catalog when authorization is enabled. Listing first requires access to the schema and

@@ -68,13 +68,14 @@ public class CatalogCredentialManager implements Closeable {
   }
 
   /**
-   * Returns whether a configured provider supplies static credentials.
+   * Returns whether every configured provider explicitly supports dynamic credentials.
    *
-   * @return true if at least one configured provider supplies static credentials
+   * @return true if all configured providers support dynamic credentials, or no provider is
+   *     configured
    */
-  public boolean hasStaticCredentialProviders() {
+  public boolean hasOnlyDynamicCredentialProviders() {
     return credentialProviders.values().stream()
-        .anyMatch(SupportsStaticCredential.class::isInstance);
+        .allMatch(SupportsDynamicCredential.class::isInstance);
   }
 
   /**
