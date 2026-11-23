@@ -127,7 +127,9 @@ public final class GlossaryTermMetaService {
     }
   }
 
-  /** Loads a definition and its synonyms from one statement snapshot without row locks. */
+  /**
+   * Loads a definition and its synonyms and domains from one statement snapshot without row locks.
+   */
   public GlossaryTermEntity get(NameIdentifier ident) {
     return getWithMetalakeId(ident).term();
   }
@@ -170,7 +172,7 @@ public final class GlossaryTermMetaService {
         });
   }
 
-  /** Lists definitions and synonyms from one statement snapshot without row locks. */
+  /** Lists definitions, synonyms and domains from one statement snapshot without row locks. */
   public List<GlossaryTermEntity> list(Namespace ns) {
     return definitions(ns, readRows(ns, null, null));
   }
@@ -480,17 +482,19 @@ public final class GlossaryTermMetaService {
     }
     Map<Long, GlossaryTermPO> definitions = new LinkedHashMap<>();
     Map<Long, List<String>> synonyms = new LinkedHashMap<>();
+    Map<Long, List<String>> domains = new LinkedHashMap<>();
     for (GlossaryTermSnapshotPO row : rows) {
       definitions.putIfAbsent(row.getTermId(), row);
       List<String> values = synonyms.computeIfAbsent(row.getTermId(), ignored -> new ArrayList<>());
       if (row.getSynonym() != null) {
         values.add(row.getSynonym());
       }
+      if (row.getDomainName() != null) {
+        domains
+            .computeIfAbsent(row.getTermId(), ignored -> new ArrayList<>())
+            .add(row.getDomainName());
+      }
     }
-    // Read membership in the caller's session, so it comes from the same snapshot.
-    Map<Long, List<String>> domains =
-        GlossaryTermDomainService.getInstance()
-            .domainNames(rows.get(0).getMetalakeId(), definitions.keySet());
     List<GlossaryTermEntity> result = new ArrayList<>();
     definitions.forEach(
         (id, row) -> result.add(fromPO(row, synonyms.get(id), domains.get(id), ns)));

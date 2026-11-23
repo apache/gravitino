@@ -48,6 +48,7 @@ import org.apache.gravitino.storage.relational.RelationalEntityStoreIdResolver;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermDomainRelMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
+import org.apache.gravitino.storage.relational.po.GlossaryTermSnapshotPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -505,6 +506,38 @@ public class TestGlossaryTermMetaService extends TestJDBCBackend {
     Assertions.assertArrayEquals(one, service.getByIds(NS, 100, Set.of(101L)).get(0).domains());
     Assertions.assertArrayEquals(
         one, service.withLockedTerm(ident("One"), false, t -> t.orElseThrow().domains()));
+  }
+
+  /** A read-committed caller receives all details from one statement without multiplying rows. */
+  @TestTemplate
+  public void testSynonymsAndDomainsShareStatementSnapshot() throws Exception {
+    setupMetalake();
+    service.insert(term(101, "One").withSynonyms(new String[] {"First", "Second"}).build(), false);
+    for (String name : List.of("Finance", "Retail", "Sales")) {
+      long id = domain(name);
+      SessionUtils.doWithCommit(
+          GlossaryTermDomainRelMapper.class, mapper -> mapper.insert(100, 101, id));
+    }
+    List<GlossaryTermSnapshotPO> rows =
+        SessionUtils.getWithoutCommit(
+            GlossaryTermMetaMapper.class,
+            mapper -> mapper.snapshot(100, "glossary", GlossaryTermNames.key("One")));
+    Assertions.assertEquals(5, rows.size());
+    Assertions.assertEquals(
+        List.of("Finance", "Retail", "Sales"),
+        rows.stream()
+            .filter(row -> row.getDomainName() != null)
+            .map(GlossaryTermSnapshotPO::getDomainName)
+            .toList());
+    Assertions.assertEquals(
+        List.of("First", "Second"),
+        rows.stream()
+            .filter(row -> row.getSynonym() != null)
+            .map(GlossaryTermSnapshotPO::getSynonym)
+            .toList());
+    GlossaryTermEntity term = service.get(ident("One"));
+    Assertions.assertArrayEquals(new String[] {"First", "Second"}, term.synonyms());
+    Assertions.assertArrayEquals(new String[] {"Finance", "Retail", "Sales"}, term.domains());
   }
 
   /** Definition writes never change membership, whatever domains the entity carries. */

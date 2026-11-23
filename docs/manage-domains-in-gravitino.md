@@ -282,8 +282,11 @@ draft = domain.unpublish()
 
 ### Delete a Domain
 
-Delete or detach children before deleting their parent. Members alone do not prevent deletion.
-The operation keeps backing tags and object assignments and returns false if the domain is absent.
+Delete or detach subdomains and remove glossary term memberships before deleting a domain.
+A term owner with `CREATE_DEFINITION` or a glossary manager with `MANAGE_DEFINITIONS` can remove
+membership from a term they can edit in a domain they can access. Domain deletion returns HTTP 409
+while any glossary term belongs to the domain, including drafts hidden from the domain manager.
+Tagged objects, backing tags and tag assignments survive deletion. An absent domain returns false.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -476,11 +479,11 @@ detached = child.detach_from_parent()
 
 Creation always requires an explicit backing tag:
 
-| Intent | Java | Python | REST `backingTag` |
-| --- | --- | --- | --- |
-| Create a new valueless tag | `TagValue.noValue("finance"), true` | `TagValue("finance"), True` | `{"name":"finance","create":true}` |
-| Bind an existing tag, any assignment | `TagValue.noValue("department"), false` | `TagValue("department"), False` | `{"name":"department","create":false}` |
-| Bind an existing tag value | `TagValue.of("department", "finance"), false` | `TagValue("department", "finance"), False` | `{"name":"department","value":"finance","create":false}` |
+| Intent                               | Java                                          | Python                                     | REST `backingTag`                                        |
+| ---                                  | ---                                           | ---                                        | ---                                                      |
+| Create a new valueless tag           | `TagValue.noValue("finance"), true`           | `TagValue("finance"), True`                | `{"name":"finance","create":true}`                       |
+| Bind an existing tag, any assignment | `TagValue.noValue("department"), false`       | `TagValue("department"), False`            | `{"name":"department","create":false}`                   |
+| Bind an existing tag value           | `TagValue.of("department", "finance"), false` | `TagValue("department", "finance"), False` | `{"name":"department","value":"finance","create":false}` |
 
 New backing tags allow no values and are owned by the creator. Creation never implicitly adopts an
 existing tag: `create=true` with an existing name conflicts. Supplying a value with `create=true` is
@@ -1000,15 +1003,15 @@ unsafe segments before sending a request; the server enforces the full naming ru
 Backing tags, metadata object names and `nameContains` search text have separate rules.
 Encode metadata path parameters individually and supply query values with `--data-urlencode`.
 
-| HTTP status | Typical Domain behavior |
-| --- | --- |
-| 200 | Success with `code: 0`; empty queries return empty arrays; deleting an absent domain returns `dropped: false`. |
-| 400 | Invalid request: invalid domain names or filters, unsupported member types, illegal hierarchy/status transition, disallowed tag value, or a value supplied while creating a new backing tag. |
-| 403 | Insufficient permission on a published domain, a required backing tag, or a reverse-lookup object. |
-| 404 | Missing metalake/domain/parent/tag/object, or a draft hidden from the caller. |
-| 409 | Duplicate domain/tag name, backing-tag binding conflict, deleting a parent with children, disabled metalake, or an optimistic lock conflict during domain alteration or deletion. |
-| 415 | Unsupported request Content-Type; the error response uses `application/json`. |
-| 5xx | Server failure; inspect the error response and server log. |
+| HTTP status | Typical Domain behavior                                                                                                                                                                               |
+| ---         | ---                                                                                                                                                                                                   |
+| 200         | Success with `code: 0`; empty queries return empty arrays; deleting an absent domain returns `dropped: false`.                                                                                        |
+| 400         | Invalid request: invalid domain names or filters, unsupported member types, illegal hierarchy/status transition, disallowed tag value, or a value supplied while creating a new backing tag.          |
+| 403         | Insufficient permission on a published domain, a required backing tag, or a reverse-lookup object.                                                                                                    |
+| 404         | Missing metalake/domain/parent/tag/object, or a draft hidden from the caller.                                                                                                                         |
+| 409         | Duplicate domain/tag name, backing-tag binding conflict, deleting a domain with subdomains or glossary terms, disabled metalake, or an optimistic lock conflict during domain alteration or deletion. |
+| 415         | Unsupported request Content-Type; the error response uses `application/json`.                                                                                                                         |
+| 5xx         | Server failure; inspect the error response and server log.                                                                                                                                            |
 
 Authentication failures follow the configured authenticator. The JSON error response contains the
 exception type and message; do not infer authorization from empty lists alone. Validation and

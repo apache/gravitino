@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.service;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -29,7 +30,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.domain.Domain;
-import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -52,7 +53,6 @@ public class TestGlossaryTermDomainService extends TestJDBCBackend {
       Namespace.of(LAKE, Entity.SYSTEM_CATALOG_RESERVED_NAME, "glossary_term");
   private final GlossaryTermDomainService service = GlossaryTermDomainService.getInstance();
   private long sales;
-  private long retail;
   private long finance;
 
   /** Every live membership row points at a live term and a live domain of the same metalake. */
@@ -109,26 +109,38 @@ public class TestGlossaryTermDomainService extends TestJDBCBackend {
   @TestTemplate
   public void testLockDomainRejectsMissingAndDeleted() throws Exception {
     setup();
-    DomainPO locked = read(() -> service.lockDomain(LAKE_ID, "Sales"));
+    DomainPO locked =
+        read(() -> service.lockDomains(LAKE_ID, Set.of(), Set.of("Sales"))).get(sales);
     Assertions.assertEquals(sales, locked.domainId());
     Assertions.assertThrows(
-        NoSuchEntityException.class, () -> read(() -> service.lockDomain(LAKE_ID, "NoSuch")));
+        NoSuchDomainException.class,
+        () -> read(() -> service.lockDomains(LAKE_ID, Set.of(), Set.of("NoSuch"))));
     Assertions.assertThrows(
-        NoSuchEntityException.class, () -> read(() -> service.lockDomain(999L, "Sales")));
+        NoSuchDomainException.class,
+        () -> read(() -> service.lockDomains(999L, Set.of(), Set.of("Sales"))));
     Assertions.assertTrue(
         DomainMetaService.getInstance()
             .deleteDomain(NameIdentifier.of(NamespaceUtil.ofDomain(LAKE), "Finance")));
     Assertions.assertThrows(
-        NoSuchEntityException.class, () -> read(() -> service.lockDomain(LAKE_ID, "Finance")));
+        NoSuchDomainException.class,
+        () -> read(() -> service.lockDomains(LAKE_ID, Set.of(), Set.of("Finance"))));
   }
 
   @TestTemplate
-  public void testSubdomains() throws Exception {
+  public void testFilterTermsAcrossDomainBatches() throws Exception {
     setup();
+    run(() -> service.add(LAKE_ID, 102, sales));
+    run(() -> service.add(LAKE_ID, 101, sales));
+    run(() -> service.add(LAKE_ID, 101, finance));
+    Set<Long> scope = new LinkedHashSet<>();
+    scope.add(sales);
+    for (long id = 1; id <= 500; id++) {
+      scope.add(-id);
+    }
+    scope.add(finance);
     Assertions.assertEquals(
-        List.of(retail),
-        read(() -> service.subdomains(LAKE_ID, sales)).stream().map(DomainPO::domainId).toList());
-    Assertions.assertTrue(read(() -> service.subdomains(LAKE_ID, retail)).isEmpty());
+        List.of(101L, 102L), List.copyOf(read(() -> service.termIds(LAKE_ID, scope))));
+    Assertions.assertTrue(read(() -> service.termIds(LAKE_ID, Set.of())).isEmpty());
   }
 
   private void setup() throws Exception {
@@ -144,13 +156,7 @@ public class TestGlossaryTermDomainService extends TestJDBCBackend {
           false);
     }
     sales = domain("Sales");
-    retail = domain("Retail");
     finance = domain("Finance");
-    DomainRelService.getInstance()
-        .insertDomainRel(
-            NameIdentifier.of(NamespaceUtil.ofDomain(LAKE), "Retail"),
-            NameIdentifier.of(NamespaceUtil.ofDomain(LAKE), "Sales"),
-            AUDIT_INFO);
   }
 
   private long domain(String name) throws Exception {

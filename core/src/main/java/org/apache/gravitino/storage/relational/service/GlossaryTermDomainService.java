@@ -23,14 +23,15 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import javax.annotation.Nullable;
-import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermDomainRelMapper;
 import org.apache.gravitino.storage.relational.po.DomainPO;
@@ -40,7 +41,7 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 /**
  * Explicit glossary term domain membership. Only the glossary term write path changes it. Every
  * method joins the caller's session. Writers hold the term row lock, and lock domain rows only
- * after every term row of the request, with {@link #lockDomain}.
+ * after every term row of the request, with {@link #lockDomains}.
  */
 public final class GlossaryTermDomainService {
   private static final int BATCH_SIZE = 500;
@@ -54,27 +55,40 @@ public final class GlossaryTermDomainService {
   }
 
   /**
-   * Resolves a live domain by name and locks its row for share until the caller's transaction ends,
-   * so a concurrent domain drop waits for this transaction or makes it fail.
-   *
-   * @param metalakeId The live metalake ID.
-   * @param name The domain name.
-   * @return The locked domain row.
-   * @throws NoSuchEntityException If the domain is missing, deleted, in another metalake, or
-   *     renamed after the name lookup.
+   * Locks existing member domains and domains named by an edit in ascending ID order. Existing
+   * memberships follow a rename. A request naming a domain that disappears or changes name before
+   * its row is locked must fail, even if another domain has taken that name.
    */
-  public DomainPO lockDomain(long metalakeId, String name) {
+  public Map<Long, DomainPO> lockDomains(
+      long metalakeId, Set<Long> members, Set<String> requestedNames) {
     return SessionUtils.getWithoutCommit(
         DomainMetaMapper.class,
         mapper -> {
-          DomainPO observed = mapper.selectDomainMetaByMetalakeIdAndName(metalakeId, name);
-          DomainPO locked =
-              observed == null ? null : mapper.selectDomainMetaByIdForShare(observed.domainId());
-          if (locked == null
-              || locked.deletedAt() != 0
-              || !Objects.equals(locked.metalakeId(), metalakeId)
-              || !Objects.equals(locked.domainName(), name)) {
-            throw new NoSuchEntityException("Domain %s does not exist", name);
+          Map<Long, String> requested = new HashMap<>();
+          Set<Long> ids = new TreeSet<>(members);
+          for (String name : requestedNames) {
+            DomainPO observed = mapper.selectDomainMetaByMetalakeIdAndName(metalakeId, name);
+            if (observed == null
+                || !name.equals(observed.domainName())
+                || requested.put(observed.domainId(), name) != null) {
+              throw new NoSuchDomainException("Domain %s does not exist", name);
+            }
+            ids.add(observed.domainId());
+          }
+          Map<Long, DomainPO> locked = new LinkedHashMap<>();
+          for (long id : ids) {
+            DomainPO row = mapper.selectDomainMetaByIdForShare(id);
+            String name = requested.get(id);
+            if (row == null
+                || row.deletedAt() != 0
+                || row.metalakeId() != metalakeId
+                || (name != null && !name.equals(row.domainName()))) {
+              if (name != null) {
+                throw new NoSuchDomainException("Domain %s does not exist", name);
+              }
+              throw new IllegalStateException("A glossary membership refers to a missing domain");
+            }
+            locked.put(id, row);
           }
           return locked;
         });
@@ -111,19 +125,6 @@ public final class GlossaryTermDomainService {
     return result;
   }
 
-  /** Returns the live domains of one term as domain ID to name, in ascending name order. */
-  public Map<Long, String> domainsOf(long metalakeId, long termId) {
-    Map<Long, String> result = new LinkedHashMap<>();
-    SessionUtils.doWithoutCommit(
-        GlossaryTermDomainRelMapper.class,
-        mapper -> {
-          for (GlossaryTermDomainRelPO row : mapper.listDomainNames(metalakeId, List.of(termId))) {
-            result.put(row.getDomainId(), row.getDomainName());
-          }
-        });
-    return result;
-  }
-
   /** Returns the live domain IDs of a term. */
   public Set<Long> domainIds(long termId) {
     return new HashSet<>(
@@ -131,42 +132,25 @@ public final class GlossaryTermDomainService {
             GlossaryTermDomainRelMapper.class, mapper -> mapper.listDomainIds(termId)));
   }
 
-  /** Returns the live member terms of the given domains. */
+  /** Returns the live member term IDs in ascending order for stable batched definition reads. */
   public Set<Long> termIds(long metalakeId, Set<Long> domainIds) {
-    if (domainIds.isEmpty()) {
-      return new HashSet<>();
-    }
-    return new HashSet<>(
-        SessionUtils.getWithoutCommit(
-            GlossaryTermDomainRelMapper.class,
-            mapper -> mapper.listTermIds(metalakeId, domainIds)));
-  }
-
-  /** Returns the live direct sub-domains of a domain, in ascending name order. */
-  public List<DomainPO> subdomains(long metalakeId, long domainId) {
-    List<Long> ids =
-        SessionUtils.getWithoutCommit(
-            GlossaryTermDomainRelMapper.class,
-            mapper -> mapper.listSubdomainIds(metalakeId, domainId));
-    List<DomainPO> result = new ArrayList<>();
-    SessionUtils.doWithoutCommit(
-        DomainMetaMapper.class,
-        mapper -> {
-          for (Long id : ids) {
-            DomainPO domain = mapper.selectDomainMetaById(id);
-            if (domain != null) {
-              result.add(domain);
+    Set<Long> result = new TreeSet<>();
+    if (!domainIds.isEmpty()) {
+      SessionUtils.doWithoutCommit(
+          GlossaryTermDomainRelMapper.class,
+          mapper -> {
+            for (List<Long> batch : Lists.partition(List.copyOf(domainIds), BATCH_SIZE)) {
+              result.addAll(mapper.listTermIds(metalakeId, batch));
             }
-          }
-        });
+          });
+    }
     return result;
   }
 
   /** Whether a domain still has live member terms. A plain read at read committed. */
   public boolean hasTerms(long domainId) {
     return SessionUtils.getWithoutCommit(
-            GlossaryTermDomainRelMapper.class, mapper -> mapper.countTerms(domainId))
-        > 0;
+        GlossaryTermDomainRelMapper.class, mapper -> mapper.hasTerms(domainId));
   }
 
   /** Adds a live membership row. The caller holds the term and domain locks. */

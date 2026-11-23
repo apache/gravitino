@@ -86,16 +86,10 @@ public interface GlossaryTermDomainRelMapper {
   List<Long> listTermIds(
       @Param("metalakeId") long metalakeId, @Param("domainIds") Collection<Long> domainIds);
 
-  /** Counts the live member terms of a domain. */
+  /** Returns whether a domain has a live member term. */
   @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
-  @SelectProvider(type = GlossaryTermDomainRelSQLProviderFactory.class, method = "countTerms")
-  int countTerms(@Param("domainId") long domainId);
-
-  /** Lists the live direct sub-domain IDs of a domain. */
-  @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
-  @SelectProvider(type = GlossaryTermDomainRelSQLProviderFactory.class, method = "listSubdomainIds")
-  List<Long> listSubdomainIds(
-      @Param("metalakeId") long metalakeId, @Param("domainId") long domainId);
+  @SelectProvider(type = GlossaryTermDomainRelSQLProviderFactory.class, method = "hasTerms")
+  boolean hasTerms(@Param("domainId") long domainId);
 
   /** Selects a bounded batch of retired rows for garbage collection. */
   @SelectProvider(type = GlossaryTermDomainRelSQLProviderFactory.class, method = "expired")

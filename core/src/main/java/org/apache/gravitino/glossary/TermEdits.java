@@ -61,8 +61,11 @@ final class TermEdits {
         .build();
   }
 
-  /** Returns a copy of a not yet persisted term with the given domain names. */
+  /** Projects domain names without changing the definition revision. */
   static GlossaryTermEntity withDomains(GlossaryTermEntity term, String[] domains) {
+    if (Arrays.equals(term.domains(), domains)) {
+      return term;
+    }
     return GlossaryTermEntity.builder()
         .withId(term.id())
         .withNamespace(term.namespace())

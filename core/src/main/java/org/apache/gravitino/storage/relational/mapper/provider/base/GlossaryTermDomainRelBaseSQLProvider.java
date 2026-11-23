@@ -21,7 +21,6 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import java.util.Collection;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.DomainRelMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermDomainRelMapper;
 import org.apache.gravitino.storage.relational.po.GlossaryTermDomainRelPO;
 import org.apache.ibatis.annotations.Param;
@@ -106,21 +105,11 @@ public class GlossaryTermDomainRelBaseSQLProvider {
         + "</foreach></script>";
   }
 
-  /** Counts the live member terms of a domain. */
-  public String countTerms(@Param("domainId") long domainId) {
-    return "SELECT COUNT(*) FROM " + TABLE + " WHERE domain_id=#{domainId} AND deleted_at=0";
-  }
-
-  /** Lists the live direct sub-domain IDs of a domain. */
-  public String listSubdomainIds(
-      @Param("metalakeId") long metalakeId, @Param("domainId") long domainId) {
-    return "SELECT r.child_id FROM "
-        + DomainRelMapper.DOMAIN_REL_TABLE_NAME
-        + " r JOIN "
-        + DomainMetaMapper.DOMAIN_TABLE_NAME
-        + " d ON d.domain_id=r.child_id AND d.deleted_at=0"
-        + " WHERE r.metalake_id=#{metalakeId} AND r.parent_id=#{domainId} AND r.deleted_at=0"
-        + " ORDER BY d.domain_name";
+  /** Returns whether a domain has a live member term. */
+  public String hasTerms(@Param("domainId") long domainId) {
+    return "SELECT EXISTS (SELECT 1 FROM "
+        + TABLE
+        + " WHERE domain_id=#{domainId} AND deleted_at=0)";
   }
 
   /** Selects a bounded batch of retired rows for garbage collection. */

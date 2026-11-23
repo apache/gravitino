@@ -115,7 +115,7 @@ public interface GlossaryTermMetaMapper {
   /** Executes purge within the current transaction. */
   @DeleteProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "purge")
   int purge(@Param("termId") long termId);
-  /** Reads definitions, synonyms and the live parent name in one snapshot without row locks. */
+  /** Reads definitions, synonyms, domains and the live parent name in one non-locking snapshot. */
   @SelectProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "snapshot")
   List<GlossaryTermSnapshotPO> snapshot(
       @Param("metalakeId") long metalakeId,

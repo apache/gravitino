@@ -21,6 +21,8 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.GlossaryTermDomainRelMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.po.GlossaryTermPO;
@@ -41,19 +43,30 @@ public class GlossaryTermMetaBaseSQLProvider {
           + "m.metalake_id AS metalakeId, t.definition AS definition, t.status AS status, "
           + "t.links AS links, t.source_ref AS sourceRef, t.properties AS properties, "
           + "t.audit_info AS auditInfo, t.current_version AS currentVersion, "
-          + "t.deleted_at AS deletedAt, s.synonym AS synonym FROM "
+          + "t.deleted_at AS deletedAt, s.synonym AS synonym, d.domain_name AS domainName FROM "
           + MetalakeMetaMapper.TABLE_NAME
           + " m LEFT JOIN "
           + GlossaryTermMetaMapper.TABLE_NAME
           + " t ON t.metalake_id=m.metalake_id AND t.deleted_at=0 ";
 
-  private static final String SNAPSHOT_SYNONYM_JOIN =
-      "LEFT JOIN "
+  // The two branches return synonyms and memberships separately. A term with S synonyms and D
+  // domains contributes max(1, S) + D rows in one statement, including at READ_COMMITTED.
+  private static final String SNAPSHOT_DETAILS =
+      "CROSS JOIN (SELECT 0 AS domain_row UNION ALL SELECT 1) kind "
+          + "LEFT JOIN "
           + GlossaryTermMetaMapper.SYNONYM_TABLE_NAME
-          + " s ON s.term_id=t.term_id "
-          + "AND s.metalake_id=t.metalake_id AND s.deleted_at=0 ";
-
-  private static final String SNAPSHOT_ORDER = " ORDER BY t.term_id,s.synonym_key</script>";
+          + " s ON kind.domain_row=0 AND s.term_id=t.term_id "
+          + "AND s.metalake_id=t.metalake_id AND s.deleted_at=0 "
+          + "LEFT JOIN "
+          + GlossaryTermDomainRelMapper.TABLE_NAME
+          + " r ON kind.domain_row=1 AND r.term_id=t.term_id "
+          + "AND r.metalake_id=t.metalake_id AND r.deleted_at=0 "
+          + "LEFT JOIN "
+          + DomainMetaMapper.DOMAIN_TABLE_NAME
+          + " d ON d.domain_id=r.domain_id AND d.metalake_id=r.metalake_id AND d.deleted_at=0 "
+          + "WHERE m.metalake_id=#{metalakeId} AND m.metalake_name=#{metalakeName} AND m.deleted_at=0 "
+          + "AND (kind.domain_row=0 OR d.domain_id IS NOT NULL) "
+          + "ORDER BY t.term_id,kind.domain_row,s.synonym_key,d.domain_name</script>";
 
   /** Locks a definition after the caller has fenced its metalake. */
   public String getForUpdate(@Param("metalakeId") long metalakeId, @Param("key") String key) {
@@ -188,11 +201,7 @@ public class GlossaryTermMetaBaseSQLProvider {
       @Param("metalakeId") long metalakeId,
       @Param("metalakeName") String metalakeName,
       @Param("key") @Nullable String key) {
-    return SNAPSHOT_SELECT
-        + (key == null ? "" : "AND t.name_key=#{key} ")
-        + SNAPSHOT_SYNONYM_JOIN
-        + "WHERE m.metalake_id=#{metalakeId} AND m.metalake_name=#{metalakeName} AND m.deleted_at=0"
-        + SNAPSHOT_ORDER;
+    return SNAPSHOT_SELECT + (key == null ? "" : "AND t.name_key=#{key} ") + SNAPSHOT_DETAILS;
   }
 
   /** Reads a bounded batch of live terms by ID. */
@@ -202,9 +211,7 @@ public class GlossaryTermMetaBaseSQLProvider {
       @Param("ids") List<Long> ids) {
     return SNAPSHOT_SELECT
         + "AND t.term_id IN <foreach item='id' collection='ids' open='(' close=')' separator=','>#{id}</foreach> "
-        + SNAPSHOT_SYNONYM_JOIN
-        + "WHERE m.metalake_id=#{metalakeId} AND m.metalake_name=#{metalakeName} AND m.deleted_at=0"
-        + SNAPSHOT_ORDER;
+        + SNAPSHOT_DETAILS;
   }
 
   /** Finds a different live term whose name matches one of the proposed synonym keys. */

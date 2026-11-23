@@ -30,11 +30,14 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.authorization.DomainAccess;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege.Name;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.GlossaryTermEntity;
+import org.apache.gravitino.storage.relational.service.DomainMetaService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -127,12 +130,23 @@ public final class GlossaryAccess {
         () -> effective(authorizer, principal, metalake, lake, Name.CREATE_DEFINITION, context),
         () -> effective(authorizer, principal, metalake, lake, Name.MANAGE_DEFINITIONS, context),
         id -> authorizer.isGlossaryTermOwner(principal, metalake, id, context),
-        domain ->
-            authorizer.canAccessDomain(
-                principal,
-                metalake,
-                MetadataObjects.of(null, domain, MetadataObject.Type.DOMAIN),
-                context));
+        name -> {
+          DomainEntity domain;
+          try {
+            domain =
+                DomainMetaService.getInstance()
+                    .getDomainByIdentifier(NameIdentifierUtil.ofDomain(metalake, name));
+          } catch (NoSuchEntityException absent) {
+            return false;
+          }
+          return DomainAccess.allowed(
+              authorizer,
+              principal,
+              metalake,
+              DomainAccess.scopes(metalake, domain),
+              DomainAccess.readPrivilege(domain),
+              context);
+        });
   }
 
   private static boolean effective(

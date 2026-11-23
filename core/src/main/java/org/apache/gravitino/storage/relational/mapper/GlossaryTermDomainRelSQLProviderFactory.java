@@ -91,15 +91,9 @@ public class GlossaryTermDomainRelSQLProviderFactory {
     return getProvider().listTermIds(metalakeId, domainIds);
   }
 
-  /** Delegates {@link GlossaryTermDomainRelBaseSQLProvider#countTerms}. */
-  public static String countTerms(@Param("domainId") long domainId) {
-    return getProvider().countTerms(domainId);
-  }
-
-  /** Delegates {@link GlossaryTermDomainRelBaseSQLProvider#listSubdomainIds}. */
-  public static String listSubdomainIds(
-      @Param("metalakeId") long metalakeId, @Param("domainId") long domainId) {
-    return getProvider().listSubdomainIds(metalakeId, domainId);
+  /** Delegates {@link GlossaryTermDomainRelBaseSQLProvider#hasTerms}. */
+  public static String hasTerms(@Param("domainId") long domainId) {
+    return getProvider().hasTerms(domainId);
   }
 
   /** Delegates {@link GlossaryTermDomainRelBaseSQLProvider#expired}. */

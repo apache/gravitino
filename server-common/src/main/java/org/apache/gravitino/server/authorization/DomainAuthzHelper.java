@@ -19,7 +19,6 @@
 package org.apache.gravitino.server.authorization;
 
 import java.security.Principal;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -33,6 +32,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.authorization.DomainAccess;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.domain.Domain;
@@ -83,16 +83,7 @@ public final class DomainAuthzHelper {
    * @return The metalake, parent and domain scopes.
    */
   public static List<MetadataObject> scopes(String metalake, @Nullable DomainEntity domain) {
-    List<MetadataObject> scopes = new ArrayList<>();
-    scopes.add(MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE));
-    if (domain != null) {
-      domain
-          .parent()
-          .ifPresent(
-              name -> scopes.add(MetadataObjects.of(null, name, MetadataObject.Type.DOMAIN)));
-      scopes.add(MetadataObjects.of(null, domain.name(), MetadataObject.Type.DOMAIN));
-    }
-    return scopes;
+    return DomainAccess.scopes(metalake, domain);
   }
 
   /**
@@ -114,22 +105,7 @@ public final class DomainAuthzHelper {
       List<MetadataObject> scopes,
       Privilege.Name privilege,
       AuthorizationRequestContext context) {
-    if (scopes.stream()
-        .anyMatch(scope -> authorizer.isOwner(principal, metalake, scope, context))) {
-      return true;
-    }
-    if (scopes.stream()
-        .anyMatch(scope -> authorizer.deny(principal, metalake, scope, privilege, context))) {
-      return false;
-    }
-    boolean granted =
-        scopes.stream()
-            .anyMatch(
-                scope -> authorizer.authorize(principal, metalake, scope, privilege, context));
-    return granted
-        || (privilege == Privilege.Name.USE_DOMAIN
-            && allowed(
-                authorizer, principal, metalake, scopes, Privilege.Name.MANAGE_DOMAIN, context));
+    return DomainAccess.allowed(authorizer, principal, metalake, scopes, privilege, context);
   }
 
   /**
@@ -406,13 +382,7 @@ public final class DomainAuthzHelper {
 
   private static boolean visible(
       String metalake, DomainEntity domain, AuthorizationRequestContext context) {
-    return allowed(
-        metalake,
-        domain,
-        domain.status() == Domain.Status.DRAFT
-            ? Privilege.Name.MANAGE_DOMAIN
-            : Privilege.Name.USE_DOMAIN,
-        context);
+    return allowed(metalake, domain, DomainAccess.readPrivilege(domain), context);
   }
 
   private static void requireVisible(

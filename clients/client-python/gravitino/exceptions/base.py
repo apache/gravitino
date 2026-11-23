@@ -360,4 +360,4 @@ class BackingTagAlreadyBoundException(AlreadyExistsException):
 
 
 class NonEmptyDomainException(NotEmptyException):
-    """A domain with subdomains cannot be deleted."""
+    """Raised when deleting a domain with subdomains or glossary terms."""

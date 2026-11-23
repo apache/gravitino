@@ -129,7 +129,8 @@ public interface GlossaryOperations {
    *     exist or is not visible to the caller.
    * @throws TermAlreadyExistsException If the term is renamed to the name of another term, or its
    *     source reference is set to the one of another term.
-   * @throws NotFoundException If a domain to add or remove does not exist or is not visible.
+   * @throws NotFoundException If a domain to add or remove is missing or is a draft hidden from the
+   *     caller.
    * @throws ForbiddenException If the caller can see the term but lacks the required edit or domain
    *     privilege.
    * @throws IllegalArgumentException If a change is not valid, for example a synonym that is the
@@ -165,7 +166,8 @@ public interface GlossaryOperations {
    * @return The altered term.
    * @throws NoSuchTermException If the term or a referenced term is missing or hidden.
    * @throws TermAlreadyExistsException If a name or source reference conflicts with another term.
-   * @throws NotFoundException If a domain to add or remove does not exist or is not visible.
+   * @throws NotFoundException If a domain to add or remove is missing or is a draft hidden from the
+   *     caller.
    * @throws ForbiddenException If the caller lacks edit or required domain access.
    * @throws IllegalArgumentException If a supported implementation receives a missing/malformed
    *     token or an invalid change.

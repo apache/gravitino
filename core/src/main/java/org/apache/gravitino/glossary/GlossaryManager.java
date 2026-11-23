@@ -48,11 +48,13 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.apache.gravitino.exceptions.TermAlreadyExistsException;
 import org.apache.gravitino.exceptions.TermVersionConflictException;
+import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.meta.GlossaryTermNames;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.po.DomainPO;
 import org.apache.gravitino.storage.relational.po.GlossaryTermRelPO;
+import org.apache.gravitino.storage.relational.service.DomainRelService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermDomainService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService.ScopedTerm;
@@ -216,14 +218,15 @@ public final class GlossaryManager {
           if (!access.canView()) {
             return new ArrayList<>();
           }
-          Set<Long> members =
-              domain == null
-                  ? null
-                  : DOMAINS.termIds(metalakeId, domainScope(metalakeId, domain, access));
-          List<GlossaryTermEntity> result =
-              terms.list(NamespaceUtil.ofGlossaryTerm(metalake), metalakeId);
-          result.removeIf(
-              term -> !access.canRead(term) || (members != null && !members.contains(term.id())));
+          Namespace ns = NamespaceUtil.ofGlossaryTerm(metalake);
+          List<GlossaryTermEntity> result;
+          if (domain == null) {
+            result = terms.list(ns, metalakeId);
+          } else {
+            Set<Long> scope = domainScope(metalake, metalakeId, domain, access);
+            result = terms.getByIds(ns, metalakeId, DOMAINS.termIds(metalakeId, scope));
+          }
+          result.removeIf(term -> !access.canRead(term));
           return visibleDomains(result, access);
         });
   }
@@ -291,7 +294,7 @@ public final class GlossaryManager {
               true,
               ignored -> {},
               (fresh, plan) -> {
-                TermDomains domains = planDomains(lake, term, domainEdits, access, true);
+                TermDomains domains = planDomains(lake, term, domainEdits, access);
                 GlossaryTermEntity created =
                     domains.changed() ? TermEdits.withDomains(term, domains.names()) : term;
                 terms.checkTermNames(created);
@@ -434,7 +437,7 @@ public final class GlossaryManager {
                             locked,
                             content.toArray(new TermChange[0]),
                             plan,
-                            planDomains(lake, locked, domainEdits, access, false)),
+                            planDomains(lake, locked, domainEdits, access)),
                         access));
           },
           missing -> {
@@ -452,9 +455,9 @@ public final class GlossaryManager {
           Preconditions.checkArgument(request.length > 0, "At least one term change is required");
           checkRevision(ident, before, conditional, token);
           TermDomains domains =
-              domainEdits.isEmpty()
+              domainEdits.isEmpty() && before.domains().length == 0
                   ? null
-                  : planDomains(lakeOf(ident), before, domainEdits, access, false);
+                  : planDomains(lakeOf(ident), before, domainEdits, access);
           return visibleDomains(
               applyChanges(ident, before, content.toArray(new TermChange[0]), null, domains),
               access);
@@ -498,6 +501,10 @@ public final class GlossaryManager {
       @Nullable TermRelations plan,
       @Nullable TermDomains domains) {
     boolean membership = domains != null && domains.changed();
+    if (domains != null && !membership) {
+      // A domain may have been renamed between the initial term read and its domain locks.
+      before = TermEdits.withDomains(before, domains.names());
+    }
     GlossaryTermEntity after =
         TermEdits.apply(
             before, request, plan != null && plan.changed(), membership ? domains.names() : null);
@@ -601,32 +608,37 @@ public final class GlossaryManager {
    * locked. A missing domain and a hidden draft domain report the same error.
    */
   private TermDomains planDomains(
-      long lake,
-      GlossaryTermEntity term,
-      List<TermDomains.Edit> edits,
-      GlossaryAccess access,
-      boolean creating) {
-    TermDomains plan =
-        new TermDomains(lake, term.id(), creating ? Map.of() : DOMAINS.domainsOf(lake, term.id()));
-    Map<String, DomainPO> locked = new HashMap<>();
-    for (String name : new TreeSet<>(edits.stream().map(TermDomains.Edit::domain).toList())) {
-      DomainPO domain;
-      try {
-        domain = DOMAINS.lockDomain(lake, name);
-      } catch (NoSuchEntityException missing) {
-        throw new NoSuchDomainException(missing, "Domain %s does not exist", name);
-      }
-      if (!access.canUseDomain(name)) {
-        if (Domain.Status.DRAFT.name().equals(domain.status())) {
-          throw new NoSuchDomainException("Domain %s does not exist", name);
-        }
-        throw new ForbiddenException("Cannot use domain %s", name);
-      }
-      locked.put(name, domain);
-    }
+      long lake, GlossaryTermEntity term, List<TermDomains.Edit> edits, GlossaryAccess access) {
+    Set<Long> members = term.domains().length == 0 ? Set.of() : DOMAINS.domainIds(term.id());
+    Set<String> requested = new TreeSet<>();
     for (TermDomains.Edit edit : edits) {
-      DomainPO domain = locked.get(edit.domain());
-      plan.edit(edit, domain.domainId(), domain.domainName());
+      requested.add(edit.domain());
+    }
+    if (members.isEmpty() && requested.isEmpty()) {
+      return new TermDomains(lake, term.id(), Map.of());
+    }
+    Map<Long, DomainPO> locked = DOMAINS.lockDomains(lake, members, requested);
+    Map<Long, String> current = new HashMap<>();
+    Map<String, DomainPO> targets = new HashMap<>();
+    for (DomainPO domain : locked.values()) {
+      String name = domain.domainName();
+      if (members.contains(domain.domainId())) {
+        current.put(domain.domainId(), name);
+      }
+      if (requested.contains(name)) {
+        if (!access.canUseDomain(name)) {
+          if (Domain.Status.DRAFT.name().equals(domain.status())) {
+            throw new NoSuchDomainException("Domain %s does not exist", name);
+          }
+          throw new ForbiddenException("Cannot use domain %s", name);
+        }
+        targets.put(name, domain);
+      }
+    }
+    TermDomains plan = new TermDomains(lake, term.id(), current);
+    for (TermDomains.Edit edit : edits) {
+      DomainPO target = targets.get(edit.domain());
+      plan.edit(edit, target.domainId(), target.domainName());
     }
     return plan;
   }
@@ -635,7 +647,8 @@ public final class GlossaryManager {
    * Resolves the domain scope of a list filter: the domain and its visible direct subdomains. A
    * missing domain and a hidden draft domain report the same error.
    */
-  private Set<Long> domainScope(long metalakeId, String name, GlossaryAccess access) {
+  private Set<Long> domainScope(
+      String metalake, long metalakeId, String name, GlossaryAccess access) {
     DomainPO domain = DOMAINS.findDomain(metalakeId, name);
     boolean visible = domain != null && access.canUseDomain(name);
     if (!visible && (domain == null || Domain.Status.DRAFT.name().equals(domain.status()))) {
@@ -646,9 +659,11 @@ public final class GlossaryManager {
     }
     Set<Long> scope = new HashSet<>();
     scope.add(domain.domainId());
-    for (DomainPO child : DOMAINS.subdomains(metalakeId, domain.domainId())) {
-      if (access.canUseDomain(child.domainName())) {
-        scope.add(child.domainId());
+    for (DomainEntity child :
+        DomainRelService.getInstance()
+            .listSubDomains(NameIdentifierUtil.ofDomain(metalake, domain.domainName()))) {
+      if (access.canUseDomain(child.name())) {
+        scope.add(child.id());
       }
     }
     return scope;

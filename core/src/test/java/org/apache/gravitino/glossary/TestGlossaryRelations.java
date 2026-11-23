@@ -22,6 +22,7 @@ package org.apache.gravitino.glossary;
 import static org.apache.gravitino.glossary.GlossaryManager.Direction.BROADER;
 import static org.apache.gravitino.glossary.GlossaryManager.Direction.NARROWER;
 import static org.apache.gravitino.glossary.GlossaryManager.Direction.RELATED;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -42,12 +43,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.apache.gravitino.exceptions.TermAlreadyExistsException;
 import org.apache.gravitino.exceptions.TermVersionConflictException;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
+import org.apache.gravitino.storage.relational.service.GlossaryDomainFixtures;
 import org.apache.gravitino.storage.relational.service.GlossaryInvariants;
 import org.apache.gravitino.storage.relational.service.GlossaryTermRelService.RelationType;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
@@ -430,10 +433,11 @@ class TestGlossaryRelations extends TestJDBCBackend {
     }
   }
 
-  /** Covers T5.9 and T5.16. */
+  /** Covers T5.9, T5.16 and T7.7. */
   @TestTemplate
   void testDeleteRacesMixedAlterAndCreateInBothOrders() throws Exception {
     createAndInsertMakeLake(LAKE);
+    GlossaryDomainFixtures.insertDomain(LAKE, "Sales", Domain.Status.PUBLISHED, null, AUDIT_INFO);
     for (boolean creating : List.of(false, true)) {
       for (boolean dropFirst : List.of(false, true)) {
         String suffix = "-" + creating + "-" + dropFirst;
@@ -459,10 +463,16 @@ class TestGlossaryRelations extends TestJDBCBackend {
         Consumer<GlossaryManager> write =
             editor -> {
               if (creating)
-                editor.createTerm(LAKE, TermSpec.builder(renamed).withBroader(target).build());
+                editor.createTerm(
+                    LAKE,
+                    TermSpec.builder(renamed).withBroader(target).withDomains("Sales").build());
               else
                 editor.alterTerm(
-                    LAKE, source, TermChange.rename(renamed), TermChange.addBroader(target));
+                    LAKE,
+                    source,
+                    TermChange.rename(renamed),
+                    TermChange.addBroader(target),
+                    TermChange.addDomain("Sales"));
             };
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
@@ -488,11 +498,16 @@ class TestGlossaryRelations extends TestJDBCBackend {
           second.get(20, TimeUnit.SECONDS);
           if (dropFirst) {
             assertThrows(NoSuchTermException.class, () -> get(renamed));
-            if (!creating) assertEquals(1, get(source).version());
+            if (!creating) {
+              assertEquals(1, get(source).version());
+              assertArrayEquals(new String[0], get(source).domains());
+            }
           } else {
             assertTrue(manager.listRelations(LAKE, renamed, BROADER, false, null).isEmpty());
             assertEquals(creating ? 2 : 3, get(renamed).version());
+            assertArrayEquals(new String[] {"Sales"}, get(renamed).domains());
           }
+          GlossaryInvariants.assertDomainMembership();
         } finally {
           release.countDown();
           pool.shutdownNow();
