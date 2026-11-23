@@ -34,6 +34,7 @@ from gravitino.dto.requests.oauth2_client_credential_request import (
 from gravitino.dto.responses.oauth2_token_response import OAuth2TokenResponse
 from gravitino.exceptions.base import (
     GravitinoRuntimeException,
+    HTTPResponseException,
     IllegalArgumentException,
     RESTException,
     UnknownError,
@@ -185,9 +186,18 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
                 raise GravitinoRuntimeException("Invalid OAuth2 token response")
             oauth2_resp = OAuth2TokenResponse.from_dict(payload, infer_missing=True)
             oauth2_resp.validate()
-        except RESTException:
-            # Transport subclasses may require structured constructor arguments.
-            failure = RESTException("OAuth2 token acquisition failed")
+        except RESTException as error:
+            # Only the exact built-in type has a known safe field contract.
+            # pylint: disable-next=unidiomatic-typecheck
+            if type(error) is HTTPResponseException:
+                failure = HTTPResponseException(
+                    error.status_code,
+                    error.request_method,
+                    error.endpoint,
+                    "OAuth2 token acquisition failed",
+                )
+            else:
+                failure = RESTException("OAuth2 token acquisition failed")
         except (
             IllegalArgumentException,
             GravitinoRuntimeException,

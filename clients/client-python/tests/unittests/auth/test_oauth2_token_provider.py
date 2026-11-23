@@ -31,6 +31,7 @@ from gravitino.auth.oauth2_client_authentication_method import (
 from gravitino.exceptions.base import (
     BadRequestException,
     GravitinoRuntimeException,
+    HTTPResponseException,
     IllegalArgumentException,
     RESTException,
     UnauthorizedException,
@@ -43,9 +44,8 @@ from tests.unittests.auth.mock_base import mock_token_response as token_response
 OAUTH_PORT = 1082
 
 
-class _StructuredRESTException(RESTException):
-    def __init__(self, status, method, endpoint, reason):
-        super().__init__("%s %s %s %s", status, method, endpoint, reason)
+class _StructuredRESTException(HTTPResponseException):
+    pass
 
 
 class _StructuredRuntimeException(GravitinoRuntimeException):
@@ -338,6 +338,12 @@ class TestOAuth2TokenExpiry(unittest.TestCase):
         )
         cases.append(
             (
+                HTTPResponseException(503, "POST", "http://localhost", "client:secret"),
+                HTTPResponseException,
+            )
+        )
+        cases.append(
+            (
                 _StructuredRuntimeException(500, "client:secret"),
                 GravitinoRuntimeException,
             )
@@ -350,6 +356,10 @@ class TestOAuth2TokenExpiry(unittest.TestCase):
                 self.assertIsNone(caught.exception.__context__)
                 self.assertIsNone(caught.exception.__cause__)
                 self.assertNotIn("secret", str(caught.exception))
+                if error_type is HTTPResponseException:
+                    self.assertEqual(503, caught.exception.status_code)
+                    self.assertEqual("POST", caught.exception.request_method)
+                    self.assertEqual("http://localhost", caught.exception.endpoint)
 
     def test_renewal_failure_preserves_cache_and_recovers(self):
         cases = [
@@ -359,6 +369,11 @@ class TestOAuth2TokenExpiry(unittest.TestCase):
             (
                 _StructuredRESTException(502, "POST", "auth", "secret"),
                 RESTException,
+                54,
+            ),
+            (
+                HTTPResponseException(503, "POST", "http://localhost", "client:secret"),
+                HTTPResponseException,
                 54,
             ),
             (
@@ -395,6 +410,10 @@ class TestOAuth2TokenExpiry(unittest.TestCase):
                 self.assertIsNone(caught.exception.__context__)
                 self.assertIsNone(caught.exception.__cause__)
                 self.assertNotIn("secret", str(caught.exception))
+                if error_type is HTTPResponseException:
+                    self.assertEqual(503, caught.exception.status_code)
+                    self.assertEqual("POST", caught.exception.request_method)
+                    self.assertEqual("http://localhost", caught.exception.endpoint)
                 self.assertEqual(b"Bearer recovered", provider.get_token_data())
                 self.assertEqual(3, self.fetch.call_count)
 
