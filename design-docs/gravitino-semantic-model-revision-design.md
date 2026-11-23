@@ -66,8 +66,9 @@ effect for every consumer immediately:
    reconciled on activation as on publication, keeping relations only for metrics in active or
    latest. Only the publication operation is limited to latest, so a later rollback can point
    `active_version` at a retained older revision without a schema or read-path change; it would add
-   its own record of who rolled back. A later withdrawal would set `active_version = 0`; its
-   `PUBLISHED` revisions tell it apart from a never-published model.
+   its own record of who rolled back. A later withdrawal would set `active_version = 0` and must
+   keep the withdrawn revision from version retention; its `PUBLISHED` revisions tell it apart from
+   a never-published model.
 3. **Diff and impact analysis**: Gravitino exposes revisions for comparison but does not compute
    differences, and dataset lookup by source answers which published definitions use a source, not
    which unpublished ones would.
@@ -430,7 +431,7 @@ on a duplicate, as today. Replacing the definition of an existing model goes thr
 | Rename                                    | Updates `semantic_model_name` and `audit_info` on the identity row only, conditional on the name read (and on `current_version = expectedRevision`, when given). Creates no revision and changes neither pointer.                                                                                                                                                                |
 | Publish revision *n* (internal)           | In one transaction: set `publication_status = 'PUBLISHED_EXPLICITLY'`, `published_by`, and `published_at` on snapshot *n*, and set `active_version = n` on the condition `current_version = n`; then reconcile metric identities. Repeating it on the published latest returns the existing record unchanged.                                                                    |
 | Owner, grant, tag, policy, Domain changes | Use their existing stores. Create no revision.                                                                                                                                                                                                                                                                                                                                   |
-| Drop                                      | Soft-deletes the model and all revisions, conditional on the name read and `current_version`.                                                                                                                                                                                                                                                                                    |
+| Drop                                      | Soft-deletes the model and all revisions, conditional on the name read.                                                                                                                                                                                                                                                                                                          |
 
 ### Rename
 
@@ -752,6 +753,11 @@ a test policy that returns `false` and exercises publication end to end.
   backfill.
 - **Installing a deferred policy**: Stored pointers and revisions are kept. Models published on
   save stay published; the next save creates a draft and active stays where it is.
+- **Existence checks under a deferred policy**: `semanticModelExists` returns `false` for a
+  never-published model, but its name is taken, so create and import with that name fail with
+  `SemanticModelAlreadyExistsException`. Clients treat that exception, not the existence check, as
+  the answer: choose another name, or, with modify authority, load `latest` and alter the existing
+  draft.
 - **Switching policies across servers**: A single build loads one policy. During a rolling upgrade
   between builds with different policies, servers share the database and the same save is a draft
   on one server and published on another. This is a transitional state: each revision's
@@ -852,7 +858,7 @@ a test policy that returns `false` and exercises publication end to end.
 | Import with an existing model name                        | `SemanticModelAlreadyExistsException`; the model and its history are unchanged.                                                                                                                                             |
 | Rename alone                                              | No revision is created; all reads use the new name; the old name returns `404`.                                                                                                                                             |
 | Alter and rename race on two servers                      | If the rename commits first, the alter returns `404` and the model keeps the new name; if the alter commits first, the rename still succeeds on top of it.                                                                  |
-| Drop racing a rename                                      | If the rename commits first, the drop of the old name returns `404` and the renamed model survives.                                                                                                                         |
+| Drop racing a rename                                      | If the rename commits first, the drop of the old name returns `dropped: false` and the renamed model survives; a concurrent comment or property change does not make a drop fail.                                           |
 | Rename combined with other changes                        | `400`; nothing changes.                                                                                                                                                                                                     |
 | Sources change A → B → A                                  | Ranges record A, B, and A at their revisions; lookup returns the dataset for the active revision only.                                                                                                                      |
 | Sources change A → B with r1 explicitly published         | After retention runs, r1's range for A is kept while r1 is retained; lookup still returns the dataset for the active revision only.                                                                                         |
