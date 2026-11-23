@@ -667,7 +667,11 @@ always in this order:
    chain of the bound object when binding;
 2. the per-metalake hierarchy lock, if needed;
 3. term rows, in ID order (exclusive);
-4. domain rows (shared).
+4. domain rows, in ID order (shared).
+
+A term write locks its current member domains and the domains named in the request. This keeps
+the domain names used for authorization, the change handler and the returned term stable through
+commit, including when an existing member is being renamed.
 
 Each row is locked only once, in its final mode. Do not process updates one by one and acquire a
 hierarchy lock after a term lock. Once locked, reread and validate the current state, apply all
@@ -675,15 +679,15 @@ updates in one transaction, and hold the locks until commit or rollback. If a re
 the plan needs an earlier lock or an additional term row that would break ID order, roll back
 and rebuild the plan before writing.
 
-| Operation                                       | Locks                                                                                                               | Conflict it prevents                                    |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| Create, including initial relations and domains | metalake (shared) -> hierarchy lock -> referenced terms (exclusive, ID order) -> domains (shared)                   | name/synonym conflict; invalid relations; endpoint drop |
-| Rename or change synonyms                       | metalake (shared) -> hierarchy lock -> term (exclusive)                                                             | name/synonym conflict; concurrent edits                 |
-| Edit other content, status or domains           | metalake (shared) -> term (exclusive) -> added domains (shared)                                                     | concurrent edits; endpoint drop                         |
-| Add or remove a relation                        | metalake (shared) -> hierarchy lock -> all referenced terms (exclusive, ID order) -> added domains (shared), if any | a cycle or overlap; endpoint drop; mixed alters         |
-| Bind / unbind                                   | object chain (`lockLiveEndpoint`, shared) -> terms (exclusive, ID order)                                            | object drop; concurrent term edits                      |
-| Delete a term                                   | metalake (shared) -> hierarchy lock -> deleted and affected surviving terms (exclusive, ID order)                   | new links; lost cleanup revisions                       |
-| Object, column or metric cleanup                | endpoint locks in the deleting or altering operation's final mode -> affected surviving terms (exclusive, ID order) | new bindings; lost cleanup revisions                    |
+| Operation                                       | Locks                                                                                                                              | Conflict it prevents                                    |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------                | ------------------------------------------------------- |
+| Create, including initial relations and domains | metalake (shared) -> hierarchy lock -> referenced terms (exclusive, ID order) -> domains (shared)                                  | name/synonym conflict; invalid relations; endpoint drop |
+| Rename or change synonyms                       | metalake (shared) -> hierarchy lock -> term (exclusive) -> member domains (shared)                                                 | name/synonym conflict; concurrent edits                 |
+| Edit other content, status or domains           | metalake (shared) -> term (exclusive) -> member and requested domains (shared)                                                     | concurrent edits; endpoint drop                         |
+| Add or remove a relation                        | metalake (shared) -> hierarchy lock -> all referenced terms (exclusive, ID order) -> member and requested domains (shared), if any | a cycle or overlap; endpoint drop; mixed alters         |
+| Bind / unbind                                   | object chain (`lockLiveEndpoint`, shared) -> terms (exclusive, ID order)                                                           | object drop; concurrent term edits                      |
+| Delete a term                                   | metalake (shared) -> hierarchy lock -> deleted and affected surviving terms (exclusive, ID order)                                  | new links; lost cleanup revisions                       |
+| Object, column or metric cleanup                | endpoint locks in the deleting or altering operation's final mode -> affected surviving terms (exclusive, ID order)                | new bindings; lost cleanup revisions                    |
 
 For an alter that combines rows of this table, use the union of locks in the global order. For
 example, rename plus `addBroader` plus `addDomain` takes the metalake fence, hierarchy lock, the
