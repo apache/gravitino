@@ -128,9 +128,9 @@ public class RelationalEntityStore
   private final ConcurrentHashMap<String, AtomicInteger> pendingHierarchyPrefixes =
       new ConcurrentHashMap<>();
 
-  // Keys being published into the cache under the key lock. Unlocked store readers ({@link
-  // #exists}, {@link #batchGet}, {@link #get}) must not observe the entry until publication
-  // finishes, including when a raced invalidation rolls the put back.
+  // Keys being published into the cache under the key lock. Store readers and the ID-resolver
+  // wrapper must not observe the entry until publication finishes, including when a raced
+  // invalidation rolls the put back.
   private final ConcurrentHashMap<EntityCacheKey, AtomicInteger> publishingWrites =
       new ConcurrentHashMap<>();
 
@@ -167,7 +167,10 @@ public class RelationalEntityStore
     if (config.get(Configs.CACHE_ENABLED)) {
       this.cache = CacheFactory.getEntityCache(config);
       EntityIdService.initialize(
-          new CachedEntityIdResolver(cache, new RelationalEntityStoreIdResolver()));
+          new CachedEntityIdResolver(
+              cache,
+              new RelationalEntityStoreIdResolver(),
+              (ident, type) -> !isCacheObservationBlocked(ident, type)));
     } else {
       this.cache = new NoOpsCache(config);
       EntityIdService.initialize(new RelationalEntityStoreIdResolver());
@@ -291,8 +294,14 @@ public class RelationalEntityStore
 
   @Override
   public boolean exists(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
-    return (!isCacheObservationBlocked(ident, entityType) && cache.contains(ident, entityType))
-        || backend.exists(ident, entityType);
+    // Same-key lock as get/publish so a mid-publication put cannot land between the blocked check
+    // and contains.
+    boolean cached =
+        cache.withCacheLock(
+            EntityCacheKey.of(ident, entityType),
+            () ->
+                !isCacheObservationBlocked(ident, entityType) && cache.contains(ident, entityType));
+    return cached || backend.exists(ident, entityType);
   }
 
   @Override
@@ -406,10 +415,14 @@ public class RelationalEntityStore
         idents.stream()
             .filter(
                 ident -> {
+                  // Per-key lock matches get(): blocked check and getIfPresent are not separable.
                   Optional<E> entity =
-                      isCacheObservationBlocked(ident, entityType)
-                          ? Optional.empty()
-                          : cache.getIfPresent(ident, entityType);
+                      cache.withCacheLock(
+                          EntityCacheKey.of(ident, entityType),
+                          () ->
+                              isCacheObservationBlocked(ident, entityType)
+                                  ? Optional.empty()
+                                  : cache.getIfPresent(ident, entityType));
                   entity.ifPresent(allEntities::add);
                   return entity.isEmpty();
                 })

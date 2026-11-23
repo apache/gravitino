@@ -43,6 +43,8 @@ import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.BaseEntityCache;
+import org.apache.gravitino.cache.CacheReadGate;
+import org.apache.gravitino.cache.CachedEntityIdResolver;
 import org.apache.gravitino.cache.CaffeineEntityCache;
 import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
@@ -54,6 +56,7 @@ import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.DomainEntity;
+import org.apache.gravitino.meta.EntityIdResolver;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
@@ -259,6 +262,14 @@ public class TestRelationalEntityStore {
     Mockito.when(cache.contains(ident, Entity.EntityType.TOPIC)).thenReturn(true);
     Mockito.when(cache.getIfPresent(ident, Entity.EntityType.TOPIC))
         .thenReturn(Optional.of(cached));
+    Mockito.when(
+            cache.withCacheLock(any(EntityCacheKey.class), any(EntityCache.ThrowingSupplier.class)))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              EntityCache.ThrowingSupplier<?, Exception> action = invocation.getArgument(1);
+              return action.get();
+            });
     Mockito.when(backend.exists(ident, Entity.EntityType.TOPIC)).thenReturn(false);
     Mockito.when(backend.batchGet(List.of(ident), Entity.EntityType.TOPIC)).thenReturn(List.of());
 
@@ -272,6 +283,30 @@ public class TestRelationalEntityStore {
         store.batchGet(List.of(ident), Entity.EntityType.TOPIC, TopicEntity.class).isEmpty());
     Mockito.verify(backend).exists(ident, Entity.EntityType.TOPIC);
     Mockito.verify(backend).batchGet(List.of(ident), Entity.EntityType.TOPIC);
+  }
+
+  @Test
+  void testCachedEntityIdResolverSkipsCacheWhenGateDisallows() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "topic");
+    TopicEntity cachedEntity = Mockito.mock(TopicEntity.class);
+    Mockito.when(cachedEntity.id()).thenReturn(1L);
+    EntityCache cache = Mockito.mock(EntityCache.class);
+    Mockito.when(cache.getIfPresent(ident, Entity.EntityType.TOPIC))
+        .thenReturn(Optional.of(cachedEntity));
+    EntityIdResolver underlying = Mockito.mock(EntityIdResolver.class);
+    Mockito.when(underlying.getEntityId(ident, Entity.EntityType.TOPIC)).thenReturn(99L);
+
+    AtomicBoolean allowCache = new AtomicBoolean(false);
+    CacheReadGate gate = (id, type) -> allowCache.get();
+    EntityIdResolver resolver = new CachedEntityIdResolver(cache, underlying, gate);
+
+    Assertions.assertEquals(99L, resolver.getEntityId(ident, Entity.EntityType.TOPIC));
+    Mockito.verify(underlying).getEntityId(ident, Entity.EntityType.TOPIC);
+    Mockito.verify(cache, Mockito.never()).getIfPresent(ident, Entity.EntityType.TOPIC);
+
+    allowCache.set(true);
+    Assertions.assertEquals(1L, resolver.getEntityId(ident, Entity.EntityType.TOPIC));
+    Mockito.verify(cache).getIfPresent(ident, Entity.EntityType.TOPIC);
   }
 
   @Test

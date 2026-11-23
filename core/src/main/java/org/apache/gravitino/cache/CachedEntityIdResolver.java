@@ -29,14 +29,32 @@ public class CachedEntityIdResolver implements EntityIdResolver {
 
   private final EntityCache entityCache;
   private final EntityIdResolver underlyingResolver;
+  private final CacheReadGate cacheReadGate;
 
   public CachedEntityIdResolver(EntityCache entityCache, EntityIdResolver underlyingResolver) {
+    this(entityCache, underlyingResolver, CacheReadGate.ALWAYS_ALLOW);
+  }
+
+  /**
+   * Creates a resolver that consults {@code cacheReadGate} before using a cache hit.
+   *
+   * @param entityCache The entity cache.
+   * @param underlyingResolver Resolver used on a cache miss or when the gate disallows a cache
+   *     read.
+   * @param cacheReadGate Whether a cache hit may be used for the given key.
+   */
+  public CachedEntityIdResolver(
+      EntityCache entityCache, EntityIdResolver underlyingResolver, CacheReadGate cacheReadGate) {
     this.entityCache = entityCache;
     this.underlyingResolver = underlyingResolver;
+    this.cacheReadGate = cacheReadGate;
   }
 
   @Override
   public NamespacedEntityId getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type) {
+    if (!cacheReadGate.allowCacheRead(nameIdentifier, type)) {
+      return underlyingResolver.getEntityIds(nameIdentifier, type);
+    }
     return entityCache
         .getIfPresent(nameIdentifier, type)
         .map(
@@ -56,6 +74,9 @@ public class CachedEntityIdResolver implements EntityIdResolver {
 
   @Override
   public Long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type) {
+    if (!cacheReadGate.allowCacheRead(nameIdentifier, type)) {
+      return underlyingResolver.getEntityId(nameIdentifier, type);
+    }
     return entityCache
         .getIfPresent(nameIdentifier, type)
         .map(HasIdentifier::id)
