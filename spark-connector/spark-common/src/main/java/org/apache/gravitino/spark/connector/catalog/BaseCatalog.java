@@ -279,7 +279,8 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       validateBeforeTableMutation();
       org.apache.gravitino.rel.Table gravitinoTable =
           createGravitinoTable(ident, schema, transforms, properties);
-      org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
+      org.apache.spark.sql.connector.catalog.Table sparkTable =
+          loadSparkTable(ident, gravitinoTable);
       return createSparkTable(
           ident,
           gravitinoTable,
@@ -357,7 +358,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
           Sets.newHashSet(Privilege.Name.SELECT_TABLE),
           e);
     }
-    Table sparkTable = loadSparkTable(ident);
+    Table sparkTable = loadSparkTable(ident, gravitinoTable);
     return createSparkTable(
         ident,
         gravitinoTable,
@@ -433,7 +434,8 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
               .asTableCatalog()
               .alterTable(
                   NameIdentifier.of(getDatabase(ident), ident.name()), gravitinoTableChanges);
-      org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
+      org.apache.spark.sql.connector.catalog.Table sparkTable =
+          loadSparkTable(ident, gravitinoTable);
       return createSparkTable(
           ident,
           gravitinoTable,
@@ -792,7 +794,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
                   e);
       throw AuthorizationTable.aggregateFailure(Collections.singletonList(denied)).orElse(e);
     }
-    org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
+    org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident, gravitinoTable);
     // Will create a catalog specific table
     return createSparkTable(
         ident,
@@ -877,7 +879,18 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     throw new NoSuchFunctionException(ident);
   }
 
-  protected Table loadSparkTable(Identifier ident) {
+  /**
+   * Loads the underlying Spark table for an identifier.
+   *
+   * <p>Subclasses that need the Gravitino table for routing must use the passed-in {@code
+   * gravitinoTable} rather than fetching it again: every caller of this hook has just obtained it
+   * (loaded, created, or altered) for this identifier.
+   *
+   * @param ident the Spark table identifier
+   * @param gravitinoTable the Gravitino table the caller already obtained for this identifier
+   * @return the underlying Spark table
+   */
+  protected Table loadSparkTable(Identifier ident, org.apache.gravitino.rel.Table gravitinoTable) {
     try {
       return sparkCatalog.loadTable(ident);
     } catch (NoSuchTableException e) {
