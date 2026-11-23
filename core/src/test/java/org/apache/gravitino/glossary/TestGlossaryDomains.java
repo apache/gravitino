@@ -60,6 +60,8 @@ import org.apache.gravitino.domain.DomainDispatcher;
 import org.apache.gravitino.domain.DomainManager;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
+import org.apache.gravitino.exceptions.NoSuchTermException;
+import org.apache.gravitino.exceptions.NonEmptyDomainException;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
@@ -71,6 +73,7 @@ import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.RaceTestUtils;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -81,6 +84,10 @@ import org.mockito.Mockito;
 /** Runs glossary domain membership against real grant, domain and term rows (T7). */
 class TestGlossaryDomains extends TestJDBCBackend {
   private static final String LAKE = "glossary";
+  private static final String NON_EMPTY =
+      "Domain %s under metalake %s still has glossary terms. Ask a term owner with"
+          + " CREATE_DEFINITION, or a user with MANAGE_DEFINITIONS, who can use the domain to"
+          + " remove the terms from it first";
   private final AtomicLong ids = new AtomicLong(100);
   private final GlossaryManager manager = new GlossaryManager(ids::incrementAndGet, true);
   private final GravitinoEnv env = GravitinoEnv.getInstance();
@@ -434,6 +441,105 @@ class TestGlossaryDomains extends TestJDBCBackend {
     }
     assertThrows(
         ForbiddenException.class, () -> as("writer", () -> manager.listTerms(LAKE, "Finance")));
+  }
+
+  /** T7.4. */
+  @TestTemplate
+  void testDropDomainWithTermsFails() throws Exception {
+    create("Churn", "Finance");
+    NonEmptyDomainException error =
+        assertThrows(
+            NonEmptyDomainException.class,
+            () -> env.internalDomainDispatcher().deleteDomain(LAKE, "Finance"));
+    assertEquals(String.format(NON_EMPTY, "Finance", LAKE), error.getMessage());
+    as("lakeOwner", () -> manager.alterTerm(LAKE, "Churn", TermChange.removeDomain("Finance")));
+    assertTrue(env.internalDomainDispatcher().deleteDomain(LAKE, "Finance"));
+  }
+
+  /** T7.5: either the add wins and the drop fails, or the drop wins and the add fails. */
+  @TestTemplate
+  void testAddDomainRacesDomainDrop() throws Exception {
+    create("Churn");
+    for (int round = 0; round < 10; round++) {
+      String domain = "Race" + round;
+      GlossaryDomainFixtures.insertDomain(LAKE, domain, Domain.Status.PUBLISHED, null, AUDIT_INFO);
+      List<Object> outcomes =
+          RaceTestUtils.runTogether(
+              List.of(
+                  () -> {
+                    try {
+                      as(
+                          "lakeOwner",
+                          () -> manager.alterTerm(LAKE, "Churn", TermChange.addDomain(domain)));
+                      return "added";
+                    } catch (NoSuchDomainException e) {
+                      return "missing";
+                    }
+                  },
+                  () -> {
+                    try {
+                      return env.internalDomainDispatcher().deleteDomain(LAKE, domain)
+                          ? "dropped"
+                          : "absent";
+                    } catch (NonEmptyDomainException e) {
+                      return "nonEmpty";
+                    }
+                  }));
+      assertTrue(
+          outcomes.equals(List.of("added", "nonEmpty"))
+              || outcomes.equals(List.of("missing", "dropped")),
+          domain + " " + outcomes);
+      GlossaryInvariants.assertDomainMembership();
+      if (outcomes.get(0).equals("added")) {
+        as("lakeOwner", () -> manager.alterTerm(LAKE, "Churn", TermChange.removeDomain(domain)));
+      }
+    }
+  }
+
+  /** T7.9: a domain admin without glossary rights cannot clear a hidden draft. */
+  @TestTemplate
+  void testDomainAdminCannotClearHiddenDraft() throws Exception {
+    as(
+        "writer",
+        () ->
+            manager.createTerm(
+                LAKE,
+                TermSpec.builder("Secret")
+                    .withStatus(GlossaryTerm.Status.DRAFT)
+                    .withDefinition("kept")
+                    .withDomains("Retail")
+                    .build()));
+    NonEmptyDomainException error =
+        assertThrows(
+            NonEmptyDomainException.class,
+            () ->
+                as(
+                    "domainAdmin",
+                    () -> env.internalDomainDispatcher().deleteDomain(LAKE, "Retail")));
+    assertEquals(String.format(NON_EMPTY, "Retail", LAKE), error.getMessage());
+    assertFalse(error.getMessage().contains("Secret"));
+    assertFalse(error.getMessage().matches(".*\\d.*"));
+    assertThrows(
+        NoSuchTermException.class,
+        () ->
+            as(
+                "domainAdmin",
+                () -> manager.alterTerm(LAKE, "Secret", TermChange.removeDomain("Retail"))));
+    as("writer", () -> manager.alterTerm(LAKE, "Secret", TermChange.removeDomain("Retail")));
+    assertTrue(
+        as("domainAdmin", () -> env.internalDomainDispatcher().deleteDomain(LAKE, "Retail")));
+    GlossaryTermEntity secret = as("writer", () -> manager.getTerm(LAKE, "Secret"));
+    assertEquals("kept", secret.definition());
+    assertEquals(GlossaryTerm.Status.DRAFT, secret.status());
+  }
+
+  /** Review focus: a recreated term with the same name starts without domains. */
+  @TestTemplate
+  void testRecreatedTermDoesNotInheritDomains() throws Exception {
+    create("Churn", "Finance");
+    assertTrue(as("admin", () -> manager.dropTerm(LAKE, "Churn")));
+    assertArrayEquals(new String[0], create("Churn").domains());
+    assertTrue(env.internalDomainDispatcher().deleteDomain(LAKE, "Finance"));
   }
 
   private GlossaryTermEntity create(String name, String... domains) throws Exception {
