@@ -52,7 +52,9 @@ const formatColumnDefaultValue = defaultValue => {
 
     switch (expression.type) {
       case 'literal':
-        return expression.value == null ? '' : String(expression.value)
+        if (expression.dataType === 'null' || expression.value == null) return 'NULL'
+
+        return expression.value === '' ? "''" : String(expression.value)
 
       case 'field': {
         const fieldName = expression.fieldName
