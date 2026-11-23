@@ -704,7 +704,7 @@ public class CatalogsPageTest extends BaseWebIT {
 
   @Test
   @Order(23)
-  void testMysqlAutoIncrementAndColumnCommentRequireSeparateSaves() throws InterruptedException {
+  void testMysqlAutoIncrementAndColumnEditsRequireSeparateSaves() throws InterruptedException {
     String schema = RandomNameUtils.genRandomName("auto_increment");
     String table = "users";
     String originalComment = "Original comment";
@@ -716,7 +716,9 @@ public class CatalogsPageTest extends BaseWebIT {
     try {
       tables.createTable(
           tableIdent,
-          new Column[] {Column.of("id", Types.LongType.get(), originalComment, false, true, null)},
+          new Column[] {
+            Column.of("id", Types.IntegerType.get(), originalComment, false, true, null)
+          },
           "",
           Map.of(),
           Transforms.EMPTY_TRANSFORM,
@@ -736,6 +738,10 @@ public class CatalogsPageTest extends BaseWebIT {
       By editTable = By.cssSelector("[data-refer='edit-table-btn']");
       By autoIncrement = By.id("tableForm_columns_0_autoIncrement");
       By columnComment = By.id("tableForm_columns_0_comment");
+      By warningTitle = By.cssSelector(".ant-modal-confirm-title");
+      By warningOk =
+          By.xpath(
+              "//div[contains(@class, 'ant-modal-confirm-warning')]//button[normalize-space(.)='OK']");
       WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       clickAndWait(editTable);
       wait.until(ExpectedConditions.attributeToBe(autoIncrement, "aria-checked", "true"));
@@ -744,17 +750,35 @@ public class CatalogsPageTest extends BaseWebIT {
       clickAndWait(catalogsPage.handleSubmitTableBtn);
       wait.until(
           ExpectedConditions.textToBePresentInElementLocated(
-              By.cssSelector(".ant-modal-confirm-title"), "Save these changes separately"));
+              warningTitle, "Save these changes separately"));
       Column unchanged = tables.loadTable(tableIdent).columns()[0];
       Assertions.assertTrue(unchanged.autoIncrement());
       Assertions.assertEquals(originalComment, unchanged.comment());
-      clickAndWait(
-          By.xpath(
-              "//div[contains(@class, 'ant-modal-confirm-warning')]//button[normalize-space(.)='OK']"));
+      clickAndWait(warningOk);
 
       driver.findElement(columnComment).sendKeys(Keys.chord(Keys.CONTROL, "a"), originalComment);
+      catalogsPage.selectTableColumnType(0, "long");
+      clickAndWait(catalogsPage.handleSubmitTableBtn);
+      wait.until(
+          ExpectedConditions.textToBePresentInElementLocated(
+              warningTitle, "Save these changes separately"));
+      Column blocked = tables.loadTable(tableIdent).columns()[0];
+      Assertions.assertTrue(blocked.autoIncrement());
+      Assertions.assertEquals(Types.IntegerType.get(), blocked.dataType());
+      clickAndWait(warningOk);
+
+      catalogsPage.selectTableColumnType(0, "integer");
       clickAndWait(catalogsPage.handleSubmitTableBtn);
       wait.until(ExpectedConditions.invisibilityOfElementLocated(columnComment));
+
+      clickAndWait(editTable);
+      wait.until(ExpectedConditions.attributeToBe(autoIncrement, "aria-checked", "false"));
+      catalogsPage.selectTableColumnType(0, "long");
+      clickAndWait(catalogsPage.handleSubmitTableBtn);
+      wait.until(ExpectedConditions.invisibilityOfElementLocated(columnComment));
+      Column retyped = tables.loadTable(tableIdent).columns()[0];
+      Assertions.assertFalse(retyped.autoIncrement());
+      Assertions.assertEquals(Types.LongType.get(), retyped.dataType());
 
       clickAndWait(editTable);
       wait.until(ExpectedConditions.attributeToBe(autoIncrement, "aria-checked", "false"));

@@ -613,7 +613,7 @@ export default function CreateTableDialog({ ...props }) {
           Modal.warning({
             title: 'Save these changes separately',
             content:
-              'Save the AutoIncrement change by itself first. Then reopen the table and save the other changes to that column one at a time.'
+              'When turning AutoIncrement off, save it first. When turning it on, save it last. Reopen the table and apply one change per save.'
           })
 
           return

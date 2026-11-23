@@ -516,28 +516,33 @@ public class CatalogsPage extends BaseWebIT {
       WebElement keyInput = driver.findElement(By.xpath(columnName));
       keyInput.sendKeys(name);
 
-      // Set the indexed column type
-      String columnType = "//div[@data-refer='column-type-" + index + "']";
-      WebElement typeSelect = driver.findElement(By.xpath(columnType));
-      clickAndWait(typeSelect);
-
-      // Wait for dropdown to appear and click the option
-      Thread.sleep(500);
-      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
-      String optionXpath =
-          "//div[contains(@class, 'ant-select-dropdown')]"
-              + "//div[contains(@class, 'ant-select-item-option') and (@title='"
-              + type
-              + "' or .//div[text()='"
-              + capitalizeFirstLetter(type)
-              + "'])]";
-
-      WebElement typeItem =
-          wait.until(ExpectedConditions.elementToBeClickable(By.xpath(optionXpath)));
-      clickAndWait(typeItem);
+      selectTableColumnType(index, type);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
+  }
+
+  /**
+   * Selects the data type of a column in the table editor.
+   *
+   * @param index zero-based column index
+   * @param type the type to select
+   * @throws InterruptedException if interrupted while interacting with the editor
+   */
+  public void selectTableColumnType(int index, String type) throws InterruptedException {
+    String columnType = "//div[@data-refer='column-type-" + index + "']";
+    clickAndWait(driver.findElement(By.xpath(columnType)));
+
+    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+    String optionXpath =
+        columnType
+            + "//div[contains(@class, 'ant-select-dropdown') and not(contains(@class, 'ant-select-dropdown-hidden'))]"
+            + "//div[contains(@class, 'ant-select-item-option') and (@title='"
+            + type
+            + "' or .//div[text()='"
+            + capitalizeFirstLetter(type)
+            + "'])]";
+    clickAndWait(wait.until(ExpectedConditions.elementToBeClickable(By.xpath(optionXpath))));
   }
 
   private String capitalizeFirstLetter(String str) {

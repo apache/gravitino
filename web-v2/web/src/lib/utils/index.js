@@ -50,9 +50,13 @@ export const hasAutoIncrementEditConflict = (provider, originalColumns, newColum
     const originalColumn = originalColumnsMap[newColumn.uniqueId]
     if (!originalColumn || Boolean(originalColumn.autoIncrement) === newColumn.autoIncrement) return false
 
+    const originalType = originalColumn.type && getColumnType(originalColumn.type)
+    const editedType = newColumn.typeObj?.type
+
     return (
       (!newColumn.autoIncrement && originalColumn.name !== newColumn.name) ||
-      (originalColumn.comment || '') !== (newColumn.comment || '')
+      (originalColumn.comment || '') !== (newColumn.comment || '') ||
+      (originalType && editedType && originalType.toLowerCase() !== editedType.toLowerCase())
     )
   })
 }

@@ -234,7 +234,7 @@ describe('genUpdates', () => {
   })
 })
 describe('hasAutoIncrementEditConflict', () => {
-  const originalColumn = { uniqueId: 'id', name: 'id', autoIncrement: true, comment: 'Old comment' }
+  const originalColumn = { uniqueId: 'id', name: 'id', type: 'integer', autoIncrement: true, comment: 'Old comment' }
 
   it.each(['jdbc-mysql', 'jdbc-oceanbase'])('blocks renaming and disabling AutoIncrement on %s', provider => {
     const newColumn = { ...originalColumn, name: 'user_id', autoIncrement: false }
@@ -258,10 +258,28 @@ describe('hasAutoIncrementEditConflict', () => {
     expect(hasAutoIncrementEditConflict('jdbc-mysql', [oldColumn], [newColumn])).toBe(true)
   })
 
+  it.each(['jdbc-mysql', 'jdbc-oceanbase'])(
+    'blocks changing Integer to Long and disabling AutoIncrement on %s',
+    provider => {
+      const newColumn = { ...originalColumn, typeObj: { type: 'Long' }, autoIncrement: false }
+
+      expect(hasAutoIncrementEditConflict(provider, [originalColumn], [newColumn])).toBe(true)
+    }
+  )
+
+  it('blocks changing the type and enabling AutoIncrement in the same save', () => {
+    const oldColumn = { ...originalColumn, type: 'varchar(32)', autoIncrement: false }
+    const newColumn = { ...oldColumn, typeObj: { type: 'Long' }, autoIncrement: true }
+
+    expect(hasAutoIncrementEditConflict('jdbc-mysql', [oldColumn], [newColumn])).toBe(true)
+  })
+
   it.each([
     { name: 'user_id' },
     { comment: 'New comment' },
     { autoIncrement: false },
+    { typeObj: { type: 'Integer' }, autoIncrement: false },
+    { typeObj: { type: 'Long' } },
     { comment: 'New comment', autoIncrement: undefined }
   ])('allows changes with no conflict on the column (%j)', changes => {
     const newColumn = { ...originalColumn, ...changes }
