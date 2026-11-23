@@ -932,7 +932,7 @@ public class RelationalEntityStore
     cache.withCacheLock(
         key,
         () -> {
-          adjustPending(key, ident, entityType, /* delta */ 1);
+          retainPendingWrite(key, ident, entityType);
           invalidateCache(ident, entityType);
         });
   }
@@ -942,23 +942,40 @@ public class RelationalEntityStore
     cache.withCacheLock(
         key,
         () -> {
-          adjustPending(key, ident, entityType, /* delta */ -1);
+          releasePendingWrite(key, ident, entityType);
           cacheInvalidationEpoch.incrementAndGet();
         });
   }
 
-  private void adjustPending(
-      EntityCacheKey key, NameIdentifier ident, Entity.EntityType entityType, int delta) {
+  private void retainPendingWrite(
+      EntityCacheKey key, NameIdentifier ident, Entity.EntityType entityType) {
     pendingWrites.compute(
         key,
         (ignored, count) -> {
-          if (delta > 0) {
+          if (count == null) {
+            return new AtomicInteger(1);
+          }
+          count.incrementAndGet();
+          return count;
+        });
+    for (String prefix : CaffeineEntityCache.descendantPrefixes(ident, entityType)) {
+      pendingHierarchyPrefixes.compute(
+          prefix,
+          (ignored, count) -> {
             if (count == null) {
               return new AtomicInteger(1);
             }
             count.incrementAndGet();
             return count;
-          }
+          });
+    }
+  }
+
+  private void releasePendingWrite(
+      EntityCacheKey key, NameIdentifier ident, Entity.EntityType entityType) {
+    pendingWrites.compute(
+        key,
+        (ignored, count) -> {
           if (count == null) {
             return null;
           }
@@ -968,13 +985,6 @@ public class RelationalEntityStore
       pendingHierarchyPrefixes.compute(
           prefix,
           (ignored, count) -> {
-            if (delta > 0) {
-              if (count == null) {
-                return new AtomicInteger(1);
-              }
-              count.incrementAndGet();
-              return count;
-            }
             if (count == null) {
               return null;
             }
