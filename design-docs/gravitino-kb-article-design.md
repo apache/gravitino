@@ -40,8 +40,8 @@ can search for an article, read it, and follow its bindings under their existing
    name and stable numeric ID. A title can change without breaking references to the article.
 2. **Current content storage**: store the title and Markdown/HTML body directly on the Article
    row. Edits update that current content; no historical-content copies are retained.
-3. **Bindings**: link an article to terms and metadata objects. Support reverse lookup from
-   either target. A binding never grants access to data.
+3. **Bindings**: link Articles to Terms and metadata objects, and list Articles by bound
+   Term or asset. A binding never grants access to data.
 4. **Domains**: organize and filter articles by zero or more Domains. Membership does not change
    article privileges in this design.
 5. **Status and privileges**: support `DRAFT`, `PUBLISHED` and `DEPRECATED`, with immediate edits
@@ -90,7 +90,7 @@ implementation work in [Task Breakdown](#task-breakdown).
 | Article API, entity and storage                 | First-class metadata and current content         | T1–T3   |
 | Definition privileges and ownership             | Metalake grants; platform Owner checks           | T4      |
 | Domain membership                               | Shared member table; filter and drop guard       | T5      |
-| Term and asset bindings                         | Stable IDs, reverse lookup and lifecycle cleanup | T6      |
+| Term and asset bindings                         | Stable IDs, target filters and lifecycle cleanup | T6      |
 | REST, editing and search                        | DTOs, errors, summaries and OpenAPI              | T7–T8   |
 | Events and audit                                | Existing listener and audit mechanisms           | T9      |
 | Java, Python and read-only MCP                  | Same contracts and visibility as REST            | T10–T12 |
@@ -256,8 +256,8 @@ them and supplies the Article tables below. Use the existing Owner and audit sto
   current row. Failed writes, no-ops, Owner transfers and background orphan cleanup leave it
   unchanged. Relation rows retain the usual store metadata columns.
 - `kb_article_relation_meta.metalake_id` is non-NULL and comes from the owning Article.
-  Metalake cleanup uses `(metalake_id, deleted_at)` without joining Article rows. Reverse lookup
-  selects live bindings through `(target_id, target_type, deleted_at)`.
+  Metalake cleanup uses `(metalake_id, deleted_at)` without joining Article rows. Term and asset
+  filters select live bindings through `(target_id, target_type, deleted_at)`.
 - For name, title, comment and source reference, use `VARCHAR(128)`, `VARCHAR(512)`,
   `VARCHAR(256)` and `VARCHAR(1024)` respectively on MySQL and PostgreSQL. On H2, use
   `VARCHAR(256)`, `VARCHAR(1024)`, `VARCHAR(512)` and `VARCHAR(2048)` respectively, allowing two
@@ -282,9 +282,10 @@ them and supplies the Article tables below. Use the existing Owner and audit sto
 
 ### Status and current content
 
-The ordinary-read privileges in this table apply when authorization is enabled.
+The ordinary-read privileges in this table apply when authorization is enabled. See
+[Lists and search](#lists-and-search) for the Term and asset filters.
 
-| Article status | Ordinary reads                       | Reverse lookup                     | MCP      |
+| Article status | Ordinary reads                       | Lists filtered by Term or asset    | MCP      |
 | -------------- | ------------------------------------ | ---------------------------------- | -------- |
 | `DRAFT`        | Current owner with CREATE, or MANAGE | Excluded                           | Excluded |
 | `PUBLISHED`    | Effective VIEW                       | Included                           | Included |
@@ -329,10 +330,18 @@ move an article.
   detach endpoint with effective `MANAGE_DOMAIN`. The operation changes only that membership
   and does not require Article edit permission. It advances the Article revision once and
   records the actor on an effective change. A missing membership is a no-op.
+- `GET /domains/{domain}/definition-members` requires effective `MANAGE_DOMAIN` on the
+  requested Domain. It lists live, directly assigned Article and Term members, including
+  hidden drafts. Each entry contains only `type` (`KNOWLEDGE_BASE_ARTICLE` or `GLOSSARY_TERM`)
+  and the current `name`. Content reads use the respective Article and Term permissions.
+  Query `domain_member_rel` by Domain, resolve live names by member type and ID, and order
+  by `(member_type, member_id)` before paging. This list uses the same `limit`, `offset` and
+  `hasMore` rules as other lists below.
 - Domain deletion checks `domain_member_rel` for any live member type under the Domain lock,
   using the shared Domain lookup index and fencing concurrent membership additions. Any remaining
   membership returns `409 NonEmptyDomainException`, without member names or counts.
-  The Domain administrator must detach remaining members explicitly before retrying the drop.
+  The Domain administrator can use the member list to find and explicitly detach remaining
+  members before retrying the drop.
 - This extends the current Domain drop path, which already checks its own lifecycle constraints.
   Changing or deleting a backing tag does not change Article membership.
 
@@ -387,8 +396,9 @@ ownership through the existing Owner API.
 ### Access control
 
 With `gravitino.authorization.enable=false`, create Articles without an initial Owner. Direct
-and list reads can include `DRAFT` Articles subject to their status filters. Reverse lookups
-still exclude drafts, and MCP still returns only `PUBLISHED` Articles.
+reads and lists without a Term or asset filter can include `DRAFT` Articles subject to their
+status filters. Lists filtered by Term or asset exclude drafts, and MCP only returns
+`PUBLISHED` Articles.
 
 When authorization is enabled, use the metalake privileges `VIEW_DEFINITION`,
 `CREATE_DEFINITION` and `MANAGE_DEFINITIONS`, abbreviated VIEW, CREATE and MANAGE in this section.
@@ -402,12 +412,13 @@ except for the Domain-only detach endpoint. Ownership never bypasses Deny on Art
 | Create                            | CREATE                                                                      |
 | Edit, set status, change bindings | Current owner with CREATE, or MANAGE                                        |
 | Change Domains in create or alter | Article create or edit authority and `MANAGE_DOMAIN` on each changed Domain |
+| List Domain definition members    | `MANAGE_DOMAIN` on the requested Domain                                     |
 | Detach from one Domain            | `MANAGE_DOMAIN` on that Domain, through the detach endpoint                 |
 | Delete in any status              | Current owner with CREATE, or MANAGE                                        |
-| Reverse lookup                    | VIEW on the article and read access to the lookup root                      |
+| Lists filtered by Term or asset   | VIEW on the Article and read access to each filter target                   |
 
 CREATE alone cannot read another owner's draft, and ownership alone cannot replace CREATE.
-Use the same rules on direct reads, lists, nested results, reverse lookups and MCP.
+Use the same rules on direct reads, lists, nested results and MCP.
 Shared securable-object validation rejects Article as a grant scope, covering role creation,
 privilege grants and subsequent updates across the generic authorization APIs.
 Administrators explicitly grant VIEW to reader roles on the metalake; there is no implicit
@@ -432,9 +443,9 @@ The recipient must be an existing user or group in the metalake, but need not ho
 effective VIEW and CREATE to edit or read its draft. Owner changes use the existing owner
 relation and audit path, without advancing the Article revision.
 
-Lists and search use the same visibility predicate. A hidden article must not appear in nested
-summaries or candidate lists, or affect `hasMore`. Reading an article does not authorize its targets;
-loading a reverse lookup first checks the Term or object root, then filters the articles.
+Lists and search use the same visibility predicate. A hidden Article must not appear in nested
+summaries or candidate lists, or affect `hasMore`. Reading an Article does not authorize its
+targets. Lists filtered by Term or asset check access to the target before filtering Articles.
 
 ### Locking and writes
 
@@ -480,8 +491,9 @@ can overwrite intervening changes to the same field. Gravitino cannot restore an
 
 Read the Article identity, status, metadata, body when requested, and visible relation previews
 from one database snapshot. Use the Article state in that snapshot for visibility filtering.
-This applies to direct reads, list and reverse-lookup pages, and binding pages. Use a single SQL
-statement when it can read the required data together. For multiple queries, use the shared
+Use the same snapshot boundary for direct reads, Article and Domain member list pages,
+and binding pages. Use a single SQL statement when it can read the required data together.
+For multiple queries, use the shared
 `SqlSessions.readSnapshot()` helper provided by T2. Open the snapshot transaction before
 reading the root and run each query in that session. Use `REPEATABLE_READ` on MySQL and
 PostgreSQL and `SERIALIZABLE` on H2. A default `READ_COMMITTED` session can see a new commit
@@ -510,9 +522,10 @@ create, load, alter, delete and binding calls. Percent-encoded length is not the
 | `GET /kb-articles/{article}`                     | Binding `limit`, `offset`                                   | `article`               | Read current content with bounded binding previews |
 | `PUT /kb-articles/{article}`                     | `updates` with optional `expectedRevision`                  | `article`               | Apply Article and binding changes atomically       |
 | `DELETE /kb-articles/{article}`                  | No body                                                     | `DropResponse` (`200`)  | Soft-delete Article and related rows atomically    |
-| `DELETE /kb-articles/{article}/domains/{domain}` | No body                                                     | None (`204`)            | Detach the Article from this Domain                |
+| `DELETE /kb-articles/{article}/domains/{domain}` | No body                                                     | `code: 0` (`200`)       | Detach the Article from this Domain                |
 | `GET /kb-articles/{article}/terms`               | `limit`, `offset`                                           | `terms`, `hasMore`      | Page visible current Term bindings                 |
 | `GET /kb-articles/{article}/objects`             | `limit`, `offset`                                           | `objects`, `hasMore`    | Page visible current asset bindings                |
+| `GET /domains/{domain}/definition-members`       | `limit`, `offset`                                           | `members`, `hasMore`    | List names and types of direct definition members  |
 
 #### Pagination and binding previews
 
@@ -732,12 +745,11 @@ succeeds. Return `200` with `dropped=false` when the Article is absent, already 
 from the caller. A visible Article still requires delete permission and returns `403` if the
 caller lacks it.
 
-For the detach endpoint, resolve the Domain and check `MANAGE_DOMAIN` first. Return `204`
-with no body for both a successful detach and an absent Article or membership. This lets a
-Domain administrator detach a named member without returning Article details or revealing
-whether anything changed. For other routes, check root visibility before action permission,
-and permissions before content conflicts. An unsuccessful mutation leaves the local Article,
-relations and revision unchanged. External DDL outcomes have the separate limits described in
+For the detach endpoint, resolve the Domain and check `MANAGE_DOMAIN` first. Return HTTP `200`
+with `{"code":0}` for both a successful detach and an absent Article or membership. For other
+routes, check root visibility before action permission, and permissions before content
+conflicts. An unsuccessful mutation leaves the local Article, relations and revision unchanged.
+External DDL outcomes have the separate limits described in
 [Bindings and target lifecycle](#bindings-and-target-lifecycle).
 
 ### Java and Python clients
@@ -803,10 +815,10 @@ principal does not cause a draft or deprecated root to bypass that filter. Root 
 returned content come from the same read snapshot. Authorization errors must not trigger an
 unfiltered or more privileged retry.
 
-Tool descriptions guide progressive retrieval: use Term/object reverse lookups when metadata
-context is known. Otherwise, discover relevant Domains and browse bounded summary pages without
-`q`, then load selected articles with `get_kb_article`. Use keyword search after narrowing the
-Domain scope when further discovery is needed. Avoid defaulting to a knowledge-base-wide body
+When the Term or asset is known, filter the Article list by that target. Otherwise, discover
+relevant Domains and browse bounded summary pages without `q`, then load selected articles with
+`get_kb_article`. Use keyword search after narrowing the Domain scope when further discovery is
+needed. Avoid defaulting to a knowledge-base-wide body
 LIKE scan or automatically broadening an empty result into one. This is retrieval guidance for
 agents; the simple REST search contract has no additional parameter or mandatory Domain check.
 
@@ -998,15 +1010,18 @@ OpenAPI definitions and validation with `./gradlew :docs:build`.
 - [ ] **T5. Add Domain integration** (`core/`). Implement typed shared membership writes, parent
       filters, current-name resolution, Domain visibility and one nonempty-drop check for all
       live member types. Apply Domain management checks and permit explicit detach by the
-      Domain administrator. Fence membership changes and verify cross-object lock
-      order. For **T5.3**, create a Domain's sole Term member through the Glossary API, verify
-      Domain deletion returns `409`, then detach the Term and verify deletion succeeds.
+      Domain administrator. Add Article name resolution to the shared list introduced by
+      Glossary T7. Fence membership changes and verify cross-object lock order.
+      For **T5.3**, create a Domain's sole Term member through the Glossary API. Verify that
+      Domain deletion returns `409` and that an administrator can list and detach the Term
+      before deleting the Domain.
       Depends on: T4, Domain prerequisites.
 - [ ] **T6. Add bindings and asynchronous cleanup** (`core/`). Resolve structured asset and Term
-      targets to stable IDs; implement binding mutation/read/reverse paths, target authorization,
-      approved-Term checks, read-time liveness filtering, batched orphan collection through
-      `OrphanedMetadataObjectRelationService` and column reconciliation. Preserve external DDL
-      failure/recovery limits. Depends on: T4, target-specific prerequisites; coordinate lock
+      targets to stable IDs. Implement binding changes, paged binding reads, Term and asset list
+      filters, target authorization, approved-Term checks and read-time liveness filtering.
+      Implement batched orphan collection through `OrphanedMetadataObjectRelationService` and
+      column reconciliation. Preserve external DDL failure/recovery limits.
+      Depends on: T4, target-specific prerequisites; coordinate lock
       ordering with T5 before release.
 
 ### Group C: REST and events
@@ -1031,7 +1046,7 @@ OpenAPI definitions and validation with `./gradlew :docs:build`.
 ### Group D: Clients and agents
 
 - [ ] **T10. Add Java client operations** (`clients/client-java/`). Expose CRUD, current content,
-      bindings, reverse lookups, filters, conditional alters and mutation errors.
+      bindings, list filters including Term and asset, conditional alters and mutation errors.
       Depends on: T8.
 - [ ] **T11. Add Python client operations** (`clients/client-python/`). Match the Java/REST
       contracts, identifier components and ordinary alter behavior.
