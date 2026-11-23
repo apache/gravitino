@@ -1488,3 +1488,19 @@ CREATE TABLE IF NOT EXISTS glossary_hierarchy_lock (
 );
 COMMENT ON TABLE glossary_hierarchy_lock IS 'serializes glossary hierarchy and name checks within a metalake';
 COMMENT ON COLUMN glossary_hierarchy_lock.metalake_id IS 'owning metalake id, one database mutex row per metalake';
+
+CREATE TABLE IF NOT EXISTS glossary_term_domain_rel (
+    metalake_id BIGINT NOT NULL,
+    term_id BIGINT NOT NULL,
+    domain_id BIGINT NOT NULL,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (term_id, domain_id, deleted_at)
+);
+CREATE INDEX IF NOT EXISTS idx_glossary_domain_rel_domain ON glossary_term_domain_rel (domain_id, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_glossary_domain_rel_metalake ON glossary_term_domain_rel (metalake_id, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_glossary_domain_rel_deleted ON glossary_term_domain_rel (deleted_at, term_id, domain_id);
+COMMENT ON TABLE glossary_term_domain_rel IS 'explicit glossary term domain membership';
+COMMENT ON COLUMN glossary_term_domain_rel.metalake_id IS 'owning metalake id';
+COMMENT ON COLUMN glossary_term_domain_rel.term_id IS 'member glossary term id';
+COMMENT ON COLUMN glossary_term_domain_rel.domain_id IS 'domain id';
+COMMENT ON COLUMN glossary_term_domain_rel.deleted_at IS 'retirement time in epoch milliseconds, advanced past retained generations to avoid collisions, 0 means live';

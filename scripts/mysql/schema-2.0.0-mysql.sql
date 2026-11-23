@@ -863,3 +863,14 @@ CREATE TABLE IF NOT EXISTS glossary_term_rel (
 CREATE TABLE IF NOT EXISTS glossary_hierarchy_lock (
     metalake_id BIGINT NOT NULL PRIMARY KEY COMMENT 'owning metalake id, one database mutex row per metalake'
 ) ENGINE=InnoDB COMMENT 'serializes glossary hierarchy and name checks within a metalake';
+
+CREATE TABLE IF NOT EXISTS glossary_term_domain_rel (
+    metalake_id BIGINT NOT NULL COMMENT 'owning metalake id',
+    term_id BIGINT NOT NULL COMMENT 'member glossary term id',
+    domain_id BIGINT NOT NULL COMMENT 'domain id',
+    deleted_at BIGINT NOT NULL DEFAULT 0 COMMENT 'retirement time in epoch milliseconds, advanced past retained generations to avoid collisions, 0 means live',
+    PRIMARY KEY (term_id, domain_id, deleted_at),
+    KEY idx_glossary_domain_rel_domain (domain_id, deleted_at),
+    KEY idx_glossary_domain_rel_metalake (metalake_id, deleted_at),
+    KEY idx_glossary_domain_rel_deleted (deleted_at, term_id, domain_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'explicit glossary term domain membership';

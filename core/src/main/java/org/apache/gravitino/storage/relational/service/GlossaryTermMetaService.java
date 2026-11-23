@@ -227,8 +227,8 @@ public final class GlossaryTermMetaService {
   }
 
   /**
-   * Soft-deletes the definition, synonyms and incident edges. Returns false if the term is absent
-   * in a live metalake.
+   * Soft-deletes the definition, synonyms, incident edges and domain membership. Returns false if
+   * the term is absent in a live metalake.
    *
    * @throws NoSuchEntityException if the parent metalake is absent or disappears before locking
    */
@@ -250,11 +250,12 @@ public final class GlossaryTermMetaService {
                   owners.softDeleteOwnerRelByMetadataObjectIdAndType(
                       row.getTermId(), Entity.EntityType.GLOSSARY_TERM.name()));
           GlossaryTermRelService.getInstance().removeTerm(metalakeId, row.getTermId());
+          GlossaryTermDomainService.getInstance().removeTerm(row.getTermId());
           return true;
         });
   }
 
-  /** Soft-deletes definitions and synonyms inside the metalake deletion transaction. */
+  /** Soft-deletes definitions, synonyms, edges and domain membership inside metalake deletion. */
   public void dropMetalake(long metalakeId) {
     long deletedAt = Math.max(1, System.currentTimeMillis());
     SessionUtils.doWithoutCommit(
@@ -263,17 +264,23 @@ public final class GlossaryTermMetaService {
           mapper.dropMetalake(metalakeId, deletedAt);
           mapper.dropMetalakeSynonyms(metalakeId, deletedAt);
           GlossaryTermRelService.getInstance().dropMetalake(metalakeId);
+          GlossaryTermDomainService.getInstance().dropMetalake(metalakeId);
         });
   }
 
   /**
-   * Purges at most limit expired relations/definitions and the definitions' synonyms atomically.
+   * Purges at most limit expired relations, domain memberships and definitions, with the
+   * definitions' synonyms, atomically.
    */
   public int collect(long cutoff, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         GlossaryTermMetaMapper.class,
         mapper -> {
           int count = GlossaryTermRelService.getInstance().collect(cutoff, limit);
+          if (count == limit) {
+            return count;
+          }
+          count += GlossaryTermDomainService.getInstance().collect(cutoff, limit - count);
           if (count == limit) {
             return count;
           }

@@ -84,6 +84,18 @@ public class TestSQLScripts extends TestJDBCBackend {
           Assertions.assertTrue(rows.next());
           Assertions.assertEquals(2, rows.getInt(1));
         }
+        String member =
+            "INSERT INTO glossary_term_domain_rel (metalake_id,term_id,domain_id,deleted_at) VALUES (100,101,201,0)";
+        statement.executeUpdate(member);
+        Assertions.assertThrows(SQLException.class, () -> statement.executeUpdate(member));
+        statement.executeUpdate(
+            "UPDATE glossary_term_domain_rel SET deleted_at=123 WHERE deleted_at=0");
+        statement.executeUpdate(member);
+        try (ResultSet rows =
+            statement.executeQuery("SELECT COUNT(*) FROM glossary_term_domain_rel")) {
+          Assertions.assertTrue(rows.next());
+          Assertions.assertEquals(2, rows.getInt(1));
+        }
       }
     }
   }
