@@ -238,11 +238,19 @@ dependencies {
 val s3aTestLibDirectory =
   "$rootDir/distribution/package-all/catalogs/lakehouse-paimon/libs"
 // hadoop-aws 3.4 is built on the AWS SDK v2, which is made of many jars. Provide all of them
-// except the ones the catalog already ships (same file name) and SLF4J, which the server provides.
+// except the modules the catalog already ships, in any version, so that no library ends up twice
+// in the directory, and SLF4J, which the server provides.
 val s3aTestJars =
   provider {
-    val shipped = configurations.runtimeClasspath.get().files.map { it.name }.toSet()
-    s3aTestRuntime.files.filter { !it.name.startsWith("slf4j-api-") && it.name !in shipped }
+    fun moduleOf(artifact: ResolvedArtifact) =
+      "${artifact.moduleVersion.id.group}:${artifact.moduleVersion.id.name}"
+    val shipped =
+      configurations.runtimeClasspath.get().resolvedConfiguration.resolvedArtifacts
+        .map(::moduleOf)
+        .toSet()
+    s3aTestRuntime.resolvedConfiguration.resolvedArtifacts
+      .filter { moduleOf(it) != "org.slf4j:slf4j-api" && moduleOf(it) !in shipped }
+      .map { it.file }
   }
 val copyS3ATestDependencies =
   tasks.register("copyS3ATestDependencies") {
