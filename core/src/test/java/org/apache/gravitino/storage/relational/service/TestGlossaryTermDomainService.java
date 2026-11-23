@@ -78,11 +78,17 @@ public class TestGlossaryTermDomainService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testRemoveReAddRemoveSameMillisecond() throws Exception {
+  public void testRepeatedRemovalAdvancesPastRetainedGeneration() throws Exception {
     setup();
-    for (int i = 0; i < 3; i++) {
+    long retained = Long.MAX_VALUE - 3;
+    run(() -> service.add(LAKE_ID, 101, sales));
+    SessionUtils.doWithCommit(
+        GlossaryTermDomainRelMapper.class, mapper -> mapper.remove(101, sales, retained));
+    for (int i = 1; i <= 2; i++) {
       run(() -> service.add(LAKE_ID, 101, sales));
       run(() -> service.remove(101, sales));
+      Assertions.assertEquals(
+          retained + i, scalar("SELECT MAX(deleted_at) FROM glossary_term_domain_rel"));
     }
     Assertions.assertTrue(read(() -> service.domainIds(101)).isEmpty());
     Assertions.assertEquals(
