@@ -80,6 +80,8 @@ It's also applicable for Azure Blob Storage(ADLS) and GCS.
 
 After updating the `hive-site.xml`, you need to ensure that the necessary S3-related JARs are included in the Hive classpath. You can do this by executing the following command:
 ```shell
+# Hadoop 3.3. Hadoop 3.4.3 has hadoop-aws under share/hadoop/common/lib and does not ship the AWS SDK v2
+# bundle jar, download software.amazon.awssdk:bundle from Maven Central instead.
 cp ${HADOOP_HOME}/share/hadoop/tools/lib/*aws* ${HIVE_HOME}/lib
 
 # For Azure Blob Storage(ADLS)

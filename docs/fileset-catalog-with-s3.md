@@ -254,7 +254,7 @@ environment:
 | Environment            | Jar providing the Amazon S3 filesystem                                                                                                                                             |
 |------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | No Hadoop installed    | [`gravitino-aws-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle), a fat jar bundling the Amazon S3 filesystem implementation and the AWS SDK |
-| Hadoop already present | `hadoop-aws-${hadoop-version}.jar` and the AWS SDK jar that matches the Hadoop version (see below), shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`            |
+| Hadoop already present | `hadoop-aws-${hadoop-version}.jar` and the AWS SDK jar that matches the Hadoop version (see below), taken from your Hadoop installation or Maven Central                         |
 
 The artifacts in full:
 
@@ -266,10 +266,16 @@ The artifacts in full:
   `gravitino-aws` functionality. Java and Hadoop-based clients require it to access Gravitino
   filesets.
 - `hadoop-aws-${hadoop-version}.jar` and the AWS SDK jar: the standard Hadoop dependencies for
-  Amazon S3 access, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`. Supply them
-  yourself when running inside an existing Hadoop environment. The AWS SDK jar depends on the
-  Hadoop version: Hadoop 3.3 uses the AWS SDK v1 (`aws-java-sdk-bundle-1.12.x.jar`), Hadoop 3.4 and
-  later use the AWS SDK v2 (`bundle-2.x.jar`).
+  Amazon S3 access. Supply them yourself when running inside an existing Hadoop environment. The
+  `hadoop-aws` jar must have exactly the version of the Hadoop libraries it runs with, otherwise
+  S3A fails with a `NoClassDefFoundError` or `NoSuchMethodError`. The AWS SDK jar depends on the
+  Hadoop version:
+  - Hadoop 3.3 uses the AWS SDK v1 (`aws-java-sdk-bundle-1.12.x.jar`). Both jars are under
+    `${HADOOP_HOME}/share/hadoop/tools/lib`.
+  - Hadoop 3.4 and later use the AWS SDK v2 (`software.amazon.awssdk:bundle`, `bundle-2.x.jar`).
+    In Hadoop 3.4.3, `hadoop-aws` is under `${HADOOP_HOME}/share/hadoop/common/lib` and the SDK
+    jar is not shipped. Download the `bundle` version that your `hadoop-aws` release was built
+    with from Maven Central.
 - [`gravitino-aws-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws):
   a "thin" jar carrying only the AWS integration code. It is already contained in both jars above,
   so it is not needed as a direct dependency unless you prefer to manage all Hadoop and AWS
@@ -346,9 +352,11 @@ fs.mkdirs(filesetPath);
 
 ### Apache Spark
 
-The example below uses PySpark 3.5.0 in an environment that already has Hadoop 3.3.4, which uses
-the AWS SDK v1. With Hadoop 3.4 and later, such as PySpark 4.0, replace the last two jars with the
-`hadoop-aws-${hadoop-version}.jar` and `bundle-2.x.jar` of that Hadoop version.
+The example below uses PySpark 3.5.0, which ships Hadoop 3.3.4 and uses the AWS SDK v1. Spark
+brings its own Hadoop libraries, so the `hadoop-aws` jar must have exactly the Hadoop version of
+your Spark (`hadoop-aws-3.3.4.jar` here). With Hadoop 3.4 and later, such as PySpark 4.0, replace
+the last two jars with the `hadoop-aws-${hadoop-version}.jar` and `bundle-2.x.jar` of the Hadoop
+version of your Spark.
 
 ```bash
 pip install pyspark==3.5.0
@@ -389,19 +397,10 @@ gvfs_path = "gvfs://fileset/s3_catalog/s3_schema/example_fileset/people"
 spark_df.coalesce(1).write.mode("overwrite").option("header", "true").csv(gvfs_path)
 ```
 
-If Spark runs without a Hadoop environment, only the jar list changes:
-
-```python
-os.environ["PYSPARK_SUBMIT_ARGS"] = (
-    "--jars /path/to/gravitino-aws-bundle-${gravitino-version}.jar,"
-    "/path/to/gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar "
-    "--master local[1] pyspark-shell"
-)
-```
-
 :::note
-Some Spark versions need a Hadoop environment in the driver and do not pick up filesystem
-implementations passed with `--jars`. If that happens, add the jars to the Spark classpath directly.
+Do not use `gravitino-aws-bundle` with a Spark distribution. The bundle carries Hadoop 3.4.3
+classes, which conflict with the Hadoop libraries of Spark and fail with a `NoSuchMethodError`.
+Use it for applications that run without any Hadoop installation.
 :::
 
 ### Hadoop fs command
@@ -442,7 +441,7 @@ implementations passed with `--jars`. If that happens, add the jars to the Spark
 2. Add these jars to the Hadoop classpath:
 
    - `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, from Maven Central.
-   - `hadoop-aws-${hadoop-version}.jar` and the AWS SDK jar (`aws-java-sdk-bundle-1.12.x.jar` for Hadoop 3.3, `bundle-2.x.jar` for Hadoop 3.4 and later), shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`.
+   - `hadoop-aws-${hadoop-version}.jar` and the AWS SDK jar (`aws-java-sdk-bundle-1.12.x.jar` for Hadoop 3.3, `bundle-2.x.jar` for Hadoop 3.4 and later). Hadoop 3.3 ships both under `${HADOOP_HOME}/share/hadoop/tools/lib`. Hadoop 3.4.3 has `hadoop-aws` on its classpath already and does not ship the SDK jar, so download `software.amazon.awssdk:bundle` from Maven Central.
 
 3. Access the fileset:
 
