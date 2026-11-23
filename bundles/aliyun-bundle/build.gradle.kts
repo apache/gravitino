@@ -29,6 +29,9 @@ dependencies {
 
   implementation(libs.aliyun.credentials.sdk)
   implementation(libs.commons.collections3)
+  // hadoop-aliyun 3.4 uses Commons Collections 4 (getFileStatus and deleteObjects), which
+  // hadoop-client-runtime shades for its own use only.
+  implementation(libs.commons.collections4)
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
   implementation(libs.hadoop3.oss)

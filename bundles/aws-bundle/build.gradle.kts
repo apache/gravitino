@@ -46,6 +46,9 @@ dependencies {
   implementation(libs.aws.iam)
   implementation(libs.aws.policy)
   implementation(libs.aws.sts)
+  // hadoop-aws 3.4 uses Commons Collections 4 (copyFromLocalFile), which hadoop-client-runtime
+  // shades for its own use only.
+  implementation(libs.commons.collections4)
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
 
