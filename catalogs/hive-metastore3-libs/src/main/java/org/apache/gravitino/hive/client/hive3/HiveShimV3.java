@@ -172,6 +172,16 @@ public class HiveShimV3 extends HiveShim {
 
   /** {@inheritDoc} */
   @Override
+  public String getTableIdentifier(String catalogName, String databaseName, String tableName) {
+    Table table =
+        invoke(
+            ExceptionTarget.table(tableName),
+            () -> client.getTable(catalogName, databaseName, tableName));
+    return tableIdentifier(table, tableName);
+  }
+
+  /** {@inheritDoc} */
+  @Override
   protected List<FieldSchema> getFields(String catalogName, String databaseName, String tableName)
       throws TException {
     return client.getFields(catalogName, databaseName, tableName);

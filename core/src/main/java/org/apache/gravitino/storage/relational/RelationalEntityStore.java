@@ -55,6 +55,7 @@ import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsDomainOperations;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.SupportsTableIdLookup;
 import org.apache.gravitino.cache.BaseEntityCache;
 import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
@@ -70,6 +71,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
@@ -96,6 +98,7 @@ import org.slf4j.LoggerFactory;
  */
 public class RelationalEntityStore
     implements EntityStore,
+        SupportsTableIdLookup,
         SupportsRelationOperations,
         SupportsDomainOperations,
         SupportsEntityChangeLog {
@@ -391,6 +394,27 @@ public class RelationalEntityStore
     E entity = backend.get(ident, entityType);
     cacheIfEpochUnchanged(entity, epochBeforeRead);
     return entity;
+  }
+
+  @Override
+  public long getTableId(NameIdentifier ident) throws IOException {
+    Entity.EntityType entityType = Entity.EntityType.TABLE;
+    Optional<Long> cachedId =
+        cache.withCacheLock(
+            EntityCacheKey.of(ident, entityType),
+            () -> {
+              if (isCacheObservationBlocked(ident, entityType)) {
+                return Optional.empty();
+              }
+              Optional<TableEntity> cached = cache.getIfPresent(ident, entityType);
+              return cached.map(TableEntity::id);
+            });
+    // Do not publish a partial TableEntity or introduce a separate name-to-ID cache. JDBC stays
+    // outside the segment lock, matching get().
+    if (cachedId.isPresent()) {
+      return cachedId.get();
+    }
+    return backend.getTableId(ident);
   }
 
   @Override

@@ -47,6 +47,8 @@ import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.job.JobOperationDispatcher;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.policy.PolicyDispatcher;
@@ -376,7 +378,8 @@ public class TestMetadataObjectUtil {
     verify(catalogDispatcher).catalogExists(catalogIdent);
     verify(schemaDispatcher).schemaExists(schemaIdent);
     verify(filesetDispatcher).filesetExists(filesetIdent);
-    verify(tableDispatcher, times(2)).tableExists(tableIdent);
+    verify(tableDispatcher).tableExists(tableIdent);
+    verify(tableDispatcher).loadTable(tableIdent);
     verify(topicDispatcher).topicExists(topicIdent);
     verify(modelDispatcher).modelExists(modelIdent);
     verify(functionDispatcher).functionExists(functionIdent);
@@ -407,9 +410,10 @@ public class TestMetadataObjectUtil {
       MetadataObjectUtil.checkMetadataObjects("metalake", List.of(table, first, second, table));
       verify(dispatcher, times(1)).tableExists(tableIdentifier);
       MetadataObjectUtil.checkMetadataObjects("metalake", List.of(first, second, table));
-      verify(dispatcher, times(2)).tableExists(tableIdentifier);
+      verify(dispatcher, times(1)).tableExists(tableIdentifier);
+      verify(dispatcher, times(2)).loadTable(tableIdentifier);
 
-      when(dispatcher.tableExists(tableIdentifier)).thenReturn(false);
+      when(dispatcher.loadTable(tableIdentifier)).thenThrow(new NoSuchTableException("missing"));
       NoSuchMetadataObjectException exception =
           Assertions.assertThrows(
               NoSuchMetadataObjectException.class,
@@ -417,7 +421,8 @@ public class TestMetadataObjectUtil {
       Assertions.assertEquals(
           "Metadata object catalog.schema.table.first type COLUMN doesn't exist",
           exception.getMessage());
-      verify(dispatcher, times(3)).tableExists(tableIdentifier);
+      verify(dispatcher, times(1)).tableExists(tableIdentifier);
+      verify(dispatcher, times(3)).loadTable(tableIdentifier);
     }
   }
 
@@ -435,9 +440,39 @@ public class TestMetadataObjectUtil {
               MetadataObjects.of("catalog.schema.table", "first", MetadataObject.Type.COLUMN),
               MetadataObjects.of("catalog.other.table", "second", MetadataObject.Type.COLUMN),
               MetadataObjects.of("other.schema", "table", MetadataObject.Type.TABLE)));
-      verify(dispatcher).tableExists(NameIdentifier.of("metalake", "catalog", "schema", "table"));
-      verify(dispatcher).tableExists(NameIdentifier.of("metalake", "catalog", "other", "table"));
+      verify(dispatcher).loadTable(NameIdentifier.of("metalake", "catalog", "schema", "table"));
+      verify(dispatcher).loadTable(NameIdentifier.of("metalake", "catalog", "other", "table"));
       verify(dispatcher).tableExists(NameIdentifier.of("metalake", "other", "schema", "table"));
+    }
+  }
+
+  @Test
+  void testColumnRefreshPreservesMissingObjectAndSourceFailureBehavior() {
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    TableDispatcher dispatcher = mock(TableDispatcher.class);
+    when(env.internalTableDispatcher()).thenReturn(dispatcher);
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    MetadataObject column =
+        MetadataObjects.of("catalog.schema.table", "column", MetadataObject.Type.COLUMN);
+    when(dispatcher.loadTable(ident))
+        .thenThrow(new NoSuchTableException("missing table"))
+        .thenThrow(new NoSuchSchemaException("missing schema"))
+        .thenThrow(new IllegalStateException("source unavailable"));
+    try (MockedStatic<GravitinoEnv> mockedEnv = mockStatic(GravitinoEnv.class)) {
+      mockedEnv.when(GravitinoEnv::getInstance).thenReturn(env);
+      for (int i = 0; i < 2; i++) {
+        NoSuchMetadataObjectException failure =
+            Assertions.assertThrows(
+                NoSuchMetadataObjectException.class,
+                () -> MetadataObjectUtil.checkMetadataObject("metalake", column));
+        Assertions.assertEquals(
+            "Metadata object catalog.schema.table.column type COLUMN doesn't exist",
+            failure.getMessage());
+      }
+      Assertions.assertThrows(
+          IllegalStateException.class,
+          () -> MetadataObjectUtil.checkMetadataObject("metalake", column));
+      verify(dispatcher, never()).tableExists(any());
     }
   }
 

@@ -176,6 +176,49 @@ postgresql:
     ##
     existingSecretPasswordKey: password
 
+## Schema migration (regular Job + Deployment wait)
+## Runs once per revision as a normal Job (#11099, #9013). Application Pods wait
+## for gravitino_schema_migration before starting. When enabled, per-pod
+## init-mysql / init-postgresql schema apply is replaced by wait-only inits.
+##
+schema:
+  migrate:
+    ## @param schema.migrate.enabled Run a schema-migrate Job for entity DB schema.
+    enabled: false
+    ## @param schema.migrate.backoffLimit Job retries before the Job fails.
+    backoffLimit: 3
+    ## @param schema.migrate.activeDeadlineSeconds Hard limit for the migrate Job.
+    activeDeadlineSeconds: 600
+    ## @param schema.migrate.existingSecret Password Secret for external MySQL/PostgreSQL (required when no in-chart DB).
+    existingSecret: ""
+    ## @param schema.migrate.existingSecretPasswordKey Key in existingSecret for entity.jdbcUser password.
+    existingSecretPasswordKey: password
+  ## How long Gravitino Pods wait for gravitino_schema_migration before the init fails.
+  wait:
+    timeoutSeconds: 600
+  ## Used when an existing database has no gravitino_schema_migration row and the
+  ## version cannot be inferred from tables. When consumed it must be X.Y.Z (the
+  ## Job validates only on that path; unused/stale values are ignored). Set to
+  ## the Gravitino version that created the database (for example 1.2.0), or to
+  ## the image version to only record and skip DDL. Inference only trusts
+  ## upgrade scripts that ADD COLUMN; index-only upgrades need this baseline.
+  baselineVersion: ""
+  ## Optional overrides when entity.jdbcUrl is not enough (IPv6, multi-host, and so on).
+  dbHost: ""
+  dbPort: ""
+  dbName: ""
+  ## PostgreSQL libpq sslmode for the migrate Job when using external PostgreSQL.
+  sslMode: ""
+  ## PostgreSQL search_path for the migrate Job (external PostgreSQL).
+  ## Simple identifiers only; mixed case is folded to lowercase for lookup,
+  ## CREATE SCHEMA, and search_path (unquoted PostgreSQL identifier / JDBC
+  ## currentSchema semantics, e.g. App → app).
+  currentSchema: ""
+  ssl:
+    ## @param schema.ssl.existingSecret CA Secret for verify-ca / verify-full (PGSSLROOTCERT).
+    existingSecret: ""
+    caCert: ca.crt
+
 ## THE CONFIGURATION FOR Gravitino ENTITY STORE
 ##
 entity:
