@@ -110,6 +110,7 @@ import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.apache.gravitino.server.web.rest.DomainMembershipOperations;
 import org.apache.gravitino.server.web.rest.DomainOperations;
 import org.apache.gravitino.server.web.rest.JobOperations;
+import org.apache.gravitino.server.web.rest.MetadataObjectCredentialOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectDomainOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectPolicyOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectSemanticModelOperations;
@@ -151,6 +152,41 @@ public class TestGravitinoInterceptionService {
   public void clearRequestContext() {
     RequestContext.resetOperationFailureFired();
     RequestContext.clear();
+  }
+
+  /**
+   * Checks that token vending retains the standard catalog metadata authorization gate.
+   *
+   * @param useCatalog whether the caller can access the catalog
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testCredentialsRequireCatalogMetadataAccess(boolean useCatalog) throws Throwable {
+    Method method =
+        MetadataObjectCredentialOperations.class.getMethod(
+            "getCredentials", String.class, String.class, String.class);
+    MethodInvocation invocation = mock(MethodInvocation.class);
+    when(invocation.getMethod()).thenReturn(method);
+    when(invocation.getArguments())
+        .thenReturn(new Object[] {"testMetalake", "catalog", "testCatalog"});
+    when(invocation.proceed()).thenReturn(Utils.ok("ok"));
+
+    Descriptor descriptor = mock(Descriptor.class);
+    when(descriptor.getImplementation())
+        .thenReturn(MetadataObjectCredentialOperations.class.getName());
+    Assertions.assertTrue(
+        new GravitinoInterceptionService().getDescriptorFilter().matches(descriptor));
+
+    try (Response response =
+        invokeWithAuthorizer(
+            catalogConnectionAuthorizer(useCatalog, false), mock(EventBus.class), invocation)) {
+      assertEquals(useCatalog ? 200 : 403, response.getStatus());
+    }
+    if (useCatalog) {
+      verify(invocation).proceed();
+    } else {
+      verify(invocation, never()).proceed();
+    }
   }
 
   @ParameterizedTest
@@ -1996,15 +2032,14 @@ public class TestGravitinoInterceptionService {
     GravitinoAuthorizer authorizer = catalogConnectionAuthorizer(true, false);
 
     MethodInvocation noBody = testExistingConnectionInvocation(null);
-    Response noBodyResponse =
-        invokeTestExistingConnection(authorizer, mock(EventBus.class), noBody);
+    Response noBodyResponse = invokeWithAuthorizer(authorizer, mock(EventBus.class), noBody);
     assertEquals(Response.Status.OK.getStatusCode(), noBodyResponse.getStatus());
     verify(noBody).proceed();
 
     MethodInvocation emptyChanges =
         testExistingConnectionInvocation(new CatalogUpdatesRequest(Collections.emptyList()));
     Response emptyChangesResponse =
-        invokeTestExistingConnection(authorizer, mock(EventBus.class), emptyChanges);
+        invokeWithAuthorizer(authorizer, mock(EventBus.class), emptyChanges);
     assertEquals(Response.Status.OK.getStatusCode(), emptyChangesResponse.getStatus());
     verify(emptyChanges).proceed();
   }
@@ -2015,8 +2050,7 @@ public class TestGravitinoInterceptionService {
     MethodInvocation invocation = testExistingConnectionInvocation(proposedCatalogChanges());
 
     Response response =
-        invokeTestExistingConnection(
-            catalogConnectionAuthorizer(true, false), eventBus, invocation);
+        invokeWithAuthorizer(catalogConnectionAuthorizer(true, false), eventBus, invocation);
 
     assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
     verify(invocation, never()).proceed();
@@ -2035,7 +2069,7 @@ public class TestGravitinoInterceptionService {
     MethodInvocation invocation = testExistingConnectionInvocation(proposedCatalogChanges());
 
     Response response =
-        invokeTestExistingConnection(
+        invokeWithAuthorizer(
             catalogConnectionAuthorizer(false, true), mock(EventBus.class), invocation);
 
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -2187,7 +2221,7 @@ public class TestGravitinoInterceptionService {
     return authorizer;
   }
 
-  private Response invokeTestExistingConnection(
+  private Response invokeWithAuthorizer(
       GravitinoAuthorizer authorizer, EventBus eventBus, MethodInvocation invocation)
       throws Throwable {
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);

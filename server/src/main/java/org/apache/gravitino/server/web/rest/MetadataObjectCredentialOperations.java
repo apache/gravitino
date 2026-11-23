@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
@@ -109,22 +110,6 @@ public class MetadataObjectCredentialOperations {
 
             NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
             Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object);
-            // Catalog credentials are not restricted to individual tables or paths. Metadata access
-            // alone must not grant the catalog account's source privileges.
-            if (object.type() == MetadataObject.Type.CATALOG
-                && (!MetadataAuthzHelper.checkAccess(
-                        identifier,
-                        entityType,
-                        AuthorizationExpressionConstants.FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION)
-                    || !MetadataAuthzHelper.checkAccess(
-                        identifier,
-                        entityType,
-                        AuthorizationExpressionConstants
-                            .FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION))) {
-              throw new ForbiddenException(
-                  "Catalog credentials require USE_SECRETS and INCLUDE_CREDENTIAL_SECRETS");
-            }
-
             Map<String, String> filteredFilesetHeaders =
                 Utils.filterFilesetCredentialHeaders(httpRequest);
             // set the fileset info into the thread local context
@@ -147,6 +132,28 @@ public class MetadataObjectCredentialOperations {
                 credentialOperationDispatcher.getCredentials(identifier, privilege);
             if (credentials == null) {
               return Utils.ok(new CredentialResponse(new CredentialDTO[0]));
+            }
+            // Metadata access permits token vending, but must not expose the catalog account's
+            // long-lived credentials. Filter mixed results before converting them to DTOs.
+            if (object.type() == MetadataObject.Type.CATALOG
+                && !credentials.isEmpty()
+                && (!MetadataAuthzHelper.checkAccess(
+                        identifier,
+                        entityType,
+                        AuthorizationExpressionConstants.FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION)
+                    || !MetadataAuthzHelper.checkAccess(
+                        identifier,
+                        entityType,
+                        AuthorizationExpressionConstants
+                            .FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION))) {
+              credentials =
+                  credentials.stream()
+                      .filter(credential -> credential.expireTimeInMs() > 0)
+                      .collect(Collectors.toList());
+              if (credentials.isEmpty()) {
+                throw new ForbiddenException(
+                    "Catalog credentials require USE_SECRETS and INCLUDE_CREDENTIAL_SECRETS");
+              }
             }
             return Utils.ok(
                 new CredentialResponse(

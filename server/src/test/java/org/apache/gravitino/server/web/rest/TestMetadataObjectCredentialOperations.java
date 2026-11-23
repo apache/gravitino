@@ -22,11 +22,15 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
@@ -35,9 +39,21 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.credential.ADLSTokenCredential;
+import org.apache.gravitino.credential.AwsIrsaCredential;
+import org.apache.gravitino.credential.AwsSecretKeyCredential;
+import org.apache.gravitino.credential.AzureAccountKeyCredential;
+import org.apache.gravitino.credential.COSSecretKeyCredential;
+import org.apache.gravitino.credential.COSTokenCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
+import org.apache.gravitino.credential.DlfSecretKeyCredential;
+import org.apache.gravitino.credential.GCSTokenCredential;
+import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.credential.OSSSecretKeyCredential;
+import org.apache.gravitino.credential.OSSTokenCredential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.dto.responses.CredentialResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
@@ -50,6 +66,9 @@ import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
 
 public class TestMetadataObjectCredentialOperations extends JerseyTest {
@@ -92,44 +111,57 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
     return resourceConfig;
   }
 
-  /** Checks catalog secret privileges without changing fileset authorization. */
-  @Test
-  public void testCatalogCredentialsRequireBothSecretPrivileges() throws Exception {
-    for (boolean useSecrets : new boolean[] {false, true}) {
-      for (boolean includeCredentials : new boolean[] {false, true}) {
-        CredentialOperationDispatcher dispatcher = mock(CredentialOperationDispatcher.class);
-        MetadataObjectCredentialOperations operations =
-            new MetadataObjectCredentialOperations(dispatcher);
-        FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
-        try (MockedStatic<MetadataAuthzHelper> auth = mockStatic(MetadataAuthzHelper.class)) {
-          auth.when(
-                  () ->
-                      MetadataAuthzHelper.checkAccess(
-                          any(),
-                          any(Entity.EntityType.class),
-                          eq(
-                              AuthorizationExpressionConstants
-                                  .FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION)))
-              .thenReturn(useSecrets);
-          auth.when(
-                  () ->
-                      MetadataAuthzHelper.checkAccess(
-                          any(),
-                          any(Entity.EntityType.class),
-                          eq(
-                              AuthorizationExpressionConstants
-                                  .FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION)))
-              .thenReturn(includeCredentials);
-          try (Response response = operations.getCredentials("test", "catalog", "catalog")) {
-            Assertions.assertEquals(
-                useSecrets && includeCredentials ? 200 : 403, response.getStatus());
-          }
-          if (!useSecrets || !includeCredentials) verifyNoInteractions(dispatcher);
-          try (Response response =
-              operations.getCredentials("test", "fileset", "catalog.schema.fileset")) {
-            Assertions.assertEquals(200, response.getStatus());
-          }
+  /** Checks that each token type is available without static-secret privileges. */
+  @ParameterizedTest
+  @MethodSource("tokenCredentials")
+  public void testCatalogTokenCredentials(Credential token) throws Exception {
+    assertCredentialsForSecretPrivileges(
+        Collections.singletonList(token), Collections.singletonList(token));
+  }
+
+  /** Checks that every static credential type still requires both privileges. */
+  @ParameterizedTest
+  @MethodSource("staticCredentials")
+  public void testCatalogStaticCredentials(Credential credential) throws Exception {
+    assertCredentialsForSecretPrivileges(
+        Collections.singletonList(credential), Collections.emptyList());
+  }
+
+  /** Checks that mixed results never include static credentials without both privileges. */
+  @ParameterizedTest
+  @MethodSource("staticCredentials")
+  public void testCatalogMixedCredentials(Credential credential) throws Exception {
+    List<Credential> tokens = tokenCredentials().collect(Collectors.toList());
+    List<Credential> credentials = new ArrayList<>(tokens);
+    credentials.add(0, credential);
+    assertCredentialsForSecretPrivileges(credentials, tokens);
+  }
+
+  /** Checks empty provider results and preserves fileset credential behavior. */
+  @ParameterizedTest
+  @CsvSource({"false,false", "false,true", "true,false", "true,true"})
+  public void testEmptyCatalogAndFilesetCredentials(boolean useSecrets, boolean includeCredentials)
+      throws Exception {
+    MetadataObjectCredentialOperations operations =
+        new MetadataObjectCredentialOperations(credentialOperationDispatcher);
+    FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
+    try (MockedStatic<MetadataAuthzHelper> auth = mockStatic(MetadataAuthzHelper.class)) {
+      mockSecretPrivileges(auth, useSecrets, includeCredentials);
+      for (List<Credential> credentials :
+          Arrays.<List<Credential>>asList(null, Collections.emptyList())) {
+        when(credentialOperationDispatcher.getCredentials(any(), any())).thenReturn(credentials);
+        try (Response response = operations.getCredentials("test", "catalog", "catalog")) {
+          assertCredentials(response, Collections.emptyList());
         }
+      }
+      List<Credential> credentials =
+          Arrays.asList(
+              new S3SecretKeyCredential("access-id", "secret-key"),
+              new S3TokenCredential("access-id", "secret-key", "token", Long.MAX_VALUE));
+      when(credentialOperationDispatcher.getCredentials(any(), any())).thenReturn(credentials);
+      try (Response response =
+          operations.getCredentials("test", "fileset", "catalog.schema.fileset")) {
+        assertCredentials(response, credentials);
       }
     }
   }
@@ -196,6 +228,90 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
     ErrorResponse error = response.readEntity(ErrorResponse.class);
     Assertions.assertTrue(error.getMessage().contains("abfs or abfss"));
     Assertions.assertTrue(error.getMessage().contains(path));
+  }
+
+  private static Stream<Credential> tokenCredentials() {
+    return Stream.of(
+        new S3TokenCredential("access-id", "secret-key", "token", Long.MAX_VALUE),
+        new OSSTokenCredential("access-id", "secret-key", "token", Long.MAX_VALUE),
+        new ADLSTokenCredential("account", "sas-token", Long.MAX_VALUE),
+        new GCSTokenCredential("token", Long.MAX_VALUE),
+        new AwsIrsaCredential("access-id", "secret-key", "token", Long.MAX_VALUE),
+        new COSTokenCredential("access-id", "secret-key", "token", Long.MAX_VALUE));
+  }
+
+  private static Stream<Credential> staticCredentials() {
+    return Stream.of(
+        new JdbcCredential("user", "password"),
+        new S3SecretKeyCredential("access-id", "secret-key"),
+        new OSSSecretKeyCredential("access-id", "secret-key"),
+        new AzureAccountKeyCredential("account", "key"),
+        new AwsSecretKeyCredential("access-id", "secret-key"),
+        new DlfSecretKeyCredential("access-id", "secret-key", "static-security-token"),
+        new COSSecretKeyCredential("access-id", "secret-key"));
+  }
+
+  private void assertCredentialsForSecretPrivileges(
+      List<Credential> credentials, List<Credential> tokens) throws Exception {
+    MetadataObjectCredentialOperations operations =
+        new MetadataObjectCredentialOperations(credentialOperationDispatcher);
+    FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
+    when(credentialOperationDispatcher.getCredentials(any(), any())).thenReturn(credentials);
+    for (boolean useSecrets : new boolean[] {false, true}) {
+      for (boolean includeCredentials : new boolean[] {false, true}) {
+        try (MockedStatic<MetadataAuthzHelper> auth = mockStatic(MetadataAuthzHelper.class)) {
+          mockSecretPrivileges(auth, useSecrets, includeCredentials);
+          try (Response response = operations.getCredentials("test", "catalog", "catalog")) {
+            if (useSecrets && includeCredentials) {
+              assertCredentials(response, credentials);
+            } else if (!tokens.isEmpty()) {
+              assertCredentials(response, tokens);
+            } else {
+              Assertions.assertEquals(403, response.getStatus());
+              Assertions.assertTrue(
+                  ((ErrorResponse) response.getEntity())
+                      .getMessage()
+                      .contains(
+                          "Catalog credentials require USE_SECRETS and INCLUDE_CREDENTIAL_SECRETS"));
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private void mockSecretPrivileges(
+      MockedStatic<MetadataAuthzHelper> auth, boolean useSecrets, boolean includeCredentials) {
+    auth.when(
+            () ->
+                MetadataAuthzHelper.checkAccess(
+                    any(),
+                    any(Entity.EntityType.class),
+                    eq(
+                        AuthorizationExpressionConstants
+                            .FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION)))
+        .thenReturn(useSecrets);
+    auth.when(
+            () ->
+                MetadataAuthzHelper.checkAccess(
+                    any(),
+                    any(Entity.EntityType.class),
+                    eq(
+                        AuthorizationExpressionConstants
+                            .FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION)))
+        .thenReturn(includeCredentials);
+  }
+
+  private void assertCredentials(Response response, List<Credential> expected) {
+    Assertions.assertEquals(200, response.getStatus());
+    CredentialResponse result = (CredentialResponse) response.getEntity();
+    Assertions.assertEquals(0, result.getCode());
+    Assertions.assertEquals(expected.size(), result.getCredentials().length);
+    for (int i = 0; i < expected.size(); i++) {
+      Assertions.assertEquals(
+          expected.get(i).toProperties(),
+          DTOConverters.fromDTO(result.getCredentials()[i]).toProperties());
+    }
   }
 
   private void testGetCredentialsForObject(MetadataObject metadataObject) {
