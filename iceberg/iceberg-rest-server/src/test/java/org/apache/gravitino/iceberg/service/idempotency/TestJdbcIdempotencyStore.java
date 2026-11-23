@@ -444,10 +444,10 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testMethodPathAndQueryDigestAreStoredSeparately() throws Exception {
-    String path = "/" + "x".repeat(1024);
-    String digest = "66532a1d5c66e58204f1ed51206ebc902cc7cea6673cc76547e83f630ab80bfe";
-    String binding = "POST " + path + "?" + digest;
+  void testStoresMethodAndCompleteRequestUri() throws Exception {
+    // Jetty accepts request targets longer than MySQL's 64 KiB TEXT limit by default.
+    String uri = "/v1/cat1/namespaces/ns%2Fone/tables?tag=" + "x".repeat(70_000) + "%26y";
+    String binding = "POST " + uri;
     long claim = store.reserve(KEY, binding, FAR_FUTURE_MS).orElseThrow();
     store.finalizeRecord(KEY, claim, 200, "{}");
     Assertions.assertEquals(binding, peer.load(KEY).orElseThrow().operationBinding());
@@ -456,11 +456,12 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
         var statement = session.getConnection().createStatement();
         var result =
             statement.executeQuery(
-                "SELECT http_method, request_uri, query_digest, generation FROM iceberg_idempotency_meta")) {
+                "SELECT http_method, request_uri, generation FROM iceberg_idempotency_meta")) {
       Assertions.assertTrue(result.next());
       Assertions.assertEquals("POST", result.getString("http_method"));
-      Assertions.assertEquals(path, result.getString("request_uri"));
-      Assertions.assertEquals(digest, result.getString("query_digest"));
+      String storedUri = result.getString("request_uri");
+      Assertions.assertEquals(uri.length(), storedUri.length());
+      Assertions.assertEquals(uri, storedUri);
       Assertions.assertEquals(claim, result.getLong("generation"));
     }
   }

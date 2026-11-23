@@ -282,16 +282,15 @@ MySQL:
 
 ```sql
 CREATE TABLE IF NOT EXISTS `iceberg_idempotency_meta` (
-  `idempotency_key`   VARCHAR(36)         NOT NULL COMMENT 'client-provided UUIDv7 idempotency key',
-  `http_method`      VARCHAR(16) NOT NULL COMMENT 'HTTP method of the request',
-  `request_uri`      TEXT NOT NULL COMMENT 'encoded request path',
-  `query_digest`     VARCHAR(64) DEFAULT NULL COMMENT 'SHA-256 of the canonical query string, if any',
-  `generation`       BIGINT NOT NULL COMMENT 'reservation fencing token',
-  `http_status`       INT(10)    UNSIGNED DEFAULT NULL COMMENT 'HTTP status of finalized response, NULL while reserved',
-  `response_summary`  MEDIUMTEXT          DEFAULT NULL COMMENT 'serialized response body (JSON) for replay',
-  `audit_info`        MEDIUMTEXT          NOT NULL COMMENT 'idempotency record audit info',
-  `created_at`        BIGINT(20) UNSIGNED NOT NULL COMMENT 'record created at (unix epoch millis)',
-  `expires_at`        BIGINT(20) UNSIGNED NOT NULL COMMENT 'record expires at (unix epoch millis)',
+  `idempotency_key`  VARCHAR(36)         NOT NULL     COMMENT 'client-provided UUIDv7 idempotency key',
+  `http_method`      VARCHAR(16)         NOT NULL     COMMENT 'HTTP method of the request',
+  `request_uri`      MEDIUMTEXT          NOT NULL     COMMENT 'encoded request path and sorted query string',
+  `generation`       BIGINT              NOT NULL     COMMENT 'reservation fencing token',
+  `http_status`      INT(10) UNSIGNED    DEFAULT NULL COMMENT 'HTTP status of finalized response, NULL while reserved',
+  `response_summary` MEDIUMTEXT          DEFAULT NULL COMMENT 'serialized response body (JSON) for replay',
+  `audit_info`       MEDIUMTEXT          NOT NULL     COMMENT 'idempotency record audit info',
+  `created_at`       BIGINT(20) UNSIGNED NOT NULL     COMMENT 'record created at (unix epoch millis)',
+  `expires_at`       BIGINT(20) UNSIGNED NOT NULL     COMMENT 'record expires at (unix epoch millis)',
   PRIMARY KEY (`idempotency_key`),
   KEY `idx_iim_expires` (`expires_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Iceberg REST idempotency records';
@@ -315,10 +314,10 @@ A per-key counter initialized to 1 would repeat after deletion and let a late
 owner touch the new reservation. The store returns the generation as the claim
 that finalize and release match against the current row.
 
-The HTTP method and encoded path are readable in `http_method` and
-`request_uri`. The service hashes the sorted, encoded query string into
-`query_digest` to distinguish requests without persisting caller-supplied
-query values.
+The HTTP method is stored in `http_method`. The `request_uri` column stores
+the encoded path plus the sorted, encoded query string when present. MySQL
+uses `MEDIUMTEXT` because the default HTTP request limit permits targets
+longer than MySQL's 64 KiB `TEXT` limit.
 
 ### 4.1 Row Lifecycle
 

@@ -39,7 +39,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * mapped by {@link IcebergIdempotencyKeyMapper}, and converts to the {@link IdempotencyRecord} the
  * store SPI hands back. Instances are created through the generated {@code builder()} (or populated
  * by MyBatis via field reflection through the private no-arg constructor) and expose no setters.
- * MyBatis fills in the generated fencing token on insert.
+ * The store supplies the fencing token when it inserts or replaces the reservation.
  */
 @Getter
 @Builder(setterPrefix = "with")
@@ -50,7 +50,6 @@ public class IcebergIdempotencyKeyPO {
   private String idempotencyKey;
   private String httpMethod;
   private String requestUri;
-  @Nullable private String queryDigest;
   private Long generation;
   @Nullable private Integer httpStatus;
   @Nullable private String responseSummary;
@@ -77,13 +76,11 @@ public class IcebergIdempotencyKeyPO {
       long expiresAtMs) {
     int separator = operationBinding.indexOf(' ');
     String method = separator < 0 ? operationBinding : operationBinding.substring(0, separator);
-    String target = separator < 0 ? "" : operationBinding.substring(separator + 1);
-    int query = target.indexOf('?');
+    String uri = separator < 0 ? "" : operationBinding.substring(separator + 1);
     return builder()
         .withIdempotencyKey(idempotencyKey)
         .withHttpMethod(method)
-        .withRequestUri(query < 0 ? target : target.substring(0, query))
-        .withQueryDigest(query < 0 ? null : target.substring(query + 1))
+        .withRequestUri(uri)
         .withGeneration(generation)
         .withHttpStatus(null)
         .withResponseSummary(null)
@@ -100,9 +97,6 @@ public class IcebergIdempotencyKeyPO {
    */
   public IdempotencyRecord toIdempotencyRecord() {
     String binding = requestUri.isEmpty() ? httpMethod : httpMethod + " " + requestUri;
-    if (queryDigest != null) {
-      binding += "?" + queryDigest;
-    }
     IdempotencyRecord record =
         IdempotencyRecord.reserved(idempotencyKey, binding, generation, createdAt, expiresAt);
     return httpStatus == null ? record : record.withResponse(httpStatus, responseSummary);

@@ -22,7 +22,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.hash.Hashing;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -209,8 +208,7 @@ public class IcebergIdempotencyManager {
    *
    * <p>The identity covers the method, encoded path, and sorted, encoded query parameters. Bodies
    * and behavior-changing headers are not compared; clients must use a fresh key for a different
-   * logical operation. The manager stores a SHA-256 digest of the complete identity to fit the
-   * store's bounded binding column without truncating distinct requests.
+   * logical operation.
    *
    * @param httpMethod the HTTP method of the endpoint
    * @param uriInfo the request URI, may be {@code null} outside a request context
@@ -235,9 +233,7 @@ public class IcebergIdempotencyManager {
                   + URLEncoder.encode(value, StandardCharsets.UTF_8));
         }
       }
-      binding
-          .append('?')
-          .append(Hashing.sha256().hashString(query.toString(), StandardCharsets.UTF_8));
+      binding.append('?').append(query);
     }
     return binding.toString();
   }

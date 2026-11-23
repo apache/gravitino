@@ -35,9 +35,9 @@ public class IcebergIdempotencyKeyBaseSQLProvider {
   public String insert(@Param("po") IcebergIdempotencyKeyPO po) {
     return "INSERT INTO "
         + TABLE_NAME
-        + " (idempotency_key, http_method, request_uri, query_digest, generation, audit_info, created_at, expires_at)"
-        + " VALUES (#{po.idempotencyKey}, #{po.httpMethod}, #{po.requestUri}, #{po.queryDigest}, #{po.generation}, #{po.auditInfo},"
-        + " #{po.createdAt}, #{po.expiresAt})";
+        + " (idempotency_key, http_method, request_uri, generation, audit_info, created_at, expires_at)"
+        + " VALUES (#{po.idempotencyKey}, #{po.httpMethod}, #{po.requestUri}, #{po.generation},"
+        + " #{po.auditInfo}, #{po.createdAt}, #{po.expiresAt})";
   }
 
   /**
@@ -49,8 +49,7 @@ public class IcebergIdempotencyKeyBaseSQLProvider {
   public String replaceExpired(@Param("po") IcebergIdempotencyKeyPO po) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET http_method = #{po.httpMethod}, request_uri = #{po.requestUri},"
-        + " query_digest = #{po.queryDigest}, generation = #{po.generation},"
+        + " SET http_method = #{po.httpMethod}, request_uri = #{po.requestUri}, generation = #{po.generation},"
         + " http_status = NULL, response_summary = NULL, audit_info = #{po.auditInfo},"
         + " created_at = #{po.createdAt}, expires_at = #{po.expiresAt}"
         + " WHERE idempotency_key = #{po.idempotencyKey} AND expires_at <= #{po.createdAt}";
@@ -77,7 +76,7 @@ public class IcebergIdempotencyKeyBaseSQLProvider {
   public String selectRecord(
       @Param("idempotencyKey") String idempotencyKey, @Param("nowMs") long nowMs) {
     return "SELECT idempotency_key AS idempotencyKey, http_method AS httpMethod, request_uri AS requestUri,"
-        + " query_digest AS queryDigest, generation, http_status AS httpStatus, response_summary AS responseSummary,"
+        + " generation, http_status AS httpStatus, response_summary AS responseSummary,"
         + " audit_info AS auditInfo, created_at AS createdAt, expires_at AS expiresAt FROM "
         + TABLE_NAME
         + " WHERE idempotency_key = #{idempotencyKey}"

@@ -255,7 +255,7 @@ public class TestIcebergIdempotencyManager {
     Mockito.when(uriInfo.getQueryParameters()).thenReturn(queryParameters);
 
     Assertions.assertEquals(
-        "DELETE /v1/cat1/namespaces/ns1/tables/t1?66532a1d5c66e58204f1ed51206ebc902cc7cea6673cc76547e83f630ab80bfe",
+        "DELETE /v1/cat1/namespaces/ns1/tables/t1?mode=async&purgeRequested=true",
         IcebergIdempotencyManager.operationBinding("DELETE", uriInfo));
   }
 
@@ -344,8 +344,7 @@ public class TestIcebergIdempotencyManager {
     Mockito.when(uri.getQueryParameters()).thenReturn(query);
     String binding = IcebergIdempotencyManager.operationBinding("POST", uri);
     Assertions.assertEquals(
-        "POST /v1/namespaces/ns%2Fone/tables?79d3ba3a8406738ce1bc95270798292111dbe1f89cbf5c2c27f11aca55030cd5",
-        binding);
+        "POST /v1/namespaces/ns%2Fone/tables?a%26b=x%3Dy%26c&a%26b=z&a%26b=z", binding);
     query.put("a&b", Arrays.asList("z", "z", "x=y&c"));
     Assertions.assertEquals(binding, IcebergIdempotencyManager.operationBinding("POST", uri));
     query.put("a&b", Arrays.asList("x=y&c", "z"));

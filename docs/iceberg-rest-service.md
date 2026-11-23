@@ -230,10 +230,10 @@ Create one store instance per Iceberg REST service instance and share it across 
 store starts its own cleanup scheduler; creating stores per request adds redundant purge work and
 database lock contention. Close the store when stopping the service to shut down its scheduler.
 
-| Configuration item | Description | Default value | Required |
-|--------------------|-------------|---------------|----------|
-| `gravitino.iceberg-rest.idempotency-store-type` | Select `jdbc` for durable storage, `in-memory` for node-local storage, or a custom implementation class. | `in-memory` | No |
-| `gravitino.iceberg-rest.idempotency-cleanup-interval` | Time between bounded JDBC cleanup passes, as an ISO-8601 duration of at least one millisecond. | `PT5M` | No |
+| Configuration item                                    | Description                                                                                              | Default value | Required |
+|-------------------------------------------------------|----------------------------------------------------------------------------------------------------------|---------------|----------|
+| `gravitino.iceberg-rest.idempotency-store-type`       | Select `jdbc` for durable storage, `in-memory` for node-local storage, or a custom implementation class. | `in-memory`   | No       |
+| `gravitino.iceberg-rest.idempotency-cleanup-interval` | Time between bounded JDBC cleanup passes, as an ISO-8601 duration of at least one millisecond.           | `PT5M`        | No       |
 
 Initialize a new database with the 2.0.0 schema or apply the 1.3.0-to-2.0.0 upgrade before selecting
 `jdbc`. An existing development 2.0.0 database created before this table was added must also apply
@@ -241,17 +241,19 @@ the `iceberg_idempotency_meta` and `iceberg_idempotency_generation_meta` tables 
 from the matching database's schema script. Store initialization fails if either table is missing.
 These tables are additive and do not modify catalog metadata.
 
-If testing against an earlier development build that used `iceberg_idempotency_key_meta`, let its
-reuse windows expire and drain in-flight mutations before switching to this schema. The new table
-starts empty.
+When switching from an earlier development build that used `iceberg_idempotency_key_meta` or
+`query_digest`, drain in-flight mutations and let existing reuse windows expire before changing
+the schema. Update all replicas to the current request binding format together. On MySQL, the
+current `request_uri` column uses `MEDIUMTEXT` to accommodate long request targets.
 
 Custom stores built against the earlier development interface must update `reserve` to return the
 store's fencing token, or an empty result for a duplicate key.
 
 Reservations are atomic across replicas. The database assigns a new generation even when the
 previous reservation for the same key was released or purged. Finalization and release match that
-generation to protect a newer reservation from an old request. The table stores the HTTP method and
-encoded request path alongside a digest of the canonical query string.
+generation to protect a newer reservation from an old request. The table stores the HTTP method
+separately from `request_uri`, which contains the encoded path followed by the sorted, encoded
+query string when present.
 
 Expiry is enforced on reads, finalization, and reservation attempts;
 reusing an expired key does not depend on the cleanup schedule. Each cleanup pass deletes at most
