@@ -84,7 +84,7 @@ After updating the `hive-site.xml`, you need to ensure that the necessary S3-rel
 # bundle jar, download software.amazon.awssdk:bundle from Maven Central instead.
 cp ${HADOOP_HOME}/share/hadoop/tools/lib/*aws* ${HIVE_HOME}/lib
 
-# For Azure Blob Storage(ADLS)
+# For Azure Blob Storage(ADLS). Hadoop 3.4.3 has these jars under share/hadoop/common/lib instead.
 cp ${HADOOP_HOME}/share/hadoop/tools/lib/*azure* ${HIVE_HOME}/lib
 
 # For Google Cloud Storage(GCS)
