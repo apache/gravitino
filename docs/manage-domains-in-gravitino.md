@@ -283,8 +283,12 @@ draft = domain.unpublish()
 
 ### Delete a Domain
 
-Delete or detach children before deleting their parent. Members alone do not prevent deletion.
-The operation keeps backing tags and object assignments and returns false if the domain is absent.
+Only a draft domain can be deleted. Unpublish a published domain first; deleting it fails with
+HTTP 400 and `IllegalArgumentException`. Delete or detach children before deleting their parent;
+deleting a draft parent with children fails with HTTP 409 and `NonEmptyDomainException`. The status
+is checked first, so a published parent with children fails with HTTP 400. Members alone do not
+prevent deletion. The operation keeps backing tags and object assignments and returns false if
+the domain is absent.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -915,8 +919,9 @@ public class DomainExample {
         if (Arrays.asList(model.supportsDomains().listDomains()).contains("Finance")) {
           throw new IllegalStateException("Detached membership must stop rolling up");
         }
-        lake.deleteDomain(child.name());
-        lake.deleteDomain(published.name());
+        // Only draft domains can be deleted.
+        lake.deleteDomain(child.unpublish().name());
+        lake.deleteDomain(published.unpublish().name());
         // Domain deletion keeps tags and assignments. Remove the assignment explicitly.
         model.supportsTags().associateTags(new String[0], new String[] {"planning"});
         lake.deleteTag("planning");
@@ -975,8 +980,9 @@ try:
     assert len(model.supports_domains().list_domains_info()) == 2
     child = child.detach_from_parent()
     assert "Finance" not in model.supports_domains().list_domains()
-    lake.delete_domain(child.name())
-    lake.delete_domain(published.name())
+    # Only draft domains can be deleted.
+    lake.delete_domain(child.unpublish().name())
+    lake.delete_domain(published.unpublish().name())
     model.supports_tags().associate_tags([], ["planning"])
     lake.delete_tag("planning")
     lake.delete_tag("finance")
@@ -1000,15 +1006,15 @@ unsafe segments before sending a request; the server enforces the full naming ru
 Backing tags, metadata object names and `nameContains` search text have separate rules.
 Encode metadata path parameters individually and supply query values with `--data-urlencode`.
 
-| HTTP status | Typical Domain behavior |
-| --- | --- |
-| 200 | Success with `code: 0`; empty queries return empty arrays; deleting an absent domain returns `dropped: false`. |
-| 400 | Invalid request: invalid domain names or filters, unsupported member types, or illegal hierarchy/status transition. |
-| 403 | Insufficient permission on a published domain, a required backing tag, or a reverse-lookup object. |
-| 404 | Missing metalake/domain/parent/tag/object, or a draft hidden from the caller. |
-| 409 | Duplicate domain/tag name, a tag that already backs another domain, deleting a parent with children, disabled metalake, or an optimistic lock conflict during domain alteration or deletion. |
-| 415 | Unsupported request Content-Type; the error response uses `application/json`. |
-| 5xx | Server failure; inspect the error response and server log. |
+| HTTP status | Typical Domain behavior                                                                                                                                                                            |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 200         | Success with `code: 0`; empty queries return empty arrays; deleting an absent domain, or a draft hidden from the caller, returns `dropped: false` and deletes nothing.                             |
+| 400         | Invalid request: invalid domain names or filters, unsupported member types, illegal hierarchy/status transition, or deleting a published domain.                                                   |
+| 403         | Insufficient permission on a published domain, a required backing tag, or a reverse-lookup object.                                                                                                 |
+| 404         | Missing metalake/domain/parent/tag/object, or a draft hidden from the caller. `DELETE` on a domain returns 404 only for a missing metalake.                                                        |
+| 409         | Duplicate domain/tag name, a tag that already backs another domain, deleting a draft parent with children, disabled metalake, or an optimistic lock conflict during domain alteration or deletion. |
+| 415         | Unsupported request Content-Type; the error response uses `application/json`.                                                                                                                      |
+| 5xx         | Server failure; inspect the error response and server log.                                                                                                                                         |
 
 Authentication failures follow the configured authenticator. The JSON error response contains the
 exception type and message; do not infer authorization from empty lists alone. Validation and

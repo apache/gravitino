@@ -218,6 +218,10 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
         replacement = self.lake.create_domain(name, None, None, "replacement", True)
         self.assertEqual(Domain.Status.PUBLISHED, draft.publish().status())
         self.assertEqual(Domain.Status.DRAFT, replacement.status())
+        # Only a draft domain can be deleted.
+        with self.assertRaises(IllegalArgumentException):
+            self.lake.delete_domain(name)
+        self.assertEqual(Domain.Status.DRAFT, draft.unpublish().status())
         self.assertTrue(self.lake.delete_domain(name))
         self.assertFalse(self.lake.delete_domain(name))
 

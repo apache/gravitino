@@ -35,67 +35,27 @@ import org.junit.jupiter.api.Test;
 class TestMaintenanceAuthConsistency {
 
   @Test
-  void testAgreeingAuthPasses() {
+  void testPolicyListAndPairOverloads() {
     Config config = new Config(false) {};
     PolicyEntity a = policy(1L, Map.of("rest.auth.type", "none"), Map.of("auth_type", "none"));
     PolicyEntity b = policy(2L, Map.of("rest.auth.type", "none"), Map.of("auth_type", "none"));
-    Assertions.assertDoesNotThrow(
-        () -> MaintenanceAuthConsistency.requireSameAuth(List.of(a, b), config));
+    Assertions.assertTrue(MaintenanceAuthConsistency.hasSameAuth(config, a, b));
+    Assertions.assertTrue(MaintenanceAuthConsistency.hasSameAuth(config, List.of(a, b)));
   }
 
   @Test
-  void testMismatchingAuthFails() {
+  void testMismatchingPolicyAuth() {
     Config config = new Config(false) {};
-    IllegalArgumentException gravitino =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                MaintenanceAuthConsistency.requireSameAuth(
-                    List.of(
-                        policy(1L, Map.of(), Map.of("auth_type", "none")),
-                        policy(2L, Map.of(), Map.of("auth_type", "simple", "username", "u"))),
-                    config));
-    Assertions.assertTrue(gravitino.getMessage().contains("gravitinoAuth mismatch"));
-    Assertions.assertTrue(gravitino.getMessage().contains("auth_type"));
+    PolicyEntity left = policy(1L, Map.of(), Map.of("auth_type", "none"));
+    PolicyEntity right = policy(2L, Map.of(), Map.of("auth_type", "simple", "username", "u"));
+    Assertions.assertFalse(MaintenanceAuthConsistency.hasSameAuth(config, left, right));
+    Assertions.assertFalse(MaintenanceAuthConsistency.hasSameAuth(config, List.of(left, right)));
 
-    IllegalArgumentException irc =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                MaintenanceAuthConsistency.requireSameAuth(
-                    List.of(
-                        policy(1L, Map.of("rest.auth.type", "none"), Map.of()),
-                        policy(2L, Map.of("rest.auth.type", "basic"), Map.of())),
-                    config));
-    Assertions.assertTrue(irc.getMessage().contains("ircAuth mismatch"));
-    Assertions.assertTrue(irc.getMessage().contains("differing keys=[rest.auth.type]"));
-  }
-
-  @Test
-  void testMismatchMessageOmitsAuthValues() {
-    Config config = new Config(false) {};
-    String secretA = "SuperSecretPassword-A";
-    String secretB = "SuperSecretPassword-B";
-    PolicyEntity a =
-        policy(
-            1L,
-            Map.of("rest.auth.type", "basic", "rest.auth.basic.password", secretA),
-            Map.of("auth_type", "basic", "password", secretA));
-    PolicyEntity b =
-        policy(
-            2L,
-            Map.of("rest.auth.type", "basic", "rest.auth.basic.password", secretB),
-            Map.of("auth_type", "basic", "password", secretB));
-    IllegalArgumentException ex =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> MaintenanceAuthConsistency.requireSameAuth(List.of(a, b), config));
-    String message = ex.getMessage();
-    Assertions.assertFalse(message.contains(secretA), message);
-    Assertions.assertFalse(message.contains(secretB), message);
-    Assertions.assertTrue(message.contains("differing keys="), message);
-    Assertions.assertTrue(
-        message.contains("password") || message.contains("rest.auth.basic.password"), message);
+    PolicyEntity ircLeft = policy(1L, Map.of("rest.auth.type", "none"), Map.of());
+    PolicyEntity ircRight = policy(2L, Map.of("rest.auth.type", "basic"), Map.of());
+    Assertions.assertFalse(MaintenanceAuthConsistency.hasSameAuth(config, ircLeft, ircRight));
+    Assertions.assertFalse(
+        MaintenanceAuthConsistency.hasSameAuth(config, List.of(ircLeft, ircRight)));
   }
 
   @Test
@@ -104,12 +64,11 @@ class TestMaintenanceAuthConsistency {
     config.loadFromMap(Map.of("gravitino.maintenance.ircAuth.rest.auth.type", "basic"), t -> true);
     PolicyEntity a = policy(1L, Map.of("rest.auth.type", "none"), Map.of());
     PolicyEntity b = policy(2L, Map.of("rest.auth.type", "oauth"), Map.of());
-    Assertions.assertDoesNotThrow(
-        () -> MaintenanceAuthConsistency.requireSameAuth(List.of(a, b), config));
+    Assertions.assertTrue(MaintenanceAuthConsistency.hasSameAuth(config, List.of(a, b)));
   }
 
   @Test
-  void testHasSameAuth() {
+  void testHasSameAuthOnSpecs() {
     Config config = new Config(false) {};
     MaintenanceJobSpec left = spec("{\"auth_type\":\"none\"}", "{\"rest.auth.type\":\"none\"}");
     MaintenanceJobSpec right = spec("{\"auth_type\":\"none\"}", "{\"rest.auth.type\":\"none\"}");

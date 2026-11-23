@@ -160,9 +160,9 @@ CREATE TABLE IF NOT EXISTS table_column_version_info (
     PRIMARY KEY (id),
     UNIQUE (table_id, table_version, column_id, deleted_at)
     );
-CREATE INDEX table_column_version_info_idx_mid ON table_column_version_info (metalake_id);
-CREATE INDEX table_column_version_info_idx_cid ON table_column_version_info (catalog_id);
-CREATE INDEX table_column_version_info_idx_sid ON table_column_version_info (schema_id);
+CREATE INDEX IF NOT EXISTS table_column_version_info_idx_mid ON table_column_version_info (metalake_id);
+CREATE INDEX IF NOT EXISTS table_column_version_info_idx_cid ON table_column_version_info (catalog_id);
+CREATE INDEX IF NOT EXISTS table_column_version_info_idx_sid ON table_column_version_info (schema_id);
 COMMENT ON TABLE table_column_version_info IS 'table column version information';
 
 COMMENT ON COLUMN table_column_version_info.id IS 'auto increment id';

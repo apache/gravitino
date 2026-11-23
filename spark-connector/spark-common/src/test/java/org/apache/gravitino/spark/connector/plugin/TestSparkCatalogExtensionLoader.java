@@ -44,12 +44,13 @@ public class TestSparkCatalogExtensionLoader {
   }
 
   @Test
-  void testAnExtensionForAnUnknownProviderIsSkipped() {
+  void testAnExtensionForAnUnknownProviderIsBoundByProvider() {
     SparkBindings bindings =
-        buildWithExtensions(List.of(fixedExtension("no-such-provider", "org.example.Catalog")));
+        buildWithExtensions(
+            List.of(fixedExtension("jdbc-clickhouse", "org.example.ClickHouseCatalog")));
 
-    Assertions.assertFalse(
-        bindings.catalogClassNames().containsKey(SparkCatalogKind.LAKEHOUSE_PAIMON));
+    Assertions.assertEquals(
+        "org.example.ClickHouseCatalog", bindings.extensionCatalogClassName("JDBC-CLICKHOUSE"));
     Assertions.assertEquals(5, bindings.catalogClassNames().size());
   }
 

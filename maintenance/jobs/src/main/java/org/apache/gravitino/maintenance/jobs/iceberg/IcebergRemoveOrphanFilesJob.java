@@ -25,6 +25,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -283,8 +284,9 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
     // Render string literals using Spark so quotes and backslashes round-trip correctly.
     StringBuilder sql = IcebergJobUtils.beginSystemProcedureCall(catalog, "remove_orphan_files");
     sql.append("table => ").append(lit(table).expr().sql());
-    if (olderThan != null && !olderThan.isEmpty()) {
-      sql.append(", older_than => TIMESTAMP ").append(lit(olderThan).expr().sql());
+    String resolvedOlderThan = IcebergJobUtils.normalizeOlderThan(olderThan, Clock.systemUTC());
+    if (resolvedOlderThan != null && !resolvedOlderThan.isEmpty()) {
+      sql.append(", older_than => TIMESTAMP ").append(lit(resolvedOlderThan).expr().sql());
     }
     if (location != null && !location.isEmpty()) {
       sql.append(", location => ").append(lit(location).expr().sql());
@@ -352,7 +354,7 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
             "  --catalog <name>          Iceberg catalog name registered in Spark",
             "  --table <identifier>      Fully qualified table name (e.g., db.table_name)"),
         IcebergJobUtils.withSparkConfUsage(
-            "  --older-than <timestamp>  Remove orphans older than this timestamp",
+            "  --older-than <timestamp|days>  Remove orphans older than timestamp or relative day count",
             "                              Example: '2024-01-01 00:00:00'",
             "  --location <path>         Orphan scan root location",
             "  --dry-run <bool>          List orphans without deleting (true or false)"),

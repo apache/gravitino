@@ -96,7 +96,7 @@ C1–C3 keep the hierarchy one level deep and acyclic, so no cycle detection is 
 
 - **Attach / move** re-points the child's single edge in one transaction. Attaching to the current parent is a no-op.
 - **Detach** removes the current edge; the child becomes top-level.
-- **Delete** is refused while the domain has subdomains. Deleting removes the domain row and its own parent edge. The tag and the tags on assets stay.
+- **Delete** requires the domain to be DRAFT: a published domain must be unpublished first. The status is checked before the children, so a published domain with subdomains fails on its status. A draft domain is refused while it has subdomains. Deleting removes the domain row and its own parent edge. The tag and the tags on assets stay.
 - **Membership and scope**: membership comes from backing tags only (see Membership and inheritance), so an asset tagged only `trading` is a member of Trading, not of Finance. A top-level domain's *scope* is its own members plus the members of the subdomains the caller can see; a subdomain's scope is its own members. Member listing and domains of an object report scope, with the relation of each entry; policies follow tags only (see Grants and policies).
 
 ### Locking

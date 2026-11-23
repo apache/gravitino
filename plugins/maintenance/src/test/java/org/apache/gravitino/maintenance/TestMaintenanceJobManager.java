@@ -47,6 +47,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestTemplate;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Unit and JDBC-backed coverage for {@link MaintenanceJobManager}, including the GROUP-owned
@@ -116,8 +117,12 @@ class TestMaintenanceJobManager extends TestJDBCBackend {
     JobEntity job = mock(JobEntity.class);
     when(job.id()).thenReturn(JOB_ID);
     AtomicReference<String> principalDuringRun = new AtomicReference<>();
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Map<String, String>> confCaptor = ArgumentCaptor.forClass(Map.class);
     when(jobs.runJob(
-            eq(metalake), eq(MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE), anyMap()))
+            eq(metalake),
+            eq(MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE),
+            confCaptor.capture()))
         .thenAnswer(
             invocation -> {
               principalDuringRun.set(PrincipalUtils.getCurrentUserName());
@@ -125,10 +130,16 @@ class TestMaintenanceJobManager extends TestJDBCBackend {
             });
 
     MaintenanceJobManager manager = new MaintenanceJobManager(jobs, true, SUBMITTER);
-    Optional<Long> bound = manager.submitAndBind(metalake, new HashMap<>(), List.of(claim));
+    Optional<Long> bound =
+        manager.submitAndBind(metalake, jobConfWithoutActionId(), List.of(claim));
 
     Assertions.assertEquals(Optional.of(JOB_ID), bound);
     Assertions.assertEquals(SUBMITTER, principalDuringRun.get());
+    Assertions.assertTrue(
+        confCaptor
+            .getValue()
+            .get(MaintenanceJobTemplates.TASKS_KEY)
+            .contains("\"action_id\":" + claim.actionId()));
     Assertions.assertEquals(
         JOB_ID, TableMaintenanceActionMetaService.getInstance().getById(claim.actionId()).jobId());
   }
@@ -151,7 +162,8 @@ class TestMaintenanceJobManager extends TestJDBCBackend {
             });
 
     MaintenanceJobManager manager = new MaintenanceJobManager(jobs, false, null);
-    Optional<Long> bound = manager.submitAndBind(metalake, new HashMap<>(), List.of(claim));
+    Optional<Long> bound =
+        manager.submitAndBind(metalake, jobConfWithoutActionId(), List.of(claim));
 
     Assertions.assertEquals(Optional.of(JOB_ID + 1), bound);
     Assertions.assertEquals(PrincipalUtils.ANONYMOUS_PRINCIPAL.getName(), principalDuringRun.get());
@@ -171,11 +183,21 @@ class TestMaintenanceJobManager extends TestJDBCBackend {
         .thenThrow(new RuntimeException("submit failed"));
 
     MaintenanceJobManager manager = new MaintenanceJobManager(jobs, true, SUBMITTER);
-    Optional<Long> bound = manager.submitAndBind(metalake, new HashMap<>(), List.of(claim));
+    Optional<Long> bound =
+        manager.submitAndBind(metalake, jobConfWithoutActionId(), List.of(claim));
 
     Assertions.assertEquals(Optional.empty(), bound);
     Assertions.assertNull(
         TableMaintenanceActionMetaService.getInstance().getById(claim.actionId()));
+  }
+
+  private static Map<String, String> jobConfWithoutActionId() {
+    Map<String, String> conf = new HashMap<>();
+    conf.put(
+        MaintenanceJobTemplates.TASKS_KEY,
+        "[{\"table_id\":1,\"policy_type\":\"system_iceberg_compaction\",\"policy_id\":1,"
+            + "\"params\":{\"catalog_name\":\"c\",\"table_identifier\":\"db.t\"},\"rules\":{}}]");
+    return conf;
   }
 
   private OccupancyClaim acquireClaim(String metalake, String policyName) throws IOException {

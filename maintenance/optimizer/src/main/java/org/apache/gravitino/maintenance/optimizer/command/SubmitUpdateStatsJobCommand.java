@@ -50,15 +50,6 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
   private static final String DEFAULT_UPDATE_MODE = "all";
   private static final String OPTION_UPDATER_OPTIONS = "updater-options";
   private static final String OPTION_SPARK_CONF = "spark-conf";
-  private static final String DEFAULT_SPARK_EXECUTOR_INSTANCES = "1";
-  private static final String DEFAULT_SPARK_EXECUTOR_CORES = "1";
-  private static final String DEFAULT_SPARK_EXECUTOR_MEMORY = "1g";
-  private static final String DEFAULT_SPARK_DRIVER_MEMORY = "1g";
-  private static final String SPARK_MASTER_KEY = "spark.master";
-  private static final String SPARK_EXECUTOR_INSTANCES_KEY = "spark.executor.instances";
-  private static final String SPARK_EXECUTOR_CORES_KEY = "spark.executor.cores";
-  private static final String SPARK_EXECUTOR_MEMORY_KEY = "spark.executor.memory";
-  private static final String SPARK_DRIVER_MEMORY_KEY = "spark.driver.memory";
   private static final String SPARK_SQL_CATALOG_PREFIX = "spark.sql.catalog.";
   private static final String ICEBERG_SPARK_CATALOG_IMPL = "org.apache.iceberg.spark.SparkCatalog";
   private static final String REDACTED = "******";
@@ -106,14 +97,14 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
 
     validateSparkConfigs(tableTargets, sparkConfigs);
     // The job ignores the master of spark_conf, as spark-submit decides it, so say where it goes.
-    if (StringUtils.isNotBlank(sparkConfigs.get(SPARK_MASTER_KEY))) {
+    if (StringUtils.isNotBlank(sparkConfigs.get(IcebergSparkConfigUtils.SPARK_MASTER_KEY))) {
       context
           .output()
           .printf(
               "WARN: %s=%s in the Spark configurations is ignored by the job. Set %sspark_master"
                   + " instead.%n",
-              SPARK_MASTER_KEY,
-              sparkConfigs.get(SPARK_MASTER_KEY),
+              IcebergSparkConfigUtils.SPARK_MASTER_KEY,
+              sparkConfigs.get(IcebergSparkConfigUtils.SPARK_MASTER_KEY),
               OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX);
     }
 
@@ -180,7 +171,8 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     Map<String, String> jobConfig = new LinkedHashMap<>();
     jobConfig.put("catalog_name", tableTarget.catalogName);
     jobConfig.putAll(
-        resolveTemplateSparkPlaceholders(tableTarget.catalogName, sparkConfigs, submitterConfigs));
+        IcebergSparkConfigUtils.resolveTemplateSparkPlaceholders(
+            tableTarget.catalogName, sparkConfigs, submitterConfigs));
     jobConfig.put(
         "table_identifier",
         IdentifierUtils.toSparkTableIdentifier(
@@ -396,65 +388,6 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     } catch (Exception e) {
       throw new IllegalStateException("Failed to serialize options as JSON", e);
     }
-  }
-
-  private static Map<String, String> resolveTemplateSparkPlaceholders(
-      String catalogName, Map<String, String> sparkConfigs, Map<String, String> submitterConfigs) {
-    Map<String, String> placeholders = new LinkedHashMap<>();
-    String catalogPrefix = SPARK_SQL_CATALOG_PREFIX + catalogName;
-
-    // An empty master leaves it to the job executor: spark-submit defaults to local[*], and the
-    // k8s job executor lets the operator decide it. spark.master in spark_conf isn't used, as the
-    // job ignores it there too.
-    placeholders.put("spark_master", firstNonBlank(submitterConfigs.get("spark_master")));
-    placeholders.put(
-        "spark_executor_instances",
-        firstNonBlank(
-            submitterConfigs.get("spark_executor_instances"),
-            sparkConfigs.get(SPARK_EXECUTOR_INSTANCES_KEY),
-            DEFAULT_SPARK_EXECUTOR_INSTANCES));
-    placeholders.put(
-        "spark_executor_cores",
-        firstNonBlank(
-            submitterConfigs.get("spark_executor_cores"),
-            sparkConfigs.get(SPARK_EXECUTOR_CORES_KEY),
-            DEFAULT_SPARK_EXECUTOR_CORES));
-    placeholders.put(
-        "spark_executor_memory",
-        firstNonBlank(
-            submitterConfigs.get("spark_executor_memory"),
-            sparkConfigs.get(SPARK_EXECUTOR_MEMORY_KEY),
-            DEFAULT_SPARK_EXECUTOR_MEMORY));
-    placeholders.put(
-        "spark_driver_memory",
-        firstNonBlank(
-            submitterConfigs.get("spark_driver_memory"),
-            sparkConfigs.get(SPARK_DRIVER_MEMORY_KEY),
-            DEFAULT_SPARK_DRIVER_MEMORY));
-    placeholders.put(
-        "catalog_type",
-        firstNonBlank(
-            submitterConfigs.get("catalog_type"), sparkConfigs.get(catalogPrefix + ".type")));
-    placeholders.put(
-        "catalog_uri",
-        firstNonBlank(
-            submitterConfigs.get("catalog_uri"), sparkConfigs.get(catalogPrefix + ".uri"), ""));
-    placeholders.put(
-        "warehouse_location",
-        firstNonBlank(
-            submitterConfigs.get("warehouse_location"),
-            sparkConfigs.get(catalogPrefix + ".warehouse"),
-            ""));
-    return placeholders;
-  }
-
-  private static String firstNonBlank(String... candidates) {
-    for (String candidate : candidates) {
-      if (StringUtils.isNotBlank(candidate)) {
-        return candidate.trim();
-      }
-    }
-    return "";
   }
 
   @VisibleForTesting

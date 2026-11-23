@@ -96,7 +96,7 @@ public class CronJobPlanner {
     if (policy == null || candidates == null || candidates.isEmpty()) {
       return 0;
     }
-    if (MaintenanceJobTemplates.templateName(policy.policyType()).isEmpty()) {
+    if (!MaintenanceJobTemplates.isIcebergMaintenance(policy.policyType())) {
       LOG.warn(
           "Skipping cron-job schedule for policy {} with unsupported type {}",
           policy.id(),
@@ -168,8 +168,8 @@ public class CronJobPlanner {
           for (TableCandidate table : scheduleTables) {
             excludeTableIds.add(table.tableId());
           }
-          List<QueuedExpireJob> peers =
-              selectQueuedJobsToClaim(
+          List<QueuedExpireJob> mergeCandidates =
+              selectMergeCandidates(
                   client,
                   catalogName,
                   remainingCapacity - scheduleTables.size(),
@@ -177,7 +177,11 @@ public class CronJobPlanner {
                   Set.of(target.instanceId.getId()),
                   excludeTableIds);
           if (mergeInto(
-              target, scheduleSpec.get().getTasks(), scheduleSpec.get(), peers, batchCapacity)) {
+              target,
+              scheduleSpec.get().getTasks(),
+              scheduleSpec.get(),
+              mergeCandidates,
+              batchCapacity)) {
             remaining.subList(0, takeCount).clear();
             continue;
           }
@@ -190,16 +194,16 @@ public class CronJobPlanner {
         Optional<QueuedExpireJob> batchJob =
             scheduleBatchJob(client, policy, scheduleSpec.get(), due);
         if (batchJob.isPresent()) {
-          List<QueuedExpireJob> peers =
-              selectQueuedJobsToClaim(
+          List<QueuedExpireJob> mergeCandidates =
+              selectMergeCandidates(
                   client,
                   catalogName,
                   batchCapacity - batchJob.get().spec.tableIds().size(),
                   batchCapacity,
                   Set.of(batchJob.get().instanceId.getId()),
                   new HashSet<>(batchJob.get().spec.tableIds()));
-          if (!peers.isEmpty()) {
-            mergeInto(batchJob.get(), List.of(), null, peers, batchCapacity);
+          if (!mergeCandidates.isEmpty()) {
+            mergeInto(batchJob.get(), List.of(), null, mergeCandidates, batchCapacity);
           }
           newRows++;
           remaining.subList(0, takeCount).clear();
@@ -226,19 +230,19 @@ public class CronJobPlanner {
       }
       QueuedExpireJob mergeTarget = target.get();
       int remainingCapacity = batchCapacity - mergeTarget.spec.tableIds().size();
-      List<QueuedExpireJob> peers =
-          selectQueuedJobsToClaim(
+      List<QueuedExpireJob> mergeCandidates =
+          selectMergeCandidates(
               client,
               mergeTarget.catalog,
               remainingCapacity,
               batchCapacity,
               Set.of(mergeTarget.instanceId.getId()),
               new HashSet<>(mergeTarget.spec.tableIds()));
-      if (peers.isEmpty()) {
+      if (mergeCandidates.isEmpty()) {
         saturatedInstanceIds.add(mergeTarget.instanceId.getId());
         continue;
       }
-      if (!mergeInto(mergeTarget, List.of(), null, peers, batchCapacity)) {
+      if (!mergeInto(mergeTarget, List.of(), null, mergeCandidates, batchCapacity)) {
         saturatedInstanceIds.add(mergeTarget.instanceId.getId());
       }
     }
@@ -266,9 +270,10 @@ public class CronJobPlanner {
   }
 
   /**
-   * Claim-first merge into {@code target}: cancel each unpicked peer then reschedule the target's
-   * {@code task_data} in one JDBC transaction. Target {@code task_instance} is unchanged. Envelope
-   * {@code spark_conf} is max-merged across target, optional schedule spec, and claimed peers.
+   * Claim-first merge into {@code target}: cancel each unpicked merge candidate then reschedule the
+   * target's {@code task_data} in one JDBC transaction. Target {@code task_instance} is unchanged.
+   * Envelope {@code spark_conf} is max-merged across target, optional schedule spec, and merged
+   * candidates.
    *
    * @return true when the target was updated, or when there was nothing to merge
    */
@@ -276,7 +281,7 @@ public class CronJobPlanner {
       QueuedExpireJob target,
       List<Task> scheduleTasks,
       @Nullable MaintenanceJobSpec scheduleSpec,
-      List<QueuedExpireJob> peersToClaim,
+      List<QueuedExpireJob> candidates,
       int batchCapacity) {
     if (scheduleSpec != null
         && !MaintenanceAuthConsistency.hasSameAuth(gravitinoConfig, target.spec, scheduleSpec)) {
@@ -286,31 +291,31 @@ public class CronJobPlanner {
       return false;
     }
 
-    List<QueuedExpireJob> claimable = new ArrayList<>();
-    for (QueuedExpireJob peer : peersToClaim) {
-      if (!MaintenanceAuthConsistency.hasSameAuth(gravitinoConfig, target.spec, peer.spec)) {
+    List<QueuedExpireJob> mergeCandidates = new ArrayList<>();
+    for (QueuedExpireJob candidate : candidates) {
+      if (!MaintenanceAuthConsistency.hasSameAuth(gravitinoConfig, target.spec, candidate.spec)) {
         LOG.debug(
-            "Skipping claim of cron-job {} for snapshot-expiry merge: auth mismatch with target {}",
-            peer.instanceId.getId(),
+            "Skipping merge candidate {} for snapshot-expiry merge: auth mismatch with target {}",
+            candidate.instanceId.getId(),
             target.instanceId.getId());
         continue;
       }
-      claimable.add(peer);
+      mergeCandidates.add(candidate);
     }
 
     Set<Long> plannedTableIds = new HashSet<>(target.spec.tableIds());
     for (Task task : scheduleTasks) {
       plannedTableIds.add(task.getTableId());
     }
-    for (QueuedExpireJob peer : claimable) {
-      plannedTableIds.addAll(peer.spec.tableIds());
+    for (QueuedExpireJob candidate : mergeCandidates) {
+      plannedTableIds.addAll(candidate.spec.tableIds());
     }
     if (plannedTableIds.size() > batchCapacity) {
       return false;
     }
 
-    if (claimable.isEmpty() && scheduleTasks.isEmpty()) {
-      return peersToClaim.isEmpty();
+    if (mergeCandidates.isEmpty() && scheduleTasks.isEmpty()) {
+      return candidates.isEmpty();
     }
 
     try {
@@ -323,8 +328,8 @@ public class CronJobPlanner {
             if (scheduleSpec != null) {
               sparkConfJsons.add(scheduleSpec.getSparkConf());
             }
-            for (QueuedExpireJob peer : claimable) {
-              Optional<MaintenanceJobSpec> claimedSpec = tryClaimQueuedJob(txClient, peer);
+            for (QueuedExpireJob candidate : mergeCandidates) {
+              Optional<MaintenanceJobSpec> claimedSpec = tryClaimQueuedJob(txClient, candidate);
               if (claimedSpec.isEmpty()) {
                 continue;
               }
@@ -335,7 +340,7 @@ public class CronJobPlanner {
             List<Task> tasksToAdd = new ArrayList<>(scheduleTasks);
             tasksToAdd.addAll(claimedTasks);
             if (tasksToAdd.isEmpty()) {
-              if (peersToClaim.isEmpty()) {
+              if (candidates.isEmpty()) {
                 return true;
               }
               throw new MergeTransactionAborted();
@@ -407,7 +412,7 @@ public class CronJobPlanner {
    * Selects whole unpicked expire cron rows that fit in {@code remainingCapacity} without exceeding
    * {@code batchCapacity}. Skips rows already at capacity. All-or-nothing per row.
    */
-  private static List<QueuedExpireJob> selectQueuedJobsToClaim(
+  private static List<QueuedExpireJob> selectMergeCandidates(
       SchedulerClient client,
       String catalogName,
       int remainingCapacity,
@@ -514,7 +519,9 @@ public class CronJobPlanner {
     }
   }
 
-  /** Schedules a new {@code batch:} for schedule tables only; peers are claimed afterward. */
+  /**
+   * Schedules a new {@code batch:} for schedule tables only; merge candidates are merged afterward.
+   */
   private Optional<QueuedExpireJob> scheduleBatchJob(
       SchedulerClient client, PolicyEntity policy, MaintenanceJobSpec spec, Instant due) {
     if (spec.getTasks() == null || spec.getTasks().isEmpty()) {
@@ -569,7 +576,7 @@ public class CronJobPlanner {
         client.getScheduledExecutionsForTask(
             MaintenanceSchedulerPools.CRON_JOB, MaintenanceJobSpec.class)) {
       MaintenanceJobSpec data = execution.getData();
-      if (data == null || !data.isValid() || !isExpireSnapshots(data)) {
+      if (data == null || !data.isValid() || !data.isSnapshotExpiration()) {
         continue;
       }
       String instanceId = execution.getTaskInstance().getId();
@@ -605,13 +612,6 @@ public class CronJobPlanner {
       }
     }
     return open;
-  }
-
-  private static boolean isExpireSnapshots(MaintenanceJobSpec spec) {
-    String expireType =
-        MaintenanceJobTemplates.maintenanceType(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION)
-            .orElseThrow();
-    return spec.getTasks().stream().anyMatch(t -> expireType.equals(t.getMaintenanceType()));
   }
 
   /**
@@ -650,7 +650,7 @@ public class CronJobPlanner {
       MaintenanceJobSpec data = execution.getData();
       if (data != null
           && data.isValid()
-          && !isExpireSnapshots(data)
+          && !data.isSnapshotExpiration()
           && data.tableIds().contains(tableId)) {
         return true;
       }
