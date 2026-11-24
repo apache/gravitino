@@ -56,6 +56,8 @@ final class ClickHouseTableSqlUtils {
       Pattern.compile("toYYYYMM\\((.+)\\)", Pattern.CASE_INSENSITIVE);
   private static final Pattern TO_DAY_PATTERN =
       Pattern.compile("toYYYYMMDD\\((.+)\\)", Pattern.CASE_INSENSITIVE);
+  private static final Pattern TO_DATETIME_PATTERN =
+      Pattern.compile("toDateTime\\((.+)\\)", Pattern.CASE_INSENSITIVE);
   private static final Pattern TO_START_OF_WEEK_PATTERN =
       Pattern.compile("toStartOfWeek[(](.+)[)]", Pattern.CASE_INSENSITIVE);
   private static final Pattern TO_START_OF_MONTH_PATTERN =
@@ -538,14 +540,15 @@ final class ClickHouseTableSqlUtils {
 
     Matcher toYearMatcher = TO_YEAR_PATTERN.matcher(trimmedExpression);
     if (toYearMatcher.matches()) {
-      String identifier = extractDatePartitionIdentifier(toYearMatcher.group(1), nativeColumnTypes);
+      String identifier =
+          extractTemporalPartitionIdentifier(toYearMatcher.group(1), nativeColumnTypes);
       return identifier == null ? null : Transforms.year(identifier);
     }
 
     Matcher toYYYYMMMatcher = TO_MONTH_PATTERN.matcher(trimmedExpression);
     if (toYYYYMMMatcher.matches()) {
       String identifier =
-          extractDatePartitionIdentifier(toYYYYMMMatcher.group(1), nativeColumnTypes);
+          extractTemporalPartitionIdentifier(toYYYYMMMatcher.group(1), nativeColumnTypes);
       return identifier == null ? null : Transforms.month(identifier);
     }
 
@@ -618,6 +621,40 @@ final class ClickHouseTableSqlUtils {
     return identifier != null && "Date".equals(nativeColumnTypes.get(identifier))
         ? identifier
         : null;
+  }
+
+  /**
+   * Resolves the partition column for a year/month granularity function, trying both toDate and
+   * toDateTime unwrapping.
+   */
+  @Nullable
+  private static String extractTemporalPartitionIdentifier(
+      String expression, Map<String, String> nativeColumnTypes) {
+    String identifier = extractDatePartitionIdentifier(expression, nativeColumnTypes);
+    if (identifier != null) {
+      return identifier;
+    }
+    return extractDateTimePartitionIdentifier(expression, nativeColumnTypes);
+  }
+
+  /**
+   * Unwraps a single toDateTime conversion when the inner column is native DateTime. toDateTime is
+   * an identity only for DateTime; other input types are not unwrapped.
+   */
+  @Nullable
+  private static String extractDateTimePartitionIdentifier(
+      String expression, Map<String, String> nativeColumnTypes) {
+    String identifier = extractPartitionIdentifier(expression);
+    if (identifier != null) {
+      return identifier;
+    }
+    String trimmed = StringUtils.trim(expression);
+    Matcher matcher = TO_DATETIME_PATTERN.matcher(trimmed);
+    if (!matcher.matches()) {
+      return null;
+    }
+    String inner = extractPartitionIdentifier(matcher.group(1));
+    return inner != null && "DateTime".equals(nativeColumnTypes.get(inner)) ? inner : null;
   }
 
   /**
