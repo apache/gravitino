@@ -352,7 +352,7 @@ public class TestSecretPropertyUtils {
   @Test
   void testResolveStaticCredentialKeysToOmitNullMetadataIsConservative() {
     Assertions.assertEquals(
-        CloudStorageCredentialPropertyKeys.staticCredentialSecretKeys(),
+        StaticCredentialSecretKeys.staticCredentialSecretKeys(),
         SecretPropertyUtils.resolveStaticCredentialKeysToOmit(null, null));
   }
 

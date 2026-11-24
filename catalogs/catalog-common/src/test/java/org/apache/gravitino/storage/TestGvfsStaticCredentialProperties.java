@@ -27,7 +27,7 @@ import org.apache.gravitino.catalog.glue.GlueConstants;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.junit.jupiter.api.Test;
 
-public class TestCloudStorageCredentialPropertyKeys {
+public class TestGvfsStaticCredentialProperties {
 
   @Test
   void testOmitStaticCredentialProperties() {
@@ -42,10 +42,10 @@ public class TestCloudStorageCredentialPropertyKeys {
             OSSProperties.GRAVITINO_OSS_REGION,
             "cn-hangzhou",
             "masked-any-key",
-            CloudStorageCredentialPropertyKeys.MASKED_PROPERTY_VALUE);
+            GvfsStaticCredentialProperties.MASKED_PROPERTY_VALUE);
 
     Map<String, String> filtered =
-        CloudStorageCredentialPropertyKeys.omitStaticCredentialProperties(input);
+        GvfsStaticCredentialProperties.omitStaticCredentialProperties(input);
 
     assertEquals("https://s3.amazonaws.com", filtered.get(S3Properties.GRAVITINO_S3_ENDPOINT));
     assertEquals("cn-hangzhou", filtered.get(OSSProperties.GRAVITINO_OSS_REGION));
@@ -59,12 +59,12 @@ public class TestCloudStorageCredentialPropertyKeys {
     Map<String, String> input =
         Map.of(
             S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
-            CloudStorageCredentialPropertyKeys.MASKED_PROPERTY_VALUE,
+            GvfsStaticCredentialProperties.MASKED_PROPERTY_VALUE,
             S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
             "secret");
 
     Map<String, String> filtered =
-        CloudStorageCredentialPropertyKeys.omitStaticCredentialProperties(input);
+        GvfsStaticCredentialProperties.omitStaticCredentialProperties(input);
 
     assertFalse(filtered.containsKey(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
     assertFalse(filtered.containsKey(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
@@ -73,13 +73,12 @@ public class TestCloudStorageCredentialPropertyKeys {
   @Test
   void testStaticCredentialKeyDetection() {
     assertTrue(
-        CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
+        GvfsStaticCredentialProperties.isStaticCredentialKey(
             COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET));
     assertFalse(
-        CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
-            GlueConstants.AWS_SECRET_ACCESS_KEY));
+        GvfsStaticCredentialProperties.isStaticCredentialKey(GlueConstants.AWS_SECRET_ACCESS_KEY));
     assertFalse(
-        CloudStorageCredentialPropertyKeys.isStaticCredentialKey(
+        GvfsStaticCredentialProperties.isStaticCredentialKey(
             PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID));
   }
 
@@ -92,7 +91,7 @@ public class TestCloudStorageCredentialPropertyKeys {
             PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID, "dlf-ak");
 
     Map<String, String> filtered =
-        CloudStorageCredentialPropertyKeys.omitStaticCredentialProperties(input);
+        GvfsStaticCredentialProperties.omitStaticCredentialProperties(input);
 
     assertFalse(filtered.containsKey(AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET));
     assertEquals("ak", filtered.get(GlueConstants.AWS_ACCESS_KEY_ID));

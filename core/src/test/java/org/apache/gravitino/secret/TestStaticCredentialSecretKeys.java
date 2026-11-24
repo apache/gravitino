@@ -32,37 +32,33 @@ import org.apache.gravitino.storage.AWSProperties;
 import org.apache.gravitino.storage.S3Properties;
 import org.junit.jupiter.api.Test;
 
-public class TestCloudStorageCredentialPropertyKeys {
+public class TestStaticCredentialSecretKeys {
 
   @Test
   void testKeysForCredentialType() {
     assertEquals(
         Set.of(
             S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY),
-        CloudStorageCredentialPropertyKeys.keysForCredentialType(
+        StaticCredentialSecretKeys.keysForCredentialType(
             S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE));
     assertEquals(
-        Set.of(
-            CloudStorageCredentialPropertyKeys.JDBC_USER,
-            CloudStorageCredentialPropertyKeys.JDBC_PASSWORD),
-        CloudStorageCredentialPropertyKeys.keysForCredentialType(
-            JdbcCredential.JDBC_CREDENTIAL_TYPE));
+        Set.of(StaticCredentialSecretKeys.JDBC_USER, StaticCredentialSecretKeys.JDBC_PASSWORD),
+        StaticCredentialSecretKeys.keysForCredentialType(JdbcCredential.JDBC_CREDENTIAL_TYPE));
     assertTrue(
-        CloudStorageCredentialPropertyKeys.keysForCredentialType(
-                S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE)
+        StaticCredentialSecretKeys.keysForCredentialType(S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE)
             .isEmpty());
   }
 
   @Test
   void testKeysForCredentialProviders() {
     assertTrue(
-        CloudStorageCredentialPropertyKeys.keysForCredentialProviders(
+        StaticCredentialSecretKeys.keysForCredentialProviders(
                 S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE
                     + ","
                     + JdbcCredential.JDBC_CREDENTIAL_TYPE)
-            .contains(CloudStorageCredentialPropertyKeys.JDBC_PASSWORD));
+            .contains(StaticCredentialSecretKeys.JDBC_PASSWORD));
     assertFalse(
-        CloudStorageCredentialPropertyKeys.keysForCredentialProviders(
+        StaticCredentialSecretKeys.keysForCredentialProviders(
                 S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE)
             .contains(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
   }
@@ -75,37 +71,36 @@ public class TestCloudStorageCredentialPropertyKeys {
             "AKIATEST",
             S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
             "secret",
-            CloudStorageCredentialPropertyKeys.JDBC_USER,
+            StaticCredentialSecretKeys.JDBC_USER,
             "db-user",
-            CloudStorageCredentialPropertyKeys.JDBC_PASSWORD,
+            StaticCredentialSecretKeys.JDBC_PASSWORD,
             "db-pass",
             "custom-token",
             "tok");
 
-    Map<String, String> filtered =
-        CloudStorageCredentialPropertyKeys.omitStaticCredentialSecrets(secrets);
+    Map<String, String> filtered = StaticCredentialSecretKeys.omitStaticCredentialSecrets(secrets);
 
     assertEquals("tok", filtered.get("custom-token"));
     assertFalse(filtered.containsKey(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
-    assertFalse(filtered.containsKey(CloudStorageCredentialPropertyKeys.JDBC_USER));
+    assertFalse(filtered.containsKey(StaticCredentialSecretKeys.JDBC_USER));
   }
 
   @Test
   void testIsStaticCredentialSecretKey() {
     assertTrue(
-        CloudStorageCredentialPropertyKeys.isStaticCredentialSecretKey(
+        StaticCredentialSecretKeys.isStaticCredentialSecretKey(
             AWSProperties.GRAVITINO_AWS_SECRET_ACCESS_KEY));
     assertTrue(
-        CloudStorageCredentialPropertyKeys.isStaticCredentialSecretKey(
+        StaticCredentialSecretKeys.isStaticCredentialSecretKey(
             PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN));
-    assertFalse(CloudStorageCredentialPropertyKeys.isStaticCredentialSecretKey("custom-token"));
+    assertFalse(StaticCredentialSecretKeys.isStaticCredentialSecretKey("custom-token"));
   }
 
   @Test
   void testOmitStaticCredentialSecretsWithScopedKeys() {
     Map<String, String> secrets =
         Map.of(
-            CloudStorageCredentialPropertyKeys.JDBC_USER,
+            StaticCredentialSecretKeys.JDBC_USER,
             "db-user",
             S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
             "AKIATEST",
@@ -113,11 +108,11 @@ public class TestCloudStorageCredentialPropertyKeys {
             "keep");
 
     Map<String, String> jdbcOnly =
-        CloudStorageCredentialPropertyKeys.omitStaticCredentialSecrets(
-            secrets, Set.of(CloudStorageCredentialPropertyKeys.JDBC_USER));
+        StaticCredentialSecretKeys.omitStaticCredentialSecrets(
+            secrets, Set.of(StaticCredentialSecretKeys.JDBC_USER));
 
     assertEquals("keep", jdbcOnly.get("custom-secret"));
     assertEquals("AKIATEST", jdbcOnly.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
-    assertFalse(jdbcOnly.containsKey(CloudStorageCredentialPropertyKeys.JDBC_USER));
+    assertFalse(jdbcOnly.containsKey(StaticCredentialSecretKeys.JDBC_USER));
   }
 }

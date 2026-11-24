@@ -30,14 +30,16 @@ import javax.annotation.Nullable;
  * (dependency-light; no {@code api}).
  *
  * <p>Plaintext for hidden static credentials is recovered via {@code getSecrets()} / {@code
- * getCredentials()}. {@code getSecrets} credential-type filtering lives in server {@code core}
- * ({@code org.apache.gravitino.secret.CloudStorageCredentialPropertyKeys}).
+ * getCredentials()}. Server-side {@code getSecrets} credential-type filtering lives in {@link
+ * org.apache.gravitino.secret.StaticCredentialSecretKeys}, which uses a broader key set (Glue AWS,
+ * Paimon DLF, JDBC, etc.) keyed by credential-provider type. This class keeps a narrower HCFS-only
+ * set and must not be unified with that map.
  *
  * <p>{@code azure-storage-account-name} is intentionally left non-hidden: it is already disclosed
  * in ADLS URIs. Only {@code azure-storage-account-key} and {@code azure-client-secret} are stripped
  * here.
  */
-public final class CloudStorageCredentialPropertyKeys {
+public final class GvfsStaticCredentialProperties {
 
   /** Placeholder returned for masked hidden properties in REST responses. */
   public static final String MASKED_PROPERTY_VALUE = "******";
@@ -58,7 +60,7 @@ public final class CloudStorageCredentialPropertyKeys {
           COSProperties.GRAVITINO_COS_ACCESS_KEY_ID,
           COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET);
 
-  private CloudStorageCredentialPropertyKeys() {}
+  private GvfsStaticCredentialProperties() {}
 
   /**
    * Returns whether the property key holds a static cloud credential for GVFS.

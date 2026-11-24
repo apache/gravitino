@@ -39,16 +39,21 @@ import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.storage.AWSProperties;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.COSProperties;
+import org.apache.gravitino.storage.GvfsStaticCredentialProperties;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
 
 /**
  * Static credential types and property keys for {@code getSecrets} authorization filtering ({@code
  * INCLUDE_CREDENTIAL_SECRETS}). Lives in {@code core} with access to {@code api} credential-type
- * constants. GVFS property stripping stays in {@link
- * org.apache.gravitino.storage.CloudStorageCredentialPropertyKeys}.
+ * constants.
+ *
+ * <p>Key set is broader than GVFS HCFS stripping in {@link GvfsStaticCredentialProperties}
+ * (includes Glue AWS, Paimon DLF, JDBC, etc.) and is indexed by credential-provider type. Do not
+ * merge the two classes: GVFS must stay dependency-light and must not omit metastore-only keys from
+ * {@code properties()} merges.
  */
-public final class CloudStorageCredentialPropertyKeys {
+public final class StaticCredentialSecretKeys {
 
   /** JDBC username property used by the {@code jdbc-user-password} credential provider. */
   public static final String JDBC_USER = JdbcCredential.GRAVITINO_JDBC_USER;
@@ -111,7 +116,7 @@ public final class CloudStorageCredentialPropertyKeys {
     ALL_STATIC_CREDENTIAL_SECRET_KEYS = ImmutableSet.copyOf(all);
   }
 
-  private CloudStorageCredentialPropertyKeys() {}
+  private StaticCredentialSecretKeys() {}
 
   /**
    * Returns whether {@code key} is a static credential secret for {@code getSecrets} without {@code

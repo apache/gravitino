@@ -425,7 +425,7 @@ public final class SecretPropertyUtils {
    */
   public static Map<String, String> omitCloudAccessKeyPairSecrets(
       @Nullable Map<String, String> secrets) {
-    return CloudStorageCredentialPropertyKeys.omitStaticCredentialSecrets(secrets);
+    return StaticCredentialSecretKeys.omitStaticCredentialSecrets(secrets);
   }
 
   /**
@@ -453,7 +453,7 @@ public final class SecretPropertyUtils {
       @Nullable Map<String, String> secrets,
       @Nullable PropertiesMetadata metadata,
       @Nullable Map<String, String> rawProperties) {
-    return CloudStorageCredentialPropertyKeys.omitStaticCredentialSecrets(
+    return StaticCredentialSecretKeys.omitStaticCredentialSecrets(
         secrets, resolveStaticCredentialKeysToOmit(metadata, rawProperties));
   }
 
@@ -468,15 +468,15 @@ public final class SecretPropertyUtils {
   static Set<String> resolveStaticCredentialKeysToOmit(
       @Nullable PropertiesMetadata metadata, @Nullable Map<String, String> rawProperties) {
     if (metadata == null) {
-      return CloudStorageCredentialPropertyKeys.staticCredentialSecretKeys();
+      return StaticCredentialSecretKeys.staticCredentialSecretKeys();
     }
     Set<String> keys = new HashSet<>();
-    for (String key : CloudStorageCredentialPropertyKeys.staticCredentialSecretKeys()) {
+    for (String key : StaticCredentialSecretKeys.staticCredentialSecretKeys()) {
       if (metadata.containsProperty(key)) {
         keys.add(key);
       }
     }
-    keys.addAll(CloudStorageCredentialPropertyKeys.keysForCredentialProviders(rawProperties));
+    keys.addAll(StaticCredentialSecretKeys.keysForCredentialProviders(rawProperties));
     return keys;
   }
 

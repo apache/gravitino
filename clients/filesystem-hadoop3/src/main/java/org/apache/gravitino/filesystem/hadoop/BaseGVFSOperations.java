@@ -86,7 +86,7 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.storage.AzureProperties;
-import org.apache.gravitino.storage.CloudStorageCredentialPropertyKeys;
+import org.apache.gravitino.storage.GvfsStaticCredentialProperties;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
 import org.apache.gravitino.utils.FilesetUtil;
@@ -1115,7 +1115,7 @@ public abstract class BaseGVFSOperations implements Closeable {
   private static void putPropsAndSecrets(
       Map<String, String> target, Map<String, String> props, SupportsSecrets secrets) {
     if (props != null) {
-      target.putAll(CloudStorageCredentialPropertyKeys.omitStaticCredentialProperties(props));
+      target.putAll(GvfsStaticCredentialProperties.omitStaticCredentialProperties(props));
     }
     if (secrets != null) {
       target.putAll(secrets.getSecrets());

@@ -54,7 +54,7 @@ import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.secret.SupportsSecrets;
-import org.apache.gravitino.storage.CloudStorageCredentialPropertyKeys;
+import org.apache.gravitino.storage.GvfsStaticCredentialProperties;
 import org.apache.gravitino.storage.S3Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -260,9 +260,9 @@ public class TestBaseGVFSOperationsSecrets {
         mockCatalogWithCredentials(
             Map.of(
                 S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
-                CloudStorageCredentialPropertyKeys.MASKED_PROPERTY_VALUE,
+                GvfsStaticCredentialProperties.MASKED_PROPERTY_VALUE,
                 S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
-                CloudStorageCredentialPropertyKeys.MASKED_PROPERTY_VALUE,
+                GvfsStaticCredentialProperties.MASKED_PROPERTY_VALUE,
                 "s3-endpoint",
                 "http://s3.example.com"),
             credentials);
