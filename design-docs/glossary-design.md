@@ -487,15 +487,15 @@ pending-content rules are specified separately below.
   accepted the term. A domain or an ontology (#14310) is published as a whole and has no review per
   item, so `DRAFT` / `PUBLISHED` is enough there.
 - **Term reads apply the same definition authorization** (REST, clients, MCP); the new glossary
-  MCP tools additionally exclude non-`APPROVED` terms. If the caller cannot see a term, lists leave
-  it out and get returns 404. The same rule applies inside responses. The `broader`,
-  `narrower` and `related` lists of a term, the terms of an object, and the terms of a domain all
-  leave out terms the caller cannot see. So a hidden draft never shows up as a relation.
+  MCP tools additionally exclude non-`APPROVED` terms. Ordinary Term lists omit hidden terms,
+  and direct gets return `404`. Nested results also omit hidden terms, including `broader`,
+  `narrower` and `related` terms and the terms of an object or Domain.
 - **Known leaks**: hiding a term does not make it secret. A user can still find out that it exists
   through a same-name create (409), a synonym equal to its name (400), or dropping a draft Domain
-  that contains hidden member terms (409). The last response discloses non-emptiness, not
-  member names or counts; clearing the membership requires the authorized callers described
-  in Domain membership.
+  that contains hidden member terms (409). The drop response discloses only non-emptiness.
+  For membership cleanup, `GET /domains/{domain}/definition-members` returns the type and name
+  of direct members, including hidden draft Terms, to callers with `MANAGE_DOMAIN`. Reading the
+  Term itself still requires the usual Glossary permissions.
   Lookup-work errors expose a coarse cost limit being reached, but return no exact candidate or
   hidden counts. Binding-page continuation also reveals that a scan may have more work, not that
   another authorized binding exists. This is not a claim that errors, cursors or timing reveal
@@ -734,6 +734,13 @@ All paths are under `/api/metalakes/{metalake}`. They follow the Tag, Policy and
 | Bind / unbind a metric | `POST /objects/semantic_model/{fullName}/metrics/{metric}/terms`                 | `TermsAssociateRequest` -> `NameListResponse`                            |
 | Owner                  | existing `/owners/glossary_term/{term}`                                          |                                                                          |
 | Tags                   | existing `/objects/glossary_term/{term}/tags`                                    |                                                                          |
+
+The Domain asset browser (`GET /domains/{domain}/objects?types=`) applies Domain visibility
+and asset-read checks. The definition member list uses a separate route because its Domain
+management check permits returning the type and name of hidden draft members for cleanup.
+On a Domain page, clients can use `/domains/{domain}/objects?types=TABLE` to show readable
+tables and `/domains/{domain}/definition-members` in the administrator's membership view to
+find direct Term and Article members to detach.
 
 For the Domain definition member list and Step 1 detach, resolve the Domain and check
 `MANAGE_DOMAIN` before looking up members. A successful detach, missing Term or absent
