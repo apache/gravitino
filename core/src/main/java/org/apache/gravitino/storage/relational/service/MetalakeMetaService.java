@@ -302,6 +302,7 @@ public class MetalakeMetaService {
                     TagMetaMapper.class,
                     mapper -> mapper.softDeleteTagMetasByMetalakeId(metalakeId)),
             () -> GlossaryTermMetaService.getInstance().dropMetalake(metalakeId),
+            () -> KnowledgeBaseArticleMetaService.getInstance().dropMetalake(metalakeId),
             () ->
                 SessionUtils.doWithoutCommit(
                     PolicyTagRelMapper.class, mapper -> mapper.softDeleteByMetalakeId(metalakeId)),
@@ -427,6 +428,7 @@ public class MetalakeMetaService {
                     TagMetaMapper.class,
                     mapper -> mapper.softDeleteTagMetasByMetalakeId(metalakeId)),
             () -> GlossaryTermMetaService.getInstance().dropMetalake(metalakeId),
+            () -> KnowledgeBaseArticleMetaService.getInstance().dropMetalake(metalakeId),
             () ->
                 SessionUtils.doWithoutCommit(
                     PolicyTagRelMapper.class, mapper -> mapper.softDeleteByMetalakeId(metalakeId)),

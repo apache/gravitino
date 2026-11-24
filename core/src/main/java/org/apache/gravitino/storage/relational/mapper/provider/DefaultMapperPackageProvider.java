@@ -36,6 +36,7 @@ import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.KnowledgeBaseArticleMapper;
 import org.apache.gravitino.storage.relational.mapper.LiveEndpointMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
@@ -72,8 +73,8 @@ public class DefaultMapperPackageProvider implements MapperPackageProvider {
   public List<Class<?>> getMapperClasses() {
     return ImmutableList.of(
         CatalogMetaMapper.class,
-        DomainMetaMapper.class,
         DomainMemberMapper.class,
+        DomainMetaMapper.class,
         DomainRelMapper.class,
         EntityChangeLogMapper.class,
         FilesetMetaMapper.class,
@@ -109,6 +110,7 @@ public class DefaultMapperPackageProvider implements MapperPackageProvider {
         GlossaryTermMetaMapper.class,
         GlossaryTermRelMapper.class,
         GlossaryTermDomainRelMapper.class,
+        KnowledgeBaseArticleMapper.class,
         TopicMetaMapper.class,
         UserMetaMapper.class,
         UserRoleRelMapper.class,
