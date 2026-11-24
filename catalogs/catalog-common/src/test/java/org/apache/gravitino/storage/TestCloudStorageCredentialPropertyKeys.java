@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.catalog.glue.GlueConstants;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.junit.jupiter.api.Test;
@@ -194,5 +195,36 @@ public class TestCloudStorageCredentialPropertyKeys {
     assertFalse(filtered.containsKey(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET));
     assertFalse(filtered.containsKey(PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN));
     assertFalse(filtered.containsKey(CloudStorageCredentialPropertyKeys.JDBC_PASSWORD));
+  }
+
+  @Test
+  void testOmitCloudAccessKeyPairPropertiesWithScopedKeys() {
+    Map<String, String> secrets =
+        Map.of(
+            CloudStorageCredentialPropertyKeys.JDBC_USER,
+            "db-user",
+            CloudStorageCredentialPropertyKeys.JDBC_PASSWORD,
+            "db-pass",
+            S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+            "AKIATEST",
+            "custom-secret",
+            "keep");
+
+    Map<String, String> jdbcOnly =
+        CloudStorageCredentialPropertyKeys.omitCloudAccessKeyPairProperties(
+            secrets,
+            Set.of(
+                CloudStorageCredentialPropertyKeys.JDBC_USER,
+                CloudStorageCredentialPropertyKeys.JDBC_PASSWORD));
+
+    assertEquals("keep", jdbcOnly.get("custom-secret"));
+    assertEquals("AKIATEST", jdbcOnly.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertFalse(jdbcOnly.containsKey(CloudStorageCredentialPropertyKeys.JDBC_USER));
+    assertFalse(jdbcOnly.containsKey(CloudStorageCredentialPropertyKeys.JDBC_PASSWORD));
+
+    Map<String, String> emptyScope =
+        CloudStorageCredentialPropertyKeys.omitCloudAccessKeyPairProperties(secrets, Set.of());
+    assertEquals("db-user", emptyScope.get(CloudStorageCredentialPropertyKeys.JDBC_USER));
+    assertEquals("AKIATEST", emptyScope.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
   }
 }

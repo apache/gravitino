@@ -78,15 +78,41 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
   }
 
   /**
-   * Returns plaintext secret properties for the given metadata object.
+   * Returns plaintext secret properties for the given metadata object, including static credential
+   * keys. Equivalent to {@link #getSecrets(NameIdentifier, Entity.EntityType, boolean)} with {@code
+   * includeCredentialSecrets = true}.
    *
    * @param identifier The entity name identifier.
    * @param entityType The entity type.
    * @return secret plaintext properties; never null
    */
   public Map<String, String> getSecrets(NameIdentifier identifier, Entity.EntityType entityType) {
+    return getSecrets(identifier, entityType, true);
+  }
+
+  /**
+   * Returns plaintext secret properties for the given metadata object.
+   *
+   * <p>When {@code includeCredentialSecrets} is {@code false}, static credential keys that apply to
+   * this object (declared in its {@link PropertiesMetadata} and/or used by an enabled static {@code
+   * credential-providers} entry) are omitted. Other secrets remain.
+   *
+   * @param identifier The entity name identifier.
+   * @param entityType The entity type.
+   * @param includeCredentialSecrets whether to include object-scoped static credential secrets
+   * @return secret plaintext properties; never null
+   */
+  public Map<String, String> getSecrets(
+      NameIdentifier identifier, Entity.EntityType entityType, boolean includeCredentialSecrets) {
     RawPropertiesAndMetadata loaded = loadRawPropertiesAndMetadata(identifier, entityType);
-    return SecretPropertyUtils.buildSecrets(secretManager, loaded.rawProperties, loaded.metadata);
+    Map<String, String> secrets =
+        SecretPropertyUtils.buildSecrets(secretManager, loaded.rawProperties, loaded.metadata);
+    if (!includeCredentialSecrets) {
+      secrets =
+          SecretPropertyUtils.omitCloudAccessKeyPairSecrets(
+              secrets, loaded.metadata, loaded.rawProperties);
+    }
+    return secrets;
   }
 
   /**

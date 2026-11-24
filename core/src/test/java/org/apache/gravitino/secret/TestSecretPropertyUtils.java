@@ -29,7 +29,9 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
+import org.apache.gravitino.storage.CloudStorageCredentialPropertyKeys;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -293,6 +295,66 @@ public class TestSecretPropertyUtils {
     Assertions.assertEquals("override", merged.get("a"));
     Assertions.assertEquals("2", merged.get("b"));
     Assertions.assertTrue(SecretPropertyUtils.mergeProperties(null, null).isEmpty());
+  }
+
+  @Test
+  void testOmitStaticCredentialSecretsScopedByMetadata() {
+    PropertiesMetadata jdbcMetadata =
+        () ->
+            Map.of(
+                "jdbc-user",
+                PropertyEntry.stringOptionalPropertyEntry("jdbc-user", "doc", false, null, false),
+                "jdbc-password",
+                PropertyEntry.stringOptionalPropertyEntry(
+                    "jdbc-password", "doc", false, null, true));
+    PropertiesMetadata hiveMetadata = () -> Map.of();
+
+    Map<String, String> secrets =
+        Map.of(
+            "jdbc-user",
+            "db-user",
+            "jdbc-password",
+            "db-pass",
+            "custom-secret",
+            "keep",
+            "s3-access-key-id",
+            "AKIA");
+
+    Map<String, String> jdbcFiltered =
+        SecretPropertyUtils.omitCloudAccessKeyPairSecrets(secrets, jdbcMetadata, null);
+    Assertions.assertEquals("keep", jdbcFiltered.get("custom-secret"));
+    Assertions.assertEquals("AKIA", jdbcFiltered.get("s3-access-key-id"));
+    Assertions.assertFalse(jdbcFiltered.containsKey("jdbc-user"));
+    Assertions.assertFalse(jdbcFiltered.containsKey("jdbc-password"));
+
+    Map<String, String> hiveFiltered =
+        SecretPropertyUtils.omitCloudAccessKeyPairSecrets(secrets, hiveMetadata, null);
+    Assertions.assertEquals("db-user", hiveFiltered.get("jdbc-user"));
+    Assertions.assertEquals("db-pass", hiveFiltered.get("jdbc-password"));
+    Assertions.assertEquals("keep", hiveFiltered.get("custom-secret"));
+    Assertions.assertEquals("AKIA", hiveFiltered.get("s3-access-key-id"));
+  }
+
+  @Test
+  void testOmitStaticCredentialSecretsFromCredentialProviders() {
+    PropertiesMetadata emptyMetadata = () -> Map.of();
+    Map<String, String> secrets =
+        Map.of("jdbc-user", "u", "jdbc-password", "p", "custom-secret", "keep");
+    Map<String, String> raw =
+        Map.of(CredentialConstants.CREDENTIAL_PROVIDERS, "jdbc-user-password,s3-token");
+
+    Map<String, String> filtered =
+        SecretPropertyUtils.omitCloudAccessKeyPairSecrets(secrets, emptyMetadata, raw);
+    Assertions.assertEquals("keep", filtered.get("custom-secret"));
+    Assertions.assertFalse(filtered.containsKey("jdbc-user"));
+    Assertions.assertFalse(filtered.containsKey("jdbc-password"));
+  }
+
+  @Test
+  void testResolveStaticCredentialKeysToOmitNullMetadataIsConservative() {
+    Assertions.assertEquals(
+        CloudStorageCredentialPropertyKeys.cloudAccessKeyPairKeys(),
+        SecretPropertyUtils.resolveStaticCredentialKeysToOmit(null, null));
   }
 
   @Test

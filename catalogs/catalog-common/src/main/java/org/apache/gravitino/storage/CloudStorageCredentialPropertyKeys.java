@@ -36,8 +36,9 @@ import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
  * Catalog credential vending requires both privileges or metalake ownership, in addition to
  * metadata access; fileset credential vending uses path-based authorization. Masked placeholders
  * are dropped by {@link #omitStaticCredentialProperties}. Callers with only {@code USE_SECRETS}
- * receive {@code getSecrets()} with static credential properties omitted via {@link
- * #omitCloudAccessKeyPairProperties}.
+ * receive {@code getSecrets()} with object-scoped static credential properties omitted via {@link
+ * #omitCloudAccessKeyPairProperties(Map, Set)} (keys declared on that object's properties metadata
+ * and/or used by an enabled static credential provider).
  *
  * <p>{@code azure-storage-account-name} is intentionally left non-hidden (and not listed here):
  * unlike S3/OSS/COS access key IDs, the account name is already disclosed in ADLS URIs such as
@@ -145,22 +146,42 @@ public final class CloudStorageCredentialPropertyKeys {
   }
 
   /**
-   * Returns a copy of {@code secrets} with static credential keys removed. Used when filtering
-   * {@code getSecrets()} for callers that hold {@code USE_SECRETS} but not {@code
-   * INCLUDE_CREDENTIAL_SECRETS}.
+   * Returns a copy of {@code secrets} with every static credential key removed. Prefer {@link
+   * #omitCloudAccessKeyPairProperties(Map, Set)} with an object-scoped key set so the same key name
+   * (for example {@code jdbc-user}) is omitted only when it is a credential property for that
+   * metadata object.
    *
    * @param secrets plaintext secrets map
    * @return secrets without static credential properties
    */
   public static Map<String, String> omitCloudAccessKeyPairProperties(
       @Nullable Map<String, String> secrets) {
+    return omitCloudAccessKeyPairProperties(secrets, CLOUD_ACCESS_KEY_PAIR_KEYS);
+  }
+
+  /**
+   * Returns a copy of {@code secrets} with keys in {@code keysToOmit} removed. Callers that know
+   * which static credential keys apply to the current metadata object (declared in {@code
+   * PropertiesMetadata} and/or enabled via static {@code credential-providers}) should pass that
+   * scoped set so undeclared same-named properties are not stripped.
+   *
+   * @param secrets plaintext secrets map
+   * @param keysToOmit keys to drop; {@code null} omits the full static-credential key set
+   * @return secrets without the given keys
+   */
+  public static Map<String, String> omitCloudAccessKeyPairProperties(
+      @Nullable Map<String, String> secrets, @Nullable Set<String> keysToOmit) {
     if (secrets == null || secrets.isEmpty()) {
       return ImmutableMap.of();
+    }
+    Set<String> omit = keysToOmit == null ? CLOUD_ACCESS_KEY_PAIR_KEYS : keysToOmit;
+    if (omit.isEmpty()) {
+      return ImmutableMap.copyOf(secrets);
     }
     Map<String, String> filtered = new HashMap<>();
     for (Map.Entry<String, String> entry : secrets.entrySet()) {
       String key = entry.getKey();
-      if (key == null || isCloudAccessKeyPairKey(key)) {
+      if (key == null || omit.contains(key)) {
         continue;
       }
       filtered.put(key, entry.getValue());
