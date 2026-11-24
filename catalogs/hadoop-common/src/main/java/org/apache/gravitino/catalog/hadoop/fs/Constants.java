@@ -58,6 +58,11 @@ public class Constants {
   public static final String S3_RETRY_LIMIT = "fs.s3a.retry.limit";
 
   public static final String S3_RETRY_THROTTLE_LIMIT = "fs.s3a.retry.throttle.limit";
+  // Hadoop 3.4 changed the default from "delete" to "keep". S3A clients of the releases without
+  // marker support (before 2.10.2, 3.1.4, 3.2.2 and 3.3.1) take a directory with a kept marker for
+  // an empty one.
+  public static final String S3_DIRECTORY_MARKER_RETENTION = "fs.s3a.directory.marker.retention";
+  public static final String S3_DIRECTORY_MARKER_RETENTION_DELETE = "delete";
 
   // GCS specific configuration keys
   public static final String GCS_GCS_HTTP_CONNECT_TIMEOUT_KEY = "fs.gs.http.connect-timeout";

@@ -425,3 +425,33 @@ CREATE TABLE IF NOT EXISTS `domain_rel` (
     KEY `domain_rel_idx_parent` (`parent_id`, `deleted_at`),
     KEY `domain_rel_idx_metalake` (`metalake_id`, `deleted_at`)
 ) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `iceberg_idempotency_meta` (
+  `idempotency_key`  VARCHAR(36) NOT NULL     COMMENT 'client-provided UUIDv7 idempotency key',
+  `http_method`      VARCHAR(16) NOT NULL     COMMENT 'HTTP method of the request',
+  `request_uri`      TEXT        NOT NULL     COMMENT 'encoded request path and sorted query string',
+  `generation`       BIGINT      NOT NULL     COMMENT 'reservation fencing token',
+  `http_status`      INT         NULL         COMMENT 'HTTP status of finalized response, NULL while reserved',
+  `response_summary` CLOB        NULL         COMMENT 'serialized response body (JSON) for replay',
+  `audit_info`       CLOB        NOT NULL     COMMENT 'idempotency record audit info',
+  `created_at`       BIGINT      NOT NULL     COMMENT 'record created at (unix epoch millis)',
+  `expires_at`       BIGINT      NOT NULL     COMMENT 'record expires at (unix epoch millis)',
+  PRIMARY KEY (`idempotency_key`)
+) COMMENT='Iceberg REST idempotency records';
+CREATE INDEX IF NOT EXISTS `idx_iim_expires` ON `iceberg_idempotency_meta` (`expires_at`);
+
+
+CREATE TABLE IF NOT EXISTS iceberg_idempotency_generation_meta (
+  stripe INT NOT NULL PRIMARY KEY,
+  generation BIGINT NOT NULL
+) ENGINE=InnoDB;
+
+-- Index live metadata lists and relationship cleanup by their lookup keys and deletion status.
+CREATE INDEX IF NOT EXISTS `idx_tag_meta_live` ON `tag_meta` (`metalake_id`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_policy_meta_live` ON `policy_meta` (`metalake_id`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_role_meta_live` ON `role_meta` (`metalake_id`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_user_meta_live` ON `user_meta` (`metalake_id`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_tag_relation_meta_live` ON `tag_relation_meta` (`metadata_object_id`, `metadata_object_type`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_role_meta_securable_object_live` ON `role_meta_securable_object` (`metadata_object_id`, `type`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_user_role_rel_live` ON `user_role_rel` (`role_id`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_policy_tag_relation_meta_live` ON `policy_tag_relation_meta` (`tag_id`, `deleted_at`);

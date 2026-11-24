@@ -240,7 +240,7 @@ environment:
 | Environment            | Jar providing the Alibaba Cloud OSS filesystem                                                                                                                                                        |
 |------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | No Hadoop installed    | [`gravitino-aliyun-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle), a fat jar bundling the Alibaba Cloud OSS filesystem implementation and its dependencies |
-| Hadoop already present | `hadoop-aliyun-${hadoop-version}.jar`, `aliyun-sdk-oss-3.13.0.jar` and `jdom2-2.0.6.jar`, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`                                           |
+| Hadoop already present | `hadoop-aliyun-${hadoop-version}.jar` and the `aliyun-sdk-oss` and `jdom2` jars it depends on (see below)                                                                                             |
 
 The artifacts in full:
 
@@ -251,10 +251,12 @@ The artifacts in full:
   a "fat" jar that bundles the Gravitino virtual filesystem client and already includes the
   `gravitino-aliyun` functionality. Java and Hadoop-based clients require it to access Gravitino
   filesets.
-- `hadoop-aliyun-${hadoop-version}.jar`, `aliyun-sdk-oss-3.13.0.jar` and `jdom2-2.0.6.jar`: the
-  standard Hadoop dependencies for Alibaba Cloud OSS access, shipped with Hadoop under
-  `${HADOOP_HOME}/share/hadoop/tools/lib`. Supply them yourself when running inside an existing
-  Hadoop environment.
+- `hadoop-aliyun-${hadoop-version}.jar` and the `aliyun-sdk-oss` and `jdom2` jars it depends on:
+  the standard Hadoop dependencies for Alibaba Cloud OSS access. Supply them yourself when running
+  inside an existing Hadoop environment. Hadoop 3.3 ships `hadoop-aliyun`, `aliyun-sdk-oss-3.13.0.jar`
+  and `jdom2-2.0.6.jar` under `${HADOOP_HOME}/share/hadoop/tools/lib`. The Hadoop 3.4.3 binary
+  distribution does not ship them, so download `hadoop-aliyun-3.4.3.jar` and the versions it
+  depends on (`aliyun-sdk-oss-3.13.2.jar` and `jdom2-2.0.6.1.jar`) from Maven Central.
 - [`gravitino-aliyun-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun):
   a "thin" jar carrying only the Aliyun integration code. It is already contained in both jars
   above, so it is not needed as a direct dependency unless you prefer to manage all Hadoop and
@@ -415,7 +417,7 @@ implementations passed with `--jars`. If that happens, add the jars to the Spark
 2. Add these jars to the Hadoop classpath:
 
    - `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, from Maven Central.
-   - `hadoop-aliyun-${hadoop-version}.jar`, `aliyun-sdk-oss-3.13.0.jar` and `jdom2-2.0.6.jar`, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`.
+   - `hadoop-aliyun-${hadoop-version}.jar` and the `aliyun-sdk-oss` and `jdom2` jars it depends on. Hadoop 3.3 ships them under `${HADOOP_HOME}/share/hadoop/tools/lib`. Hadoop 3.4.3 does not ship them, so download `hadoop-aliyun-3.4.3.jar`, `aliyun-sdk-oss-3.13.2.jar` and `jdom2-2.0.6.1.jar` from Maven Central.
 
 3. Access the fileset:
 

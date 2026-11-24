@@ -48,6 +48,7 @@ import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
@@ -314,6 +315,8 @@ public class GravitinoInterceptionService implements InterceptionService {
           scope.bindIfRead(method, metalakeIdent, authorizationRequestContext);
         }
         return methodInvocation.proceed();
+      } catch (NoSuchCatalogException ex) {
+        return Utils.notFound(ex.getMessage(), ex);
       } catch (BadRequestException ex) {
         LOG.warn("Invalid authorization request", ex);
         return Utils.illegalArguments(ex.getMessage(), ex);

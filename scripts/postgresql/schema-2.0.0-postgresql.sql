@@ -296,6 +296,7 @@ CREATE TABLE IF NOT EXISTS user_meta (
     PRIMARY KEY (user_id),
     UNIQUE (metalake_id, user_name, deleted_at)
 );
+CREATE INDEX IF NOT EXISTS idx_user_meta_live ON user_meta (metalake_id) WHERE deleted_at = 0;
 COMMENT ON TABLE user_meta IS 'user metadata';
 
 COMMENT ON COLUMN user_meta.user_id IS 'user id';
@@ -321,6 +322,7 @@ CREATE TABLE IF NOT EXISTS role_meta (
     UNIQUE (metalake_id, role_name, deleted_at)
 );
 
+CREATE INDEX IF NOT EXISTS idx_role_meta_live ON role_meta (metalake_id) WHERE deleted_at = 0;
 COMMENT ON TABLE role_meta IS 'role metadata';
 
 COMMENT ON COLUMN role_meta.role_id IS 'role id';
@@ -348,6 +350,7 @@ CREATE TABLE IF NOT EXISTS role_meta_securable_object (
 );
 
 CREATE INDEX IF NOT EXISTS role_meta_securable_object_idx_role_id ON role_meta_securable_object (role_id);
+CREATE INDEX IF NOT EXISTS idx_role_meta_securable_object_live ON role_meta_securable_object (metadata_object_id, type) WHERE deleted_at = 0;
 COMMENT ON TABLE role_meta_securable_object IS 'role to securable object relation metadata';
 
 COMMENT ON COLUMN role_meta_securable_object.id IS 'auto increment id';
@@ -375,6 +378,7 @@ CREATE TABLE IF NOT EXISTS user_role_rel (
 
 CREATE INDEX IF NOT EXISTS user_role_rel_idx_user_id ON user_role_rel (user_id);
 CREATE INDEX IF NOT EXISTS user_role_rel_idx_role_id ON user_role_rel (role_id);
+CREATE INDEX IF NOT EXISTS idx_user_role_rel_live ON user_role_rel (role_id) WHERE deleted_at = 0;
 COMMENT ON TABLE user_role_rel IS 'user role relation metadata';
 
 COMMENT ON COLUMN user_role_rel.id IS 'auto increment id';
@@ -515,6 +519,7 @@ CREATE TABLE IF NOT EXISTS tag_meta (
     UNIQUE (metalake_id, tag_name, deleted_at)
 );
 
+CREATE INDEX IF NOT EXISTS idx_tag_meta_live ON tag_meta (metalake_id) WHERE deleted_at = 0;
 COMMENT ON TABLE tag_meta IS 'tag metadata';
 
 COMMENT ON COLUMN tag_meta.tag_id IS 'tag id';
@@ -543,6 +548,7 @@ CREATE TABLE IF NOT EXISTS tag_relation_meta (
 CREATE INDEX IF NOT EXISTS tag_relation_meta_idx_tag_id ON tag_relation_meta (tag_id);
 CREATE INDEX IF NOT EXISTS tag_relation_meta_idx_metadata_object_id ON tag_relation_meta (metadata_object_id);
 CREATE INDEX IF NOT EXISTS tag_relation_meta_idx_tag_id_value ON tag_relation_meta (tag_id, tag_value);
+CREATE INDEX IF NOT EXISTS idx_tag_relation_meta_live ON tag_relation_meta (metadata_object_id, metadata_object_type) WHERE deleted_at = 0;
 COMMENT ON TABLE tag_relation_meta IS 'tag metadata object relation';
 COMMENT ON COLUMN tag_relation_meta.id IS 'auto increment id';
 COMMENT ON COLUMN tag_relation_meta.tag_id IS 'tag id';
@@ -698,6 +704,7 @@ CREATE TABLE IF NOT EXISTS policy_meta (
     UNIQUE (metalake_id, policy_name, deleted_at)
 );
 
+CREATE INDEX IF NOT EXISTS idx_policy_meta_live ON policy_meta (metalake_id) WHERE deleted_at = 0;
 COMMENT ON TABLE policy_meta IS 'policy metadata';
 COMMENT ON COLUMN policy_meta.policy_id IS 'policy id';
 COMMENT ON COLUMN policy_meta.policy_name IS 'policy name';
@@ -749,6 +756,7 @@ CREATE TABLE IF NOT EXISTS policy_tag_relation_meta (
 );
 
 CREATE INDEX IF NOT EXISTS policy_tag_relation_meta_idx_tag_id ON policy_tag_relation_meta (tag_id);
+CREATE INDEX IF NOT EXISTS idx_policy_tag_relation_meta_live ON policy_tag_relation_meta (tag_id) WHERE deleted_at = 0;
 COMMENT ON TABLE policy_tag_relation_meta IS 'policy tag relation';
 COMMENT ON COLUMN policy_tag_relation_meta.id IS 'auto increment id';
 COMMENT ON COLUMN policy_tag_relation_meta.policy_id IS 'policy id';
@@ -1415,3 +1423,32 @@ COMMENT ON COLUMN domain_rel.audit_info IS 'domain relation audit info';
 COMMENT ON COLUMN domain_rel.current_version IS 'domain relation current version';
 COMMENT ON COLUMN domain_rel.last_version IS 'domain relation last version';
 COMMENT ON COLUMN domain_rel.deleted_at IS 'domain relation deleted at';
+
+CREATE TABLE IF NOT EXISTS iceberg_idempotency_meta (
+  idempotency_key  VARCHAR(36) NOT NULL PRIMARY KEY,
+  http_method      VARCHAR(16) NOT NULL,
+  request_uri      TEXT        NOT NULL,
+  generation       BIGINT      NOT NULL,
+  http_status      INT,
+  response_summary TEXT,
+  audit_info       TEXT        NOT NULL,
+  created_at       BIGINT      NOT NULL,
+  expires_at       BIGINT      NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_iim_expires ON iceberg_idempotency_meta (expires_at);
+COMMENT ON TABLE iceberg_idempotency_meta IS 'Iceberg REST idempotency records';
+COMMENT ON COLUMN iceberg_idempotency_meta.idempotency_key IS 'client-provided UUIDv7 idempotency key';
+COMMENT ON COLUMN iceberg_idempotency_meta.http_method IS 'HTTP method of the request';
+COMMENT ON COLUMN iceberg_idempotency_meta.request_uri IS 'encoded request path and sorted query string';
+COMMENT ON COLUMN iceberg_idempotency_meta.generation IS 'reservation fencing token';
+COMMENT ON COLUMN iceberg_idempotency_meta.http_status IS 'HTTP status of finalized response, NULL while reserved';
+COMMENT ON COLUMN iceberg_idempotency_meta.response_summary IS 'serialized response body (JSON) for replay';
+COMMENT ON COLUMN iceberg_idempotency_meta.audit_info IS 'idempotency record audit info';
+COMMENT ON COLUMN iceberg_idempotency_meta.created_at IS 'record created at (unix epoch millis)';
+COMMENT ON COLUMN iceberg_idempotency_meta.expires_at IS 'record expires at (unix epoch millis)';
+
+
+CREATE TABLE IF NOT EXISTS iceberg_idempotency_generation_meta (
+  stripe INT NOT NULL PRIMARY KEY,
+  generation BIGINT NOT NULL
+);

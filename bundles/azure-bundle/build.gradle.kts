@@ -33,6 +33,9 @@ dependencies {
 
   implementation(libs.azure.identity)
   implementation(libs.azure.storage.file.datalake)
+  // hadoop-azure 3.4 uses Commons IO (workload identity, identity mapping and the blob endpoint
+  // client), which hadoop-client-runtime shades for its own use only.
+  implementation(libs.commons.io)
   implementation(libs.hadoop3.abs)
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)

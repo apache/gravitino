@@ -21,6 +21,7 @@ package org.apache.gravitino.s3.credential;
 
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.S3TokenCredential;
+import org.apache.gravitino.credential.SupportsDynamicCredential;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -29,10 +30,14 @@ public class TestCredentialProvider {
   @Test
   void testCredentialProviderType() {
     S3TokenProvider s3TokenProvider = new S3TokenProvider();
+    Assertions.assertInstanceOf(SupportsDynamicCredential.class, s3TokenProvider);
     Assertions.assertEquals(
         S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE, s3TokenProvider.credentialType());
 
+    Assertions.assertInstanceOf(SupportsDynamicCredential.class, new AwsIrsaCredentialProvider());
+
     S3SecretKeyProvider s3SecretKeyProvider = new S3SecretKeyProvider();
+    Assertions.assertFalse(s3SecretKeyProvider instanceof SupportsDynamicCredential);
     Assertions.assertEquals(
         S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE, s3SecretKeyProvider.credentialType());
   }

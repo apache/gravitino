@@ -152,7 +152,7 @@ it('retries failed tag loads', async () => {
   expect(container.textContent).toContain('tag-one')
 })
 
-it('refreshes tags after removing a tag', async () => {
+it('refreshes tags after removing a tag value', async () => {
   let removed = false
   defHttp.post.mockImplementation(request => {
     if (!request.url.includes('/bulk/')) {
@@ -162,17 +162,19 @@ it('refreshes tags after removing a tag', async () => {
     }
     const result = response(namesFrom(request))
     if (removed) result.results[0].tags.tags = []
-    else result.results[0].tags.tags[0].inherited = false
+    else Object.assign(result.results[0].tags.tags[0], { inherited: false, assignmentValues: ['private'] })
 
     return Promise.resolve(result)
   })
   await renderRows(['one'])
+  expect(container.textContent).toContain('tag-one=private')
   const close = container.querySelector('.ant-tag-close-icon')
   expect(close).not.toBeNull()
   await act(async () => close.click())
   await settle()
   expect(container.textContent).toContain('No Tags')
   expect(defHttp.post).toHaveBeenCalledTimes(3)
+  expect(defHttp.post.mock.calls[1][0].data).toEqual({ tagsToRemove: [{ name: 'tag-one', value: 'private' }] })
   expect(defHttp.get).not.toHaveBeenCalled()
 })
 
