@@ -923,3 +923,91 @@ CREATE TABLE IF NOT EXISTS `domain_rel` (
     KEY `domain_rel_idx_parent` (`parent_id`, `deleted_at`),
     KEY `domain_rel_idx_metalake` (`metalake_id`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'domain parent relation';
+<<<<<<< HEAD
+=======
+
+CREATE TABLE IF NOT EXISTS `iceberg_idempotency_meta` (
+  `idempotency_key`  VARCHAR(36)         NOT NULL     COMMENT 'client-provided UUIDv7 idempotency key',
+  `http_method`      VARCHAR(16)         NOT NULL     COMMENT 'HTTP method of the request',
+  `request_uri`      MEDIUMTEXT          NOT NULL     COMMENT 'encoded request path and sorted query string',
+  `generation`       BIGINT              NOT NULL     COMMENT 'reservation fencing token',
+  `http_status`      INT(10) UNSIGNED    DEFAULT NULL COMMENT 'HTTP status of finalized response, NULL while reserved',
+  `response_summary` MEDIUMTEXT          DEFAULT NULL COMMENT 'serialized response body (JSON) for replay',
+  `audit_info`       MEDIUMTEXT          NOT NULL     COMMENT 'idempotency record audit info',
+  `created_at`       BIGINT(20) UNSIGNED NOT NULL     COMMENT 'record created at (unix epoch millis)',
+  `expires_at`       BIGINT(20) UNSIGNED NOT NULL     COMMENT 'record expires at (unix epoch millis)',
+  PRIMARY KEY (`idempotency_key`),
+  KEY `idx_iim_expires` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Iceberg REST idempotency records';
+
+
+CREATE TABLE IF NOT EXISTS iceberg_idempotency_generation_meta (
+  stripe INT NOT NULL PRIMARY KEY,
+  generation BIGINT NOT NULL
+) ENGINE=InnoDB;
+
+-- Index live metadata lists and relationship cleanup by their lookup keys and deletion status.
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'tag_meta' AND index_name = 'idx_tag_meta_live'),
+    'SELECT 1',
+    'CREATE INDEX `idx_tag_meta_live` ON `tag_meta` (`metalake_id`, `deleted_at`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'policy_meta' AND index_name = 'idx_policy_meta_live'),
+    'SELECT 1',
+    'CREATE INDEX `idx_policy_meta_live` ON `policy_meta` (`metalake_id`, `deleted_at`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'role_meta' AND index_name = 'idx_role_meta_live'),
+    'SELECT 1',
+    'CREATE INDEX `idx_role_meta_live` ON `role_meta` (`metalake_id`, `deleted_at`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'user_meta' AND index_name = 'idx_user_meta_live'),
+    'SELECT 1',
+    'CREATE INDEX `idx_user_meta_live` ON `user_meta` (`metalake_id`, `deleted_at`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'tag_relation_meta' AND index_name = 'idx_tag_relation_meta_live'),
+    'SELECT 1',
+    'CREATE INDEX `idx_tag_relation_meta_live` ON `tag_relation_meta` (`metadata_object_id`, `metadata_object_type`, `deleted_at`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'role_meta_securable_object' AND index_name = 'idx_role_meta_securable_object_live'),
+    'SELECT 1',
+    'CREATE INDEX `idx_role_meta_securable_object_live` ON `role_meta_securable_object` (`metadata_object_id`, `type`, `deleted_at`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'user_role_rel' AND index_name = 'idx_user_role_rel_live'),
+    'SELECT 1',
+    'CREATE INDEX `idx_user_role_rel_live` ON `user_role_rel` (`role_id`, `deleted_at`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'policy_tag_relation_meta' AND index_name = 'idx_policy_tag_relation_meta_live'),
+    'SELECT 1',
+    'CREATE INDEX `idx_policy_tag_relation_meta_live` ON `policy_tag_relation_meta` (`tag_id`, `deleted_at`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+>>>>>>> 13ed3e84c ([#15193] fix(core): Index live governance metadata across relational backends (#15194))

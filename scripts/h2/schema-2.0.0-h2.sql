@@ -179,7 +179,8 @@ CREATE TABLE IF NOT EXISTS `user_meta` (
     `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'updated at',
     PRIMARY KEY (`user_id`),
     CONSTRAINT `uk_mid_us_del` UNIQUE (`metalake_id`, `user_name`, `deleted_at`),
-    KEY `idx_user_meta_name_del_upd` (`metalake_id`, `user_name`, `deleted_at`, `updated_at`)
+    KEY `idx_user_meta_name_del_upd` (`metalake_id`, `user_name`, `deleted_at`, `updated_at`),
+    KEY `idx_user_meta_live` (`metalake_id`, `deleted_at`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `role_meta` (
@@ -193,7 +194,8 @@ CREATE TABLE IF NOT EXISTS `role_meta` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'role deleted at',
     `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'updated at',
     PRIMARY KEY (`role_id`),
-    CONSTRAINT `uk_mid_rn_del` UNIQUE (`metalake_id`, `role_name`, `deleted_at`)
+    CONSTRAINT `uk_mid_rn_del` UNIQUE (`metalake_id`, `role_name`, `deleted_at`),
+    KEY `idx_role_meta_live` (`metalake_id`, `deleted_at`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `role_meta_securable_object` (
@@ -208,7 +210,8 @@ CREATE TABLE IF NOT EXISTS `role_meta_securable_object` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'securable object deleted at',
     PRIMARY KEY (`id`),
     KEY `idx_obj_rid` (`role_id`),
-    KEY `idx_obj_eid` (`metadata_object_id`)
+    KEY `idx_obj_eid` (`metadata_object_id`),
+    KEY `idx_role_meta_securable_object_live` (`metadata_object_id`, `type`, `deleted_at`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `user_role_rel` (
@@ -221,7 +224,8 @@ CREATE TABLE IF NOT EXISTS `user_role_rel` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'relation deleted at',
     PRIMARY KEY (`id`),
     CONSTRAINT `uk_ui_ri_del` UNIQUE (`user_id`, `role_id`, `deleted_at`),
-    KEY `idx_rid` (`role_id`)
+    KEY `idx_rid` (`role_id`),
+    KEY `idx_user_role_rel_live` (`role_id`, `deleted_at`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `group_meta` (
@@ -303,7 +307,8 @@ CREATE TABLE IF NOT EXISTS `tag_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'tag deleted at',
     PRIMARY KEY (`tag_id`),
-    UNIQUE KEY `uk_mn_tn_del` (`metalake_id`, `tag_name`, `deleted_at`)
+    UNIQUE KEY `uk_mn_tn_del` (`metalake_id`, `tag_name`, `deleted_at`),
+    KEY `idx_tag_meta_live` (`metalake_id`, `deleted_at`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `tag_relation_meta` (
@@ -320,7 +325,8 @@ CREATE TABLE IF NOT EXISTS `tag_relation_meta` (
     UNIQUE KEY `uk_ti_mi_mo_tv_del` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `tag_value`, `deleted_at`),
     KEY `idx_tid` (`tag_id`),
     KEY `idx_mid` (`metadata_object_id`),
-    KEY `idx_tid_value` (`tag_id`, `tag_value`)
+    KEY `idx_tid_value` (`tag_id`, `tag_value`),
+    KEY `idx_tag_relation_meta_live` (`metadata_object_id`, `metadata_object_type`, `deleted_at`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `owner_meta` (
@@ -403,7 +409,8 @@ CREATE TABLE IF NOT EXISTS `policy_meta` (
     `occ_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy optimistic concurrency version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy deleted at',
     PRIMARY KEY (`policy_id`),
-    UNIQUE KEY `uk_mi_pn_del` (`metalake_id`, `policy_name`, `deleted_at`)
+    UNIQUE KEY `uk_mi_pn_del` (`metalake_id`, `policy_name`, `deleted_at`),
+    KEY `idx_policy_meta_live` (`metalake_id`, `deleted_at`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `policy_version_info` (
@@ -431,7 +438,8 @@ CREATE TABLE IF NOT EXISTS `policy_tag_relation_meta` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy tag relation deleted at',
     PRIMARY KEY (`id`),
     UNIQUE KEY `policy_tag_relation_meta_uk_pid_tid_del` (`policy_id`, `tag_id`, `deleted_at`),
-    KEY `policy_tag_relation_meta_idx_tag_id` (`tag_id`)
+    KEY `policy_tag_relation_meta_idx_tag_id` (`tag_id`),
+    KEY `idx_policy_tag_relation_meta_live` (`tag_id`, `deleted_at`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `statistic_meta` (

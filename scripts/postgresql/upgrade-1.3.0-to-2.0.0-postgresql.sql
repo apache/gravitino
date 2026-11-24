@@ -554,3 +554,45 @@ COMMENT ON COLUMN domain_rel.audit_info IS 'domain relation audit info';
 COMMENT ON COLUMN domain_rel.current_version IS 'domain relation current version';
 COMMENT ON COLUMN domain_rel.last_version IS 'domain relation last version';
 COMMENT ON COLUMN domain_rel.deleted_at IS 'domain relation deleted at';
+<<<<<<< HEAD
+=======
+
+CREATE TABLE IF NOT EXISTS iceberg_idempotency_meta (
+  idempotency_key  VARCHAR(36) NOT NULL PRIMARY KEY,
+  http_method      VARCHAR(16) NOT NULL,
+  request_uri      TEXT        NOT NULL,
+  generation       BIGINT      NOT NULL,
+  http_status      INT,
+  response_summary TEXT,
+  audit_info       TEXT        NOT NULL,
+  created_at       BIGINT      NOT NULL,
+  expires_at       BIGINT      NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_iim_expires ON iceberg_idempotency_meta (expires_at);
+COMMENT ON TABLE iceberg_idempotency_meta IS 'Iceberg REST idempotency records';
+COMMENT ON COLUMN iceberg_idempotency_meta.idempotency_key IS 'client-provided UUIDv7 idempotency key';
+COMMENT ON COLUMN iceberg_idempotency_meta.http_method IS 'HTTP method of the request';
+COMMENT ON COLUMN iceberg_idempotency_meta.request_uri IS 'encoded request path and sorted query string';
+COMMENT ON COLUMN iceberg_idempotency_meta.generation IS 'reservation fencing token';
+COMMENT ON COLUMN iceberg_idempotency_meta.http_status IS 'HTTP status of finalized response, NULL while reserved';
+COMMENT ON COLUMN iceberg_idempotency_meta.response_summary IS 'serialized response body (JSON) for replay';
+COMMENT ON COLUMN iceberg_idempotency_meta.audit_info IS 'idempotency record audit info';
+COMMENT ON COLUMN iceberg_idempotency_meta.created_at IS 'record created at (unix epoch millis)';
+COMMENT ON COLUMN iceberg_idempotency_meta.expires_at IS 'record expires at (unix epoch millis)';
+
+
+CREATE TABLE IF NOT EXISTS iceberg_idempotency_generation_meta (
+  stripe INT NOT NULL PRIMARY KEY,
+  generation BIGINT NOT NULL
+);
+
+-- Keep retained deletions out of live metadata lists and relationship cleanup scans.
+CREATE INDEX IF NOT EXISTS idx_tag_meta_live ON tag_meta (metalake_id) WHERE deleted_at = 0;
+CREATE INDEX IF NOT EXISTS idx_policy_meta_live ON policy_meta (metalake_id) WHERE deleted_at = 0;
+CREATE INDEX IF NOT EXISTS idx_role_meta_live ON role_meta (metalake_id) WHERE deleted_at = 0;
+CREATE INDEX IF NOT EXISTS idx_user_meta_live ON user_meta (metalake_id) WHERE deleted_at = 0;
+CREATE INDEX IF NOT EXISTS idx_tag_relation_meta_live ON tag_relation_meta (metadata_object_id, metadata_object_type) WHERE deleted_at = 0;
+CREATE INDEX IF NOT EXISTS idx_role_meta_securable_object_live ON role_meta_securable_object (metadata_object_id, type) WHERE deleted_at = 0;
+CREATE INDEX IF NOT EXISTS idx_user_role_rel_live ON user_role_rel (role_id) WHERE deleted_at = 0;
+CREATE INDEX IF NOT EXISTS idx_policy_tag_relation_meta_live ON policy_tag_relation_meta (tag_id) WHERE deleted_at = 0;
+>>>>>>> 13ed3e84c ([#15193] fix(core): Index live governance metadata across relational backends (#15194))
