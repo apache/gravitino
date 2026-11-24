@@ -78,7 +78,8 @@ public interface GravitinoAuthorizer extends Closeable {
   /**
    * Returns whether the caller may read this glossary term through a generic metadata endpoint.
    * Implementations must check visibility against the observed term and its current owner, using
-   * the caller's snapshot when present. The default denies access.
+   * the caller's snapshot when present. A term that does not exist is not accessible, so callers
+   * cannot tell a missing term from a hidden one. The default denies access.
    */
   default boolean canAccessGlossaryTerm(
       Principal principal,

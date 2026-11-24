@@ -171,7 +171,10 @@ public class GlossaryTermMetaSQLProviderFactory {
     @Override
     public String getForUpdate(@Param("metalakeId") long metalakeId, @Param("key") String key) {
       // Relation writers lock the primary key before updating the name index. Resolve the ID
-      // without locking the name index, then verify the live name on the locked row.
+      // without locking the name index, then verify the live name on the locked row. MySQL does
+      // not extend the outer FOR UPDATE to rows read by a nested subquery, so on 8.0.35
+      // performance_schema.data_locks reports only an X,REC_NOT_GAP lock on PRIMARY for this
+      // statement, where the plain name predicate also locks the name index record.
       String liveTerm = liveTermByName(metalakeId, key);
       return SELECT_TERM
           + " FORCE INDEX (PRIMARY) WHERE term_id=(SELECT term_id FROM "
