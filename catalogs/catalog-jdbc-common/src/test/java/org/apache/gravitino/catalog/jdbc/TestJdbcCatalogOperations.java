@@ -32,6 +32,7 @@ import javax.sql.DataSource;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.dbcp2.DelegatingConnection;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteExceptionConverter;
@@ -41,10 +42,57 @@ import org.apache.gravitino.catalog.jdbc.operation.SqliteTableOperations;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestJdbcCatalogOperations {
+
+  @Test
+  public void testRejectedChangesHaveReadableMessages() {
+    try (JdbcCatalogOperations operations =
+        new JdbcCatalogOperations(
+            new SqliteExceptionConverter(),
+            new SqliteTypeConverter(),
+            new SqliteDatabaseOperations("/unused"),
+            new SqliteTableOperations(),
+            new SqliteColumnDefaultValueConverter())) {
+      NameIdentifier table = NameIdentifier.of("metalake", "catalog", "schema", "table");
+      IllegalArgumentException rename =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  operations.alterTable(
+                      table,
+                      TableChange.rename("new_table"),
+                      TableChange.addColumn(new String[] {"nested", "c"}, Types.StringType.get()),
+                      TableChange.deleteColumn(new String[] {"old"}, true)));
+      Assertions.assertEquals(
+          "A table rename cannot be combined with other changes: ADDCOLUMN nested.c string, DELETECOLUMN old",
+          rename.getMessage());
+      IllegalArgumentException sort =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  operations.createTable(
+                      table,
+                      new Column[0],
+                      null,
+                      Collections.emptyMap(),
+                      new Transform[0],
+                      null,
+                      new SortOrder[] {null},
+                      new Index[0]));
+      Assertions.assertEquals(
+          "Cannot create table metalake.catalog.schema.table: The catalog does not support sort orders",
+          sort.getMessage());
+    }
+  }
 
   @Test
   public void testExistingCatalogConnectionFailure() {
@@ -214,6 +262,86 @@ public class TestJdbcCatalogOperations {
       // When the backend returns the name unchanged, the same normalized identifier is returned.
       NameIdentifier unchanged = NameIdentifier.of("metalake", "catalog", "db", "ALREADY_PHYSICAL");
       Assertions.assertSame(unchanged, catalogOperations.resolveTableName(unchanged));
+    }
+  }
+
+  @Test
+  public void testLoadSchemaWithoutGravitinoId() {
+    SqliteDatabaseOperations databaseOperations =
+        new SqliteDatabaseOperations("/unused") {
+          @Override
+          public JdbcSchema load(String databaseName) {
+            return JdbcSchema.builder()
+                .withName(databaseName)
+                .withComment("user authored comment without id")
+                .build();
+          }
+        };
+
+    try (JdbcCatalogOperations catalogOperations =
+        new JdbcCatalogOperations(
+            new SqliteExceptionConverter(),
+            new SqliteTypeConverter(),
+            databaseOperations,
+            new SqliteTableOperations(),
+            new SqliteColumnDefaultValueConverter())) {
+      NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "test_schema");
+      JdbcSchema schema = catalogOperations.loadSchema(ident);
+      Assertions.assertEquals("test_schema", schema.name());
+      Assertions.assertEquals("user authored comment without id", schema.comment());
+      Assertions.assertNull(StringIdentifier.fromProperties(schema.properties()));
+    }
+  }
+
+  @Test
+  public void testLoadSchemaWithNullComment() {
+    SqliteDatabaseOperations databaseOperations =
+        new SqliteDatabaseOperations("/unused") {
+          @Override
+          public JdbcSchema load(String databaseName) {
+            return JdbcSchema.builder().withName(databaseName).withComment(null).build();
+          }
+        };
+
+    try (JdbcCatalogOperations catalogOperations =
+        new JdbcCatalogOperations(
+            new SqliteExceptionConverter(),
+            new SqliteTypeConverter(),
+            databaseOperations,
+            new SqliteTableOperations(),
+            new SqliteColumnDefaultValueConverter())) {
+      NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "test_schema");
+      JdbcSchema schema = catalogOperations.loadSchema(ident);
+      Assertions.assertEquals("test_schema", schema.name());
+      Assertions.assertNull(schema.comment());
+      Assertions.assertNull(StringIdentifier.fromProperties(schema.properties()));
+    }
+  }
+
+  @Test
+  public void testLoadSchemaWithGravitinoId() {
+    String comment = StringIdentifier.addToComment(StringIdentifier.fromId(12345L), "user comment");
+    SqliteDatabaseOperations databaseOperations =
+        new SqliteDatabaseOperations("/unused") {
+          @Override
+          public JdbcSchema load(String databaseName) {
+            return JdbcSchema.builder().withName(databaseName).withComment(comment).build();
+          }
+        };
+
+    try (JdbcCatalogOperations catalogOperations =
+        new JdbcCatalogOperations(
+            new SqliteExceptionConverter(),
+            new SqliteTypeConverter(),
+            databaseOperations,
+            new SqliteTableOperations(),
+            new SqliteColumnDefaultValueConverter())) {
+      NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "test_schema");
+      JdbcSchema schema = catalogOperations.loadSchema(ident);
+      Assertions.assertEquals("test_schema", schema.name());
+      Assertions.assertEquals("user comment", schema.comment());
+      Assertions.assertNotNull(StringIdentifier.fromProperties(schema.properties()));
+      Assertions.assertEquals(12345L, StringIdentifier.fromProperties(schema.properties()).id());
     }
   }
 }

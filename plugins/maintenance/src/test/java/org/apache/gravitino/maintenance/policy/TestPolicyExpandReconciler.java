@@ -18,13 +18,12 @@
  */
 package org.apache.gravitino.maintenance.policy;
 
-import com.github.kagkarlsson.scheduler.task.ExecutionComplete;
-import com.github.kagkarlsson.scheduler.task.ExecutionOperations;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import javax.sql.DataSource;
+import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandClient;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -66,14 +65,13 @@ class TestPolicyExpandReconciler extends TestJDBCBackend {
     PolicyMetaService.getInstance().insertPolicy(policy, false);
 
     DataSource dataSource = entityStoreDataSource();
-    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(dataSource);
+    PolicyExpandClient reader = PolicyExpandClient.forReads(dataSource);
     Assertions.assertTrue(reader.scheduledExecutionTime(policy.id()).isEmpty());
 
-    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
-    PolicyExpandLifecycleHook aligner = new PolicyExpandLifecycleHook(writer);
+    PolicyExpandClient writer = PolicyExpandClient.joiningCurrentTransaction();
     int aligned =
         new PolicyExpandReconciler(
-                aligner, writer, MetalakeMetaService.getInstance(), PolicyMetaService.getInstance())
+                writer, MetalakeMetaService.getInstance(), PolicyMetaService.getInstance())
             .reconcileAll();
 
     Assertions.assertTrue(aligned >= 1);
@@ -98,14 +96,13 @@ class TestPolicyExpandReconciler extends TestJDBCBackend {
 
     // db-scheduler / JDBC timestamps are microsecond precision; truncate so round-trip equals.
     Instant overdue = Instant.now().minusSeconds(3600).truncatedTo(ChronoUnit.MICROS);
-    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
-    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(entityStoreDataSource());
+    PolicyExpandClient writer = PolicyExpandClient.joiningCurrentTransaction();
+    PolicyExpandClient reader = PolicyExpandClient.forReads(entityStoreDataSource());
     SessionUtils.doMultipleWithCommit(() -> writer.scheduleAt(policy.id(), overdue));
     Assertions.assertEquals(overdue, reader.scheduledExecutionTime(policy.id()).orElseThrow());
 
-    PolicyExpandLifecycleHook aligner = new PolicyExpandLifecycleHook(writer);
     new PolicyExpandReconciler(
-            aligner, writer, MetalakeMetaService.getInstance(), PolicyMetaService.getInstance())
+            writer, MetalakeMetaService.getInstance(), PolicyMetaService.getInstance())
         .reconcileAll();
 
     Assertions.assertEquals(overdue, reader.scheduledExecutionTime(policy.id()).orElseThrow());
@@ -127,14 +124,14 @@ class TestPolicyExpandReconciler extends TestJDBCBackend {
             .build();
     PolicyMetaService.getInstance().insertPolicy(policy, false);
 
-    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
-    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(entityStoreDataSource());
-    SessionUtils.doMultipleWithCommit(() -> writer.sync(policy.id(), true, LATER_CRON));
+    PolicyExpandClient writer = PolicyExpandClient.joiningCurrentTransaction();
+    PolicyExpandClient reader = PolicyExpandClient.forReads(entityStoreDataSource());
+    SessionUtils.doMultipleWithCommit(
+        () -> writer.scheduleAt(policy.id(), PolicyExpandClient.nextExecution(LATER_CRON)));
     Instant staleDue = reader.scheduledExecutionTime(policy.id()).orElseThrow();
 
-    PolicyExpandLifecycleHook aligner = new PolicyExpandLifecycleHook(writer);
     new PolicyExpandReconciler(
-            aligner, writer, MetalakeMetaService.getInstance(), PolicyMetaService.getInstance())
+            writer, MetalakeMetaService.getInstance(), PolicyMetaService.getInstance())
         .reconcileAll();
 
     Instant corrected = reader.scheduledExecutionTime(policy.id()).orElseThrow();
@@ -162,64 +159,31 @@ class TestPolicyExpandReconciler extends TestJDBCBackend {
     Mockito.when(policies.listPoliciesByNamespace(NamespaceUtil.ofPolicy("ml")))
         .thenReturn(List.of(bad));
 
-    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
-    SessionUtils.doMultipleWithCommit(() -> writer.sync(7L, true, CRON));
-    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(entityStoreDataSource());
+    PolicyExpandClient writer = PolicyExpandClient.joiningCurrentTransaction();
+    SessionUtils.doMultipleWithCommit(
+        () -> writer.scheduleAt(7L, PolicyExpandClient.nextExecution(CRON)));
+    PolicyExpandClient reader = PolicyExpandClient.forReads(entityStoreDataSource());
     Assertions.assertTrue(reader.scheduledExecutionTime(7L).isPresent());
 
-    PolicyExpandLifecycleHook aligner = new PolicyExpandLifecycleHook(writer);
     Assertions.assertDoesNotThrow(
-        () -> new PolicyExpandReconciler(aligner, writer, metalakes, policies).reconcileAll());
+        () -> new PolicyExpandReconciler(writer, metalakes, policies).reconcileAll());
     Assertions.assertTrue(reader.scheduledExecutionTime(7L).isEmpty());
   }
 
   @TestTemplate
   void testReconcileRemovesOrphanExpandRow() {
-    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
-    SessionUtils.doMultipleWithCommit(() -> writer.sync(99L, true, CRON));
-    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(entityStoreDataSource());
+    PolicyExpandClient writer = PolicyExpandClient.joiningCurrentTransaction();
+    SessionUtils.doMultipleWithCommit(
+        () -> writer.scheduleAt(99L, PolicyExpandClient.nextExecution(CRON)));
+    PolicyExpandClient reader = PolicyExpandClient.forReads(entityStoreDataSource());
     Assertions.assertTrue(reader.scheduledExecutionTime(99L).isPresent());
 
     MetalakeMetaService metalakes = Mockito.mock(MetalakeMetaService.class);
     PolicyMetaService policies = Mockito.mock(PolicyMetaService.class);
     Mockito.when(metalakes.listMetalakes()).thenReturn(List.of());
 
-    PolicyExpandLifecycleHook aligner = new PolicyExpandLifecycleHook(writer);
-    new PolicyExpandReconciler(aligner, writer, metalakes, policies).reconcileAll();
+    new PolicyExpandReconciler(writer, metalakes, policies).reconcileAll();
     Assertions.assertTrue(reader.scheduledExecutionTime(99L).isEmpty());
-  }
-
-  @TestTemplate
-  void testCompletePickReschedulesEnabledPolicy() throws IOException {
-    createAndInsertMakeLake(METALAKE + "_pick");
-    String metalake = METALAKE + "_pick";
-    PolicyEntity policy =
-        PolicyEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName("picked")
-            .withNamespace(NamespaceUtil.ofPolicy(metalake))
-            .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
-            .withContent(compaction(CRON))
-            .withEnabled(true)
-            .withAuditInfo(AuditInfo.EMPTY)
-            .build();
-    PolicyMetaService.getInstance().insertPolicy(policy, false);
-
-    ExecutionOperations<Void> operations = Mockito.mock(ExecutionOperations.class);
-    ExecutionComplete complete = ExecutionComplete.simulatedSuccess(Instant.now());
-    PolicyExpandLifecycleHook.completePick("policy:" + policy.id(), complete, operations);
-
-    Mockito.verify(operations)
-        .reschedule(Mockito.eq(complete), Mockito.argThat(due -> due.isAfter(Instant.now())));
-    Mockito.verify(operations, Mockito.never()).remove();
-  }
-
-  @TestTemplate
-  void testCompletePickRemovesMissingPolicy() {
-    ExecutionOperations<Void> operations = Mockito.mock(ExecutionOperations.class);
-    ExecutionComplete complete = ExecutionComplete.simulatedSuccess(Instant.now());
-    PolicyExpandLifecycleHook.completePick("policy:424242", complete, operations);
-    Mockito.verify(operations).remove();
   }
 
   private static DataSource entityStoreDataSource() {

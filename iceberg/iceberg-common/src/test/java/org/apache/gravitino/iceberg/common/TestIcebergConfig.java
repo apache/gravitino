@@ -26,8 +26,44 @@ import org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestIcebergConfig {
+  @Test
+  void testStorageCredentialSourceDefaults() {
+    IcebergConfig config = new IcebergConfig(ImmutableMap.of());
+    Assertions.assertEquals(
+        "remote", config.get(IcebergConfig.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE));
+
+    IcebergConfig serviceAccountConfig =
+        new IcebergConfig(
+            ImmutableMap.of(IcebergConstants.REST_BACKEND_AUTH_TYPE, "service-account"));
+    Assertions.assertEquals(
+        "remote", serviceAccountConfig.get(IcebergConfig.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"local", "remote"})
+  void testStorageCredentialSource(String source) {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE, source));
+    Assertions.assertEquals(
+        source, config.get(IcebergConfig.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"gravitino", "unknown"})
+  void testStorageCredentialSourceRejectsInvalidValues(String source) {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE, source));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> config.get(IcebergConfig.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE));
+  }
+
   @Test
   public void testLoadIcebergConfig() {
     Map<String, String> properties =

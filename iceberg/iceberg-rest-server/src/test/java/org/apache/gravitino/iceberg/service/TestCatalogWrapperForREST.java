@@ -22,16 +22,20 @@ package org.apache.gravitino.iceberg.service;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import com.sun.net.httpserver.HttpServer;
 import java.io.OutputStream;
+import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -41,12 +45,17 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.cache.LocalScanPlanCache;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.BaseTransaction;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.MetadataUpdate;
@@ -62,6 +71,7 @@ import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.exceptions.NotAuthorizedException;
@@ -87,10 +97,118 @@ import org.apache.iceberg.rest.responses.PlanTableScanResponseParser;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.InOrder;
 
 public class TestCatalogWrapperForREST {
 
   private static final AtomicBoolean CONSTRUCTION_IN_PROGRESS = new AtomicBoolean(false);
+
+  @Test
+  void testLocalBackendPolicies() throws Exception {
+    IcebergConfig config =
+        new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
+    try (CatalogWrapperForREST wrapper = new CatalogWrapperForREST("local", config)) {
+      Assertions.assertFalse(wrapper.forwardsUserToken());
+      Assertions.assertTrue(wrapper.supportsAsyncPurge());
+      Assertions.assertDoesNotThrow(
+          () -> wrapper.validateServerContext(mock(IcebergRESTServerContext.class)));
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "user-token, false",
+    "user-token, true",
+    "service-account, false",
+    "service-account, true"
+  })
+  void testFederatedBackendPolicies(String authType, boolean authorizationEnabled)
+      throws Exception {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "rest",
+                IcebergConstants.REST_BACKEND_AUTH_TYPE,
+                authType));
+    IcebergRESTServerContext context = mock(IcebergRESTServerContext.class);
+    when(context.isAuthorizationEnabled()).thenReturn(authorizationEnabled);
+    try (CatalogWrapperForREST wrapper = new FederatedCatalogWrapper("remote", config)) {
+      Assertions.assertEquals("user-token".equals(authType), wrapper.forwardsUserToken());
+      Assertions.assertFalse(wrapper.supportsAsyncPurge());
+      if ("service-account".equals(authType) && !authorizationEnabled) {
+        IllegalArgumentException failure =
+            Assertions.assertThrows(
+                IllegalArgumentException.class, () -> wrapper.validateServerContext(context));
+        Assertions.assertTrue(
+            failure.getMessage().contains("requires authorization to be enabled"));
+      } else {
+        Assertions.assertDoesNotThrow(() -> wrapper.validateServerContext(context));
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testFederatedPurgeForwardsToRemoteCatalog(boolean tableExists) throws Exception {
+    TableIdentifier identifier = TableIdentifier.of("db", "table");
+    RESTCatalog catalog = mock(RESTCatalog.class);
+    when(catalog.dropTable(identifier, true)).thenReturn(tableExists);
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "rest",
+                IcebergConstants.TABLE_METADATA_CACHE_IMPL,
+                ""));
+    TableMetadataCache cache = mock(TableMetadataCache.class);
+
+    try (CatalogWrapperForREST wrapper =
+        new StaticCatalogWrapperForREST("remote", config, catalog)) {
+      Field cacheField = IcebergCatalogWrapper.class.getDeclaredField("metadataCache");
+      cacheField.setAccessible(true);
+      cacheField.set(wrapper, cache);
+
+      if (tableExists) {
+        wrapper.purgeTable(identifier);
+      } else {
+        Assertions.assertThrows(NoSuchTableException.class, () -> wrapper.purgeTable(identifier));
+      }
+
+      InOrder order = inOrder(cache, catalog);
+      order.verify(cache).invalidate(identifier);
+      order.verify(catalog).dropTable(identifier, true);
+      verifyNoMoreInteractions(catalog);
+    }
+  }
+
+  @Test
+  void testFederatedPurgePropagatesRemoteFailure() throws Exception {
+    TableIdentifier identifier = TableIdentifier.of("db", "table");
+    RESTCatalog catalog = mock(RESTCatalog.class);
+    ForbiddenException failure = new ForbiddenException("Remote purge denied");
+    when(catalog.dropTable(identifier, true)).thenThrow(failure);
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "rest",
+                IcebergConstants.TABLE_METADATA_CACHE_IMPL,
+                ""));
+
+    try (CatalogWrapperForREST wrapper =
+        new StaticCatalogWrapperForREST("remote", config, catalog)) {
+      Assertions.assertSame(
+          failure,
+          Assertions.assertThrows(ForbiddenException.class, () -> wrapper.purgeTable(identifier)));
+      verify(catalog).dropTable(identifier, true);
+      verifyNoMoreInteractions(catalog);
+    }
+  }
 
   @Test
   void testCheckPropertiesForCompatibility() {
@@ -387,6 +505,117 @@ public class TestCatalogWrapperForREST {
     } finally {
       server.stop(0);
     }
+  }
+
+  @Test
+  void testRegisterOverwriteWithAnotherTablesMetadataIsRefused(@TempDir Path warehouse) {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.<String, String>builder()
+                .put(IcebergConstants.CATALOG_BACKEND, "jdbc")
+                .put(IcebergConstants.URI, "jdbc:sqlite:" + warehouse.resolve("catalog.db"))
+                .put(IcebergConstants.WAREHOUSE, warehouse.toUri().toString())
+                .put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC")
+                .put(IcebergConstants.ICEBERG_JDBC_USER, "test")
+                .put(IcebergConstants.ICEBERG_JDBC_PASSWORD, "test")
+                .put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "true")
+                .build());
+    CatalogWrapperForREST wrapper = new CatalogWrapperForREST("register-test", config);
+    Namespace namespace = Namespace.of("db");
+    Catalog catalog = wrapper.getCatalog();
+    ((SupportsNamespaces) catalog).createNamespace(namespace);
+    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+    TableIdentifier target = TableIdentifier.of(namespace, "target");
+    TableIdentifier other = TableIdentifier.of(namespace, "other");
+    catalog.createTable(target, schema);
+    catalog.createTable(other, schema);
+    String targetMetadata =
+        ((BaseTable) catalog.loadTable(target)).operations().current().metadataFileLocation();
+    String otherMetadata =
+        ((BaseTable) catalog.loadTable(other)).operations().current().metadataFileLocation();
+
+    RegisterTableRequest otherTable =
+        ImmutableRegisterTableRequest.builder()
+            .name("target")
+            .metadataLocation(otherMetadata)
+            .overwrite(true)
+            .build();
+    BadRequestException e =
+        Assertions.assertThrows(
+            BadRequestException.class, () -> wrapper.registerTable(namespace, otherTable));
+    Assertions.assertTrue(e.getMessage().contains("different table"), e.getMessage());
+    // The REST executor uses the overload carrying the credential-vending flag.
+    for (boolean requestCredential : new boolean[] {false, true}) {
+      Assertions.assertThrows(
+          BadRequestException.class,
+          () -> wrapper.registerTable(namespace, otherTable, requestCredential));
+    }
+    Assertions.assertEquals(
+        targetMetadata,
+        ((BaseTable) catalog.loadTable(target)).operations().current().metadataFileLocation());
+
+    // An overwrite with metadata of the same table is still accepted.
+    RegisterTableRequest sameTable =
+        ImmutableRegisterTableRequest.builder()
+            .name("target")
+            .metadataLocation(targetMetadata)
+            .overwrite(true)
+            .build();
+    Assertions.assertDoesNotThrow(() -> wrapper.registerTable(namespace, sameTable));
+  }
+
+  @Test
+  void testVendsOnlyWhereACredentialProviderCoversTheLocation() {
+    Namespace namespace = Namespace.of("db");
+    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+    TableIdentifier table = TableIdentifier.of(namespace, "tbl");
+
+    // No credential provider: a request asking for vended credentials is served without them.
+    CatalogWrapperForREST noProvider =
+        new CatalogWrapperForREST(
+            "no-provider",
+            new IcebergConfig(
+                ImmutableMap.of(
+                    IcebergConstants.CATALOG_BACKEND, "memory",
+                    IcebergConstants.WAREHOUSE, "/tmp/warehouse")));
+    ((SupportsNamespaces) noProvider.getCatalog()).createNamespace(namespace);
+    noProvider
+        .getCatalog()
+        .createTable(
+            table,
+            schema,
+            PartitionSpec.unpartitioned(),
+            "s3://bucket/wh/db/tbl",
+            Collections.emptyMap());
+    LoadTableResponse loaded = noProvider.loadTable(table, true, CredentialPrivilege.READ);
+    Assertions.assertFalse(noProvider.shouldGenerateCredential(loaded, true));
+    Assertions.assertTrue(loaded.credentials().isEmpty());
+    Assertions.assertTrue(
+        loaded.config().keySet().stream().noneMatch(key -> key.startsWith("s3.")),
+        loaded.config().toString());
+
+    // With a provider covering the scheme, credentials are vended as before.
+    CatalogWrapperForREST withProvider =
+        new CatalogWrapperForREST(
+            "with-provider",
+            new IcebergConfig(
+                ImmutableMap.of(
+                    IcebergConstants.CATALOG_BACKEND, "memory",
+                    IcebergConstants.WAREHOUSE, "/tmp/warehouse",
+                    CredentialConstants.CREDENTIAL_PROVIDERS,
+                        DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE)));
+    ((SupportsNamespaces) withProvider.getCatalog()).createNamespace(namespace);
+    withProvider
+        .getCatalog()
+        .createTable(
+            table,
+            schema,
+            PartitionSpec.unpartitioned(),
+            "s3://bucket/wh/db/tbl",
+            Collections.emptyMap());
+    Assertions.assertTrue(
+        withProvider.shouldGenerateCredential(
+            withProvider.loadTable(table, false, CredentialPrivilege.READ), true));
   }
 
   @Test
@@ -714,6 +943,106 @@ public class TestCatalogWrapperForREST {
           credential.config().get("client.refresh-credentials-endpoint"));
       Assertions.assertEquals(
           "org.apache.iceberg.aws.s3.S3FileIO", response.config().get("io-impl"));
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "user-token, local",
+    "service-account, local",
+    "service-account, remote",
+    "service-account, "
+  })
+  void testFederatedLoadTableWithLocalStorageCredentials(
+      String authType, @Nullable String credentialSource) throws Exception {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
+    TableMetadata metadata =
+        TableMetadataParser.fromJson(
+            "s3://bucket/db/tbl/metadata/v1.metadata.json",
+            TableMetadataParser.toJson(
+                TableMetadata.newTableMetadata(
+                    new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())),
+                    PartitionSpec.unpartitioned(),
+                    SortOrder.unsorted(),
+                    "s3://bucket/db/tbl",
+                    Collections.emptyMap())));
+    // The remote returns broad credentials even when none are requested. With Gravitino
+    // credential vending they must not reach the client.
+    Credential upstreamCredential =
+        IcebergRESTUtils.toRESTCredential(
+            "s3://bucket/",
+            ImmutableMap.of(
+                "s3.access-key-id", "upstream-key", "s3.secret-access-key", "upstream-secret"));
+    String upstreamJson =
+        LoadTableResponseParser.toJson(
+            LoadTableResponse.builder()
+                .withTableMetadata(metadata)
+                .addAllConfig(ImmutableMap.of("io-impl", "org.apache.iceberg.aws.s3.S3FileIO"))
+                .addCredential(upstreamCredential)
+                .build());
+
+    AtomicReference<String> accessDelegationHeader = new AtomicReference<>("unset");
+    HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+    server.createContext(
+        "/",
+        exchange -> {
+          accessDelegationHeader.set(
+              exchange.getRequestHeaders().getFirst("X-Iceberg-Access-Delegation"));
+          byte[] body = upstreamJson.getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          try (OutputStream os = exchange.getResponseBody()) {
+            os.write(body);
+          }
+        });
+    server.start();
+    try {
+      String uri = "http://127.0.0.1:" + server.getAddress().getPort();
+      RESTCatalog restCatalog = mock(RESTCatalog.class);
+      when(restCatalog.name()).thenReturn("upstream");
+      when(restCatalog.properties())
+          .thenReturn(
+              ImmutableMap.of(
+                  CatalogProperties.URI,
+                  uri,
+                  AuthProperties.AUTH_TYPE,
+                  AuthProperties.AUTH_TYPE_NONE,
+                  "prefix",
+                  "upstream"));
+
+      ImmutableMap.Builder<String, String> properties =
+          ImmutableMap.<String, String>builder()
+              .put(IcebergConstants.CATALOG_BACKEND, "memory")
+              .put(IcebergConstants.WAREHOUSE, "/tmp/warehouse")
+              .put(
+                  CredentialConstants.CREDENTIAL_PROVIDERS,
+                  DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE)
+              .put(IcebergConstants.REST_BACKEND_AUTH_TYPE, authType);
+      if (credentialSource != null) {
+        properties.put(IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE, credentialSource);
+      }
+      IcebergConfig config = new IcebergConfig(properties.build());
+      CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("local", config, restCatalog);
+
+      LoadTableResponse response = wrapper.loadTable(table, true, CredentialPrivilege.READ);
+
+      Assertions.assertNull(accessDelegationHeader.get(), "remote must not be asked to vend");
+      Assertions.assertEquals(1, response.credentials().size());
+      Credential credential = response.credentials().get(0);
+      Assertions.assertEquals("s3://bucket/db/tbl", credential.prefix());
+      Assertions.assertNotEquals("upstream-key", credential.config().get("s3.access-key-id"));
+      Assertions.assertNotEquals("upstream-key", response.config().get("s3.access-key-id"));
+      Assertions.assertEquals(
+          "org.apache.iceberg.aws.s3.S3FileIO", response.config().get("io-impl"));
+
+      LoadTableResponse withoutRequest = wrapper.loadTable(table, false, CredentialPrivilege.READ);
+      Assertions.assertNull(accessDelegationHeader.get());
+      Assertions.assertTrue(
+          withoutRequest.credentials().stream()
+              .noneMatch(c -> "upstream-key".equals(c.config().get("s3.access-key-id"))),
+          "remote credentials returned without a request are passed through only in remote mode");
     } finally {
       server.stop(0);
     }

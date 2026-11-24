@@ -178,6 +178,21 @@ public class TestCatalogNormalizeDispatcher {
   }
 
   @Test
+  void testRenameCatalogRejectsDottedName() {
+    NameIdentifier ident = NameIdentifier.of(metalake, "catalog");
+    Mockito.clearInvocations(catalogManager);
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogNormalizeDispatcher.alterCatalog(
+                    ident, CatalogChange.rename("catalog.xxx")));
+    Assertions.assertEquals("The catalog name 'catalog.xxx' is illegal.", exception.getMessage());
+    Mockito.verify(catalogManager, Mockito.never())
+        .alterCatalog(Mockito.eq(ident), Mockito.any(CatalogChange[].class));
+  }
+
+  @Test
   void testConnectionChangesValidateRenamedCatalogName() {
     NameIdentifier catalogIdent = NameIdentifier.of(metalake, "catalog");
     Mockito.clearInvocations(catalogManager);

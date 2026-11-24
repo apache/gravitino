@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.maintenance.policy;
 
+import com.google.common.base.Preconditions;
 import java.util.HashSet;
 import java.util.Set;
+import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandClient;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
@@ -49,36 +51,22 @@ public final class PolicyExpandReconciler {
 
   private static final Logger LOG = LoggerFactory.getLogger(PolicyExpandReconciler.class);
 
-  private final PolicyExpandLifecycleHook aligner;
-  private final PolicyExpandRegistrar registrar;
+  private final PolicyExpandClient expandClient;
   private final MetalakeMetaService metalakeMetaService;
   private final PolicyMetaService policyMetaService;
 
   /**
-   * @param aligner same expand rules as the lifecycle hook
-   * @param registrar writer used for orphan cleanup; both must use {@link
-   *     PolicyExpandRegistrar#joiningCurrentTransaction()}
-   */
-  public PolicyExpandReconciler(
-      PolicyExpandLifecycleHook aligner, PolicyExpandRegistrar registrar) {
-    this(aligner, registrar, MetalakeMetaService.getInstance(), PolicyMetaService.getInstance());
-  }
-
-  /**
-   * @param aligner expand aligner
-   * @param registrar expand registrar for orphan deletes
+   * @param expandClient expand writer used for {@link PolicyExpandClient#align} and orphan cleanup
    * @param metalakeMetaService metalake listing
    * @param policyMetaService policy listing
    */
   public PolicyExpandReconciler(
-      PolicyExpandLifecycleHook aligner,
-      PolicyExpandRegistrar registrar,
+      PolicyExpandClient expandClient,
       MetalakeMetaService metalakeMetaService,
       PolicyMetaService policyMetaService) {
-    this.aligner = aligner;
-    this.registrar = registrar;
-    this.metalakeMetaService = metalakeMetaService;
-    this.policyMetaService = policyMetaService;
+    this.expandClient = Preconditions.checkNotNull(expandClient);
+    this.metalakeMetaService = Preconditions.checkNotNull(metalakeMetaService);
+    this.policyMetaService = Preconditions.checkNotNull(policyMetaService);
   }
 
   /**
@@ -94,7 +82,7 @@ public final class PolicyExpandReconciler {
       for (PolicyEntity policy :
           policyMetaService.listPoliciesByNamespace(NamespaceUtil.ofPolicy(metalake.name()))) {
         knownPolicyIds.add(policy.id());
-        SessionUtils.doMultipleWithCommit(() -> aligner.align(policy));
+        SessionUtils.doMultipleWithCommit(() -> expandClient.align(policy));
         aligned++;
       }
     }
@@ -102,9 +90,9 @@ public final class PolicyExpandReconciler {
     int[] removedOrphans = {0};
     SessionUtils.doMultipleWithCommit(
         () -> {
-          for (long scheduledId : registrar.scheduledPolicyIds()) {
+          for (long scheduledId : expandClient.scheduledPolicyIds()) {
             if (!knownPolicyIds.contains(scheduledId)) {
-              registrar.remove(scheduledId);
+              expandClient.remove(scheduledId);
               removedOrphans[0]++;
             }
           }

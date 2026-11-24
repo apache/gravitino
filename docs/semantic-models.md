@@ -42,7 +42,7 @@ definition, and audit information. The definition uses these components:
 |-----------|---------|
 | `datasets` | A required, non-empty list of named sources. Each dataset can define fields, a primary key, and unique keys. |
 | `fields` | Named expressions within a dataset, with optional data types, labels, descriptions, and dimension information. |
-| `relationships` | Links between datasets in the same model, using source column names in `fromColumns` and `toColumns`. |
+| `relationships` | Links between datasets in the same model, using the endpoint datasets' field names in `fromColumns` and `toColumns`. |
 | `metrics` | Named expressions such as `SUM(orders.order_amount)`, with optional data types and descriptions. |
 | `aiContext` | Context for consumers, represented as text or a structured object. |
 | `customExtensions` | Vendor-specific information preserved with the definition. |
@@ -53,6 +53,17 @@ Other non-empty dialect identifiers are also accepted and preserved. Choose iden
 by the application consuming the model. Gravitino validates the definition's structure but does
 not parse or execute the expression text.
 
+### Metric Discovery
+
+Applications can discover metrics across Semantic Models in a schema by listing metric
+identifiers or retrieving complete definitions. A metric is identified by its containing model's
+identifier and the metric name, so different models can use the same metric name. Results reflect the
+models' current committed definitions and follow their visibility rules.
+
+Use discovery to find definitions for an analytical application or AI tool. Gravitino does not
+execute the metric expressions, and source data access remains separate. See the
+[REST, Java, and Python examples](./manage-semantic-model-metadata-using-gravitino.md#discover-metrics-in-a-schema).
+
 ### Sources and Validation
 
 Dataset sources use `catalog.schema.object` within the model's metalake. They may reference another
@@ -60,17 +71,19 @@ catalog or schema in that metalake. Each source must resolve to an existing tabl
 supported by its catalog. Cross-metalake references are not supported.
 
 The `from` and `to` endpoints of a relationship name datasets within the model.
-Primary-key, unique-key, and relationship columns refer to columns of the source table or view,
-rather than field aliases in the model. Gravitino checks that these columns exist; it does not
+Primary-key, unique-key, and relationship entries name fields declared in `fields` by the
+referenced datasets, not columns of the source table or view. A dataset that declares no fields
+exposes no names to keys or relationships. Gravitino checks that these fields exist; it does not
 check whether the data satisfies the declared keys or relationships.
 
-Creating, importing, or replacing a definition checks source existence and these columns, even
-when authorization is disabled. With authorization enabled, source lookups also require the
-caller's access to the source metadata.
+Creating, importing, or replacing a definition checks source existence and these field
+references, even when authorization is disabled. With authorization enabled, source lookups also
+require the caller's access to the source metadata.
 
 Loading or exporting a model, renaming it, and changing only its comment or properties do not
-revalidate source metadata. Review definitions when their source schemas change: a stored model
-can become stale after a source column is changed or removed.
+revalidate source metadata. Review definitions when their source schemas change: field
+expressions are not checked against source columns, so a stored model can become stale after a
+source column is changed or removed.
 
 ### Exchanging Definitions
 

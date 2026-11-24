@@ -28,6 +28,7 @@ import java.net.URLClassLoader;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.JavaVersion;
 import org.apache.commons.lang3.SystemUtils;
@@ -68,7 +69,7 @@ public class IsolatedClassLoader implements Closeable {
     this.execJars = execJars;
     this.sharedClasses = sharedClasses;
     this.barrierClasses = barrierClasses;
-    this.baseClassLoader = Thread.currentThread().getContextClassLoader();
+    this.baseClassLoader = getBaseClassLoader(Thread.currentThread().getContextClassLoader());
   }
 
   /**
@@ -253,10 +254,19 @@ public class IsolatedClassLoader implements Closeable {
       return classLoader;
     }
 
-    ClassLoader parent = Thread.currentThread().getContextClassLoader();
     this.classLoader =
-        new CustomURLClassLoader(execJars.toArray(new URL[0]), parent, baseClassLoader);
+        new CustomURLClassLoader(execJars.toArray(new URL[0]), baseClassLoader, baseClassLoader);
     return classLoader;
+  }
+
+  private static ClassLoader getBaseClassLoader(@Nullable ClassLoader contextClassLoader) {
+    // Catalog loaders have independent lifecycles. Retaining one as a shared base or parent
+    // would reuse its provider classes even after its JARs have been closed.
+    ClassLoader base = contextClassLoader;
+    while (base instanceof CustomURLClassLoader) {
+      base = ((CustomURLClassLoader) base).baseClassLoader;
+    }
+    return base == null ? IsolatedClassLoader.class.getClassLoader() : base;
   }
 
   /**

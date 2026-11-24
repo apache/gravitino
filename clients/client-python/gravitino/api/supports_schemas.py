@@ -75,6 +75,10 @@ class SupportsSchemas(ABC):
 
         Returns:
             True if the schema exists, false otherwise.
+
+        Raises:
+            SchemaAlreadyExistsException: If loading detects another existing schema's identifier.
+                The conflict is propagated instead of returning False.
         """
         try:
             self.load_schema(schema_name)
@@ -118,6 +122,8 @@ class SupportsSchemas(ABC):
 
         Raises:
             NoSuchSchemaException: If the schema does not exist (optional).
+            SchemaAlreadyExistsException: If the source marker belongs to another existing schema.
+                Remove the copied source marker before importing an independent copy.
 
         Returns:
             A schema.
@@ -142,17 +148,21 @@ class SupportsSchemas(ABC):
 
     @abstractmethod
     def drop_schema(self, schema_name: str, cascade: bool) -> bool:
-        """Drop a schema from the catalog. If cascade option is true, recursively
-        drop all objects within the schema.
+        """Drop a schema from the catalog.
+
+        Cascade support depends on the catalog. PostgreSQL refuses non-empty
+        schemas even when cascade is requested, because native cascade may
+        remove objects in other schemas.
 
         Args:
             schema_name: The name of the schema.
-            cascade: If true, recursively drop all objects within the schema.
+            cascade: Whether to request recursive deletion, subject to catalog support.
 
         Returns:
             True if the schema exists and is dropped successfully, false otherwise.
 
         Raises:
-            NonEmptySchemaException: If the schema is not empty and cascade is false.
+            NonEmptySchemaException: If the schema is non-empty and cascade is false,
+                or the catalog cannot safely cascade within the schema.
         """
         pass

@@ -23,11 +23,17 @@ from gravitino.api.audit import Audit
 from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
+from gravitino.api.policy.policy import Policy
+from gravitino.api.policy.policy_list import PolicyList
+from gravitino.api.policy.supports_policies import SupportsPolicies
 from gravitino.api.schema import Schema
 from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
 from gravitino.api.tag.tag_list import TagList
+from gravitino.client.metadata_object_policy_operations import (
+    MetadataObjectPolicyOperations,
+)
 from gravitino.client.metadata_object_role_operations import (
     MetadataObjectRoleOperations,
 )
@@ -43,6 +49,7 @@ class GenericSchema(
     Schema,
     SupportsRoles,
     SupportsTags,
+    SupportsPolicies,
     SupportsSecrets,
 ):
     def __init__(
@@ -61,6 +68,11 @@ class GenericSchema(
             MetadataObject.Type.SCHEMA,
         )
         self._metadata_object_tag_operations = MetadataObjectTagOperations(
+            metalake,
+            metadata_object,
+            rest_client,
+        )
+        self._metadata_object_policy_operations = MetadataObjectPolicyOperations(
             metalake,
             metadata_object,
             rest_client,
@@ -129,6 +141,23 @@ class GenericSchema(
         )
 
     def supports_tags(self) -> SupportsTags:
+        return self
+
+    def list_policies(self) -> list[str]:
+        return self._metadata_object_policy_operations.list_policies()
+
+    def list_policies_with_visibility(self) -> PolicyList[str]:
+        return self._metadata_object_policy_operations.list_policies_with_visibility()
+
+    def list_policy_infos(self) -> list[Policy]:
+        return self._metadata_object_policy_operations.list_policy_infos()
+
+    def list_policy_infos_with_visibility(self) -> PolicyList[Policy]:
+        return (
+            self._metadata_object_policy_operations.list_policy_infos_with_visibility()
+        )
+
+    def supports_policies(self) -> SupportsPolicies:
         return self
 
     def supports_roles(self) -> SupportsRoles:

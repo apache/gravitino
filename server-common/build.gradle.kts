@@ -25,6 +25,10 @@ plugins {
 }
 
 dependencies {
+  // Raise the xnio-api pulled in by kerb-admin (3.8.8.Final) to the version in the catalog.
+  constraints {
+    implementation(libs.xnio.api)
+  }
   implementation(project(":api"))
   implementation(project(":catalogs:catalog-common"))
   implementation(project(":common")) {
@@ -37,7 +41,11 @@ dependencies {
   implementation(libs.bundles.jwt) {
     exclude(group = "com.google.errorprone", module = "error_prone_annotations")
   }
-  implementation(libs.bundles.kerby)
+  // Keep the interactive admin shell library (org.jline) out of the server; only keytab/principal
+  // types are used, and the shell is only referenced by the kerb-admin command line tool.
+  implementation(libs.bundles.kerby) {
+    exclude("org.jline")
+  }
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.metrics)
   implementation(libs.caffeine)

@@ -59,6 +59,7 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.policy.AllValuesSelector;
+import org.apache.gravitino.policy.HiddenPolicyTag;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyDispatcher;
@@ -162,7 +163,8 @@ public class PolicyOperations {
           httpRequest,
           () -> {
             request.validate();
-            validateCreatePolicyType(request.getPolicyType());
+            NameIdentifierUtil.checkMetadataObjectName(
+                NameIdentifierUtil.ofPolicy(metalake, request.getName()), Entity.EntityType.POLICY);
             PolicyEntity policy =
                 policyDispatcher.createPolicy(
                     metalake,
@@ -231,11 +233,18 @@ public class PolicyOperations {
           httpRequest,
           () -> {
             request.validate();
-
             PolicyChange[] changes =
                 request.getUpdates().stream()
                     .map(PolicyUpdateRequest::policyChange)
                     .toArray(PolicyChange[]::new);
+            for (PolicyChange change : changes) {
+              if (change instanceof PolicyChange.RenamePolicy) {
+                NameIdentifierUtil.checkMetadataObjectName(
+                    NameIdentifierUtil.ofPolicy(
+                        metalake, ((PolicyChange.RenamePolicy) change).getNewName()),
+                    Entity.EntityType.POLICY);
+              }
+            }
             PolicyEntity policy = policyDispatcher.alterPolicy(metalake, name, changes);
 
             LOG.info("Altered policy: {} under metalake: {}", name, metalake);
@@ -343,6 +352,11 @@ public class PolicyOperations {
             RelationalEntity<?>[] associations =
                 policyDispatcher.listTagAssociationsForPolicy(metalake, policyName);
             associations =
+                Arrays.stream(associations)
+                    .filter(
+                        relation -> !HiddenPolicyTag.isReservedName(relation.targetEntity().name()))
+                    .toArray(RelationalEntity<?>[]::new);
+            associations =
                 MetadataAuthzHelper.filterByExpression(
                     metalake,
                     AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION,
@@ -395,16 +409,5 @@ public class PolicyOperations {
             .relationValue()
             .map(PolicyAssociationSelectorSerde::deserialize)
             .orElseGet(AllValuesSelector::get));
-  }
-
-  private static void validateCreatePolicyType(String policyType) {
-    Policy.BuiltInType builtInType = Policy.BuiltInType.fromPolicyType(policyType);
-    if (builtInType != Policy.BuiltInType.CUSTOM
-        && !builtInType.policyType().equalsIgnoreCase(policyType)) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Built-in policy type must use prefixed value '%s', but got: %s",
-              builtInType.policyType(), policyType));
-    }
   }
 }

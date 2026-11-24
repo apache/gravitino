@@ -20,6 +20,8 @@ package org.apache.gravitino.dto.rel;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
@@ -55,12 +57,20 @@ public class ColumnDTO implements Column {
   private boolean autoIncrement = false;
 
   @JsonProperty("defaultValue")
+  @JsonSetter(nulls = Nulls.SKIP)
   // the NON_EMPTY annotation is used to avoid serializing the defaultValue field if it is not set
   // or null.
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   @JsonSerialize(using = JsonUtils.ColumnDefaultValueSerializer.class)
   @JsonDeserialize(using = JsonUtils.ColumnDefaultValueDeserializer.class)
   private Expression defaultValue = Column.DEFAULT_VALUE_NOT_SET;
+
+  @JsonProperty("initialDefaultValue")
+  @JsonSetter(nulls = Nulls.SKIP)
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @JsonSerialize(using = JsonUtils.ColumnDefaultValueSerializer.class)
+  @JsonDeserialize(using = JsonUtils.ColumnInitialDefaultValueDeserializer.class)
+  private Expression initialDefaultValue = Column.INITIAL_DEFAULT_VALUE_NOT_SET;
 
   private ColumnDTO() {}
 
@@ -73,6 +83,7 @@ public class ColumnDTO implements Column {
    * @param nullable Whether the column value can be null.
    * @param autoIncrement Whether the column is an auto-increment column.
    * @param defaultValue The default value of the column.
+   * @param initialDefaultValue The initial default value of the column.
    */
   private ColumnDTO(
       String name,
@@ -80,13 +91,16 @@ public class ColumnDTO implements Column {
       String comment,
       boolean nullable,
       boolean autoIncrement,
-      Expression defaultValue) {
+      Expression defaultValue,
+      Expression initialDefaultValue) {
     this.name = name;
     this.dataType = dataType;
     this.comment = comment;
     this.nullable = nullable;
     this.autoIncrement = autoIncrement;
     this.defaultValue = defaultValue == null ? Column.DEFAULT_VALUE_NOT_SET : defaultValue;
+    this.initialDefaultValue =
+        initialDefaultValue == null ? Column.INITIAL_DEFAULT_VALUE_NOT_SET : initialDefaultValue;
   }
 
   @Override
@@ -117,6 +131,11 @@ public class ColumnDTO implements Column {
   @Override
   public Expression defaultValue() {
     return defaultValue;
+  }
+
+  @Override
+  public Expression initialDefaultValue() {
+    return initialDefaultValue;
   }
 
   /**
@@ -152,6 +171,9 @@ public class ColumnDTO implements Column {
 
     /** The default value of the column. */
     protected Expression defaultValue;
+
+    /** The initial default value of the column. */
+    protected Expression initialDefaultValue;
 
     /** Constructs a new Builder. */
     public Builder() {}
@@ -223,6 +245,17 @@ public class ColumnDTO implements Column {
     }
 
     /**
+     * Sets the initial default value of the column.
+     *
+     * @param initialDefaultValue The initial default value of the column.
+     * @return The Builder instance.
+     */
+    public S withInitialDefaultValue(Expression initialDefaultValue) {
+      this.initialDefaultValue = initialDefaultValue;
+      return (S) this;
+    }
+
+    /**
      * Builds a Column DTO based on the provided builder parameters.
      *
      * @return A new ColumnDTO instance.
@@ -231,7 +264,8 @@ public class ColumnDTO implements Column {
     public ColumnDTO build() {
       Preconditions.checkArgument(name != null, "Column name cannot be null");
       Preconditions.checkArgument(dataType != null, "Column data type cannot be null");
-      return new ColumnDTO(name, dataType, comment, nullable, autoIncrement, defaultValue);
+      return new ColumnDTO(
+          name, dataType, comment, nullable, autoIncrement, defaultValue, initialDefaultValue);
     }
   }
 

@@ -202,17 +202,19 @@ public final class JdbcConnectionTimeouts {
 
   /**
    * Converts milliseconds to seconds, rounded up with a minimum of 1 so a sub-second bound never
-   * collapses to 0 ("no timeout"). The arithmetic is overflow-safe for the whole positive {@code
-   * long} range (the input is validated positive and {@code <= Integer.MAX_VALUE} by {@link
-   * JdbcConfig}).
+   * collapses to 0 ("no timeout"). Cap the result at the largest whole-second timeout that the
+   * PostgreSQL driver can multiply by 1000 without overflowing its integer millisecond timeout. The
+   * input is validated positive and {@code <= Integer.MAX_VALUE} by {@link JdbcConfig}.
    *
    * @param millis the timeout in milliseconds (positive)
-   * @return the timeout in whole seconds, at least 1
+   * @return the timeout in whole seconds, from 1 through {@code Integer.MAX_VALUE / 1000}
    */
   private static long millisToSeconds(long millis) {
     // (millis - 1) / 1000 + 1 is ceil(millis/1000) for positive millis without the overflow that
     // (millis + 999) would hit near Long.MAX_VALUE.
-    return (millis - 1L) / 1000L + 1L;
+    // PostgreSQL converts seconds back to int milliseconds. At the upper bound, rounding down
+    // by less than one second keeps the timeout positive instead of overflowing or disabling it.
+    return Math.min((millis - 1L) / 1000L + 1L, Integer.MAX_VALUE / 1000L);
   }
 
   /**

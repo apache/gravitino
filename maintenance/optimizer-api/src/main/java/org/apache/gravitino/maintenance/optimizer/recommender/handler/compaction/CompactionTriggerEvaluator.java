@@ -19,58 +19,41 @@
 package org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction;
 
 import com.google.common.base.Preconditions;
-import java.util.HashMap;
 import java.util.Map;
-import org.apache.gravitino.maintenance.optimizer.recommender.util.ExpressionEvaluator;
-import org.apache.gravitino.maintenance.optimizer.recommender.util.QLExpressionEvaluator;
+import org.apache.gravitino.maintenance.optimizer.recommender.handler.TriggerExprEvaluator;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 
 /**
- * Evaluates Iceberg compaction {@code trigger-expr} with the same QL expression stack used by the
- * optimizer compaction strategy handler ({@code CompactionStrategyHandler} / {@code
- * BaseExpressionStrategyHandler}).
+ * Compaction-only {@code trigger-expr} evaluation against sampled metrics.
  *
- * <p>Intended for callers that already have table-level metric values (for example TMS in-job
- * sample JSON) without constructing a full strategy handler.
+ * <p>For rewrite-manifests use {@code ManifestRewriteTriggerEvaluator}. Shared QL evaluation lives
+ * in {@link TriggerExprEvaluator}.
  */
 public final class CompactionTriggerEvaluator {
-
-  private static final ExpressionEvaluator EVALUATOR = new QLExpressionEvaluator();
 
   private CompactionTriggerEvaluator() {}
 
   /**
    * @param content compaction policy content (provides numeric rules + trigger-expr)
    * @param metricValues sampled metric name → value (e.g. {@code custom-data-file-mse})
-   * @return whether maintenance should run
+   * @return whether compaction should run
    */
   public static boolean shouldMaintain(
       IcebergDataCompactionContent content, Map<String, Object> metricValues) {
     Preconditions.checkNotNull(content, "content");
-    Preconditions.checkNotNull(metricValues, "metricValues");
+    return shouldMaintain(content.rules(), metricValues);
+  }
 
-    Map<String, Object> context = new HashMap<>();
-    // Mirror BaseExpressionStrategyHandler#getRulesExpressionContext: numeric rules only.
-    content
-        .rules()
-        .forEach(
-            (key, value) -> {
-              if (value == null) {
-                return;
-              }
-              try {
-                context.put(key, Long.parseLong(value.toString()));
-              } catch (NumberFormatException ignored) {
-                // Non-numeric rule values (expressions, strings) are not QL bindings.
-              }
-            });
-    context.putAll(metricValues);
-
-    Object trigger = content.rules().get(IcebergDataCompactionContent.TRIGGER_EXPR_KEY);
-    String expression =
-        trigger == null || trigger.toString().trim().isEmpty()
-            ? "false"
-            : trigger.toString().trim();
-    return EVALUATOR.evaluateBool(expression, context);
+  /**
+   * Evaluates compaction {@code trigger-expr} from a policy {@code rules()} map against sampled
+   * metrics.
+   *
+   * @param rules compaction policy rules (thresholds + {@code trigger-expr})
+   * @param metricValues sampled metric name → value
+   * @return whether compaction should run
+   */
+  public static boolean shouldMaintain(
+      Map<String, Object> rules, Map<String, Object> metricValues) {
+    return TriggerExprEvaluator.evaluate(rules, metricValues);
   }
 }

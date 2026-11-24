@@ -24,6 +24,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionContext;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.ManifestRewriteJobContext;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
@@ -55,13 +56,16 @@ public class TestGravitinoJobSubmitter {
             config,
             new ManifestRewriteJobContext(
                 NameIdentifier.of("catalog", "db", "table"), 1, useCaching),
-            adapter);
+            adapter,
+            IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
     Assertions.assertEquals("1", result.get("spec_id"));
     Assertions.assertEquals("catalog", result.get("catalog_name"));
     Assertions.assertEquals("local[2]", result.get("spark_master"));
     Assertions.assertEquals(
         useCaching == null ? "" : useCaching.toString(), result.get("use_caching"));
-    Assertions.assertThrows(IllegalArgumentException.class, () -> adapter.jobConfig(null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> adapter.jobConfig(null, IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR));
   }
 
   @Test
@@ -128,10 +132,12 @@ public class TestGravitinoJobSubmitter {
         };
 
     GravitinoJobAdapter adapter =
-        jobExecutionContext ->
+        (jobExecutionContext, submitterConfigs, schemaSeparator) ->
             Map.of("table", "db.table", "options", "map('k','v')", "override", "adapter");
 
-    Map<String, String> merged = GravitinoJobSubmitter.buildJobConfig(config, context, adapter);
+    Map<String, String> merged =
+        GravitinoJobSubmitter.buildJobConfig(
+            config, context, adapter, IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
 
     Assertions.assertEquals("optimizer", merged.get("custom"));
     Assertions.assertEquals("adapter", merged.get("override"));

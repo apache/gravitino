@@ -23,12 +23,15 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.glue.GlueConstants;
 import org.apache.gravitino.client.GravitinoClient;
@@ -46,10 +49,11 @@ import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import org.apache.iceberg.spark.SparkCatalog;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
-import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
+import org.apache.spark.sql.connector.catalog.TableChange;
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
+import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -57,6 +61,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.mockito.ArgumentCaptor;
 
 @TestInstance(Lifecycle.PER_CLASS)
 public class TestGravitinoGlueCatalog {
@@ -179,14 +184,10 @@ public class TestGravitinoGlueCatalog {
           {
             sparkCatalog = mockCatalog;
           }
-
-          @Override
-          protected Table loadGravitinoTable(Identifier ident) throws NoSuchTableException {
-            return mockGravitinoTable;
-          }
         };
 
-    org.apache.spark.sql.connector.catalog.Table result = catalog.loadSparkTable(ident);
+    org.apache.spark.sql.connector.catalog.Table result =
+        catalog.loadSparkTable(ident, mockGravitinoTable);
     Assertions.assertSame(mockSparkTable, result);
   }
 
@@ -255,6 +256,156 @@ public class TestGravitinoGlueCatalog {
     Assertions.assertNotNull(typeConverter);
     Assertions.assertInstanceOf(
         org.apache.gravitino.spark.connector.hive.SparkHiveTypeConverter.class, typeConverter);
+  }
+
+  @Test
+  void testIcebergTablesUseIcebergTimestampTypes() {
+    SparkTypeConverter converter =
+        gravitinoGlueCatalog.getSparkTypeConverter(
+            ImmutableMap.of(GlueConstants.TABLE_FORMAT, GlueConstants.TABLE_FORMAT_ICEBERG));
+
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(), converter.toGravitinoType(DataTypes.TimestampType));
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(),
+        converter.toGravitinoType(DataTypes.TimestampNTZType));
+    Assertions.assertEquals(
+        DataTypes.TimestampNTZType, converter.toSparkType(Types.TimestampType.withoutTimeZone(6)));
+  }
+
+  @Test
+  void testTablesWithoutFormatFollowCatalogDefaultTableFormat() throws Exception {
+    Field catalogProperties = GravitinoGlueCatalog.class.getDeclaredField("catalogProperties");
+    catalogProperties.setAccessible(true);
+    catalogProperties.set(
+        gravitinoGlueCatalog, ImmutableMap.of(GlueConstants.DEFAULT_TABLE_FORMAT, "iceberg"));
+
+    SparkTypeConverter converter = gravitinoGlueCatalog.getSparkTypeConverter(ImmutableMap.of());
+
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(), converter.toGravitinoType(DataTypes.TimestampType));
+  }
+
+  @Test
+  void testIcebergTableChangesUseIcebergTimestampTypes() {
+    Table icebergTable =
+        createMockGravitinoTable(
+            ImmutableMap.of(GlueConstants.TABLE_FORMAT, GlueConstants.TABLE_FORMAT_ICEBERG));
+    GravitinoGlueCatalog catalog =
+        new GravitinoGlueCatalog() {
+          @Override
+          protected Table loadGravitinoTable(Identifier ident) {
+            return icebergTable;
+          }
+        };
+
+    TableChange addColumn = TableChange.addColumn(new String[] {"ts"}, DataTypes.TimestampType);
+
+    org.apache.gravitino.rel.TableChange change =
+        catalog
+            .getSparkTableChangeConverter(
+                Identifier.of(new String[] {"db"}, "tbl"), new TableChange[] {addColumn})
+            .toGravitinoTableChange(addColumn);
+
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(),
+        ((org.apache.gravitino.rel.TableChange.AddColumn) change).getDataType());
+  }
+
+  @Test
+  void testAlterIcebergTableAddsColumnWithIcebergTimestampType() throws Exception {
+    Table icebergTable =
+        createMockGravitinoTable(
+            ImmutableMap.of(GlueConstants.TABLE_FORMAT, GlueConstants.TABLE_FORMAT_ICEBERG));
+    org.apache.gravitino.rel.TableCatalog tableCatalog =
+        mock(org.apache.gravitino.rel.TableCatalog.class);
+    Catalog client = mock(Catalog.class);
+    when(client.asTableCatalog()).thenReturn(tableCatalog);
+    TableCatalog mockSparkCatalog = mock(TableCatalog.class);
+    GravitinoGlueCatalog catalog =
+        new GravitinoGlueCatalog() {
+          {
+            sparkCatalog = mockSparkCatalog;
+          }
+
+          @Override
+          protected Catalog gravitinoCatalog() {
+            return client;
+          }
+
+          @Override
+          protected Table loadGravitinoTable(Identifier ident) {
+            return icebergTable;
+          }
+
+          @Override
+          protected org.apache.spark.sql.connector.catalog.Table loadSparkTable(
+              Identifier ident, Table gravitinoTable) {
+            return null;
+          }
+
+          @Override
+          protected org.apache.spark.sql.connector.catalog.Table createSparkTable(
+              Identifier identifier,
+              Table gravitinoTable,
+              org.apache.spark.sql.connector.catalog.Table sparkTable,
+              TableCatalog sparkHiveCatalog,
+              PropertiesConverter propertiesConverter,
+              SparkTransformConverter sparkTransformConverter,
+              SparkTypeConverter sparkTypeConverter) {
+            return null;
+          }
+        };
+
+    catalog.alterTable(
+        Identifier.of(new String[] {"db"}, "tbl"),
+        TableChange.addColumn(new String[] {"ts"}, DataTypes.TimestampType));
+
+    ArgumentCaptor<org.apache.gravitino.rel.TableChange> change =
+        ArgumentCaptor.forClass(org.apache.gravitino.rel.TableChange.class);
+    verify(tableCatalog).alterTable(any(), change.capture());
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(),
+        ((org.apache.gravitino.rel.TableChange.AddColumn) change.getValue()).getDataType());
+  }
+
+  @Test
+  void testTableIsLoadedOnlyForChangesThatSetTimestampTypes() {
+    Table icebergTable =
+        createMockGravitinoTable(
+            ImmutableMap.of(GlueConstants.TABLE_FORMAT, GlueConstants.TABLE_FORMAT_ICEBERG));
+    AtomicInteger loads = new AtomicInteger();
+    GravitinoGlueCatalog catalog =
+        new GravitinoGlueCatalog() {
+          @Override
+          protected Table loadGravitinoTable(Identifier ident) {
+            loads.incrementAndGet();
+            return icebergTable;
+          }
+        };
+    Identifier ident = Identifier.of(new String[] {"db"}, "tbl");
+    String[] column = {"c"};
+
+    catalog.getSparkTableChangeConverter(
+        ident,
+        new TableChange[] {
+          TableChange.setProperty("comment", "c"),
+          TableChange.addColumn(column, DataTypes.LongType),
+          TableChange.updateColumnType(column, DataTypes.StringType)
+        });
+    Assertions.assertEquals(0, loads.get());
+
+    catalog.getSparkTableChangeConverter(
+        ident,
+        new TableChange[] {
+          TableChange.addColumn(column, DataTypes.createArrayType(DataTypes.TimestampType))
+        });
+    Assertions.assertEquals(1, loads.get());
+
+    catalog.getSparkTableChangeConverter(
+        ident,
+        new TableChange[] {TableChange.updateColumnType(column, DataTypes.TimestampNTZType)});
+    Assertions.assertEquals(2, loads.get());
   }
 
   @Test
@@ -340,6 +491,52 @@ public class TestGravitinoGlueCatalog {
     // In the test environment, super also throws; verify Iceberg was consulted first.
     Assertions.assertThrows(Exception.class, () -> catalog.loadFunction(ident));
     verify(mockIcebergCatalog).loadFunction(ident);
+  }
+
+  // -------------------------------------------------------------------------
+  // One loadTable must cost one Gravitino round trip: the loadSparkTable hook receives
+  // the already-fetched table instead of re-fetching it for Iceberg/Hive routing.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void testLoadTableFetchesGravitinoTableOnce() throws Exception {
+    Catalog client = mock(Catalog.class);
+    org.apache.gravitino.rel.TableCatalog gravitinoTableCatalog =
+        mock(org.apache.gravitino.rel.TableCatalog.class);
+    when(client.asTableCatalog()).thenReturn(gravitinoTableCatalog);
+    Table gravitinoTable = createMockGravitinoTable(ImmutableMap.of());
+    when(gravitinoTableCatalog.loadTable(any(), any())).thenReturn(gravitinoTable);
+    TableCatalog mockSparkCatalog = mock(TableCatalog.class);
+    when(mockSparkCatalog.loadTable(any()))
+        .thenReturn(mock(org.apache.spark.sql.connector.catalog.Table.class));
+
+    GravitinoGlueCatalog catalog =
+        new GravitinoGlueCatalog() {
+          {
+            sparkCatalog = mockSparkCatalog;
+          }
+
+          @Override
+          protected Catalog gravitinoCatalog() {
+            return client;
+          }
+
+          @Override
+          protected org.apache.spark.sql.connector.catalog.Table createSparkTable(
+              Identifier identifier,
+              Table gravitinoTable,
+              org.apache.spark.sql.connector.catalog.Table sparkTable,
+              TableCatalog sparkHiveCatalog,
+              PropertiesConverter propertiesConverter,
+              SparkTransformConverter sparkTransformConverter,
+              SparkTypeConverter sparkTypeConverter) {
+            return sparkTable;
+          }
+        };
+
+    catalog.loadTable(Identifier.of(new String[] {"db"}, "tbl"));
+
+    verify(gravitinoTableCatalog, times(1)).loadTable(any(), any());
   }
 
   // -------------------------------------------------------------------------

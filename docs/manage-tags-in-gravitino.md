@@ -16,6 +16,9 @@ resolves, and how to work with tags in the UI, see [Tags](./tags.md).
 Policies can be associated with tags to govern objects carrying those tags. See
 [Policy-to-Tag Associations](./manage-policies-in-gravitino.md#policy-to-tag-associations).
 
+Domains derive membership from explicit backing tags and existing assignments. See
+[Manage domains](./manage-domains-in-gravitino.md) for binding, ownership and conflict rules.
+
 ## Tag Operations
 
 ### Create a Tag
@@ -248,6 +251,10 @@ client.delete_tag("pii")
 Both happen in one request, and either list can be omitted. The object type and full name go in the
 path, so the same call covers catalogs, schemas, tables, views, columns, filesets, topics, models,
 functions, and [Semantic Models](./manage-semantic-model-metadata-using-gravitino.md#tags-and-policies).
+
+Tag names that do not exist in the metalake are ignored instead of failing the request, in either
+list. The call returns the tags attached to the object after the change, so compare it with the
+names you sent to catch a typo or a tag that was dropped in the meantime.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">

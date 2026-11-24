@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.hive.client.hive3;
 
+import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -31,6 +32,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
@@ -40,6 +42,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.gravitino.catalog.hive.HiveConstants;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.hive.converter.HiveTableConverter;
 import org.apache.gravitino.meta.AuditInfo;
@@ -49,11 +53,13 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.DefaultConstraintsRequest;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NotNullConstraintsRequest;
 import org.apache.hadoop.hive.metastore.api.SQLDefaultConstraint;
 import org.apache.hadoop.hive.metastore.api.SQLNotNullConstraint;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
@@ -89,6 +95,25 @@ class TestHiveShimV3 {
     IMetaStoreClient metaStoreClient() {
       return client;
     }
+  }
+
+  @Test
+  void testIdentifierProbeUsesCatalogAwareGetTableOnly() throws Exception {
+    MockHiveShimV3 shim = new MockHiveShimV3();
+    IMetaStoreClient client = shim.metaStoreClient();
+    Table table = new Table();
+    table.setTableType("MANAGED_TABLE");
+    table.setParameters(Map.of(ID_KEY, "source-identifier"));
+    when(client.getTable(CATALOG, DB, TABLE)).thenReturn(table);
+    Assertions.assertEquals("source-identifier", shim.getTableIdentifier(CATALOG, DB, TABLE));
+    verify(client).getTable(CATALOG, DB, TABLE);
+    // In particular, no column constraint or SerDe field RPC is allowed.
+    verifyNoMoreInteractions(client);
+    table.setParameters(null);
+    Assertions.assertNull(shim.getTableIdentifier(CATALOG, DB, TABLE));
+    table.setTableType("VIRTUAL_VIEW");
+    Assertions.assertThrows(
+        NoSuchTableException.class, () -> shim.getTableIdentifier(CATALOG, DB, TABLE));
   }
 
   private HiveTable testTable(Column... columns) {
@@ -337,6 +362,123 @@ class TestHiveShimV3 {
 
     verify(client, never()).getNotNullConstraints(any());
     verify(client, never()).getDefaultConstraints(any());
+  }
+
+  @Test
+  void testGetTableResolvesDerivedColumnTypesWithCatalog() throws Exception {
+    MockHiveShimV3 shim = new MockHiveShimV3();
+    IMetaStoreClient client = shim.metaStoreClient();
+
+    Column plainColumn = Column.of("value", Types.StringType.get(), null, true, false, null);
+    Table hiveTable = HiveTableConverter.toHiveTable(testTable(plainColumn));
+    hiveTable.setCatName(CATALOG);
+    hiveTable.getSd().getCols().get(0).setType("<derived from deserializer>");
+    when(client.getTable(CATALOG, DB, TABLE)).thenReturn(hiveTable);
+    when(client.getFields(CATALOG, DB, TABLE))
+        .thenReturn(List.of(new FieldSchema("value", "string", "from deserializer")));
+
+    HiveTable loaded = shim.getTable(CATALOG, DB, TABLE);
+
+    assertEquals(Types.StringType.get(), loaded.columns()[0].dataType());
+    assertEquals("from deserializer", loaded.columns()[0].comment());
+    verify(client).getFields(CATALOG, DB, TABLE);
+  }
+
+  @Test
+  void testBatchResolvesDerivedColumnsWithCatalog() throws Exception {
+    MockHiveShimV3 shim = new MockHiveShimV3();
+    IMetaStoreClient client = shim.metaStoreClient();
+    Table derived =
+        HiveTableConverter.toHiveTable(testTable(Column.of("value", Types.StringType.get())));
+    derived.getSd().getCols().get(0).setType("<derived from deserializer>");
+    Table regular =
+        HiveTableConverter.toHiveTable(testTable(Column.of("value", Types.IntegerType.get())));
+    regular.setTableName("regular");
+    when(client.getTableObjectsByName(CATALOG, DB, List.of(TABLE, "regular")))
+        .thenReturn(List.of(derived, regular));
+    when(client.getFields(CATALOG, DB, TABLE))
+        .thenReturn(List.of(new FieldSchema("value", "string", null)));
+
+    List<HiveTable> loaded = shim.getTableObjectsByName(CATALOG, DB, List.of(TABLE, "regular"));
+
+    assertEquals(Types.StringType.get(), loaded.get(0).columns()[0].dataType());
+    assertEquals(Types.IntegerType.get(), loaded.get(1).columns()[0].dataType());
+    assertEquals(
+        "<derived from deserializer>",
+        HiveTableConverter.toHiveTable(loaded.get(0)).getSd().getCols().get(0).getType());
+    verify(client).getFields(CATALOG, DB, TABLE);
+    verify(client, never()).getFields(CATALOG, DB, "regular");
+    verify(client, never()).getNotNullConstraints(any());
+    verify(client, never()).getDefaultConstraints(any());
+  }
+
+  @Test
+  void testGetFieldsFailureIncludesServerConfigurationGuidance() throws Exception {
+    for (String tableName : List.of(TABLE, "network_events", "connect_events")) {
+      MockHiveShimV3 shim = new MockHiveShimV3();
+      IMetaStoreClient client = shim.metaStoreClient();
+      Table derived =
+          HiveTableConverter.toHiveTable(testTable(Column.of("value", Types.StringType.get())));
+      derived.getSd().getCols().get(0).setType("<derived from deserializer>");
+      derived.setTableName(tableName);
+      when(client.getTable(CATALOG, DB, tableName)).thenReturn(derived);
+      when(client.getFields(CATALOG, DB, tableName))
+          .thenThrow(new MetaException("Storage schema reading not supported"));
+
+      GravitinoRuntimeException failure =
+          assertThrows(
+              GravitinoRuntimeException.class, () -> shim.getTable(CATALOG, DB, tableName));
+
+      assertTrue(failure.getMessage().contains("metastore.storage.schema.reader.impl="));
+      verify(client, never()).getNotNullConstraints(any());
+      assertEquals(GravitinoRuntimeException.class, failure.getClass());
+    }
+  }
+
+  @Test
+  void testMetadataListingUsesCatalogWithoutResolvingSchemas() throws Exception {
+    MockHiveShimV3 shim = new MockHiveShimV3();
+    IMetaStoreClient client = shim.metaStoreClient();
+    Table derived =
+        HiveTableConverter.toHiveTable(testTable(Column.of("value", Types.StringType.get())));
+    derived.getSd().getCols().get(0).setType("<derived from deserializer>");
+    derived.getSd().setInputFormat("org.apache.hadoop.mapred.TextInputFormat");
+    Table hudi =
+        HiveTableConverter.toHiveTable(testTable(Column.of("value", Types.IntegerType.get())));
+    hudi.setTableName("hudi");
+    hudi.getSd().setInputFormat("org.apache.hudi.hadoop.HoodieParquetInputFormat");
+    when(client.getTableObjectsByName(CATALOG, DB, List.of(TABLE, "hudi")))
+        .thenReturn(List.of(derived, hudi));
+    when(client.getFields(CATALOG, DB, TABLE)).thenThrow(new MetaException("SerDe missing"));
+    assertEquals(
+        List.of("hudi"),
+        shim.getTableNamesByInputFormatPrefix(
+            CATALOG, DB, List.of(TABLE, "hudi"), "org.apache.hudi"));
+    verify(client, never()).getFields(anyString(), anyString(), anyString());
+    verify(client, never()).getNotNullConstraints(any());
+    verify(client, never()).getDefaultConstraints(any());
+    assertThrows(
+        GravitinoRuntimeException.class,
+        () -> shim.getTableObjectsByName(CATALOG, DB, List.of(TABLE, "hudi")));
+  }
+
+  @Test
+  void testGetTableRejectsUnresolvedSchemaAfterExceptionConversion() throws Exception {
+    for (String tableName : List.of(TABLE, "network_events", "connect_events")) {
+      MockHiveShimV3 shim = new MockHiveShimV3();
+      IMetaStoreClient client = shim.metaStoreClient();
+      Table derived =
+          HiveTableConverter.toHiveTable(testTable(Column.of("value", Types.StringType.get())));
+      derived.getSd().getCols().get(0).setType("<derived from deserializer>");
+      derived.setTableName(tableName);
+      when(client.getTable(CATALOG, DB, tableName)).thenReturn(derived);
+      when(client.getFields(CATALOG, DB, tableName)).thenReturn(derived.getSd().getCols());
+      IllegalArgumentException failure =
+          assertThrows(IllegalArgumentException.class, () -> shim.getTable(CATALOG, DB, tableName));
+      assertTrue(failure.getMessage().contains("metastore.storage.schema.reader.impl="));
+      verify(client, never()).getNotNullConstraints(any());
+      assertEquals(IllegalArgumentException.class, failure.getClass());
+    }
   }
 
   @Test

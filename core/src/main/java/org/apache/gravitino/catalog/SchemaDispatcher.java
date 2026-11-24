@@ -25,7 +25,9 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretReference;
 
@@ -62,6 +64,12 @@ public interface SchemaDispatcher extends SupportsSchemas {
    * <p>The default implementation rejects create-time secrets. Implementations that support secrets
    * must override this method.
    *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, source schema creation can succeed before Gravitino registration fails. Resolve the
+   * reported error, verify the source identity, and call {@link #loadSchema(NameIdentifier)} to
+   * import it instead of repeating creation. Reconcile an existing registration before creating the
+   * same name; an external rename does not make its metadata safe to delete.
+   *
    * @param ident The name identifier of the schema.
    * @param comment The comment of the schema.
    * @param properties The properties of the schema.
@@ -83,4 +91,17 @@ public interface SchemaDispatcher extends SupportsSchemas {
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     throw new UnsupportedOperationException("Creating a schema with secrets is not supported");
   }
+
+  /**
+   * Imports an externally created schema into Gravitino, or returns the already imported entity.
+   * Catalog-reported audit fields take precedence over the supplied audit. Existing nonempty
+   * creation fields are preserved; missing creation fields may be filled after a competing import.
+   * This operation does not create the schema in the underlying catalog.
+   *
+   * @param ident the identifier of the existing external schema
+   * @param auditInfo fallback creation audit used when the catalog reports no creator
+   * @return the imported schema
+   * @throws NoSuchSchemaException if the external schema does not exist
+   */
+  Schema importSchema(NameIdentifier ident, AuditInfo auditInfo) throws NoSuchSchemaException;
 }

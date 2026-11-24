@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.client;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockserver.integration.ClientAndServer.startClientAndServer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -29,6 +28,7 @@ import io.jsonwebtoken.security.Keys;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
+import java.util.Base64;
 import java.util.Date;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.dto.responses.OAuth2ErrorResponse;
@@ -42,6 +42,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockserver.integration.ClientAndServer;
 import org.mockserver.matchers.Times;
+import org.mockserver.model.HttpRequest;
 import org.mockserver.model.HttpResponse;
 
 @SuppressWarnings("JavaUtilDate")
@@ -83,7 +84,7 @@ public class TestOAuth2TokenProvider {
         new OAuth2ErrorResponse(OAuth2ClientUtil.INVALID_CLIENT_ERROR, "invalid");
     String respJson = ObjectMapperProvider.objectMapper().writeValueAsString(respBody);
     mockResponse = mockResponse.withBody(respJson);
-    mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
+    mockServer.when(HttpRequest.request(), Times.exactly(1)).respond(mockResponse);
     OAuth2TokenProvider.Builder builder =
         DefaultOAuth2TokenProvider.builder()
             .withUri(String.format("http://127.0.0.1:%d", PORT))
@@ -95,7 +96,7 @@ public class TestOAuth2TokenProvider {
     respBody = new OAuth2ErrorResponse(OAuth2ClientUtil.INVALID_GRANT_ERROR, "invalid");
     respJson = ObjectMapperProvider.objectMapper().writeValueAsString(respBody);
     mockResponse = mockResponse.withBody(respJson);
-    mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
+    mockServer.when(HttpRequest.request(), Times.exactly(1)).respond(mockResponse);
     Assertions.assertThrows(BadRequestException.class, builder::build);
   }
 
@@ -113,12 +114,12 @@ public class TestOAuth2TokenProvider {
     OAuth2TokenResponse response = new OAuth2TokenResponse("1", "2", "3", 1, "test", null);
     String respJson = objectMapper.writeValueAsString(response);
     mockResponse = mockResponse.withBody(respJson);
-    mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
+    mockServer.when(HttpRequest.request(), Times.exactly(1)).respond(mockResponse);
     Assertions.assertThrows(IllegalArgumentException.class, builder::build);
     response = new OAuth2TokenResponse("1", "2", "bearer", 1, "test", null);
     respJson = objectMapper.writeValueAsString(response);
     mockResponse = mockResponse.withBody(respJson);
-    mockServer.when(any(), Times.exactly(2)).respond(mockResponse);
+    mockServer.when(HttpRequest.request(), Times.exactly(2)).respond(mockResponse);
     OAuth2TokenProvider provider = builder.build();
     Assertions.assertTrue(provider.hasTokenData());
     Assertions.assertNotNull(provider.getTokenData());
@@ -134,7 +135,7 @@ public class TestOAuth2TokenProvider {
     response = new OAuth2TokenResponse(oldAccessToken, "2", "bearer", 1, "test", null);
     respJson = objectMapper.writeValueAsString(response);
     mockResponse = mockResponse.withBody(respJson);
-    mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
+    mockServer.when(HttpRequest.request(), Times.exactly(1)).respond(mockResponse);
     provider = builder.build();
     String accessToken =
         Jwts.builder()
@@ -147,7 +148,7 @@ public class TestOAuth2TokenProvider {
     response = new OAuth2TokenResponse(accessToken, "2", "bearer", 1, "test", null);
     respJson = ObjectMapperProvider.objectMapper().writeValueAsString(response);
     mockResponse = mockResponse.withBody(respJson);
-    mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
+    mockServer.when(HttpRequest.request(), Times.exactly(1)).respond(mockResponse);
     Assertions.assertNotEquals(accessToken, oldAccessToken);
     Assertions.assertEquals(
         AuthConstants.AUTHORIZATION_BEARER_HEADER + accessToken,
@@ -177,11 +178,157 @@ public class TestOAuth2TokenProvider {
         new OAuth2TokenResponse(accessToken, "2", "bearer", 1, "test", null);
     String respJson = objectMapper.writeValueAsString(response);
     mockResponse = mockResponse.withBody(respJson);
-    mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
+    mockServer.when(HttpRequest.request(), Times.exactly(1)).respond(mockResponse);
     OAuth2TokenProvider provider = builder.build();
     String token = provider.getAccessToken();
     Assertions.assertEquals(accessToken, token);
     String oldToken = provider.getAccessToken();
     Assertions.assertEquals(accessToken, oldToken);
+  }
+
+  @Test
+  public void testClientSecretBasicAuthentication() throws Exception {
+    OAuth2TokenProvider.Builder builder =
+        DefaultOAuth2TokenProvider.builder()
+            .withUri(String.format("http://127.0.0.1:%d", PORT))
+            .withCredential("clientId:clientSecret")
+            .withPath("oauth/token")
+            .withScope("test")
+            .withClientAuthenticationMethod(OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
+
+    OAuth2TokenResponse response =
+        new OAuth2TokenResponse("access-token", "refresh-token", "bearer", 3600, "test", null);
+    String respJson = ObjectMapperProvider.objectMapper().writeValueAsString(response);
+
+    String basicAuth =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString("clientId:clientSecret".getBytes(StandardCharsets.UTF_8));
+
+    HttpRequest tokenRequest = HttpRequest.request().withMethod("POST").withPath("/oauth/token");
+
+    mockServer.clear(tokenRequest);
+
+    HttpResponse mockResponse =
+        HttpResponse.response().withStatusCode(HttpStatus.SC_OK).withBody(respJson);
+
+    mockServer
+        .when(
+            HttpRequest.request()
+                .withMethod("POST")
+                .withPath("/oauth/token")
+                .withHeader("Authorization", basicAuth),
+            Times.exactly(2))
+        .respond(mockResponse);
+
+    OAuth2TokenProvider provider = builder.build();
+
+    Assertions.assertTrue(provider.hasTokenData());
+    Assertions.assertEquals(
+        AuthConstants.AUTHORIZATION_BEARER_HEADER + "access-token",
+        new String(provider.getTokenData(), StandardCharsets.UTF_8));
+
+    HttpRequest[] recordedRequests = mockServer.retrieveRecordedRequests(tokenRequest);
+    Assertions.assertEquals(2, recordedRequests.length);
+
+    for (HttpRequest recordedRequest : recordedRequests) {
+      Assertions.assertEquals(basicAuth, recordedRequest.getFirstHeader("Authorization"));
+
+      String requestBody = recordedRequest.getBodyAsString();
+      Assertions.assertFalse(requestBody.contains("client_id"));
+      Assertions.assertFalse(requestBody.contains("client_secret"));
+    }
+  }
+
+  @Test
+  public void testClientSecretBasicRequiresClientId() {
+    OAuth2TokenProvider.Builder builder =
+        DefaultOAuth2TokenProvider.builder()
+            .withUri(String.format("http://127.0.0.1:%d", PORT))
+            .withCredential("clientSecret")
+            .withPath("oauth/token")
+            .withScope("test")
+            .withClientAuthenticationMethod(OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
+
+    Assertions.assertThrows(IllegalArgumentException.class, builder::build);
+  }
+
+  @Test
+  public void testRejectsNullClientAuthenticationMethod() {
+    DefaultOAuth2TokenProvider.Builder builder =
+        DefaultOAuth2TokenProvider.builder()
+            .withUri(String.format("http://127.0.0.1:%d", PORT))
+            .withCredential("clientId:clientSecret")
+            .withPath("oauth/token")
+            .withScope("test");
+
+    Assertions.assertThrows(
+        NullPointerException.class, () -> builder.withClientAuthenticationMethod(null));
+  }
+
+  @Test
+  public void testFromValueAcceptsRfcStyleNames() {
+    Assertions.assertEquals(
+        OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC,
+        OAuth2ClientAuthenticationMethod.fromValue("client_secret_basic"));
+    Assertions.assertEquals(
+        OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC,
+        OAuth2ClientAuthenticationMethod.fromValue("CLIENT_SECRET_BASIC"));
+    Assertions.assertEquals(
+        OAuth2ClientAuthenticationMethod.CLIENT_SECRET_POST,
+        OAuth2ClientAuthenticationMethod.fromValue("client_secret_post"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> OAuth2ClientAuthenticationMethod.fromValue("basic"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> OAuth2ClientAuthenticationMethod.fromValue(""));
+  }
+
+  @Test
+  public void testClientSecretBasicEncodesReservedCharacters() throws Exception {
+    OAuth2TokenProvider.Builder builder =
+        DefaultOAuth2TokenProvider.builder()
+            .withUri(String.format("http://127.0.0.1:%d", PORT))
+            .withCredential("client*@id:s ecret:/+?~")
+            .withPath("oauth/token")
+            .withScope("test")
+            .withClientAuthenticationMethod(OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
+
+    OAuth2TokenResponse response =
+        new OAuth2TokenResponse("access-token", "refresh-token", "bearer", 3600, "test", null);
+    String respJson = ObjectMapperProvider.objectMapper().writeValueAsString(response);
+
+    String basicAuth = "Basic Y2xpZW50KiU0MGlkOnMrZWNyZXQlM0ElMkYlMkIlM0YlN0U=";
+
+    HttpRequest tokenRequest = HttpRequest.request().withMethod("POST").withPath("/oauth/token");
+    mockServer.clear(tokenRequest);
+
+    HttpResponse mockResponse =
+        HttpResponse.response().withStatusCode(HttpStatus.SC_OK).withBody(respJson);
+
+    mockServer
+        .when(
+            HttpRequest.request()
+                .withMethod("POST")
+                .withPath("/oauth/token")
+                .withHeader("Authorization", basicAuth),
+            Times.exactly(2))
+        .respond(mockResponse);
+
+    OAuth2TokenProvider provider = builder.build();
+
+    Assertions.assertTrue(provider.hasTokenData());
+    Assertions.assertEquals(
+        AuthConstants.AUTHORIZATION_BEARER_HEADER + "access-token",
+        new String(provider.getTokenData(), StandardCharsets.UTF_8));
+    HttpRequest[] recordedRequests = mockServer.retrieveRecordedRequests(tokenRequest);
+    Assertions.assertEquals(2, recordedRequests.length);
+
+    for (HttpRequest recordedRequest : recordedRequests) {
+      Assertions.assertEquals(basicAuth, recordedRequest.getFirstHeader("Authorization"));
+
+      String requestBody = recordedRequest.getBodyAsString();
+      Assertions.assertFalse(requestBody.contains("client_id"));
+      Assertions.assertFalse(requestBody.contains("client_secret"));
+    }
   }
 }
