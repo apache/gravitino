@@ -19,6 +19,7 @@
 package org.apache.gravitino.server.web.rest;
 
 import static org.awaitility.Awaitility.await;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -179,6 +180,17 @@ public class TestTermOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testListDefaultsToNamesAcrossVisibleStatuses() {
+    when(dispatcher.listTermNames("test", null, null, null))
+        .thenReturn(new String[] {"Draft term"});
+    try (Response response = target(BASE).request().get()) {
+      assertEquals(200, response.getStatus());
+      assertArrayEquals(
+          new String[] {"Draft term"}, response.readEntity(NameListResponse.class).getNames());
+    }
+  }
+
+  @Test
   void testCreateAndFilter() throws Exception {
     TermDTO term = JsonUtils.objectMapper().readValue("{\"name\":\"Term\"}", TermDTO.class);
     when(dispatcher.createTerm("test", TermSpec.builder("Term").build())).thenReturn(term);
@@ -270,6 +282,10 @@ public class TestTermOperations extends BaseOperationsTest {
 
   @Test
   void testUnsupportedListFiltersAndMissingBodiesAreRejectedBeforeDispatch() {
+    try (Response r = target(BASE).queryParam("details", "yes").request().get()) {
+      assertEquals(400, r.getStatus());
+      assertTrue(r.readEntity(ErrorResponse.class).getMessage().contains("true or false"));
+    }
     try (Response r = target(BASE).queryParam("match", "revenue").request().get()) {
       assertEquals(400, r.getStatus());
     }

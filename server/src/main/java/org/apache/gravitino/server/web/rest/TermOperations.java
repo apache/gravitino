@@ -25,6 +25,7 @@ import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.BeanParam;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -79,38 +80,48 @@ public class TermOperations {
     this.views = views;
   }
 
-  /** Lists visible names or full snapshots matching the supplied filters. */
+  /**
+   * Lists visible terms. A bare {@code GET /metalakes/{metalake}/terms} returns names across all
+   * domains and statuses. For approved definitions in a domain, use {@code
+   * ?domain=Sales&status=APPROVED&details=true}.
+   *
+   * @param metalake Required metalake name from the path.
+   * @param query Optional list filters and response format. See {@link ListTermsQuery}.
+   * @return A name list by default, or term snapshots when details are requested.
+   */
   @GET
   @Timed(name = "list-terms." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-terms", absolute = true)
   @AuthorizationExpression(expression = "")
   public Response listTerms(
       @PathParam("metalake") @AuthorizationMetadata(type = EntityType.METALAKE) String metalake,
-      @QueryParam("details") @DefaultValue("false") boolean details,
-      @QueryParam("domain") String domain,
-      @QueryParam("status") String status,
-      @QueryParam("nameContains") String nameContains,
-      @QueryParam("match") String match,
-      @QueryParam("bindings") String bindings) {
+      @BeanParam ListTermsQuery query) {
     return execute(
         OperationType.LIST,
         metalake,
         null,
         () -> {
-          Preconditions.checkArgument(
-              match == null && bindings == null,
-              "Term lookup and binding expansion are not supported");
-          GlossaryTerm.Status filter = parseStatus(status);
-          return details
+          query.validate();
+          GlossaryTerm.Status filter = parseStatus(query.status);
+          return Boolean.parseBoolean(query.details)
               ? Utils.ok(
-                  new TermListResponse(views.listTerms(metalake, domain, nameContains, filter)))
+                  new TermListResponse(
+                      views.listTerms(metalake, query.domain, query.nameContains, filter)))
               : Utils.ok(
                   new NameListResponse(
-                      views.listTermNames(metalake, domain, nameContains, filter)));
+                      views.listTermNames(metalake, query.domain, query.nameContains, filter)));
         });
   }
 
-  /** Reads a visible glossary definition. */
+  /**
+   * Reads a term by name, including its visible direct relations.
+   *
+   * @param metalake Required metalake name.
+   * @param term Required term name. Encode an embedded slash as {@code %2F}.
+   * @param status Optional case-insensitive DRAFT, APPROVED or DEPRECATED filter. Omit to read any
+   *     visible status. A root outside the filter returns 404.
+   * @return The matching term snapshot.
+   */
   @GET
   @Path("{term}")
   @Timed(name = "get-term." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
@@ -119,7 +130,7 @@ public class TermOperations {
   public Response getTerm(
       @PathParam("metalake") @AuthorizationMetadata(type = EntityType.METALAKE) String metalake,
       @PathParam("term") String term,
-      @QueryParam("status") String status) {
+      @QueryParam("status") @Nullable String status) {
     return execute(
         OperationType.GET,
         metalake,
@@ -127,7 +138,15 @@ public class TermOperations {
         () -> Utils.ok(new TermResponse(views.getTerm(metalake, term, parseStatus(status)))));
   }
 
-  /** Creates the definition and its initial relationships atomically. */
+  /**
+   * Creates a term and its initial relationships atomically.
+   *
+   * @param metalake Required metalake name.
+   * @param request Required JSON body. Only {@code name} is required, for example {@code
+   *     {"name":"Revenue"}}. Status defaults to APPROVED. DRAFT and DEPRECATED are also accepted.
+   *     Omitted synonyms, domains, relations, links and properties start empty.
+   * @return The created term and its revision token.
+   */
   @POST
   @Consumes("application/json")
   @Timed(name = "create-term." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
@@ -146,7 +165,16 @@ public class TermOperations {
         });
   }
 
-  /** Applies a batch of term edits, optionally checking the caller's revision token. */
+  /**
+   * Applies the requested edits in order as one transaction.
+   *
+   * @param metalake Required metalake name.
+   * @param term Required current term name.
+   * @param request Required body with a nonempty {@code updates} array. To guard against concurrent
+   *     changes, copy the last read's {@code revisionToken} into {@code expectedRevision}. Omit
+   *     that field for an unconditional update. A stale token returns 409.
+   * @return The resulting term snapshot.
+   */
   @PUT
   @Path("{term}")
   @Consumes("application/json")
@@ -170,7 +198,13 @@ public class TermOperations {
         });
   }
 
-  /** Drops a visible term and returns whether it existed. */
+  /**
+   * Drops a term by name.
+   *
+   * @param metalake Required metalake name.
+   * @param term Required term name.
+   * @return A drop response with {@code dropped=false} for a missing or hidden term.
+   */
   @DELETE
   @Path("{term}")
   @Timed(name = "delete-term." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
@@ -186,7 +220,17 @@ public class TermOperations {
         () -> Utils.ok(new DropResponse(views.dropTerm(metalake, term))));
   }
 
-  /** Walks the visible hierarchy transitively in the requested direction. */
+  /**
+   * Walks the hierarchy from a named root.
+   *
+   * @param metalake Required metalake name.
+   * @param term Required root term name.
+   * @param direction Optional traversal direction. NARROWER (default) returns descendants; BROADER
+   *     returns ancestors.
+   * @param status Optional case-insensitive DRAFT, APPROVED or DEPRECATED filter. Omit to traverse
+   *     all visible statuses. A filtered root returns 404. Traversal stops at each filtered node.
+   * @return Each reachable visible term once, excluding the root.
+   */
   @GET
   @Path("{term}/hierarchy")
   @Timed(name = "get-term-hierarchy." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
@@ -196,7 +240,7 @@ public class TermOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = EntityType.METALAKE) String metalake,
       @PathParam("term") String term,
       @QueryParam("direction") @DefaultValue("NARROWER") String direction,
-      @QueryParam("status") String status) {
+      @QueryParam("status") @Nullable String status) {
     return execute(
         OperationType.LIST,
         metalake,
@@ -207,6 +251,50 @@ public class TermOperations {
               new TermTreeResponse(
                   views.getTermHierarchy(metalake, term, walk, parseStatus(status))));
         });
+  }
+
+  /** Optional query parameters for browsing glossary terms. Combine filters to narrow the list. */
+  public static class ListTermsQuery {
+    /** Return full definitions with true, or names only with false (default). */
+    @QueryParam("details")
+    @DefaultValue("false")
+    private String details;
+
+    /** Restrict results to this domain and its visible subdomains. Omit to include every domain. */
+    @QueryParam("domain")
+    @Nullable
+    private String domain;
+
+    /**
+     * Filter by DRAFT, APPROVED or DEPRECATED, ignoring case. Omit to include every visible status.
+     */
+    @QueryParam("status")
+    @Nullable
+    private String status;
+
+    /** Case-insensitive substring of the term name. Omit to include every name. */
+    @QueryParam("nameContains")
+    @Nullable
+    private String nameContains;
+
+    // Reserved lookup parameters. Reject them until term matching and binding expansion are
+    // available.
+    @QueryParam("match")
+    @Nullable
+    private String match;
+
+    @QueryParam("bindings")
+    @Nullable
+    private String bindings;
+
+    private void validate() {
+      Preconditions.checkArgument(
+          "true".equalsIgnoreCase(details) || "false".equalsIgnoreCase(details),
+          "Invalid details value '%s', expected true or false",
+          details);
+      Preconditions.checkArgument(
+          match == null && bindings == null, "Term lookup and binding expansion are not supported");
+    }
   }
 
   @Nullable
