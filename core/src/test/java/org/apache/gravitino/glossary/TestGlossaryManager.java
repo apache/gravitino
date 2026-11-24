@@ -342,6 +342,7 @@ class TestGlossaryManager extends TestJDBCBackend {
             child.revisionToken(),
             TermChange.addBroader("parent"),
             TermChange.removeBroader("parent"),
+            TermChange.removeBroader("parent"),
             TermChange.updateDefinition("still points to original"));
     Assertions.assertThrows(
         NoSuchTermException.class,
@@ -353,6 +354,7 @@ class TestGlossaryManager extends TestJDBCBackend {
             "child",
             addThenRemove.revisionToken(),
             TermChange.removeBroader("parent"),
+            TermChange.removeRelated("peer"),
             TermChange.removeRelated("peer"));
     gated.publishCandidate(LAKE, child.id(), repaired.publication().versionId());
     Assertions.assertTrue(

@@ -708,16 +708,16 @@ public final class GlossaryManager {
         new TermRelations(lake, term.id(), head.getPublishedVersion() == null);
     relations.replace(previous.broader(), previous.related());
     List<TermDomains.Edit> domainEdits = new ArrayList<>();
-    Map<RelationType, Map<String, Long>> addedReferences = new EnumMap<>(RelationType.class);
+    Map<RelationType, Map<String, Long>> resolvedReferences = new EnumMap<>(RelationType.class);
     State state = State.SUBMITTED;
     for (TermChange change : changes) {
       TermRelations.Edit edge = TermRelations.Edit.from(change);
       TermDomains.Edit domain = TermDomains.Edit.from(change);
       if (edge != null) {
-        Map<String, Long> added =
-            addedReferences.computeIfAbsent(edge.type(), ignored -> new HashMap<>());
+        Map<String, Long> resolved =
+            resolvedReferences.computeIfAbsent(edge.type(), ignored -> new HashMap<>());
         String targetKey = GlossaryTermNames.key(edge.target());
-        Long removedId = added.remove(targetKey);
+        Long removedId = resolved.get(targetKey);
         if (!edge.add() && removedId == null) {
           removedId =
               findSnapshotReference(
@@ -731,6 +731,7 @@ public final class GlossaryManager {
             if (!access.canRead(target) || !readable.test(target))
               throw new NoSuchTermException("Referenced term does not exist");
           }
+          resolved.put(targetKey, removedId);
           relations.edit(edge, removedId);
         } else {
           GlossaryTermEntity endpoint =
@@ -738,7 +739,7 @@ public final class GlossaryManager {
           if (!access.canRead(endpoint) || !readable.test(endpoint))
             throw new NoSuchTermException("Referenced term does not exist");
           relations.edit(edge, endpoint.id());
-          if (edge.add()) added.put(targetKey, endpoint.id());
+          resolved.put(targetKey, endpoint.id());
         }
       } else if (domain != null) {
         domainEdits.add(domain);
