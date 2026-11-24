@@ -63,7 +63,13 @@ public interface GlossaryTerm extends Auditable {
     /** The term is replaced. It stays readable, but lookups for agents leave it out. */
     DEPRECATED;
 
-    /** Parses a case-insensitive term status supplied by a caller. */
+    /**
+     * Parses a term status by name, ignoring case.
+     *
+     * @param value The status name to parse.
+     * @return The matching term status.
+     * @throws IllegalArgumentException If the value does not match a status name.
+     */
     public static Status fromString(String value) {
       for (Status status : values()) {
         if (status.name().equalsIgnoreCase(value)) {
