@@ -486,9 +486,9 @@ public class PaimonCatalogOperations
       LOG.warn("Paimon table {} does not exist.", identifier);
       return false;
     } catch (RuntimeException e) {
-      // Since Paimon 2.0, the Hive catalog fails with a RuntimeException instead of
-      // TableNotExistException when the table's database no longer exists
-      // (https://github.com/apache/paimon/issues/11408).
+      // TODO: Remove after upgrading to a Paimon release that fixes apache/paimon#11408.
+      // Since Paimon 2.0, the Hive catalog throws a RuntimeException instead of
+      // TableNotExistException when the table's database no longer exists.
       if (!databaseExists(tableIdentifier.namespace().level(0), e)) {
         LOG.warn("Paimon table {} does not exist because its schema does not exist.", identifier);
         return false;
