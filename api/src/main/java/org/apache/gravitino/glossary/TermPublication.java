@@ -47,7 +47,15 @@ public final class TermPublication {
   @Nullable private final Long publishedVersionId;
   @Nullable private final Long candidateVersionId;
 
-  /** Identifies the returned snapshot and the current published and candidate pointers. */
+  /**
+   * Describes one version and the current publication state of its term.
+   *
+   * @param termId stable term ID shared by all its versions
+   * @param versionId positive version number of the returned snapshot
+   * @param state lifecycle state of the returned version
+   * @param publishedVersionId current published version, or null before first publication
+   * @param candidateVersionId current candidate version, or null if no candidate is visible
+   */
   public TermPublication(
       long termId,
       long versionId,
@@ -62,24 +70,39 @@ public final class TermPublication {
     this.publishedVersionId = publishedVersionId;
     this.candidateVersionId = candidateVersionId;
   }
-  /** Stable identity retained across renames and publication. */
+
+  /**
+   * @return the stable term ID retained across renames and publication
+   */
   public long termId() {
     return termId;
   }
-  /** Immutable business version of the returned content. */
+
+  /**
+   * @return the version number of the returned snapshot
+   */
   public long versionId() {
     return versionId;
   }
-  /** Actual outcome of this version. */
+
+  /**
+   * @return the lifecycle state of the returned version
+   */
   public State state() {
     return state;
   }
-  /** Current published version, absent before first publication. */
+
+  /**
+   * @return the current published version, or null before first publication
+   */
   @Nullable
   public Long publishedVersionId() {
     return publishedVersionId;
   }
-  /** Current candidate, absent when there is no outstanding proposal. */
+
+  /**
+   * @return the current candidate version, or null if no candidate is visible
+   */
   @Nullable
   public Long candidateVersionId() {
     return candidateVersionId;
