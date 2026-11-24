@@ -27,17 +27,33 @@ import org.apache.gravitino.annotation.Evolving;
 @Evolving
 public interface SemanticModelRevision extends Auditable {
 
-  /** Returns the revision number, starting at one. */
+  /**
+   * Returns the revision number.
+   *
+   * @return The revision number, starting at one.
+   */
   int revision();
 
-  /** Returns the revision's publication status. */
+  /**
+   * Returns the revision's publication status.
+   *
+   * @return The publication status.
+   */
   SemanticModel.Status status();
 
-  /** Returns the publishing principal, or null for a draft. */
+  /**
+   * Returns the publishing principal.
+   *
+   * @return The publishing principal, or {@code null} for a draft.
+   */
   @Nullable
   String publishedBy();
 
-  /** Returns the publication time, or null for a draft. */
+  /**
+   * Returns the publication time.
+   *
+   * @return The publication time, or {@code null} for a draft.
+   */
   @Nullable
   Instant publishedAt();
 }

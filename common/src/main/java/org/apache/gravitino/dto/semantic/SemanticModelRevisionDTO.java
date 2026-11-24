@@ -78,7 +78,12 @@ public final class SemanticModelRevisionDTO implements SemanticModelRevision {
     this.audit = audit;
   }
 
-  /** Creates a wire summary from revision metadata. */
+  /**
+   * Creates a wire summary from revision metadata.
+   *
+   * @param revision The retained revision to convert.
+   * @return The corresponding revision summary.
+   */
   public static SemanticModelRevisionDTO fromRevision(SemanticModelRevision revision) {
     return new SemanticModelRevisionDTO(
         revision.revision(),

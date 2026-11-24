@@ -241,7 +241,12 @@ public class SemanticModelDTO implements SemanticModel {
       return this;
     }
 
-    /** Sets the revision and its publication metadata. */
+    /**
+     * Sets the revision and its publication metadata.
+     *
+     * @param revisionInfo The Semantic Model revision metadata.
+     * @return This builder.
+     */
     public Builder withRevision(SemanticModelRevision revisionInfo) {
       this.revisionInfo = revisionInfo;
       return this;
