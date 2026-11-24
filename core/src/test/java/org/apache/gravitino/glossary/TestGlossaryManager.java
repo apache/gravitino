@@ -271,6 +271,54 @@ class TestGlossaryManager extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testCandidateConflictsDoNotSupersedeSavedDraft() throws IOException {
+    createAndInsertMakeLake(LAKE);
+    manager.createTerm(LAKE, TermSpec.builder("taken").withSourceRef("crm:1").build());
+    GlossaryTermEntity live =
+        manager.createTerm(
+            LAKE, TermSpec.builder("editable").withStatus(GlossaryTerm.Status.DRAFT).build());
+    GlossaryManager gated = approvalManager();
+    GlossaryTermEntity draft =
+        gated.alterTerm(LAKE, "editable", TermChange.setStatus(GlossaryTerm.Status.DRAFT));
+    Assertions.assertEquals(
+        gated
+            .getTermVersion(LAKE, live.id(), draft.publication().versionId())
+            .term()
+            .revisionToken(),
+        draft.revisionToken());
+    Assertions.assertThrows(
+        TermAlreadyExistsException.class,
+        () -> gated.alterTerm(LAKE, "editable", TermChange.rename("TAKEN")));
+    Assertions.assertThrows(
+        TermAlreadyExistsException.class,
+        () -> gated.alterTerm(LAKE, "editable", TermChange.setSourceRef("crm:1")));
+    Assertions.assertThrows(
+        TermAlreadyExistsException.class,
+        () -> gated.createTerm(LAKE, TermSpec.builder("other").withSourceRef("crm:1").build()));
+    Assertions.assertEquals(
+        "new",
+        gated
+            .alterTerm(LAKE, "editable", draft.revisionToken(), TermChange.updateDefinition("new"))
+            .definition());
+  }
+
+  @TestTemplate
+  void testHiddenRenamedEndpointIsNotDisclosedByCandidateRemoval() throws IOException {
+    createAndInsertMakeLake(LAKE);
+    GlossaryManager gated = approvalManager();
+    manager.createTerm(LAKE, TermSpec.builder("parent").build());
+    gated.createTerm(LAKE, TermSpec.builder("child").withBroader("parent").build());
+    manager.alterTerm(LAKE, "parent", TermChange.rename("private-name"));
+    GlossaryManager restricted =
+        gated.withTermVisibility(term -> !term.name().equals("private-name"));
+    NoSuchTermException missing =
+        Assertions.assertThrows(
+            NoSuchTermException.class,
+            () -> restricted.alterTerm(LAKE, "child", TermChange.removeBroader("parent")));
+    Assertions.assertFalse(missing.getMessage().contains("private-name"));
+  }
+
+  @TestTemplate
   void testRemoveDeletedAndRecreatedCandidateReferences() throws IOException {
     createAndInsertMakeLake(LAKE);
     GlossaryManager gated = approvalManager();
@@ -280,15 +328,30 @@ class TestGlossaryManager extends TestJDBCBackend {
         gated.createTerm(
             LAKE, TermSpec.builder("child").withBroader("parent").withRelated("peer").build());
     manager.dropTerm(LAKE, "parent");
-    manager.dropTerm(LAKE, "peer");
     manager.createTerm(LAKE, TermSpec.builder("parent").build());
     Assertions.assertThrows(
         NoSuchTermException.class, () -> gated.publishCandidate(LAKE, child.id(), 1));
-    GlossaryTermEntity repaired =
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            gated.alterTerm(LAKE, "child", child.revisionToken(), TermChange.addBroader("parent")));
+    GlossaryTermEntity addThenRemove =
         gated.alterTerm(
             LAKE,
             "child",
             child.revisionToken(),
+            TermChange.addBroader("parent"),
+            TermChange.removeBroader("parent"),
+            TermChange.updateDefinition("still points to original"));
+    Assertions.assertThrows(
+        NoSuchTermException.class,
+        () -> gated.publishCandidate(LAKE, child.id(), addThenRemove.publication().versionId()));
+    manager.dropTerm(LAKE, "peer");
+    GlossaryTermEntity repaired =
+        gated.alterTerm(
+            LAKE,
+            "child",
+            addThenRemove.revisionToken(),
             TermChange.removeBroader("parent"),
             TermChange.removeRelated("peer"));
     gated.publishCandidate(LAKE, child.id(), repaired.publication().versionId());

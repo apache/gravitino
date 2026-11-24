@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -344,15 +345,7 @@ public final class GlossaryManager {
                 TermDomains domains = planDomains(lake, term, domainEdits, access);
                 GlossaryTermEntity created =
                     domains.changed() ? TermEdits.withDomains(term, domains.names()) : term;
-                terms.checkTermNames(created);
-                // The hierarchy lock fences concurrent creates, renames and deletes. Reject a
-                // duplicate without waiting on its term row while holding requested domain locks.
-                if (!terms
-                    .getIdsByKeys(lake, Set.of(GlossaryTermNames.key(created.name())))
-                    .isEmpty()) {
-                  throw new TermAlreadyExistsException(
-                      "Term name or source reference already exists");
-                }
+                terms.validateTermNameSynonymsAndSourceRef(created);
                 checkTermNameReservation(lake, created);
                 State state =
                     resolvePublicationState(
@@ -715,23 +708,28 @@ public final class GlossaryManager {
         new TermRelations(lake, term.id(), head.getPublishedVersion() == null);
     relations.replace(previous.broader(), previous.related());
     List<TermDomains.Edit> domainEdits = new ArrayList<>();
+    Map<RelationType, Map<String, Long>> addedReferences = new EnumMap<>(RelationType.class);
     State state = State.SUBMITTED;
     for (TermChange change : changes) {
       TermRelations.Edit edge = TermRelations.Edit.from(change);
       TermDomains.Edit domain = TermDomains.Edit.from(change);
       if (edge != null) {
-        Long removedId =
-            edge.add()
-                ? null
-                : findSnapshotReference(
-                    previous.referenceNames(),
-                    edge.type() == RelationType.BROADER ? relations.broader() : relations.related(),
-                    edge.target());
-        if (removedId != null) {
+        Map<String, Long> added =
+            addedReferences.computeIfAbsent(edge.type(), ignored -> new HashMap<>());
+        String targetKey = GlossaryTermNames.key(edge.target());
+        Long removedId = added.remove(targetKey);
+        if (!edge.add() && removedId == null) {
+          removedId =
+              findSnapshotReference(
+                  previous.referenceNames(),
+                  edge.type() == RelationType.BROADER ? relations.broader() : relations.related(),
+                  edge.target());
+        }
+        if (!edge.add() && removedId != null) {
           for (GlossaryTermEntity target :
               terms.getByIds(term.namespace(), lake, Set.of(removedId))) {
             if (!access.canRead(target) || !readable.test(target))
-              throw missingRelationRoot(target.nameIdentifier());
+              throw new NoSuchTermException("Referenced term does not exist");
           }
           relations.edit(edge, removedId);
         } else {
@@ -740,6 +738,7 @@ public final class GlossaryManager {
           if (!access.canRead(endpoint) || !readable.test(endpoint))
             throw new NoSuchTermException("Referenced term does not exist");
           relations.edit(edge, endpoint.id());
+          if (edge.add()) added.put(targetKey, endpoint.id());
         }
       } else if (domain != null) {
         domainEdits.add(domain);
@@ -764,12 +763,9 @@ public final class GlossaryManager {
       edited =
           TermEdits.copyWithStatus(edited, domains.names(), null, GlossaryTerm.Status.APPROVED);
     }
-    terms.checkTermNames(edited);
+    terms.validateTermNameSynonymsAndSourceRef(edited);
     checkTermNameReservation(lake, edited);
     String key = GlossaryTermNames.key(edited.name());
-    Long existingId = terms.getIdsByKeys(lake, Set.of(key)).get(key);
-    if (existingId != null && !existingId.equals(term.id()))
-      throw new TermAlreadyExistsException("Term name already exists");
     if (edited == term && state == publication.state())
       return visibleDomains(
           TermEdits.toPublicationView(term, domains.names(), publication), access);
@@ -926,8 +922,8 @@ public final class GlossaryManager {
       return TermEdits.toPublicationView(
           after, after.domains(), GlossaryTermVersions.toPublicationResult(head, row));
     }
-    if (TermEdits.needsHierarchyLock(request)) {
-      terms.checkTermNames(after);
+    if (approval || TermEdits.needsHierarchyLock(request)) {
+      terms.validateTermNameSynonymsAndSourceRef(after);
       checkTermNameReservation(lake, after);
     }
     loadOrCreateVersionHead(lake, before);
@@ -955,7 +951,7 @@ public final class GlossaryManager {
           });
     TermPublication result =
         GlossaryTermVersions.recordTermVersion(lake, snapshot, before.version(), state, null);
-    return TermEdits.toPublicationView(after, after.domains(), result);
+    return TermEdits.toPublicationView(snapshot.term(ident.namespace()), after.domains(), result);
   }
 
   private static State resolvePublicationState(
@@ -1215,7 +1211,7 @@ public final class GlossaryManager {
     }
     GlossaryTermEntity resolvedAfter = TermEdits.withDomains(after, domains.names());
     checkTermNameReservation(lake, resolvedAfter);
-    terms.checkTermNames(resolvedAfter);
+    terms.validateTermNameSynonymsAndSourceRef(resolvedAfter);
     GlossaryTermEntity finalBefore = before;
     handler.handle(
         finalBefore,
@@ -1410,7 +1406,7 @@ public final class GlossaryManager {
               requireVisibleDomain(name, domain, access);
               targets.put(name, domain);
             });
-    Map<Long, String> current = new HashMap<>();
+    Map<Long, String> current = new HashMap<>(previousDomains);
     for (long id : previousDomains.keySet()) {
       DomainPO row = locked.get(id);
       if (row != null) {
@@ -1424,8 +1420,15 @@ public final class GlossaryManager {
       Long originalId = snapshotIdsByName.get(edit.domain());
       DomainPO target = originalId == null ? targets.get(edit.domain()) : locked.get(originalId);
       if (target != null) {
-        requireVisibleDomain(target.domainName(), target, access);
+        requireAccessToResolvedDomain(edit.domain(), target, access);
         plan.edit(edit, target.domainId(), target.domainName());
+      } else if (!edit.add() && originalId != null) {
+        plan.edit(edit, originalId, edit.domain());
+      }
+    }
+    for (long id : plan.ids()) {
+      if (!locked.containsKey(id)) {
+        throw new NoSuchDomainException("Domain %s does not exist", current.get(id));
       }
     }
     return plan;
@@ -1456,11 +1459,16 @@ public final class GlossaryManager {
     if (domain == null || !name.equals(domain.domainName())) {
       throw new NoSuchDomainException("Domain %s does not exist", name);
     }
-    if (!access.canUseDomain(name)) {
+    requireAccessToResolvedDomain(name, domain, access);
+  }
+
+  private static void requireAccessToResolvedDomain(
+      String requestedName, DomainPO domain, GlossaryAccess access) {
+    if (!access.canUseDomain(domain.domainName())) {
       if (Domain.Status.DRAFT.name().equals(domain.status())) {
-        throw new NoSuchDomainException("Domain %s does not exist", name);
+        throw new NoSuchDomainException("Domain %s does not exist", requestedName);
       }
-      throw new ForbiddenException("Cannot use domain %s", name);
+      throw new ForbiddenException("Cannot use domain %s", requestedName);
     }
   }
 

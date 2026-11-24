@@ -33,6 +33,7 @@ import org.apache.gravitino.glossary.TermPublication;
 import org.apache.gravitino.glossary.TermPublication.State;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.GlossaryTermEntity;
+import org.apache.gravitino.meta.GlossaryTermNames;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermVersionMapper.Head;
@@ -76,6 +77,16 @@ public final class GlossaryTermVersions {
           GlossaryTermMetaService.getInstance()
               .getByIds(term.namespace(), definition.getMetalakeId(), ids)) {
         names.put(endpoint.id(), endpoint.name());
+      }
+      for (Set<Long> members : List.of(broader, related)) {
+        Set<String> distinctNames = new HashSet<>();
+        for (long id : members) {
+          String name = names.get(id);
+          if (name != null && !distinctNames.add(GlossaryTermNames.key(name))) {
+            throw new IllegalArgumentException(
+                "Remove the retired relationship before adding its same-name replacement");
+          }
+        }
       }
       return new Snapshot(
           definition, synonyms, domains, broader, related, originalRelated, names, creatorId);

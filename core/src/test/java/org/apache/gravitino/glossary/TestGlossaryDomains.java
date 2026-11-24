@@ -708,6 +708,13 @@ class TestGlossaryDomains extends TestJDBCBackend {
     assertThrows(
         NoSuchDomainException.class,
         () -> as("lakeOwner", () -> gated.publishCandidate(LAKE, deletedDomainCandidate.id(), 1)));
+    assertThrows(
+        NoSuchDomainException.class,
+        () ->
+            as(
+                "lakeOwner",
+                () ->
+                    gated.alterTerm(LAKE, "DeletedDomDraft", TermChange.updateDefinition("new"))));
     GlossaryTermEntity cleaned =
         as(
             "lakeOwner",

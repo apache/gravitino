@@ -42,6 +42,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.TermAlreadyExistsException;
 import org.apache.gravitino.glossary.GlossaryTerm.Status;
 import org.apache.gravitino.glossary.TermLink;
 import org.apache.gravitino.json.JsonUtils;
@@ -350,13 +351,19 @@ public final class GlossaryTermMetaService {
     return transaction(ns, true, missingParent, (mapper, lake) -> operation.apply(lake));
   }
 
-  /** Checks indexed name/synonym conflicts inside the caller's hierarchy transaction. */
-  public void checkTermNames(GlossaryTermEntity term) {
+  /** Checks for conflicting live names, synonyms and external source references. */
+  public void validateTermNameSynonymsAndSourceRef(GlossaryTermEntity term) {
     String name = GlossaryTermNames.key(term.name());
     long metalakeId = metalake(term.namespace()).getMetalakeId();
     SessionUtils.doWithoutCommit(
         GlossaryTermMetaMapper.class,
         mapper -> {
+          if (mapper.conflictingName(metalakeId, term.id(), List.of(name)) != null
+              || (term.sourceRef() != null
+                  && mapper.findOtherTermIdBySourceRef(metalakeId, term.id(), term.sourceRef())
+                      != null)) {
+            throw new TermAlreadyExistsException("Term name or source reference already exists");
+          }
           Preconditions.checkArgument(
               mapper.conflictingSynonym(metalakeId, term.id(), name) == null,
               "Term name conflicts with a synonym");
