@@ -42,9 +42,6 @@ import org.apache.gravitino.listener.api.event.ListTagsInfoForMetadataObjectFail
 import org.apache.gravitino.listener.api.event.ListTagsInfoForMetadataObjectPreEvent;
 import org.apache.gravitino.listener.api.event.RemovePolicyFromTagEvent;
 import org.apache.gravitino.listener.api.event.RemovePolicyFromTagPreEvent;
-import org.apache.gravitino.listener.api.event.policy.ListPolicyInfosForMetadataObjectEvent;
-import org.apache.gravitino.listener.api.event.policy.ListPolicyInfosForMetadataObjectFailureEvent;
-import org.apache.gravitino.listener.api.event.policy.ListPolicyInfosForMetadataObjectPreEvent;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.AllValuesSelector;
@@ -58,35 +55,6 @@ public class TestPolicyTagDispatcherChain {
   private static final String METALAKE = "metalake";
   private static final String TAG = "tag";
   private static final String POLICY = "policy";
-
-  @Test
-  void testDisplayPoliciesPreserveDispatcherEvents() {
-    PolicyDispatcher delegate = mock(PolicyDispatcher.class);
-    DummyEventListener listener = new DummyEventListener();
-    PolicyDispatcher dispatcher =
-        new PolicyHookDispatcher(
-            new PolicyEventDispatcher(new EventBus(Collections.singletonList(listener)), delegate));
-    MetadataObject object = MetadataObjects.parse("catalog.schema", MetadataObject.Type.SCHEMA);
-    List<MetadataObject> objects = List.of(object);
-    Map<MetadataObject, PolicyEntity[]> expected =
-        Collections.singletonMap(object, new PolicyEntity[0]);
-    when(delegate.listPolicyInfosForDisplay(METALAKE, objects)).thenReturn(expected);
-
-    Assertions.assertSame(expected, dispatcher.listPolicyInfosForDisplay(METALAKE, objects));
-    Assertions.assertInstanceOf(
-        ListPolicyInfosForMetadataObjectPreEvent.class, listener.getPreEvents().get(0));
-    Assertions.assertInstanceOf(
-        ListPolicyInfosForMetadataObjectEvent.class, listener.getPostEvents().get(0));
-    RuntimeException failure = new RuntimeException("store unavailable");
-    when(delegate.listPolicyInfosForDisplay(METALAKE, objects)).thenThrow(failure);
-    Assertions.assertSame(
-        failure,
-        Assertions.assertThrows(
-            RuntimeException.class, () -> dispatcher.listPolicyInfosForDisplay(METALAKE, objects)));
-    Assertions.assertInstanceOf(
-        ListPolicyInfosForMetadataObjectFailureEvent.class, listener.getPostEvents().get(1));
-    verify(delegate, times(2)).listPolicyInfosForDisplay(METALAKE, objects);
-  }
 
   @Test
   void testDisplayTagsPreserveDispatcherEvents() {

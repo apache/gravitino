@@ -112,28 +112,8 @@ public class ObjectPolicyResolver {
     if (metadataObjects.isEmpty()) {
       return new LinkedHashMap<>();
     }
-    return resolve(metalake, effectiveTagResolver.resolveWithSources(metalake, metadataObjects));
-  }
-
-  /**
-   * Resolves policies for display using only stored metadata.
-   *
-   * <p>Unregistered objects can inherit policies through registered ancestors. External metadata is
-   * neither validated nor imported. Enforcement callers must use {@link #resolve(String, List)}
-   * instead.
-   *
-   * @param metalake the metalake name
-   * @param metadataObjects the objects to resolve
-   * @return policies keyed by requested object
-   */
-  public Map<MetadataObject, PolicyEntity[]> resolveForDisplay(
-      String metalake, List<MetadataObject> metadataObjects) {
-    return resolve(
-        metalake, effectiveTagResolver.resolveWithSourcesForDisplay(metalake, metadataObjects));
-  }
-
-  private Map<MetadataObject, PolicyEntity[]> resolve(
-      String metalake, Map<MetadataObject, ResolvedTag[]> tagsByObject) {
+    Map<MetadataObject, ResolvedTag[]> tagsByObject =
+        effectiveTagResolver.resolveWithSources(metalake, metadataObjects);
     Map<String, NameIdentifier> tagIdentifiers = new LinkedHashMap<>();
     tagsByObject
         .values()
@@ -148,7 +128,7 @@ public class ObjectPolicyResolver {
     List<RelationalEntity<?>> relations =
         tagIdentifiers.isEmpty()
             ? Collections.emptyList()
-            : loadRelations(new ArrayList<>(tagIdentifiers.values()), tagsByObject.keySet());
+            : loadRelations(new ArrayList<>(tagIdentifiers.values()), metadataObjects);
     Map<String, List<Integer>> relationPositionsByTag = new LinkedHashMap<>();
     for (int i = 0; i < relations.size(); i++) {
       relationPositionsByTag

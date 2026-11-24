@@ -181,20 +181,4 @@ public interface PolicyDispatcher {
         object -> result.put(object, listPolicyInfosForMetadataObject(metalake, object)));
     return result;
   }
-
-  /**
-   * Lists effective policies for display using only stored metadata.
-   *
-   * <p>Unregistered objects have no direct assignments but can inherit from registered ancestors.
-   * External metadata is neither validated nor imported. This method must not be used for policy
-   * enforcement.
-   *
-   * @param metalake the metalake name
-   * @param metadataObjects the objects to resolve
-   * @return effective policies keyed by requested object
-   */
-  default Map<MetadataObject, PolicyEntity[]> listPolicyInfosForDisplay(
-      String metalake, List<MetadataObject> metadataObjects) {
-    return listPolicyInfosForMetadataObjects(metalake, metadataObjects);
-  }
 }

@@ -234,9 +234,6 @@ paths:
   /bulk/metalakes/{metalake}/objects/tags:
     $ref: "./bulk.yaml#/paths/~1bulk~1metalakes~1%7Bmetalake%7D~1objects~1tags"
 
-  /bulk/metalakes/{metalake}/objects/policies:
-    $ref: "./bulk.yaml#/paths/~1bulk~1metalakes~1%7Bmetalake%7D~1objects~1policies"
-
   /bulk/metalakes/{metalake}/users/add:
     $ref: "./bulk.yaml#/paths/~1bulk~1metalakes~1%7Bmetalake%7D~1users~1add"
 

@@ -303,16 +303,6 @@ public class PolicyManager implements PolicyDispatcher {
     return objectPolicyResolver.resolve(metalake, metadataObjects);
   }
 
-  @Override
-  public Map<MetadataObject, PolicyEntity[]> listPolicyInfosForDisplay(
-      String metalake, List<MetadataObject> metadataObjects) {
-    if (metadataObjects.isEmpty()) {
-      return new LinkedHashMap<>();
-    }
-    checkMetalake(NameIdentifier.of(metalake), entityStore);
-    return objectPolicyResolver.resolveForDisplay(metalake, metadataObjects);
-  }
-
   private PolicyEntity loadPolicyEntity(String metalake, String policyName) {
     try {
       return entityStore.get(

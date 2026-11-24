@@ -18,13 +18,13 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { LockOutlined, PlusOutlined } from '@ant-design/icons'
-import { Button, Flex, Select, Space, Spin, Tag, Tooltip, theme } from 'antd'
+import { Flex, Select, Space, Tag, Tooltip, theme } from 'antd'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import { addPolicyForTag, getPoliciesForTag, removePolicyFromTag } from '@/lib/store/policies'
 import { getCurrentEntityPolicies } from '@/lib/store/metalakes'
 import { useSearchParams } from 'next/navigation'
-import { useMetadataObjectList } from './MetadataObjectListsProvider'
 
 const tagInputStyle = {
   width: 100,
@@ -41,12 +41,10 @@ export default function PolicyTag({ ...props }) {
   const [optionList, setOptionList] = useState([])
   const containerRef = useRef(null)
   const inputRef = useRef(null)
+  const router = useRouter()
   const store = useAppSelector(state => state.policies)
   const dispatch = useAppDispatch()
-  const [loadedPolicies, setPoliciesForObject] = useState([])
-  const list = useMetadataObjectList('policies', isTag ? undefined : metadataObjectType, metadataObjectFullName)
-  const bulk = list !== null
-  const policiesForObject = list?.data?.policies || loadedPolicies
+  const [policiesForObject, setPoliciesForObject] = useState([])
   const searchParams = useSearchParams()
   const currentMetalake = searchParams.get('metalake')
 
@@ -69,7 +67,7 @@ export default function PolicyTag({ ...props }) {
       const policies = await getPolicies()
       if (policies) setPoliciesForObject(policies)
     }
-    if (!bulk && currentMetalake && metadataObjectType && metadataObjectFullName) {
+    if (currentMetalake && metadataObjectType && metadataObjectFullName) {
       if (!isTag || typeof IntersectionObserver === 'undefined') {
         initLoad()
       } else {
@@ -84,7 +82,7 @@ export default function PolicyTag({ ...props }) {
         return () => observer.disconnect()
       }
     }
-  }, [bulk, currentMetalake, metadataObjectType, metadataObjectFullName, isTag])
+  }, [currentMetalake, metadataObjectType, metadataObjectFullName, isTag])
 
   useEffect(() => {
     if (inputVisible) {
@@ -151,23 +149,14 @@ export default function PolicyTag({ ...props }) {
     setInputVisible(false)
   }
 
+  const handleClick = name => () => {
+    router.push(`/metadataObjectsForPolicy?policy=${name}&metalake=${currentMetalake}`)
+  }
+
   const tagPlusStyle = {
     height: 22,
     background: token.colorBgContainer,
     borderStyle: 'dashed'
-  }
-
-  if (bulk && !list.data) {
-    return list.error ? (
-      <span>
-        Unable to load policies.{' '}
-        <Button type='link' size='small' onClick={list.retry}>
-          Retry
-        </Button>
-      </span>
-    ) : (
-      <Spin size='small' aria-label='Loading policies' />
-    )
   }
 
   return (
@@ -182,6 +171,8 @@ export default function PolicyTag({ ...props }) {
             color={color}
             closable={isTag && !readOnly && !policy.inherited}
             icon={policy.inherited ? <LockOutlined /> : null}
+            onClick={handleClick(policy.name)}
+            className='cursor-pointer'
             style={{ userSelect: 'none' }}
             onClose={event => handleClose(policy.name, event)}
           >

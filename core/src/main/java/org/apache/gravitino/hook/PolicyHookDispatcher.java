@@ -131,10 +131,4 @@ public class PolicyHookDispatcher implements PolicyDispatcher {
       String metalake, List<MetadataObject> metadataObjects) {
     return dispatcher.listPolicyInfosForMetadataObjects(metalake, metadataObjects);
   }
-
-  @Override
-  public Map<MetadataObject, PolicyEntity[]> listPolicyInfosForDisplay(
-      String metalake, List<MetadataObject> metadataObjects) {
-    return dispatcher.listPolicyInfosForDisplay(metalake, metadataObjects);
-  }
 }

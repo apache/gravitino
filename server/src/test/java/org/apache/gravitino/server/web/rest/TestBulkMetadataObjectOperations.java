@@ -56,7 +56,6 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.dto.requests.BulkMetadataObjectsRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
-import org.apache.gravitino.dto.responses.BulkMetadataObjectPolicyListResponse;
 import org.apache.gravitino.dto.responses.BulkMetadataObjectTagListResponse;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
@@ -64,11 +63,7 @@ import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
-import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
-import org.apache.gravitino.policy.Policy;
-import org.apache.gravitino.policy.PolicyContents;
-import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
@@ -82,14 +77,11 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 
 public class TestBulkMetadataObjectOperations extends BaseOperationsTest {
   private static final TagDispatcher TAGS = mock(TagDispatcher.class);
-  private static final PolicyDispatcher POLICIES = mock(PolicyDispatcher.class);
-  private static final String PATH = "/bulk/metalakes/demo/objects/";
+  private static final String PATH = "/bulk/metalakes/demo/objects/tags";
   private static final String REQUEST =
       "{\"metadataObjects\":[{\"type\":\"SCHEMA\",\"fullName\":\"catalog.one\"},{\"type\":\"SCHEMA\",\"fullName\":\"catalog.two\"}]}";
   private static final MetadataObject ONE =
@@ -115,14 +107,12 @@ public class TestBulkMetadataObjectOperations extends BaseOperationsTest {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    return new ResourceConfig(
-            BulkMetadataObjectTagOperations.class, BulkMetadataObjectPolicyOperations.class)
+    return new ResourceConfig(BulkMetadataObjectTagOperations.class)
         .register(
             new AbstractBinder() {
               @Override
               protected void configure() {
                 bind(TAGS).to(TagDispatcher.class);
-                bind(POLICIES).to(PolicyDispatcher.class);
                 bind(mock(HttpServletRequest.class)).to(HttpServletRequest.class);
               }
             });
@@ -130,7 +120,7 @@ public class TestBulkMetadataObjectOperations extends BaseOperationsTest {
 
   @BeforeEach
   public void setupData() {
-    reset(TAGS, POLICIES);
+    reset(TAGS);
     AuditInfo audit =
         AuditInfo.builder().withCreator("tester").withCreateTime(Instant.EPOCH).build();
     Tag inherited =
@@ -141,33 +131,15 @@ public class TestBulkMetadataObjectOperations extends BaseOperationsTest {
             .withProperties(Collections.emptyMap())
             .build()
             .copyWithInherited(true);
-    PolicyEntity policy =
-        PolicyEntity.builder()
-            .withId(2L)
-            .withName("policy")
-            .withAuditInfo(audit)
-            .withPolicyType(Policy.BuiltInType.CUSTOM)
-            .withEnabled(true)
-            .withContent(
-                PolicyContents.custom(
-                    null,
-                    Collections.singleton(MetadataObject.Type.SCHEMA),
-                    Collections.emptyMap()))
-            .build();
     Map<MetadataObject, Tag[]> tags = new LinkedHashMap<>();
     tags.put(ONE, new Tag[] {inherited});
     tags.put(TWO, new Tag[0]);
     when(TAGS.listEffectiveTagsForDisplay(eq("demo"), any())).thenReturn(tags);
-    Map<MetadataObject, PolicyEntity[]> policies = new LinkedHashMap<>();
-    policies.put(ONE, new PolicyEntity[] {policy});
-    policies.put(TWO, new PolicyEntity[0]);
-    when(POLICIES.listPolicyInfosForDisplay(eq("demo"), any())).thenReturn(policies);
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"tags", "policies"})
-  public void testBatchContainsOnlyRequestedKindAndEmptyObjects(String kind) throws Exception {
-    try (Response response = post(kind, REQUEST)) {
+  @Test
+  public void testBatchContainsTagsAndEmptyObjects() throws Exception {
+    try (Response response = post(REQUEST)) {
       Assertions.assertEquals(200, response.getStatus());
       JsonNode body = JsonUtils.objectMapper().readTree(response.readEntity(String.class));
       Assertions.assertEquals(0, body.path("code").asInt());
@@ -175,30 +147,18 @@ public class TestBulkMetadataObjectOperations extends BaseOperationsTest {
       JsonNode first = body.path("results").get(0);
       Assertions.assertEquals(
           "catalog.one", first.path("metadataObject").path("fullName").asText());
-      Assertions.assertEquals(1, first.path(kind).path(kind).size());
-      Assertions.assertFalse(first.has(kind.equals("tags") ? "policies" : "tags"));
-      Assertions.assertEquals(0, body.path("results").get(1).path(kind).path(kind).size());
-      if (kind.equals("tags")) {
-        Assertions.assertTrue(first.path(kind).path(kind).get(0).path("inherited").asBoolean());
-        Assertions.assertEquals(
-            "inherited", first.path(kind).path(kind).get(0).path("name").asText());
-      } else {
-        Assertions.assertEquals("policy", first.path(kind).path(kind).get(0).path("name").asText());
-      }
+      Assertions.assertEquals(1, first.path("tags").path("tags").size());
+      Assertions.assertTrue(first.path("tags").path("tags").get(0).path("inherited").asBoolean());
+      Assertions.assertEquals(
+          "inherited", first.path("tags").path("tags").get(0).path("name").asText());
+      Assertions.assertEquals(0, body.path("results").get(1).path("tags").path("tags").size());
     }
-    if (kind.equals("tags")) {
-      verify(TAGS).listEffectiveTagsForDisplay("demo", List.of(ONE, TWO));
-      verifyNoInteractions(POLICIES);
-    } else {
-      verify(POLICIES).listPolicyInfosForDisplay("demo", List.of(ONE, TWO));
-      verifyNoInteractions(TAGS);
-    }
-    verifyNoMoreInteractions(TAGS, POLICIES);
+    verify(TAGS).listEffectiveTagsForDisplay("demo", List.of(ONE, TWO));
+    verifyNoMoreInteractions(TAGS);
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"tags", "policies"})
-  public void testRejectsInvalidBatchBeforeLoading(String kind) {
+  @Test
+  public void testRejectsInvalidBatchBeforeLoading() {
     for (String request :
         List.of(
             "null",
@@ -207,30 +167,27 @@ public class TestBulkMetadataObjectOperations extends BaseOperationsTest {
             "{\"metadataObjects\":[null]}",
             "{\"metadataObjects\":[{\"type\":\"ROLE\",\"fullName\":\"role\"}]}",
             "{\"metadataObjects\":[{\"type\":\"SCHEMA\",\"fullName\":\"catalog.one\"},{\"type\":\"SCHEMA\",\"fullName\":\"catalog.one\"}]}")) {
-      try (Response response = post(kind, request)) {
+      try (Response response = post(request)) {
         Assertions.assertEquals(400, response.getStatus(), request);
       }
     }
-    verifyNoInteractions(TAGS, POLICIES);
+    verifyNoInteractions(TAGS);
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"tags", "policies"})
-  public void testRejectsOversizedBatch(String kind) {
+  @Test
+  public void testRejectsOversizedBatch() {
     String[] objects = new String[101];
     for (int i = 0; i < objects.length; i++) {
       objects[i] = "{\"type\":\"SCHEMA\",\"fullName\":\"catalog.s" + i + "\"}";
     }
-    try (Response response =
-        post(kind, "{\"metadataObjects\":[" + String.join(",", objects) + "]}")) {
+    try (Response response = post("{\"metadataObjects\":[" + String.join(",", objects) + "]}")) {
       Assertions.assertEquals(400, response.getStatus());
     }
-    verifyNoInteractions(TAGS, POLICIES);
+    verifyNoInteractions(TAGS);
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"tags", "policies"})
-  public void testChecksEachObjectBeforeLoading(String kind) throws Exception {
+  @Test
+  public void testChecksEachObjectBeforeLoading() throws Exception {
     try (MockedStatic<MetadataAuthzHelper> auth =
         mockStatic(MetadataAuthzHelper.class, CALLS_REAL_METHODS)) {
       auth.when(
@@ -240,7 +197,7 @@ public class TestBulkMetadataObjectOperations extends BaseOperationsTest {
           .thenAnswer(
               invocation ->
                   new MetadataObjectDTO[] {((MetadataObjectDTO[]) invocation.getArgument(1))[0]});
-      try (Response response = directPost(kind)) {
+      try (Response response = directPost()) {
         Assertions.assertEquals(200, response.getStatus());
         BaseResponse result = (BaseResponse) response.getEntity();
         result.validate();
@@ -250,20 +207,13 @@ public class TestBulkMetadataObjectOperations extends BaseOperationsTest {
         Assertions.assertEquals(1, body.path("errors").get(0).path("index").asInt());
         Assertions.assertEquals(1008, body.path("errors").get(0).path("code").asInt());
       }
-      if (kind.equals("tags")) {
-        verify(TAGS).listEffectiveTagsForDisplay("demo", List.of(ONE));
-        verifyNoInteractions(POLICIES);
-      } else {
-        verify(POLICIES).listPolicyInfosForDisplay("demo", List.of(ONE));
-        verifyNoInteractions(TAGS);
-      }
-      verifyNoMoreInteractions(TAGS, POLICIES);
+      verify(TAGS).listEffectiveTagsForDisplay("demo", List.of(ONE));
+      verifyNoMoreInteractions(TAGS);
     }
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"tags", "policies"})
-  public void testFiltersHiddenResults(String kind) throws Exception {
+  @Test
+  public void testFiltersHiddenResults() throws Exception {
     try (MockedStatic<MetadataAuthzHelper> auth =
         mockStatic(MetadataAuthzHelper.class, CALLS_REAL_METHODS)) {
       auth.when(
@@ -275,39 +225,25 @@ public class TestBulkMetadataObjectOperations extends BaseOperationsTest {
                       any(TagDTO[].class),
                       any()))
           .thenReturn(new TagDTO[0]);
-      auth.when(
-              () ->
-                  MetadataAuthzHelper.filterByExpression(
-                      eq("demo"),
-                      eq(AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION),
-                      eq(EntityType.POLICY),
-                      any(PolicyEntity[].class),
-                      any()))
-          .thenReturn(new PolicyEntity[0]);
-      try (Response response = directPost(kind)) {
+      try (Response response = directPost()) {
         Assertions.assertEquals(200, response.getStatus());
         BaseResponse result = (BaseResponse) response.getEntity();
         result.validate();
         JsonNode body = JsonUtils.objectMapper().valueToTree(result);
-        String flag = kind.equals("tags") ? "hasInaccessibleTags" : "hasInaccessiblePolicies";
-        Assertions.assertEquals(0, body.path("results").get(0).path(kind).path(kind).size());
-        Assertions.assertTrue(body.path("results").get(0).path(kind).path(flag).asBoolean());
-        Assertions.assertFalse(body.path("results").get(1).path(kind).path(flag).asBoolean());
+        Assertions.assertEquals(0, body.path("results").get(0).path("tags").path("tags").size());
+        Assertions.assertTrue(
+            body.path("results").get(0).path("tags").path("hasInaccessibleTags").asBoolean());
+        Assertions.assertFalse(
+            body.path("results").get(1).path("tags").path("hasInaccessibleTags").asBoolean());
       }
     }
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"tags", "policies"})
-  public void testFailureInOneKindDoesNotPreventOtherRead(String kind) throws Exception {
-    if (kind.equals("tags")) {
-      when(TAGS.listEffectiveTagsForDisplay(eq("demo"), any()))
-          .thenThrow(new NoSuchMetadataObjectException("Object was removed"));
-    } else {
-      when(POLICIES.listPolicyInfosForDisplay(eq("demo"), any()))
-          .thenThrow(new NoSuchMetadataObjectException("Object was removed"));
-    }
-    try (Response response = post(kind, REQUEST)) {
+  @Test
+  public void testFailureReturnsPerObjectErrors() throws Exception {
+    when(TAGS.listEffectiveTagsForDisplay(eq("demo"), any()))
+        .thenThrow(new NoSuchMetadataObjectException("Object was removed"));
+    try (Response response = post(REQUEST)) {
       Assertions.assertEquals(200, response.getStatus());
       JsonNode body = JsonUtils.objectMapper().readTree(response.readEntity(String.class));
       Assertions.assertEquals(0, body.path("results").size());
@@ -315,51 +251,32 @@ public class TestBulkMetadataObjectOperations extends BaseOperationsTest {
       Assertions.assertEquals(0, body.path("errors").get(0).path("index").asInt());
       Assertions.assertEquals(1, body.path("errors").get(1).path("index").asInt());
     }
-    try (Response response = post(kind.equals("tags") ? "policies" : "tags", REQUEST)) {
-      Assertions.assertEquals(200, response.getStatus());
-    }
   }
 
   @Test
   public void testMissingMetalakeFailsRequestWithoutPerObjectRetries() throws Exception {
     when(TAGS.listEffectiveTagsForDisplay(eq("demo"), any()))
         .thenThrow(new NoSuchMetalakeException("Metalake demo does not exist"));
-    try (Response response = post("tags", REQUEST)) {
+    try (Response response = post(REQUEST)) {
       Assertions.assertEquals(404, response.getStatus());
     }
     verify(TAGS, times(1)).listEffectiveTagsForDisplay(eq("demo"), any());
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"tags", "policies"})
-  public void testOneObjectFailurePreservesSuccessfulResults(String kind) throws Exception {
-    if (kind.equals("tags")) {
-      Map<MetadataObject, Tag[]> data = TAGS.listEffectiveTagsForDisplay("demo", List.of(ONE));
-      reset(TAGS);
-      when(TAGS.listEffectiveTagsForDisplay(eq("demo"), any()))
-          .thenAnswer(
-              invocation -> {
-                List<MetadataObject> objects = invocation.getArgument(1);
-                if (objects.contains(TWO)) {
-                  throw new RuntimeException("Missing external metadata file");
-                }
-                return data;
-              });
-    } else {
-      Map<MetadataObject, PolicyEntity[]> data =
-          POLICIES.listPolicyInfosForDisplay("demo", List.of(ONE));
-      reset(POLICIES);
-      when(POLICIES.listPolicyInfosForDisplay(eq("demo"), any()))
-          .thenAnswer(
-              invocation -> {
-                List<MetadataObject> objects = invocation.getArgument(1);
-                if (objects.contains(TWO)) {
-                  throw new RuntimeException("Missing external metadata file");
-                }
-                return data;
-              });
-    }
-    try (Response response = directPost(kind)) {
+  @Test
+  public void testOneObjectFailurePreservesSuccessfulResults() throws Exception {
+    Map<MetadataObject, Tag[]> data = TAGS.listEffectiveTagsForDisplay("demo", List.of(ONE));
+    reset(TAGS);
+    when(TAGS.listEffectiveTagsForDisplay(eq("demo"), any()))
+        .thenAnswer(
+            invocation -> {
+              List<MetadataObject> objects = invocation.getArgument(1);
+              if (objects.contains(TWO)) {
+                throw new RuntimeException("Missing external metadata file");
+              }
+              return data;
+            });
+    try (Response response = directPost()) {
       Assertions.assertEquals(200, response.getStatus());
       BaseResponse result = (BaseResponse) response.getEntity();
       result.validate();
@@ -368,7 +285,7 @@ public class TestBulkMetadataObjectOperations extends BaseOperationsTest {
       Assertions.assertEquals(
           "catalog.one",
           body.path("results").get(0).path("metadataObject").path("fullName").asText());
-      Assertions.assertEquals(1, body.path("results").get(0).path(kind).path(kind).size());
+      Assertions.assertEquals(1, body.path("results").get(0).path("tags").path("tags").size());
       Assertions.assertEquals(1, body.path("errors").size());
       JsonNode error = body.path("errors").get(0);
       Assertions.assertEquals(1, error.path("index").asInt());
@@ -376,53 +293,32 @@ public class TestBulkMetadataObjectOperations extends BaseOperationsTest {
       Assertions.assertEquals(1002, error.path("code").asInt());
       Assertions.assertEquals("Missing external metadata file", error.path("message").asText());
     }
-    if (kind.equals("tags")) {
-      verify(TAGS).listEffectiveTagsForDisplay("demo", List.of(ONE, TWO));
-      verify(TAGS).listEffectiveTagsForDisplay("demo", List.of(ONE));
-      verify(TAGS).listEffectiveTagsForDisplay("demo", List.of(TWO));
-    } else {
-      verify(POLICIES).listPolicyInfosForDisplay("demo", List.of(ONE, TWO));
-      verify(POLICIES).listPolicyInfosForDisplay("demo", List.of(ONE));
-      verify(POLICIES).listPolicyInfosForDisplay("demo", List.of(TWO));
-    }
-    verifyNoMoreInteractions(TAGS, POLICIES);
+    verify(TAGS).listEffectiveTagsForDisplay("demo", List.of(ONE, TWO));
+    verify(TAGS).listEffectiveTagsForDisplay("demo", List.of(ONE));
+    verify(TAGS).listEffectiveTagsForDisplay("demo", List.of(TWO));
+    verifyNoMoreInteractions(TAGS);
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"tags", "policies"})
-  public void testSingleFailureReturnsValidErrorWithoutRetry(String kind) throws Exception {
-    if (kind.equals("tags")) {
-      when(TAGS.listEffectiveTagsForDisplay(eq("demo"), any())).thenThrow(new RuntimeException());
-    } else {
-      when(POLICIES.listPolicyInfosForDisplay(eq("demo"), any())).thenThrow(new RuntimeException());
-    }
+  @Test
+  public void testSingleFailureReturnsValidErrorWithoutRetry() throws Exception {
+    when(TAGS.listEffectiveTagsForDisplay(eq("demo"), any())).thenThrow(new RuntimeException());
     String request = "{\"metadataObjects\":[{\"type\":\"SCHEMA\",\"fullName\":\"catalog.one\"}]}";
-    try (Response response = post(kind, request)) {
+    try (Response response = post(request)) {
       Assertions.assertEquals(200, response.getStatus());
       String body = response.readEntity(String.class);
-      BaseResponse decoded =
-          kind.equals("tags")
-              ? JsonUtils.objectMapper().readValue(body, BulkMetadataObjectTagListResponse.class)
-              : JsonUtils.objectMapper()
-                  .readValue(body, BulkMetadataObjectPolicyListResponse.class);
-      decoded.validate();
+      JsonUtils.objectMapper().readValue(body, BulkMetadataObjectTagListResponse.class).validate();
       JsonNode json = JsonUtils.objectMapper().readTree(body);
       Assertions.assertEquals(0, json.path("results").size());
       Assertions.assertEquals(1, json.path("errors").size());
       Assertions.assertEquals(
           "RuntimeException", json.path("errors").get(0).path("message").asText());
     }
-    if (kind.equals("tags")) {
-      verify(TAGS).listEffectiveTagsForDisplay("demo", List.of(ONE));
-    } else {
-      verify(POLICIES).listPolicyInfosForDisplay("demo", List.of(ONE));
-    }
-    verifyNoMoreInteractions(TAGS, POLICIES);
+    verify(TAGS).listEffectiveTagsForDisplay("demo", List.of(ONE));
+    verifyNoMoreInteractions(TAGS);
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"tags", "policies"})
-  public void testAllDeniedObjectsAreNotLoaded(String kind) throws Exception {
+  @Test
+  public void testAllDeniedObjectsAreNotLoaded() throws Exception {
     try (MockedStatic<MetadataAuthzHelper> auth =
         mockStatic(MetadataAuthzHelper.class, CALLS_REAL_METHODS)) {
       auth.when(
@@ -430,7 +326,7 @@ public class TestBulkMetadataObjectOperations extends BaseOperationsTest {
                   MetadataAuthzHelper.filterMetadataObject(
                       eq("demo"), any(MetadataObjectDTO[].class)))
           .thenReturn(new MetadataObjectDTO[0]);
-      try (Response response = directPost(kind)) {
+      try (Response response = directPost()) {
         Assertions.assertEquals(200, response.getStatus());
         BaseResponse result = (BaseResponse) response.getEntity();
         result.validate();
@@ -438,13 +334,12 @@ public class TestBulkMetadataObjectOperations extends BaseOperationsTest {
         Assertions.assertEquals(0, body.path("results").size());
         Assertions.assertEquals(2, body.path("errors").size());
       }
-      verifyNoInteractions(TAGS, POLICIES);
+      verifyNoInteractions(TAGS);
     }
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"tags", "policies"})
-  public void testAuthorizedUserCanLoadBatchWithAuthorizationEnabled(String kind) throws Exception {
+  @Test
+  public void testAuthorizedUserCanLoadBatchWithAuthorizationEnabled() throws Exception {
     Config config = GravitinoEnv.getInstance().config();
     doReturn(true).when(config).get(ENABLE_AUTHORIZATION);
     GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
@@ -454,7 +349,7 @@ public class TestBulkMetadataObjectOperations extends BaseOperationsTest {
     try (MockedStatic<GravitinoAuthorizerProvider> providers =
         mockStatic(GravitinoAuthorizerProvider.class)) {
       providers.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
-      try (Response response = directPost(kind)) {
+      try (Response response = directPost()) {
         Assertions.assertEquals(200, response.getStatus());
         BaseResponse result = (BaseResponse) response.getEntity();
         result.validate();
@@ -467,28 +362,26 @@ public class TestBulkMetadataObjectOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testCombinedEndpointIsNotExposed() {
-    try (Response response = post("associations", REQUEST)) {
+  public void testPolicyEndpointIsNotExposed() {
+    try (Response response =
+        target("/bulk/metalakes/demo/objects/policies")
+            .request()
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(REQUEST, MediaType.APPLICATION_JSON_TYPE))) {
       Assertions.assertEquals(404, response.getStatus());
     }
   }
 
-  private Response directPost(String kind) throws Exception {
+  private Response directPost() throws Exception {
     BulkMetadataObjectsRequest request =
         JsonUtils.objectMapper().readValue(REQUEST, BulkMetadataObjectsRequest.class);
-    if (kind.equals("tags")) {
-      BulkMetadataObjectTagOperations operations = new BulkMetadataObjectTagOperations(TAGS);
-      FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
-      return operations.listTags("demo", request);
-    }
-    BulkMetadataObjectPolicyOperations operations =
-        new BulkMetadataObjectPolicyOperations(POLICIES);
+    BulkMetadataObjectTagOperations operations = new BulkMetadataObjectTagOperations(TAGS);
     FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
-    return operations.listPolicies("demo", request);
+    return operations.listTags("demo", request);
   }
 
-  private Response post(String kind, String request) {
-    return target(PATH + kind)
+  private Response post(String request) {
+    return target(PATH)
         .request()
         .accept("application/vnd.gravitino.v1+json")
         .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));

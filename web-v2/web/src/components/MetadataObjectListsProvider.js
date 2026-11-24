@@ -18,11 +18,11 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
-import { getMetadataObjectTagsApi, getMetadataObjectPoliciesApi } from '@/lib/api/metalakes'
+import { getMetadataObjectTagsApi } from '@/lib/api/metalakes'
 
 const ListsContext = createContext(null)
 const MAX_BATCH_SIZE = 100
-const loaders = { tags: getMetadataObjectTagsApi, policies: getMetadataObjectPoliciesApi }
+const loaders = { tags: getMetadataObjectTagsApi }
 
 export default function MetadataObjectListsProvider({ metalake, children }) {
   const entries = useRef(new Map())
