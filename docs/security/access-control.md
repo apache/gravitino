@@ -205,8 +205,8 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 | `REGISTER_MODEL`     | Metalake, Catalog, Schema                                                   | Register models in any schema in scope                               |
 | `LINK_MODEL_VERSION` | Metalake, Catalog, Schema, Model                                            | Link versions to any model in scope                                  |
 | `USE_MODEL`          | Metalake, Catalog, Schema, Model                                            | Read the metadata of, and download versions of, any model in scope   |
-| `USE_SECRETS`                   | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | Call `getSecrets` (cloud access-key pairs omitted unless also granted `INCLUDE_CREDENTIAL_SECRETS`); required with `INCLUDE_CREDENTIAL_SECRETS` for catalog `getCredentials` |
-| `INCLUDE_CREDENTIAL_SECRETS`    | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | With `USE_SECRETS`, include cloud access-key pairs in `getSecrets` and authorize catalog `getCredentials` |
+| `USE_SECRETS`                   | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | Call `getSecrets` (cloud access-key pairs omitted unless also granted `INCLUDE_CREDENTIAL_SECRETS`); required with `INCLUDE_CREDENTIAL_SECRETS` for static catalog credentials |
+| `INCLUDE_CREDENTIAL_SECRETS`    | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | With `USE_SECRETS`, include cloud access-key pairs in `getSecrets` and static credentials in catalog `getCredentials` |
 | `REGISTER_FUNCTION`  | Metalake, Catalog, Schema                                                   | Register functions in any schema in scope                            |
 | `EXECUTE_FUNCTION`   | Metalake, Catalog, Schema, Function                                         | Read the metadata of, and execute, any function in scope             |
 | `MODIFY_FUNCTION`    | Metalake, Catalog, Schema, Function                                         | Alter or drop any function in scope                                  |
@@ -294,10 +294,25 @@ Table statistics follow the table itself: reading them takes `SELECT_TABLE` or `
 writing them takes `MODIFY_TABLE`. Model versions follow the model: `USE_MODEL` to read, owner to
 alter or delete. Fetching plaintext secrets (`getSecrets`) requires owning the metalake or holding
 `USE_SECRETS`. Cloud access-key pairs are included only when the caller is the metalake owner or also
-holds `INCLUDE_CREDENTIAL_SECRETS`. Catalog credential vending (`getCredentials`) requires metadata access plus both
-`USE_SECRETS` and `INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership. Missing either privilege
-returns a forbidden error. Fileset credential vending retains its path-based authorization. Callers who can load the object but lack
-`USE_SECRETS` receive an empty `getSecrets` result rather than a forbidden error.
+holds `INCLUDE_CREDENTIAL_SECRETS`. Catalog credential vending (`getCredentials`) requires metadata
+access. Unless every configured provider explicitly implements `SupportsDynamicCredential`, the
+catalog request additionally requires both `USE_SECRETS` and `INCLUDE_CREDENTIAL_SECRETS`, or
+metalake ownership. Unmarked providers retain these checks, including existing custom providers
+and mixed dynamic and unmarked configurations. Catalog requests do not partially return credentials.
+Catalog requests carry no storage path. Built-in path-only token providers therefore return no
+catalog credentials, and a token-only catalog probe succeeds with an empty result. Tokens are
+generated through the existing path-based fileset and Iceberg REST vending flows, with the
+authorized paths and storage privileges. Catalogs with no credentials also return an empty result.
+Callers who can load the object but lack `USE_SECRETS` receive an empty `getSecrets` result rather
+than a forbidden error.
+
+Credential providers that issue dynamic credentials without returning stored source credentials can
+opt into metadata-only catalog access by implementing
+`org.apache.gravitino.credential.SupportsDynamicCredential`. These providers must respect the
+supplied authorization context. Built-in token providers implement this interface; custom dynamic
+providers must explicitly add it to receive the same exemption. Existing providers without the marker
+continue to load through the unchanged SPI and retain secret-privilege checks. Provider authorization
+happens before credentials are generated, including for mixed-provider catalogs.
 
 The View row applies to metadata operations through both the native Gravitino REST API and the
 Iceberg REST Catalog when authorization is enabled. Listing first requires access to the schema and

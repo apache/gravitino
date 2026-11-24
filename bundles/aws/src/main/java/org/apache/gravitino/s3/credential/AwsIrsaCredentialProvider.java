@@ -21,6 +21,7 @@ package org.apache.gravitino.s3.credential;
 
 import org.apache.gravitino.credential.AwsIrsaCredential;
 import org.apache.gravitino.credential.CredentialProviderDelegator;
+import org.apache.gravitino.credential.SupportsDynamicCredential;
 
 /**
  * AWS IRSA credential provider that supports both basic IRSA credentials and fine-grained
@@ -56,7 +57,8 @@ import org.apache.gravitino.credential.CredentialProviderDelegator;
  *       directly)
  * </ul>
  */
-public class AwsIrsaCredentialProvider extends CredentialProviderDelegator<AwsIrsaCredential> {
+public class AwsIrsaCredentialProvider extends CredentialProviderDelegator<AwsIrsaCredential>
+    implements SupportsDynamicCredential {
 
   @Override
   public boolean supportsScheme(String scheme) {

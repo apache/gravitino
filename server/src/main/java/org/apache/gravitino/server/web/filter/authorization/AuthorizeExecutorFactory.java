@@ -41,6 +41,13 @@ public class AuthorizeExecutorFactory {
     return switch (requestType) {
       case COMMON -> new CommonAuthorizerExecutor(
           expression, metadataContext, pathParams, entityType);
+      case GET_CREDENTIALS -> new CredentialAuthorizationExecutor(
+          expression,
+          metadataContext,
+          pathParams,
+          entityType,
+          secondaryExpression,
+          secondaryExpressionCondition);
       case ASSOCIATE_TAG -> new AssociateTagAuthorizationExecutor(
           expression, parameters, args, metadataContext, pathParams, entityType);
       case RUN_JOB -> new RunJobAuthorizationExecutor(
