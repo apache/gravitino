@@ -140,7 +140,8 @@ public class ShellJobTemplate extends JobTemplate {
     protected void validate() {
       super.validate();
 
-      this.scripts = JobTemplateValidations.immutableListCopy("scripts", scripts);
+      JobTemplateValidations.checkNoBlankElements("scripts", scripts);
+      this.scripts = JobTemplateValidations.immutableListCopy(scripts);
     }
   }
 }

@@ -287,10 +287,14 @@ public class SparkJobTemplate extends JobTemplate {
     protected void validate() {
       super.validate();
 
-      this.jars = JobTemplateValidations.immutableListCopy("jars", jars);
-      this.files = JobTemplateValidations.immutableListCopy("files", files);
-      this.archives = JobTemplateValidations.immutableListCopy("archives", archives);
-      this.configs = JobTemplateValidations.immutableMapCopy("configs", configs);
+      JobTemplateValidations.checkNoBlankElements("jars", jars);
+      JobTemplateValidations.checkNoBlankElements("files", files);
+      JobTemplateValidations.checkNoBlankElements("archives", archives);
+      JobTemplateValidations.checkNoBlankKeysOrNullValues("configs", configs);
+      this.jars = JobTemplateValidations.immutableListCopy(jars);
+      this.files = JobTemplateValidations.immutableListCopy(files);
+      this.archives = JobTemplateValidations.immutableListCopy(archives);
+      this.configs = JobTemplateValidations.immutableMapCopy(configs);
     }
   }
 }

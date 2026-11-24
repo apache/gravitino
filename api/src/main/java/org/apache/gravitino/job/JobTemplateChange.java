@@ -237,8 +237,10 @@ public interface JobTemplateChange {
      */
     protected TemplateUpdate(BaseBuilder<?, ?> builder) {
       JobTemplateValidations.checkNoNullElements("newArguments", builder.newArguments);
-      JobTemplateValidations.checkNoNullEntries("newEnvironments", builder.newEnvironments);
-      JobTemplateValidations.checkNoNullEntries("newCustomFields", builder.newCustomFields);
+      JobTemplateValidations.checkNoBlankKeysOrNullValues(
+          "newEnvironments", builder.newEnvironments);
+      JobTemplateValidations.checkNoBlankKeysOrNullValues(
+          "newCustomFields", builder.newCustomFields);
       this.newExecutable = builder.newExecutable;
       this.newArguments = builder.newArguments;
       this.newEnvironments = builder.newEnvironments;
@@ -386,7 +388,7 @@ public interface JobTemplateChange {
 
     private ShellTemplateUpdate(Builder builder) {
       super(builder);
-      JobTemplateValidations.checkNoNullElements("newScripts", builder.newScripts);
+      JobTemplateValidations.checkNoBlankElements("newScripts", builder.newScripts);
       this.newScripts = builder.newScripts;
     }
 
@@ -487,10 +489,10 @@ public interface JobTemplateChange {
 
     private SparkTemplateUpdate(Builder builder) {
       super(builder);
-      JobTemplateValidations.checkNoNullElements("newJars", builder.newJars);
-      JobTemplateValidations.checkNoNullElements("newFiles", builder.newFiles);
-      JobTemplateValidations.checkNoNullElements("newArchives", builder.newArchives);
-      JobTemplateValidations.checkNoNullEntries("newConfigs", builder.newConfigs);
+      JobTemplateValidations.checkNoBlankElements("newJars", builder.newJars);
+      JobTemplateValidations.checkNoBlankElements("newFiles", builder.newFiles);
+      JobTemplateValidations.checkNoBlankElements("newArchives", builder.newArchives);
+      JobTemplateValidations.checkNoBlankKeysOrNullValues("newConfigs", builder.newConfigs);
       this.newClassName = builder.newClassName;
       this.newJars = builder.newJars;
       this.newFiles = builder.newFiles;

@@ -396,7 +396,7 @@ public class TestJobOperations extends JerseyTest {
   }
 
   @Test
-  public void testRegisterJobTemplateRejectsNullElementsAndValues() {
+  public void testRegisterJobTemplateRejectsInvalidElementsAndKeys() {
     String nullArgument =
         "{\"jobTemplate\": {\"jobType\": \"shell\", \"name\": \"t1\","
             + " \"executable\": \"/bin/echo\", \"arguments\": [\"a\", null, \"b\"]}}";
@@ -416,6 +416,26 @@ public class TestJobOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(nullEnvironment, APPLICATION_JSON_TYPE)),
         "\"environments\" must not contain null values, found one for key \"Z\"");
+
+    String blankScript =
+        "{\"jobTemplate\": {\"jobType\": \"shell\", \"name\": \"t1\","
+            + " \"executable\": \"/bin/echo\", \"scripts\": [\" \"]}}";
+    assertJobTemplateRequestRejected(
+        target(jobTemplatePath())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(blankScript, APPLICATION_JSON_TYPE)),
+        "\"scripts\" must not contain null or blank elements, found one at index 0");
+
+    String blankEnvironmentKey =
+        "{\"jobTemplate\": {\"jobType\": \"shell\", \"name\": \"t1\","
+            + " \"executable\": \"/bin/echo\", \"environments\": {\"\": \"v\"}}}";
+    assertJobTemplateRequestRejected(
+        target(jobTemplatePath())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(blankEnvironmentKey, APPLICATION_JSON_TYPE)),
+        "\"environments\" must not contain null or blank keys");
 
     verify(jobOperationDispatcher, never()).registerJobTemplate(any(), any());
   }

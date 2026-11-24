@@ -38,7 +38,7 @@ public class TestJobTemplateValidations {
         "\"arguments\" must not contain null elements, found one at index 1",
         () -> shellTemplate().withArguments(NULL_ELEMENT).build());
     assertRejected(
-        "\"scripts\" must not contain null elements, found one at index 1",
+        "\"scripts\" must not contain null or blank elements, found one at index 1",
         () -> shellTemplate().withScripts(NULL_ELEMENT).build());
   }
 
@@ -48,24 +48,97 @@ public class TestJobTemplateValidations {
         "\"environments\" must not contain null values, found one for key \"Z\"",
         () -> shellTemplate().withEnvironments(nullValue("Z")).build());
     assertRejected(
-        "\"customFields\" must not contain null keys",
+        "\"customFields\" must not contain null or blank keys",
         () -> shellTemplate().withCustomFields(nullKey()).build());
   }
 
   @Test
   public void testSparkJobTemplateRejectsNulls() {
     assertRejected(
-        "\"jars\" must not contain null elements",
+        "\"jars\" must not contain null or blank elements",
         () -> sparkTemplate().withJars(NULL_ELEMENT).build());
     assertRejected(
-        "\"files\" must not contain null elements",
+        "\"files\" must not contain null or blank elements",
         () -> sparkTemplate().withFiles(NULL_ELEMENT).build());
     assertRejected(
-        "\"archives\" must not contain null elements",
+        "\"archives\" must not contain null or blank elements",
         () -> sparkTemplate().withArchives(NULL_ELEMENT).build());
     assertRejected(
         "\"configs\" must not contain null values, found one for key \"spark.master\"",
         () -> sparkTemplate().withConfigs(nullValue("spark.master")).build());
+  }
+
+  @Test
+  public void testJobTemplateRejectsBlankResourcesAndKeys() {
+    List<String> blankElement = Arrays.asList("a", " ");
+    assertRejected(
+        "\"scripts\" must not contain null or blank elements, found one at index 1",
+        () -> shellTemplate().withScripts(blankElement).build());
+    assertRejected(
+        "\"jars\" must not contain null or blank elements, found one at index 1",
+        () -> sparkTemplate().withJars(blankElement).build());
+    assertRejected(
+        "\"files\" must not contain null or blank elements",
+        () -> sparkTemplate().withFiles(Collections.singletonList("")).build());
+    assertRejected(
+        "\"archives\" must not contain null or blank elements",
+        () -> sparkTemplate().withArchives(blankElement).build());
+    assertRejected(
+        "\"environments\" must not contain null or blank keys",
+        () -> shellTemplate().withEnvironments(Collections.singletonMap(" ", "v")).build());
+    assertRejected(
+        "\"configs\" must not contain null or blank keys",
+        () -> sparkTemplate().withConfigs(Collections.singletonMap("", "v")).build());
+  }
+
+  @Test
+  public void testTemplateUpdateRejectsBlankResourcesAndKeys() {
+    assertRejected(
+        "\"newScripts\" must not contain null or blank elements, found one at index 0",
+        () ->
+            JobTemplateChange.ShellTemplateUpdate.builder()
+                .withNewScripts(Collections.singletonList(" "))
+                .build());
+    assertRejected(
+        "\"newJars\" must not contain null or blank elements",
+        () ->
+            JobTemplateChange.SparkTemplateUpdate.builder()
+                .withNewJars(Collections.singletonList(""))
+                .build());
+    assertRejected(
+        "\"newEnvironments\" must not contain null or blank keys",
+        () ->
+            JobTemplateChange.ShellTemplateUpdate.builder()
+                .withNewEnvironments(Collections.singletonMap(" ", "v"))
+                .build());
+    assertRejected(
+        "\"newConfigs\" must not contain null or blank keys",
+        () ->
+            JobTemplateChange.SparkTemplateUpdate.builder()
+                .withNewConfigs(Collections.singletonMap("", "v"))
+                .build());
+  }
+
+  @Test
+  public void testRuntimeTemplateAllowsEmptyArgumentsAndValues() {
+    // A placeholder with an empty default, e.g. {{older_than:-}}, resolves to "" at run time.
+    SparkJobTemplate template =
+        sparkTemplate()
+            .withArguments(Arrays.asList("--older-than", "", "--location", " "))
+            .withEnvironments(Collections.singletonMap("EMPTY", ""))
+            .withConfigs(Collections.singletonMap("spark.extra", ""))
+            .build();
+    Assertions.assertEquals(
+        Arrays.asList("--older-than", "", "--location", " "), template.arguments());
+    Assertions.assertEquals("", template.environments().get("EMPTY"));
+    Assertions.assertEquals("", template.configs().get("spark.extra"));
+
+    JobTemplateChange.ShellTemplateUpdate update =
+        JobTemplateChange.ShellTemplateUpdate.builder()
+            .withNewArguments(Collections.singletonList(""))
+            .withNewEnvironments(Collections.singletonMap("EMPTY", ""))
+            .build();
+    Assertions.assertEquals(Collections.singletonList(""), update.getNewArguments());
   }
 
   @Test
@@ -94,24 +167,24 @@ public class TestJobTemplateValidations {
                 .withNewEnvironments(nullValue("Z"))
                 .build());
     assertRejected(
-        "\"newCustomFields\" must not contain null keys",
+        "\"newCustomFields\" must not contain null or blank keys",
         () ->
             JobTemplateChange.ShellTemplateUpdate.builder().withNewCustomFields(nullKey()).build());
     assertRejected(
-        "\"newScripts\" must not contain null elements",
+        "\"newScripts\" must not contain null or blank elements",
         () -> JobTemplateChange.ShellTemplateUpdate.builder().withNewScripts(NULL_ELEMENT).build());
   }
 
   @Test
   public void testSparkTemplateUpdateRejectsNulls() {
     assertRejected(
-        "\"newJars\" must not contain null elements",
+        "\"newJars\" must not contain null or blank elements",
         () -> JobTemplateChange.SparkTemplateUpdate.builder().withNewJars(NULL_ELEMENT).build());
     assertRejected(
-        "\"newFiles\" must not contain null elements",
+        "\"newFiles\" must not contain null or blank elements",
         () -> JobTemplateChange.SparkTemplateUpdate.builder().withNewFiles(NULL_ELEMENT).build());
     assertRejected(
-        "\"newArchives\" must not contain null elements",
+        "\"newArchives\" must not contain null or blank elements",
         () ->
             JobTemplateChange.SparkTemplateUpdate.builder().withNewArchives(NULL_ELEMENT).build());
     assertRejected(

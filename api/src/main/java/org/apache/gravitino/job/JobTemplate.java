@@ -328,9 +328,12 @@ public abstract class JobTemplate {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(executable), "Executable must not be null or empty");
 
-      this.arguments = JobTemplateValidations.immutableListCopy("arguments", arguments);
-      this.environments = JobTemplateValidations.immutableMapCopy("environments", environments);
-      this.customFields = JobTemplateValidations.immutableMapCopy("customFields", customFields);
+      JobTemplateValidations.checkNoNullElements("arguments", arguments);
+      JobTemplateValidations.checkNoBlankKeysOrNullValues("environments", environments);
+      JobTemplateValidations.checkNoBlankKeysOrNullValues("customFields", customFields);
+      this.arguments = JobTemplateValidations.immutableListCopy(arguments);
+      this.environments = JobTemplateValidations.immutableMapCopy(environments);
+      this.customFields = JobTemplateValidations.immutableMapCopy(customFields);
     }
   }
 }
