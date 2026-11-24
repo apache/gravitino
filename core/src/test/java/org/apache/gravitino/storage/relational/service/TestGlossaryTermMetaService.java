@@ -517,7 +517,8 @@ public class TestGlossaryTermMetaService extends TestJDBCBackend {
     for (String name : List.of("Finance", "Retail", "Sales")) {
       long id = domain(name);
       SessionUtils.doWithCommit(
-          GlossaryTermDomainRelMapper.class, mapper -> mapper.insert(100, 101, id));
+          GlossaryTermDomainRelMapper.class,
+          ignored -> GlossaryTermDomainService.getInstance().add(100, 101, id));
     }
     List<GlossaryTermSnapshotPO> rows =
         SessionUtils.getWithoutCommit(

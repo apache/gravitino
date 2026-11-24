@@ -682,7 +682,7 @@ public final class GlossaryManager {
    */
   private TermDomains planDomains(
       long lake, GlossaryTermEntity term, List<TermDomains.Edit> edits, GlossaryAccess access) {
-    Set<Long> members = term.domains().length == 0 ? Set.of() : DOMAINS.domainIds(term.id());
+    Set<Long> members = term.domains().length == 0 ? Set.of() : DOMAINS.domainIds(lake, term.id());
     Set<String> requested = new HashSet<>();
     for (TermDomains.Edit edit : edits) {
       requested.add(edit.domain());

@@ -22,13 +22,11 @@ package org.apache.gravitino.storage.relational.po;
 import lombok.Getter;
 import lombok.Setter;
 
-/** A glossary term domain membership row, including its soft-deletion identity. */
+/** The live Domain name and identity of a Term membership. */
 @Getter
 @Setter
 public class GlossaryTermDomainRelPO {
-  private Long metalakeId;
   private Long termId;
   private Long domainId;
   private String domainName;
-  private Long deletedAt;
 }

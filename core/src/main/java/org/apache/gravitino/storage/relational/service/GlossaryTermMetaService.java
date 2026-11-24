@@ -254,7 +254,7 @@ public final class GlossaryTermMetaService {
                   owners.softDeleteOwnerRelByMetadataObjectIdAndType(
                       row.getTermId(), Entity.EntityType.GLOSSARY_TERM.name()));
           GlossaryTermRelService.getInstance().removeTerm(metalakeId, row.getTermId());
-          GlossaryTermDomainService.getInstance().removeTerm(row.getTermId());
+          GlossaryTermDomainService.getInstance().removeTerm(metalakeId, row.getTermId());
           return true;
         });
   }
@@ -273,18 +273,14 @@ public final class GlossaryTermMetaService {
   }
 
   /**
-   * Purges at most limit expired relations, domain memberships and definitions, with the
-   * definitions' synonyms, atomically.
+   * Purges at most limit expired term relations and definitions, with the definitions' synonyms,
+   * atomically.
    */
   public int collect(long cutoff, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         GlossaryTermMetaMapper.class,
         mapper -> {
           int count = GlossaryTermRelService.getInstance().collect(cutoff, limit);
-          if (count == limit) {
-            return count;
-          }
-          count += GlossaryTermDomainService.getInstance().collect(cutoff, limit - count);
           if (count == limit) {
             return count;
           }
