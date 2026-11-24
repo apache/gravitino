@@ -207,7 +207,10 @@ export default function Tags({ ...props }) {
                             maxLength={256}
                             value={selectedTag?.name === tag.name ? selectedValue || '' : ''}
                             onFocus={() => setSelectedTag(tag)}
-                            onMouseDown={event => event.stopPropagation()}
+                            onMouseDown={event => {
+                              event.stopPropagation()
+                              setSelectedTag(tag)
+                            }}
                             onChange={event => {
                               setSelectedTag(tag)
                               setSelectedValue(event.target.value)
@@ -230,7 +233,7 @@ export default function Tags({ ...props }) {
           }))}
           onChange={handleChange}
           onBlur={() => {
-            if (selectedTag?.allowedValues == null) return
+            if (selectedTag && selectedTag.allowedValues == null) return
             if (selectedTag && selectedValue !== undefined && selectedValue !== '') {
               associateSelectedTag(selectedTag, selectedValue || undefined)
             } else if (selectedTag?.allowedValues?.length === 0) {
