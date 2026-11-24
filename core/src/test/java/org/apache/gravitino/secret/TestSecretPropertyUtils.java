@@ -349,6 +349,34 @@ public class TestSecretPropertyUtils {
     Assertions.assertFalse(filtered.containsKey("jdbc-password"));
   }
 
+  /** Mixed token + static providers: only static provider keys are omitted. */
+  @Test
+  void testOmitStaticCredentialSecretsWithMixedTokenAndStaticProviders() {
+    PropertiesMetadata emptyMetadata = () -> Map.of();
+    Map<String, String> secrets =
+        Map.of(
+            "s3-access-key-id", "AKIA", "s3-secret-access-key", "secret", "custom-secret", "keep");
+    Map<String, String> raw =
+        Map.of(CredentialConstants.CREDENTIAL_PROVIDERS, "s3-token,s3-secret-key");
+
+    Map<String, String> filtered =
+        SecretPropertyUtils.omitStaticCredentialSecrets(secrets, emptyMetadata, raw);
+    Assertions.assertEquals("keep", filtered.get("custom-secret"));
+    Assertions.assertFalse(filtered.containsKey("s3-access-key-id"));
+    Assertions.assertFalse(filtered.containsKey("s3-secret-access-key"));
+  }
+
+  @Test
+  void testIsStaticCredentialType() {
+    Assertions.assertTrue(StaticCredentialSecretKeys.isStaticCredentialType("s3-secret-key"));
+    Assertions.assertTrue(StaticCredentialSecretKeys.isStaticCredentialType("S3-SECRET-KEY"));
+    Assertions.assertTrue(StaticCredentialSecretKeys.isStaticCredentialType("jdbc-user-password"));
+    Assertions.assertFalse(StaticCredentialSecretKeys.isStaticCredentialType("s3-token"));
+    Assertions.assertFalse(StaticCredentialSecretKeys.isStaticCredentialType("aws-irsa"));
+    Assertions.assertFalse(StaticCredentialSecretKeys.isStaticCredentialType(null));
+    Assertions.assertFalse(StaticCredentialSecretKeys.isStaticCredentialType(""));
+  }
+
   @Test
   void testAssembleWithNullTargetWhenNoSecrets() {
     try (SecretManager sm = memorySecretManager()) {

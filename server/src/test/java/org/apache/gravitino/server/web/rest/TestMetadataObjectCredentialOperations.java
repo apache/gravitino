@@ -171,6 +171,33 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
     }
   }
 
+  /** Mixed providers with USE+INCLUDE return both token and static credentials. */
+  @Test
+  public void testCatalogMixedCredentialsWithIncludeReturnsBoth() throws Exception {
+    S3TokenCredential token =
+        new S3TokenCredential("ak", "sk", "session-token", System.currentTimeMillis() + 60_000);
+    S3SecretKeyCredential staticCredential = new S3SecretKeyCredential("static-ak", "static-sk");
+    CredentialOperationDispatcher dispatcher = mock(CredentialOperationDispatcher.class);
+    when(dispatcher.getCredentials(any(), any()))
+        .thenReturn(Arrays.asList(staticCredential, token));
+    MetadataObjectCredentialOperations operations =
+        new MetadataObjectCredentialOperations(dispatcher);
+    FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
+    try (MockedStatic<MetadataAuthzHelper> auth = mockStatic(MetadataAuthzHelper.class)) {
+      stubSecretPrivilegeChecks(auth, true, true);
+      try (Response response = operations.getCredentials("test", "catalog", "catalog")) {
+        Assertions.assertEquals(200, response.getStatus());
+        CredentialResponse body = response.readEntity(CredentialResponse.class);
+        Assertions.assertEquals(2, body.getCredentials().length);
+        Assertions.assertEquals(
+            S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE,
+            body.getCredentials()[0].credentialType());
+        Assertions.assertEquals(
+            S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE, body.getCredentials()[1].credentialType());
+      }
+    }
+  }
+
   private static void stubSecretPrivilegeChecks(
       MockedStatic<MetadataAuthzHelper> auth, boolean useSecrets, boolean includeCredentials) {
     auth.when(
