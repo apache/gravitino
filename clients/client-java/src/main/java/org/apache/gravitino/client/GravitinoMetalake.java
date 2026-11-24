@@ -139,6 +139,10 @@ import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.SupportsJobs;
+import org.apache.gravitino.ontology.Ontology;
+import org.apache.gravitino.ontology.OntologyChange;
+import org.apache.gravitino.ontology.OntologyDefinition;
+import org.apache.gravitino.ontology.SupportsOntologies;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.policy.PolicyChange;
@@ -149,6 +153,8 @@ import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.secret.SupportsSecrets;
+import org.apache.gravitino.semantic.OssieDocument;
+import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagOperations;
@@ -166,7 +172,8 @@ public class GravitinoMetalake extends MetalakeDTO
         SupportsRoles,
         SupportsJobs,
         PolicyOperations,
-        SupportsSecrets {
+        SupportsSecrets,
+        SupportsOntologies {
   private static final String API_METALAKES_CATALOGS_PATH = "api/metalakes/%s/catalogs/%s";
   private static final String API_PERMISSION_PATH = "api/metalakes/%s/permissions/%s";
   private static final String API_METALAKES_USERS_PATH = "api/metalakes/%s/users/%s";
@@ -181,6 +188,7 @@ public class GravitinoMetalake extends MetalakeDTO
   private static final String BLANK_PLACEHOLDER = "";
 
   private final RESTClient restClient;
+  private final SupportsOntologies ontologyOperations;
   private final MetadataObjectRoleOperations metadataObjectRoleOperations;
   private final MetadataObjectSecretOperations metadataObjectSecretOperations;
 
@@ -193,11 +201,64 @@ public class GravitinoMetalake extends MetalakeDTO
       RESTClient restClient) {
     super(name, comment, properties, auditDTO, owner);
     this.restClient = restClient;
+    this.ontologyOperations = new OntologyClientOperations(restClient, name);
     MetadataObject metalakeObject = MetadataObjects.of(null, name, MetadataObject.Type.METALAKE);
     this.metadataObjectRoleOperations =
         new MetadataObjectRoleOperations(name, metalakeObject, restClient);
     this.metadataObjectSecretOperations =
         new MetadataObjectSecretOperations(name, metalakeObject, restClient);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String[] listOntologies() {
+    return ontologyOperations.listOntologies();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Ontology loadOntology(String name) {
+    return ontologyOperations.loadOntology(name);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Ontology createOntology(
+      String name,
+      @Nullable String comment,
+      OntologyDefinition definition,
+      Map<String, String> properties) {
+    return ontologyOperations.createOntology(name, comment, definition, properties);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Ontology importOntology(OssieDocument document) {
+    return ontologyOperations.importOntology(document);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public OssieDocument exportOntology(String name, OssieFormat format) {
+    return ontologyOperations.exportOntology(name, format);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Ontology alterOntology(String name, OntologyChange... changes) {
+    return ontologyOperations.alterOntology(name, changes);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public boolean dropOntology(String name) {
+    return ontologyOperations.dropOntology(name);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public NameIdentifier[] listOntologyMappings(String name) {
+    return ontologyOperations.listOntologyMappings(name);
   }
 
   /**
