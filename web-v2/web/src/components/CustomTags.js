@@ -94,14 +94,18 @@ export default function Tags({ ...props }) {
   const handleChange = path => {
     const tag = store.tagsData?.find(item => item.name === path[0])
 
-    if (path[1] === '__no_value__') {
+    if (tag?.allowedValues == null && path[1] === '__no_value__') {
       associateSelectedTag(tag, undefined)
 
       return
     }
 
     setSelectedTag(tag)
-    setSelectedValue(path[1] === '__custom_value__' ? '' : (path[1] ?? (tag?.allowedValues == null ? '' : undefined)))
+    setSelectedValue(
+      tag?.allowedValues == null && path[1] === '__custom_value__'
+        ? ''
+        : (path[1] ?? (tag?.allowedValues == null ? '' : undefined))
+    )
   }
 
   const associateSelectedTag = async (tag, value) => {

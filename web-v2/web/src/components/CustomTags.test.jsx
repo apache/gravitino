@@ -143,3 +143,29 @@ it('closes the picker without requesting an already-associated value', async () 
   expect(container.querySelector('[data-testid="cascader"]')).toBeNull()
   expect(mocks.dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'associate' }))
 })
+
+it.each(['__no_value__', '__custom_value__'])(
+  'associates %s as a literal value when it is explicitly allowed',
+  async literalValue => {
+    mocks.tagsData = [{ name: 'classification', allowedValues: [literalValue] }]
+    mocks.dispatch.mockResolvedValue({ payload: { tags: [] } })
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+
+    await act(async () => root.render(<Tags metadataObjectType='table' metadataObjectFullName='sales.orders' />))
+    await act(async () => container.querySelector('button').click())
+    await act(async () => mocks.change(['classification', literalValue]))
+    await act(async () => mocks.blur())
+
+    expect(mocks.dispatch).toHaveBeenCalledWith({
+      kind: 'associate',
+      args: {
+        metalake: 'demo',
+        metadataObjectType: 'table',
+        metadataObjectFullName: 'sales.orders',
+        data: { tagsToAdd: [{ name: 'classification', value: literalValue }] }
+      }
+    })
+  }
+)
