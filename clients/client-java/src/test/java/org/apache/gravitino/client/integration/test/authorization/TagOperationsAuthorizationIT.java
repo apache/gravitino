@@ -163,6 +163,7 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
   public void testLoadTag() {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     String[] tagsLoadByAdmin = gravitinoMetalake.listTags();
+    Arrays.sort(tagsLoadByAdmin);
     assertArrayEquals(new String[] {"tag1", "tag2", "tag3"}, tagsLoadByAdmin);
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     String[] tagsLoadByNormalUser = gravitinoMetalakeLoadByNormalUser.listTags();

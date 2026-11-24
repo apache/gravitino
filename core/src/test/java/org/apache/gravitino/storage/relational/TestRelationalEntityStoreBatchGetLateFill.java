@@ -229,7 +229,9 @@ public class TestRelationalEntityStoreBatchGetLateFill {
 
     store.batchGet(List.of(ident), Entity.EntityType.TABLE, TableEntity.class);
 
-    Mockito.verify(cache).clear();
+    // invalidateOrClear clears when the targeted drop throws, then the listener fallback clears
+    // again. Either clear fences the in-flight fill.
+    Mockito.verify(cache, Mockito.atLeastOnce()).clear();
     Assertions.assertFalse(cache.contains(ident, Entity.EntityType.TABLE));
   }
 
