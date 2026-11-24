@@ -47,6 +47,7 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -78,6 +79,7 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.TableLoadScope;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -373,6 +375,596 @@ public class TestLanceTableOperations {
                 null,
                 new SortOrder[0],
                 new Index[0]));
+  }
+
+  /**
+   * lance-core does not open Hadoop FileSystem on the calling thread, so server-side dataset I/O
+   * rejects hdfs and viewfs before touching storage or metadata.
+   */
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "hdfs://namenode:8020/lake/orders",
+        "viewfs://cluster/lake/orders",
+        "HDFS://namenode:8020/lake/orders"
+      })
+  public void testCreateRejectsDistributedFileSystemBeforeMetadataWrite(String location)
+      throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "orders");
+    Column[] columns = new Column[] {Column.of("id", Types.IntegerType.get())};
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
+    properties.put(Table.PROPERTY_LOCATION, location);
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    columns,
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+
+    Assertions.assertTrue(exception.getMessage().contains("does not support"));
+    Assertions.assertTrue(
+        exception.getMessage().toLowerCase(Locale.ROOT).contains("hdfs")
+            || exception.getMessage().contains("viewfs"));
+    verify(store, never()).put(any(), anyBoolean());
+  }
+
+  /** A declared table keeps an hdfs location as metadata and does not create a dataset. */
+  @Test
+  public void testDeclareStoresHdfsLocationWithoutCreatingDataset() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "declared");
+    String location = "hdfs://namenode:8020/lake/declared";
+    Column[] columns = new Column[] {Column.of("id", Types.IntegerType.get())};
+    when(idGenerator.nextId()).thenReturn(10L);
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
+    properties.put(Table.PROPERTY_LOCATION, location);
+    properties.put(LANCE_TABLE_DECLARED, "true");
+    properties.putAll(StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(1L), null));
+    AtomicReference<TableEntity> stored = new AtomicReference<>();
+    Mockito.doAnswer(
+            invocation -> {
+              stored.set(invocation.getArgument(0));
+              return null;
+            })
+        .when(store)
+        .put(any(TableEntity.class), eq(false));
+
+    Table created =
+        PrincipalUtils.doAs(
+            new UserPrincipal("tester"),
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    columns,
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+
+    Assertions.assertEquals(location, created.properties().get(Table.PROPERTY_LOCATION));
+    Assertions.assertEquals("true", created.properties().get(LANCE_TABLE_DECLARED));
+    verify(lanceTableOps, never()).createDataset(anyString(), any(), anyMap());
+  }
+
+  /** Registration must validate the dataset, so an hdfs location is rejected before metadata. */
+  @Test
+  public void testRegisterRejectsHdfsBeforeMetadataWrite() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "registered");
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
+    properties.put(Table.PROPERTY_LOCATION, "hdfs://namenode:8020/lake/registered");
+    properties.put(LANCE_TABLE_REGISTER, "true");
+    when(store.exists(ident, Entity.EntityType.TABLE)).thenReturn(false);
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    new Column[] {Column.of("id", Types.IntegerType.get())},
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+
+    Assertions.assertTrue(exception.getMessage().contains("does not support"));
+    verify(store, never()).put(any(), anyBoolean());
+  }
+
+  /** Dropping a managed hdfs table must fail before the metadata row is removed. */
+  @Test
+  public void testDropManagedHdfsRejectsBeforeMetadataDelete() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "managed");
+    String location = "hdfs://namenode:8020/lake/managed";
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(
+            tableEntity(
+                ident,
+                List.of(),
+                Map.of(Table.PROPERTY_TABLE_FORMAT, "lance", Table.PROPERTY_LOCATION, location)));
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class, () -> lanceTableOps.dropTable(ident));
+
+    Assertions.assertTrue(exception.getMessage().contains("does not support"));
+    verify(store, never()).delete(ident, Entity.EntityType.TABLE);
+  }
+
+  /** An external hdfs table drop removes metadata only and does not open the dataset. */
+  @Test
+  public void testDropExternalHdfsRemovesMetadataOnly() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "external");
+    String location = "hdfs://namenode:8020/lake/external";
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(
+            tableEntity(
+                ident,
+                List.of(integerColumn("id")),
+                Map.of(
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance",
+                    Table.PROPERTY_LOCATION,
+                    location,
+                    Table.PROPERTY_EXTERNAL,
+                    "true")));
+    when(store.delete(ident, Entity.EntityType.TABLE)).thenReturn(true);
+
+    Assertions.assertTrue(lanceTableOps.dropTable(ident));
+    verify(store).delete(ident, Entity.EntityType.TABLE);
+    verify(lanceTableOps, never()).openDataset(anyString(), anyMap());
+  }
+
+  /** Purging an external hdfs dataset is rejected before metadata removal. */
+  @Test
+  public void testPurgeExternalHdfsRejectsBeforeMetadataDelete() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "external");
+    lanceTableOps.setCatalogProperties(Map.of(LANCE_ALLOW_EXTERNAL_TABLE_PURGE, "true"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(
+            tableEntity(
+                ident,
+                List.of(),
+                Map.of(
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance",
+                    Table.PROPERTY_LOCATION,
+                    "viewfs://cluster/lake/external",
+                    Table.PROPERTY_EXTERNAL,
+                    "true")));
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class, () -> lanceTableOps.purgeTable(ident));
+
+    Assertions.assertTrue(exception.getMessage().contains("does not support"));
+    verify(store, never()).delete(ident, Entity.EntityType.TABLE);
+  }
+
+  /** An empty stored schema must not be treated as confirmed when the dataset cannot be opened. */
+  @Test
+  public void testLoadEmptyHdfsSchemaRejectsInsteadOfReturningStoredMetadata() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "empty");
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(
+            tableEntity(
+                ident,
+                List.of(),
+                Map.of(
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance",
+                    Table.PROPERTY_LOCATION,
+                    "hdfs://namenode:8020/lake/empty")));
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class, () -> lanceTableOps.loadTable(ident));
+
+    Assertions.assertTrue(exception.getMessage().contains("does not support hdfs"));
+    verify(store, never()).update(any(), any(), any(), any());
+  }
+
+  /** Lance REST DropTable purges, so a managed hdfs table is rejected before metadata removal. */
+  @Test
+  public void testPurgeManagedHdfsRejectsBeforeMetadataDelete() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "managed");
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(
+            tableEntity(
+                ident,
+                List.of(integerColumn("id")),
+                Map.of(
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance",
+                    Table.PROPERTY_LOCATION,
+                    "hdfs://namenode:8020/lake/managed")));
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class, () -> lanceTableOps.purgeTable(ident));
+
+    Assertions.assertTrue(exception.getMessage().contains("does not support hdfs"));
+    verify(store, never()).delete(ident, Entity.EntityType.TABLE);
+  }
+
+  /** A stored hdfs table with columns loads from metadata and does not open the dataset. */
+  @Test
+  public void testLoadStoredHdfsTableDoesNotOpenDataset() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "stored");
+    String location = "hdfs://namenode:8020/lake/stored";
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(
+            tableEntity(
+                ident,
+                List.of(integerColumn("id")),
+                Map.of(
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance",
+                    Table.PROPERTY_LOCATION,
+                    location,
+                    LANCE_TABLE_VERSION,
+                    "3")));
+
+    Table loaded = lanceTableOps.loadTable(ident);
+
+    Assertions.assertEquals(location, loaded.properties().get(Table.PROPERTY_LOCATION));
+    Assertions.assertEquals(1, loaded.columns().length);
+    verify(lanceTableOps, never()).openDataset(anyString(), anyMap());
+  }
+
+  /** A path that is not a legal URI still counts as HDFS when it starts with hdfs://. */
+  @Test
+  public void testCreateRejectsHdfsLocationThatIsNotALegalUri() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "spaced");
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
+    properties.put(Table.PROPERTY_LOCATION, "hdfs://namenode:8020/lake/my table");
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    new Column[] {Column.of("id", Types.IntegerType.get())},
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+
+    Assertions.assertTrue(exception.getMessage().contains("does not support hdfs"));
+    verify(store, never()).put(any(), anyBoolean());
+  }
+
+  /** Altering a stored hdfs table opens the dataset, so it is rejected before metadata changes. */
+  @Test
+  public void testAlterStoredHdfsTableRejectsBeforeMetadataUpdate() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "stored");
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(
+            tableEntity(
+                ident,
+                List.of(integerColumn("id")),
+                Map.of(
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance",
+                    Table.PROPERTY_LOCATION,
+                    "hdfs://namenode:8020/lake/stored",
+                    LANCE_TABLE_VERSION,
+                    "3")));
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                lanceTableOps.alterTable(
+                    ident, TableChange.deleteColumn(new String[] {"id"}, false)));
+
+    Assertions.assertTrue(exception.getMessage().contains("does not support hdfs"));
+    verify(store, never()).update(any(), any(), any(), any());
+  }
+
+  /** VERSION_CHECK opens every load, including a table that already has stored columns. */
+  @Test
+  public void testVersionCheckLoadRejectsHdfsLocation() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "stored");
+    lanceTableOps.setCatalogProperties(Map.of(LANCE_SCHEMA_REFRESH_MODE, "VERSION_CHECK"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(
+            tableEntity(
+                ident,
+                List.of(integerColumn("id")),
+                Map.of(
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance",
+                    Table.PROPERTY_LOCATION,
+                    "viewfs://cluster/lake/stored",
+                    LANCE_TABLE_VERSION,
+                    "3")));
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class, () -> lanceTableOps.loadTable(ident));
+
+    Assertions.assertTrue(exception.getMessage().contains("does not support viewfs"));
+    verify(store, never()).update(any(), any(), any(), any());
+  }
+
+  /**
+   * Overwrite purges the existing dataset, so an hdfs table is rejected before metadata removal.
+   */
+  @Test
+  public void testOverwriteManagedHdfsRejectsBeforeMetadataDelete() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "managed");
+    String location = "hdfs://namenode:8020/lake/managed";
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(
+            tableEntity(
+                ident,
+                List.of(integerColumn("id")),
+                Map.of(Table.PROPERTY_TABLE_FORMAT, "lance", Table.PROPERTY_LOCATION, location)));
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
+    properties.put(Table.PROPERTY_LOCATION, location);
+    properties.put(LANCE_CREATION_MODE, "OVERWRITE");
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    new Column[] {Column.of("id", Types.IntegerType.get())},
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+
+    Assertions.assertTrue(exception.getMessage().contains("does not support hdfs"));
+    verify(store, never()).delete(ident, Entity.EntityType.TABLE);
+    verify(store, never()).put(any(), anyBoolean());
+  }
+
+  /** Declared hdfs tables must surface the unsupported scheme instead of stale metadata. */
+  @Test
+  public void testLoadDeclaredHdfsRejectsInsteadOfReturningStoredSchema() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "declared");
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(
+            tableEntity(
+                ident,
+                List.of(),
+                Map.of(
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance",
+                    Table.PROPERTY_LOCATION,
+                    "hdfs://namenode:8020/lake/declared",
+                    LANCE_TABLE_DECLARED,
+                    "true")));
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class, () -> lanceTableOps.loadTable(ident));
+
+    Assertions.assertTrue(exception.getMessage().contains("does not support"));
+    verify(store, never()).update(any(), any(), any(), any());
+  }
+
+  /** Deregister and table-exists loads can read a declared hdfs table without opening it. */
+  @Test
+  public void testStoredMetadataLoadSkipsOpeningHdfsDataset() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "declared");
+    String location = "hdfs://namenode:8020/lake/declared";
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(
+            tableEntity(
+                ident,
+                List.of(),
+                Map.of(
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance",
+                    Table.PROPERTY_LOCATION,
+                    location,
+                    LANCE_TABLE_DECLARED,
+                    "true")));
+
+    Table loaded = TableLoadScope.call(() -> lanceTableOps.loadTable(ident));
+
+    Assertions.assertEquals(location, loaded.properties().get(Table.PROPERTY_LOCATION));
+    Assertions.assertFalse(TableLoadScope.isActive());
+    verify(lanceTableOps, never()).openDataset(anyString(), anyMap());
+    verify(store, never()).update(any(), any(), any(), any());
+  }
+
+  /** A metadata-only load of an object-store table still opens the dataset. */
+  @Test
+  public void testStoredMetadataLoadStillOpensObjectStoreDataset() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "declared");
+    String location = "s3://bucket/declared";
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(
+            tableEntity(
+                ident,
+                List.of(),
+                Map.of(
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance",
+                    Table.PROPERTY_LOCATION,
+                    location,
+                    LANCE_TABLE_DECLARED,
+                    "true")));
+    doThrow(new IllegalArgumentException("dataset not found"))
+        .when(lanceTableOps)
+        .openDataset(anyString(), anyMap());
+
+    Table loaded = TableLoadScope.call(() -> lanceTableOps.loadTable(ident));
+
+    Assertions.assertEquals(location, loaded.properties().get(Table.PROPERTY_LOCATION));
+    verify(lanceTableOps).openDataset(anyString(), anyMap());
+  }
+
+  /** A declared managed hdfs table can be removed because it has no dataset. */
+  @Test
+  public void testDropDeclaredManagedHdfsRemovesMetadataOnly() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "declared");
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(
+            tableEntity(
+                ident,
+                List.of(),
+                Map.of(
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance",
+                    Table.PROPERTY_LOCATION,
+                    "hdfs://namenode:8020/lake/declared",
+                    LANCE_TABLE_DECLARED,
+                    "true")));
+    when(store.delete(ident, Entity.EntityType.TABLE)).thenReturn(true);
+
+    Assertions.assertTrue(lanceTableOps.dropTable(ident));
+    verify(store).delete(ident, Entity.EntityType.TABLE);
+    verify(lanceTableOps, never()).openDataset(anyString(), anyMap());
+  }
+
+  /** OVERWRITE must not delete the current dataset when the replacement location is hdfs. */
+  @Test
+  public void testOverwriteRejectsHdfsBeforePurgingExistingTable() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "orders");
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(
+            tableEntity(
+                ident,
+                List.of(integerColumn("id")),
+                Map.of(
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance",
+                    Table.PROPERTY_LOCATION,
+                    tempDir.resolve("orders").toString())));
+    when(store.delete(ident, Entity.EntityType.TABLE)).thenReturn(true);
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
+    properties.put(Table.PROPERTY_LOCATION, "hdfs://namenode:8020/lake/orders");
+    properties.put(LANCE_CREATION_MODE, "OVERWRITE");
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    new Column[] {Column.of("id", Types.IntegerType.get())},
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+
+    Assertions.assertTrue(exception.getMessage().contains("does not support hdfs"));
+    verify(store, never()).delete(ident, Entity.EntityType.TABLE);
+  }
+
+  /** Leading whitespace does not hide an hdfs scheme. */
+  @Test
+  public void testCreateRejectsHdfsLocationWithLeadingWhitespace() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "orders");
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
+    properties.put(Table.PROPERTY_LOCATION, " hdfs://namenode:8020/lake/orders");
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    new Column[] {Column.of("id", Types.IntegerType.get())},
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+
+    Assertions.assertTrue(exception.getMessage().contains("does not support hdfs"));
+    verify(store, never()).put(any(), anyBoolean());
+  }
+
+  /** A dataset NotSupported failure on a local path still returns the stored schema. */
+  @Test
+  public void testLoadReturnsStoredMetadataWhenOpenIsUnsupported() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("schema", "declared");
+    String location = tempDir.resolve("declared-local").toString();
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(
+            tableEntity(
+                ident,
+                List.of(),
+                Map.of(
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance",
+                    Table.PROPERTY_LOCATION,
+                    location,
+                    LANCE_TABLE_DECLARED,
+                    "true")));
+    doThrow(new UnsupportedOperationException("Not supported"))
+        .when(lanceTableOps)
+        .openDataset(anyString(), anyMap());
+
+    Table loaded = lanceTableOps.loadTable(ident);
+
+    Assertions.assertEquals(location, loaded.properties().get(Table.PROPERTY_LOCATION));
+    verify(store, never()).update(any(), any(), any(), any());
+  }
+
+  /** Unsupported dataset operations other than hdfs stay wrapped as creation failures. */
+  @Test
+  public void testCreateWrapsUnsupportedDatasetOperation() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "orders");
+    String location = tempDir.resolve("unsupported-type").toString();
+    doThrow(new UnsupportedOperationException("unsupported column type"))
+        .when(lanceTableOps)
+        .createDataset(anyString(), any(), anyMap());
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
+    properties.put(Table.PROPERTY_LOCATION, location);
+
+    RuntimeException exception =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    new Column[] {Column.of("id", Types.IntegerType.get())},
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+
+    Assertions.assertFalse(exception instanceof UnsupportedOperationException);
+    Assertions.assertTrue(exception.getMessage().contains("Failed to create Lance dataset"));
+    Assertions.assertInstanceOf(UnsupportedOperationException.class, exception.getCause());
+    verify(store, never()).put(any(), anyBoolean());
   }
 
   /** Verifies EXIST_OK does not return a non-Lance entity as a Lance table. */
@@ -2418,6 +3010,16 @@ public class TestLanceTableOperations {
                 null,
                 new SortOrder[0],
                 new Index[0]));
+  }
+
+  private static ColumnEntity integerColumn(String name) {
+    return ColumnEntity.builder()
+        .withId(11L)
+        .withName(name)
+        .withDataType(Types.IntegerType.get())
+        .withPosition(0)
+        .withAuditInfo(AuditInfo.EMPTY)
+        .build();
   }
 
   private static TableEntity tableEntity(

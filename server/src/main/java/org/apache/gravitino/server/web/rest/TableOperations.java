@@ -61,6 +61,7 @@ import org.apache.gravitino.server.authorization.expression.AuthorizationExpress
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.gravitino.utils.TableLoadScope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -189,7 +190,8 @@ public class TableOperations {
       @PathParam("table") @AuthorizationMetadata(type = Entity.EntityType.TABLE) String table,
       @QueryParam("privileges")
           @AuthorizationRequest(type = AuthorizationRequest.RequestType.LOAD_TABLE)
-          String requiredPrivileges) {
+          String requiredPrivileges,
+      @QueryParam(TableLoadScope.METADATA_ONLY_PARAM) @DefaultValue("false") boolean metadataOnly) {
     LOG.info(
         "Received load table request for table: {}.{}.{}.{}", metalake, catalog, schema, table);
     try {
@@ -197,7 +199,10 @@ public class TableOperations {
           httpRequest,
           () -> {
             NameIdentifier ident = NameIdentifierUtil.ofTable(metalake, catalog, schema, table);
-            Table t = dispatcher.loadTable(ident);
+            Table t =
+                metadataOnly
+                    ? TableLoadScope.call(() -> dispatcher.loadTable(ident))
+                    : dispatcher.loadTable(ident);
             Response response = Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
             LOG.info("Table loaded: {}.{}.{}.{}", metalake, catalog, schema, table);
             return response;

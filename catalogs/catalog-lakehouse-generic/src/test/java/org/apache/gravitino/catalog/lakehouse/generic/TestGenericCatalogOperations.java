@@ -87,6 +87,7 @@ import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -912,6 +913,160 @@ public class TestGenericCatalogOperations {
     // The format cache is populated after a successful creation, so a refused one must leave no
     // entry behind for a later table of the same name to read.
     Assertions.assertNull(opsWithFakeProvider.tableFormatCache().getIfPresent(tableIdent));
+  }
+
+  /** A managed hdfs table stops a cascade before its metadata or the schema is removed. */
+  @Test
+  public void testCascadeDropStopsBeforeRemovingManagedHdfsTable() throws IOException {
+    GenericCatalogOperations catalogOps = new GenericCatalogOperations(store, idGenerator);
+    catalogOps.initialize(ImmutableMap.of(), null, new GenericCatalog());
+    String schemaName = "hdfs_cascade_" + UUID.randomUUID().toString().replace("-", "");
+    NameIdentifier schemaIdent =
+        NameIdentifierUtil.ofSchema(METALAKE_NAME, CATALOG_NAME, schemaName);
+    catalogOps.createSchema(
+        schemaIdent,
+        "schema comment",
+        StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(idGenerator.nextId()), null));
+    NameIdentifier tableIdent =
+        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName, "orders");
+    store.put(
+        TableEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName("orders")
+            .withNamespace(Namespace.of(METALAKE_NAME, CATALOG_NAME, schemaName))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .withProperties(
+                ImmutableMap.of(
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance",
+                    Table.PROPERTY_LOCATION,
+                    "hdfs://namenode:8020/lake/orders"))
+            .build(),
+        false);
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class, () -> catalogOps.dropSchema(schemaIdent, true));
+
+    Assertions.assertTrue(exception.getMessage().contains("does not support hdfs"));
+    Assertions.assertNotNull(store.get(tableIdent, TABLE, TableEntity.class));
+    Assertions.assertDoesNotThrow(() -> catalogOps.loadSchema(schemaIdent));
+  }
+
+  /** Existence is the stored row. Opening an hdfs dataset is not required. */
+  @Test
+  public void testHdfsTableExistsWithoutOpeningDataset() throws IOException {
+    GenericCatalogOperations catalogOps = new GenericCatalogOperations(store, idGenerator);
+    catalogOps.initialize(ImmutableMap.of(), null, new GenericCatalog());
+    String schemaName = "hdfs_exists_" + UUID.randomUUID().toString().replace("-", "");
+    NameIdentifier schemaIdent =
+        NameIdentifierUtil.ofSchema(METALAKE_NAME, CATALOG_NAME, schemaName);
+    catalogOps.createSchema(
+        schemaIdent,
+        "schema comment",
+        StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(idGenerator.nextId()), null));
+    NameIdentifier tableIdent =
+        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName, "orders");
+    store.put(
+        TableEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName("orders")
+            .withNamespace(Namespace.of(METALAKE_NAME, CATALOG_NAME, schemaName))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .withProperties(
+                ImmutableMap.of(
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance",
+                    Table.PROPERTY_LOCATION,
+                    "hdfs://namenode:8020/lake/orders",
+                    "lance.declared",
+                    "true"))
+            .build(),
+        false);
+
+    Assertions.assertTrue(catalogOps.tableExists(tableIdent));
+    Assertions.assertNotNull(store.get(tableIdent, TABLE, TableEntity.class));
+  }
+
+  /** A table with no location inherits the catalog path, including an hdfs scheme. */
+  @Test
+  public void testCreateRejectsLocationInheritedFromHdfsCatalog() {
+    GenericCatalogOperations catalogOps = new GenericCatalogOperations(store, idGenerator);
+    catalogOps.initialize(
+        ImmutableMap.of(Catalog.PROPERTY_LOCATION, "hdfs://namenode:8020/lake"),
+        null,
+        new GenericCatalog());
+    String schemaName = "hdfs_inherited_" + UUID.randomUUID().toString().replace("-", "");
+    NameIdentifier schemaIdent =
+        NameIdentifierUtil.ofSchema(METALAKE_NAME, CATALOG_NAME, schemaName);
+    catalogOps.createSchema(
+        schemaIdent,
+        "schema comment",
+        StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(idGenerator.nextId()), null));
+    NameIdentifier tableIdent =
+        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName, "orders");
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
+    properties.putAll(
+        StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(idGenerator.nextId()), null));
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                catalogOps.createTable(
+                    tableIdent,
+                    new Column[] {Column.of("id", Types.IntegerType.get())},
+                    "comment",
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+
+    Assertions.assertTrue(exception.getMessage().contains("does not support hdfs"));
+    Assertions.assertFalse(catalogOps.tableExists(tableIdent));
+  }
+
+  /** An explicit table location stays on that scheme when the catalog location is hdfs. */
+  @Test
+  public void testExplicitFileLocationIsNotRejectedBecauseCatalogLocationIsHdfs() {
+    GenericCatalogOperations catalogOps = new GenericCatalogOperations(store, idGenerator);
+    catalogOps.initialize(
+        ImmutableMap.of(Catalog.PROPERTY_LOCATION, "hdfs://namenode:8020/lake"),
+        null,
+        new GenericCatalog());
+    String schemaName = "file_override_" + UUID.randomUUID().toString().replace("-", "");
+    NameIdentifier schemaIdent =
+        NameIdentifierUtil.ofSchema(METALAKE_NAME, CATALOG_NAME, schemaName);
+    catalogOps.createSchema(
+        schemaIdent,
+        "schema comment",
+        StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(idGenerator.nextId()), null));
+    String location = lanceDataDir.resolve("explicit-file").toString();
+    NameIdentifier tableIdent =
+        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName, "orders");
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
+    properties.put(Table.PROPERTY_LOCATION, location);
+    properties.putAll(
+        StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(idGenerator.nextId()), null));
+
+    Table created =
+        catalogOps.createTable(
+            tableIdent,
+            new Column[] {Column.of("id", Types.IntegerType.get())},
+            "comment",
+            properties,
+            new Transform[0],
+            null,
+            new SortOrder[0],
+            new Index[0]);
+
+    Assertions.assertTrue(created.properties().get(Table.PROPERTY_LOCATION).startsWith(location));
+    Assertions.assertFalse(created.properties().get(Table.PROPERTY_LOCATION).startsWith("hdfs"));
   }
 
   private NameIdentifier createSchema() {

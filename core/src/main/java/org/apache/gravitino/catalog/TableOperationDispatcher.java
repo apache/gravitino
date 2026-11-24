@@ -65,6 +65,7 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.exceptions.UnsupportedTableStorageException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
@@ -160,7 +161,12 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     }
     // Cold tables, changed identifiers, managed catalogs and connectors without the optional
     // probe retain the load/import path, including its identity conflict checks.
-    return TableDispatcher.super.tableExists(ident);
+    try {
+      return TableDispatcher.super.tableExists(ident);
+    } catch (UnsupportedTableStorageException e) {
+      // Opening the dataset is unsupported, but the stored table row is what existence checks.
+      return true;
+    }
   }
 
   /**

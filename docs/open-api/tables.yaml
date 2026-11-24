@@ -87,7 +87,11 @@ paths:
         - table
       summary: Get table
       operationId: loadTable
-      description: Returns the specified table object
+      description: |
+        Returns the specified table object. Set `metadataOnly` to return the stored table
+        without refreshing its schema from the dataset.
+      parameters:
+        - $ref: "#/components/parameters/metadataOnly"
       responses:
         "200":
           $ref: "#/components/responses/TableResponse"
@@ -174,6 +178,16 @@ components:
       name: purge
       in: query
       description: Removes both the metadata and the directory associated with the table completely and skipping trash.
+      required: false
+      schema:
+        type: boolean
+        default: false
+    metadataOnly:
+      name: metadataOnly
+      in: query
+      description: |
+        When true, return the table metadata stored by Gravitino and do not open the underlying
+        dataset to refresh the schema.
       required: false
       schema:
         type: boolean
