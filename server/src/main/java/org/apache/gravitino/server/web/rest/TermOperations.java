@@ -59,7 +59,13 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
 
-/** Metalake-scoped glossary term definitions and hierarchy. */
+/**
+ * Metalake-scoped glossary term definitions and hierarchy.
+ *
+ * <p>The empty authorization expressions retain the interceptor's metalake membership and active
+ * role checks. The glossary manager checks term and domain access inside the read snapshot or write
+ * transaction, including domains and relation targets supplied in a request body.
+ */
 @Path("/metalakes/{metalake}/terms")
 @Produces("application/vnd.gravitino.v1+json")
 public class TermOperations {

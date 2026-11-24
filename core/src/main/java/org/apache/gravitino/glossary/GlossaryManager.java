@@ -168,7 +168,7 @@ public final class GlossaryManager {
     List<GlossaryTermEntity> result = new ArrayList<>();
     Set<Long> seen = new HashSet<>(Set.of(root.id()));
     Set<Long> frontier = Set.of(root.id());
-    do {
+    for (; ; ) {
       Set<Long> next = new LinkedHashSet<>();
       List<GlossaryTermRelPO> links =
           switch (direction) {
@@ -193,7 +193,10 @@ public final class GlossaryManager {
           frontier.add(term.id());
         }
       }
-    } while (transitive && !frontier.isEmpty());
+      if (!transitive || frontier.isEmpty()) {
+        break;
+      }
+    }
     return visibleDomains(result, access);
   }
 
