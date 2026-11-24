@@ -31,7 +31,6 @@ import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
-import org.apache.gravitino.storage.CloudStorageCredentialPropertyKeys;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -353,7 +352,7 @@ public class TestSecretPropertyUtils {
   @Test
   void testResolveStaticCredentialKeysToOmitNullMetadataIsConservative() {
     Assertions.assertEquals(
-        CloudStorageCredentialPropertyKeys.cloudAccessKeyPairKeys(),
+        CloudStorageCredentialPropertyKeys.staticCredentialSecretKeys(),
         SecretPropertyUtils.resolveStaticCredentialKeysToOmit(null, null));
   }
 

@@ -33,7 +33,6 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
-import org.apache.gravitino.storage.CloudStorageCredentialPropertyKeys;
 
 /**
  * Helpers for secret-related entity property handling and request validation.
@@ -426,7 +425,7 @@ public final class SecretPropertyUtils {
    */
   public static Map<String, String> omitCloudAccessKeyPairSecrets(
       @Nullable Map<String, String> secrets) {
-    return CloudStorageCredentialPropertyKeys.omitCloudAccessKeyPairProperties(secrets);
+    return CloudStorageCredentialPropertyKeys.omitStaticCredentialSecrets(secrets);
   }
 
   /**
@@ -454,7 +453,7 @@ public final class SecretPropertyUtils {
       @Nullable Map<String, String> secrets,
       @Nullable PropertiesMetadata metadata,
       @Nullable Map<String, String> rawProperties) {
-    return CloudStorageCredentialPropertyKeys.omitCloudAccessKeyPairProperties(
+    return CloudStorageCredentialPropertyKeys.omitStaticCredentialSecrets(
         secrets, resolveStaticCredentialKeysToOmit(metadata, rawProperties));
   }
 
@@ -469,15 +468,15 @@ public final class SecretPropertyUtils {
   static Set<String> resolveStaticCredentialKeysToOmit(
       @Nullable PropertiesMetadata metadata, @Nullable Map<String, String> rawProperties) {
     if (metadata == null) {
-      return CloudStorageCredentialPropertyKeys.cloudAccessKeyPairKeys();
+      return CloudStorageCredentialPropertyKeys.staticCredentialSecretKeys();
     }
     Set<String> keys = new HashSet<>();
-    for (String key : CloudStorageCredentialPropertyKeys.cloudAccessKeyPairKeys()) {
+    for (String key : CloudStorageCredentialPropertyKeys.staticCredentialSecretKeys()) {
       if (metadata.containsProperty(key)) {
         keys.add(key);
       }
     }
-    keys.addAll(StaticCredentialPropertyKeys.keysForCredentialProviders(rawProperties));
+    keys.addAll(CloudStorageCredentialPropertyKeys.keysForCredentialProviders(rawProperties));
     return keys;
   }
 
