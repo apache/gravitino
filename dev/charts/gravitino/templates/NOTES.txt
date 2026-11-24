@@ -69,6 +69,19 @@ Override postgresql.auth.password (or set postgresql.auth.existingSecret)
 before any non-trial deployment.
 {{- end }}
 
+{{- if eq (include "gravitino.schemaMigrateEnabled" . | trim) "true" }}
+
+NOTE: Entity schema migration runs in a regular schema-migrate Job
+(schema.migrate.enabled). Application Pods wait for gravitino_schema_migration
+before starting. Per-pod init-mysql/init-postgresql schema apply is replaced by
+wait-only inits while migrate is enabled. The Job inherits Deployment
+nodeSelector/affinity/tolerations. For an existing database without a recorded
+version, set schema.baselineVersion (X.Y.Z) to the version that created it.
+{{- if and (not .Values.mysql.enabled) (not .Values.postgresql.enabled) }}
+Set schema.migrate.existingSecret for external database credentials.
+{{- end }}
+{{- end }}
+
 {{- if and (eq (include "gravitino.entityUsesExternalPostgresql" . | trim) "true") .Values.postgresql.init.enabled }}
 
 NOTE: External PostgreSQL schema init is enabled (postgresql.init.enabled).
