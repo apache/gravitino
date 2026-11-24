@@ -131,7 +131,9 @@ public class TestCloudStorageCredentialPropertyKeys {
             "AKIATEST",
             S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
             "secret",
-            "jdbc-password",
+            CloudStorageCredentialPropertyKeys.JDBC_USER,
+            "db-user",
+            CloudStorageCredentialPropertyKeys.JDBC_PASSWORD,
             "db-pass",
             "custom-token",
             "tok");
@@ -139,10 +141,11 @@ public class TestCloudStorageCredentialPropertyKeys {
     Map<String, String> filtered =
         CloudStorageCredentialPropertyKeys.omitCloudAccessKeyPairProperties(secrets);
 
-    assertEquals("db-pass", filtered.get("jdbc-password"));
     assertEquals("tok", filtered.get("custom-token"));
     assertFalse(filtered.containsKey(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
     assertFalse(filtered.containsKey(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+    assertFalse(filtered.containsKey(CloudStorageCredentialPropertyKeys.JDBC_USER));
+    assertFalse(filtered.containsKey(CloudStorageCredentialPropertyKeys.JDBC_PASSWORD));
   }
 
   @Test
@@ -159,7 +162,13 @@ public class TestCloudStorageCredentialPropertyKeys {
     assertTrue(
         CloudStorageCredentialPropertyKeys.isCloudAccessKeyPairKey(
             PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN));
-    assertFalse(CloudStorageCredentialPropertyKeys.isCloudAccessKeyPairKey("jdbc-password"));
+    assertTrue(
+        CloudStorageCredentialPropertyKeys.isCloudAccessKeyPairKey(
+            CloudStorageCredentialPropertyKeys.JDBC_USER));
+    assertTrue(
+        CloudStorageCredentialPropertyKeys.isCloudAccessKeyPairKey(
+            CloudStorageCredentialPropertyKeys.JDBC_PASSWORD));
+    assertFalse(CloudStorageCredentialPropertyKeys.isCloudAccessKeyPairKey("custom-token"));
   }
 
   @Test
@@ -172,15 +181,18 @@ public class TestCloudStorageCredentialPropertyKeys {
             "dlf-sk",
             PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN,
             "dlf-token",
-            "jdbc-password",
-            "db-pass");
+            CloudStorageCredentialPropertyKeys.JDBC_PASSWORD,
+            "db-pass",
+            "other-secret",
+            "keep");
 
     Map<String, String> filtered =
         CloudStorageCredentialPropertyKeys.omitCloudAccessKeyPairProperties(secrets);
 
-    assertEquals("db-pass", filtered.get("jdbc-password"));
+    assertEquals("keep", filtered.get("other-secret"));
     assertFalse(filtered.containsKey(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID));
     assertFalse(filtered.containsKey(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET));
     assertFalse(filtered.containsKey(PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN));
+    assertFalse(filtered.containsKey(CloudStorageCredentialPropertyKeys.JDBC_PASSWORD));
   }
 }

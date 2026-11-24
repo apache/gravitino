@@ -415,12 +415,12 @@ public final class SecretPropertyUtils {
   }
 
   /**
-   * Omits cloud access-key pair properties from a plaintext secrets map for {@code USE_SECRETS}
-   * callers. Delegates to {@link
+   * Omits static credential properties from a plaintext secrets map for {@code USE_SECRETS} callers
+   * that lack {@code INCLUDE_CREDENTIAL_SECRETS}. Delegates to {@link
    * CloudStorageCredentialPropertyKeys#omitCloudAccessKeyPairProperties}.
    *
    * @param secrets plaintext secrets
-   * @return secrets without cloud AK/SK pairs
+   * @return secrets without static credential properties
    */
   public static Map<String, String> omitCloudAccessKeyPairSecrets(
       @Nullable Map<String, String> secrets) {

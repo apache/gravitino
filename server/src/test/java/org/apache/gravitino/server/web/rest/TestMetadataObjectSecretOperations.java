@@ -177,7 +177,7 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
   }
 
   @Test
-  public void testGetSecretsFiltersCloudKeysWithUseSecretsOnly() throws Exception {
+  public void testGetSecretsFiltersStaticCredentialKeysWithUseSecretsOnly() throws Exception {
     MetadataObject metadataObject =
         MetadataObjects.parse("catalog.schema.fileset", MetadataObject.Type.FILESET);
     when(secretPropertyOperationDispatcher.getSecrets(any(), any(Entity.EntityType.class)))
@@ -187,6 +187,8 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
                 "AKIA",
                 "s3-secret-access-key",
                 "secret",
+                "jdbc-user",
+                "db-user",
                 "jdbc-password",
                 "db-pass",
                 "custom-secret",
@@ -225,10 +227,11 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
       Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
       SecretsResponse secretResponse = (SecretsResponse) response.getEntity();
       Assertions.assertEquals(0, secretResponse.getCode());
-      Assertions.assertEquals("db-pass", secretResponse.getSecrets().get("jdbc-password"));
       Assertions.assertEquals("plaintext", secretResponse.getSecrets().get("custom-secret"));
       Assertions.assertFalse(secretResponse.getSecrets().containsKey("s3-access-key-id"));
       Assertions.assertFalse(secretResponse.getSecrets().containsKey("s3-secret-access-key"));
+      Assertions.assertFalse(secretResponse.getSecrets().containsKey("jdbc-user"));
+      Assertions.assertFalse(secretResponse.getSecrets().containsKey("jdbc-password"));
     }
   }
 
