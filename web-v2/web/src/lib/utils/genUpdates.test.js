@@ -274,6 +274,30 @@ describe('hasAutoIncrementEditConflict', () => {
     expect(hasAutoIncrementEditConflict('jdbc-mysql', [oldColumn], [newColumn])).toBe(true)
   })
 
+  it.each(['jdbc-mysql', 'jdbc-oceanbase'])(
+    'requires saving Required before enabling AutoIncrement on %s',
+    provider => {
+      const saved = { ...originalColumn, nullable: true, autoIncrement: false }
+      const edited = { uniqueId: 'id', name: 'id', comment: saved.comment, required: true, autoIncrement: true }
+
+      expect(hasAutoIncrementEditConflict(provider, [saved], [edited])).toBe(true)
+      expect(hasAutoIncrementEditConflict(provider, [saved], [{ ...edited, autoIncrement: false }])).toBe(false)
+      expect(hasAutoIncrementEditConflict(provider, [{ ...saved, nullable: false }], [edited])).toBe(false)
+    }
+  )
+
+  it.each(['jdbc-mysql', 'jdbc-oceanbase'])(
+    'requires disabling AutoIncrement before clearing Required on %s',
+    provider => {
+      const saved = { ...originalColumn, nullable: false }
+      const edited = { uniqueId: 'id', name: 'id', comment: saved.comment, required: false, autoIncrement: false }
+
+      expect(hasAutoIncrementEditConflict(provider, [saved], [edited])).toBe(true)
+      expect(hasAutoIncrementEditConflict(provider, [saved], [{ ...edited, required: true }])).toBe(false)
+      expect(hasAutoIncrementEditConflict(provider, [{ ...saved, autoIncrement: false }], [edited])).toBe(false)
+    }
+  )
+
   it.each([
     { name: 'user_id' },
     { comment: 'New comment' },

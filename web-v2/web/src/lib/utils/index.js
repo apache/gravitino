@@ -52,10 +52,12 @@ export const hasAutoIncrementEditConflict = (provider, originalColumns, newColum
 
     const originalType = originalColumn.type && getColumnType(originalColumn.type)
     const editedType = newColumn.typeObj?.type
+    const wasRequired = !originalColumn.nullable
 
     return (
       (!newColumn.autoIncrement && originalColumn.name !== newColumn.name) ||
       (originalColumn.comment || '') !== (newColumn.comment || '') ||
+      (typeof newColumn.required === 'boolean' && newColumn.required !== wasRequired) ||
       (originalType && editedType && originalType.toLowerCase() !== editedType.toLowerCase())
     )
   })
