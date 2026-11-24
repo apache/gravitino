@@ -41,10 +41,15 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.audit.CallerContext;
+import org.apache.gravitino.credential.ADLSTokenCredential;
+import org.apache.gravitino.credential.AwsIrsaCredential;
+import org.apache.gravitino.credential.COSTokenCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
 import org.apache.gravitino.credential.CredentialPrivilege;
-import org.apache.gravitino.credential.CredentialProviderKinds;
+import org.apache.gravitino.credential.GCSTokenCredential;
+import org.apache.gravitino.credential.OSSTokenCredential;
+import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.responses.CredentialResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
@@ -68,6 +73,16 @@ public class MetadataObjectCredentialOperations {
 
   private static final Set<MetadataObject.Type> supportsCredentialMetadataTypes =
       ImmutableSet.of(MetadataObject.Type.CATALOG, MetadataObject.Type.FILESET);
+
+  /** Short-lived token / scoped types returned without INCLUDE_CREDENTIAL_SECRETS. */
+  private static final Set<String> TOKEN_CREDENTIAL_TYPES =
+      ImmutableSet.of(
+          S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE,
+          OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE,
+          COSTokenCredential.COS_TOKEN_CREDENTIAL_TYPE,
+          ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE,
+          GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE,
+          AwsIrsaCredential.AWS_IRSA_CREDENTIAL_TYPE);
 
   private CredentialOperationDispatcher credentialOperationDispatcher;
 
@@ -175,12 +190,18 @@ public class MetadataObjectCredentialOperations {
     }
     List<Credential> tokens = new ArrayList<>();
     for (Credential credential : credentials) {
-      if (credential != null
-          && CredentialProviderKinds.isTokenCredentialType(credential.credentialType())) {
+      if (credential != null && isTokenCredentialType(credential.credentialType())) {
         tokens.add(credential);
       }
     }
     return tokens;
+  }
+
+  private static boolean isTokenCredentialType(String credentialType) {
+    if (credentialType == null || credentialType.isEmpty()) {
+      return false;
+    }
+    return TOKEN_CREDENTIAL_TYPES.contains(credentialType.toLowerCase(Locale.ROOT));
   }
 
   private static boolean supportsCredentialOperations(MetadataObject metadataObject) {
