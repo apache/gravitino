@@ -46,10 +46,13 @@ import org.apache.gravitino.storage.S3Properties;
  * Static credential type → property keys for {@code getSecrets} filtering when the caller has
  * {@code USE_SECRETS} but not {@code INCLUDE_CREDENTIAL_SECRETS}. Token providers are absent.
  *
+ * <p>Also used by catalog {@code getCredentials} soft-filtering: without {@code
+ * INCLUDE_CREDENTIAL_SECRETS}, drop credentials whose type is in this map.
+ *
  * <p>Includes Glue AWS, Paimon DLF, JDBC, and cloud storage static keys. GVFS only drops masked
  * {@code properties()} placeholders in {@code BaseGVFSOperations}.
  */
-final class StaticCredentialSecretKeys {
+public final class StaticCredentialSecretKeys {
 
   private static final Map<String, Set<String>> KEYS_BY_CREDENTIAL_TYPE =
       ImmutableMap.<String, Set<String>>builder()
@@ -104,6 +107,19 @@ final class StaticCredentialSecretKeys {
   }
 
   private StaticCredentialSecretKeys() {}
+
+  /**
+   * Returns whether {@code credentialType} is a known static (long-lived) credential-provider type.
+   *
+   * @param credentialType credential type string, or null
+   * @return true for types in {@link #KEYS_BY_CREDENTIAL_TYPE}
+   */
+  public static boolean isStaticCredentialType(@Nullable String credentialType) {
+    if (credentialType == null || credentialType.isEmpty()) {
+      return false;
+    }
+    return KEYS_BY_CREDENTIAL_TYPE.containsKey(credentialType.toLowerCase(Locale.ROOT));
+  }
 
   /** All static credential secret keys (conservative omit when metadata is unavailable). */
   static Set<String> allKeys() {
