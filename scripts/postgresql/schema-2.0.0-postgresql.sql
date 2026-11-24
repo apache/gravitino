@@ -1425,6 +1425,13 @@ CREATE TABLE IF NOT EXISTS glossary_term_version_head (
     reserved_name VARCHAR(384),
     CONSTRAINT uk_glossary_candidate_name UNIQUE (metalake_id, reserved_name)
 );
+COMMENT ON TABLE glossary_term_version_head IS 'Publication pointers and pending name reservation for one glossary term';
+COMMENT ON COLUMN glossary_term_version_head.term_id IS 'Stable term ID shared by all versions, including candidates created before first publication';
+COMMENT ON COLUMN glossary_term_version_head.metalake_id IS 'Metalake that owns the term and scopes its reserved name';
+COMMENT ON COLUMN glossary_term_version_head.last_version IS 'Highest business version allocated for this term, including superseded and rejected versions';
+COMMENT ON COLUMN glossary_term_version_head.published_version IS 'Version currently served to readers, NULL until the first publication';
+COMMENT ON COLUMN glossary_term_version_head.candidate_version IS 'Current draft or submitted version, NULL when the term has no pending changes';
+COMMENT ON COLUMN glossary_term_version_head.reserved_name IS 'Normalized term name held by an unpublished candidate, released on publication or rejection';
 
 CREATE TABLE IF NOT EXISTS glossary_term_version_info (
     term_id BIGINT NOT NULL,
@@ -1434,6 +1441,12 @@ CREATE TABLE IF NOT EXISTS glossary_term_version_info (
     snapshot TEXT NOT NULL,
     PRIMARY KEY (term_id, version_id)
 );
+COMMENT ON TABLE glossary_term_version_info IS 'Historical glossary term snapshots and their publication outcomes';
+COMMENT ON COLUMN glossary_term_version_info.term_id IS 'Stable term ID to which this snapshot belongs';
+COMMENT ON COLUMN glossary_term_version_info.version_id IS 'Business version number within the term, used to address this exact snapshot';
+COMMENT ON COLUMN glossary_term_version_info.base_revision IS 'Concurrency revision of the live definition when this snapshot was taken, zero for an unpublished creation';
+COMMENT ON COLUMN glossary_term_version_info.lifecycle IS 'Publication state of this version: DRAFT, SUBMITTED, PUBLISHED, REJECTED or SUPERSEDED';
+COMMENT ON COLUMN glossary_term_version_info.snapshot IS 'JSON containing the definition, audit fields, synonyms, domain membership and term relationships at capture time';
 
 CREATE TABLE IF NOT EXISTS glossary_term_meta (
     term_id BIGINT NOT NULL PRIMARY KEY,

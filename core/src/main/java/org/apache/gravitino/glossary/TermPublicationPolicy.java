@@ -28,7 +28,8 @@ public interface TermPublicationPolicy {
   /**
    * Authorizes the current authenticated actor to publish or reject this exact submitted version.
    */
-  default boolean canDecide(String metalake, long termId, long candidateVersionId) {
+  default boolean canPublishOrRejectCandidate(
+      String metalake, long termId, long candidateVersionId) {
     return false;
   }
 }

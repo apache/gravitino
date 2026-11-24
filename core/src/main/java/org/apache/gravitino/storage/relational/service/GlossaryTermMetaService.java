@@ -269,8 +269,8 @@ public final class GlossaryTermMetaService {
           SessionUtils.doWithoutCommit(
               GlossaryTermVersionMapper.class,
               versions -> {
-                versions.deleteMetalakeVersions(metalakeId);
-                versions.deleteMetalakeHeads(metalakeId);
+                versions.deleteVersionsByMetalakeId(metalakeId);
+                versions.deleteVersionHeadsByMetalakeId(metalakeId);
               });
           mapper.dropMetalake(metalakeId, deletedAt);
           mapper.dropMetalakeSynonyms(metalakeId, deletedAt);
@@ -295,8 +295,8 @@ public final class GlossaryTermMetaService {
             SessionUtils.doWithoutCommit(
                 GlossaryTermVersionMapper.class,
                 versions -> {
-                  versions.deleteVersions(id);
-                  versions.deleteHead(id);
+                  versions.deleteVersionsByTermId(id);
+                  versions.deleteVersionHeadByTermId(id);
                 });
             mapper.purgeSynonyms(id);
             count += mapper.purge(id);

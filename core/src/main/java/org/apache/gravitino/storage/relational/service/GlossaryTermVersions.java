@@ -65,7 +65,7 @@ public final class GlossaryTermVersions {
 
     /** Filters frozen names using access to the same domain identity at read time. */
     public String[] visibleDomainNames(Predicate<String> readable) {
-      return currentDomains(domainIds()).stream()
+      return loadDomainsById(domainIds()).stream()
           .filter(domain -> readable.test(domain.domainName()))
           .map(domain -> domains.get(domain.domainId()))
           .sorted()
@@ -80,10 +80,10 @@ public final class GlossaryTermVersions {
   }
 
   /** Freezes the proposed definition and its final relationships in one transaction. */
-  public static Snapshot capture(
+  public static Snapshot captureSnapshot(
       long lake, GlossaryTermEntity term, Set<Long> domains, Set<Long> broader, Set<Long> related) {
     Map<Long, String> names = new HashMap<>();
-    for (DomainPO domain : currentDomains(domains)) {
+    for (DomainPO domain : loadDomainsById(domains)) {
       names.put(domain.domainId(), domain.domainName());
     }
     return new Snapshot(
@@ -96,7 +96,7 @@ public final class GlossaryTermVersions {
   }
 
   /** Decodes the exact version previously recorded. */
-  public static Snapshot snapshot(Version version) {
+  public static Snapshot decodeSnapshot(Version version) {
     try {
       return JsonUtils.anyFieldMapper().readValue(version.getSnapshot(), Snapshot.class);
     } catch (IOException e) {
@@ -105,19 +105,19 @@ public final class GlossaryTermVersions {
   }
 
   /** Appends a new snapshot, superseding any outstanding candidate. Caller holds the term lock. */
-  public static TermPublication append(
+  public static TermPublication recordTermVersion(
       long lake, Snapshot snapshot, long baseRevision, State state, @Nullable String reservation) {
     return SessionUtils.getWithoutCommit(
         GlossaryTermVersionMapper.class,
         mapper -> {
           long id = snapshot.definition().getTermId();
-          Head head = mapper.getHead(lake, id);
+          Head head = mapper.getVersionHeadByMetalakeAndTermId(lake, id);
           if (head == null) {
-            mapper.insertHead(lake, id, reservation);
-            head = mapper.getHead(lake, id);
+            mapper.insertVersionHead(lake, id, reservation);
+            head = mapper.getVersionHeadByMetalakeAndTermId(lake, id);
           }
           if (head.getCandidateVersion() != null) {
-            mapper.setLifecycle(id, head.getCandidateVersion(), State.SUPERSEDED.name());
+            mapper.updateVersionLifecycle(id, head.getCandidateVersion(), State.SUPERSEDED.name());
           }
           long next = Math.incrementExact(head.getLastVersion());
           Version row = new Version();
@@ -129,7 +129,7 @@ public final class GlossaryTermVersions {
           } catch (IOException e) {
             throw new UncheckedIOException(e);
           }
-          mapper.appendVersion(id, row);
+          mapper.insertTermVersion(id, row);
           head.setLastVersion(next);
           if (state == State.PUBLISHED) {
             head.setPublishedVersion(next);
@@ -139,13 +139,13 @@ public final class GlossaryTermVersions {
             head.setCandidateVersion(next);
             head.setReservedName(reservation);
           }
-          mapper.updateHead(head);
-          return publication(head, row);
+          mapper.updateVersionHead(head);
+          return toPublicationResult(head, row);
         });
   }
 
   /** Identifies the requested snapshot independently of the current pointers. */
-  public static TermPublication publication(Head head, Version row) {
+  public static TermPublication toPublicationResult(Head head, Version row) {
     return new TermPublication(
         head.getTermId(),
         row.getVersionId(),
@@ -154,7 +154,7 @@ public final class GlossaryTermVersions {
         head.getCandidateVersion());
   }
 
-  private static List<DomainPO> currentDomains(Set<Long> ids) {
+  private static List<DomainPO> loadDomainsById(Set<Long> ids) {
     if (ids.isEmpty()) return List.of();
     return SessionUtils.getWithoutCommit(
         DomainMetaMapper.class, mapper -> mapper.listDomainPOsByDomainIds(List.copyOf(ids)));

@@ -93,7 +93,7 @@ class TestGlossaryManager extends TestJDBCBackend {
           }
 
           @Override
-          public boolean canDecide(String lake, long id, long version) {
+          public boolean canPublishOrRejectCandidate(String lake, long id, long version) {
             return true;
           }
         };

@@ -66,19 +66,19 @@ final class TermEdits {
     if (Arrays.equals(term.domains(), domains)) {
       return term;
     }
-    return project(term, domains, term.publication());
+    return toPublicationView(term, domains, term.publication());
   }
 
-  static GlossaryTermEntity project(
+  static GlossaryTermEntity toPublicationView(
       GlossaryTermEntity term, String[] domains, @Nullable TermPublication publication) {
     GlossaryTerm.Status status =
         publication != null && publication.state() != TermPublication.State.PUBLISHED
             ? GlossaryTerm.Status.DRAFT
             : term.status();
-    return copy(term, domains, publication, status);
+    return copyWithStatus(term, domains, publication, status);
   }
 
-  static GlossaryTermEntity copy(
+  static GlossaryTermEntity copyWithStatus(
       GlossaryTermEntity term,
       String[] domains,
       @Nullable TermPublication publication,

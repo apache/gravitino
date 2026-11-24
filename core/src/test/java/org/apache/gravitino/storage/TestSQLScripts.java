@@ -1224,6 +1224,8 @@ public class TestSQLScripts extends TestJDBCBackend {
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession();
         Connection connection = session.getConnection();
         Statement statement = connection.createStatement()) {
+      assertTableAndColumnComments(connection, "glossary_term_version_head");
+      assertTableAndColumnComments(connection, "glossary_term_version_info");
       try (ResultSet rows =
           statement.executeQuery(
               "SELECT term_id, metalake_id, name, name_key, definition, status, links, source_ref, properties, audit_info, current_version, deleted_at FROM glossary_term_meta WHERE 1=0")) {
@@ -1245,5 +1247,27 @@ public class TestSQLScripts extends TestJDBCBackend {
         Assertions.assertEquals(6, rows.getMetaData().getColumnCount());
       }
     }
+  }
+
+  private void assertTableAndColumnComments(Connection connection, String table)
+      throws SQLException {
+    DatabaseMetaData metadata = connection.getMetaData();
+    String name = metadata.storesUpperCaseIdentifiers() ? table.toUpperCase(Locale.ROOT) : table;
+    try (ResultSet tables = metadata.getTables(connection.getCatalog(), null, name, null)) {
+      Assertions.assertTrue(tables.next(), table);
+      Assertions.assertFalse(isMissingComment(tables), table + " needs a table comment");
+    }
+    try (ResultSet columns = metadata.getColumns(connection.getCatalog(), null, name, "%")) {
+      while (columns.next()) {
+        Assertions.assertFalse(
+            isMissingComment(columns),
+            table + "." + columns.getString("COLUMN_NAME") + " needs a column comment");
+      }
+    }
+  }
+
+  private boolean isMissingComment(ResultSet metadata) throws SQLException {
+    String comment = metadata.getString("REMARKS");
+    return comment == null || comment.isBlank();
   }
 }
