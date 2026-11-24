@@ -479,15 +479,34 @@ public class PaimonCatalogOperations
    */
   @Override
   public boolean purgeTable(NameIdentifier identifier) throws UnsupportedOperationException {
+    NameIdentifier tableIdentifier = buildPaimonNameIdentifier(identifier);
     try {
-      NameIdentifier tableIdentifier = buildPaimonNameIdentifier(identifier);
       paimonCatalogOps.purgeTable(tableIdentifier.toString());
     } catch (Catalog.TableNotExistException e) {
       LOG.warn("Paimon table {} does not exist.", identifier);
       return false;
+    } catch (RuntimeException e) {
+      // Since Paimon 2.0, the Hive catalog fails with a RuntimeException instead of
+      // TableNotExistException when the table's database no longer exists
+      // (https://github.com/apache/paimon/issues/11408).
+      if (!databaseExists(tableIdentifier.namespace().level(0), e)) {
+        LOG.warn("Paimon table {} does not exist because its schema does not exist.", identifier);
+        return false;
+      }
+      throw e;
     }
     LOG.info("Purged Paimon table {}.", identifier);
     return true;
+  }
+
+  private boolean databaseExists(String databaseName, RuntimeException purgeFailure) {
+    try {
+      // listDatabases is not cached by Paimon's CachingCatalog, unlike getDatabase.
+      return paimonCatalogOps.listDatabases().contains(databaseName);
+    } catch (RuntimeException e) {
+      purgeFailure.addSuppressed(e);
+      throw purgeFailure;
+    }
   }
 
   /**
