@@ -21,7 +21,6 @@ package org.apache.gravitino.server.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.base.Preconditions;
-import java.util.Arrays;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -85,7 +84,7 @@ public class TermOperations {
   @Timed(name = "list-terms." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-terms", absolute = true)
   @AuthorizationExpression(expression = "")
-  public Response list(
+  public Response listTerms(
       @PathParam("metalake") @AuthorizationMetadata(type = EntityType.METALAKE) String metalake,
       @QueryParam("details") @DefaultValue("false") boolean details,
       @QueryParam("domain") String domain,
@@ -103,8 +102,11 @@ public class TermOperations {
               "Term lookup and binding expansion are not supported");
           GlossaryTerm.Status filter = parseStatus(status);
           return details
-              ? Utils.ok(new TermListResponse(views.list(metalake, domain, nameContains, filter)))
-              : Utils.ok(new NameListResponse(views.names(metalake, domain, nameContains, filter)));
+              ? Utils.ok(
+                  new TermListResponse(views.listTerms(metalake, domain, nameContains, filter)))
+              : Utils.ok(
+                  new NameListResponse(
+                      views.listTermNames(metalake, domain, nameContains, filter)));
         });
   }
 
@@ -114,7 +116,7 @@ public class TermOperations {
   @Timed(name = "get-term." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-term", absolute = true)
   @AuthorizationExpression(expression = "")
-  public Response get(
+  public Response getTerm(
       @PathParam("metalake") @AuthorizationMetadata(type = EntityType.METALAKE) String metalake,
       @PathParam("term") String term,
       @QueryParam("status") String status) {
@@ -122,7 +124,7 @@ public class TermOperations {
         OperationType.GET,
         metalake,
         term,
-        () -> Utils.ok(new TermResponse(views.get(metalake, term, parseStatus(status)))));
+        () -> Utils.ok(new TermResponse(views.getTerm(metalake, term, parseStatus(status)))));
   }
 
   /** Creates the definition and its initial relationships atomically. */
@@ -131,7 +133,7 @@ public class TermOperations {
   @Timed(name = "create-term." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-term", absolute = true)
   @AuthorizationExpression(expression = "")
-  public Response create(
+  public Response createTerm(
       @PathParam("metalake") @AuthorizationMetadata(type = EntityType.METALAKE) String metalake,
       TermCreateRequest request) {
     return execute(
@@ -140,7 +142,7 @@ public class TermOperations {
         null,
         () -> {
           Preconditions.checkArgument(request != null, "Request body is required");
-          return Utils.ok(new TermResponse(views.create(metalake, request.toSpec())));
+          return Utils.ok(new TermResponse(views.createTerm(metalake, request.toSpec())));
         });
   }
 
@@ -151,7 +153,7 @@ public class TermOperations {
   @Timed(name = "alter-term." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-term", absolute = true)
   @AuthorizationExpression(expression = "")
-  public Response alter(
+  public Response alterTerm(
       @PathParam("metalake") @AuthorizationMetadata(type = EntityType.METALAKE) String metalake,
       @PathParam("term") String term,
       TermUpdatesRequest request) {
@@ -163,7 +165,8 @@ public class TermOperations {
           Preconditions.checkArgument(request != null, "Request body is required");
           return Utils.ok(
               new TermResponse(
-                  views.alter(metalake, term, request.getExpectedRevision(), request.changes())));
+                  views.alterTerm(
+                      metalake, term, request.getExpectedRevision(), request.changes())));
         });
   }
 
@@ -173,14 +176,14 @@ public class TermOperations {
   @Timed(name = "delete-term." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "delete-term", absolute = true)
   @AuthorizationExpression(expression = "")
-  public Response drop(
+  public Response dropTerm(
       @PathParam("metalake") @AuthorizationMetadata(type = EntityType.METALAKE) String metalake,
       @PathParam("term") String term) {
     return execute(
         OperationType.DELETE,
         metalake,
         term,
-        () -> Utils.ok(new DropResponse(views.drop(metalake, term))));
+        () -> Utils.ok(new DropResponse(views.dropTerm(metalake, term))));
   }
 
   /** Walks the visible hierarchy transitively in the requested direction. */
@@ -189,7 +192,7 @@ public class TermOperations {
   @Timed(name = "get-term-hierarchy." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-term-hierarchy", absolute = true)
   @AuthorizationExpression(expression = "")
-  public Response hierarchy(
+  public Response getTermHierarchy(
       @PathParam("metalake") @AuthorizationMetadata(type = EntityType.METALAKE) String metalake,
       @PathParam("term") String term,
       @QueryParam("direction") @DefaultValue("NARROWER") String direction,
@@ -201,24 +204,14 @@ public class TermOperations {
         () -> {
           GlossaryManager.Direction walk = parseDirection(direction);
           return Utils.ok(
-              new TermTreeResponse(views.hierarchy(metalake, term, walk, parseStatus(status))));
+              new TermTreeResponse(
+                  views.getTermHierarchy(metalake, term, walk, parseStatus(status))));
         });
   }
 
   @Nullable
   private static GlossaryTerm.Status parseStatus(@Nullable String status) {
-    if (status == null) {
-      return null;
-    }
-    try {
-      return GlossaryTerm.Status.valueOf(status);
-    } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Invalid term status '%s', expected one of %s",
-              status, Arrays.toString(GlossaryTerm.Status.values())),
-          e);
-    }
+    return status == null ? null : GlossaryTerm.Status.fromString(status);
   }
 
   private static GlossaryManager.Direction parseDirection(String direction) {

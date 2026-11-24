@@ -188,16 +188,20 @@ class TestTermRequests {
     assertEquals(
         "Invalid term status 'BOGUS', expected one of [DRAFT, APPROVED, DEPRECATED]",
         invalidStatus.getMessage());
-    IllegalArgumentException invalidCreate =
-        assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                mapper
-                    .readValue("{\"name\":\"T\",\"status\":\"draft\"}", TermCreateRequest.class)
-                    .validate());
     assertEquals(
-        "Invalid term status 'draft', expected one of [DRAFT, APPROVED, DEPRECATED]",
-        invalidCreate.getMessage());
+        GlossaryTerm.Status.DRAFT,
+        mapper
+            .readValue("{\"name\":\"T\",\"status\":\"draft\"}", TermCreateRequest.class)
+            .toSpec()
+            .status()
+            .get());
+    assertArrayEquals(
+        new TermChange[] {TermChange.setStatus(GlossaryTerm.Status.DEPRECATED)},
+        mapper
+            .readValue(
+                "{\"updates\":[{\"@type\":\"setStatus\",\"status\":\"DePrEcAtEd\"}]}",
+                TermUpdatesRequest.class)
+            .changes());
   }
 
   private <T> T roundTrip(String json, Class<T> type) throws Exception {

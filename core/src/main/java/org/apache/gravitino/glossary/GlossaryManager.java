@@ -109,14 +109,14 @@ public final class GlossaryManager {
         ids, authorizationEnabled, handler, readable.and(visibility), depthLimit);
   }
 
-  boolean canProject(
+  boolean isTermVisible(
       GlossaryTermEntity term, GlossaryAccess access, @Nullable GlossaryTerm.Status status) {
     return (status == null || status == term.status())
         && access.canRead(term)
         && readable.test(term);
   }
 
-  GlossaryAccess access(String metalake) {
+  GlossaryAccess accessForMetalake(String metalake) {
     return GlossaryAccess.forRequest(metalake, authorizationEnabled);
   }
 
@@ -161,7 +161,7 @@ public final class GlossaryManager {
     long lake = termReadMetalakeId(ident);
     GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
     GlossaryTermEntity root = loadRootForView(ident, lake, access);
-    Predicate<GlossaryTermEntity> visible = term -> canProject(term, access, status);
+    Predicate<GlossaryTermEntity> visible = term -> isTermVisible(term, access, status);
     if (!visible.test(root)) {
       throw missingRelationRoot(ident);
     }
@@ -187,7 +187,7 @@ public final class GlossaryManager {
         }
       }
       frontier = new LinkedHashSet<>();
-      for (GlossaryTermEntity term : terms.getByIds(root.namespace(), lake, next)) {
+      for (GlossaryTermEntity term : terms.listTermsByIds(root.namespace(), lake, next)) {
         if (visible.test(term)) {
           result.add(term);
           frontier.add(term.id());
@@ -237,7 +237,8 @@ public final class GlossaryManager {
       @Nullable String domain,
       Predicate<GlossaryTermEntity> matchesName,
       @Nullable GlossaryTerm.Status status) {
-    return listInSnapshot(metalake, domain, matchesName, status, GlossaryManager::visibleDomains);
+    return listVisibleTermsInSnapshot(
+        metalake, domain, matchesName, status, GlossaryManager::visibleDomains);
   }
 
   String[] listTermNamesInSnapshot(
@@ -245,7 +246,8 @@ public final class GlossaryManager {
       @Nullable String domain,
       Predicate<GlossaryTermEntity> matchesName,
       @Nullable GlossaryTerm.Status status) {
-    return listInSnapshot(metalake, domain, matchesName, status, (term, access) -> term.name())
+    return listVisibleTermsInSnapshot(
+            metalake, domain, matchesName, status, (term, access) -> term.name())
         .toArray(String[]::new);
   }
 
@@ -270,7 +272,7 @@ public final class GlossaryManager {
     long lake = termReadMetalakeId(ident);
     GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
     GlossaryTermEntity term = loadRootForView(ident, lake, access);
-    if (!canProject(term, access, status)) {
+    if (!isTermVisible(term, access, status)) {
       throw missingRelationRoot(ident);
     }
     return visibleDomains(term, access);
@@ -405,7 +407,7 @@ public final class GlossaryManager {
                     null,
                     () -> {
                       for (GlossaryTermEntity survivor :
-                          terms.getByIds(ident.namespace(), lake, affected)) {
+                          terms.listTermsByIds(ident.namespace(), lake, affected)) {
                         GlossaryTermEntity after =
                             TermEdits.apply(survivor, new TermChange[0], true);
                         handler.handleRelationLoss(
@@ -425,7 +427,7 @@ public final class GlossaryManager {
         missing -> false);
   }
 
-  private <T> List<T> listInSnapshot(
+  private <T> List<T> listVisibleTermsInSnapshot(
       String metalake,
       @Nullable String domain,
       Predicate<GlossaryTermEntity> matchesName,
@@ -447,11 +449,11 @@ public final class GlossaryManager {
       result = terms.list(ns, metalakeId);
     } else {
       Set<Long> scope = domainScope(metalake, metalakeId, domain, access);
-      result = terms.getByIds(ns, metalakeId, DOMAINS.termIds(metalakeId, scope));
+      result = terms.listTermsByIds(ns, metalakeId, DOMAINS.termIds(metalakeId, scope));
     }
     List<T> visible = new ArrayList<>();
     for (GlossaryTermEntity term : result) {
-      if (matchesName.test(term) && canProject(term, access, status)) {
+      if (matchesName.test(term) && isTermVisible(term, access, status)) {
         visible.add(project.apply(term, access));
       }
     }
@@ -794,7 +796,8 @@ public final class GlossaryManager {
           GlossaryTermEntity locked = creating ? root : terms.get(root.nameIdentifier());
           checkRoot.accept(locked);
           Set<Long> visibleIds = new HashSet<>();
-          for (GlossaryTermEntity endpoint : terms.getByIds(root.namespace(), lake, endpoints)) {
+          for (GlossaryTermEntity endpoint :
+              terms.listTermsByIds(root.namespace(), lake, endpoints)) {
             if (access.canRead(endpoint) && readable.test(endpoint)) {
               visibleIds.add(endpoint.id());
             }

@@ -59,7 +59,7 @@ public final class GlossaryTermViews {
   }
 
   /** Returns the terms matching a domain and case-insensitive name fragment. */
-  public TermDTO[] list(
+  public TermDTO[] listTerms(
       String metalake,
       @Nullable String domain,
       @Nullable String nameContains,
@@ -68,12 +68,12 @@ public final class GlossaryTermViews {
         () -> {
           List<GlossaryTermEntity> terms =
               manager.listTermsInSnapshot(metalake, domain, matchesName(nameContains), status);
-          return project(metalake, terms, status);
+          return projectTermSnapshots(metalake, terms, status);
         });
   }
 
   /** Lists names without loading owner or relation projections. */
-  public String[] names(
+  public String[] listTermNames(
       String metalake,
       @Nullable String domain,
       @Nullable String nameContains,
@@ -83,20 +83,20 @@ public final class GlossaryTermViews {
   }
 
   /** Drops the term if it is visible and the caller may delete it. */
-  public boolean drop(String metalake, String name) {
+  public boolean dropTerm(String metalake, String name) {
     return manager.dropTerm(metalake, name);
   }
 
   /** Returns a term and its visible neighbors from one database snapshot. */
-  public TermDTO get(String metalake, String name, @Nullable GlossaryTerm.Status status) {
+  public TermDTO getTerm(String metalake, String name, @Nullable GlossaryTerm.Status status) {
     return SqlSessions.readSnapshot(
         () ->
-            project(metalake, List.of(manager.getTermInSnapshot(metalake, name, status)), status)[
-                0]);
+            projectTermSnapshots(
+                metalake, List.of(manager.getTermInSnapshot(metalake, name, status)), status)[0]);
   }
 
   /** Returns each visible ancestor or descendant once, excluding the root. */
-  public TermDTO[] hierarchy(
+  public TermDTO[] getTermHierarchy(
       String metalake,
       String name,
       GlossaryManager.Direction direction,
@@ -107,7 +107,7 @@ public final class GlossaryTermViews {
         "direction must be BROADER or NARROWER");
     return SqlSessions.readSnapshot(
         () ->
-            project(
+            projectTermSnapshots(
                 metalake,
                 manager.listRelationsInSnapshot(metalake, name, direction, true, status),
                 status));
@@ -117,17 +117,17 @@ public final class GlossaryTermViews {
    * Creates and projects the new term in one transaction. A caller supplying an outer transaction
    * must roll it back if this method fails.
    */
-  public TermDTO create(String metalake, TermSpec spec) {
-    return write(metalake, () -> manager.createTerm(metalake, spec));
+  public TermDTO createTerm(String metalake, TermSpec spec) {
+    return applyChangeAndProjectTerm(metalake, () -> manager.createTerm(metalake, spec));
   }
 
   /**
    * Applies the ordered edits and projects the resulting revision in one transaction. A caller
    * supplying an outer transaction must roll it back if this method fails.
    */
-  public TermDTO alter(
+  public TermDTO alterTerm(
       String metalake, String name, @Nullable String revision, TermChange[] changes) {
-    return write(
+    return applyChangeAndProjectTerm(
         metalake,
         () ->
             revision == null
@@ -143,10 +143,10 @@ public final class GlossaryTermViews {
     return term -> term.name().toLowerCase(Locale.ROOT).contains(fragment);
   }
 
-  private TermDTO write(String metalake, Supplier<GlossaryTermEntity> change) {
+  private TermDTO applyChangeAndProjectTerm(String metalake, Supplier<GlossaryTermEntity> change) {
     SessionUtils.beginTransaction();
     try {
-      TermDTO result = project(metalake, List.of(change.get()), null)[0];
+      TermDTO result = projectTermSnapshots(metalake, List.of(change.get()), null)[0];
       SessionUtils.commitTransaction();
       return result;
     } catch (RuntimeException | Error e) {
@@ -155,7 +155,7 @@ public final class GlossaryTermViews {
     }
   }
 
-  private TermDTO[] project(
+  private TermDTO[] projectTermSnapshots(
       String metalake, List<GlossaryTermEntity> roots, @Nullable GlossaryTerm.Status status) {
     if (roots.isEmpty()) {
       return new TermDTO[0];
@@ -172,19 +172,21 @@ public final class GlossaryTermViews {
     Set<Long> endpoints = new HashSet<>();
     edges
         .listBroaderEdges(lake, ids)
-        .forEach(e -> add(broader, e.getFromTermId(), e.getToTermId(), endpoints));
+        .forEach(
+            e -> recordRelationEndpoint(broader, e.getFromTermId(), e.getToTermId(), endpoints));
     edges
         .listNarrowerEdges(lake, ids)
-        .forEach(e -> add(narrower, e.getToTermId(), e.getFromTermId(), endpoints));
+        .forEach(
+            e -> recordRelationEndpoint(narrower, e.getToTermId(), e.getFromTermId(), endpoints));
     edges
         .listRelatedEdges(lake, ids)
         .forEach(
             e -> {
               if (ids.contains(e.getFromTermId())) {
-                add(related, e.getFromTermId(), e.getToTermId(), endpoints);
+                recordRelationEndpoint(related, e.getFromTermId(), e.getToTermId(), endpoints);
               }
               if (ids.contains(e.getToTermId())) {
-                add(related, e.getToTermId(), e.getFromTermId(), endpoints);
+                recordRelationEndpoint(related, e.getToTermId(), e.getFromTermId(), endpoints);
               }
             });
     Map<Long, String> names = new HashMap<>();
@@ -195,18 +197,18 @@ public final class GlossaryTermViews {
       }
     }
     if (!endpoints.isEmpty()) {
-      GlossaryAccess access = manager.access(metalake);
+      GlossaryAccess access = manager.accessForMetalake(metalake);
       for (GlossaryTermEntity term :
           GlossaryTermMetaService.getInstance()
-              .getByIds(roots.get(0).namespace(), lake, endpoints)) {
-        if (manager.canProject(term, access, status)) {
+              .listTermsByIds(roots.get(0).namespace(), lake, endpoints)) {
+        if (manager.isTermVisible(term, access, status)) {
           names.put(term.id(), term.name());
         }
       }
     }
     Map<String, OwnerDTO> owners = new HashMap<>();
     OwnerMetaService.getInstance()
-        .batchGetOwnersById(metalake, identifiers, EntityType.GLOSSARY_TERM)
+        .listOwnersByObjectIds(metalake, identifiers, EntityType.GLOSSARY_TERM)
         .forEach(
             rel ->
                 owners.put(
@@ -224,9 +226,9 @@ public final class GlossaryTermViews {
                     term.synonyms(),
                     term.status(),
                     term.domains(),
-                    names(broader, term.id(), names),
-                    names(narrower, term.id(), names),
-                    names(related, term.id(), names),
+                    visibleRelationNames(broader, term.id(), names),
+                    visibleRelationNames(narrower, term.id(), names),
+                    visibleRelationNames(related, term.id(), names),
                     Arrays.stream(term.links())
                         .map(link -> new TermLinkDTO(link.label(), link.url()))
                         .toArray(TermLinkDTO[]::new),
@@ -239,13 +241,14 @@ public final class GlossaryTermViews {
         .toArray(TermDTO[]::new);
   }
 
-  private static void add(
+  private static void recordRelationEndpoint(
       Map<Long, List<Long>> edges, long root, long neighbor, Set<Long> endpoints) {
     edges.computeIfAbsent(root, ignored -> new ArrayList<>()).add(neighbor);
     endpoints.add(neighbor);
   }
 
-  private static String[] names(Map<Long, List<Long>> edges, long id, Map<Long, String> visible) {
+  private static String[] visibleRelationNames(
+      Map<Long, List<Long>> edges, long id, Map<Long, String> visible) {
     return edges.getOrDefault(id, List.of()).stream()
         .filter(visible::containsKey)
         .map(visible::get)

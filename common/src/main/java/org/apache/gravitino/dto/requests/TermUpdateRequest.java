@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.gravitino.dto.glossary.TermLinkDTO;
+import org.apache.gravitino.glossary.GlossaryTerm;
 import org.apache.gravitino.glossary.TermChange;
 import org.apache.gravitino.glossary.TermLink;
 
@@ -121,7 +122,7 @@ public interface TermUpdateRequest {
     @Override
     public TermChange toChange() {
       Preconditions.checkArgument(status != null, "status is required");
-      return TermChange.setStatus(TermCreateRequest.parseStatus(status));
+      return TermChange.setStatus(GlossaryTerm.Status.fromString(status));
     }
   }
 

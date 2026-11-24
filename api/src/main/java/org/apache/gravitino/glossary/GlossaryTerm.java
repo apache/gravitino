@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.glossary;
 
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
@@ -60,7 +61,19 @@ public interface GlossaryTerm extends Auditable {
      */
     APPROVED,
     /** The term is replaced. It stays readable, but lookups for agents leave it out. */
-    DEPRECATED
+    DEPRECATED;
+
+    /** Parses a case-insensitive term status supplied by a caller. */
+    public static Status fromString(String value) {
+      for (Status status : values()) {
+        if (status.name().equalsIgnoreCase(value)) {
+          return status;
+        }
+      }
+      throw new IllegalArgumentException(
+          String.format(
+              "Invalid term status '%s', expected one of %s", value, Arrays.toString(values())));
+    }
   }
 
   /**

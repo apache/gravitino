@@ -503,7 +503,8 @@ public class TestGlossaryTermMetaService extends TestJDBCBackend {
     service.list(NS).forEach(t -> listed.put(t.name(), t.domains()));
     Assertions.assertArrayEquals(one, listed.get("One"));
     Assertions.assertArrayEquals(new String[0], listed.get("Two"));
-    Assertions.assertArrayEquals(one, service.getByIds(NS, 100, Set.of(101L)).get(0).domains());
+    Assertions.assertArrayEquals(
+        one, service.listTermsByIds(NS, 100, Set.of(101L)).get(0).domains());
     Assertions.assertArrayEquals(
         one, service.withLockedTerm(ident("One"), false, t -> t.orElseThrow().domains()));
   }

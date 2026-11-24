@@ -146,10 +146,10 @@ public class TestTermOperations extends BaseOperationsTest {
                     + "\",\"status\":\"APPROVED\",\"version\":1,\"revisionToken\":\"token\"}",
                 TermDTO.class);
     String item = BASE + "/" + name.replace("/", "%2F");
-    when(dispatcher.get("test", name, null)).thenReturn(term);
-    when(dispatcher.alter(eq("test"), eq(name), eq("token"), any())).thenReturn(term);
-    when(dispatcher.drop("test", name)).thenReturn(true);
-    when(dispatcher.hierarchy("test", name, GlossaryManager.Direction.NARROWER, null))
+    when(dispatcher.getTerm("test", name, null)).thenReturn(term);
+    when(dispatcher.alterTerm(eq("test"), eq(name), eq("token"), any())).thenReturn(term);
+    when(dispatcher.dropTerm("test", name)).thenReturn(true);
+    when(dispatcher.getTermHierarchy("test", name, GlossaryManager.Direction.NARROWER, null))
         .thenReturn(new TermDTO[] {term});
     try (Response r = target(item).request().get()) {
       assertEquals(200, r.getStatus());
@@ -181,10 +181,10 @@ public class TestTermOperations extends BaseOperationsTest {
   @Test
   void testCreateAndFilter() throws Exception {
     TermDTO term = JsonUtils.objectMapper().readValue("{\"name\":\"Term\"}", TermDTO.class);
-    when(dispatcher.create("test", TermSpec.builder("Term").build())).thenReturn(term);
-    when(dispatcher.list("test", "Sales", "erm", GlossaryTerm.Status.APPROVED))
+    when(dispatcher.createTerm("test", TermSpec.builder("Term").build())).thenReturn(term);
+    when(dispatcher.listTerms("test", "Sales", "erm", GlossaryTerm.Status.APPROVED))
         .thenReturn(new TermDTO[] {term});
-    when(dispatcher.names("test", "Sales", "erm", GlossaryTerm.Status.APPROVED))
+    when(dispatcher.listTermNames("test", "Sales", "erm", GlossaryTerm.Status.APPROVED))
         .thenReturn(new String[] {"Term"});
     try (Response r = target(BASE).request().post(Entity.json("{\"name\":\"Term\"}"))) {
       assertEquals(200, r.getStatus());
@@ -194,7 +194,7 @@ public class TestTermOperations extends BaseOperationsTest {
     for (boolean details : new boolean[] {false, true}) {
       try (Response r =
           target(BASE)
-              .queryParam("status", "APPROVED")
+              .queryParam("status", "approved")
               .queryParam("domain", "Sales")
               .queryParam("nameContains", "erm")
               .queryParam("details", details)
@@ -227,20 +227,20 @@ public class TestTermOperations extends BaseOperationsTest {
         target(item + "/hierarchy").queryParam("direction", "RELATED").request().get()) {
       assertEquals(400, r.getStatus());
     }
-    when(dispatcher.get("test", "T", null)).thenThrow(new NoSuchTermException("hidden"));
+    when(dispatcher.getTerm("test", "T", null)).thenThrow(new NoSuchTermException("hidden"));
     try (Response r = target(item).request().get()) {
       assertError(r, 404, "NoSuchTermException");
     }
-    when(dispatcher.drop("test", "T")).thenThrow(new ForbiddenException("denied"));
+    when(dispatcher.dropTerm("test", "T")).thenThrow(new ForbiddenException("denied"));
     try (Response r = target(item).request().delete()) {
       assertError(r, 403, "ForbiddenException");
     }
-    when(dispatcher.create(eq("test"), any()))
+    when(dispatcher.createTerm(eq("test"), any()))
         .thenThrow(new TermAlreadyExistsException("duplicate"));
     try (Response r = target(BASE).request().post(Entity.json("{\"name\":\"T\"}"))) {
       assertError(r, 409, "TermAlreadyExistsException");
     }
-    when(dispatcher.alter(eq("test"), eq("T"), eq("old"), any()))
+    when(dispatcher.alterTerm(eq("test"), eq("T"), eq("old"), any()))
         .thenThrow(new TermVersionConflictException("stale"));
     try (Response r =
         target(item)
@@ -287,7 +287,7 @@ public class TestTermOperations extends BaseOperationsTest {
 
   @Test
   void testStorageConflictPreservesErrorTypeAndCode() {
-    when(dispatcher.drop("test", "T")).thenThrow(new OptimisticLockException("Term changed"));
+    when(dispatcher.dropTerm("test", "T")).thenThrow(new OptimisticLockException("Term changed"));
     try (Response response = target(BASE + "/T").request().delete()) {
       assertEquals(409, response.getStatus());
       ErrorResponse error = response.readEntity(ErrorResponse.class);
@@ -298,7 +298,7 @@ public class TestTermOperations extends BaseOperationsTest {
 
   @Test
   void testDeleteMetricsCountSuccessAndConflict() {
-    when(dispatcher.drop("test", "T"))
+    when(dispatcher.dropTerm("test", "T"))
         .thenReturn(true)
         .thenThrow(new OptimisticLockException("changed"));
     for (int status : new int[] {200, 409}) {
@@ -367,7 +367,7 @@ public class TestTermOperations extends BaseOperationsTest {
 
   @Test
   void testInvalidEnumParametersExplainAllowedValues() {
-    try (Response r = target(BASE + "/T").queryParam("status", "approved").request().get()) {
+    try (Response r = target(BASE + "/T").queryParam("status", "unknown").request().get()) {
       assertEquals(400, r.getStatus());
       String message = r.readEntity(ErrorResponse.class).getMessage();
       assertTrue(message.contains("[DRAFT, APPROVED, DEPRECATED]"), message);

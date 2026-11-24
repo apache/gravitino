@@ -118,19 +118,19 @@ public class OwnerMetaService {
       long id = EntityIdService.getEntityId(identifier, type);
       nameIdentifierMap.put(id, identifier);
     }
-    return batchGetOwnersById(metalake, nameIdentifierMap, type);
+    return listOwnersByObjectIds(metalake, nameIdentifierMap, type);
   }
 
   /**
    * Loads user and group owners for live objects of one type in a metalake. The caller must resolve
    * each ID and its identifier in the same snapshot. Objects without an owner are omitted.
    */
-  public List<RelationalEntity<?>> batchGetOwnersById(
+  public List<RelationalEntity<?>> listOwnersByObjectIds(
       String metalake, Map<Long, NameIdentifier> nameIdentifierMap, Entity.EntityType type) {
     List<RelationalEntity<?>> result = new ArrayList<>();
     for (List<Long> ids :
         Lists.partition(List.copyOf(nameIdentifierMap.keySet()), OWNER_BATCH_SIZE)) {
-      collectOwners(metalake, nameIdentifierMap, type, ids, result);
+      collectOwnersByObjectIds(metalake, nameIdentifierMap, type, ids, result);
     }
     return result;
   }
@@ -231,7 +231,7 @@ public class OwnerMetaService {
                 OwnerMetaMapper.class, mapper -> mapper.batchInsertOwnerRels(ownerRelPOs)));
   }
 
-  private void collectOwners(
+  private void collectOwnersByObjectIds(
       String metalake,
       Map<Long, NameIdentifier> nameIdentifierMap,
       Entity.EntityType type,

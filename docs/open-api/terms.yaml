@@ -49,7 +49,7 @@ paths:
           name: status
           description: Include only terms and nested relation endpoints with this status.
           schema:
-            $ref: "#/components/schemas/TermStatus"
+            $ref: "#/components/schemas/TermStatusInput"
       responses:
         "200":
           description: Successful glossary operation.
@@ -127,7 +127,7 @@ paths:
           description: Apply this status to roots and nested terms. A named root excluded
             by the filter returns 404.
           schema:
-            $ref: "#/components/schemas/TermStatus"
+            $ref: "#/components/schemas/TermStatusInput"
       responses:
         "200":
           description: Successful glossary operation.
@@ -229,7 +229,7 @@ paths:
           description: Apply this status to roots and nested terms. A named root excluded
             by the filter returns 404.
           schema:
-            $ref: "#/components/schemas/TermStatus"
+            $ref: "#/components/schemas/TermStatusInput"
       responses:
         "200":
           description: Successful glossary operation.
@@ -249,7 +249,13 @@ paths:
           $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
 components:
   schemas:
+    TermStatusInput:
+      type: string
+      description: Case-insensitive term status.
+      pattern: "^([Dd][Rr][Aa][Ff][Tt]|[Aa][Pp][Pp][Rr][Oo][Vv][Ee][Dd]|[Dd][Ee][Pp][Rr][Ee][Cc][Aa][Tt][Ee][Dd])$"
+      example: APPROVED
     TermStatus:
+      description: Responses use the uppercase spelling. Status inputs are case-insensitive.
       type: string
       enum:
         - DRAFT
@@ -284,7 +290,7 @@ components:
         status:
           description: Omit to create an APPROVED term.
           allOf:
-            - $ref: "#/components/schemas/TermStatus"
+            - $ref: "#/components/schemas/TermStatusInput"
         domains:
           type: array
           items:
@@ -463,7 +469,7 @@ components:
                     enum:
                       - setStatus
                   status:
-                    $ref: "#/components/schemas/TermStatus"
+                    $ref: "#/components/schemas/TermStatusInput"
               - type: object
                 required:
                   - "@type"

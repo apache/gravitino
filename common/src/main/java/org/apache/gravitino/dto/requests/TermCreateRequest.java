@@ -99,7 +99,7 @@ public class TermCreateRequest implements RESTRequest {
         .withDomains(domains)
         .withBroader(broader)
         .withRelated(related)
-        .withStatus(status == null ? null : parseStatus(status))
+        .withStatus(status == null ? null : GlossaryTerm.Status.fromString(status))
         .withSourceRef(sourceRef)
         .withProperties(properties)
         .withLinks(
@@ -116,17 +116,5 @@ public class TermCreateRequest implements RESTRequest {
   @Override
   public void validate() {
     toSpec();
-  }
-
-  static GlossaryTerm.Status parseStatus(String status) {
-    try {
-      return GlossaryTerm.Status.valueOf(status);
-    } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Invalid term status '%s', expected one of %s",
-              status, Arrays.toString(GlossaryTerm.Status.values())),
-          e);
-    }
   }
 }
