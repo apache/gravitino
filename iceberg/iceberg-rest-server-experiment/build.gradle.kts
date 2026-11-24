@@ -28,6 +28,7 @@ plugins {
 val datastratoIcebergVersion: String = libs.versions.datastrato.iceberg.get()
 val caffeineVersion: String = libs.versions.caffeine.get()
 val jacksonVersion: String = libs.versions.jackson.get()
+val jacksonAnnotationsVersion: String = libs.versions.jacksonAnnotations.get()
 val experimentalScalaVersion = "2.13"
 val experimentalSparkVersion: String = libs.versions.spark41.get()
 val experimentalSparkMajorVersion: String = experimentalSparkVersion.substringBeforeLast(".")
@@ -41,7 +42,7 @@ configurations.configureEach {
   resolutionStrategy {
     force("com.github.ben-manes.caffeine:caffeine:$caffeineVersion")
     force(
-      "com.fasterxml.jackson.core:jackson-annotations:$jacksonVersion",
+      "com.fasterxml.jackson.core:jackson-annotations:$jacksonAnnotationsVersion",
       "com.fasterxml.jackson.core:jackson-core:$jacksonVersion",
       "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion",
       "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jacksonVersion",

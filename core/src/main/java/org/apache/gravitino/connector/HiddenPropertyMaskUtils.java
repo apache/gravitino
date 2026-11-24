@@ -27,7 +27,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -260,9 +259,7 @@ public final class HiddenPropertyMaskUtils {
     if (node.isObject()) {
       ObjectNode out = JsonNodeFactory.instance.objectNode();
       boolean changed = false;
-      Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
-      while (fields.hasNext()) {
-        Map.Entry<String, JsonNode> entry = fields.next();
+      for (Map.Entry<String, JsonNode> entry : node.properties()) {
         String nestedKey = entry.getKey();
         JsonNode nestedRaw = entry.getValue();
         if (nestedRaw.isObject() || nestedRaw.isArray()) {

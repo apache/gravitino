@@ -28,7 +28,6 @@ import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -382,9 +381,7 @@ public final class ExecutablePolicyContentSerde {
     Preconditions.checkArgument(
         mapNode.isObject(), "Cannot parse string map property %s from: %s", property, mapNode);
     Map<String, String> map = new LinkedHashMap<>();
-    Iterator<Map.Entry<String, JsonNode>> fields = mapNode.fields();
-    while (fields.hasNext()) {
-      Map.Entry<String, JsonNode> entry = fields.next();
+    for (Map.Entry<String, JsonNode> entry : mapNode.properties()) {
       map.put(entry.getKey(), entry.getValue().isNull() ? null : entry.getValue().asText());
     }
     return map;

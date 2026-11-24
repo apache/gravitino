@@ -30,9 +30,10 @@ val shadedJarTest: SourceSet by sourceSets.creating
 val shadedJarTestImplementation: Configuration by configurations.getting
 val shadedJarTestRuntimeOnly: Configuration by configurations.getting
 
-// Keeps the Jackson line brought in by fabric8 on its latest patch release. The BOM sits in a
-// dedicated configuration so that it only applies to this module and is not exported to the
-// modules that depend on it.
+// fabric8 7.2.0 does not work with Jackson 2.19 or later, so this module keeps the Jackson
+// artifacts brought in by fabric8 on the Jackson 2.18 line. The BOM sits in a dedicated
+// configuration so that it only applies to this module and is not exported to the modules that
+// depend on it.
 val jacksonBom: Configuration by configurations.creating {
   isCanBeConsumed = false
   isCanBeResolved = false
@@ -44,6 +45,20 @@ listOf(
   "testRuntimeClasspath"
 ).forEach {
   configurations.named(it) { extendsFrom(jacksonBom) }
+}
+// The unit tests put the Gravitino modules next to fabric8 without relocation, and those modules
+// bring the newer Jackson of the catalog. Keep the test classpaths on the line fabric8 needs; the
+// shadedJarTest below covers the relocated jar next to the Jackson of the Gravitino server.
+val jackson218Version: String = libs.versions.jackson218.get()
+listOf("testCompileClasspath", "testRuntimeClasspath").forEach {
+  configurations.named(it) {
+    resolutionStrategy.eachDependency {
+      if (requested.group.startsWith("com.fasterxml.jackson")) {
+        useVersion(jackson218Version)
+        because("fabric8 7.2.0 does not work with Jackson 2.19 or later")
+      }
+    }
+  }
 }
 dependencies {
   annotationProcessor(libs.lombok)
@@ -64,9 +79,9 @@ dependencies {
     exclude(group = "io.fabric8", module = "kubernetes-httpclient-vertx")
   }
   implementation(libs.fabric8.kubernetes.httpclient.jdk)
-  // Parses the spark_conf of built-in jobs. Resolved to the version fabric8 needs, and relocated
-  // with it.
-  implementation(libs.jackson.databind)
+  // Parses the spark_conf of built-in jobs. Left without a version so that the BOM above resolves
+  // it to the version fabric8 needs, and relocated with it.
+  implementation("com.fasterxml.jackson.core:jackson-databind")
 
   testImplementation(project(":api"))
   testImplementation(project(":common"))
