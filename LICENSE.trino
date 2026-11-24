@@ -218,6 +218,7 @@
    Jackson Datatype JSR310
    Jackson Parameter Names
    Jakarta Dependency Injection
+   JSpecify
    Airlift
    Trino JDBC Driver
    fast_double_parser

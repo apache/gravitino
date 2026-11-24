@@ -75,8 +75,8 @@ import org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
+import org.apache.gravitino.rel.SupportsTableIdentifier;
 import org.apache.gravitino.rel.Table;
-import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewCatalog;
@@ -98,7 +98,7 @@ import org.slf4j.LoggerFactory;
 
 /** Operations for interacting with an Apache Hive catalog in Apache Gravitino. */
 public class HiveCatalogOperations
-    implements CatalogOperations, SupportsSchemas, TableCatalog, ViewCatalog {
+    implements CatalogOperations, SupportsSchemas, SupportsTableIdentifier, ViewCatalog {
 
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalogOperations.class);
 
@@ -486,6 +486,18 @@ public class HiveCatalogOperations
     }
     LOG.info("Loaded Hive table {} from Hive Metastore ", tableIdent.name());
     return hiveTable;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String loadTableIdentifier(NameIdentifier tableIdent) {
+    NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
+    try {
+      return clientPool.run(
+          c -> c.getTableIdentifier(catalogName, schemaIdent.name(), tableIdent.name()));
+    } catch (InterruptedException e) {
+      throw ExceptionMessages.wrap("Failed to check Hive table " + tableIdent.name(), e);
+    }
   }
 
   private HiveTableHandle loadHiveTable(NameIdentifier tableIdent) {

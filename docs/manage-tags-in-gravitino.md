@@ -252,6 +252,10 @@ Both happen in one request, and either list can be omitted. The object type and 
 path, so the same call covers catalogs, schemas, tables, views, columns, filesets, topics, models,
 functions, and [Semantic Models](./manage-semantic-model-metadata-using-gravitino.md#tags-and-policies).
 
+Tag names that do not exist in the metalake are ignored instead of failing the request, in either
+list. The call returns the tags attached to the object after the change, so compare it with the
+names you sent to catch a typo or a tag that was dropped in the meantime.
+
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
 
