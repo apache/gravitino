@@ -554,3 +554,13 @@ COMMENT ON COLUMN domain_rel.audit_info IS 'domain relation audit info';
 COMMENT ON COLUMN domain_rel.current_version IS 'domain relation current version';
 COMMENT ON COLUMN domain_rel.last_version IS 'domain relation last version';
 COMMENT ON COLUMN domain_rel.deleted_at IS 'domain relation deleted at';
+
+-- Keep retained deletions out of live metadata lists and relationship cleanup scans.
+CREATE INDEX IF NOT EXISTS idx_tag_meta_live ON tag_meta (metalake_id) WHERE deleted_at = 0;
+CREATE INDEX IF NOT EXISTS idx_policy_meta_live ON policy_meta (metalake_id) WHERE deleted_at = 0;
+CREATE INDEX IF NOT EXISTS idx_role_meta_live ON role_meta (metalake_id) WHERE deleted_at = 0;
+CREATE INDEX IF NOT EXISTS idx_user_meta_live ON user_meta (metalake_id) WHERE deleted_at = 0;
+CREATE INDEX IF NOT EXISTS idx_tag_relation_meta_live ON tag_relation_meta (metadata_object_id, metadata_object_type) WHERE deleted_at = 0;
+CREATE INDEX IF NOT EXISTS idx_role_meta_securable_object_live ON role_meta_securable_object (metadata_object_id, type) WHERE deleted_at = 0;
+CREATE INDEX IF NOT EXISTS idx_user_role_rel_live ON user_role_rel (role_id) WHERE deleted_at = 0;
+CREATE INDEX IF NOT EXISTS idx_policy_tag_relation_meta_live ON policy_tag_relation_meta (tag_id) WHERE deleted_at = 0;

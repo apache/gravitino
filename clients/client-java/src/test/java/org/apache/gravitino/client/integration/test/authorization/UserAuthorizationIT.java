@@ -79,6 +79,7 @@ public class UserAuthorizationIT extends BaseRestApiAuthorizationIT {
         },
         usersLoadByUser1);
     String[] usernames = client.loadMetalake(METALAKE).listUserNames();
+    Arrays.sort(usernames);
     Assertions.assertArrayEquals(new String[] {USER, NORMAL_USER, "user1", "user2"}, usernames);
     String[] usernamesLoadByUser1 = getClientByUser("user1").loadMetalake(METALAKE).listUserNames();
     Assertions.assertArrayEquals(
