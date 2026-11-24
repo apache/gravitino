@@ -61,6 +61,14 @@ class TestTermRequests {
     assertEquals(
         TermSpec.builder("name").build(),
         mapper.readValue("{\"name\":\"name\"}", TermCreateRequest.class).toSpec());
+    assertEquals("Example", request.getName());
+    assertEquals("APPROVED", request.getStatus());
+    assertThrows(
+        MismatchedInputException.class,
+        () -> mapper.readValue("{\"name\":\"T\",\"status\":null}", TermCreateRequest.class));
+    assertThrows(
+        MismatchedInputException.class,
+        () -> mapper.readValue("{\"name\":\"T\",\"properties\":null}", TermCreateRequest.class));
   }
 
   @Test
@@ -148,6 +156,14 @@ class TestTermRequests {
             mapper.readValue(
                 "{\"expectedRevision\":null,\"updates\":[{\"@type\":\"rename\",\"newName\":\"New\"}]}",
                 TermUpdatesRequest.class));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new TermUpdatesRequest("", new TermUpdateRequest.Rename("New")));
+    TermUpdatesRequest blankRevision =
+        mapper.readValue(
+            "{\"expectedRevision\":\"  \",\"updates\":[{\"@type\":\"rename\",\"newName\":\"New\"}]}",
+            TermUpdatesRequest.class);
+    assertThrows(IllegalArgumentException.class, blankRevision::validate);
   }
 
   @Test

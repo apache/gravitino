@@ -38,6 +38,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.dto.requests.TermCreateRequest;
 import org.apache.gravitino.dto.requests.TermUpdatesRequest;
@@ -58,6 +59,8 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Metalake-scoped glossary term definitions and hierarchy.
@@ -69,6 +72,7 @@ import org.apache.gravitino.server.web.Utils;
 @Path("/metalakes/{metalake}/terms")
 @Produces("application/vnd.gravitino.v1+json")
 public class TermOperations {
+  private static final Logger LOG = LoggerFactory.getLogger(TermOperations.class);
   private static final ExceptionHandler COMMON_ERRORS =
       new ExceptionHandlers.BaseExceptionHandler();
   private final GlossaryTermViews views;
@@ -95,21 +99,23 @@ public class TermOperations {
   @AuthorizationExpression(expression = "")
   public Response listTerms(
       @PathParam("metalake") @AuthorizationMetadata(type = EntityType.METALAKE) String metalake,
-      @BeanParam ListTermsQuery query) {
+      @BeanParam @Nullable ListTermsQuery query) {
     return execute(
         OperationType.LIST,
         metalake,
         null,
         () -> {
-          query.validate();
-          GlossaryTerm.Status filter = parseStatus(query.status);
-          return Boolean.parseBoolean(query.details)
+          ListTermsQuery effective = query == null ? new ListTermsQuery() : query;
+          effective.validate();
+          GlossaryTerm.Status filter = parseStatus(effective.status);
+          return Boolean.parseBoolean(effective.details)
               ? Utils.ok(
                   new TermListResponse(
-                      views.listTerms(metalake, query.domain, query.nameContains, filter)))
+                      views.listTerms(metalake, effective.domain, effective.nameContains, filter)))
               : Utils.ok(
                   new NameListResponse(
-                      views.listTermNames(metalake, query.domain, query.nameContains, filter)));
+                      views.listTermNames(
+                          metalake, effective.domain, effective.nameContains, filter)));
         });
   }
 
@@ -225,8 +231,8 @@ public class TermOperations {
    *
    * @param metalake Required metalake name.
    * @param term Required root term name.
-   * @param direction Optional traversal direction. NARROWER (default) returns descendants; BROADER
-   *     returns ancestors.
+   * @param direction Optional case-insensitive traversal direction. NARROWER (default) returns
+   *     descendants; BROADER returns ancestors.
    * @param status Optional case-insensitive DRAFT, APPROVED or DEPRECATED filter. Omit to traverse
    *     all visible statuses. A filtered root returns 404. Traversal stops at each filtered node.
    * @return Each reachable visible term once, excluding the root.
@@ -258,7 +264,7 @@ public class TermOperations {
     /** Return full definitions with true, or names only with false (default). */
     @QueryParam("details")
     @DefaultValue("false")
-    private String details;
+    private String details = "false";
 
     /** Restrict results to this domain and its visible subdomains. Omit to include every domain. */
     @QueryParam("domain")
@@ -287,11 +293,102 @@ public class TermOperations {
     @Nullable
     private String bindings;
 
+    /** Creates a query with default values (names only, no filters). */
+    public ListTermsQuery() {}
+
+    /**
+     * Returns whether full term definitions were requested.
+     *
+     * @return The raw details flag string, defaulting to {@code "false"}.
+     */
+    public String getDetails() {
+      return details;
+    }
+
+    /**
+     * Sets whether to return full term definitions.
+     *
+     * @param details {@code "true"} or {@code "false"}, ignoring case.
+     * @return This query instance.
+     */
+    public ListTermsQuery withDetails(String details) {
+      this.details = details;
+      return this;
+    }
+
+    /**
+     * Returns the optional domain filter.
+     *
+     * @return The domain name, or null if omitted.
+     */
+    @Nullable
+    public String getDomain() {
+      return domain;
+    }
+
+    /**
+     * Restricts results to the named domain and its visible subdomains.
+     *
+     * @param domain The nonblank domain name, or null to include all domains.
+     * @return This query instance.
+     */
+    public ListTermsQuery withDomain(@Nullable String domain) {
+      this.domain = domain;
+      return this;
+    }
+
+    /**
+     * Returns the optional status filter.
+     *
+     * @return The raw status filter string, or null if omitted.
+     */
+    @Nullable
+    public String getStatus() {
+      return status;
+    }
+
+    /**
+     * Restricts results to terms matching the given case-insensitive status.
+     *
+     * @param status DRAFT, APPROVED, or DEPRECATED (ignoring case), or null for all statuses.
+     * @return This query instance.
+     */
+    public ListTermsQuery withStatus(@Nullable String status) {
+      this.status = status;
+      return this;
+    }
+
+    /**
+     * Returns the optional case-insensitive name substring filter.
+     *
+     * @return The name fragment, or null if omitted.
+     */
+    @Nullable
+    public String getNameContains() {
+      return nameContains;
+    }
+
+    /**
+     * Restricts results to terms whose name contains the given case-insensitive substring.
+     *
+     * @param nameContains The nonblank name fragment, or null to include all names.
+     * @return This query instance.
+     */
+    public ListTermsQuery withNameContains(@Nullable String nameContains) {
+      this.nameContains = nameContains;
+      return this;
+    }
+
     private void validate() {
       Preconditions.checkArgument(
           "true".equalsIgnoreCase(details) || "false".equalsIgnoreCase(details),
           "Invalid details value '%s', expected true or false",
           details);
+      Preconditions.checkArgument(
+          domain == null || StringUtils.isNotBlank(domain), "domain must not be blank");
+      Preconditions.checkArgument(
+          nameContains == null || StringUtils.isNotBlank(nameContains),
+          "nameContains must not be blank");
       Preconditions.checkArgument(
           match == null && bindings == null, "Term lookup and binding expansion are not supported");
     }
@@ -302,13 +399,15 @@ public class TermOperations {
     return status == null ? null : GlossaryTerm.Status.fromString(status);
   }
 
-  private static GlossaryManager.Direction parseDirection(String direction) {
-    Preconditions.checkArgument(
-        GlossaryManager.Direction.BROADER.name().equals(direction)
-            || GlossaryManager.Direction.NARROWER.name().equals(direction),
-        "Invalid hierarchy direction '%s', expected BROADER or NARROWER",
-        direction);
-    return GlossaryManager.Direction.valueOf(direction);
+  private static GlossaryManager.Direction parseDirection(@Nullable String direction) {
+    if (GlossaryManager.Direction.BROADER.name().equalsIgnoreCase(direction)) {
+      return GlossaryManager.Direction.BROADER;
+    }
+    if (GlossaryManager.Direction.NARROWER.name().equalsIgnoreCase(direction)) {
+      return GlossaryManager.Direction.NARROWER;
+    }
+    throw new IllegalArgumentException(
+        String.format("Invalid hierarchy direction '%s', expected BROADER or NARROWER", direction));
   }
 
   private Response execute(
@@ -323,14 +422,49 @@ public class TermOperations {
             return action.get();
           });
     } catch (IllegalArgumentException e) {
+      LOG.warn(
+          "Invalid glossary term {} request for [{}] under metalake [{}]: {}",
+          operation,
+          term,
+          metalake,
+          e.getMessage(),
+          e);
       return Utils.illegalArguments(e.getMessage(), e);
     } catch (NotFoundException e) {
+      LOG.warn(
+          "Glossary term {} target [{}] not found under metalake [{}]: {}",
+          operation,
+          term,
+          metalake,
+          e.getMessage(),
+          e);
       return Utils.notFound(e.getMessage(), e);
     } catch (ForbiddenException e) {
+      LOG.warn(
+          "Forbidden glossary term {} request for [{}] under metalake [{}]: {}",
+          operation,
+          term,
+          metalake,
+          e.getMessage(),
+          e);
       return Utils.forbidden(e.getMessage(), e);
     } catch (AlreadyExistsException e) {
+      LOG.warn(
+          "Conflict on glossary term {} request for [{}] under metalake [{}]: {}",
+          operation,
+          term,
+          metalake,
+          e.getMessage(),
+          e);
       return Utils.alreadyExists(e.getMessage(), e);
     } catch (NotInUseException e) {
+      LOG.warn(
+          "Metalake [{}] is not in use for glossary term {} request [{}]: {}",
+          metalake,
+          operation,
+          term,
+          e.getMessage(),
+          e);
       return Utils.notInUse(e.getMessage(), e);
     } catch (Exception e) {
       return COMMON_ERRORS.handle(operation, term, metalake, e);

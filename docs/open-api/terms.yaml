@@ -37,14 +37,16 @@ paths:
             default: false
         - in: query
           name: domain
-          description: Include terms in the domain and its visible subdomains.
+          description: Include terms in the domain and its visible subdomains. Must be non-blank when supplied.
           schema:
             type: string
+            minLength: 1
         - in: query
           name: nameContains
-          description: Case-insensitive substring of the term name.
+          description: Case-insensitive substring of the term name. Must be non-blank when supplied.
           schema:
             type: string
+            minLength: 1
         - in: query
           name: status
           description: Include only terms and nested relation endpoints with this status.
@@ -54,7 +56,7 @@ paths:
         "200":
           description: Successful glossary operation.
           content:
-            application/json:
+            application/vnd.gravitino.v1+json:
               schema:
                 oneOf:
                   - allOf:
@@ -92,7 +94,7 @@ paths:
         "200":
           description: Successful glossary operation.
           content:
-            application/json:
+            application/vnd.gravitino.v1+json:
               schema:
                 $ref: "#/components/schemas/TermResponse"
         "400":
@@ -132,7 +134,7 @@ paths:
         "200":
           description: Successful glossary operation.
           content:
-            application/json:
+            application/vnd.gravitino.v1+json:
               schema:
                 $ref: "#/components/schemas/TermResponse"
         "400":
@@ -165,7 +167,7 @@ paths:
         "200":
           description: Successful glossary operation.
           content:
-            application/json:
+            application/vnd.gravitino.v1+json:
               schema:
                 $ref: "#/components/schemas/TermResponse"
         "400":
@@ -217,12 +219,10 @@ paths:
       parameters:
         - in: query
           name: direction
-          description: Walk ancestors or descendants.
+          description: Case-insensitive traversal direction (BROADER for ancestors, NARROWER for descendants).
           schema:
             type: string
-            enum:
-              - BROADER
-              - NARROWER
+            pattern: "^([Bb][Rr][Oo][Aa][Dd][Ee][Rr]|[Nn][Aa][Rr][Rr][Oo][Ww][Ee][Rr])$"
             default: NARROWER
         - in: query
           name: status
@@ -234,7 +234,7 @@ paths:
         "200":
           description: Successful glossary operation.
           content:
-            application/json:
+            application/vnd.gravitino.v1+json:
               schema:
                 $ref: "#/components/schemas/TermTreeResponse"
         "400":

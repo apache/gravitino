@@ -18,11 +18,16 @@
  */
 package org.apache.gravitino.dto.requests;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
+import lombok.Getter;
 import org.apache.gravitino.dto.glossary.TermLinkDTO;
 import org.apache.gravitino.glossary.GlossaryTerm;
 import org.apache.gravitino.glossary.TermLink;
@@ -30,6 +35,7 @@ import org.apache.gravitino.glossary.TermSpec;
 import org.apache.gravitino.rest.RESTRequest;
 
 /** The initial definition, relations and memberships of a term. */
+@Getter
 public class TermCreateRequest implements RESTRequest {
   @JsonProperty("name")
   private String name;
@@ -40,8 +46,9 @@ public class TermCreateRequest implements RESTRequest {
   @JsonProperty("synonyms")
   private String[] synonyms = new String[0];
 
-  @JsonProperty("status")
   @Nullable
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @JsonSetter(value = "status", nulls = Nulls.FAIL)
   private String status;
 
   @JsonProperty("domains")
@@ -59,8 +66,8 @@ public class TermCreateRequest implements RESTRequest {
   @JsonProperty("sourceRef")
   private @Nullable String sourceRef;
 
-  @JsonProperty("properties")
-  private Map<String, String> properties;
+  @JsonSetter(value = "properties", nulls = Nulls.FAIL)
+  private Map<String, String> properties = Collections.emptyMap();
 
   /** Creates an empty request for deserialization. */
   public TermCreateRequest() {}

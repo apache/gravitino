@@ -81,6 +81,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 public class TestTermOperations extends BaseOperationsTest {
 
   private static final String BASE = "/metalakes/test/terms";
+  private static final String ACCEPT_V1 = "application/vnd.gravitino.v1+json";
   private MetricRegistry metrics;
   private final GlossaryTermViews dispatcher = mock(GlossaryTermViews.class);
   private final EntityStore entityStore = mock(EntityStore.class);
@@ -183,10 +184,42 @@ public class TestTermOperations extends BaseOperationsTest {
   void testListDefaultsToNamesAcrossVisibleStatuses() {
     when(dispatcher.listTermNames("test", null, null, null))
         .thenReturn(new String[] {"Draft term"});
-    try (Response response = target(BASE).request().get()) {
+    try (Response response = target(BASE).request(ACCEPT_V1).get()) {
       assertEquals(200, response.getStatus());
       assertArrayEquals(
           new String[] {"Draft term"}, response.readEntity(NameListResponse.class).getNames());
+    }
+  }
+
+  @Test
+  void testListTermsQueryDefaultsAndDirectCall() throws Exception {
+    when(dispatcher.listTermNames("test", null, null, null))
+        .thenReturn(new String[] {"Draft term"});
+    when(dispatcher.listTerms("test", "Sales", "rev", GlossaryTerm.Status.APPROVED))
+        .thenReturn(new TermDTO[0]);
+    TermOperations ops = new TermOperations(dispatcher);
+    FieldUtils.writeField(ops, "httpRequest", mock(HttpServletRequest.class), true);
+
+    TermOperations.ListTermsQuery defaults = new TermOperations.ListTermsQuery();
+    assertEquals("false", defaults.getDetails());
+    try (Response r = ops.listTerms("test", defaults)) {
+      assertEquals(200, r.getStatus());
+    }
+    try (Response r = ops.listTerms("test", null)) {
+      assertEquals(200, r.getStatus());
+    }
+    TermOperations.ListTermsQuery filtered =
+        new TermOperations.ListTermsQuery()
+            .withDetails("true")
+            .withDomain("Sales")
+            .withStatus("approved")
+            .withNameContains("rev");
+    assertEquals("true", filtered.getDetails());
+    assertEquals("Sales", filtered.getDomain());
+    assertEquals("approved", filtered.getStatus());
+    assertEquals("rev", filtered.getNameContains());
+    try (Response r = ops.listTerms("test", filtered)) {
+      assertEquals(200, r.getStatus());
     }
   }
 
@@ -389,10 +422,76 @@ public class TestTermOperations extends BaseOperationsTest {
       assertTrue(message.contains("[DRAFT, APPROVED, DEPRECATED]"), message);
     }
     try (Response r =
-        target(BASE + "/T/hierarchy").queryParam("direction", "narrower").request().get()) {
+        target(BASE + "/T/hierarchy").queryParam("direction", "sideways").request().get()) {
       assertEquals(400, r.getStatus());
       String message = r.readEntity(ErrorResponse.class).getMessage();
       assertTrue(message.contains("expected BROADER or NARROWER"), message);
+    }
+    try (Response r = target(BASE + "/T/hierarchy").queryParam("direction", "").request().get()) {
+      assertEquals(400, r.getStatus());
+      String message = r.readEntity(ErrorResponse.class).getMessage();
+      assertTrue(message.contains("expected BROADER or NARROWER"), message);
+    }
+    verifyNoInteractions(dispatcher);
+  }
+
+  @Test
+  void testCaseInsensitiveHierarchyDirection() throws Exception {
+    TermDTO term =
+        JsonUtils.objectMapper()
+            .readValue(
+                "{\"name\":\"Child\",\"status\":\"APPROVED\",\"version\":1,\"revisionToken\":\"token\"}",
+                TermDTO.class);
+    when(dispatcher.getTermHierarchy("test", "T", GlossaryManager.Direction.NARROWER, null))
+        .thenReturn(new TermDTO[] {term});
+    when(dispatcher.getTermHierarchy(
+            "test", "T", GlossaryManager.Direction.BROADER, GlossaryTerm.Status.APPROVED))
+        .thenReturn(new TermDTO[] {term});
+    try (Response r =
+        target(BASE + "/T/hierarchy")
+            .queryParam("direction", "narrower")
+            .request(ACCEPT_V1)
+            .get()) {
+      assertEquals(200, r.getStatus());
+      assertEquals("Child", r.readEntity(TermTreeResponse.class).getTerms()[0].getName());
+    }
+    try (Response r =
+        target(BASE + "/T/hierarchy")
+            .queryParam("direction", "Broader")
+            .queryParam("status", "approved")
+            .request(ACCEPT_V1)
+            .get()) {
+      assertEquals(200, r.getStatus());
+      assertEquals("Child", r.readEntity(TermTreeResponse.class).getTerms()[0].getName());
+    }
+  }
+
+  @Test
+  void testBlankQueryFiltersAndNullCreateFieldsAreRejectedBeforeDispatch() {
+    for (Response r :
+        Arrays.asList(
+            target(BASE).queryParam("domain", "").request(ACCEPT_V1).get(),
+            target(BASE).queryParam("domain", "   ").request(ACCEPT_V1).get(),
+            target(BASE).queryParam("nameContains", "").request(ACCEPT_V1).get(),
+            target(BASE).queryParam("nameContains", "   ").request(ACCEPT_V1).get(),
+            target(BASE).request(ACCEPT_V1).post(Entity.json("{\"name\":\"T\",\"status\":null}")),
+            target(BASE)
+                .request(ACCEPT_V1)
+                .post(Entity.json("{\"name\":\"T\",\"properties\":null}")),
+            target(BASE).request(ACCEPT_V1).post(Entity.json("{\"name\":\"T\",\"synonyms\":null}")),
+            target(BASE + "/T")
+                .request(ACCEPT_V1)
+                .put(
+                    Entity.json(
+                        "{\"expectedRevision\":\"\",\"updates\":[{\"@type\":\"rename\",\"newName\":\"New\"}]}")),
+            target(BASE + "/T")
+                .request(ACCEPT_V1)
+                .put(
+                    Entity.json(
+                        "{\"expectedRevision\":\"   \",\"updates\":[{\"@type\":\"rename\",\"newName\":\"New\"}]}")))) {
+      try (r) {
+        assertEquals(400, r.getStatus());
+      }
     }
     verifyNoInteractions(dispatcher);
   }

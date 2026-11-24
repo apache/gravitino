@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import lombok.Getter;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.glossary.TermChange;
 import org.apache.gravitino.rest.RESTRequest;
 
@@ -72,6 +73,9 @@ public class TermUpdatesRequest implements RESTRequest {
   }
 
   private void validateUpdates() {
+    Preconditions.checkArgument(
+        expectedRevision == null || StringUtils.isNotBlank(expectedRevision),
+        "expectedRevision must not be blank");
     Preconditions.checkArgument(
         updates != null && updates.length > 0 && Arrays.stream(updates).allMatch(Objects::nonNull),
         "updates must contain one or more changes");
