@@ -43,6 +43,7 @@ public class TermResponse extends BaseResponse {
    */
   public TermResponse(TermDTO term) {
     super(0);
+    Preconditions.checkArgument(term != null, "term must not be null");
     this.term = term;
   }
 

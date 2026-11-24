@@ -105,6 +105,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
         5XX:
           $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
   "/metalakes/{metalake}/terms/{term}":
@@ -178,6 +180,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
         5XX:
           $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
     delete:
@@ -195,7 +199,11 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
-          $ref: "#/components/responses/NotFound"
+          description: The metalake does not exist. An absent or hidden term returns HTTP 200 with dropped=false.
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorModel
         "409":
           $ref: "#/components/responses/Conflict"
         5XX:
@@ -637,6 +645,12 @@ components:
     Conflict:
       description: The metalake is not in use, the name or source reference already exists,
         the expected revision is stale, or a concurrent modification prevented the write.
+      content:
+        application/json:
+          schema:
+            $ref: ./openapi.yaml#/components/schemas/ErrorModel
+    UnsupportedMediaType:
+      description: Request Content-Type must be application/json.
       content:
         application/json:
           schema:

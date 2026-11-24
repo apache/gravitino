@@ -69,6 +69,34 @@ class TestTermRequests {
     assertThrows(
         MismatchedInputException.class,
         () -> mapper.readValue("{\"name\":\"T\",\"properties\":null}", TermCreateRequest.class));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            mapper
+                .readValue("{\"name\":\"T\",\"domains\":null}", TermCreateRequest.class)
+                .toSpec());
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            mapper
+                .readValue("{\"name\":\"T\",\"links\":[null]}", TermCreateRequest.class)
+                .toSpec());
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            mapper
+                .readValue(
+                    "{\"updates\":[{\"@type\":\"updateLinks\",\"links\":[null]}]}",
+                    TermUpdatesRequest.class)
+                .changes());
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            mapper
+                .readValue(
+                    "{\"updates\":[{\"@type\":\"setStatus\",\"status\":null}]}",
+                    TermUpdatesRequest.class)
+                .changes());
   }
 
   @Test
@@ -186,6 +214,14 @@ class TestTermRequests {
     String term =
         "{\"name\":\"Example\",\"definition\":\"Glossary definition\",\"domains\":[\"Sales\"],\"broader\":[\"Parent\"],\"related\":[\"Peer\"],\"synonyms\":[\"Syn\"],\"properties\":{\"p\":\"value\"},\"status\":\"APPROVED\",\"links\":[{\"label\":\"docs\",\"url\":\"https://example.org\"}],\"sourceRef\":\"source:id\",\"narrower\":[\"Child\"],\"version\":2,\"revisionToken\":\"opaque\",\"owner\":{\"name\":\"alice\",\"type\":\"user\"},\"audit\":{\"creator\":\"alice\",\"createTime\":\"2026-01-01T00:00:00Z\",\"lastModifier\":null,\"lastModifiedTime\":null}}";
     roundTrip("{\"code\":0,\"term\":" + term + "}", TermResponse.class).validate();
+    assertThrows(IllegalArgumentException.class, () -> new TermResponse(null));
+    TermResponse parsed =
+        mapper.readValue("{\"code\":0,\"term\":" + term + "}", TermResponse.class);
+    String[] syns = parsed.getTerm().getSynonyms();
+    syns[0] = "Mutated";
+    assertArrayEquals(new String[] {"Syn"}, parsed.getTerm().getSynonyms());
+    assertThrows(
+        UnsupportedOperationException.class, () -> parsed.getTerm().getProperties().put("k", "v"));
     String list = "{\"code\":0,\"terms\":[" + term + "]}";
     roundTrip(list, TermListResponse.class).validate();
     roundTrip(list, TermTreeResponse.class).validate();

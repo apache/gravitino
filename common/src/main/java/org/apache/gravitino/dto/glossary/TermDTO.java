@@ -22,6 +22,8 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.Getter;
@@ -89,18 +91,65 @@ public class TermDTO {
       @JsonProperty("audit") AuditDTO audit) {
     this.name = name;
     this.definition = definition;
-    this.synonyms = synonyms;
+    this.synonyms = cloneArray(synonyms);
     this.status = status;
-    this.domains = domains;
-    this.broader = broader;
-    this.narrower = narrower;
-    this.related = related;
-    this.links = links;
+    this.domains = cloneArray(domains);
+    this.broader = cloneArray(broader);
+    this.narrower = cloneArray(narrower);
+    this.related = cloneArray(related);
+    this.links = cloneArray(links);
     this.owner = owner;
     this.sourceRef = sourceRef;
-    this.properties = properties;
+    this.properties =
+        properties == null ? null : Collections.unmodifiableMap(new LinkedHashMap<>(properties));
     this.version = version;
     this.revisionToken = revisionToken;
     this.audit = audit;
+  }
+
+  /**
+   * @return A defensive copy of the synonyms array, or null if absent.
+   */
+  public String[] getSynonyms() {
+    return cloneArray(synonyms);
+  }
+
+  /**
+   * @return A defensive copy of the domains array, or null if absent.
+   */
+  public String[] getDomains() {
+    return cloneArray(domains);
+  }
+
+  /**
+   * @return A defensive copy of the broader terms array, or null if absent.
+   */
+  public String[] getBroader() {
+    return cloneArray(broader);
+  }
+
+  /**
+   * @return A defensive copy of the narrower terms array, or null if absent.
+   */
+  public String[] getNarrower() {
+    return cloneArray(narrower);
+  }
+
+  /**
+   * @return A defensive copy of the related terms array, or null if absent.
+   */
+  public String[] getRelated() {
+    return cloneArray(related);
+  }
+
+  /**
+   * @return A defensive copy of the documentation links array, or null if absent.
+   */
+  public TermLinkDTO[] getLinks() {
+    return cloneArray(links);
+  }
+
+  private static <T> T[] cloneArray(@Nullable T[] values) {
+    return values == null ? null : values.clone();
   }
 }

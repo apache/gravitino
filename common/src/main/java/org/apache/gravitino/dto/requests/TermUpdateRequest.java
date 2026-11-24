@@ -306,7 +306,7 @@ public interface TermUpdateRequest {
      */
     @JsonCreator
     public UpdateLinks(@JsonProperty(value = "links", required = true) TermLinkDTO[] links) {
-      this.links = links;
+      this.links = links == null ? null : links.clone();
     }
 
     @Override

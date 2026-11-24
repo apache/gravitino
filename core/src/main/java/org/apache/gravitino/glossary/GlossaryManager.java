@@ -109,6 +109,8 @@ public final class GlossaryManager {
         ids, authorizationEnabled, handler, readable.and(visibility), depthLimit);
   }
 
+  record SnapshotTerms(long metalakeId, GlossaryAccess access, List<GlossaryTermEntity> terms) {}
+
   boolean isTermVisible(
       GlossaryTermEntity term, GlossaryAccess access, @Nullable GlossaryTerm.Status status) {
     return (status == null || status == term.status())
@@ -148,10 +150,10 @@ public final class GlossaryManager {
     Preconditions.checkArgument(
         direction != Direction.RELATED || !transitive, "RELATED is not transitive");
     return SqlSessions.readSnapshot(
-        () -> listRelationsInSnapshot(metalake, name, direction, transitive, status));
+        () -> listRelationsInSnapshot(metalake, name, direction, transitive, status).terms());
   }
 
-  List<GlossaryTermEntity> listRelationsInSnapshot(
+  SnapshotTerms listRelationsInSnapshot(
       String metalake,
       String name,
       Direction direction,
@@ -197,7 +199,7 @@ public final class GlossaryManager {
         break;
       }
     }
-    return visibleDomains(result, access);
+    return new SnapshotTerms(lake, access, visibleDomains(result, access));
   }
 
   /**
@@ -229,16 +231,27 @@ public final class GlossaryManager {
       return all;
     }
     return SqlSessions.readSnapshot(
-        () -> listTermsInSnapshot(metalake, domain, ignored -> true, null));
+        () -> listTermsInSnapshot(metalake, domain, ignored -> true, null).terms());
   }
 
-  List<GlossaryTermEntity> listTermsInSnapshot(
+  SnapshotTerms listTermsInSnapshot(
       String metalake,
       @Nullable String domain,
       Predicate<GlossaryTermEntity> matchesName,
       @Nullable GlossaryTerm.Status status) {
-    return listVisibleTermsInSnapshot(
-        metalake, domain, matchesName, status, GlossaryManager::visibleDomains);
+    long metalakeId = resolveMetalakeId(metalake);
+    GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
+    return new SnapshotTerms(
+        metalakeId,
+        access,
+        listVisibleTermsInSnapshot(
+            metalake,
+            metalakeId,
+            access,
+            domain,
+            matchesName,
+            status,
+            GlossaryManager::visibleDomains));
   }
 
   String[] listTermNamesInSnapshot(
@@ -246,8 +259,16 @@ public final class GlossaryManager {
       @Nullable String domain,
       Predicate<GlossaryTermEntity> matchesName,
       @Nullable GlossaryTerm.Status status) {
+    long metalakeId = resolveMetalakeId(metalake);
+    GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
     return listVisibleTermsInSnapshot(
-            metalake, domain, matchesName, status, (term, access) -> term.name())
+            metalake,
+            metalakeId,
+            access,
+            domain,
+            matchesName,
+            status,
+            (term, ignored) -> term.name())
         .toArray(String[]::new);
   }
 
@@ -263,10 +284,10 @@ public final class GlossaryManager {
     if (!authorizationEnabled) {
       return requireVisible(ident, relationRoot(ident).term());
     }
-    return SqlSessions.readSnapshot(() -> getTermInSnapshot(metalake, name, null));
+    return SqlSessions.readSnapshot(() -> getTermInSnapshot(metalake, name, null).terms().get(0));
   }
 
-  GlossaryTermEntity getTermInSnapshot(
+  SnapshotTerms getTermInSnapshot(
       String metalake, String name, @Nullable GlossaryTerm.Status status) {
     NameIdentifier ident = NameIdentifierUtil.ofGlossaryTerm(metalake, name);
     long lake = termReadMetalakeId(ident);
@@ -275,7 +296,7 @@ public final class GlossaryManager {
     if (!isTermVisible(term, access, status)) {
       throw missingRelationRoot(ident);
     }
-    return visibleDomains(term, access);
+    return new SnapshotTerms(lake, access, List.of(visibleDomains(term, access)));
   }
 
   /**
@@ -427,19 +448,22 @@ public final class GlossaryManager {
         missing -> false);
   }
 
+  private static long resolveMetalakeId(String metalake) {
+    try {
+      return MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+    } catch (NoSuchEntityException missing) {
+      throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", metalake);
+    }
+  }
+
   private <T> List<T> listVisibleTermsInSnapshot(
       String metalake,
+      long metalakeId,
+      GlossaryAccess access,
       @Nullable String domain,
       Predicate<GlossaryTermEntity> matchesName,
       @Nullable GlossaryTerm.Status status,
       BiFunction<GlossaryTermEntity, GlossaryAccess, T> project) {
-    long metalakeId;
-    try {
-      metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
-    } catch (NoSuchEntityException missing) {
-      throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", metalake);
-    }
-    GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
     if (!access.canView()) {
       return new ArrayList<>();
     }

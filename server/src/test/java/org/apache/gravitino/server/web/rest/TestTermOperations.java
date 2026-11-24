@@ -221,6 +221,11 @@ public class TestTermOperations extends BaseOperationsTest {
     try (Response r = ops.listTerms("test", filtered)) {
       assertEquals(200, r.getStatus());
     }
+    when(dispatcher.getTermHierarchy("test", "T", GlossaryManager.Direction.NARROWER, null))
+        .thenReturn(new TermDTO[0]);
+    try (Response r = ops.getTermHierarchy("test", "T", null, null)) {
+      assertEquals(200, r.getStatus());
+    }
   }
 
   @Test

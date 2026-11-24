@@ -415,6 +415,11 @@ class TestGlossaryDomains extends TestJDBCBackend {
     assertArrayEquals(
         new String[] {"Finance", "Sales"},
         as("lakeOwner", () -> views.getTerm(LAKE, "Leaf", null)).getDomains());
+
+    GlossaryTermViews unauthzViews =
+        new GlossaryTermViews(new GlossaryManager(ids::incrementAndGet, false));
+    TermDTO unowned = unauthzViews.createTerm(LAKE, TermSpec.builder("Unowned").build());
+    assertEquals(null, unowned.getOwner());
   }
 
   @TestTemplate

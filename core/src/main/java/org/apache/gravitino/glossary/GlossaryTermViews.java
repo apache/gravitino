@@ -66,9 +66,10 @@ public final class GlossaryTermViews {
       @Nullable GlossaryTerm.Status status) {
     return SqlSessions.readSnapshot(
         () -> {
-          List<GlossaryTermEntity> terms =
+          GlossaryManager.SnapshotTerms snapshot =
               manager.listTermsInSnapshot(metalake, domain, matchesName(nameContains), status);
-          return projectTermSnapshots(metalake, terms, status);
+          return projectTermSnapshots(
+              metalake, snapshot.metalakeId(), snapshot.access(), snapshot.terms(), status);
         });
   }
 
@@ -90,9 +91,12 @@ public final class GlossaryTermViews {
   /** Returns a term and its visible neighbors from one database snapshot. */
   public TermDTO getTerm(String metalake, String name, @Nullable GlossaryTerm.Status status) {
     return SqlSessions.readSnapshot(
-        () ->
-            projectTermSnapshots(
-                metalake, List.of(manager.getTermInSnapshot(metalake, name, status)), status)[0]);
+        () -> {
+          GlossaryManager.SnapshotTerms snapshot =
+              manager.getTermInSnapshot(metalake, name, status);
+          return projectTermSnapshots(
+              metalake, snapshot.metalakeId(), snapshot.access(), snapshot.terms(), status)[0];
+        });
   }
 
   /** Returns each visible ancestor or descendant once, excluding the root. */
@@ -106,11 +110,12 @@ public final class GlossaryTermViews {
             || direction == GlossaryManager.Direction.NARROWER,
         "direction must be BROADER or NARROWER");
     return SqlSessions.readSnapshot(
-        () ->
-            projectTermSnapshots(
-                metalake,
-                manager.listRelationsInSnapshot(metalake, name, direction, true, status),
-                status));
+        () -> {
+          GlossaryManager.SnapshotTerms snapshot =
+              manager.listRelationsInSnapshot(metalake, name, direction, true, status);
+          return projectTermSnapshots(
+              metalake, snapshot.metalakeId(), snapshot.access(), snapshot.terms(), status);
+        });
   }
 
   /**
@@ -160,7 +165,23 @@ public final class GlossaryTermViews {
     if (roots.isEmpty()) {
       return new TermDTO[0];
     }
-    long lake = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+    return projectTermSnapshots(
+        metalake,
+        MetalakeMetaService.getInstance().getMetalakeIdByName(metalake),
+        null,
+        roots,
+        status);
+  }
+
+  private TermDTO[] projectTermSnapshots(
+      String metalake,
+      long lake,
+      @Nullable GlossaryAccess resolvedAccess,
+      List<GlossaryTermEntity> roots,
+      @Nullable GlossaryTerm.Status status) {
+    if (roots.isEmpty()) {
+      return new TermDTO[0];
+    }
     Map<Long, NameIdentifier> identifiers =
         roots.stream()
             .collect(Collectors.toMap(GlossaryTermEntity::id, GlossaryTermEntity::nameIdentifier));
@@ -197,7 +218,8 @@ public final class GlossaryTermViews {
       }
     }
     if (!endpoints.isEmpty()) {
-      GlossaryAccess access = manager.accessForMetalake(metalake);
+      GlossaryAccess access =
+          resolvedAccess != null ? resolvedAccess : manager.accessForMetalake(metalake);
       for (GlossaryTermEntity term :
           GlossaryTermMetaService.getInstance()
               .listTermsByIds(roots.get(0).namespace(), lake, endpoints)) {

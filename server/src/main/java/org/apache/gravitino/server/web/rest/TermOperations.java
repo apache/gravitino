@@ -400,11 +400,12 @@ public class TermOperations {
   }
 
   private static GlossaryManager.Direction parseDirection(@Nullable String direction) {
+    if (direction == null
+        || GlossaryManager.Direction.NARROWER.name().equalsIgnoreCase(direction)) {
+      return GlossaryManager.Direction.NARROWER;
+    }
     if (GlossaryManager.Direction.BROADER.name().equalsIgnoreCase(direction)) {
       return GlossaryManager.Direction.BROADER;
-    }
-    if (GlossaryManager.Direction.NARROWER.name().equalsIgnoreCase(direction)) {
-      return GlossaryManager.Direction.NARROWER;
     }
     throw new IllegalArgumentException(
         String.format("Invalid hierarchy direction '%s', expected BROADER or NARROWER", direction));
