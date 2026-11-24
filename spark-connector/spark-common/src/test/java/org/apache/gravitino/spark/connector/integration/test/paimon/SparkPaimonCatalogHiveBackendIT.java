@@ -188,12 +188,26 @@ public abstract class SparkPaimonCatalogHiveBackendIT extends SparkPaimonCatalog
   }
 
   @Test
-  void testCreateTableUsingUnsupportedFormatIsNotAFormatTable() {
-    // Paimon 1.2 has no text format table, so its SparkCatalog creates a Paimon table for USING
-    // text.
+  void testCreateTableUsingTextIsAFormatTable() {
+    // Paimon supports text format tables since Paimon 2.0.
     String tableName = "test_create_using_text";
     dropTableIfExists(tableName);
     sql(String.format("CREATE TABLE %s (value STRING) USING text", tableName));
+    Map<String, String> paimonOptions = getPaimonOptions(tableName);
+    Assertions.assertEquals("format-table", paimonOptions.get("type"));
+    Assertions.assertEquals("text", paimonOptions.get("file.format"));
+    sql(String.format("INSERT INTO %s VALUES ('a')", tableName));
+    Assertions.assertEquals(
+        Arrays.asList("a"), getQueryData(String.format("SELECT value FROM %s", tableName)));
+    sql(String.format("DROP TABLE %s", tableName));
+  }
+
+  @Test
+  void testCreateTableUsingUnsupportedFormatIsNotAFormatTable() {
+    // Paimon has no avro format table, so Gravitino creates a Paimon table for USING avro.
+    String tableName = "test_create_using_avro";
+    dropTableIfExists(tableName);
+    sql(String.format("CREATE TABLE %s (value STRING) USING avro", tableName));
     Map<String, String> paimonOptions = getPaimonOptions(tableName);
     Assertions.assertNotEquals("format-table", paimonOptions.get("type"));
     Assertions.assertNull(paimonOptions.get("file.format"));
