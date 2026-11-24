@@ -163,6 +163,17 @@ describe('genUpdates', () => {
     })
   })
 
+  it.each([
+    { type: 'literal', dataType: 'string', value: '' },
+    { type: 'literal', dataType: 'null', value: 'NULL' }
+  ])('can set an explicit default on a column without one (%j)', defaultValue => {
+    const column = { uniqueId: 'name', name: 'name', type: 'string', nullable: true }
+
+    expect(genUpdates({ columns: [column] }, { columns: [{ ...column, defaultValue }] })).toEqual([
+      { '@type': 'updateColumnDefaultValue', fieldName: ['name'], newDefaultValue: defaultValue }
+    ])
+  })
+
   it.each([true, false])('includes autoIncrement when adding a new column: %s', autoIncrement => {
     const originalData = {
       name: 'users',
@@ -256,6 +267,45 @@ describe('hasAutoIncrementEditConflict', () => {
     const newColumn = { ...originalColumn, comment: '' }
 
     expect(hasAutoIncrementEditConflict('jdbc-mysql', [oldColumn], [newColumn])).toBe(true)
+  })
+
+  describe.each(['jdbc-mysql', 'jdbc-oceanbase'])('default value edits on %s', provider => {
+    it('requires disabling AutoIncrement before setting a default', () => {
+      const disabled = { ...originalColumn, autoIncrement: false }
+      const edited = { ...disabled, defaultValue: { value: '1' } }
+
+      expect(hasAutoIncrementEditConflict(provider, [originalColumn], [edited])).toBe(true)
+      expect(hasAutoIncrementEditConflict(provider, [originalColumn], [disabled])).toBe(false)
+      expect(hasAutoIncrementEditConflict(provider, [disabled], [edited])).toBe(false)
+    })
+
+    it('blocks editing an existing expression while enabling AutoIncrement', () => {
+      const defaultValue = { type: 'unparsed', unparsedExpression: '1' }
+      const saved = { ...originalColumn, autoIncrement: false, defaultValue }
+      const edited = { ...saved, autoIncrement: true, defaultValue: { ...defaultValue, value: '2' } }
+
+      expect(hasAutoIncrementEditConflict(provider, [saved], [edited])).toBe(true)
+    })
+
+    it.each([
+      [
+        { unparsedExpression: '1', type: 'unparsed' },
+        { type: 'unparsed', unparsedExpression: '1', value: '1' }
+      ],
+      [
+        { type: 'function', funcName: 'current_timestamp' },
+        { type: 'function', funcName: 'current_timestamp', funcArgs: [] }
+      ],
+      [null, { value: undefined }]
+    ])('allows an unchanged default and emits only the AutoIncrement update (%j)', (savedDefault, formDefault) => {
+      const saved = createTableData(true, savedDefault)
+      const edited = { ...saved.columns[0], autoIncrement: false, defaultValue: formDefault }
+
+      expect(hasAutoIncrementEditConflict(provider, saved.columns, [edited])).toBe(false)
+      expect(genUpdates(saved, createTableData(false, normalizeColumnDefaultValue(formDefault)))).toEqual([
+        { '@type': 'updateColumnAutoIncrement', fieldName: ['id'], autoIncrement: false }
+      ])
+    })
   })
 
   it.each(['jdbc-mysql', 'jdbc-oceanbase'])(

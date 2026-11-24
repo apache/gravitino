@@ -57,6 +57,7 @@ export const hasAutoIncrementEditConflict = (provider, originalColumns, newColum
     return (
       (!newColumn.autoIncrement && originalColumn.name !== newColumn.name) ||
       (originalColumn.comment || '') !== (newColumn.comment || '') ||
+      hasColumnDefaultValueChanged(originalColumn.defaultValue, newColumn.defaultValue) ||
       (typeof newColumn.required === 'boolean' && newColumn.required !== wasRequired) ||
       (originalType && editedType && originalType.toLowerCase() !== editedType.toLowerCase())
     )
@@ -96,7 +97,9 @@ export const loggerGitHubInfo = (stars, forks) => {
 }
 
 export const normalizeColumnDefaultValue = expression => {
-  if (!expression || typeof expression !== 'object') return expression
+  if (expression == null) return undefined
+  if (typeof expression !== 'object') return expression
+  if (!expression.type && expression.value === undefined) return undefined
 
   switch (expression.type) {
     case 'literal':
@@ -138,6 +141,9 @@ export const normalizeColumnDefaultValue = expression => {
           }
   }
 }
+
+const hasColumnDefaultValueChanged = (saved, edited) =>
+  !isEqual(normalizeColumnDefaultValue(saved), normalizeColumnDefaultValue(edited))
 
 export const genUpdates = (originalData, newData, disableUpdate = false) => {
   const updates = []
@@ -277,7 +283,7 @@ export const genUpdates = (originalData, newData, disableUpdate = false) => {
           autoIncrement: Boolean(newColumnsMap[key].autoIncrement)
         })
       }
-      if (JSON.stringify(originalColumnsMap[key].defaultValue) !== JSON.stringify(newColumnsMap[key].defaultValue)) {
+      if (hasColumnDefaultValueChanged(originalColumnsMap[key].defaultValue, newColumnsMap[key].defaultValue)) {
         updates.push({
           '@type': 'updateColumnDefaultValue',
           fieldName: [newColumnsMap[key].name],
