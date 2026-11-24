@@ -303,11 +303,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       // not support, as UnsupportedOperationException. createTable has no 406 response.
       throw new BadRequestException("Invalid table definition: %s", e.getMessage());
     } catch (IllegalStateException e) {
-      // With the format version taken from the catalog defaults, a column type that version does
-      // not support is only detected while Iceberg builds the table metadata.
-      if (e.getMessage() != null && e.getMessage().startsWith("Invalid schema for v")) {
-        throw new BadRequestException("%s", e.getMessage());
-      }
+      throwIfFormatVersionSchemaError(e);
       throw e;
     }
     if (loadTableResponse != null) {
@@ -515,6 +511,10 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     } catch (UnsupportedOperationException e) {
       // As in createTable: an invalid update, not an unsupported operation. updateTable has no 406.
       throw new BadRequestException("Invalid table update: %s", e.getMessage());
+    } catch (IllegalStateException e) {
+      // Adding a V3-only type to a v2 table fails while Iceberg builds the updated metadata.
+      throwIfFormatVersionSchemaError(e);
+      throw e;
     }
     if (loadTableResponse != null) {
       getMetadataCache().updateTableMetadata(tableIdentifier, loadTableResponse.tableMetadata());
@@ -536,7 +536,12 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   public LoadTableResponse updateTable(IcebergTableChange icebergTableChange) {
     Transaction transaction = icebergTableChange.getTransaction();
     try {
-      transaction.commitTransaction();
+      try {
+        transaction.commitTransaction();
+      } catch (IllegalStateException e) {
+        throwIfFormatVersionSchemaError(e);
+        throw e;
+      }
     } finally {
       // A load during the commit can cache old metadata, even if the commit ultimately fails.
       getMetadataCache().invalidate(icebergTableChange.getTableIdentifier());
@@ -561,7 +566,14 @@ public class IcebergCatalogWrapper implements AutoCloseable {
    * @return the response after committing the table change
    */
   public LoadTableResponse buildAndUpdateTable(Function<Catalog, IcebergTableChange> builder) {
-    IcebergTableChange change = builder.apply(getCatalog());
+    IcebergTableChange change;
+    try {
+      change = builder.apply(getCatalog());
+    } catch (IllegalStateException e) {
+      // Schema updates that add a V3-only type to a v2 table can fail while building the change.
+      throwIfFormatVersionSchemaError(e);
+      throw e;
+    }
     return updateTable(change);
   }
 
@@ -729,6 +741,17 @@ public class IcebergCatalogWrapper implements AutoCloseable {
         capacity,
         expireMinutes);
     return cache;
+  }
+
+  /**
+   * Iceberg raises {@link IllegalStateException} when a schema uses types the table format version
+   * does not support. Map that client error to {@link BadRequestException} so REST and the
+   * Gravitino catalog API return 400 instead of 500.
+   */
+  private static void throwIfFormatVersionSchemaError(IllegalStateException e) {
+    if (e.getMessage() != null && e.getMessage().startsWith("Invalid schema for v")) {
+      throw new BadRequestException("%s", e.getMessage());
+    }
   }
 
   /**

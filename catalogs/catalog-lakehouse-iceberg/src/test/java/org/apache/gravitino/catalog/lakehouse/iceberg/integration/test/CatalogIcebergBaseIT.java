@@ -1007,9 +1007,9 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
         };
     TableCatalog tableCatalog = catalog.asTableCatalog();
     // Without format-version=3 the table defaults to v2, which Iceberg rejects for variant columns.
-    Exception exception =
+    IllegalArgumentException exception =
         Assertions.assertThrows(
-            Exception.class,
+            IllegalArgumentException.class,
             () ->
                 tableCatalog.createTable(
                     ident,

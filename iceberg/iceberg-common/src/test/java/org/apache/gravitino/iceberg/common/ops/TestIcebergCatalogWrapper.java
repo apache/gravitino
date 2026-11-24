@@ -377,6 +377,58 @@ public class TestIcebergCatalogWrapper {
   }
 
   @Test
+  public void testCreateTableWithV3TypeAndDefaultFormatVersionIsBadRequest(
+      @TempDir Path warehouseDir) throws Exception {
+    Schema variantSchema =
+        new Schema(Types.NestedField.optional(1, "payload", Types.VariantType.get()));
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Namespace namespace = Namespace.of("db");
+      wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+      CreateTableRequest request =
+          CreateTableRequest.builder().withName("t_variant").withSchema(variantSchema).build();
+      BadRequestException failure =
+          Assertions.assertThrows(
+              BadRequestException.class, () -> wrapper.createTable(namespace, request));
+      Assertions.assertTrue(
+          failure.getMessage().contains("variant is not supported until v3"), failure.getMessage());
+    }
+  }
+
+  @Test
+  public void testAddV3ColumnToV2TableIsBadRequest(@TempDir Path warehouseDir) throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Namespace namespace = Namespace.of("db");
+      TableIdentifier identifier = TableIdentifier.of(namespace, "t_v2");
+      wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+      wrapper.createTable(
+          namespace,
+          CreateTableRequest.builder()
+              .withName("t_v2")
+              .withSchema(new Schema(Types.NestedField.required(1, "id", Types.LongType.get())))
+              .setProperties(ImmutableMap.of("format-version", "2"))
+              .build());
+
+      BadRequestException failure =
+          Assertions.assertThrows(
+              BadRequestException.class,
+              () ->
+                  wrapper.buildAndUpdateTable(
+                      catalog -> {
+                        Transaction transaction = catalog.loadTable(identifier).newTransaction();
+                        transaction
+                            .updateSchema()
+                            .addColumn("payload", Types.VariantType.get())
+                            .commit();
+                        return new IcebergTableChange(identifier, transaction);
+                      }));
+      Assertions.assertTrue(
+          failure.getMessage().contains("variant is not supported until v3"), failure.getMessage());
+    }
+  }
+
+  @Test
   public void testUpdateTableToUnknownDefaultSpecOrSortOrderIsBadRequest(@TempDir Path warehouseDir)
       throws Exception {
     try (IcebergCatalogWrapper wrapper =
