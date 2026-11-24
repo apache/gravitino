@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.NonEmptyDomainException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -47,8 +48,8 @@ import org.apache.gravitino.tag.TagValue;
  * exception reaches the caller unchanged, unless it is caused by a database error, which is
  * reported like any other failure of the store.
  *
- * <p>The store only locks, reads and writes; the rules themselves, such as how deep the hierarchy
- * may be or which status a parent needs, are the caller's check. Since the check sees the domains
+ * <p>The store enforces the non-empty checks on domain deletion. The caller's check enforces rules
+ * such as how deep the hierarchy may be or which status a parent needs. Since it sees the domains
  * as they are under the locks, a rule it enforces cannot be broken by a concurrent change that the
  * locks exclude.
  *
@@ -66,11 +67,16 @@ public interface SupportsDomainOperations {
   int JOINED_DOMAIN_BATCH_SIZE = 5_000;
 
   /**
-   * Deletes a domain after checking its current state under the domain row lock.
+   * Deletes a domain after checking its current state under the domain row lock. After the
+   * authorization check succeeds, the store checks for subdomains and live glossary term
+   * memberships while holding that lock. Either condition preserves the domain and its memberships.
+   * For glossary members, the exception directs the caller to a term owner or glossary manager with
+   * domain access. Its message must omit member names and counts.
    *
    * @param ident The domain identifier.
    * @param check The authorization check; throwing rolls back the deletion.
    * @return Whether a domain was deleted.
+   * @throws NonEmptyDomainException If glossary terms still belong to the domain.
    * @throws IOException If the domain cannot be deleted.
    */
   boolean deleteDomain(NameIdentifier ident, Consumer<DomainEntity> check) throws IOException;

@@ -40,6 +40,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
+import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
@@ -442,7 +443,7 @@ class TestGlossaryManager extends TestJDBCBackend {
         IllegalArgumentException.class,
         () -> manager.createTerm(LAKE, TermSpec.builder("tooMany").withSynonyms(synonyms).build()));
     Assertions.assertThrows(
-        IllegalArgumentException.class,
+        NoSuchDomainException.class,
         () ->
             manager.createTerm(LAKE, TermSpec.builder("needsDomain").withDomains("sales").build()));
     String token = manager.createTerm(LAKE, TermSpec.builder("A").build()).revisionToken();

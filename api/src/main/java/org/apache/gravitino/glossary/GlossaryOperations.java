@@ -90,8 +90,9 @@ public interface GlossaryOperations {
    * {@link GlossaryTerm.Status#APPROVED}; this does not mean that a human reviewed the term.
    *
    * <p>The caller needs effective {@code VIEW_DEFINITION}, effective {@code CREATE_DEFINITION}, and
-   * read access to each requested domain ({@code USE_DOMAIN}) and referenced broader or related
-   * term. Returned domains and relations follow the same visibility rules as reads.
+   * read access to each requested domain ({@code USE_DOMAIN} for published domains, {@code
+   * MANAGE_DOMAIN} for drafts) and referenced broader or related term. Returned domains and
+   * relations follow the same visibility rules as reads.
    *
    * @param spec The content of the term.
    * @return The created term.
@@ -99,7 +100,8 @@ public interface GlossaryOperations {
    *     already exists.
    * @throws NoSuchTermException If a broader or related term does not exist or is not visible to
    *     the caller.
-   * @throws NotFoundException If a requested domain does not exist.
+   * @throws NotFoundException If a requested domain is missing or is a draft hidden from the
+   *     caller.
    * @throws ForbiddenException If the caller lacks the required creation or domain privilege.
    * @throws IllegalArgumentException If a synonym is the name of another term, or a relation is not
    *     allowed.
@@ -129,7 +131,8 @@ public interface GlossaryOperations {
    *     exist or is not visible to the caller.
    * @throws TermAlreadyExistsException If the term is renamed to the name of another term, or its
    *     source reference is set to the one of another term.
-   * @throws NotFoundException If a domain to add does not exist.
+   * @throws NotFoundException If a domain to add or remove is missing or is a draft hidden from the
+   *     caller.
    * @throws ForbiddenException If the caller can see the term but lacks the required edit or domain
    *     privilege.
    * @throws IllegalArgumentException If a change is not valid, for example a synonym that is the
@@ -165,7 +168,8 @@ public interface GlossaryOperations {
    * @return The altered term.
    * @throws NoSuchTermException If the term or a referenced term is missing or hidden.
    * @throws TermAlreadyExistsException If a name or source reference conflicts with another term.
-   * @throws NotFoundException If a domain to add does not exist.
+   * @throws NotFoundException If a domain to add or remove is missing or is a draft hidden from the
+   *     caller.
    * @throws ForbiddenException If the caller lacks edit or required domain access.
    * @throws IllegalArgumentException If a supported implementation receives a missing/malformed
    *     token or an invalid change.

@@ -59,12 +59,12 @@ import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.DomainAccess;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cache.CaffeineGravitinoCache;
 import org.apache.gravitino.cache.GravitinoCache;
-import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.glossary.GlossaryAccess;
@@ -440,9 +440,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         principal,
         metalake,
         DomainAuthzHelper.scopes(metalake, domain),
-        domain.status() == Domain.Status.DRAFT
-            ? Privilege.Name.MANAGE_DOMAIN
-            : Privilege.Name.USE_DOMAIN,
+        DomainAccess.readPrivilege(domain),
         requestContext);
   }
 

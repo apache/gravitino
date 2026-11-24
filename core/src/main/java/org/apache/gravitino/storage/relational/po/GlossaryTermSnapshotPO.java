@@ -23,9 +23,10 @@ import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.Setter;
 
-/** One row of a definition/synonym snapshot; synonym is null for terms without synonyms. */
+/** One row of a term snapshot, optionally carrying one synonym or one domain name. */
 @Getter
 @Setter
 public class GlossaryTermSnapshotPO extends GlossaryTermPO {
   @Nullable private String synonym;
+  @Nullable private String domainName;
 }

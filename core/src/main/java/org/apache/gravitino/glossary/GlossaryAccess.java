@@ -22,16 +22,23 @@ package org.apache.gravitino.glossary;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import java.security.Principal;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.BiPredicate;
 import java.util.function.LongPredicate;
+import javax.annotation.Nullable;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.authorization.DomainAccess;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege.Name;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.GlossaryTermEntity;
+import org.apache.gravitino.storage.relational.service.DomainMetaService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -39,22 +46,29 @@ import org.apache.gravitino.utils.PrincipalUtils;
 /** Metalake capabilities for one glossary operation. Term ownership follows the observed ID. */
 public final class GlossaryAccess {
   private static final GlossaryAccess UNRESTRICTED =
-      new GlossaryAccess(true, () -> true, () -> true, id -> true);
+      new GlossaryAccess(true, () -> true, () -> true, id -> true, (name, domain) -> true);
   private static final GlossaryAccess DENIED =
-      new GlossaryAccess(false, () -> false, () -> false, id -> false);
+      new GlossaryAccess(false, () -> false, () -> false, id -> false, (name, domain) -> false);
 
   private final boolean view;
   private final Supplier<Boolean> create;
   private final Supplier<Boolean> manage;
   private final LongPredicate owns;
+  private final BiPredicate<String, DomainEntity> domains;
+  private final Map<String, Boolean> visibleDomains = new HashMap<>();
 
   private GlossaryAccess(
-      boolean view, Supplier<Boolean> create, Supplier<Boolean> manage, LongPredicate owns) {
+      boolean view,
+      Supplier<Boolean> create,
+      Supplier<Boolean> manage,
+      LongPredicate owns,
+      BiPredicate<String, DomainEntity> domains) {
     this.view = view;
     // A list or hierarchy walk can visit many drafts. Evaluate each required privilege once.
     this.create = Suppliers.memoize(create);
     this.manage = Suppliers.memoize(manage);
     this.owns = owns;
+    this.domains = domains;
   }
 
   boolean canView() {
@@ -116,7 +130,26 @@ public final class GlossaryAccess {
         true,
         () -> effective(authorizer, principal, metalake, lake, Name.CREATE_DEFINITION, context),
         () -> effective(authorizer, principal, metalake, lake, Name.MANAGE_DEFINITIONS, context),
-        id -> authorizer.isGlossaryTermOwner(principal, metalake, id, context));
+        id -> authorizer.isGlossaryTermOwner(principal, metalake, id, context),
+        (name, snapshot) -> {
+          DomainEntity domain = snapshot;
+          if (domain == null) {
+            try {
+              domain =
+                  DomainMetaService.getInstance()
+                      .getDomainByIdentifier(NameIdentifierUtil.ofDomain(metalake, name));
+            } catch (NoSuchEntityException absent) {
+              return false;
+            }
+          }
+          return DomainAccess.allowed(
+              authorizer,
+              principal,
+              metalake,
+              DomainAccess.scopes(metalake, domain),
+              DomainAccess.readPrivilege(domain),
+              context);
+        });
   }
 
   private static boolean effective(
@@ -137,6 +170,27 @@ public final class GlossaryAccess {
   boolean canEdit(GlossaryTermEntity term) {
     // Listing drafts as a creator requires a current owner lookup per draft to observe transfers.
     return manage() || (create.get() && owns.test(term.id()));
+  }
+
+  /**
+   * Whether the caller can see a domain through the ordinary domain-read check: USE_DOMAIN on a
+   * published domain, MANAGE_DOMAIN on a draft. A missing domain is not visible. Each name is
+   * checked once per request.
+   */
+  boolean canUseDomain(String domain) {
+    return canUseDomain(domain, null);
+  }
+
+  /** Uses the already loaded domain and parent in a subdomain listing. */
+  boolean canUseDomain(DomainEntity domain) {
+    return canUseDomain(domain.name(), domain);
+  }
+
+  private boolean canUseDomain(String name, @Nullable DomainEntity domain) {
+    if (this == UNRESTRICTED || this == DENIED) {
+      return this == UNRESTRICTED;
+    }
+    return visibleDomains.computeIfAbsent(name, key -> domains.test(key, domain));
   }
 
   void requireCreate() {

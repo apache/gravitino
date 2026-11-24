@@ -197,7 +197,7 @@ public interface DomainDispatcher {
    * @param name The name of the domain.
    * @return True if the domain is deleted, false if it does not exist.
    * @throws NoSuchMetalakeException If the metalake does not exist.
-   * @throws NonEmptyDomainException If the domain has sub-domains.
+   * @throws NonEmptyDomainException If the domain has sub-domains or glossary terms.
    */
   boolean deleteDomain(String metalake, String name) throws NonEmptyDomainException;
 

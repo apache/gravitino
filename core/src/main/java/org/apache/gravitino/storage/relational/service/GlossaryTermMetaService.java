@@ -101,9 +101,11 @@ public final class GlossaryTermMetaService {
           entity.namespace(),
           (mapper, metalakeId) -> {
             GlossaryTermPO old =
-                mapper.getForUpdate(metalakeId, GlossaryTermNames.key(entity.name()));
+                overwritten
+                    ? mapper.getForUpdate(metalakeId, GlossaryTermNames.key(entity.name()))
+                    : null;
             GlossaryTermPO row = toPO(entity, metalakeId);
-            if (overwritten && old != null) {
+            if (old != null) {
               Preconditions.checkArgument(
                   Objects.equals(old.getTermId(), entity.id()),
                   "Cannot overwrite glossary term %s with ID %s; load and retain existing ID %s",
@@ -127,7 +129,9 @@ public final class GlossaryTermMetaService {
     }
   }
 
-  /** Loads a definition and its synonyms from one statement snapshot without row locks. */
+  /**
+   * Loads a definition and its synonyms and domains from one statement snapshot without row locks.
+   */
   public GlossaryTermEntity get(NameIdentifier ident) {
     return getWithMetalakeId(ident).term();
   }
@@ -170,7 +174,7 @@ public final class GlossaryTermMetaService {
         });
   }
 
-  /** Lists definitions and synonyms from one statement snapshot without row locks. */
+  /** Lists definitions, synonyms and domains from one statement snapshot without row locks. */
   public List<GlossaryTermEntity> list(Namespace ns) {
     return definitions(ns, readRows(ns, null, null));
   }
@@ -227,8 +231,8 @@ public final class GlossaryTermMetaService {
   }
 
   /**
-   * Soft-deletes the definition, synonyms and incident edges. Returns false if the term is absent
-   * in a live metalake.
+   * Soft-deletes the definition, synonyms, incident edges and domain membership. Returns false if
+   * the term is absent in a live metalake.
    *
    * @throws NoSuchEntityException if the parent metalake is absent or disappears before locking
    */
@@ -250,11 +254,12 @@ public final class GlossaryTermMetaService {
                   owners.softDeleteOwnerRelByMetadataObjectIdAndType(
                       row.getTermId(), Entity.EntityType.GLOSSARY_TERM.name()));
           GlossaryTermRelService.getInstance().removeTerm(metalakeId, row.getTermId());
+          GlossaryTermDomainService.getInstance().removeTerm(row.getTermId());
           return true;
         });
   }
 
-  /** Soft-deletes definitions and synonyms inside the metalake deletion transaction. */
+  /** Soft-deletes definitions, synonyms, edges and domain membership inside metalake deletion. */
   public void dropMetalake(long metalakeId) {
     long deletedAt = Math.max(1, System.currentTimeMillis());
     SessionUtils.doWithoutCommit(
@@ -263,17 +268,23 @@ public final class GlossaryTermMetaService {
           mapper.dropMetalake(metalakeId, deletedAt);
           mapper.dropMetalakeSynonyms(metalakeId, deletedAt);
           GlossaryTermRelService.getInstance().dropMetalake(metalakeId);
+          GlossaryTermDomainService.getInstance().dropMetalake(metalakeId);
         });
   }
 
   /**
-   * Purges at most limit expired relations/definitions and the definitions' synonyms atomically.
+   * Purges at most limit expired relations, domain memberships and definitions, with the
+   * definitions' synonyms, atomically.
    */
   public int collect(long cutoff, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         GlossaryTermMetaMapper.class,
         mapper -> {
           int count = GlossaryTermRelService.getInstance().collect(cutoff, limit);
+          if (count == limit) {
+            return count;
+          }
+          count += GlossaryTermDomainService.getInstance().collect(cutoff, limit - count);
           if (count == limit) {
             return count;
           }
@@ -473,15 +484,22 @@ public final class GlossaryTermMetaService {
     }
     Map<Long, GlossaryTermPO> definitions = new LinkedHashMap<>();
     Map<Long, List<String>> synonyms = new LinkedHashMap<>();
+    Map<Long, List<String>> domains = new LinkedHashMap<>();
     for (GlossaryTermSnapshotPO row : rows) {
       definitions.putIfAbsent(row.getTermId(), row);
       List<String> values = synonyms.computeIfAbsent(row.getTermId(), ignored -> new ArrayList<>());
       if (row.getSynonym() != null) {
         values.add(row.getSynonym());
       }
+      if (row.getDomainName() != null) {
+        domains
+            .computeIfAbsent(row.getTermId(), ignored -> new ArrayList<>())
+            .add(row.getDomainName());
+      }
     }
     List<GlossaryTermEntity> result = new ArrayList<>();
-    definitions.forEach((id, row) -> result.add(fromPO(row, synonyms.get(id), ns)));
+    definitions.forEach(
+        (id, row) -> result.add(fromPO(row, synonyms.get(id), domains.get(id), ns)));
     return result;
   }
 
@@ -537,10 +555,17 @@ public final class GlossaryTermMetaService {
 
   private GlossaryTermEntity fromPO(
       GlossaryTermPO row, GlossaryTermMetaMapper mapper, Namespace ns) {
-    return fromPO(row, mapper.synonyms(row.getTermId()), ns);
+    return fromPO(
+        row,
+        mapper.synonyms(row.getTermId()),
+        GlossaryTermDomainService.getInstance()
+            .domainNames(row.getMetalakeId(), List.of(row.getTermId()))
+            .get(row.getTermId()),
+        ns);
   }
 
-  private GlossaryTermEntity fromPO(GlossaryTermPO row, List<String> synonyms, Namespace ns) {
+  private GlossaryTermEntity fromPO(
+      GlossaryTermPO row, List<String> synonyms, @Nullable List<String> domains, Namespace ns) {
     try {
       List<Map<String, String>> links =
           JsonUtils.anyFieldMapper()
@@ -554,6 +579,7 @@ public final class GlossaryTermMetaService {
           .withSourceRef(row.getSourceRef())
           .withVersion(row.getCurrentVersion())
           .withSynonyms(synonyms.toArray(new String[0]))
+          .withDomains(domains == null ? new String[0] : domains.toArray(new String[0]))
           .withLinks(
               links.stream()
                   .map(link -> TermLink.of(link.get("label"), link.get("url")))

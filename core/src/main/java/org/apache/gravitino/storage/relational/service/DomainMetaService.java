@@ -40,6 +40,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.NonEmptyDomainException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -477,6 +478,7 @@ public class DomainMetaService {
    * @param identifier The domain identifier.
    * @return True if the domain is deleted, false if it does not exist.
    * @throws NonEmptyEntityException If the domain has sub-domains.
+   * @throws NonEmptyDomainException If glossary terms still belong to the domain.
    */
   public boolean deleteDomain(NameIdentifier identifier) {
     return deleteDomain(identifier, domain -> {});
@@ -590,6 +592,15 @@ public class DomainMetaService {
                 DomainRelService.getInstance()
                     .toEntityWithParent(lockedDomainPO, identifier.namespace()));
             DomainRelService.getInstance().checkDomainHasNoSubDomains(identifier, domainId);
+            // A plain read at read committed sees every membership committed before this
+            // exclusive lock: term writers hold a share lock on the domain row while adding.
+            if (GlossaryTermDomainService.getInstance().hasTerms(domainId)) {
+              throw new NonEmptyDomainException(
+                  "Domain %s under metalake %s still has glossary terms. Ask a term owner with"
+                      + " CREATE_DEFINITION, or a user with MANAGE_DEFINITIONS, who can use the"
+                      + " domain to remove the terms from it first",
+                  identifier.name(), identifier.namespace().level(0));
+            }
             deleteDomainWithVersion(identifier, lockedDomainPO);
             EntityChangeLogWriter.append(identifier, Entity.EntityType.DOMAIN, OperateType.DROP);
           },

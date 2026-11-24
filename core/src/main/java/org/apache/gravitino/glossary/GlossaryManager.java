@@ -23,6 +23,8 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -37,16 +39,22 @@ import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.apache.gravitino.exceptions.TermAlreadyExistsException;
 import org.apache.gravitino.exceptions.TermVersionConflictException;
+import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.meta.GlossaryTermNames;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.po.DomainPO;
 import org.apache.gravitino.storage.relational.po.GlossaryTermRelPO;
+import org.apache.gravitino.storage.relational.service.DomainRelService;
+import org.apache.gravitino.storage.relational.service.GlossaryTermDomainService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService.ScopedTerm;
 import org.apache.gravitino.storage.relational.service.GlossaryTermRelService;
@@ -59,6 +67,7 @@ import org.apache.gravitino.utils.NamespaceUtil;
 
 /** Manages live glossary definitions. Callers supply the metalake scope for every operation. */
 public final class GlossaryManager {
+  private static final GlossaryTermDomainService DOMAINS = GlossaryTermDomainService.getInstance();
   static final int MAX_HIERARCHY_DEPTH = 20;
   private final GlossaryTermRelService edges = GlossaryTermRelService.getInstance();
   private final Predicate<GlossaryTermEntity> readable;
@@ -171,7 +180,7 @@ public final class GlossaryManager {
               }
             }
           } while (transitive && !frontier.isEmpty());
-          return result;
+          return visibleDomains(result, access);
         });
   }
 
@@ -183,7 +192,22 @@ public final class GlossaryManager {
    *     session
    */
   public List<GlossaryTermEntity> listTerms(String metalake) {
-    if (!authorizationEnabled) {
+    return listTerms(metalake, null);
+  }
+
+  /**
+   * Lists the visible term definitions in the given metalake. With a domain, lists only the terms
+   * of that domain and of its subdomains that the caller can see. A caller without glossary view
+   * access receives an empty list before the domain filter is evaluated.
+   *
+   * @throws NoSuchMetalakeException if the metalake does not exist
+   * @throws NoSuchDomainException if the domain does not exist or is a draft hidden from the caller
+   * @throws ForbiddenException if the domain is published but the caller cannot use it
+   * @throws IllegalStateException if authorization is enabled or a domain is given, and the caller
+   *     already has a SQL session
+   */
+  public List<GlossaryTermEntity> listTerms(String metalake, @Nullable String domain) {
+    if (!authorizationEnabled && domain == null) {
       List<GlossaryTermEntity> all = loadTerms(metalake);
       all.removeIf(term -> !readable.test(term));
       return all;
@@ -196,14 +220,20 @@ public final class GlossaryManager {
           } catch (NoSuchEntityException missing) {
             throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", metalake);
           }
-          GlossaryAccess access = GlossaryAccess.forRequest(metalake, true);
+          GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
           if (!access.canView()) {
             return new ArrayList<>();
           }
-          List<GlossaryTermEntity> result =
-              terms.list(NamespaceUtil.ofGlossaryTerm(metalake), metalakeId);
+          Namespace ns = NamespaceUtil.ofGlossaryTerm(metalake);
+          List<GlossaryTermEntity> result;
+          if (domain == null) {
+            result = terms.list(ns, metalakeId);
+          } else {
+            Set<Long> scope = domainScope(metalake, metalakeId, domain, access);
+            result = terms.getByIds(ns, metalakeId, DOMAINS.termIds(metalakeId, scope));
+          }
           result.removeIf(term -> !access.canRead(term) || !readable.test(term));
-          return result;
+          return visibleDomains(result, access);
         });
   }
 
@@ -227,7 +257,7 @@ public final class GlossaryManager {
           if (!access.canRead(term)) {
             throw missingRelationRoot(ident);
           }
-          return requireVisible(ident, term);
+          return visibleDomains(requireVisible(ident, term), access);
         });
   }
 
@@ -258,6 +288,10 @@ public final class GlossaryManager {
           for (String name : spec.related()) {
             edits.add(new TermRelations.Edit(RelationType.RELATED, name, true));
           }
+          List<TermDomains.Edit> domainEdits = new ArrayList<>();
+          for (String domain : spec.domains()) {
+            domainEdits.add(new TermDomains.Edit(domain, true));
+          }
           return withRelationPlan(
               lake,
               term,
@@ -266,9 +300,21 @@ public final class GlossaryManager {
               true,
               ignored -> {},
               (fresh, plan) -> {
-                terms.checkTermNames(term);
-                handler.handle(null, term, () -> persistNewTerm(metalake, term, plan));
-                return term;
+                TermDomains domains = planDomains(lake, term, domainEdits, access);
+                GlossaryTermEntity created =
+                    domains.changed() ? TermEdits.withDomains(term, domains.names()) : term;
+                terms.checkTermNames(created);
+                // The hierarchy lock fences concurrent creates, renames and deletes. Reject a
+                // duplicate without waiting on its term row while holding requested domain locks.
+                if (!terms
+                    .getIdsByKeys(lake, Set.of(GlossaryTermNames.key(created.name())))
+                    .isEmpty()) {
+                  throw new TermAlreadyExistsException(
+                      "Term name or source reference already exists");
+                }
+                handler.handle(
+                    null, created, () -> persistNewTerm(metalake, created, plan, domains));
+                return visibleDomains(created, access);
               });
         });
   }
@@ -375,13 +421,17 @@ public final class GlossaryManager {
     NameIdentifier ident = NameIdentifierUtil.ofGlossaryTerm(metalake, name);
     TermChange[] request = changes.clone();
     List<TermRelations.Edit> edits = new ArrayList<>();
+    List<TermDomains.Edit> domainEdits = new ArrayList<>();
     List<TermChange> content = new ArrayList<>();
     for (TermChange change : request) {
       TermRelations.Edit edit = TermRelations.Edit.from(change);
-      if (edit == null) {
-        content.add(change);
-      } else {
+      TermDomains.Edit domainEdit = TermDomains.Edit.from(change);
+      if (edit != null) {
         edits.add(edit);
+      } else if (domainEdit != null) {
+        domainEdits.add(domainEdit);
+      } else {
+        content.add(change);
       }
     }
     if (!edits.isEmpty()) {
@@ -401,7 +451,14 @@ public final class GlossaryManager {
                   checkRevision(ident, locked, conditional, token);
                 },
                 (locked, plan) ->
-                    applyChanges(ident, locked, content.toArray(new TermChange[0]), plan));
+                    visibleDomains(
+                        applyChanges(
+                            ident,
+                            locked,
+                            content.toArray(new TermChange[0]),
+                            plan,
+                            planDomains(lake, locked, domainEdits, access)),
+                        access));
           },
           missing -> {
             throw missingRelationRoot(ident);
@@ -413,9 +470,16 @@ public final class GlossaryManager {
         locked -> {
           GlossaryTermEntity before =
               locked.orElseThrow(() -> new NoSuchTermException("Term %s does not exist", ident));
-          requireEdit(GlossaryAccess.forRequest(metalake, authorizationEnabled), ident, before);
+          GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
+          requireEdit(access, ident, before);
           checkRevision(ident, before, conditional, token);
-          return applyChanges(ident, before, request, null);
+          TermDomains domains =
+              domainEdits.isEmpty() && before.domains().length == 0
+                  ? null
+                  : planDomains(lakeOf(ident), before, domainEdits, access);
+          return visibleDomains(
+              applyChanges(ident, before, content.toArray(new TermChange[0]), null, domains),
+              access);
         });
   }
 
@@ -450,8 +514,16 @@ public final class GlossaryManager {
       NameIdentifier ident,
       GlossaryTermEntity before,
       TermChange[] request,
-      @Nullable TermRelations plan) {
-    GlossaryTermEntity after = TermEdits.apply(before, request, plan != null && plan.changed());
+      @Nullable TermRelations plan,
+      @Nullable TermDomains domains) {
+    boolean membership = domains != null && domains.changed();
+    if (domains != null) {
+      // A domain may have been renamed between the initial term read and its domain locks.
+      before = TermEdits.withDomains(before, domains.originalNames());
+    }
+    GlossaryTermEntity after =
+        TermEdits.apply(
+            before, request, plan != null && plan.changed(), membership ? domains.names() : null);
     if (before == after) {
       return before;
     }
@@ -466,12 +538,15 @@ public final class GlossaryManager {
           if (plan != null) {
             plan.persist();
           }
+          if (membership) {
+            domains.persist();
+          }
         });
     return after;
   }
 
   private void persistNewTerm(
-      String metalake, GlossaryTermEntity term, @Nullable TermRelations plan) {
+      String metalake, GlossaryTermEntity term, @Nullable TermRelations plan, TermDomains domains) {
     try {
       terms.insert(term, false);
     } catch (EntityAlreadyExistsException e) {
@@ -482,6 +557,7 @@ public final class GlossaryManager {
     if (plan != null) {
       plan.persist();
     }
+    domains.persist();
     if (authorizationEnabled) {
       OwnerMetaService.getInstance()
           .setOwner(
@@ -548,6 +624,96 @@ public final class GlossaryManager {
   // A relation caller must receive the same error for missing and unreadable roots.
   private static NoSuchTermException missingRelationRoot(NameIdentifier requested) {
     return new NoSuchTermException("Term %s does not exist", requested);
+  }
+
+  /**
+   * Resolves, authorizes and locks every requested domain after all term rows of the request are
+   * locked. A missing domain and a hidden draft domain report the same error.
+   */
+  private TermDomains planDomains(
+      long lake, GlossaryTermEntity term, List<TermDomains.Edit> edits, GlossaryAccess access) {
+    Set<Long> members = term.domains().length == 0 ? Set.of() : DOMAINS.domainIds(term.id());
+    Set<String> requested = new HashSet<>();
+    for (TermDomains.Edit edit : edits) {
+      requested.add(edit.domain());
+    }
+    if (members.isEmpty() && requested.isEmpty()) {
+      return new TermDomains(lake, term.id(), Map.of());
+    }
+    Map<String, DomainPO> targets = new HashMap<>();
+    Map<Long, DomainPO> locked =
+        DOMAINS.lockDomains(
+            lake,
+            members,
+            requested,
+            domain -> {
+              String name = domain.domainName();
+              requireVisibleDomain(name, domain, access);
+              targets.put(name, domain);
+            });
+    Map<Long, String> current = new HashMap<>();
+    for (long id : members) {
+      current.put(id, locked.get(id).domainName());
+    }
+    TermDomains plan = new TermDomains(lake, term.id(), current);
+    for (TermDomains.Edit edit : edits) {
+      DomainPO target = targets.get(edit.domain());
+      plan.edit(edit, target.domainId(), target.domainName());
+    }
+    return plan;
+  }
+
+  /**
+   * Resolves the domain scope of a list filter: the domain and its visible direct subdomains. A
+   * missing domain and a hidden draft domain report the same error.
+   */
+  private Set<Long> domainScope(
+      String metalake, long metalakeId, String name, GlossaryAccess access) {
+    DomainPO domain = DOMAINS.findDomain(metalakeId, name);
+    requireVisibleDomain(name, domain, access);
+    Set<Long> scope = new HashSet<>();
+    scope.add(domain.domainId());
+    for (DomainEntity child :
+        DomainRelService.getInstance()
+            .listSubDomains(NameIdentifierUtil.ofDomain(metalake, domain.domainName()))) {
+      if (access.canUseDomain(child)) {
+        scope.add(child.id());
+      }
+    }
+    return scope;
+  }
+
+  private static void requireVisibleDomain(
+      String name, @Nullable DomainPO domain, GlossaryAccess access) {
+    if (domain == null || !name.equals(domain.domainName())) {
+      throw new NoSuchDomainException("Domain %s does not exist", name);
+    }
+    if (!access.canUseDomain(name)) {
+      if (Domain.Status.DRAFT.name().equals(domain.status())) {
+        throw new NoSuchDomainException("Domain %s does not exist", name);
+      }
+      throw new ForbiddenException("Cannot use domain %s", name);
+    }
+  }
+
+  /** Returns the term with only the domains the caller can see. Stored membership is unchanged. */
+  private static GlossaryTermEntity visibleDomains(GlossaryTermEntity term, GlossaryAccess access) {
+    String[] domains = term.domains();
+    String[] visible = Arrays.stream(domains).filter(access::canUseDomain).toArray(String[]::new);
+    return visible.length == domains.length ? term : TermEdits.withDomains(term, visible);
+  }
+
+  private static List<GlossaryTermEntity> visibleDomains(
+      List<GlossaryTermEntity> terms, GlossaryAccess access) {
+    List<GlossaryTermEntity> result = new ArrayList<>(terms.size());
+    for (GlossaryTermEntity term : terms) {
+      result.add(visibleDomains(term, access));
+    }
+    return result;
+  }
+
+  private static long lakeOf(NameIdentifier ident) {
+    return MetalakeMetaService.getInstance().getMetalakeIdByName(ident.namespace().level(0));
   }
 
   private <T> T withRelationPlan(

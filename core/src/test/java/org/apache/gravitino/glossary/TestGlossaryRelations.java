@@ -22,12 +22,15 @@ package org.apache.gravitino.glossary;
 import static org.apache.gravitino.glossary.GlossaryManager.Direction.BROADER;
 import static org.apache.gravitino.glossary.GlossaryManager.Direction.NARROWER;
 import static org.apache.gravitino.glossary.GlossaryManager.Direction.RELATED;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -42,12 +45,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.apache.gravitino.exceptions.TermAlreadyExistsException;
 import org.apache.gravitino.exceptions.TermVersionConflictException;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
+import org.apache.gravitino.storage.relational.service.GlossaryDomainFixtures;
 import org.apache.gravitino.storage.relational.service.GlossaryInvariants;
 import org.apache.gravitino.storage.relational.service.GlossaryTermRelService.RelationType;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
@@ -431,74 +436,90 @@ class TestGlossaryRelations extends TestJDBCBackend {
     }
   }
 
-  /** Covers T5.9 and T5.16. */
+  /** Covers T5.9, T5.16 and T7.7. */
   @TestTemplate
   void testDeleteRacesMixedAlterAndCreateInBothOrders() throws Exception {
     createAndInsertMakeLake(LAKE);
-    for (boolean creating : List.of(false, true)) {
-      for (boolean dropFirst : List.of(false, true)) {
-        String suffix = "-" + creating + "-" + dropFirst;
-        String target = "target" + suffix, source = "source" + suffix, renamed = "updated" + suffix;
-        manager.createTerm(
-            LAKE,
-            TermSpec.builder(target)
-                .withStatus(creating ? GlossaryTerm.Status.DRAFT : GlossaryTerm.Status.DEPRECATED)
-                .build());
-        if (!creating) create(source);
-        CountDownLatch locked = new CountDownLatch(1),
-            release = new CountDownLatch(1),
-            started = new CountDownLatch(1);
-        GlossaryManager holder =
-            new GlossaryManager(
-                ids::incrementAndGet,
-                false,
-                (before, after, persist) -> {
-                  locked.countDown();
-                  await(release);
-                  persist.run();
-                });
-        Consumer<GlossaryManager> write =
-            editor -> {
-              if (creating)
-                editor.createTerm(LAKE, TermSpec.builder(renamed).withBroader(target).build());
-              else
-                editor.alterTerm(
-                    LAKE, source, TermChange.rename(renamed), TermChange.addBroader(target));
-            };
-        ExecutorService pool = Executors.newFixedThreadPool(2);
-        try {
-          Future<?> first =
-              pool.submit(
-                  () -> {
-                    if (dropFirst) assertTrue(holder.dropTerm(LAKE, target));
-                    else write.accept(holder);
-                  });
-          await(locked);
-          Future<?> second =
-              pool.submit(
-                  () -> {
-                    started.countDown();
-                    if (dropFirst)
-                      assertThrows(NoSuchTermException.class, () -> write.accept(manager));
-                    else assertTrue(manager.dropTerm(LAKE, target));
-                  });
-          await(started);
-          assertThrows(TimeoutException.class, () -> second.get(100, TimeUnit.MILLISECONDS));
-          release.countDown();
-          first.get(20, TimeUnit.SECONDS);
-          second.get(20, TimeUnit.SECONDS);
-          if (dropFirst) {
-            assertThrows(NoSuchTermException.class, () -> get(renamed));
-            if (!creating) assertEquals(1, get(source).version());
-          } else {
-            assertTrue(manager.listRelations(LAKE, renamed, BROADER, false, null).isEmpty());
-            assertEquals(creating ? 2 : 3, get(renamed).version());
+    GlossaryDomainFixtures.insertDomain(LAKE, "Sales", Domain.Status.PUBLISHED, null, AUDIT_INFO);
+    assertTimeoutPreemptively(
+        Duration.ofMinutes(3),
+        () -> {
+          for (int round = 0; round < 20; round++) {
+            runMixedDeleteRace(true, round);
+            runMixedDeleteRace(false, round);
           }
-        } finally {
-          release.countDown();
-          pool.shutdownNow();
+        });
+  }
+
+  private void runMixedDeleteRace(boolean creating, int round) throws Exception {
+    boolean dropFirst = round % 2 == 0;
+    GlossaryTerm.Status targetStatus =
+        (round / 2) % 2 == 0 ? GlossaryTerm.Status.DRAFT : GlossaryTerm.Status.DEPRECATED;
+    String suffix = "-" + creating + "-" + round;
+    String target = "target" + suffix, source = "source" + suffix, renamed = "updated" + suffix;
+    manager.createTerm(LAKE, TermSpec.builder(target).withStatus(targetStatus).build());
+    if (!creating) create(source);
+    CountDownLatch locked = new CountDownLatch(1),
+        release = new CountDownLatch(1),
+        started = new CountDownLatch(1);
+    GlossaryManager holder =
+        new GlossaryManager(
+            ids::incrementAndGet,
+            false,
+            (before, after, persist) -> {
+              locked.countDown();
+              await(release);
+              persist.run();
+            });
+    Consumer<GlossaryManager> write =
+        editor -> {
+          if (creating)
+            editor.createTerm(
+                LAKE, TermSpec.builder(renamed).withBroader(target).withDomains("Sales").build());
+          else
+            editor.alterTerm(
+                LAKE,
+                source,
+                TermChange.rename(renamed),
+                TermChange.addBroader(target),
+                TermChange.addDomain("Sales"));
+        };
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    try {
+      Future<?> first =
+          pool.submit(
+              () -> {
+                if (dropFirst) assertTrue(holder.dropTerm(LAKE, target));
+                else write.accept(holder);
+              });
+      await(locked);
+      Future<?> second =
+          pool.submit(
+              () -> {
+                started.countDown();
+                if (dropFirst) assertThrows(NoSuchTermException.class, () -> write.accept(manager));
+                else assertTrue(manager.dropTerm(LAKE, target));
+              });
+      await(started);
+      assertThrows(TimeoutException.class, () -> second.get(100, TimeUnit.MILLISECONDS));
+      release.countDown();
+      first.get(20, TimeUnit.SECONDS);
+      second.get(20, TimeUnit.SECONDS);
+      if (dropFirst) {
+        assertThrows(NoSuchTermException.class, () -> get(renamed));
+        if (!creating) {
+          assertEquals(1, get(source).version());
+          assertArrayEquals(new String[0], get(source).domains());
         }
+      } else {
+        assertTrue(manager.listRelations(LAKE, renamed, BROADER, false, null).isEmpty());
+        assertEquals(creating ? 2 : 3, get(renamed).version());
+        assertArrayEquals(new String[] {"Sales"}, get(renamed).domains());
       }
+      GlossaryInvariants.assertDomainMembership();
+    } finally {
+      release.countDown();
+      pool.shutdownNow();
     }
   }
 

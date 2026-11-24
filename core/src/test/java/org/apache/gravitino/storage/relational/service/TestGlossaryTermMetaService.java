@@ -22,9 +22,11 @@ package org.apache.gravitino.storage.relational.service;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -34,16 +36,22 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.glossary.GlossaryTerm.Status;
 import org.apache.gravitino.glossary.TermLink;
+import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.meta.GlossaryTermNames;
+import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.RelationalEntityStoreIdResolver;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.GlossaryTermDomainRelMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
+import org.apache.gravitino.storage.relational.po.GlossaryTermSnapshotPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
@@ -475,6 +483,96 @@ public class TestGlossaryTermMetaService extends TestJDBCBackend {
                   () -> backend.delete(ident("New term"), TYPE, false));
           Assertions.assertEquals("Metalake glossary no longer exists", missingParent.getMessage());
         });
+  }
+
+  /** Every read path carries the stored domain names, read in the definition snapshot. */
+  @TestTemplate
+  public void testReadsCarryStoredDomains() throws Exception {
+    setupMetalake();
+    long sales = domain("Sales");
+    service.insert(term(101, "One").build(), false);
+    service.insert(term(102, "Two").build(), false);
+    SessionUtils.doWithCommit(
+        GlossaryTermDomainRelMapper.class,
+        ignored -> GlossaryTermDomainService.getInstance().add(100, 101, sales));
+    String[] one = {"Sales"};
+    Assertions.assertArrayEquals(one, service.get(ident("One")).domains());
+    Assertions.assertArrayEquals(one, service.getWithMetalakeId(ident("One")).term().domains());
+    Assertions.assertArrayEquals(new String[0], service.get(ident("Two")).domains());
+    Map<String, String[]> listed = new HashMap<>();
+    service.list(NS).forEach(t -> listed.put(t.name(), t.domains()));
+    Assertions.assertArrayEquals(one, listed.get("One"));
+    Assertions.assertArrayEquals(new String[0], listed.get("Two"));
+    Assertions.assertArrayEquals(one, service.getByIds(NS, 100, Set.of(101L)).get(0).domains());
+    Assertions.assertArrayEquals(
+        one, service.withLockedTerm(ident("One"), false, t -> t.orElseThrow().domains()));
+  }
+
+  /** A read-committed caller receives all details from one statement without multiplying rows. */
+  @TestTemplate
+  public void testSynonymsAndDomainsShareStatementSnapshot() throws Exception {
+    setupMetalake();
+    service.insert(term(101, "One").withSynonyms(new String[] {"First", "Second"}).build(), false);
+    for (String name : List.of("Finance", "Retail", "Sales")) {
+      long id = domain(name);
+      SessionUtils.doWithCommit(
+          GlossaryTermDomainRelMapper.class, mapper -> mapper.insert(100, 101, id));
+    }
+    List<GlossaryTermSnapshotPO> rows =
+        SessionUtils.getWithoutCommit(
+            GlossaryTermMetaMapper.class,
+            mapper -> mapper.snapshot(100, "glossary", GlossaryTermNames.key("One")));
+    Assertions.assertEquals(5, rows.size());
+    Assertions.assertEquals(
+        List.of("Finance", "Retail", "Sales"),
+        rows.stream()
+            .filter(row -> row.getDomainName() != null)
+            .map(GlossaryTermSnapshotPO::getDomainName)
+            .toList());
+    Assertions.assertEquals(
+        List.of("First", "Second"),
+        rows.stream()
+            .filter(row -> row.getSynonym() != null)
+            .map(GlossaryTermSnapshotPO::getSynonym)
+            .toList());
+    GlossaryTermEntity term = service.get(ident("One"));
+    Assertions.assertArrayEquals(new String[] {"First", "Second"}, term.synonyms());
+    Assertions.assertArrayEquals(new String[] {"Finance", "Retail", "Sales"}, term.domains());
+  }
+
+  /** Definition writes never change membership, whatever domains the entity carries. */
+  @TestTemplate
+  public void testUpdateIgnoresEntityDomains() throws Exception {
+    setupMetalake();
+    long sales = domain("Sales");
+    domain("Finance");
+    service.insert(term(101, "One").withDomains("Finance").build(), false);
+    Assertions.assertArrayEquals(new String[0], service.get(ident("One")).domains());
+    SessionUtils.doWithCommit(
+        GlossaryTermDomainRelMapper.class,
+        ignored -> GlossaryTermDomainService.getInstance().add(100, 101, sales));
+    service.update(
+        ident("One"),
+        (GlossaryTermEntity old) ->
+            term(101, "One")
+                .withDefinition("changed")
+                .withVersion(old.version() + 1)
+                .withDomains("Finance")
+                .build());
+    Assertions.assertArrayEquals(new String[] {"Sales"}, service.get(ident("One")).domains());
+  }
+
+  private long domain(String name) throws Exception {
+    DomainEntity domain =
+        DomainEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(name)
+            .withNamespace(NamespaceUtil.ofDomain("glossary"))
+            .withStatus(Domain.Status.PUBLISHED)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    DomainMetaService.getInstance().insertDomain(domain, false);
+    return domain.id();
   }
 
   private void assertOperationAfterMetalakeRename(Executable operation) throws Exception {

@@ -70,5 +70,8 @@ class DomainOperations(ABC):
 
     @abstractmethod
     def delete_domain(self, name: str) -> bool:
-        """Delete, keeping tags; return False if absent, reject nonempty parents."""
+        """Delete the domain, keeping its tags. Return False if absent.
+
+        Raises NonEmptyDomainException if the domain has subdomains or glossary terms.
+        """
         raise NotImplementedError
