@@ -341,10 +341,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
     cacheData.invalidate(key);
     removeIndexEntryIfAbsent(key);
 
-    String identifier = indexText(key.identifier());
-    invalidateDescendants(identifier + NAME_LEVEL_BOUNDARY);
-    if (key.entityType() == Entity.EntityType.SCHEMA) {
-      invalidateDescendants(identifier + HierarchicalSchemaUtil.schemaSeparator());
+    for (String prefix : descendantPrefixes(key.identifier(), key.entityType())) {
+      invalidateDescendants(prefix);
     }
   }
 
@@ -387,6 +385,76 @@ public class CaffeineEntityCache extends BaseEntityCache {
       appendEscaped(text, level).append(NAME_LEVEL_BOUNDARY);
     }
     return appendEscaped(text, ident.name()).toString();
+  }
+
+  /**
+   * Returns the descendant index prefixes used when cascading from {@code ident}.
+   *
+   * <p>Same prefixes {@link #invalidateHierarchy} uses. Does not include {@code ident} itself.
+   *
+   * @param ident The ancestor identifier.
+   * @param type The ancestor entity type.
+   * @return One or two prefixes ending at a name-level or schema-separator boundary.
+   */
+  public static List<String> descendantPrefixes(NameIdentifier ident, Entity.EntityType type) {
+    String identifier = indexText(ident);
+    List<String> prefixes = Lists.newArrayListWithCapacity(2);
+    prefixes.add(identifier + NAME_LEVEL_BOUNDARY);
+    if (type == Entity.EntityType.SCHEMA) {
+      prefixes.add(identifier + HierarchicalSchemaUtil.schemaSeparator());
+    }
+    return prefixes;
+  }
+
+  /**
+   * Returns whether {@code ident} lies under a hierarchy prefix from {@link #descendantPrefixes}.
+   *
+   * @param ident The identifier to test.
+   * @param prefix A prefix from {@link #descendantPrefixes}.
+   * @return {@code true} if {@code ident} is matched by {@code prefix}.
+   */
+  public static boolean isUnderHierarchyPrefix(NameIdentifier ident, String prefix) {
+    return indexText(ident).startsWith(prefix);
+  }
+
+  /**
+   * Returns the hierarchy prefixes an ancestor may have registered that would match {@code ident}.
+   *
+   * <p>Each value is a boundary-terminated prefix of {@link #indexText(NameIdentifier)} (name-level
+   * {@code .} or the schema separator). Looking these up in a pending-prefix map is O(depth)
+   * instead of scanning every active write.
+   *
+   * @param ident The identifier to test.
+   * @return Candidate prefixes, nearest ancestors last; never includes {@code ident} itself.
+   */
+  public static List<String> ancestorHierarchyPrefixes(NameIdentifier ident) {
+    String text = indexText(ident);
+    String schemaSeparator = HierarchicalSchemaUtil.schemaSeparator();
+    List<String> prefixes = Lists.newArrayList();
+    for (int i = 0; i < text.length(); i++) {
+      char c = text.charAt(i);
+      if (c == INDEX_ESCAPE) {
+        // Skip the escaped character so a literal '.' inside a level is not a boundary.
+        i++;
+        continue;
+      }
+      if (c == NAME_LEVEL_BOUNDARY.charAt(0)) {
+        prefixes.add(text.substring(0, i + 1));
+        continue;
+      }
+      if (schemaSeparator.isEmpty()) {
+        continue;
+      }
+      if (schemaSeparator.length() == 1) {
+        if (c == schemaSeparator.charAt(0)) {
+          prefixes.add(text.substring(0, i + 1));
+        }
+      } else if (text.startsWith(schemaSeparator, i)) {
+        prefixes.add(text.substring(0, i + schemaSeparator.length()));
+        i += schemaSeparator.length() - 1;
+      }
+    }
+    return prefixes;
   }
 
   /**

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.iceberg.common.idempotency;
+package org.apache.gravitino.iceberg.service.idempotency;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -31,9 +32,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.LongSupplier;
-import java.util.stream.Collectors;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
-import org.apache.gravitino.iceberg.common.idempotency.IdempotencyStore.ReserveResult;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,7 +45,6 @@ public class TestInMemoryIdempotencyStore {
   private static final String OTHER_KEY = "017f22e2-79b0-7cc3-98c4-dc0c0c073990";
   private static final String BINDING = "POST v1/cat1/namespaces/ns1/tables";
   private static final long FAR_FUTURE_MS = Long.MAX_VALUE;
-  private static final long CLAIM = 1L;
 
   private InMemoryIdempotencyStore store;
 
@@ -62,25 +60,20 @@ public class TestInMemoryIdempotencyStore {
 
   @Test
   void testReserveClaimsKeyOnlyOnce() {
-    Assertions.assertEquals(
-        ReserveResult.RESERVED, store.reserve(KEY, BINDING, CLAIM, FAR_FUTURE_MS));
-    Assertions.assertEquals(
-        ReserveResult.DUPLICATE, store.reserve(KEY, BINDING, CLAIM + 1, FAR_FUTURE_MS));
-    Assertions.assertEquals(
-        ReserveResult.RESERVED, store.reserve(OTHER_KEY, BINDING, CLAIM, FAR_FUTURE_MS));
+    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS).isPresent());
+    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS).isEmpty());
+    Assertions.assertTrue(store.reserve(OTHER_KEY, BINDING, FAR_FUTURE_MS).isPresent());
   }
 
   @Test
   void testKeyCaseVariantsAddressTheSameRecord() {
-    Assertions.assertEquals(
-        ReserveResult.RESERVED, store.reserve(KEY_UPPER, BINDING, CLAIM, FAR_FUTURE_MS));
-    Assertions.assertEquals(
-        ReserveResult.DUPLICATE, store.reserve(KEY, BINDING, CLAIM + 1, FAR_FUTURE_MS));
+    long claim = store.reserve(KEY_UPPER, BINDING, FAR_FUTURE_MS).orElseThrow();
+    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS).isEmpty());
     Assertions.assertEquals(1, store.size());
 
     // Finalizing under one casing has to be replayable under the other, otherwise a retry that
     // changes case re-executes the mutation.
-    store.finalizeRecord(KEY_UPPER, CLAIM, 200, "{\"a\":1}");
+    store.finalizeRecord(KEY_UPPER, claim, 200, "{\"a\":1}");
     IdempotencyRecord record = store.load(KEY).orElseThrow(AssertionError::new);
     Assertions.assertEquals(KEY, record.idempotencyKey());
     Assertions.assertEquals(200, record.httpStatus().intValue());
@@ -88,10 +81,10 @@ public class TestInMemoryIdempotencyStore {
 
   @Test
   void testLoadReturnsEmptyUntilFinalized() {
-    store.reserve(KEY, BINDING, CLAIM, FAR_FUTURE_MS);
+    long claim = store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
     Assertions.assertEquals(Optional.empty(), store.load(KEY));
 
-    store.finalizeRecord(KEY, CLAIM, 200, "{\"a\":1}");
+    store.finalizeRecord(KEY, claim, 200, "{\"a\":1}");
 
     IdempotencyRecord record = store.load(KEY).orElseThrow(AssertionError::new);
     Assertions.assertTrue(record.isFinalized());
@@ -108,8 +101,8 @@ public class TestInMemoryIdempotencyStore {
 
   @Test
   void testFinalizeWithoutBodyIsReplayable() {
-    store.reserve(KEY, BINDING, CLAIM, FAR_FUTURE_MS);
-    store.finalizeRecord(KEY, CLAIM, 204, null);
+    long claim = store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
+    store.finalizeRecord(KEY, claim, 204, null);
 
     IdempotencyRecord record = store.load(KEY).orElseThrow(AssertionError::new);
     Assertions.assertEquals(204, record.httpStatus().intValue());
@@ -118,48 +111,42 @@ public class TestInMemoryIdempotencyStore {
 
   @Test
   void testFinalizeDoesNotResurrectAPurgedRecord() {
-    store.finalizeRecord(KEY, CLAIM, 200, "{}");
+    store.finalizeRecord(KEY, 1L, 200, "{}");
     Assertions.assertEquals(Optional.empty(), store.load(KEY));
     Assertions.assertEquals(0, store.size());
   }
 
   @Test
   void testReleaseFreesTheKeyForRetry() {
-    store.reserve(KEY, BINDING, CLAIM, FAR_FUTURE_MS);
-    store.release(KEY, CLAIM);
+    long claim = store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
+    store.release(KEY, claim);
 
-    Assertions.assertEquals(
-        ReserveResult.RESERVED, store.reserve(KEY, BINDING, CLAIM, FAR_FUTURE_MS));
+    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS).isPresent());
   }
 
   @Test
   void testReleaseKeepsAFinalizedRecord() {
-    store.reserve(KEY, BINDING, CLAIM, FAR_FUTURE_MS);
-    store.finalizeRecord(KEY, CLAIM, 200, "{}");
-    store.release(KEY, CLAIM);
+    long claim = store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
+    store.finalizeRecord(KEY, claim, 200, "{}");
+    store.release(KEY, claim);
 
     Assertions.assertTrue(store.load(KEY).isPresent());
-    Assertions.assertEquals(
-        ReserveResult.DUPLICATE, store.reserve(KEY, BINDING, CLAIM, FAR_FUTURE_MS));
+    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS).isEmpty());
   }
 
   @Test
   void testStaleFinalizeAfterReReservationIsIgnored() {
-    long staleClaim = 1L;
-    long currentClaim = 2L;
-    store.reserve(KEY, BINDING, staleClaim, FAR_FUTURE_MS);
+    long staleClaim = store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
     // The first reservation goes away underneath its owner, as a size eviction or a purge would do,
     // and a second caller takes the key.
     store.release(KEY, staleClaim);
-    Assertions.assertEquals(
-        ReserveResult.RESERVED, store.reserve(KEY, BINDING, currentClaim, FAR_FUTURE_MS));
+    long currentClaim = store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
 
     store.finalizeRecord(KEY, staleClaim, 200, "{\"stale\":true}");
 
     // The current owner is still mid-flight: nothing to replay, and the key stays taken.
     Assertions.assertEquals(Optional.empty(), store.load(KEY));
-    Assertions.assertEquals(
-        ReserveResult.DUPLICATE, store.reserve(KEY, BINDING, 3L, FAR_FUTURE_MS));
+    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS).isEmpty());
 
     // And the current owner can still finalize its own response.
     store.finalizeRecord(KEY, currentClaim, 201, "{\"stale\":false}");
@@ -169,32 +156,27 @@ public class TestInMemoryIdempotencyStore {
 
   @Test
   void testStaleReleaseAfterReReservationIsIgnored() {
-    long staleClaim = 1L;
-    long currentClaim = 2L;
-    store.reserve(KEY, BINDING, staleClaim, FAR_FUTURE_MS);
+    long staleClaim = store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
     store.release(KEY, staleClaim);
-    store.reserve(KEY, BINDING, currentClaim, FAR_FUTURE_MS);
+    store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
 
     store.release(KEY, staleClaim);
 
     // Releasing on a lost claim must not free a key the current owner is executing under, which
     // would let a third request run the mutation a second time.
-    Assertions.assertEquals(
-        ReserveResult.DUPLICATE, store.reserve(KEY, BINDING, 3L, FAR_FUTURE_MS));
+    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS).isEmpty());
   }
 
   @Test
   void testDifferentBindingStillReturnsDuplicateWithoutReplacingOriginal() {
     String otherBinding = "DELETE v1/cat1/namespaces/ns1/tables/t1";
-    store.reserve(KEY, BINDING, CLAIM, FAR_FUTURE_MS);
+    long claim = store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
 
-    Assertions.assertEquals(
-        ReserveResult.DUPLICATE, store.reserve(KEY, otherBinding, CLAIM + 1, FAR_FUTURE_MS));
+    Assertions.assertTrue(store.reserve(KEY, otherBinding, FAR_FUTURE_MS).isEmpty());
     Assertions.assertEquals(Optional.empty(), store.load(KEY));
 
-    store.finalizeRecord(KEY, CLAIM, 201, "{}");
-    Assertions.assertEquals(
-        ReserveResult.DUPLICATE, store.reserve(KEY, otherBinding, CLAIM + 1, FAR_FUTURE_MS));
+    store.finalizeRecord(KEY, claim, 201, "{}");
+    Assertions.assertTrue(store.reserve(KEY, otherBinding, FAR_FUTURE_MS).isEmpty());
     Assertions.assertEquals(
         BINDING, store.load(KEY).orElseThrow(AssertionError::new).operationBinding());
   }
@@ -204,18 +186,16 @@ public class TestInMemoryIdempotencyStore {
     AtomicLong now = new AtomicLong(1_000_000L);
     InMemoryIdempotencyStore clockedStore = newStore(ImmutableMap.of(), now::get);
     try {
-      clockedStore.reserve(KEY, BINDING, CLAIM, now.get() + 1_000L);
-      clockedStore.reserve(OTHER_KEY, BINDING, CLAIM, now.get() + 60_000L);
+      clockedStore.reserve(KEY, BINDING, now.get() + 1_000L);
+      clockedStore.reserve(OTHER_KEY, BINDING, now.get() + 60_000L);
 
       // Only the first record's window has elapsed.
       now.addAndGet(1_000L);
       Assertions.assertEquals(1, clockedStore.purgeExpired(now.get()));
 
-      Assertions.assertEquals(
-          ReserveResult.RESERVED, clockedStore.reserve(KEY, BINDING, CLAIM, now.get() + 1_000L));
-      Assertions.assertEquals(
-          ReserveResult.DUPLICATE,
-          clockedStore.reserve(OTHER_KEY, BINDING, CLAIM, now.get() + 60_000L));
+      Assertions.assertTrue(clockedStore.reserve(KEY, BINDING, now.get() + 1_000L).isPresent());
+      Assertions.assertTrue(
+          clockedStore.reserve(OTHER_KEY, BINDING, now.get() + 60_000L).isEmpty());
     } finally {
       clockedStore.close();
     }
@@ -227,19 +207,17 @@ public class TestInMemoryIdempotencyStore {
     InMemoryIdempotencyStore clockedStore = newStore(ImmutableMap.of(), now::get);
     try {
       long deadline = now.get() + 1_000L;
-      Assertions.assertEquals(
-          ReserveResult.RESERVED, clockedStore.reserve(KEY, BINDING, CLAIM, deadline));
+      long claim = clockedStore.reserve(KEY, BINDING, deadline).orElseThrow();
 
       // Finalize halfway through the window. A cache expiring on last-write would restart the
       // clock here and keep the record past the lifetime advertised to clients.
       now.set(deadline - 500L);
-      clockedStore.finalizeRecord(KEY, CLAIM, 200, "{}");
+      clockedStore.finalizeRecord(KEY, claim, 200, "{}");
       Assertions.assertTrue(clockedStore.load(KEY).isPresent());
 
       now.set(deadline);
       Assertions.assertEquals(Optional.empty(), clockedStore.load(KEY));
-      Assertions.assertEquals(
-          ReserveResult.RESERVED, clockedStore.reserve(KEY, BINDING, CLAIM, now.get() + 1_000L));
+      Assertions.assertTrue(clockedStore.reserve(KEY, BINDING, now.get() + 1_000L).isPresent());
     } finally {
       clockedStore.close();
     }
@@ -251,7 +229,7 @@ public class TestInMemoryIdempotencyStore {
         newStore(ImmutableMap.of(IcebergConstants.ICEBERG_IDEMPOTENCY_MAX_ENTRIES, "2"));
     try {
       for (int i = 0; i < 50; i++) {
-        boundedStore.reserve(uuidKey(i), BINDING, CLAIM, FAR_FUTURE_MS);
+        boundedStore.reserve(uuidKey(i), BINDING, FAR_FUTURE_MS);
       }
       // Caffeine evicts during maintenance, so the bound is reached shortly after the writes
       // rather than synchronously with them.
@@ -272,16 +250,15 @@ public class TestInMemoryIdempotencyStore {
     ExecutorService executor = Executors.newFixedThreadPool(threads);
     CountDownLatch start = new CountDownLatch(1);
     CountDownLatch done = new CountDownLatch(threads);
-    List<ReserveResult> results = Collections.synchronizedList(new ArrayList<>());
+    List<OptionalLong> results = Collections.synchronizedList(new ArrayList<>());
     AtomicReference<Throwable> failure = new AtomicReference<>();
     try {
       for (int i = 0; i < threads; i++) {
-        long claim = i;
         executor.submit(
             () -> {
               try {
                 start.await();
-                results.add(store.reserve(KEY, BINDING, claim, FAR_FUTURE_MS));
+                results.add(store.reserve(KEY, BINDING, FAR_FUTURE_MS));
               } catch (Throwable t) {
                 failure.compareAndSet(null, t);
               } finally {
@@ -292,11 +269,8 @@ public class TestInMemoryIdempotencyStore {
       start.countDown();
       Assertions.assertTrue(done.await(30, TimeUnit.SECONDS));
       Assertions.assertNull(failure.get(), "no reserve should fail");
-      Map<ReserveResult, Long> counts =
-          results.stream().collect(Collectors.groupingBy(result -> result, Collectors.counting()));
       Assertions.assertEquals(threads, results.size(), "every caller should report a result");
-      Assertions.assertEquals(1L, counts.getOrDefault(ReserveResult.RESERVED, 0L));
-      Assertions.assertEquals(threads - 1L, counts.getOrDefault(ReserveResult.DUPLICATE, 0L));
+      Assertions.assertEquals(1, results.stream().filter(OptionalLong::isPresent).count());
     } finally {
       executor.shutdownNow();
     }
