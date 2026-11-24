@@ -227,4 +227,24 @@ public class TestCloudStorageCredentialPropertyKeys {
     assertEquals("db-user", emptyScope.get(CloudStorageCredentialPropertyKeys.JDBC_USER));
     assertEquals("AKIATEST", emptyScope.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
   }
+
+  @Test
+  void testKeysForCredentialType() {
+    assertEquals(
+        Set.of(
+            S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY),
+        CloudStorageCredentialPropertyKeys.keysForCredentialType("s3-secret-key"));
+    assertEquals(
+        Set.of(
+            CloudStorageCredentialPropertyKeys.JDBC_USER,
+            CloudStorageCredentialPropertyKeys.JDBC_PASSWORD),
+        CloudStorageCredentialPropertyKeys.keysForCredentialType("jdbc-user-password"));
+    assertTrue(CloudStorageCredentialPropertyKeys.keysForCredentialType("s3-token").isEmpty());
+    assertTrue(
+        CloudStorageCredentialPropertyKeys.keysForCredentialProviders("s3-token,jdbc-user-password")
+            .contains(CloudStorageCredentialPropertyKeys.JDBC_PASSWORD));
+    assertFalse(
+        CloudStorageCredentialPropertyKeys.keysForCredentialProviders("s3-token")
+            .contains(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+  }
 }

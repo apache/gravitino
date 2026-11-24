@@ -21,8 +21,6 @@ package org.apache.gravitino.secret;
 import static org.apache.gravitino.secret.SecretConstants.URN_PREFIX;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -33,16 +31,9 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
-import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
-import org.apache.gravitino.credential.CredentialConstants;
-import org.apache.gravitino.storage.AWSProperties;
-import org.apache.gravitino.storage.AzureProperties;
-import org.apache.gravitino.storage.COSProperties;
 import org.apache.gravitino.storage.CloudStorageCredentialPropertyKeys;
-import org.apache.gravitino.storage.OSSProperties;
-import org.apache.gravitino.storage.S3Properties;
 
 /**
  * Helpers for secret-related entity property handling and request validation.
@@ -60,48 +51,6 @@ public final class SecretPropertyUtils {
           return Map.of();
         }
       };
-
-  /**
-   * Static credential-provider type → property keys that {@code getSecrets} must treat as
-   * credential secrets (INCLUDE required). Token providers are intentionally absent.
-   */
-  private static final Map<String, Set<String>> STATIC_CREDENTIAL_PROVIDER_KEYS =
-      ImmutableMap.<String, Set<String>>builder()
-          .put(
-              "jdbc-user-password",
-              ImmutableSet.of(
-                  CloudStorageCredentialPropertyKeys.JDBC_USER,
-                  CloudStorageCredentialPropertyKeys.JDBC_PASSWORD))
-          .put(
-              "s3-secret-key",
-              ImmutableSet.of(
-                  S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
-                  S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY))
-          .put(
-              "oss-secret-key",
-              ImmutableSet.of(
-                  OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID,
-                  OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET))
-          .put(
-              "cos-secret-key",
-              ImmutableSet.of(
-                  COSProperties.GRAVITINO_COS_ACCESS_KEY_ID,
-                  COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET))
-          .put(
-              "azure-account-key",
-              ImmutableSet.of(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY))
-          .put(
-              "aws-secret-key",
-              ImmutableSet.of(
-                  AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID,
-                  AWSProperties.GRAVITINO_AWS_SECRET_ACCESS_KEY))
-          .put(
-              "dlf-secret-key",
-              ImmutableSet.of(
-                  PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID,
-                  PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET,
-                  PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN))
-          .build();
 
   private SecretPropertyUtils() {}
 
@@ -528,34 +477,7 @@ public final class SecretPropertyUtils {
         keys.add(key);
       }
     }
-    keys.addAll(staticCredentialKeysFromProviders(rawProperties));
-    return keys;
-  }
-
-  /**
-   * Returns static credential property keys implied by enabled static {@code credential-providers}
-   * on {@code rawProperties}. Token providers are ignored.
-   */
-  private static Set<String> staticCredentialKeysFromProviders(
-      @Nullable Map<String, String> rawProperties) {
-    if (rawProperties == null || rawProperties.isEmpty()) {
-      return Set.of();
-    }
-    String providers = rawProperties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
-    if (StringUtils.isBlank(providers)) {
-      return Set.of();
-    }
-    Set<String> keys = new HashSet<>();
-    for (String provider : providers.split(",")) {
-      String type = provider.trim().toLowerCase(Locale.ROOT);
-      if (type.isEmpty()) {
-        continue;
-      }
-      Set<String> providerKeys = STATIC_CREDENTIAL_PROVIDER_KEYS.get(type);
-      if (providerKeys != null) {
-        keys.addAll(providerKeys);
-      }
-    }
+    keys.addAll(CloudStorageCredentialPropertyKeys.keysForCredentialProviders(rawProperties));
     return keys;
   }
 

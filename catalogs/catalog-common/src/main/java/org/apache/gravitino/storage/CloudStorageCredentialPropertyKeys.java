@@ -21,10 +21,14 @@ package org.apache.gravitino.storage;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
+import org.apache.gravitino.credential.CredentialConstants;
 
 /**
  * Gravitino property keys for cloud static credentials (access-key pairs and related secrets).
@@ -72,28 +76,59 @@ public final class CloudStorageCredentialPropertyKeys {
           COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET);
 
   /**
-   * Static credential property keys omitted from {@code getSecrets()} when the caller has {@code
-   * USE_SECRETS} but not {@code INCLUDE_CREDENTIAL_SECRETS}. Includes cloud access-key pairs, Azure
-   * client secret, DLF static secrets, and JDBC login properties that correspond to static
-   * credential providers. Short-lived token credentials are out of scope for this list.
+   * Static credential type → property keys omitted from {@code getSecrets()} when the caller has
+   * {@code USE_SECRETS} but not {@code INCLUDE_CREDENTIAL_SECRETS}. Map keys are
+   * credential-provider / credential-info types ({@code s3-secret-key}, {@code jdbc-user-password},
+   * …). Token providers are intentionally absent.
    */
-  private static final Set<String> CLOUD_ACCESS_KEY_PAIR_KEYS =
-      ImmutableSet.of(
-          S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
-          S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
-          OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID,
-          OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
-          COSProperties.GRAVITINO_COS_ACCESS_KEY_ID,
-          COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET,
-          AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID,
-          AWSProperties.GRAVITINO_AWS_SECRET_ACCESS_KEY,
-          AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
-          AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET,
-          PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID,
-          PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET,
-          PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN,
-          JDBC_USER,
-          JDBC_PASSWORD);
+  private static final Map<String, Set<String>> CLOUD_ACCESS_KEY_PAIR_KEYS =
+      ImmutableMap.<String, Set<String>>builder()
+          .put(
+              "s3-secret-key",
+              ImmutableSet.of(
+                  S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+                  S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY))
+          .put(
+              "oss-secret-key",
+              ImmutableSet.of(
+                  OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID,
+                  OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET))
+          .put(
+              "cos-secret-key",
+              ImmutableSet.of(
+                  COSProperties.GRAVITINO_COS_ACCESS_KEY_ID,
+                  COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET))
+          .put(
+              "aws-secret-key",
+              ImmutableSet.of(
+                  AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID,
+                  AWSProperties.GRAVITINO_AWS_SECRET_ACCESS_KEY))
+          .put(
+              "azure-account-key",
+              ImmutableSet.of(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY))
+          .put(
+              "dlf-secret-key",
+              ImmutableSet.of(
+                  PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID,
+                  PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET,
+                  PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN))
+          .put("jdbc-user-password", ImmutableSet.of(JDBC_USER, JDBC_PASSWORD))
+          .build();
+
+  /**
+   * Flattened property keys from {@link #CLOUD_ACCESS_KEY_PAIR_KEYS}, plus {@code
+   * azure-client-secret} (catalog Azure AD config with no credential-provider type).
+   */
+  private static final Set<String> ALL_CLOUD_ACCESS_KEY_PAIR_KEYS;
+
+  static {
+    Set<String> all = new HashSet<>();
+    for (Set<String> keys : CLOUD_ACCESS_KEY_PAIR_KEYS.values()) {
+      all.addAll(keys);
+    }
+    all.add(AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET);
+    ALL_CLOUD_ACCESS_KEY_PAIR_KEYS = ImmutableSet.copyOf(all);
+  }
 
   private CloudStorageCredentialPropertyKeys() {}
 
@@ -115,7 +150,55 @@ public final class CloudStorageCredentialPropertyKeys {
    * @return true when the key must be omitted for use-secret-only callers
    */
   public static boolean isCloudAccessKeyPairKey(@Nullable String key) {
-    return key != null && CLOUD_ACCESS_KEY_PAIR_KEYS.contains(key);
+    return key != null && ALL_CLOUD_ACCESS_KEY_PAIR_KEYS.contains(key);
+  }
+
+  /**
+   * Returns property keys for a static credential type, or an empty set when the type is unknown or
+   * is a token provider.
+   *
+   * @param credentialType credential-provider / credential-info type (for example {@code
+   *     s3-secret-key})
+   * @return property keys for that type; never null
+   */
+  public static Set<String> keysForCredentialType(@Nullable String credentialType) {
+    if (credentialType == null || credentialType.isEmpty()) {
+      return ImmutableSet.of();
+    }
+    Set<String> keys = CLOUD_ACCESS_KEY_PAIR_KEYS.get(credentialType.toLowerCase(Locale.ROOT));
+    return keys == null ? ImmutableSet.of() : keys;
+  }
+
+  /**
+   * Returns static credential property keys implied by a comma-separated {@code
+   * credential-providers} value. Token providers are ignored.
+   *
+   * @param credentialProviders raw {@code credential-providers} property value, or null
+   * @return union of keys for enabled static credential types; never null
+   */
+  public static Set<String> keysForCredentialProviders(@Nullable String credentialProviders) {
+    if (StringUtils.isBlank(credentialProviders)) {
+      return ImmutableSet.of();
+    }
+    Set<String> keys = new HashSet<>();
+    for (String provider : credentialProviders.split(",")) {
+      keys.addAll(keysForCredentialType(provider.trim()));
+    }
+    return keys;
+  }
+
+  /**
+   * Returns static credential property keys implied by {@code credential-providers} on {@code
+   * properties}.
+   *
+   * @param properties entity properties, or null
+   * @return union of keys for enabled static credential types; never null
+   */
+  public static Set<String> keysForCredentialProviders(@Nullable Map<String, String> properties) {
+    if (properties == null || properties.isEmpty()) {
+      return ImmutableSet.of();
+    }
+    return keysForCredentialProviders(properties.get(CredentialConstants.CREDENTIAL_PROVIDERS));
   }
 
   /**
@@ -156,7 +239,7 @@ public final class CloudStorageCredentialPropertyKeys {
    */
   public static Map<String, String> omitCloudAccessKeyPairProperties(
       @Nullable Map<String, String> secrets) {
-    return omitCloudAccessKeyPairProperties(secrets, CLOUD_ACCESS_KEY_PAIR_KEYS);
+    return omitCloudAccessKeyPairProperties(secrets, ALL_CLOUD_ACCESS_KEY_PAIR_KEYS);
   }
 
   /**
@@ -174,7 +257,7 @@ public final class CloudStorageCredentialPropertyKeys {
     if (secrets == null || secrets.isEmpty()) {
       return ImmutableMap.of();
     }
-    Set<String> omit = keysToOmit == null ? CLOUD_ACCESS_KEY_PAIR_KEYS : keysToOmit;
+    Set<String> omit = keysToOmit == null ? ALL_CLOUD_ACCESS_KEY_PAIR_KEYS : keysToOmit;
     if (omit.isEmpty()) {
       return ImmutableMap.copyOf(secrets);
     }
@@ -195,9 +278,17 @@ public final class CloudStorageCredentialPropertyKeys {
   }
 
   /**
-   * Returns static credential keys omitted for {@code USE_SECRETS}-only {@code getSecrets} callers.
+   * Returns static credential keys omitted for {@code USE_SECRETS}-only {@code getSecrets} callers
+   * (flattened from {@link #CLOUD_ACCESS_KEY_PAIR_KEYS}).
    */
   public static Set<String> cloudAccessKeyPairKeys() {
+    return ALL_CLOUD_ACCESS_KEY_PAIR_KEYS;
+  }
+
+  /**
+   * Returns the static credential type → property keys map used for {@code getSecrets} filtering.
+   */
+  public static Map<String, Set<String>> cloudAccessKeyPairKeysByCredentialType() {
     return CLOUD_ACCESS_KEY_PAIR_KEYS;
   }
 }
