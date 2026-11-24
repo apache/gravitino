@@ -715,6 +715,14 @@ subprojects {
     resolutionStrategy.force("org.apache.httpcomponents.core5:httpcore5:$httpcore5Version")
     resolutionStrategy.force("org.apache.httpcomponents.core5:httpcore5-h2:$httpcore5Version")
 
+    // Paimon 2.x depends on at.yawk.lz4:lz4-java, the maintained fork of org.lz4:lz4-java (same
+    // net.jpountz packages, drop-in). The fork declares the org.lz4:lz4-java capability, so Gradle
+    // rejects a classpath that also gets org.lz4:lz4-java from Spark or Kafka. Keep the higher
+    // version, which is the fork whenever both are present.
+    resolutionStrategy.capabilitiesResolution.withCapability("org.lz4:lz4-java") {
+      selectHighestVersion()
+    }
+
     // Exclude log4j 1.x (CVE-2020-9493, CVSS 9.8) pulled transitively by Hive and Hadoop.
     // The safe log4j-1.2-api bridge from Log4j 2.x is already included in the log4j bundle.
     exclude(group = "log4j", module = "log4j")

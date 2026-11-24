@@ -127,6 +127,8 @@ public class CatalogUtils {
   @SuppressWarnings("FormatStringAnnotation")
   public static Catalog loadCatalogBackendWithSimpleAuth(PaimonConfig paimonConfig) {
     checkPaimonConfig(paimonConfig);
+    // TODO: Remove after upgrading to a Paimon release that fixes apache/paimon#11096.
+    PaimonJdbcTablePropertiesWorkaround.createTablePropertiesTableIfNeeded(paimonConfig);
     CatalogContext catalogContext =
         CatalogContext.create(Options.fromMap(paimonConfig.getAllConfig()));
     try {

@@ -190,7 +190,7 @@ dependencies {
     exclude("com.sun.jersey.contribs")
   }
 
-  testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
+  testImplementation("org.apache.paimon:paimon-spark-${sparkMajorVersion}_$scalaVersion:$paimonVersion") {
     exclude("org.apache.hadoop")
   }
   testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
