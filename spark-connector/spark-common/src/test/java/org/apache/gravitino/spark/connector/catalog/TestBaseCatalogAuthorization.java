@@ -316,9 +316,8 @@ public class TestBaseCatalogAuthorization {
   }
 
   /**
-   * ALTER TABLE ... RENAME TO an existing name must surface as Spark's TableAlreadyExistsException
-   * - which renameTable declares - mirroring createTable's conversion. The Gravitino exception used
-   * to escape unconverted as a raw runtime error.
+   * A rename onto an existing name raises Spark's TableAlreadyExistsException, which renameTable
+   * declares, as createTable does.
    */
   @Test
   void testRenameTableToExistingNameThrowsAlreadyExists() throws Exception {
@@ -342,18 +341,20 @@ public class TestBaseCatalogAuthorization {
         "the error must name the name that is taken");
   }
 
-  /** A rename onto a free name goes through without an error. */
+  /** A rename onto a free name reaches Gravitino with the new name. */
   @Test
   void testRenameTableToFreeNameSucceeds() throws Exception {
     Identifier oldIdentifier = Identifier.of(new String[] {"schema"}, "t");
     Identifier newIdentifier = Identifier.of(new String[] {"schema"}, "renamed");
 
     Assertions.assertDoesNotThrow(() -> catalog.renameTable(oldIdentifier, newIdentifier));
-    // and the rename still reaches Gravitino
+    ArgumentCaptor<org.apache.gravitino.rel.TableChange> change =
+        ArgumentCaptor.forClass(org.apache.gravitino.rel.TableChange.class);
     verify(gravitinoTableCatalog)
-        .alterTable(
-            eq(NameIdentifier.of("schema", "t")),
-            any(org.apache.gravitino.rel.TableChange[].class));
+        .alterTable(eq(NameIdentifier.of("schema", "t")), change.capture());
+    Assertions.assertEquals(
+        "renamed",
+        ((org.apache.gravitino.rel.TableChange.RenameTable) change.getValue()).getNewName());
   }
 
   @Test
