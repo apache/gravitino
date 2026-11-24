@@ -28,7 +28,14 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
+import org.apache.gravitino.credential.AwsSecretKeyCredential;
+import org.apache.gravitino.credential.AzureAccountKeyCredential;
+import org.apache.gravitino.credential.COSSecretKeyCredential;
 import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.DlfSecretKeyCredential;
+import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.credential.OSSSecretKeyCredential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
 
 /**
  * Gravitino property keys for cloud static credentials (access-key pairs and related secrets).
@@ -55,10 +62,10 @@ public final class CloudStorageCredentialPropertyKeys {
   public static final String MASKED_PROPERTY_VALUE = "******";
 
   /** JDBC username property used by the {@code jdbc-user-password} credential provider. */
-  public static final String JDBC_USER = "jdbc-user";
+  public static final String JDBC_USER = JdbcCredential.GRAVITINO_JDBC_USER;
 
   /** JDBC password property used by the {@code jdbc-user-password} credential provider. */
-  public static final String JDBC_PASSWORD = "jdbc-password";
+  public static final String JDBC_PASSWORD = JdbcCredential.GRAVITINO_JDBC_PASSWORD;
 
   /**
    * Static cloud credential property keys omitted from REST {@code properties()} merges for GVFS
@@ -84,35 +91,35 @@ public final class CloudStorageCredentialPropertyKeys {
   private static final Map<String, Set<String>> CLOUD_ACCESS_KEY_PAIR_KEYS =
       ImmutableMap.<String, Set<String>>builder()
           .put(
-              "s3-secret-key",
+              S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE,
               ImmutableSet.of(
                   S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
                   S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY))
           .put(
-              "oss-secret-key",
+              OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE,
               ImmutableSet.of(
                   OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID,
                   OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET))
           .put(
-              "cos-secret-key",
+              COSSecretKeyCredential.COS_SECRET_KEY_CREDENTIAL_TYPE,
               ImmutableSet.of(
                   COSProperties.GRAVITINO_COS_ACCESS_KEY_ID,
                   COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET))
           .put(
-              "aws-secret-key",
+              AwsSecretKeyCredential.AWS_SECRET_KEY_CREDENTIAL_TYPE,
               ImmutableSet.of(
                   AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID,
                   AWSProperties.GRAVITINO_AWS_SECRET_ACCESS_KEY))
           .put(
-              "azure-account-key",
+              AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE,
               ImmutableSet.of(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY))
           .put(
-              "dlf-secret-key",
+              DlfSecretKeyCredential.DLF_SECRET_KEY_CREDENTIAL_TYPE,
               ImmutableSet.of(
                   PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID,
                   PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET,
                   PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN))
-          .put("jdbc-user-password", ImmutableSet.of(JDBC_USER, JDBC_PASSWORD))
+          .put(JdbcCredential.JDBC_CREDENTIAL_TYPE, ImmutableSet.of(JDBC_USER, JDBC_PASSWORD))
           .build();
 
   /**

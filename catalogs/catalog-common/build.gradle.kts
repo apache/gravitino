@@ -23,6 +23,7 @@ plugins {
 
 // try to avoid adding extra dependencies because it is used by catalogs and connectors.
 dependencies {
+  compileOnly(project(":api"))
   compileOnly(project(":common"))
 
   implementation(libs.commons.lang3)
@@ -30,6 +31,7 @@ dependencies {
   implementation(libs.jakarta.validation.api)
   implementation(libs.slf4j.api)
 
+  testImplementation(project(":api"))
   testImplementation(project(":common"))
 
   testImplementation(libs.junit.jupiter.api)

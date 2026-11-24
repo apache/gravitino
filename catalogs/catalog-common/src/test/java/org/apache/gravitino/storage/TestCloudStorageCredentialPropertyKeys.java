@@ -26,6 +26,9 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.catalog.glue.GlueConstants;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
+import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.credential.S3TokenCredential;
 import org.junit.jupiter.api.Test;
 
 public class TestCloudStorageCredentialPropertyKeys {
@@ -233,18 +236,27 @@ public class TestCloudStorageCredentialPropertyKeys {
     assertEquals(
         Set.of(
             S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY),
-        CloudStorageCredentialPropertyKeys.keysForCredentialType("s3-secret-key"));
+        CloudStorageCredentialPropertyKeys.keysForCredentialType(
+            S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE));
     assertEquals(
         Set.of(
             CloudStorageCredentialPropertyKeys.JDBC_USER,
             CloudStorageCredentialPropertyKeys.JDBC_PASSWORD),
-        CloudStorageCredentialPropertyKeys.keysForCredentialType("jdbc-user-password"));
-    assertTrue(CloudStorageCredentialPropertyKeys.keysForCredentialType("s3-token").isEmpty());
+        CloudStorageCredentialPropertyKeys.keysForCredentialType(
+            JdbcCredential.JDBC_CREDENTIAL_TYPE));
     assertTrue(
-        CloudStorageCredentialPropertyKeys.keysForCredentialProviders("s3-token,jdbc-user-password")
+        CloudStorageCredentialPropertyKeys.keysForCredentialType(
+                S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE)
+            .isEmpty());
+    assertTrue(
+        CloudStorageCredentialPropertyKeys.keysForCredentialProviders(
+                S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE
+                    + ","
+                    + JdbcCredential.JDBC_CREDENTIAL_TYPE)
             .contains(CloudStorageCredentialPropertyKeys.JDBC_PASSWORD));
     assertFalse(
-        CloudStorageCredentialPropertyKeys.keysForCredentialProviders("s3-token")
+        CloudStorageCredentialPropertyKeys.keysForCredentialProviders(
+                S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE)
             .contains(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
   }
 }
