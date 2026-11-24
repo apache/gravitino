@@ -434,6 +434,44 @@ class TestGlossaryManager extends TestJDBCBackend {
             gated.alterTerm(LAKE, "root", cand.revisionToken(), TermChange.setProperty("a", "b")));
     Assertions.assertEquals(List.of(2L, 1L), gated.listTermVersions(LAKE, root.id()));
 
+    // Submitting a saved draft fails fast when a live symmetric RELATED edge changed.
+    GlossaryTermEntity draftRoot = manager.createTerm(LAKE, TermSpec.builder("draftRoot").build());
+    GlossaryTermEntity savedDraft =
+        gated.alterTerm(
+            LAKE,
+            "draftRoot",
+            TermChange.updateDefinition("drafted"),
+            TermChange.setStatus(GlossaryTerm.Status.DRAFT));
+    manager.createTerm(LAKE, TermSpec.builder("peerOfDraft").withRelated("draftRoot").build());
+    Assertions.assertThrows(
+        TermVersionConflictException.class,
+        () -> gated.submitDraft(LAKE, draftRoot.id(), savedDraft.publication().versionId()));
+    Assertions.assertEquals(
+        TermPublication.State.DRAFT,
+        gated
+            .getTermVersion(LAKE, draftRoot.id(), savedDraft.publication().versionId())
+            .term()
+            .publication()
+            .state());
+
+    // Proposing and publishing DEPRECATED on an existing published term succeeds.
+    GlossaryTermEntity deprecateCand =
+        gated.alterTerm(LAKE, "draftRoot", TermChange.setStatus(GlossaryTerm.Status.DEPRECATED));
+    gated.publishCandidate(LAKE, draftRoot.id(), deprecateCand.publication().versionId());
+    Assertions.assertEquals(
+        GlossaryTerm.Status.DEPRECATED, manager.getTerm(LAKE, "draftRoot").status());
+
+    // Dropping a term records a new published snapshot on surviving terms without the removed edge.
+    GlossaryTermEntity dropParent =
+        manager.createTerm(LAKE, TermSpec.builder("dropParent").build());
+    GlossaryTermEntity dropChild =
+        manager.createTerm(LAKE, TermSpec.builder("dropChild").withBroader("dropParent").build());
+    Assertions.assertTrue(manager.dropTerm(LAKE, "dropParent"));
+    Assertions.assertEquals(List.of(2L, 1L), manager.listTermVersions(LAKE, dropChild.id()));
+    Assertions.assertEquals(
+        Set.of(dropParent.id()), manager.getTermVersion(LAKE, dropChild.id(), 1).broader());
+    Assertions.assertTrue(manager.getTermVersion(LAKE, dropChild.id(), 2).broader().isEmpty());
+
     // Drop is rejected under approval policy; dropping live term while disabled hides its
     // candidate without blaming a referenced term.
     Assertions.assertThrows(ForbiddenException.class, () -> gated.dropTerm(LAKE, "root"));

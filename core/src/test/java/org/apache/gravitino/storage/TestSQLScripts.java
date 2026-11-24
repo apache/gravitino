@@ -1216,6 +1216,23 @@ public class TestSQLScripts extends TestJDBCBackend {
         Assertions.assertTrue(rows.next());
         Assertions.assertEquals(3, rows.getInt(1));
       }
+      // Multiple published/rejected rows with NULL reserved_name may coexist in the same metalake,
+      // while two unpublished candidates cannot reserve the same normalized name.
+      statement.executeUpdate(
+          "INSERT INTO glossary_term_version_head (term_id, metalake_id, last_version, reserved_name) VALUES (101, 100, 1, NULL)");
+      statement.executeUpdate(
+          "INSERT INTO glossary_term_version_head (term_id, metalake_id, last_version, reserved_name) VALUES (102, 100, 1, NULL)");
+      statement.executeUpdate(
+          "INSERT INTO glossary_term_version_head (term_id, metalake_id, last_version, reserved_name) VALUES (103, 100, 1, 'pending')");
+      Assertions.assertThrows(
+          SQLException.class,
+          () ->
+              statement.executeUpdate(
+                  "INSERT INTO glossary_term_version_head (term_id, metalake_id, last_version, reserved_name) VALUES (104, 100, 1, 'pending')"));
+      statement.executeUpdate(
+          "INSERT INTO glossary_term_version_head (term_id, metalake_id, last_version, reserved_name) VALUES (105, 101, 1, 'pending')");
+      statement.executeUpdate(
+          "DELETE FROM glossary_term_version_head WHERE term_id BETWEEN 101 AND 105");
     }
   }
 

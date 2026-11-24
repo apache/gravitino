@@ -323,6 +323,12 @@ public final class GlossaryManager {
           GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
           access.requireCreate();
           GlossaryTermEntity term = TermEdits.create(ids.nextId(), ns, spec);
+          State state =
+              resolvePublicationState(
+                  policy.requiresApproval(metalake), spec.status().orElse(null));
+          Preconditions.checkArgument(
+              state == State.PUBLISHED || term.status() != GlossaryTerm.Status.DEPRECATED,
+              "Omit status to submit a new term or specify DRAFT to save it.");
           List<TermRelations.Edit> edits = new ArrayList<>();
           for (String name : spec.broader()) {
             edits.add(new TermRelations.Edit(RelationType.BROADER, name, true));
@@ -347,12 +353,6 @@ public final class GlossaryManager {
                     domains.changed() ? TermEdits.withDomains(term, domains.names()) : term;
                 terms.validateTermNameSynonymsAndSourceRef(created);
                 checkTermNameReservation(lake, created);
-                State state =
-                    resolvePublicationState(
-                        policy.requiresApproval(metalake), spec.status().orElse(null));
-                Preconditions.checkArgument(
-                    state == State.PUBLISHED || created.status() != GlossaryTerm.Status.DEPRECATED,
-                    "Omit status to submit a new term or specify DRAFT to save it.");
                 if (state == State.PUBLISHED) {
                   handler.handle(
                       null, created, () -> persistNewTerm(metalake, created, plan, domains));
@@ -532,11 +532,12 @@ public final class GlossaryManager {
             return mapper.listVersionIdsByTermId(termId, upper, limit);
           List<Long> result = new ArrayList<>();
           GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
+          Map<Long, Long> currentUserIds = new HashMap<>();
           while (upper > 0 && result.size() < limit) {
             int batchSize = Math.min(100, Math.max(limit - result.size(), 16));
             List<Version> rows = mapper.listVersionsByTermId(termId, upper, batchSize);
             for (Version row : rows) {
-              if (canReadTermVersion(metalake, head, row, access)) {
+              if (canReadTermVersion(metalake, head, row, access, currentUserIds)) {
                 result.add(row.getVersionId());
                 if (result.size() == limit) break;
               }
@@ -606,6 +607,16 @@ public final class GlossaryManager {
           if (!canReadTermVersion(metalake, head, row))
             throw new NoSuchTermException("Glossary draft does not exist");
           Snapshot draft = GlossaryTermVersions.decodeSnapshot(row);
+          if (head.getPublishedVersion() != null) {
+            long lake = draft.definition().getMetalakeId();
+            List<GlossaryTermEntity> live =
+                terms.getByIds(NamespaceUtil.ofGlossaryTerm(metalake), lake, Set.of(termId));
+            if (live.isEmpty()
+                || live.get(0).version() != row.getBaseRevision()
+                || !edges.listRelated(lake, termId).equals(draft.baseRelated())) {
+              throw staleCandidateConflict();
+            }
+          }
           draft.definition().setStatus(GlossaryTerm.Status.APPROVED.name());
           return GlossaryTermVersions.recordTermVersion(
               draft.definition().getMetalakeId(),
@@ -1113,6 +1124,15 @@ public final class GlossaryManager {
 
   private boolean canReadTermVersion(
       String metalake, Head head, Version row, GlossaryAccess access) {
+    return canReadTermVersion(metalake, head, row, access, null);
+  }
+
+  private boolean canReadTermVersion(
+      String metalake,
+      Head head,
+      Version row,
+      GlossaryAccess access,
+      @Nullable Map<Long, Long> currentUserIds) {
     if (!State.PUBLISHED.name().equals(row.getLifecycle())
         && head.getPublishedVersion() != null
         && !access.canEdit(head.getTermId())) {
@@ -1120,23 +1140,46 @@ public final class GlossaryManager {
     }
     Snapshot snapshot = GlossaryTermVersions.decodeSnapshot(row);
     return canReadTermVersion(
-        head, row, access, snapshot, snapshot.term(NamespaceUtil.ofGlossaryTerm(metalake)));
+        head,
+        row,
+        access,
+        snapshot,
+        snapshot.term(NamespaceUtil.ofGlossaryTerm(metalake)),
+        currentUserIds);
   }
 
   private boolean canReadTermVersion(
       Head head, Version row, GlossaryAccess access, Snapshot snapshot, GlossaryTermEntity term) {
+    return canReadTermVersion(head, row, access, snapshot, term, null);
+  }
+
+  private boolean canReadTermVersion(
+      Head head,
+      Version row,
+      GlossaryAccess access,
+      Snapshot snapshot,
+      GlossaryTermEntity term,
+      @Nullable Map<Long, Long> currentUserIds) {
     if (!readable.test(term)) return false;
     if (State.PUBLISHED.name().equals(row.getLifecycle())) return access.canRead(term);
     if (head.getPublishedVersion() != null) return access.canEdit(term);
     if (access.manage()) return true;
-    if (!term.auditInfo().creator().equals(PrincipalUtils.getCurrentUserName())) return false;
+    String currentUser = PrincipalUtils.getCurrentUserName();
+    if (!term.auditInfo().creator().equals(currentUser)) return false;
     if (!access.canCreate()) return false;
-    Long currentUserId =
-        SessionUtils.getWithoutCommit(
-            UserMetaMapper.class,
-            m ->
-                m.selectUserIdByMetalakeIdAndName(
-                    snapshot.definition().getMetalakeId(), term.auditInfo().creator()));
+    long metalakeId = snapshot.definition().getMetalakeId();
+    Long currentUserId;
+    if (currentUserIds != null && currentUserIds.containsKey(metalakeId)) {
+      currentUserId = currentUserIds.get(metalakeId);
+    } else {
+      currentUserId =
+          SessionUtils.getWithoutCommit(
+              UserMetaMapper.class,
+              m -> m.selectUserIdByMetalakeIdAndName(metalakeId, currentUser));
+      if (currentUserIds != null) {
+        currentUserIds.put(metalakeId, currentUserId);
+      }
+    }
     return currentUserId != null && currentUserId.equals(snapshot.creatorUserId());
   }
 
@@ -1168,6 +1211,10 @@ public final class GlossaryManager {
                       throw new NoSuchTermException("Glossary term %s does not exist", termId);
                     }
                     locks.add(termId);
+                    if (outcome == State.PUBLISHED) {
+                      locks.addAll(edges.listBroader(lake, termId));
+                      locks.addAll(edges.listRelated(lake, termId));
+                    }
                   }
                   boolean[] lockedEntered = {false};
                   try {
@@ -1222,11 +1269,15 @@ public final class GlossaryManager {
         && (before.version() != row.getBaseRevision()
             || !edges.listRelated(lake, id).equals(snapshot.baseRelated())))
       throw staleCandidateConflict();
-    GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
-    if (!visibleEndpoints(lake, after, snapshot.broader(), access).equals(snapshot.broader())
-        || !visibleEndpoints(lake, after, snapshot.related(), access).equals(snapshot.related()))
-      throw new NoSuchTermException("Referenced term is no longer visible");
     TermRelations relations = new TermRelations(lake, id, before == null);
+    Set<Long> addedBroader = new HashSet<>(snapshot.broader());
+    addedBroader.removeAll(relations.broader());
+    Set<Long> addedRelated = new HashSet<>(snapshot.related());
+    addedRelated.removeAll(relations.related());
+    GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
+    if (!visibleEndpoints(lake, after, addedBroader, access).equals(addedBroader)
+        || !visibleEndpoints(lake, after, addedRelated, access).equals(addedRelated))
+      throw new NoSuchTermException("Referenced term is no longer visible");
     relations.replace(snapshot.broader(), snapshot.related());
     relations.validate(depthLimit);
     Set<Long> current = before == null ? Set.of() : DOMAINS.domainIds(lake, id);
@@ -1236,8 +1287,13 @@ public final class GlossaryManager {
     for (long domain : current) oldNames.put(domain, domainRows.get(domain).domainName());
     for (long domain : snapshot.domainIds()) {
       DomainPO target = domainRows.get(domain);
-      String domainName = target == null ? snapshot.domains().get(domain) : target.domainName();
-      requireVisibleDomain(domainName, target, access);
+      String frozenName = snapshot.domains().get(domain);
+      if (target == null) {
+        throw new NoSuchDomainException("Domain %s does not exist", frozenName);
+      }
+      if (!current.contains(domain)) {
+        requireAccessToResolvedDomain(frozenName, target, access);
+      }
       newNames.put(domain, target.domainName());
     }
     TermDomains domains = new TermDomains(lake, id, oldNames);
