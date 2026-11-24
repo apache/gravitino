@@ -93,17 +93,26 @@ export default function Tags({ ...props }) {
 
   const handleChange = path => {
     const tag = store.tagsData?.find(item => item.name === path[0])
+
+    if (path[1] === '__no_value__') {
+      associateSelectedTag(tag, undefined)
+
+      return
+    }
+
     setSelectedTag(tag)
     setSelectedValue(path[1] === '__custom_value__' ? '' : (path[1] ?? (tag?.allowedValues == null ? '' : undefined)))
   }
 
   const associateSelectedTag = async (tag, value) => {
-    if (
-      !tag ||
-      associatingRef.current ||
-      tagsForEntity.some(item => item.name === tag.name && (!value || item.assignmentValues?.includes(value)))
-    )
+    if (!tag || associatingRef.current) return
+    if (tagsForEntity.some(item => item.name === tag.name && (!value || item.assignmentValues?.includes(value)))) {
+      setSelectedTag(null)
+      setSelectedValue(undefined)
+      setInputVisible(false)
+
       return
+    }
     associatingRef.current = true
     await dispatch(
       associateTag({
@@ -198,6 +207,7 @@ export default function Tags({ ...props }) {
               : tag.allowedValues == null
                 ? {
                     children: [
+                      { value: '__no_value__', label: 'Assign without a value' },
                       {
                         value: '__custom_value__',
                         label: (
