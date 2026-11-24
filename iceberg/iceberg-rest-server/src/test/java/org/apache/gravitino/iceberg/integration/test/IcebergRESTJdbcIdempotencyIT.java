@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -41,19 +42,19 @@ import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Exercises durable idempotency through the Iceberg REST auxiliary service. This suite runs only in
- * the H2 lane and uses file-backed databases to preserve state across a server restart. MySQL and
- * PostgreSQL dialect coverage lives in the JDBC store tests.
+ * Exercises durable idempotency through the Iceberg REST auxiliary service in the H2, MySQL, and
+ * PostgreSQL lanes. H2 uses file-backed databases. In the Docker lanes the Iceberg catalog uses its
+ * own tables in the database provisioned for the entity store.
  */
-@EnabledIfEnvironmentVariable(named = "jdbcBackend", matches = "(?i)h2")
 public class IcebergRESTJdbcIdempotencyIT extends BaseIT {
 
+  private static final String CATALOG_URI = GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.URI;
   private static final String KEY = "017f22e2-79b0-7cc3-98c4-dc0c0c07398f";
   private static final String DIFFERENT_KEY = "017f22e2-79b0-7cc3-98c4-dc0c0c073990";
   private static final String QUERY_KEY = "017f22e2-79b0-7cc3-98c4-dc0c0c073991";
@@ -73,14 +74,10 @@ public class IcebergRESTJdbcIdempotencyIT extends BaseIT {
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
+    Assumptions.assumeTrue(
+        !usesDockerBackend() || Boolean.parseBoolean(System.getenv("dockerTest")),
+        "The MySQL and PostgreSQL integration lanes require Docker tests to be enabled");
     ignoreIcebergAuxRestService = false;
-    // BaseIT allocates a new default entity-store path on every start. An explicit URL keeps
-    // reservations on disk across the restart and disables H2 auto-server for this single server.
-    customConfigs.put(
-        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY,
-        "jdbc:h2:file:"
-            + dataDirectory.resolve("entity-store")
-            + ";MODE=MYSQL;AUTO_SERVER=FALSE;WRITE_DELAY=0");
     customConfigs.put(
         GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.ICEBERG_REST_CATALOG_CONFIG_PROVIDER,
         IcebergConstants.STATIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME);
@@ -89,20 +86,41 @@ public class IcebergRESTJdbcIdempotencyIT extends BaseIT {
     customConfigs.put(
         GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.ICEBERG_IDEMPOTENCY_STORE_TYPE, "jdbc");
     customConfigs.put(GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.CATALOG_BACKEND, "jdbc");
-    // Iceberg looks up the catalog's schema columns by their lowercase names on restart.
-    customConfigs.put(
-        GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.URI,
-        "jdbc:h2:file:" + dataDirectory.resolve("iceberg-catalog") + ";DATABASE_TO_LOWER=TRUE");
-    customConfigs.put(
-        GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.h2.Driver");
-    customConfigs.put(
-        GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_JDBC_USER, "iceberg");
-    customConfigs.put(
-        GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_JDBC_PASSWORD, "iceberg");
     customConfigs.put(
         GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.WAREHOUSE,
         dataDirectory.resolve("warehouse").toUri().toString());
     startAndAwaitIcebergRest();
+  }
+
+  /** Configures the databases once so restarting the server keeps the catalog and reservations. */
+  @Override
+  protected void configureJdbcBackend() throws SQLException {
+    // Restart restores the original configs before starting the server again.
+    if (customConfigs.containsKey(CATALOG_URI)) {
+      return;
+    }
+    if (usesDockerBackend()) {
+      super.configureJdbcBackend();
+      configureIcebergCatalog(
+          customConfigs.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY),
+          customConfigs.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY),
+          customConfigs.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY),
+          customConfigs.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY));
+      return;
+    }
+
+    // BaseIT allocates a new default entity-store path on each start.
+    customConfigs.put(
+        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY,
+        "jdbc:h2:file:"
+            + dataDirectory.resolve("entity-store")
+            + ";MODE=MYSQL;AUTO_SERVER=FALSE;WRITE_DELAY=0");
+    // Iceberg looks up the catalog's schema columns by their lowercase names on restart.
+    configureIcebergCatalog(
+        "jdbc:h2:file:" + dataDirectory.resolve("iceberg-catalog") + ";DATABASE_TO_LOWER=TRUE",
+        "org.h2.Driver",
+        "iceberg",
+        "iceberg");
   }
 
   /** Stops the active server, if any, and releases the HTTP client. */
@@ -172,6 +190,20 @@ public class IcebergRESTJdbcIdempotencyIT extends BaseIT {
                 return response.getStatus() == 200;
               }
             });
+  }
+
+  private boolean usesDockerBackend() {
+    String backend = getJDBCBackend();
+    return "mysql".equalsIgnoreCase(backend) || "postgresql".equalsIgnoreCase(backend);
+  }
+
+  private void configureIcebergCatalog(String url, String driver, String user, String password) {
+    customConfigs.put(CATALOG_URI, url);
+    customConfigs.put(
+        GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_JDBC_DRIVER, driver);
+    customConfigs.put(GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_JDBC_USER, user);
+    customConfigs.put(
+        GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_JDBC_PASSWORD, password);
   }
 
   private void restartTestServer() throws Exception {

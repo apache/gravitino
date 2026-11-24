@@ -241,6 +241,11 @@ tasks.register("experimentalTest") {
 }
 
 tasks.test {
+  // The shared test setup applies these settings at execution time. Include them in the cache key.
+  inputs.property("jdbcBackend", providers.gradleProperty("jdbcBackend").orElse("h2"))
+  inputs.property("testMode", providers.gradleProperty("testMode").orElse("embedded"))
+  inputs.property("dockerTest", rootProject.extra["dockerTest"] as? Boolean ?: false)
+
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     // Exclude integration tests
