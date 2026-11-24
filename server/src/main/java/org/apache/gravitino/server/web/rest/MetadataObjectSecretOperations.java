@@ -123,10 +123,9 @@ public class MetadataObjectSecretOperations {
                     entityType,
                     AuthorizationExpressionConstants
                         .FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION);
-            SecretPropertyOperationDispatcher.LoadedSecrets loaded =
-                secretPropertyOperationDispatcher.getSecrets(identifier, entityType);
             Map<String, String> secrets =
-                canIncludeCredentialSecrets ? loaded.all() : loaded.withoutStaticCredentials();
+                secretPropertyOperationDispatcher.getSecrets(
+                    identifier, entityType, canIncludeCredentialSecrets);
             return Utils.ok(new SecretsResponse(secrets));
           });
     } catch (Exception e) {

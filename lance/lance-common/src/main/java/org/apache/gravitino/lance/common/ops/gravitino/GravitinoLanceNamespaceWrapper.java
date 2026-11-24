@@ -147,10 +147,8 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
   private Map<String, String> catalogSecrets(String catalogName) {
     SecretPropertyOperationDispatcher dispatcher = secretDispatcher();
     if (dispatcher != null) {
-      return dispatcher
-          .getSecrets(
-              NameIdentifierUtil.ofCatalog(metalakeName, catalogName), Entity.EntityType.CATALOG)
-          .all();
+      return dispatcher.getSecrets(
+          NameIdentifierUtil.ofCatalog(metalakeName, catalogName), Entity.EntityType.CATALOG, true);
     }
     return loadCatalog(catalogName).supportsSecrets().getSecrets();
   }
@@ -158,9 +156,8 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
   private Map<String, String> schemaSecrets(String catalogName, String schemaName) {
     SecretPropertyOperationDispatcher dispatcher = secretDispatcher();
     if (dispatcher != null) {
-      return dispatcher
-          .getSecrets(schemaIdent(catalogName, schemaName), Entity.EntityType.SCHEMA)
-          .all();
+      return dispatcher.getSecrets(
+          schemaIdent(catalogName, schemaName), Entity.EntityType.SCHEMA, true);
     }
     return loadSchema(loadCatalog(catalogName), schemaName).supportsSecrets().getSecrets();
   }

@@ -121,7 +121,7 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
     entityStore.put(updated, true);
 
     Map<String, String> secrets =
-        secretDispatcher.getSecrets(NameIdentifier.of(metalake), Entity.EntityType.METALAKE).all();
+        secretDispatcher.getSecrets(NameIdentifier.of(metalake), Entity.EntityType.METALAKE, true);
     Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
@@ -134,7 +134,7 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
         tableIdent, columns, "comment", SECRET_PROPS, new Transform[0]);
 
     Map<String, String> secrets =
-        secretDispatcher.getSecrets(tableIdent, Entity.EntityType.TABLE).all();
+        secretDispatcher.getSecrets(tableIdent, Entity.EntityType.TABLE, true);
     Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
@@ -145,7 +145,7 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
     topicOperationDispatcher.createTopic(topicIdent, "comment", null, SECRET_PROPS);
 
     Map<String, String> secrets =
-        secretDispatcher.getSecrets(topicIdent, Entity.EntityType.TOPIC).all();
+        secretDispatcher.getSecrets(topicIdent, Entity.EntityType.TOPIC, true);
     Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
@@ -161,7 +161,7 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
         viewIdent, "comment", new Column[0], representations, null, null, SECRET_PROPS);
 
     Map<String, String> secrets =
-        secretDispatcher.getSecrets(viewIdent, Entity.EntityType.VIEW).all();
+        secretDispatcher.getSecrets(viewIdent, Entity.EntityType.VIEW, true);
     Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
@@ -173,7 +173,7 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
     modelOperationDispatcher.registerModel(modelIdent, "comment", SECRET_PROPS);
 
     Map<String, String> secrets =
-        secretDispatcher.getSecrets(modelIdent, Entity.EntityType.MODEL).all();
+        secretDispatcher.getSecrets(modelIdent, Entity.EntityType.MODEL, true);
     Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }

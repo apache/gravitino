@@ -78,19 +78,28 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
   }
 
   /**
-   * Loads plaintext secrets for the given metadata object. Always includes static credential keys
-   * in {@link LoadedSecrets#all()}; callers that lack {@code INCLUDE_CREDENTIAL_SECRETS} should use
-   * {@link LoadedSecrets#withoutStaticCredentials()} instead.
+   * Returns plaintext secret properties for the given metadata object.
+   *
+   * <p>When {@code includeStaticCredentials} is {@code false}, static credential keys that apply to
+   * this object (declared in its {@link PropertiesMetadata} and/or used by an enabled static {@code
+   * credential-providers} entry) are omitted. Other secrets remain.
    *
    * @param identifier The entity name identifier.
    * @param entityType The entity type.
-   * @return loaded secrets with filter context; never null
+   * @param includeStaticCredentials whether to keep object-scoped static credential secrets
+   * @return secret plaintext properties; never null
    */
-  public LoadedSecrets getSecrets(NameIdentifier identifier, Entity.EntityType entityType) {
+  public Map<String, String> getSecrets(
+      NameIdentifier identifier, Entity.EntityType entityType, boolean includeStaticCredentials) {
     RawPropertiesAndMetadata loaded = loadRawPropertiesAndMetadata(identifier, entityType);
     Map<String, String> secrets =
         SecretPropertyUtils.buildSecrets(secretManager, loaded.rawProperties, loaded.metadata);
-    return new LoadedSecrets(secrets, loaded.metadata, loaded.rawProperties);
+    if (!includeStaticCredentials) {
+      secrets =
+          SecretPropertyUtils.omitCloudAccessKeyPairSecrets(
+              secrets, loaded.metadata, loaded.rawProperties);
+    }
+    return secrets;
   }
 
   /**
@@ -273,49 +282,6 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
       throw e;
     } catch (Exception e) {
       throw new RuntimeException(e);
-    }
-  }
-
-  /**
-   * Plaintext secrets plus the metadata context needed to omit object-scoped static credential
-   * keys. Authorization decides which view to expose; this type does not perform authz checks.
-   */
-  public static final class LoadedSecrets {
-    private final Map<String, String> secrets;
-    private final PropertiesMetadata metadata;
-    private final Map<String, String> rawProperties;
-
-    private LoadedSecrets(
-        Map<String, String> secrets,
-        PropertiesMetadata metadata,
-        Map<String, String> rawProperties) {
-      this.secrets = secrets;
-      this.metadata = metadata;
-      this.rawProperties = rawProperties;
-    }
-
-    /**
-     * Test helper that wraps a secrets map with empty metadata (no keys are treated as declared
-     * static credentials unless providers are present).
-     *
-     * @param secrets plaintext secrets
-     * @return loaded secrets for tests
-     */
-    public static LoadedSecrets forTest(Map<String, String> secrets) {
-      return new LoadedSecrets(secrets, null, Map.of());
-    }
-
-    /** All plaintext secrets, including static credential keys. */
-    public Map<String, String> all() {
-      return secrets;
-    }
-
-    /**
-     * Secrets with static credential keys that apply to this object omitted (declared in properties
-     * metadata and/or used by an enabled static {@code credential-providers} entry).
-     */
-    public Map<String, String> withoutStaticCredentials() {
-      return SecretPropertyUtils.omitCloudAccessKeyPairSecrets(secrets, metadata, rawProperties);
     }
   }
 
