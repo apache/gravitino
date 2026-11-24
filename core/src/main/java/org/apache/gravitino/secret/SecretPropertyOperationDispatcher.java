@@ -78,31 +78,15 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
   }
 
   /**
-   * Returns plaintext secret properties for the given metadata object, including static credential
-   * keys.
+   * Loads plaintext secrets for the given metadata object. Always includes static credential keys
+   * in {@link LoadedSecrets#all()}; callers that lack {@code INCLUDE_CREDENTIAL_SECRETS} should use
+   * {@link LoadedSecrets#withoutStaticCredentials()} instead.
    *
    * @param identifier The entity name identifier.
    * @param entityType The entity type.
-   * @return secret plaintext properties; never null
+   * @return loaded secrets with filter context; never null
    */
-  public Map<String, String> getSecrets(NameIdentifier identifier, Entity.EntityType entityType) {
-    return loadSecrets(identifier, entityType).secrets();
-  }
-
-  /**
-   * Returns plaintext secrets with object-scoped static credential keys omitted. Used by the REST
-   * layer when the caller has {@code USE_SECRETS} but not {@code INCLUDE_CREDENTIAL_SECRETS}.
-   *
-   * @param identifier The entity name identifier.
-   * @param entityType The entity type.
-   * @return secrets without static credential properties for this object; never null
-   */
-  public Map<String, String> getSecretsWithoutStaticCredentials(
-      NameIdentifier identifier, Entity.EntityType entityType) {
-    return loadSecrets(identifier, entityType).withoutStaticCredentialSecrets();
-  }
-
-  private LoadedSecrets loadSecrets(NameIdentifier identifier, Entity.EntityType entityType) {
+  public LoadedSecrets getSecrets(NameIdentifier identifier, Entity.EntityType entityType) {
     RawPropertiesAndMetadata loaded = loadRawPropertiesAndMetadata(identifier, entityType);
     Map<String, String> secrets =
         SecretPropertyUtils.buildSecrets(secretManager, loaded.rawProperties, loaded.metadata);
@@ -292,8 +276,11 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
     }
   }
 
-  /** Plaintext secrets plus metadata context for object-scoped static-credential filtering. */
-  private static final class LoadedSecrets {
+  /**
+   * Plaintext secrets plus the metadata context needed to omit object-scoped static credential
+   * keys. Authorization decides which view to expose; this type does not perform authz checks.
+   */
+  public static final class LoadedSecrets {
     private final Map<String, String> secrets;
     private final PropertiesMetadata metadata;
     private final Map<String, String> rawProperties;
@@ -307,11 +294,27 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
       this.rawProperties = rawProperties;
     }
 
-    private Map<String, String> secrets() {
+    /**
+     * Test helper that wraps a secrets map with empty metadata (no keys are treated as declared
+     * static credentials unless providers are present).
+     *
+     * @param secrets plaintext secrets
+     * @return loaded secrets for tests
+     */
+    public static LoadedSecrets forTest(Map<String, String> secrets) {
+      return new LoadedSecrets(secrets, null, Map.of());
+    }
+
+    /** All plaintext secrets, including static credential keys. */
+    public Map<String, String> all() {
       return secrets;
     }
 
-    private Map<String, String> withoutStaticCredentialSecrets() {
+    /**
+     * Secrets with static credential keys that apply to this object omitted (declared in properties
+     * metadata and/or used by an enabled static {@code credential-providers} entry).
+     */
+    public Map<String, String> withoutStaticCredentials() {
       return SecretPropertyUtils.omitCloudAccessKeyPairSecrets(secrets, metadata, rawProperties);
     }
   }

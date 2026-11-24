@@ -393,15 +393,15 @@ public class TestGravitinoLanceNamespaceWrapper {
     SecretPropertyOperationDispatcher dispatcher =
         new SecretPropertyOperationDispatcher(null, null, null, null) {
           @Override
-          public Map<String, String> getSecrets(
+          public SecretPropertyOperationDispatcher.LoadedSecrets getSecrets(
               NameIdentifier identifier, Entity.EntityType entityType) {
+            Map<String, String> secrets = Map.of();
             if (catalogIdent.equals(identifier) && entityType == Entity.EntityType.CATALOG) {
-              return Map.of("jdbc-password", "from-dispatcher");
+              secrets = Map.of("jdbc-password", "from-dispatcher");
+            } else if (schemaIdent.equals(identifier) && entityType == Entity.EntityType.SCHEMA) {
+              secrets = Map.of("schema-pwd", "from-dispatcher-schema");
             }
-            if (schemaIdent.equals(identifier) && entityType == Entity.EntityType.SCHEMA) {
-              return Map.of("schema-pwd", "from-dispatcher-schema");
-            }
-            return Map.of();
+            return SecretPropertyOperationDispatcher.LoadedSecrets.forTest(secrets);
           }
         };
     FieldUtils.writeField(

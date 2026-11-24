@@ -121,7 +121,7 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
     entityStore.put(updated, true);
 
     Map<String, String> secrets =
-        secretDispatcher.getSecrets(NameIdentifier.of(metalake), Entity.EntityType.METALAKE);
+        secretDispatcher.getSecrets(NameIdentifier.of(metalake), Entity.EntityType.METALAKE).all();
     Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
@@ -133,7 +133,8 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
     tableOperationDispatcher.createTable(
         tableIdent, columns, "comment", SECRET_PROPS, new Transform[0]);
 
-    Map<String, String> secrets = secretDispatcher.getSecrets(tableIdent, Entity.EntityType.TABLE);
+    Map<String, String> secrets =
+        secretDispatcher.getSecrets(tableIdent, Entity.EntityType.TABLE).all();
     Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
@@ -143,7 +144,8 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
     NameIdentifier topicIdent = NameIdentifier.of(metalake, catalog, SCHEMA, "secret_topic");
     topicOperationDispatcher.createTopic(topicIdent, "comment", null, SECRET_PROPS);
 
-    Map<String, String> secrets = secretDispatcher.getSecrets(topicIdent, Entity.EntityType.TOPIC);
+    Map<String, String> secrets =
+        secretDispatcher.getSecrets(topicIdent, Entity.EntityType.TOPIC).all();
     Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
@@ -158,7 +160,8 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
     viewOperationDispatcher.createView(
         viewIdent, "comment", new Column[0], representations, null, null, SECRET_PROPS);
 
-    Map<String, String> secrets = secretDispatcher.getSecrets(viewIdent, Entity.EntityType.VIEW);
+    Map<String, String> secrets =
+        secretDispatcher.getSecrets(viewIdent, Entity.EntityType.VIEW).all();
     Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
@@ -169,7 +172,8 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
         NameIdentifierUtil.ofModel(metalake, catalog, SCHEMA, "secret_model");
     modelOperationDispatcher.registerModel(modelIdent, "comment", SECRET_PROPS);
 
-    Map<String, String> secrets = secretDispatcher.getSecrets(modelIdent, Entity.EntityType.MODEL);
+    Map<String, String> secrets =
+        secretDispatcher.getSecrets(modelIdent, Entity.EntityType.MODEL).all();
     Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
