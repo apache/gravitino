@@ -485,6 +485,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   /** {@inheritDoc} */
   @Override
+  public boolean isTagAuthorizationEnabled() {
+    return objectPolicyResolver != null;
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public Optional<PolicyEntity> matchTagPolicy(
       Principal principal,
       String metalake,

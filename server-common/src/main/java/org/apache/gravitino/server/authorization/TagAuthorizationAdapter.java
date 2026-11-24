@@ -68,14 +68,23 @@ public final class TagAuthorizationAdapter {
         break;
       }
     }
-    if (findDeny(principal, metalake, scopes, privilege, context) != null) {
+    boolean tagEnabled = authorizer.isTagAuthorizationEnabled();
+    if (!rbacAllows && !tagEnabled) {
       return false;
     }
-    if (rbacAllows) {
+    MetadataObject denyScope = findDeny(principal, metalake, scopes, privilege, context);
+    if (rbacAllows && denyScope == null) {
       return true;
+    }
+    if (!tagEnabled || (denyScope != null && !LOG.isDebugEnabled())) {
+      return false;
     }
     MetadataObject target = scopes.get(scopes.size() - 1);
     if (target == null) {
+      return false;
+    }
+    if (denyScope != null) {
+      logSuppressedTagAllow(principal, metalake, target, privilege, context, denyScope);
       return false;
     }
     Optional<PolicyEntity> match =
@@ -94,6 +103,35 @@ public final class TagAuthorizationAdapter {
         policy.name(),
         policy.id());
     return true;
+  }
+
+  private void logSuppressedTagAllow(
+      Principal principal,
+      String metalake,
+      MetadataObject target,
+      Privilege.Name privilege,
+      AuthorizationRequestContext context,
+      MetadataObject denyScope) {
+    try {
+      authorizer
+          .matchTagPolicy(principal, metalake, target, privilege, context)
+          .ifPresent(
+              policy ->
+                  LOG.debug(
+                      "Suppressed tag allow: principal {}, metalake {}, object {}:{}, privilege {}, "
+                          + "policy {} ({}), deny scope {}:{}",
+                      principal.getName(),
+                      metalake,
+                      target.type(),
+                      target.fullName(),
+                      privilege,
+                      policy.name(),
+                      policy.id(),
+                      denyScope.type(),
+                      denyScope.fullName()));
+    } catch (RuntimeException e) {
+      LOG.debug("Unable to resolve a tag grant for an already denied privilege", e);
+    }
   }
 
   @Nullable

@@ -58,6 +58,15 @@ public interface GravitinoAuthorizer extends Closeable {
       AuthorizationRequestContext requestContext);
 
   /**
+   * Reports whether this authorizer evaluates tag-based grants.
+   *
+   * @return whether tag-based authorization is enabled
+   */
+  default boolean isTagAuthorizationEnabled() {
+    return false;
+  }
+
+  /**
    * Finds tag-policy evidence for the original target of a privilege check.
    *
    * @param principal the caller

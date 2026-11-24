@@ -40,6 +40,9 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LoggerContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -55,18 +58,27 @@ public class TestTagAuthorizationAdapter {
   private final MetadataObject table =
       MetadataObjects.parse("catalog.schema.table", MetadataObject.Type.TABLE);
 
+  @Test
+  void testDisabledRbacMissSkipsDeniesAndTags() {
+    assertFalse(evaluate());
+    verify(authorizer, never()).deny(any(), any(), any(), any(), any());
+    verify(authorizer, never()).matchTagPolicy(any(), any(), any(), any(), any());
+  }
+
   /** Tests that an RBAC allow without a deny skips tag-policy resolution. */
   @Test
   public void testRbacAllowSkipsTags() {
     when(authorizer.authorize(principal, "metalake", catalog, SELECT_TABLE, context))
         .thenReturn(true);
     assertTrue(evaluate());
+    verify(authorizer).deny(principal, "metalake", table, SELECT_TABLE, context);
     verify(authorizer, never()).matchTagPolicy(any(), any(), any(), any(), any());
   }
 
   /** Tests that a matching tag policy can satisfy an RBAC miss. */
   @Test
   public void testRbacMissAllowsMatchingTag() {
+    when(authorizer.isTagAuthorizationEnabled()).thenReturn(true);
     doReturn(Optional.of(mock(PolicyEntity.class)))
         .when(authorizer)
         .matchTagPolicy(principal, "metalake", table, SELECT_TABLE, context);
@@ -79,6 +91,7 @@ public class TestTagAuthorizationAdapter {
   /** Tests denial when neither RBAC nor a tag policy allows the privilege. */
   @Test
   public void testRbacMissAndNoMatchDeny() {
+    when(authorizer.isTagAuthorizationEnabled()).thenReturn(true);
     assertFalse(evaluate());
   }
 
@@ -86,6 +99,7 @@ public class TestTagAuthorizationAdapter {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   public void testExplicitDenySkipsTagPolicies(boolean rbacAllows) {
+    when(authorizer.isTagAuthorizationEnabled()).thenReturn(true);
     when(authorizer.authorize(principal, "metalake", catalog, SELECT_TABLE, context))
         .thenReturn(rbacAllows);
     when(authorizer.deny(principal, "metalake", table, SELECT_TABLE, context)).thenReturn(true);
@@ -93,9 +107,30 @@ public class TestTagAuthorizationAdapter {
     verify(authorizer, never()).matchTagPolicy(any(), any(), any(), any(), any());
   }
 
+  @Test
+  void testDebugTagReadFailurePreservesExplicitDeny() {
+    when(authorizer.isTagAuthorizationEnabled()).thenReturn(true);
+    when(authorizer.deny(principal, "metalake", catalog, SELECT_TABLE, context)).thenReturn(true);
+    when(authorizer.matchTagPolicy(principal, "metalake", table, SELECT_TABLE, context))
+        .thenThrow(new IllegalStateException("policy read failed"));
+    var logger =
+        ((LoggerContext)
+                LogManager.getContext(TagAuthorizationAdapter.class.getClassLoader(), false))
+            .getLogger(TagAuthorizationAdapter.class.getName());
+    Level previous = logger.getLevel();
+    logger.setLevel(Level.DEBUG);
+    try {
+      assertFalse(evaluate());
+    } finally {
+      logger.setLevel(previous);
+    }
+    verify(authorizer).matchTagPolicy(principal, "metalake", table, SELECT_TABLE, context);
+  }
+
   /** Tests that a tag-policy read failure propagates instead of becoming a non-match. */
   @Test
   public void testReadFailureRemainsAnError() {
+    when(authorizer.isTagAuthorizationEnabled()).thenReturn(true);
     RuntimeException failure = new IllegalStateException("policy read failed");
     when(authorizer.matchTagPolicy(principal, "metalake", table, SELECT_TABLE, context))
         .thenThrow(failure);
@@ -105,6 +140,7 @@ public class TestTagAuthorizationAdapter {
   /** Tests that a missing target cannot inherit a grant from an ancestor check. */
   @Test
   public void testMissingTargetDoesNotEvaluateAncestorTags() {
+    when(authorizer.isTagAuthorizationEnabled()).thenReturn(true);
     assertFalse(
         adapter.authorize(
             principal, "metalake", Arrays.asList(catalog, null), SELECT_TABLE, context));
