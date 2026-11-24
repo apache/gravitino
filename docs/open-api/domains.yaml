@@ -238,9 +238,9 @@ paths:
       summary: Delete a domain
       operationId: deleteDomain
       description: >-
-        Deleting a domain keeps its backing tag, tag assignments and tagged objects. Unpublish the Domain before deleting it.
-        A draft Domain with subdomains or direct definition members returns HTTP 409
-        (NonEmptyDomainException, code 1005). Detach its members and remove its subdomains before retrying.
+        Deleting a domain keeps its backing tag, tag assignments and tagged objects. A domain with
+        subdomains or glossary terms returns HTTP 409 (NonEmptyDomainException, code 1005).
+        Remove or detach its subdomains and clear its glossary term memberships before retrying.
         Returns dropped=false if the domain is absent or is a draft hidden from the caller.
         Requires MANAGE_DOMAIN on the domain, inherited from its current parent or the metalake.
         Other permission failures return 403.
@@ -266,7 +266,7 @@ paths:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "409":
-          description: The metalake is disabled, the domain has subdomains or definition members, or deletion conflicts with a concurrent update.
+          description: The metalake is disabled, the domain has subdomains or glossary terms, or deletion conflicts with a concurrent update.
           content:
             application/json:
               schema:
@@ -441,110 +441,6 @@ paths:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "404":
           description: The metalake or domain does not exist, or the requested domain is a hidden draft.
-          content:
-            application/json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-        "409":
-          description: The metalake is not in use.
-          content:
-            application/json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-        "5XX":
-          $ref: "#/components/responses/ServerErrorResponse"
-
-  /metalakes/{metalake}/domains/{domain}/definition-members:
-    parameters:
-      - $ref: "./openapi.yaml#/components/parameters/metalake"
-      - $ref: "#/components/parameters/domain"
-    get:
-      tags: [domain]
-      summary: List definitions assigned directly to a Domain
-      operationId: listDefinitionMembers
-      description: Requires MANAGE_DOMAIN. Includes hidden drafts. Ordered by member type and stable ID.
-      parameters:
-        - name: limit
-          in: query
-          schema: {type: integer, default: 20, minimum: 1, maximum: 1000}
-        - name: offset
-          in: query
-          schema: {type: integer, default: 0, minimum: 0}
-      responses:
-        "200":
-          description: A page of live definition names.
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                type: object
-                required: [code, members, hasMore]
-                properties:
-                  code: {type: integer, enum: [0]}
-                  hasMore: {type: boolean}
-                  members:
-                    type: array
-                    items:
-                      type: object
-                      required: [type, name]
-                      properties:
-                        type: {type: string, enum: [GLOSSARY_TERM, KNOWLEDGE_BASE_ARTICLE]}
-                        name: {type: string}
-        "400":
-          $ref: "#/components/responses/BadRequestResponse"
-        "403":
-          description: The caller lacks MANAGE_DOMAIN on the Domain.
-          content:
-            application/json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-        "404":
-          description: The metalake or Domain is absent, or the draft Domain is hidden.
-          content:
-            application/json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-        "409":
-          description: The metalake is not in use.
-          content:
-            application/json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-        "5XX":
-          $ref: "#/components/responses/ServerErrorResponse"
-
-  /metalakes/{metalake}/terms/{term}/domains/{domain}:
-    parameters:
-      - $ref: "./openapi.yaml#/components/parameters/metalake"
-      - $ref: "#/components/parameters/domain"
-      - name: term
-        in: path
-        required: true
-        schema: {type: string}
-    delete:
-      tags: [domain]
-      summary: Detach a Term from a Domain
-      operationId: detachTermDomain
-      description: Requires MANAGE_DOMAIN. An absent Term or membership returns the same success response.
-      responses:
-        "200":
-          description: The membership is absent.
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                type: object
-                required: [code]
-                properties:
-                  code: {type: integer, enum: [0]}
-        "400":
-          $ref: "#/components/responses/BadRequestResponse"
-        "403":
-          description: The caller lacks MANAGE_DOMAIN on the Domain.
-          content:
-            application/json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-        "404":
-          description: The metalake or Domain is absent, or the draft Domain is hidden.
           content:
             application/json:
               schema:

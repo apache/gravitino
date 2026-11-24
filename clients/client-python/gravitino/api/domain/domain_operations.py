@@ -72,6 +72,6 @@ class DomainOperations(ABC):
     def delete_domain(self, name: str) -> bool:
         """Delete the domain, keeping its tags. Return False if absent.
 
-        Raises NonEmptyDomainException if the domain has subdomains or direct definition members.
+        Raises NonEmptyDomainException if the domain has subdomains or glossary terms.
         """
         raise NotImplementedError

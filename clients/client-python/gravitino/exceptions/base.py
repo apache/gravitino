@@ -360,4 +360,4 @@ class BackingTagAlreadyBoundException(AlreadyExistsException):
 
 
 class NonEmptyDomainException(NotEmptyException):
-    """Raised when deleting a domain with subdomains or direct definition members."""
+    """Raised when deleting a domain with subdomains or glossary terms."""

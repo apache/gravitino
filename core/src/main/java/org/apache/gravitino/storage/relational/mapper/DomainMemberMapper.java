@@ -19,7 +19,6 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
-import org.apache.gravitino.domain.DefinitionMember;
 import org.apache.ibatis.annotations.Arg;
 import org.apache.ibatis.annotations.ConstructorArgs;
 import org.apache.ibatis.annotations.Delete;
@@ -45,28 +44,6 @@ public interface DomainMemberMapper {
 
   /** Stable member and Domain identities for reverse lookups and bulk reads. */
   record Membership(MemberType memberType, long memberId, long domainId) {}
-
-  /** Current identity exposed in the Domain administration API. */
-  record NamedMember(DefinitionMember.Type type, String name) implements DefinitionMember {}
-
-  /** Resolves live definitions before applying the offset and limit. */
-  @Select(
-      """
-      SELECT r.member_type, t.name FROM domain_member_rel r
-      JOIN glossary_term_meta t ON r.member_type='GLOSSARY_TERM' AND r.member_id=t.term_id
-        AND r.metalake_id=t.metalake_id AND t.deleted_at=0
-      WHERE r.metalake_id=#{lake} AND r.domain_id=#{domain} AND r.deleted_at=0
-      ORDER BY r.member_type, r.member_id LIMIT #{limit} OFFSET #{offset}
-      """)
-  @ConstructorArgs({
-    @Arg(column = "member_type", javaType = DefinitionMember.Type.class),
-    @Arg(column = "name", javaType = String.class)
-  })
-  List<NamedMember> namedMembers(
-      @Param("lake") long lake,
-      @Param("domain") long domain,
-      @Param("limit") int limit,
-      @Param("offset") int offset);
 
   /** Checks all member types after the caller has acquired the exclusive Domain lock. */
   @Options(useCache = false, flushCache = Options.FlushCachePolicy.TRUE)

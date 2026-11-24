@@ -65,8 +65,7 @@ public final class GlossaryTermDomainService {
    * @param metalakeId The live metalake ID.
    * @param members The current member domain IDs of the locked term.
    * @param requestedNames The names supplied by the caller.
-   * @param checkRequested The authorization check run before and after locking each requested
-   *     Domain.
+   * @param checkRequested The authorization check for each requested live domain.
    * @return The locked domain rows by ID.
    */
   public Map<Long, DomainPO> lockDomains(
@@ -79,14 +78,12 @@ public final class GlossaryTermDomainService {
         mapper -> {
           Map<String, Long> observedIds = new HashMap<>();
           Set<Long> ids = new TreeSet<>(members);
-          for (String name : new TreeSet<>(requestedNames)) {
+          for (String name : requestedNames) {
             DomainPO row = mapper.selectDomainMetaByMetalakeIdAndName(metalakeId, name);
-            if (row == null || !name.equals(row.domainName())) {
-              throw new NoSuchDomainException("Domain %s does not exist", name);
+            if (row != null && name.equals(row.domainName())) {
+              observedIds.put(name, row.domainId());
+              ids.add(row.domainId());
             }
-            checkRequested.accept(row);
-            observedIds.put(name, row.domainId());
-            ids.add(row.domainId());
           }
           Map<Long, DomainPO> locked = new LinkedHashMap<>();
           for (long id : ids) {

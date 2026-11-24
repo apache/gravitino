@@ -123,8 +123,7 @@ public interface DomainOperations {
    *
    * @param name The name of the domain.
    * @return True if the domain is deleted, false if it does not exist.
-   * @throws IllegalArgumentException If the domain is published.
-   * @throws NonEmptyDomainException If the domain has sub-domains or direct definition members.
+   * @throws NonEmptyDomainException If the domain has sub-domains or glossary terms.
    */
   boolean deleteDomain(String name) throws NonEmptyDomainException;
 }

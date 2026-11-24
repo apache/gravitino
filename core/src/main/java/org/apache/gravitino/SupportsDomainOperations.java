@@ -76,7 +76,7 @@ public interface SupportsDomainOperations {
    * @param ident The domain identifier.
    * @param check The authorization check; throwing rolls back the deletion.
    * @return Whether a domain was deleted.
-   * @throws NonEmptyDomainException If definitions still belong to the domain.
+   * @throws NonEmptyDomainException If glossary terms still belong to the domain.
    * @throws IOException If the domain cannot be deleted.
    */
   boolean deleteDomain(NameIdentifier ident, Consumer<DomainEntity> check) throws IOException;
