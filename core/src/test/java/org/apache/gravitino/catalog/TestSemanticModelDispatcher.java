@@ -27,6 +27,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.Map;
+import java.util.function.Consumer;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
@@ -74,7 +75,8 @@ public class TestSemanticModelDispatcher {
                 "exportSemanticModel",
                 NameIdentifier.class,
                 SemanticModelRevisionSelector.class,
-                OssieFormat.class)
+                OssieFormat.class,
+                Consumer.class)
             .isDefault());
   }
 

@@ -250,14 +250,20 @@ public class TestSemanticModelNormalizeDispatcher {
   public void testOssieExportNormalizesAndForwardsWithoutLoading() {
     OssieDocument document = OssieDocument.json("{}");
     when(delegate.exportSemanticModel(
-            eq(NORMALIZED_IDENT), eq(SemanticModelRevisionSelector.ACTIVE), eq(OssieFormat.JSON)))
+            eq(NORMALIZED_IDENT),
+            eq(SemanticModelRevisionSelector.ACTIVE),
+            eq(OssieFormat.JSON),
+            any()))
         .thenReturn(new SemanticModelDispatcher.SemanticModelExport(document, 1));
 
     assertSame(document, dispatcher.exportOssieDocument(INPUT_IDENT, OssieFormat.JSON));
 
     verify(delegate)
         .exportSemanticModel(
-            eq(NORMALIZED_IDENT), eq(SemanticModelRevisionSelector.ACTIVE), eq(OssieFormat.JSON));
+            eq(NORMALIZED_IDENT),
+            eq(SemanticModelRevisionSelector.ACTIVE),
+            eq(OssieFormat.JSON),
+            any());
     verifyNoMoreInteractions(delegate);
   }
 

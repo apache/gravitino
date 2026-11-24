@@ -72,6 +72,12 @@ public interface RelationalBackend
     throw new UnsupportedOperationException("Listing Semantic Model revisions is not supported");
   }
 
+  /** Publishes the latest Semantic Model revision. */
+  default SemanticModelEntity publishSemanticModelRevision(
+      NameIdentifier ident, int revision, String principal) throws IOException {
+    throw new UnsupportedOperationException("Publishing Semantic Model revisions is not supported");
+  }
+
   /** Lists model identities for governance, irrespective of publication state. */
   default List<NameIdentifier> listSemanticModelIdentifiers(Namespace namespace)
       throws IOException {
