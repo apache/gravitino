@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.glossary;
 
+import com.google.common.base.Preconditions;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.Evolving;
 
@@ -52,6 +54,8 @@ public final class TermPublication {
       State state,
       @Nullable Long publishedVersionId,
       @Nullable Long candidateVersionId) {
+    Preconditions.checkArgument(versionId >= 1, "versionId must be positive");
+    Preconditions.checkArgument(state != null, "state cannot be null");
     this.termId = termId;
     this.versionId = versionId;
     this.state = state;
@@ -79,5 +83,41 @@ public final class TermPublication {
   @Nullable
   public Long candidateVersionId() {
     return candidateVersionId;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof TermPublication)) {
+      return false;
+    }
+    TermPublication that = (TermPublication) o;
+    return termId == that.termId
+        && versionId == that.versionId
+        && state == that.state
+        && Objects.equals(publishedVersionId, that.publishedVersionId)
+        && Objects.equals(candidateVersionId, that.candidateVersionId);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(termId, versionId, state, publishedVersionId, candidateVersionId);
+  }
+
+  @Override
+  public String toString() {
+    return "TermPublication{termId="
+        + termId
+        + ", versionId="
+        + versionId
+        + ", state="
+        + state
+        + ", publishedVersionId="
+        + publishedVersionId
+        + ", candidateVersionId="
+        + candidateVersionId
+        + "}";
   }
 }

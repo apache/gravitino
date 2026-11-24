@@ -241,6 +241,29 @@ class TestGlossaryManager extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testDeletedRelationTargetAndMissingMetalakeHistory() throws IOException {
+    createAndInsertMakeLake(LAKE);
+    GlossaryManager gated = approvalManager();
+    GlossaryTermEntity parent = manager.createTerm(LAKE, TermSpec.builder("parent").build());
+    GlossaryTermEntity child =
+        gated.createTerm(LAKE, TermSpec.builder("child").withBroader(parent.name()).build());
+    manager.dropTerm(LAKE, parent.name());
+    Assertions.assertThrows(
+        NoSuchTermException.class, () -> gated.publishCandidate(LAKE, child.id(), 1));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> gated.listTermVersions("no_such_lake", 1L));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> gated.getTermVersion("no_such_lake", 1L, 1L));
+    TermPublication p1 = new TermPublication(1L, 2L, TermPublication.State.SUBMITTED, 1L, 2L);
+    TermPublication p2 = new TermPublication(1L, 2L, TermPublication.State.SUBMITTED, 1L, 2L);
+    Assertions.assertEquals(p1, p2);
+    Assertions.assertEquals(p1.hashCode(), p2.hashCode());
+    Assertions.assertTrue(p1.toString().contains("SUBMITTED"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new TermPublication(1L, 1L, null, null, null));
+  }
+
+  @TestTemplate
   void testMissingParentMakesTermAbsent() {
     TermChange change = TermChange.updateDefinition("new");
     Assertions.assertThrows(NoSuchTermException.class, () -> manager.getTerm(LAKE, "term"));

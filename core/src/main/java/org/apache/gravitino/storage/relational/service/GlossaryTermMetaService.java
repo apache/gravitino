@@ -292,6 +292,9 @@ public final class GlossaryTermMetaService {
             return count;
           }
           for (Long id : mapper.expired(cutoff, limit - count)) {
+            // Purges version history for expired published terms. Rejected unpublished candidates
+            // have no glossary_term_meta row and remain retained until Step 2 workflow retention
+            // or metalake deletion.
             SessionUtils.doWithoutCommit(
                 GlossaryTermVersionMapper.class,
                 versions -> {

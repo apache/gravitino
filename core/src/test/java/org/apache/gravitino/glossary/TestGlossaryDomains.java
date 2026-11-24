@@ -566,6 +566,91 @@ class TestGlossaryDomains extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testCandidatePublicationHandlesRenamedAndDeletedDomains() throws Exception {
+    TermPublicationPolicy policy =
+        new TermPublicationPolicy() {
+          @Override
+          public boolean requiresApproval(String lake) {
+            return true;
+          }
+
+          @Override
+          public boolean canPublishOrRejectCandidate(String lake, long id, long version) {
+            return true;
+          }
+        };
+    List<String[]> observedAfterDomains = new ArrayList<>();
+    GlossaryManager gated =
+        new GlossaryManager(
+            ids::incrementAndGet,
+            true,
+            (before, after, persist) -> {
+              if (after != null) {
+                observedAfterDomains.add(after.domains());
+              }
+              persist.run();
+            },
+            term -> true,
+            GlossaryManager.MAX_HIERARCHY_DEPTH,
+            policy);
+
+    GlossaryTermEntity renamedCandidate =
+        as(
+            "lakeOwner",
+            () ->
+                gated.createTerm(
+                    LAKE, TermSpec.builder("RenamedDomTerm").withDomains("Sales").build()));
+    env.internalDomainDispatcher().alterDomain(LAKE, "Sales", DomainChange.rename("Revenue"));
+    as("lakeOwner", () -> gated.publishCandidate(LAKE, renamedCandidate.id(), 1));
+    assertEquals(1, observedAfterDomains.size());
+    assertArrayEquals(new String[] {"Revenue"}, observedAfterDomains.get(0));
+    assertArrayEquals(
+        new String[] {"Revenue"},
+        as("lakeOwner", () -> manager.getTerm(LAKE, "RenamedDomTerm")).domains());
+
+    GlossaryTermEntity deletedDomainCandidate =
+        as(
+            "lakeOwner",
+            () ->
+                gated.createTerm(
+                    LAKE, TermSpec.builder("DeletedDomTerm").withDomains("Finance").build()));
+    GlossaryTermEntity deletedDomainDraft =
+        as(
+            "lakeOwner",
+            () ->
+                gated.createTerm(
+                    LAKE,
+                    TermSpec.builder("DeletedDomDraft")
+                        .withStatus(GlossaryTerm.Status.DRAFT)
+                        .withDomains("Finance")
+                        .build()));
+    env.internalDomainDispatcher().deleteDomain(LAKE, "Finance");
+    assertThrows(
+        NoSuchDomainException.class,
+        () -> as("lakeOwner", () -> gated.publishCandidate(LAKE, deletedDomainCandidate.id(), 1)));
+    GlossaryTermEntity cleaned =
+        as(
+            "lakeOwner",
+            () ->
+                gated.alterTerm(
+                    LAKE,
+                    "DeletedDomDraft",
+                    TermChange.removeDomain("Finance"),
+                    TermChange.setStatus(GlossaryTerm.Status.DRAFT)));
+    assertArrayEquals(new String[0], cleaned.domains());
+    as(
+        "lakeOwner",
+        () -> gated.submitDraft(LAKE, deletedDomainDraft.id(), cleaned.publication().versionId()));
+    as(
+        "lakeOwner",
+        () ->
+            gated.publishCandidate(
+                LAKE, deletedDomainDraft.id(), cleaned.publication().versionId() + 1));
+    assertArrayEquals(
+        new String[0], as("lakeOwner", () -> manager.getTerm(LAKE, "DeletedDomDraft")).domains());
+  }
+
+  @TestTemplate
   void testAlterResponseFollowsRenamedMemberWhenOldNameIsReused() throws Exception {
     GlossaryTermEntity before =
         as(

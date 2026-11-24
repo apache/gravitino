@@ -120,7 +120,7 @@ public final class GlossaryManager {
     this(ids, authorizationEnabled, handler, readable, depthLimit, lake -> false);
   }
 
-  private GlossaryManager(
+  GlossaryManager(
       IdGenerator ids,
       boolean authorizationEnabled,
       TermChangeHandler handler,
@@ -503,9 +503,10 @@ public final class GlossaryManager {
         metalake,
         termId,
         (mapper, head) -> {
+          GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
           List<Long> result = new ArrayList<>();
           for (Version row : mapper.listVersionsByTermId(termId)) {
-            if (canReadTermVersion(metalake, head, row)) result.add(row.getVersionId());
+            if (canReadTermVersion(metalake, head, row, access)) result.add(row.getVersionId());
           }
           return result;
         });
@@ -657,14 +658,16 @@ public final class GlossaryManager {
       }
     }
     relations.validate(depthLimit);
-    TermDomains domains = planDomains(lake, term.id(), previous.domainIds(), domainEdits, access);
+    TermDomains domains =
+        planCandidateDomains(lake, term.id(), previous.domains(), domainEdits, access);
+    boolean domainsChanged = domains.changed() || !previous.domainIds().equals(domains.ids());
     GlossaryTermEntity edited =
         TermEdits.apply(
             term,
             content.toArray(new TermChange[0]),
             !previous.related().equals(relations.related())
                 || !previous.broader().equals(relations.broader()),
-            domains.changed() ? domains.names() : null);
+            domainsChanged ? domains.names() : null);
     if (state == State.SUBMITTED && edited.status() == GlossaryTerm.Status.DRAFT) {
       edited =
           TermEdits.copyWithStatus(edited, domains.names(), null, GlossaryTerm.Status.APPROVED);
@@ -911,7 +914,12 @@ public final class GlossaryManager {
     T result =
         SqlSessions.readSnapshot(
             () -> {
-              long lake = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+              long lake;
+              try {
+                lake = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+              } catch (NoSuchEntityException missing) {
+                throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", metalake);
+              }
               return withVersionMapper(
                   mapper -> readScopedVersion(metalake, lake, id, mapper, read, false));
             });
@@ -965,10 +973,15 @@ public final class GlossaryManager {
   }
 
   private boolean canReadTermVersion(String metalake, Head head, Version row) {
+    return canReadTermVersion(
+        metalake, head, row, GlossaryAccess.forRequest(metalake, authorizationEnabled));
+  }
+
+  private boolean canReadTermVersion(
+      String metalake, Head head, Version row, GlossaryAccess access) {
     GlossaryTermEntity term =
         GlossaryTermVersions.decodeSnapshot(row).term(NamespaceUtil.ofGlossaryTerm(metalake));
     if (!readable.test(term)) return false;
-    GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
     if (State.PUBLISHED.name().equals(row.getLifecycle())) return access.canRead(term);
     if (head.getPublishedVersion() != null) return access.canEdit(term);
     if (access.manage()) return true;
@@ -1000,28 +1013,33 @@ public final class GlossaryManager {
                     locks.addAll(snapshot.broader());
                   }
                   if (head.getPublishedVersion() != null) locks.add(termId);
-                  return edges.withHierarchyLock(
-                      lake,
-                      locks,
-                      () -> {
-                        SessionUtils.clearSessionCache();
-                        Head locked = mapper.getVersionHeadByMetalakeAndTermId(lake, termId);
-                        if (!Objects.equals(locked.getCandidateVersion(), candidateVersionId))
-                          throw staleCandidateConflict();
-                        GlossaryTermEntity after = snapshot.term(ns);
-                        if (!readable.test(after))
-                          throw new NoSuchTermException("Glossary term does not exist");
-                        if (outcome == State.PUBLISHED) {
-                          persistCandidateAsLiveTerm(metalake, lake, locked, row, snapshot, after);
-                          locked.setPublishedVersion(candidateVersionId);
-                        }
-                        locked.setCandidateVersion(null);
-                        locked.setReservedName(null);
-                        row.setLifecycle(outcome.name());
-                        mapper.updateVersionLifecycle(termId, candidateVersionId, outcome.name());
-                        mapper.updateVersionHead(locked);
-                        return GlossaryTermVersions.toPublicationResult(locked, row);
-                      });
+                  try {
+                    return edges.withHierarchyLock(
+                        lake,
+                        locks,
+                        () -> {
+                          SessionUtils.clearSessionCache();
+                          Head locked = mapper.getVersionHeadByMetalakeAndTermId(lake, termId);
+                          if (!Objects.equals(locked.getCandidateVersion(), candidateVersionId))
+                            throw staleCandidateConflict();
+                          GlossaryTermEntity after = snapshot.term(ns);
+                          if (!readable.test(after))
+                            throw new NoSuchTermException("Glossary term does not exist");
+                          if (outcome == State.PUBLISHED) {
+                            persistCandidateAsLiveTerm(
+                                metalake, lake, locked, row, snapshot, after);
+                            locked.setPublishedVersion(candidateVersionId);
+                          }
+                          locked.setCandidateVersion(null);
+                          locked.setReservedName(null);
+                          row.setLifecycle(outcome.name());
+                          mapper.updateVersionLifecycle(termId, candidateVersionId, outcome.name());
+                          mapper.updateVersionHead(locked);
+                          return GlossaryTermVersions.toPublicationResult(locked, row);
+                        });
+                  } catch (NoSuchEntityException missing) {
+                    throw new NoSuchTermException(missing, "Referenced term is no longer visible");
+                  }
                 }));
   }
 
@@ -1050,27 +1068,32 @@ public final class GlossaryManager {
     relations.replace(snapshot.broader(), snapshot.related());
     relations.validate(depthLimit);
     Set<Long> current = before == null ? Set.of() : DOMAINS.domainIds(lake, id);
-    Set<Long> all = new HashSet<>(current);
-    all.addAll(snapshot.domainIds());
-    Map<Long, DomainPO> domainRows = DOMAINS.lockDomains(lake, all, Set.of(), ignored -> {});
+    Map<Long, DomainPO> domainRows =
+        DOMAINS.lockDomains(lake, current, snapshot.domainIds(), Set.of(), ignored -> {});
     Map<Long, String> oldNames = new HashMap<>(), newNames = new HashMap<>();
     for (long domain : current) oldNames.put(domain, domainRows.get(domain).domainName());
     for (long domain : snapshot.domainIds()) {
       DomainPO target = domainRows.get(domain);
-      requireVisibleDomain(target.domainName(), target, access);
+      String domainName = target == null ? snapshot.domains().get(domain) : target.domainName();
+      requireVisibleDomain(domainName, target, access);
       newNames.put(domain, target.domainName());
     }
     TermDomains domains = new TermDomains(lake, id, oldNames);
     domains.replace(newNames);
-    checkTermNameReservation(lake, after);
-    terms.checkTermNames(after);
+    if (before != null) {
+      before = TermEdits.withDomains(before, domains.originalNames());
+    }
+    GlossaryTermEntity resolvedAfter = TermEdits.withDomains(after, domains.names());
+    checkTermNameReservation(lake, resolvedAfter);
+    terms.checkTermNames(resolvedAfter);
+    GlossaryTermEntity finalBefore = before;
     handler.handle(
-        before,
-        after,
+        finalBefore,
+        resolvedAfter,
         () -> {
-          if (before == null) persistNewTerm(metalake, after, relations, domains);
+          if (finalBefore == null) persistNewTerm(metalake, resolvedAfter, relations, domains);
           else {
-            persistDefinition(before.nameIdentifier(), after);
+            persistDefinition(finalBefore.nameIdentifier(), resolvedAfter);
             relations.persist();
             domains.persist();
           }
@@ -1202,6 +1225,53 @@ public final class GlossaryManager {
     }
     TermDomains plan = new TermDomains(lake, termId, current);
     for (TermDomains.Edit edit : edits) {
+      DomainPO target = targets.get(edit.domain());
+      plan.edit(edit, target.domainId(), target.domainName());
+    }
+    return plan;
+  }
+
+  private TermDomains planCandidateDomains(
+      long lake,
+      long termId,
+      Map<Long, String> previousDomains,
+      List<TermDomains.Edit> edits,
+      GlossaryAccess access) {
+    Set<String> requested = new HashSet<>();
+    List<TermDomains.Edit> liveEdits = new ArrayList<>();
+    for (TermDomains.Edit edit : edits) {
+      if (!edit.add()
+          && previousDomains.containsValue(edit.domain())
+          && DOMAINS.findDomain(lake, edit.domain()) == null) {
+        continue;
+      }
+      liveEdits.add(edit);
+      requested.add(edit.domain());
+    }
+    if (previousDomains.isEmpty() && requested.isEmpty()) {
+      return new TermDomains(lake, termId, Map.of());
+    }
+    Map<String, DomainPO> targets = new HashMap<>();
+    Map<Long, DomainPO> locked =
+        DOMAINS.lockDomains(
+            lake,
+            Set.of(),
+            previousDomains.keySet(),
+            requested,
+            domain -> {
+              String name = domain.domainName();
+              requireVisibleDomain(name, domain, access);
+              targets.put(name, domain);
+            });
+    Map<Long, String> current = new HashMap<>();
+    for (long id : previousDomains.keySet()) {
+      DomainPO row = locked.get(id);
+      if (row != null) {
+        current.put(id, row.domainName());
+      }
+    }
+    TermDomains plan = new TermDomains(lake, termId, current);
+    for (TermDomains.Edit edit : liveEdits) {
       DomainPO target = targets.get(edit.domain());
       plan.edit(edit, target.domainId(), target.domainName());
     }
