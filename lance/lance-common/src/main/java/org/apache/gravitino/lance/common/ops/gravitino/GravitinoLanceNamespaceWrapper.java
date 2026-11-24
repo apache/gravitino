@@ -144,6 +144,14 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     return props;
   }
 
+  /**
+   * Loads catalog secrets for in-process Lance storage config. Passes {@code true} for {@code
+   * includeStaticCredentials}: this is a server-side operational path that must merge the full
+   * secret map (including static credential keys) into properties so Lance can reach object
+   * storage. Caller privilege filtering for static credentials belongs only on the REST {@code
+   * getSecrets} boundary, not here. Lance does not use catalog {@code getCredentials} / credential
+   * vending.
+   */
   private Map<String, String> catalogSecrets(String catalogName) {
     SecretPropertyOperationDispatcher dispatcher = secretDispatcher();
     if (dispatcher != null) {
@@ -153,6 +161,10 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     return loadCatalog(catalogName).supportsSecrets().getSecrets();
   }
 
+  /**
+   * Loads schema secrets for in-process Lance storage config. Same rationale as {@link
+   * #catalogSecrets(String)}: always include static credentials for operational merge.
+   */
   private Map<String, String> schemaSecrets(String catalogName, String schemaName) {
     SecretPropertyOperationDispatcher dispatcher = secretDispatcher();
     if (dispatcher != null) {
