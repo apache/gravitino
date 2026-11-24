@@ -337,13 +337,14 @@ move an article.
   Query `domain_member_rel` by Domain, resolve live names by member type and ID, and order
   by `(member_type, member_id)` before paging. This list uses the same `limit`, `offset` and
   `hasMore` rules as other lists below.
-- Domain deletion checks `domain_member_rel` for any live member type under the Domain lock,
-  using the shared Domain lookup index and fencing concurrent membership additions. Any remaining
-  membership returns `409 NonEmptyDomainException`, without member names or counts.
+- Domain deletion follows the existing authorization, status and subdomain checks. An authorized
+  attempt to delete a `PUBLISHED` Domain returns `400` with an instruction to unpublish it first.
+  Once a `DRAFT` Domain passes those checks, check `domain_member_rel` for any live member type
+  under the same Domain lock, using the shared Domain lookup index. A remaining membership
+  returns `409 NonEmptyDomainException` without member names or counts.
   The Domain administrator can use the member list to find and explicitly detach remaining
   members before retrying the drop.
-- This extends the current Domain drop path, which already checks its own lifecycle constraints.
-  Changing or deleting a backing tag does not change Article membership.
+- Changing or deleting a backing tag does not change Article membership.
 
 ### Bindings and target lifecycle
 
@@ -403,8 +404,10 @@ status filters. Lists filtered by Term or asset exclude drafts, and MCP only ret
 When authorization is enabled, use the metalake privileges `VIEW_DEFINITION`,
 `CREATE_DEFINITION` and `MANAGE_DEFINITIONS`, abbreviated VIEW, CREATE and MANAGE in this section.
 `MANAGE_DEFINITIONS` implies CREATE, and CREATE implies VIEW. Expand those implications and
-apply explicit Deny rules to every required capability. Article operations require effective VIEW
-except for the Domain-only detach endpoint. Ownership never bypasses Deny on Article operations.
+apply explicit Deny rules to every required capability. Article operations require effective VIEW.
+The Domain definition member list and the dedicated detach endpoint are exceptions and require
+effective `MANAGE_DOMAIN` on the requested Domain. Ownership never bypasses Deny on Article
+operations.
 
 | Operation                         | Required authority                                                          |
 | --------------------------------- | --------------------------------------------------------------------------- |
@@ -418,7 +421,7 @@ except for the Domain-only detach endpoint. Ownership never bypasses Deny on Art
 | Lists filtered by Term or asset   | VIEW on the Article and read access to each filter target                   |
 
 CREATE alone cannot read another owner's draft, and ownership alone cannot replace CREATE.
-Use the same rules on direct reads, lists, nested results and MCP.
+Use the same Article visibility rules on direct reads, Article lists, nested results and MCP.
 Shared securable-object validation rejects Article as a grant scope, covering role creation,
 privilege grants and subsequent updates across the generic authorization APIs.
 Administrators explicitly grant VIEW to reader roles on the metalake; there is no implicit
@@ -443,9 +446,12 @@ The recipient must be an existing user or group in the metalake, but need not ho
 effective VIEW and CREATE to edit or read its draft. Owner changes use the existing owner
 relation and audit path, without advancing the Article revision.
 
-Lists and search use the same visibility predicate. A hidden Article must not appear in nested
-summaries or candidate lists, or affect `hasMore`. Reading an Article does not authorize its
-targets. Lists filtered by Term or asset check access to the target before filtering Articles.
+Article lists, search and nested summaries use the same visibility predicate. Hidden Articles are
+excluded before pagination and do not affect `hasMore`. The Domain definition member list is an
+exception. To support cleanup, it returns the type and name of directly assigned members,
+including hidden drafts, to callers with effective `MANAGE_DOMAIN`. Article reads still require
+the usual Article permissions. Reading an Article does not authorize its targets. Lists filtered
+by Term or asset check access to the target before filtering Articles.
 
 ### Locking and writes
 
@@ -478,6 +484,9 @@ so unrelated writes that take the fence can still serialize within a metalake.
   while holding that exclusive Domain lock. A concurrent add either commits first and blocks
   the drop, or fails because the Domain was dropped. A detach that commits first can let
   the drop proceed.
+- For the dedicated detach operation, recheck `MANAGE_DOMAIN` in the write transaction after
+  locking the Domain, using its current parent to evaluate inherited privileges. Hold the Domain
+  lock through commit so a concurrent move cannot change the applicable scope during the write.
 - New bindings use the target's normal endpoint fence and revalidate its identity. Target removal
   takes its existing endpoint locks without acquiring linked Article locks. Background orphan
   cleanup conditionally removes only stale binding rows and does not update Article state.
@@ -745,10 +754,11 @@ succeeds. Return `200` with `dropped=false` when the Article is absent, already 
 from the caller. A visible Article still requires delete permission and returns `403` if the
 caller lacks it.
 
-For the detach endpoint, resolve the Domain and check `MANAGE_DOMAIN` first. Return HTTP `200`
-with `{"code":0}` for both a successful detach and an absent Article or membership. For other
-routes, check root visibility before action permission, and permissions before content
-conflicts. An unsuccessful mutation leaves the local Article, relations and revision unchanged.
+For the Domain definition member list and the dedicated detach endpoint, resolve the Domain and
+check `MANAGE_DOMAIN` before looking up members. Return HTTP `200` with `{"code":0}` for both a
+successful detach and an absent Article or membership. For ordinary Article operations, check
+root visibility before action permission, and permissions before content conflicts. An unsuccessful
+mutation leaves the local Article, relations and revision unchanged.
 External DDL outcomes have the separate limits described in
 [Bindings and target lifecycle](#bindings-and-target-lifecycle).
 
@@ -950,8 +960,8 @@ Storage and lifecycle operations preserve the following invariants:
 4. **Follow target lifecycles**: renames preserve stable-ID bindings; reads omit retired targets
    before asynchronous cleanup. Same-name replacements do not inherit old bindings.
 5. **Manage Domains**: readers filter by visible Domains and subdomains. Renames preserve IDs.
-   A nonempty Domain cannot be dropped. A Domain administrator without Article edit permission
-   explicitly detaches a member and can delete the Domain once it is empty.
+   A Domain administrator can list and explicitly detach members, including hidden drafts, and
+   can drop the Domain once it is a draft with no members or subdomains.
 6. **Ownership**: inject an initial Owner write failure with authorization enabled. Verify
    the Article and its relations roll back and creation can be retried with the same name.
    The current owner or metalake owner uses the existing Owner API to transfer ownership.
@@ -1004,17 +1014,21 @@ OpenAPI definitions and validation with `./gradlew :docs:build`.
       Depends on: T2.
 - [ ] **T4. Add Article authorization and ownership** (`core/`, `server/`). Implement definition
       privilege implications and Deny, shared-authorizer Owner checks, group ownership, draft
-      visibility and filtering across all reads; integrate Owner transfer and reject Article
-      grant scopes through shared securable-object validation. Verify generic capability
+      visibility and filtering for ordinary Article reads. Integrate Owner transfer and reject
+      Article grant scopes through shared securable-object validation. Verify generic capability
       boundaries. Depends on: T3.
 - [ ] **T5. Add Domain integration** (`core/`). Implement typed shared membership writes, parent
       filters, current-name resolution, Domain visibility and one nonempty-drop check for all
       live member types. Apply Domain management checks and permit explicit detach by the
       Domain administrator. Add Article name resolution to the shared list introduced by
       Glossary T7. Fence membership changes and verify cross-object lock order.
-      For **T5.3**, create a Domain's sole Term member through the Glossary API. Verify that
-      Domain deletion returns `409` and that an administrator can list and detach the Term
-      before deleting the Domain.
+      For **T5.3**, create a Domain with no subdomains and use the Glossary API to add its sole
+      Term member. Publish the Domain and verify that dropping it returns `400` with an
+      instruction to unpublish. Unpublish it and verify `409 NonEmptyDomainException`. Verify
+      that the administrator can list and detach the Term, then drop the Domain.
+      Pause an Article detach after its initial permission check. Before it takes the Domain
+      lock, commit a Domain move that removes the caller's inherited `MANAGE_DOMAIN`. Verify
+      that detach returns `403` and leaves the membership and Article `revision` unchanged.
       Depends on: T4, Domain prerequisites.
 - [ ] **T6. Add bindings and asynchronous cleanup** (`core/`). Resolve structured asset and Term
       targets to stable IDs. Implement binding changes, paged binding reads, Term and asset list
@@ -1070,6 +1084,8 @@ OpenAPI definitions and validation with `./gradlew :docs:build`.
       through the existing Owner API. `MANAGE_DEFINITIONS` alone does not grant permission
       to transfer ownership.
       Explain that draft privacy depends on enabling authorization.
+      Explain that the Domain definition member list exposes the type and name of hidden drafts
+      to Domain administrators for cleanup. Article reads still require the usual permissions.
       Explain that metalake `VIEW_DEFINITION` gives access to all published Articles in the
       metalake, and point to [Access control](#access-control) for the future Domain-scoped model.
       Show how to use `expectedRevision` on an alter and reconcile a conflict. Explain that
