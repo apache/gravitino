@@ -39,6 +39,7 @@ from gravitino.client.metadata_object_policy_operations import (
     MetadataObjectPolicyOperations,
 )
 from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
+from gravitino.client.ontology_operations import SupportsOntologyMappings
 from gravitino.dto.semantic.semantic_model_dto import SemanticModelDTO
 from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient
@@ -63,6 +64,9 @@ class GenericSemanticModel(
             semantic_model_ns (Namespace): The full metalake.catalog.schema namespace.
         """
         self._name = semantic_model_dto.name()
+        self._mapping_operations = SupportsOntologyMappings(
+            rest_client, semantic_model_ns, self._name
+        )
         self._comment = semantic_model_dto.comment()
         self._definition = semantic_model_dto.definition()
         self._properties = dict(semantic_model_dto.properties())
@@ -138,6 +142,10 @@ class GenericSemanticModel(
             f"definition={self._definition!r}, properties={self._properties!r}, "
             f"audit={self._audit!r})"
         )
+
+    def supports_ontology_mappings(self) -> SupportsOntologyMappings:
+        """Returns the mapping operations for this semantic model."""
+        return self._mapping_operations
 
     def supports_tags(self) -> SupportsTags:
         return self
