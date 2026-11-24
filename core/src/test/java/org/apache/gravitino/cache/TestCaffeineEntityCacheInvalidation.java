@@ -410,4 +410,55 @@ public class TestCaffeineEntityCacheInvalidation {
     Assertions.assertEquals(0, cache.size());
     Assertions.assertFalse(cache.contains(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
   }
+
+  @Test
+  void testDescendantPrefixesUseNameLevelBoundary() {
+    NameIdentifier catalog1 = NameIdentifier.of("metalake", "catalog1");
+    java.util.List<String> prefixes =
+        CaffeineEntityCache.descendantPrefixes(catalog1, Entity.EntityType.CATALOG);
+
+    Assertions.assertEquals(1, prefixes.size());
+    Assertions.assertTrue(
+        CaffeineEntityCache.isUnderHierarchyPrefix(
+            NameIdentifier.of("metalake", "catalog1", "schema"), prefixes.get(0)));
+    Assertions.assertFalse(
+        CaffeineEntityCache.isUnderHierarchyPrefix(
+            NameIdentifier.of("metalake", "catalog10"), prefixes.get(0)));
+    Assertions.assertFalse(
+        CaffeineEntityCache.isUnderHierarchyPrefix(
+            NameIdentifier.of("metalake", "catalog1"), prefixes.get(0)));
+  }
+
+  @Test
+  void testSchemaAddsHierarchicalSeparatorPrefix() {
+    NameIdentifier schema = NameIdentifier.of("metalake", "catalog", "schema");
+    java.util.List<String> prefixes =
+        CaffeineEntityCache.descendantPrefixes(schema, Entity.EntityType.SCHEMA);
+
+    Assertions.assertEquals(2, prefixes.size());
+    Assertions.assertTrue(prefixes.get(0).endsWith("."));
+    Assertions.assertTrue(prefixes.get(1).endsWith(HierarchicalSchemaUtil.schemaSeparator()));
+    Assertions.assertTrue(
+        CaffeineEntityCache.isUnderHierarchyPrefix(
+            NameIdentifier.of("metalake", "catalog", "schema", "table"), prefixes.get(0)));
+  }
+
+  @Test
+  void testAncestorHierarchyPrefixesCoverDescendantRegistrations() {
+    NameIdentifier catalog = NameIdentifier.of("metalake", "catalog");
+    NameIdentifier schema = NameIdentifier.of("metalake", "catalog", "schema");
+    NameIdentifier table = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    java.util.List<String> ancestors = CaffeineEntityCache.ancestorHierarchyPrefixes(table);
+
+    Assertions.assertTrue(
+        ancestors.containsAll(
+            CaffeineEntityCache.descendantPrefixes(catalog, Entity.EntityType.CATALOG)));
+    Assertions.assertTrue(
+        ancestors.contains(
+            CaffeineEntityCache.descendantPrefixes(schema, Entity.EntityType.SCHEMA).get(0)));
+    Assertions.assertFalse(
+        ancestors.containsAll(
+            CaffeineEntityCache.descendantPrefixes(
+                NameIdentifier.of("metalake", "catalog10"), Entity.EntityType.CATALOG)));
+  }
 }
