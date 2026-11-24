@@ -25,43 +25,28 @@ import org.junit.jupiter.api.Test;
 class TestMaintenanceTaskIds {
 
   @Test
-  void testSeparators() {
+  void testFormatParseAndRejectInvalid() {
     Assertions.assertEquals(':', MaintenanceTaskIds.KV_SEP);
     Assertions.assertEquals(';', MaintenanceTaskIds.PAIR_SEP);
-  }
 
-  @Test
-  void testExpandPolicyRoundTrip() {
     Assertions.assertEquals("policy:42", MaintenanceTaskIds.forExpandPolicy(42L));
     Assertions.assertEquals(42L, MaintenanceTaskIds.parseExpandPolicy("policy:42").orElseThrow());
-  }
 
-  @Test
-  void testCronTableRoundTrip() {
-    String id = MaintenanceTaskIds.forCronTable(10L, 20L);
-    Assertions.assertEquals("table:10;policy:20", id);
-    Optional<long[]> parsed = MaintenanceTaskIds.parseCronTable(id);
-    Assertions.assertTrue(parsed.isPresent());
-    Assertions.assertArrayEquals(new long[] {10L, 20L}, parsed.get());
-  }
+    String cronTable = MaintenanceTaskIds.forCronTable(10L, 20L);
+    Assertions.assertEquals("table:10;policy:20", cronTable);
+    Optional<long[]> cronTableParsed = MaintenanceTaskIds.parseCronTable(cronTable);
+    Assertions.assertTrue(cronTableParsed.isPresent());
+    Assertions.assertArrayEquals(new long[] {10L, 20L}, cronTableParsed.get());
 
-  @Test
-  void testCronBatchRoundTrip() {
     Assertions.assertEquals("batch:0;policy:9", MaintenanceTaskIds.forCronBatch(0L, 9L));
     Assertions.assertEquals("batch:12;policy:9", MaintenanceTaskIds.forCronBatch(12L, 9L));
-    Optional<long[]> parsed = MaintenanceTaskIds.parseCronBatch("batch:12;policy:9");
-    Assertions.assertTrue(parsed.isPresent());
-    Assertions.assertArrayEquals(new long[] {12L, 9L}, parsed.get());
-  }
+    Optional<long[]> cronBatchParsed = MaintenanceTaskIds.parseCronBatch("batch:12;policy:9");
+    Assertions.assertTrue(cronBatchParsed.isPresent());
+    Assertions.assertArrayEquals(new long[] {12L, 9L}, cronBatchParsed.get());
 
-  @Test
-  void testCommitTableRoundTrip() {
     Assertions.assertEquals("table:99", MaintenanceTaskIds.forCommitTable(99L));
     Assertions.assertEquals(99L, MaintenanceTaskIds.parseCommitTable("table:99").orElseThrow());
-  }
 
-  @Test
-  void testParseRejectsInvalid() {
     Assertions.assertTrue(MaintenanceTaskIds.parseExpandPolicy(null).isEmpty());
     Assertions.assertTrue(MaintenanceTaskIds.parseExpandPolicy("42").isEmpty());
     Assertions.assertTrue(MaintenanceTaskIds.parseExpandPolicy("policy:").isEmpty());

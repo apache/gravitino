@@ -28,6 +28,7 @@ from gravitino.api.rel.expressions.transforms.transform import Transform
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.table import Table
 from gravitino.exceptions.base import (
+    NoSuchSchemaException,
     NoSuchTableException,
     UnsupportedOperationException,
 )
@@ -83,6 +84,7 @@ class TableCatalog(ABC):
 
         Raises:
             NoSuchTableException: If the table does not exist.
+            NoSuchSchemaException: If the containing schema does not exist.
         """
 
     def table_exists(self, identifier: NameIdentifier) -> bool:
@@ -94,7 +96,7 @@ class TableCatalog(ABC):
         Returns:
             bool: `True` If the table exists, `False` otherwise.
         """
-        with suppress(NoSuchTableException):
+        with suppress(NoSuchTableException, NoSuchSchemaException):
             self.load_table(identifier)
             return True
         return False

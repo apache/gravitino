@@ -58,6 +58,7 @@ import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
@@ -137,6 +138,7 @@ public class TestCatalogOperations
   public static final String FAIL_CREATE = "fail-create";
 
   public static final String FAIL_TEST = "need-fail";
+  public static final String FORBID_TEST = "need-forbid";
 
   public static final String VALIDATE_ON_CREATE = "validate-on-create";
 
@@ -906,6 +908,10 @@ public class TestCatalogOperations
     // Mirror a JDBC-style backend probe: fail when the catalog was created with FAIL_TEST=true.
     if ("true".equals(config.get(FAIL_TEST))) {
       throw new ConnectionFailedException("Connection failed");
+    }
+    // Mirror a backend that refuses the configured credentials.
+    if ("true".equals(config.get(FORBID_TEST))) {
+      throw new ForbiddenException("Backend denied access");
     }
     // A catalog that opts into create-time verification mirrors a reachable JDBC backend: the probe
     // succeeds. Otherwise keep the interface default (unsupported) so the standalone testConnection

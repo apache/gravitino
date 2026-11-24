@@ -258,46 +258,32 @@ public class PolicyContents {
    * @return manifest rewrite policy
    */
   public static IcebergRewriteManifestsContent icebergRewriteManifests() {
-    return new IcebergRewriteManifestsContent(
-        null, null, null, null, null, PolicyExecutionSpec.empty());
+    return new IcebergRewriteManifestsContent(null, null, null, PolicyExecutionSpec.empty());
   }
 
   /**
-   * Creates a manifest rewrite policy. Null thresholds use the built-in defaults.
+   * Creates a manifest rewrite policy. A null threshold uses the built-in default.
    *
-   * @param manifestCountCritical count that triggers regardless of size
-   * @param manifestCountWarning minimum count for the size trigger
-   * @param avgManifestSizeThresholdBytes exclusive average size threshold in bytes
+   * @param manifestCountThreshold inclusive manifest count that triggers rewrite
    * @param specId requested existing spec, or null to resolve Iceberg's current default at
    *     evaluation
    * @param useCaching caching option, or null for the Iceberg default
    * @return manifest rewrite policy
    */
   public static IcebergRewriteManifestsContent icebergRewriteManifests(
-      @Nullable Long manifestCountCritical,
-      @Nullable Long manifestCountWarning,
-      @Nullable Long avgManifestSizeThresholdBytes,
+      @Nullable Long manifestCountThreshold,
       @Nullable Integer specId,
       @Nullable Boolean useCaching) {
     return icebergRewriteManifests(
-        manifestCountCritical,
-        manifestCountWarning,
-        avgManifestSizeThresholdBytes,
-        specId,
-        useCaching,
-        null,
-        null,
-        null,
-        null,
-        null);
+        manifestCountThreshold, specId, useCaching, null, null, null, null, null);
   }
 
   /**
    * Creates Iceberg rewrite-manifests policy content with default thresholds and the given
    * execution peers.
    *
-   * <p>Prefer this over a peers-only five-arg overload so it does not clash with the thresholds
-   * factory {@code (Long, Long, Long, Integer, Boolean)}.
+   * <p>Prefer this over a peers-only overload so it does not clash with the thresholds factory
+   * {@code (Long, Integer, Boolean)}.
    *
    * @param executionSpec execution peers, or null for empty peers
    * @return rewrite-manifests policy content
@@ -305,21 +291,14 @@ public class PolicyContents {
   public static IcebergRewriteManifestsContent icebergRewriteManifests(
       @Nullable PolicyExecutionSpec executionSpec) {
     return new IcebergRewriteManifestsContent(
-        null,
-        null,
-        null,
-        null,
-        null,
-        executionSpec == null ? PolicyExecutionSpec.empty() : executionSpec);
+        null, null, null, executionSpec == null ? PolicyExecutionSpec.empty() : executionSpec);
   }
 
   /**
-   * Creates a manifest rewrite policy with thresholds and execution peers. Null thresholds use the
-   * built-in defaults.
+   * Creates a manifest rewrite policy with threshold and execution peers. A null threshold uses the
+   * built-in default.
    *
-   * @param manifestCountCritical count that triggers regardless of size
-   * @param manifestCountWarning minimum count for the size trigger
-   * @param avgManifestSizeThresholdBytes exclusive average size threshold in bytes
+   * @param manifestCountThreshold inclusive manifest count that triggers rewrite
    * @param specId requested existing spec, or null to resolve Iceberg's current default at
    *     evaluation
    * @param useCaching caching option, or null for the Iceberg default
@@ -331,9 +310,7 @@ public class PolicyContents {
    * @return manifest rewrite policy
    */
   public static IcebergRewriteManifestsContent icebergRewriteManifests(
-      @Nullable Long manifestCountCritical,
-      @Nullable Long manifestCountWarning,
-      @Nullable Long avgManifestSizeThresholdBytes,
+      @Nullable Long manifestCountThreshold,
       @Nullable Integer specId,
       @Nullable Boolean useCaching,
       @Nullable String timeTrigger,
@@ -342,9 +319,7 @@ public class PolicyContents {
       @Nullable Map<String, String> jobOptions,
       @Nullable Map<String, String> updaterOptions) {
     return new IcebergRewriteManifestsContent(
-        manifestCountCritical,
-        manifestCountWarning,
-        avgManifestSizeThresholdBytes,
+        manifestCountThreshold,
         specId,
         useCaching,
         PolicyExecutionSpec.of(

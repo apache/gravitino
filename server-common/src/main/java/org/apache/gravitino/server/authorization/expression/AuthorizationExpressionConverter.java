@@ -187,7 +187,8 @@ public class AuthorizationExpressionConverter {
               ( entityType == 'JOB_TEMPLATE' && (%s)) ||
               ( entityType == 'COLUMN' && (%s)) ||
               ( entityType == 'FUNCTION' && (%s)) ||
-              ( entityType == 'SEMANTIC_MODEL' && (%s)))
+              ( entityType == 'SEMANTIC_MODEL' && (%s)) ||
+              ( entityType == 'DOMAIN' && (authorizer.canAccessDomain(principal,METALAKE_NAME,DOMAIN,authorizationContext))))
               """
             .formatted(
                 LOAD_CATALOG_AUTHORIZATION_EXPRESSION,

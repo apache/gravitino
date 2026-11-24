@@ -111,6 +111,12 @@ public class HiveClientImpl implements HiveClient {
     return shim.getTable(catalogName, databaseName, tableName);
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public String getTableIdentifier(String catalogName, String databaseName, String tableName) {
+    return shim.getTableIdentifier(catalogName, databaseName, tableName);
+  }
+
   @Override
   public void alterTable(
       String catalogName,
@@ -181,6 +187,14 @@ public class HiveClientImpl implements HiveClient {
   public List<HiveTable> getTableObjectsByName(
       String catalogName, String databaseName, List<String> allTables) {
     return shim.getTableObjectsByName(catalogName, databaseName, allTables);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public List<String> getTableNamesByInputFormatPrefix(
+      String catalogName, String databaseName, List<String> allTables, String inputFormatPrefix) {
+    return shim.getTableNamesByInputFormatPrefix(
+        catalogName, databaseName, allTables, inputFormatPrefix);
   }
 
   @Override

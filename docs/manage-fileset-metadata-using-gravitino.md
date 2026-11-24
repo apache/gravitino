@@ -19,12 +19,14 @@ managed and external, how storage locations and placeholders work, and how GVFS 
 
 ### Create a Fileset
 
-A fileset needs a name, a type, and a storage location. A `MANAGED` fileset is created and deleted
-with its data; an `EXTERNAL` one points at a location that already exists.
-With filesystem operations enabled, creating a `MANAGED` fileset on an existing non-empty location
-is rejected by default. Set `allow-existing-location-as-managed=true` at creation to explicitly adopt
-that data, including deleting it when the fileset is dropped. An existing empty directory needs no
-override.
+A `MANAGED` fileset can inherit all its locations from its schema or catalog. An `EXTERNAL` fileset
+must supply at least one location in the create request.
+
+With filesystem operations enabled, Gravitino creates missing directories for either type. By
+default, it rejects existing non-empty directories for a `MANAGED` fileset. Set
+`allow-existing-location-as-managed=true` at creation to adopt that data and delete it on drop.
+An existing empty directory needs no override. With `disable-filesystem-ops=true`, creation only
+registers the fileset metadata.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -75,8 +77,10 @@ fileset = filesets.create_fileset(
 
 ### Create a Fileset With Several Locations
 
-`storageLocations` takes a map of location name to path. The name is what a reader selects, and
-`default-location-name` picks the one used when none is named.
+The create request accepts both `storageLocation` and `storageLocations`. A non-null
+`storageLocation` overrides `storageLocations["unknown"]` and keeps the other named entries.
+In this example, the `raw` schema also supplies `location-eu=s3a://example-eu/landing/raw`,
+as shown in [the catalog configuration](./fileset-catalog.md#how-fileset-locations-are-resolved).
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -85,11 +89,11 @@ fileset = filesets.create_fileset(
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" -d '{
   "name": "raw_events",
-  "comment": "Raw event drops, two regions",
   "type": "MANAGED",
+  "storageLocation": "s3a://example-bucket/imports/raw_events",
   "storageLocations": {
-    "us": "s3a://example-us/landing/raw_events",
-    "eu": "s3a://example-eu/landing/raw_events"
+    "unknown": "s3a://example-bucket/staging/raw_events",
+    "us": "s3a://example-us/landing/raw_events"
   },
   "properties": {"default-location-name": "us"}
 }' http://localhost:8090/api/metalakes/example/catalogs/landing/schemas/raw/filesets
@@ -97,6 +101,18 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 </TabItem>
 </Tabs>
+
+The resulting fileset has three locations.
+
+| Name | Fileset path | Source |
+| --- | --- | --- |
+| `unknown` | `s3a://example-bucket/imports/raw_events` | `storageLocation` |
+| `us` | `s3a://example-us/landing/raw_events` | `storageLocations["us"]` |
+| `eu` | `s3a://example-eu/landing/raw/raw_events` | Inherited from the schema |
+
+With multiple resolved names, `default-location-name` must match one of them. GVFS uses `us` by
+default here. A reader can [select another location](./how-to-use-gvfs.md#examples) by specifying
+`unknown` or `eu`.
 
 ### Create a Fileset From a Location Template
 
@@ -242,8 +258,10 @@ fileset = filesets.alter_fileset(
 
 ### Drop a Fileset
 
-Dropping a `MANAGED` fileset deletes its files. Dropping an `EXTERNAL` one removes only the
-Gravitino record.
+With filesystem operations enabled, dropping a `MANAGED` fileset deletes every resolved fileset
+directory and its contents, including directories derived from schema or catalog locations.
+Dropping an `EXTERNAL` fileset preserves data at every location. With `disable-filesystem-ops=true`,
+dropping either type removes only its metadata. See [Managed and External](./filesets.md#managed-and-external).
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">

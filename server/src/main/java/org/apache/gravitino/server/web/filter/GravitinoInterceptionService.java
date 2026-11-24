@@ -48,6 +48,7 @@ import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
@@ -63,14 +64,18 @@ import org.apache.gravitino.server.web.filter.authorization.AuthorizationExecuto
 import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutorFactory;
 import org.apache.gravitino.server.web.rest.BulkOperations;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
+import org.apache.gravitino.server.web.rest.DomainMembershipOperations;
+import org.apache.gravitino.server.web.rest.DomainOperations;
 import org.apache.gravitino.server.web.rest.ExceptionHandlers;
 import org.apache.gravitino.server.web.rest.FilesetOperations;
 import org.apache.gravitino.server.web.rest.FunctionOperations;
 import org.apache.gravitino.server.web.rest.GroupOperations;
 import org.apache.gravitino.server.web.rest.JobOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectCredentialOperations;
+import org.apache.gravitino.server.web.rest.MetadataObjectDomainOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectPolicyOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectSecretOperations;
+import org.apache.gravitino.server.web.rest.MetadataObjectSemanticModelOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
 import org.apache.gravitino.server.web.rest.MetalakeOperations;
 import org.apache.gravitino.server.web.rest.ModelOperations;
@@ -91,6 +96,7 @@ import org.apache.gravitino.server.web.rest.TopicOperations;
 import org.apache.gravitino.server.web.rest.UserOperations;
 import org.apache.gravitino.server.web.rest.ViewOperations;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.NameValidationUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.glassfish.hk2.api.Descriptor;
 import org.glassfish.hk2.api.Filter;
@@ -118,6 +124,7 @@ public class GravitinoInterceptionService implements InterceptionService {
             FunctionOperations.class.getName(),
             SemanticModelOperations.class.getName(),
             SemanticModelMetricOperations.class.getName(),
+            MetadataObjectSemanticModelOperations.class.getName(),
             TopicOperations.class.getName(),
             FilesetOperations.class.getName(),
             BulkOperations.class.getName(),
@@ -130,6 +137,9 @@ public class GravitinoInterceptionService implements InterceptionService {
             PartitionOperations.class.getName(),
             MetadataObjectTagOperations.class.getName(),
             TagOperations.class.getName(),
+            DomainOperations.class.getName(),
+            DomainMembershipOperations.class.getName(),
+            MetadataObjectDomainOperations.class.getName(),
             PolicyOperations.class.getName(),
             MetadataObjectPolicyOperations.class.getName(),
             JobOperations.class.getName(),
@@ -178,10 +188,21 @@ public class GravitinoInterceptionService implements InterceptionService {
           String expression = expressionAnnotation.expression();
           Object[] args = methodInvocation.getArguments();
           Optional<String> entityType = extractMetadataObjectTypeFromParameters(parameters, args);
+          Map<String, Object> pathParams = Utils.extractPathParamsFromParameters(parameters, args);
+          // Grant and owner expressions may resolve this path before the resource method runs.
+          Object objectType =
+              pathParams.getOrDefault("p_metadataObjectType", pathParams.get("p_type"));
+          if ("domain".equalsIgnoreCase(String.valueOf(objectType))
+              && pathParams.containsKey("p_fullName")) {
+            try {
+              NameValidationUtils.validateName("domain", (String) pathParams.get("p_fullName"));
+            } catch (IllegalArgumentException e) {
+              return Utils.illegalArguments(e.getMessage(), e);
+            }
+          }
           Map<Entity.EntityType, NameIdentifier> metadataContext =
               extractNameIdentifierFromParameters(parameters, args);
 
-          Map<String, Object> pathParams = Utils.extractPathParamsFromParameters(parameters, args);
           AuthorizationRequestContext authorizationRequestContext =
               new AuthorizationRequestContext();
 
@@ -270,9 +291,6 @@ public class GravitinoInterceptionService implements InterceptionService {
                   viewIdent.name(),
                   NameIdentifierUtil.getSchemaIdentifier(viewIdent).name(),
                   exception);
-            } catch (BadRequestException exception) {
-              LOG.warn("Invalid authorization request", exception);
-              return Utils.illegalArguments(exception.getMessage(), exception);
             }
             if (!authorizeResult) {
               MetadataObject.Type type = expressionAnnotation.accessMetadataType();
@@ -295,8 +313,13 @@ public class GravitinoInterceptionService implements InterceptionService {
           scope.bindIfRead(method, metalakeIdent, authorizationRequestContext);
         }
         return methodInvocation.proceed();
+      } catch (NoSuchCatalogException ex) {
+        return Utils.notFound(ex.getMessage(), ex);
+      } catch (BadRequestException ex) {
+        LOG.warn("Invalid authorization request", ex);
+        return Utils.illegalArguments(ex.getMessage(), ex);
       } catch (IllegalMetadataObjectException ex) {
-        LOG.warn("Invalid metadata object type during authorization", ex);
+        LOG.warn("Invalid metadata object during authorization", ex);
         return Utils.illegalArguments(
             IllegalArgumentException.class.getSimpleName(), ex.getMessage(), ex);
       } catch (IllegalNameIdentifierException ex) {

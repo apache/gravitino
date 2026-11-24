@@ -31,17 +31,18 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobTemplates;
+import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
+import org.apache.gravitino.policy.Policy;
 
 /**
- * Enqueue-time spec stored as JSON in db-scheduler {@code task_data} for {@code cron-job} and
+ * Schedule-time spec stored as JSON in db-scheduler {@code task_data} for {@code cron-job} and
  * {@code commit-job} rows.
  *
  * <p>Shape stays close to Iceberg update-stats {@code runJob} conf: each {@link Task} carries TMS
- * routing fields plus a flat {@code parameters} map (old template placeholders). Shared session
- * bags {@code updater_options} and {@code spark_conf} sit at the envelope top as JSON object
- * strings. Submit merges one task (cron) or all tasks (commit chain) into the flat {@code
- * Map<String,String>} passed to {@code runJob}.
+ * routing fields plus a flat {@code parameters} map (old template placeholders). Shared {@code
+ * updater_options} and {@code spark_conf} sit at the top as JSON object strings. Submit applies
+ * soft-slot {@code actionId} values onto tasks, then builds a {@code tasks[]} wire jobConf for
+ * {@code runJob}.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class MaintenanceJobSpec {
@@ -154,6 +155,19 @@ public final class MaintenanceJobSpec {
         && tasks.stream().allMatch(Task::isValid);
   }
 
+  /**
+   * @return true when every task is Iceberg snapshot expiration ({@link
+   *     Policy.BuiltInType#ICEBERG_SNAPSHOT_EXPIRATION})
+   */
+  @JsonIgnore
+  public boolean isSnapshotExpiration() {
+    if (tasks == null || tasks.isEmpty()) {
+      return false;
+    }
+    String expireType = Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION.policyType();
+    return tasks.stream().allMatch(t -> expireType.equals(t.getPolicyType()));
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -183,8 +197,8 @@ public final class MaintenanceJobSpec {
   }
 
   /**
-   * One runnable maintenance unit (typically one {@code runJob} on the cron path; commit chains
-   * pack several tasks into one Spark submit).
+   * One runnable maintenance unit. Cron snapshot-expiry batches and commit chains pack several
+   * tasks into one Spark submit; a single-table cron row usually has one task.
    */
   @JsonIgnoreProperties(ignoreUnknown = true)
   public static final class Task {
@@ -192,7 +206,7 @@ public final class MaintenanceJobSpec {
     private long tableId;
     @Nullable private Long actionId;
     private long policyId;
-    private String maintenanceType;
+    private String policyType;
     private Map<String, String> parameters = new LinkedHashMap<>();
 
     /** Jackson constructor. */
@@ -201,21 +215,21 @@ public final class MaintenanceJobSpec {
     /**
      * @param tableId table entity id
      * @param policyId policy entity id
-     * @param maintenanceType Spark wire maintenance type
-     * @param actionId soft-slot action id when known; null at enqueue
+     * @param policyType {@link org.apache.gravitino.policy.Policy.BuiltInType#policyType()}
+     * @param actionId soft-slot action id when known; null at schedule
      * @param parameters flat template placeholders (old builtin jobConf keys)
      */
     public Task(
         long tableId,
         long policyId,
-        String maintenanceType,
+        String policyType,
         @Nullable Long actionId,
         Map<String, String> parameters) {
       Preconditions.checkArgument(tableId > 0, "tableId must be positive");
       Preconditions.checkArgument(policyId > 0, "policyId must be positive");
       this.tableId = tableId;
       this.policyId = policyId;
-      this.maintenanceType = Preconditions.checkNotNull(maintenanceType, "maintenanceType");
+      this.policyType = Preconditions.checkNotNull(policyType, "policyType");
       this.actionId = actionId;
       this.parameters = new LinkedHashMap<>(Preconditions.checkNotNull(parameters, "parameters"));
     }
@@ -264,17 +278,17 @@ public final class MaintenanceJobSpec {
     }
 
     /**
-     * @return Spark wire maintenance type
+     * @return {@link org.apache.gravitino.policy.Policy.BuiltInType#policyType()} wire value
      */
-    public String getMaintenanceType() {
-      return maintenanceType;
+    public String getPolicyType() {
+      return policyType;
     }
 
     /**
-     * @param maintenanceType Spark wire maintenance type
+     * @param policyType {@link org.apache.gravitino.policy.Policy.BuiltInType#policyType()}
      */
-    public void setMaintenanceType(String maintenanceType) {
-      this.maintenanceType = maintenanceType;
+    public void setPolicyType(String policyType) {
+      this.policyType = policyType;
     }
 
     /**
@@ -314,8 +328,8 @@ public final class MaintenanceJobSpec {
     boolean isValid() {
       return tableId > 0
           && policyId > 0
-          && maintenanceType != null
-          && !maintenanceType.isBlank()
+          && policyType != null
+          && !policyType.isBlank()
           && parameters != null
           && catalogName() != null
           && tableIdentifier() != null;
@@ -333,13 +347,13 @@ public final class MaintenanceJobSpec {
       return tableId == that.tableId
           && policyId == that.policyId
           && Objects.equals(actionId, that.actionId)
-          && Objects.equals(maintenanceType, that.maintenanceType)
+          && Objects.equals(policyType, that.policyType)
           && Objects.equals(parameters, that.parameters);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(tableId, actionId, policyId, maintenanceType, parameters);
+      return Objects.hash(tableId, actionId, policyId, policyType, parameters);
     }
 
     private static @Nullable String blankToNull(@Nullable String value) {

@@ -476,15 +476,22 @@ class PermissionManager {
       RoleEntity roleEntity,
       SecurableObject targetObject,
       AuthorizationPluginCallbackWrapper authorizationPluginCallbackWrapper) {
-    // Removed duplicated privileges by set
-    Set<Privilege> updatePrivileges = Sets.newHashSet();
-    updatePrivileges.addAll(targetObject.privileges());
-    // If old object contains all the privileges to grant, the object doesn't
-    // need to update.
-    if (updatePrivileges.containsAll(privileges)) {
+    Set<Privilege> updatePrivileges = Sets.newHashSet(targetObject.privileges());
+    Set<Privilege> existingCanonicalPrivileges =
+        targetObject.privileges().stream()
+            .map(p -> AuthorizationUtils.replaceLegacyPrivilege(p.name(), p.condition()))
+            .collect(Collectors.toSet());
+    Set<Privilege> canonicalPrivileges = Sets.newHashSet(existingCanonicalPrivileges);
+    for (Privilege privilege : privileges) {
+      if (canonicalPrivileges.add(
+          AuthorizationUtils.replaceLegacyPrivilege(privilege.name(), privilege.condition()))) {
+        updatePrivileges.add(privilege);
+      }
+    }
+    // Preserve the stored spelling when an equivalent privilege is already held.
+    if (canonicalPrivileges.equals(existingCanonicalPrivileges)) {
       return targetObject;
     } else {
-      updatePrivileges.addAll(privileges);
       AuthorizationUtils.checkDuplicatedNamePrivilege(updatePrivileges);
 
       SecurableObject newSecurableObject =

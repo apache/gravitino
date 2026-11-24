@@ -19,7 +19,14 @@
 package org.apache.gravitino.dto.secret;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.AccessLevel;
@@ -38,6 +45,7 @@ import org.apache.gravitino.secret.SecretBinding;
 @AllArgsConstructor
 @Builder(setterPrefix = "with")
 @ToString(exclude = "plaintext")
+@JsonDeserialize(using = SecretBindingDTO.Deserializer.class)
 public class SecretBindingDTO {
 
   @JsonProperty("provider")
@@ -104,5 +112,43 @@ public class SecretBindingDTO {
       dtos.put(entry.getKey(), fromSecretBinding(entry.getValue()));
     }
     return dtos.build();
+  }
+
+  /**
+   * Rejects scalar / array {@code secretBindings} values without quoting them in the exception
+   * message, so a mistaken bare-string binding does not echo the secret in the HTTP 400 stack.
+   */
+  public static final class Deserializer extends JsonDeserializer<SecretBindingDTO> {
+
+    @Override
+    public SecretBindingDTO deserialize(JsonParser p, DeserializationContext ctxt)
+        throws IOException {
+      JsonNode node = p.getCodec().readTree(p);
+      if (node == null || node.isNull()) {
+        return null;
+      }
+      if (!node.isObject()) {
+        // Pass a null parser so Jackson does not append the input source (which may be the
+        // secret plaintext) into the exception message / HTTP error stack.
+        throw new JsonMappingException(
+            null,
+            "secretBindings values must be JSON objects with 'provider' and 'plaintext', not a"
+                + " scalar or array");
+      }
+      if (node.has("plaintext")
+          && !node.get("plaintext").isNull()
+          && !node.get("plaintext").isTextual()) {
+        throw new JsonMappingException(null, "secretBindings.plaintext must be a string");
+      }
+      String provider =
+          node.has("provider") && !node.get("provider").isNull()
+              ? node.get("provider").asText()
+              : null;
+      String plaintext =
+          node.has("plaintext") && !node.get("plaintext").isNull()
+              ? node.get("plaintext").asText()
+              : null;
+      return SecretBindingDTO.builder().withProvider(provider).withPlaintext(plaintext).build();
+    }
   }
 }

@@ -143,9 +143,8 @@ public class HologresSchemaOperations extends JdbcDatabaseOperations {
   }
 
   @Override
-  protected String generateDatabaseExistSql(String databaseName) {
-    return String.format(
-        "SELECT n.datname FROM pg_catalog.pg_database n where n.datname='%s'", databaseName);
+  protected String generateDatabaseExistSql() {
+    return "SELECT n.datname FROM pg_catalog.pg_database n where n.datname = ?";
   }
 
   @Override

@@ -19,11 +19,49 @@
 package org.apache.gravitino.maintenance.optimizer.command;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.maintenance.optimizer.command.SubmitUpdateStatsJobCommand.TableTarget;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class TestSubmitUpdateStatsJobCommand {
+
+  @Test
+  void parseTableTargetsAcceptsGravitinoHierarchicalSchema() {
+    List<TableTarget> targets =
+        SubmitUpdateStatsJobCommand.parseTableTargets(new String[] {"lake.a|b.events"}, null, "|");
+    Assertions.assertEquals(1, targets.size());
+    Assertions.assertEquals("lake", targets.get(0).catalogName);
+    Assertions.assertEquals("a|b", targets.get(0).schemaName);
+    Assertions.assertEquals("events", targets.get(0).tableName);
+  }
+
+  @Test
+  void parseTableTargetsAcceptsSparkPhysicalHierarchicalIdentifier() {
+    List<TableTarget> targets =
+        SubmitUpdateStatsJobCommand.parseTableTargets(new String[] {"lake.a.b.events"}, null, "|");
+    Assertions.assertEquals(1, targets.size());
+    Assertions.assertEquals("lake", targets.get(0).catalogName);
+    Assertions.assertEquals("a|b", targets.get(0).schemaName);
+    Assertions.assertEquals("events", targets.get(0).tableName);
+    Assertions.assertEquals("lake.a|b.events", targets.get(0).fullIdentifier);
+    Assertions.assertEquals(
+        "a.b.events",
+        IdentifierUtils.toSparkTableIdentifier(
+            org.apache.gravitino.NameIdentifier.of("lake", "a|b", "events"), "|"));
+  }
+
+  @Test
+  void parseTableTargetsKeepsThreeLevelAsGravitinoForm() {
+    List<TableTarget> targets =
+        SubmitUpdateStatsJobCommand.parseTableTargets(
+            new String[] {"lake.db.table"}, null, IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
+    Assertions.assertEquals("lake", targets.get(0).catalogName);
+    Assertions.assertEquals("db", targets.get(0).schemaName);
+    Assertions.assertEquals("table", targets.get(0).tableName);
+  }
 
   @Test
   void redactJobConfigForLogMasksSensitiveUpdaterOptions() {

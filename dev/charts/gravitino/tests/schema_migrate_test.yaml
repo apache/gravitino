@@ -1,0 +1,499 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+suite: test schema migrate job and wait-init
+templates:
+  - schema-migrate-job.yaml
+  - configmap.yaml
+  - deployment.yaml
+tests:
+  - it: ships schema-migrate.sh with a full upgrade chain
+    template: configmap.yaml
+    release:
+      name: gravitino
+    asserts:
+      - matchRegex:
+          path: data["schema-migrate.sh"]
+          pattern: "apply_upgrade_chain"
+      - matchRegex:
+          path: data["schema-migrate.sh"]
+          pattern: "find_next_upgrade"
+      - matchRegex:
+          path: data["schema-migrate.sh"]
+          pattern: "Refusing to skip intermediate migrations"
+      - matchRegex:
+          path: data["schema-migrate.sh"]
+          pattern: "schema_upgrade_script_from"
+      - matchRegex:
+          path: data["schema-migrate.sh"]
+          pattern: "ensure_column_name_capacity"
+      - matchRegex:
+          path: data["schema-migrate.sh"]
+          pattern: "schema_version_markers_present"
+      - matchRegex:
+          path: data["schema-migrate.sh"]
+          pattern: "found_marker"
+      - matchRegex:
+          path: data["schema-migrate.sh"]
+          pattern: "require_semver"
+      - matchRegex:
+          path: data["schema-migrate.sh"]
+          pattern: "Waiting for MySQL database"
+      - matchRegex:
+          path: data["schema-migrate.sh"]
+          pattern: "Schema migration completed successfully"
+      - matchRegex:
+          path: data["schema-migrate.sh"]
+          pattern: "schema.baselineVersion"
+      - notMatchRegex:
+          path: data["schema-migrate.sh"]
+          pattern: "tail -n 1"
+      - notMatchRegex:
+          path: data["schema-migrate.sh"]
+          pattern: "table match is enough"
+
+  - it: renders a regular Job without Helm hooks for in-chart PostgreSQL
+    template: schema-migrate-job.yaml
+    release:
+      name: gravitino
+    set:
+      schema:
+        migrate:
+          enabled: true
+      postgresql:
+        enabled: true
+    asserts:
+      - isKind:
+          of: Job
+      - notExists:
+          path: metadata.annotations["helm.sh/hook"]
+      - equal:
+          path: spec.parallelism
+          value: 1
+      - equal:
+          path: spec.template.spec.containers[0].command[1]
+          value: /schema-migrate.sh
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DB_ENGINE
+            value: postgresql
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASELINE_VERSION
+            value: ""
+
+  - it: passes schema.baselineVersion to the migrate Job
+    template: schema-migrate-job.yaml
+    release:
+      name: gravitino
+    set:
+      schema:
+        migrate:
+          enabled: true
+        baselineVersion: "1.2.0"
+      postgresql:
+        enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASELINE_VERSION
+            value: "1.2.0"
+
+  - it: postgresql wait-init does not apply upgrade SQL when migrate is enabled
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      schema:
+        migrate:
+          enabled: true
+      postgresql:
+        enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[1].name
+          value: init-postgresql
+      - matchRegex:
+          path: spec.template.spec.initContainers[1].command[2]
+          pattern: "Waiting for schema version"
+      - matchRegex:
+          path: spec.template.spec.initContainers[1].command[2]
+          pattern: "gravitino_schema_migration"
+      - matchRegex:
+          path: spec.template.spec.initContainers[1].command[2]
+          pattern: 'psql -h .* -U "\$POSTGRES_USER" -d "\$GRAVITINO_DB" -c "SELECT 1"'
+      - notMatchRegex:
+          path: spec.template.spec.initContainers[1].command[2]
+          pattern: "upgrade-.*-to-.*-postgresql"
+      - contains:
+          path: spec.template.spec.initContainers[1].env
+          content:
+            name: SCHEMA_WAIT_TIMEOUT
+            value: "600"
+
+  - it: mysql wait-init does not apply upgrade SQL when migrate is enabled
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      schema:
+        migrate:
+          enabled: true
+      mysql:
+        enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[1].name
+          value: init-mysql
+      - matchRegex:
+          path: spec.template.spec.initContainers[1].command[2]
+          pattern: "Waiting for schema version"
+      - notMatchRegex:
+          path: spec.template.spec.initContainers[1].command[2]
+          pattern: "upgrade-.*-to-.*-mysql"
+
+  - it: collapses Bitnami MySQL host and Secret when release name contains mysql
+    release:
+      name: gravitino-sm-mysql
+    set:
+      schema:
+        migrate:
+          enabled: true
+      mysql:
+        enabled: true
+    asserts:
+      - template: schema-migrate-job.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DB_HOST
+            value: gravitino-sm-mysql
+      - template: schema-migrate-job.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MYSQL_PWD
+            valueFrom:
+              secretKeyRef:
+                name: gravitino-sm-mysql
+                key: mysql-root-password
+      - template: deployment.yaml
+        matchRegex:
+          path: spec.template.spec.initContainers[1].command[2]
+          pattern: "mysql -h gravitino-sm-mysql "
+      - template: deployment.yaml
+        contains:
+          path: spec.template.spec.initContainers[1].env
+          content:
+            name: MYSQL_PWD
+            valueFrom:
+              secretKeyRef:
+                name: gravitino-sm-mysql
+                key: mysql-root-password
+      - template: configmap.yaml
+        matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "jdbc:mysql://gravitino-sm-mysql:3306/"
+
+  - it: keeps Release-Name-mysql when release name does not contain mysql
+    release:
+      name: gravitino
+    set:
+      schema:
+        migrate:
+          enabled: true
+      mysql:
+        enabled: true
+    asserts:
+      - template: schema-migrate-job.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DB_HOST
+            value: gravitino-mysql
+      - template: schema-migrate-job.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MYSQL_PWD
+            valueFrom:
+              secretKeyRef:
+                name: gravitino-mysql
+                key: mysql-root-password
+
+  - it: external PostgreSQL migrate Job uses operator Secret and Deployment wait
+    release:
+      name: gravitino
+    set:
+      schema:
+        migrate:
+          enabled: true
+          existingSecret: gravitino-pg-secret
+      postgresql:
+        enabled: false
+      entity:
+        jdbcUrl: jdbc:postgresql://pg.example.ci.local:5432/gravitino_meta?currentSchema=gravitino&sslmode=require
+        jdbcDriver: org.postgresql.Driver
+        jdbcUser: gravitino_app
+    asserts:
+      - template: schema-migrate-job.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DB_HOST
+            value: pg.example.ci.local
+      - template: schema-migrate-job.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: gravitino-pg-secret
+                key: password
+      - template: schema-migrate-job.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PGOPTIONS
+            value: "-c search_path=gravitino"
+      - template: deployment.yaml
+        equal:
+          path: spec.template.spec.initContainers[1].name
+          value: wait-for-schema
+      - template: deployment.yaml
+        matchRegex:
+          path: spec.template.spec.initContainers[1].command[2]
+          pattern: "Waiting for schema version"
+      - template: deployment.yaml
+        matchRegex:
+          path: spec.template.spec.initContainers[1].command[2]
+          pattern: 'psql -h "\$DB_HOST" -p "\$DB_PORT" -U "\$POSTGRES_USER" -d "\$GRAVITINO_DB" -c "SELECT 1"'
+      - template: deployment.yaml
+        contains:
+          path: spec.template.spec.initContainers[1].env
+          content:
+            name: PGOPTIONS
+            value: "-c search_path=gravitino"
+
+  - it: folds mixed-case schema.currentSchema to lowercase for migrate Job and Deployment wait
+    release:
+      name: gravitino
+    set:
+      schema:
+        migrate:
+          enabled: true
+          existingSecret: gravitino-pg-secret
+        currentSchema: App
+      postgresql:
+        enabled: false
+      entity:
+        jdbcUrl: jdbc:postgresql://pg.example.ci.local:5432/gravitino_meta?currentSchema=OtherSchema
+        jdbcDriver: org.postgresql.Driver
+        jdbcUser: gravitino_app
+    asserts:
+      - template: schema-migrate-job.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PG_CURRENT_SCHEMA
+            value: app
+      - template: schema-migrate-job.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PGOPTIONS
+            value: "-c search_path=app"
+      - template: deployment.yaml
+        equal:
+          path: spec.template.spec.initContainers[1].name
+          value: wait-for-schema
+      - template: deployment.yaml
+        contains:
+          path: spec.template.spec.initContainers[1].env
+          content:
+            name: PGOPTIONS
+            value: "-c search_path=app"
+
+  - it: folds mixed-case currentSchema from entity.jdbcUrl to lowercase for migrate Job and wait
+    release:
+      name: gravitino
+    set:
+      schema:
+        migrate:
+          enabled: true
+          existingSecret: gravitino-pg-secret
+      postgresql:
+        enabled: false
+      entity:
+        jdbcUrl: jdbc:postgresql://pg.example.ci.local:5432/gravitino_meta?currentSchema=App&sslmode=require
+        jdbcDriver: org.postgresql.Driver
+        jdbcUser: gravitino_app
+    asserts:
+      - template: schema-migrate-job.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PG_CURRENT_SCHEMA
+            value: app
+      - template: schema-migrate-job.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PGOPTIONS
+            value: "-c search_path=app"
+      - template: deployment.yaml
+        contains:
+          path: spec.template.spec.initContainers[1].env
+          content:
+            name: PGOPTIONS
+            value: "-c search_path=app"
+
+  - it: keeps distinct Job names across revisions for a long release name
+    template: schema-migrate-job.yaml
+    release:
+      # 48 chars: truncating the full printf would drop "-schema-migrate-rN".
+      name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      revision: 1
+    set:
+      schema:
+        migrate:
+          enabled: true
+      postgresql:
+        enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-schema-migrate-r1
+      - matchRegex:
+          path: metadata.name
+          pattern: "-schema-migrate-r1$"
+
+  - it: keeps a different Job name for revision 2 with the same long release name
+    template: schema-migrate-job.yaml
+    release:
+      name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      revision: 2
+    set:
+      schema:
+        migrate:
+          enabled: true
+      postgresql:
+        enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-schema-migrate-r2
+      - matchRegex:
+          path: metadata.name
+          pattern: "-schema-migrate-r2$"
+
+  - it: inherits Deployment nodeSelector affinity and tolerations on the Job
+    template: schema-migrate-job.yaml
+    release:
+      name: gravitino
+    set:
+      schema:
+        migrate:
+          enabled: true
+      postgresql:
+        enabled: true
+      nodeSelector:
+        disktype: ssd
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: topology.kubernetes.io/zone
+                    operator: In
+                    values:
+                      - ci-zone
+      tolerations:
+        - key: dedicated
+          operator: Exists
+          effect: NoSchedule
+    asserts:
+      - equal:
+          path: spec.template.spec.nodeSelector.disktype
+          value: ssd
+      - equal:
+          path: spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key
+          value: topology.kubernetes.io/zone
+      - contains:
+          path: spec.template.spec.tolerations
+          content:
+            key: dedicated
+            operator: Exists
+            effect: NoSchedule
+
+  - it: fails when schema migrate enabled without relational target
+    template: schema-migrate-job.yaml
+    release:
+      name: gravitino
+    set:
+      schema:
+        migrate:
+          enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: "schema.migrate.enabled is true but no relational target"
+
+  - it: does not fail render for a non-X.Y.Z baselineVersion left unused
+    template: schema-migrate-job.yaml
+    release:
+      name: gravitino
+    set:
+      schema:
+        migrate:
+          enabled: true
+        # Runtime validates only when baseline is consumed; stale typos must not
+        # block helm template when a recorded version already exists.
+        baselineVersion: "1.2"
+      postgresql:
+        enabled: true
+    asserts:
+      - isKind:
+          of: Job
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASELINE_VERSION
+            value: "1.2"
+
+  - it: fails external PostgreSQL migrate without existingSecret
+    template: schema-migrate-job.yaml
+    release:
+      name: gravitino
+    set:
+      schema:
+        migrate:
+          enabled: true
+      postgresql:
+        enabled: false
+      entity:
+        jdbcUrl: jdbc:postgresql://pg.example.ci.local:5432/gravitino
+        jdbcDriver: org.postgresql.Driver
+        jdbcUser: gravitino_app
+    asserts:
+      - failedTemplate:
+          errorPattern: "schema.migrate.existingSecret is required"

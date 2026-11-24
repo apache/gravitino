@@ -77,7 +77,7 @@ public class GravitinoMetadata479 extends GravitinoMetadata {
     if (position instanceof ColumnPosition.After after) {
       columnPosition = TableChange.ColumnPosition.after(after.columnName());
     }
-    GravitinoColumn gravitinoColumn = metadataAdapter.createColumn(column);
+    GravitinoColumn gravitinoColumn = createColumn(tableHandle, column);
     catalogConnectorMetadata.addColumn(getTableName(tableHandle), gravitinoColumn, columnPosition);
   }
 

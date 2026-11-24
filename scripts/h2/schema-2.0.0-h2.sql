@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS `schema_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'schema current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'schema last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'schema deleted at',
-    PRIMARY KEY (schema_id),
+    PRIMARY KEY (schema_id, deleted_at),
     CONSTRAINT uk_cid_sn_del UNIQUE (catalog_id, schema_name, deleted_at),
     -- Aliases are used here, and indexes with the same name in H2 can only be created once.
     KEY idx_smid (metalake_id)
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS `table_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'table current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'table last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'table deleted at',
-    PRIMARY KEY (table_id),
+    PRIMARY KEY (table_id, deleted_at),
     CONSTRAINT uk_sid_tn_del UNIQUE (schema_id, table_name, deleted_at),
     -- Aliases are used here, and indexes with the same name in H2 can only be created once.
     KEY idx_tmid (metalake_id),
@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS `table_column_version_info` (
     `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id',
     `table_version` INT UNSIGNED NOT NULL COMMENT 'table version',
     `column_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'column id',
-    `column_name` VARCHAR(128) NOT NULL COMMENT 'column name',
+    `column_name` VARCHAR(300) NOT NULL COMMENT 'column name',
     `column_position` INT UNSIGNED NOT NULL COMMENT 'column position, starting from 0',
     `column_type` CLOB NOT NULL COMMENT 'column type',
     `column_comment` VARCHAR(4096) DEFAULT '' COMMENT 'column comment',
@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS `fileset_version_info` (
     `version` INT UNSIGNED NOT NULL COMMENT 'fileset info version',
     `fileset_comment` VARCHAR(256) DEFAULT '' COMMENT 'fileset comment',
     `properties` CLOB DEFAULT NULL COMMENT 'fileset properties',
-    `storage_location_name` VARCHAR(128) NOT NULL DEFAULT 'default' COMMENT 'fileset storage location name',
+    `storage_location_name` VARCHAR(256) NOT NULL DEFAULT 'default' COMMENT 'fileset storage location name',
     `storage_location` CLOB DEFAULT NULL COMMENT 'fileset storage location',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'fileset deleted at',
     PRIMARY KEY (id),
@@ -161,7 +161,7 @@ CREATE TABLE IF NOT EXISTS `topic_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'topic current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'topic last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'topic deleted at',
-    PRIMARY KEY (topic_id),
+    PRIMARY KEY (topic_id, deleted_at),
     CONSTRAINT uk_cid_tn_del UNIQUE (schema_id, topic_name, deleted_at),
     -- Aliases are used here, and indexes with the same name in H2 can only be created once.
     KEY idx_tvmid (metalake_id),
@@ -179,7 +179,8 @@ CREATE TABLE IF NOT EXISTS `user_meta` (
     `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'updated at',
     PRIMARY KEY (`user_id`),
     CONSTRAINT `uk_mid_us_del` UNIQUE (`metalake_id`, `user_name`, `deleted_at`),
-    KEY `idx_user_meta_name_del_upd` (`metalake_id`, `user_name`, `deleted_at`, `updated_at`)
+    KEY `idx_user_meta_name_del_upd` (`metalake_id`, `user_name`, `deleted_at`, `updated_at`),
+    KEY `idx_user_meta_live` (`metalake_id`, `deleted_at`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `role_meta` (
@@ -193,7 +194,8 @@ CREATE TABLE IF NOT EXISTS `role_meta` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'role deleted at',
     `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'updated at',
     PRIMARY KEY (`role_id`),
-    CONSTRAINT `uk_mid_rn_del` UNIQUE (`metalake_id`, `role_name`, `deleted_at`)
+    CONSTRAINT `uk_mid_rn_del` UNIQUE (`metalake_id`, `role_name`, `deleted_at`),
+    KEY `idx_role_meta_live` (`metalake_id`, `deleted_at`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `role_meta_securable_object` (
@@ -208,7 +210,8 @@ CREATE TABLE IF NOT EXISTS `role_meta_securable_object` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'securable object deleted at',
     PRIMARY KEY (`id`),
     KEY `idx_obj_rid` (`role_id`),
-    KEY `idx_obj_eid` (`metadata_object_id`)
+    KEY `idx_obj_eid` (`metadata_object_id`),
+    KEY `idx_role_meta_securable_object_live` (`metadata_object_id`, `type`, `deleted_at`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `user_role_rel` (
@@ -221,7 +224,8 @@ CREATE TABLE IF NOT EXISTS `user_role_rel` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'relation deleted at',
     PRIMARY KEY (`id`),
     CONSTRAINT `uk_ui_ri_del` UNIQUE (`user_id`, `role_id`, `deleted_at`),
-    KEY `idx_rid` (`role_id`)
+    KEY `idx_rid` (`role_id`),
+    KEY `idx_user_role_rel_live` (`role_id`, `deleted_at`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `group_meta` (
@@ -303,7 +307,8 @@ CREATE TABLE IF NOT EXISTS `tag_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'tag deleted at',
     PRIMARY KEY (`tag_id`),
-    UNIQUE KEY `uk_mn_tn_del` (`metalake_id`, `tag_name`, `deleted_at`)
+    UNIQUE KEY `uk_mn_tn_del` (`metalake_id`, `tag_name`, `deleted_at`),
+    KEY `idx_tag_meta_live` (`metalake_id`, `deleted_at`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `tag_relation_meta` (
@@ -320,7 +325,8 @@ CREATE TABLE IF NOT EXISTS `tag_relation_meta` (
     UNIQUE KEY `uk_ti_mi_mo_tv_del` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `tag_value`, `deleted_at`),
     KEY `idx_tid` (`tag_id`),
     KEY `idx_mid` (`metadata_object_id`),
-    KEY `idx_tid_value` (`tag_id`, `tag_value`)
+    KEY `idx_tid_value` (`tag_id`, `tag_value`),
+    KEY `idx_tag_relation_meta_live` (`metadata_object_id`, `metadata_object_type`, `deleted_at`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `owner_meta` (
@@ -370,7 +376,7 @@ CREATE TABLE IF NOT EXISTS `model_version_info` (
     `version` INT UNSIGNED NOT NULL COMMENT 'model version',
     `model_version_comment` CLOB DEFAULT NULL COMMENT 'model version comment',
     `model_version_properties` CLOB DEFAULT NULL COMMENT 'model version properties',
-    `model_version_uri_name` VARCHAR(128) NOT NULL COMMENT 'model version uri name',
+    `model_version_uri_name` VARCHAR(256) NOT NULL COMMENT 'model version uri name',
     `model_version_uri` CLOB NOT NULL COMMENT 'model storage uri',
     `audit_info` CLOB NOT NULL COMMENT 'model version audit info',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'model version deleted at',
@@ -403,7 +409,8 @@ CREATE TABLE IF NOT EXISTS `policy_meta` (
     `occ_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy optimistic concurrency version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy deleted at',
     PRIMARY KEY (`policy_id`),
-    UNIQUE KEY `uk_mi_pn_del` (`metalake_id`, `policy_name`, `deleted_at`)
+    UNIQUE KEY `uk_mi_pn_del` (`metalake_id`, `policy_name`, `deleted_at`),
+    KEY `idx_policy_meta_live` (`metalake_id`, `deleted_at`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `policy_version_info` (
@@ -431,7 +438,8 @@ CREATE TABLE IF NOT EXISTS `policy_tag_relation_meta` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy tag relation deleted at',
     PRIMARY KEY (`id`),
     UNIQUE KEY `policy_tag_relation_meta_uk_pid_tid_del` (`policy_id`, `tag_id`, `deleted_at`),
-    KEY `policy_tag_relation_meta_idx_tag_id` (`tag_id`)
+    KEY `policy_tag_relation_meta_idx_tag_id` (`tag_id`),
+    KEY `idx_policy_tag_relation_meta_live` (`tag_id`, `deleted_at`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `statistic_meta` (
@@ -545,7 +553,7 @@ CREATE TABLE IF NOT EXISTS `view_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'view current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'view last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'view deleted at',
-    PRIMARY KEY (`view_id`),
+    PRIMARY KEY (view_id, deleted_at),
     UNIQUE KEY `uk_sid_vn_del` (`schema_id`, `view_name`, `deleted_at`),
     KEY `idx_vemid` (`metalake_id`),
     KEY `idx_vecid` (`catalog_id`)
@@ -781,3 +789,70 @@ CREATE TABLE IF NOT EXISTS `table_snapshot_metrics` (
 ) COMMENT='table snapshot metrics metadata';
 CREATE INDEX IF NOT EXISTS `idx_tsm_tid_pid_sid` ON `table_snapshot_metrics`(`table_id`, `policy_id`, `snapshot_id`);
 CREATE INDEX IF NOT EXISTS `idx_tsm_created_at` ON `table_snapshot_metrics`(`created_at`);
+
+CREATE TABLE IF NOT EXISTS `semantic_model_source_rel` (
+    `id` BIGINT AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT NOT NULL COMMENT 'containing metalake id',
+    `semantic_model_id` BIGINT NOT NULL COMMENT 'containing semantic model id',
+    `dataset_name` CLOB NOT NULL COMMENT 'exact dataset name in the current definition',
+    `source_type` VARCHAR(64) NOT NULL COMMENT 'TABLE or VIEW',
+    `source_id` BIGINT NOT NULL COMMENT 'resolved source object id',
+    `deleted_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'association retired at',
+    PRIMARY KEY (`id`)
+) COMMENT='current semantic model dataset source associations';
+CREATE INDEX IF NOT EXISTS `idx_smsr_model` ON `semantic_model_source_rel` (`semantic_model_id`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_smsr_source` ON `semantic_model_source_rel` (`metalake_id`, `source_type`, `source_id`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_smsr_deleted_at` ON `semantic_model_source_rel` (`deleted_at`);
+
+CREATE TABLE IF NOT EXISTS `domain_meta` (
+    `domain_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'domain id',
+    `domain_name` VARCHAR(128) NOT NULL COMMENT 'domain name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `domain_comment` VARCHAR(256) DEFAULT '' COMMENT 'domain comment',
+    `domain_status` VARCHAR(16) NOT NULL DEFAULT 'DRAFT' COMMENT 'domain status, DRAFT or PUBLISHED',
+    `backing_tag_id` BIGINT(20) UNSIGNED DEFAULT NULL COMMENT 'id of the backing tag, NULL if the domain has none',
+    `backing_tag_value` VARCHAR(256) DEFAULT NULL COMMENT 'value of the backing tag, NULL binds the tag without a value',
+    `properties` CLOB DEFAULT NULL COMMENT 'domain properties',
+    `audit_info` CLOB NOT NULL COMMENT 'domain audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'domain deleted at',
+    PRIMARY KEY (`domain_id`),
+    UNIQUE KEY `uk_mi_dn_del` (`metalake_id`, `domain_name`, `deleted_at`),
+    KEY `domain_meta_idx_backing_tag` (`metalake_id`, `backing_tag_id`, `backing_tag_value`, `deleted_at`)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `domain_rel` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `parent_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'parent domain id',
+    `child_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'sub-domain id',
+    `audit_info` CLOB NOT NULL COMMENT 'domain relation audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'domain relation deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_dr_ci_del` (`child_id`, `deleted_at`),
+    KEY `domain_rel_idx_parent` (`parent_id`, `deleted_at`),
+    KEY `domain_rel_idx_metalake` (`metalake_id`, `deleted_at`)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `iceberg_idempotency_meta` (
+  `idempotency_key`  VARCHAR(36) NOT NULL     COMMENT 'client-provided UUIDv7 idempotency key',
+  `http_method`      VARCHAR(16) NOT NULL     COMMENT 'HTTP method of the request',
+  `request_uri`      TEXT        NOT NULL     COMMENT 'encoded request path and sorted query string',
+  `generation`       BIGINT      NOT NULL     COMMENT 'reservation fencing token',
+  `http_status`      INT         NULL         COMMENT 'HTTP status of finalized response, NULL while reserved',
+  `response_summary` CLOB        NULL         COMMENT 'serialized response body (JSON) for replay',
+  `audit_info`       CLOB        NOT NULL     COMMENT 'idempotency record audit info',
+  `created_at`       BIGINT      NOT NULL     COMMENT 'record created at (unix epoch millis)',
+  `expires_at`       BIGINT      NOT NULL     COMMENT 'record expires at (unix epoch millis)',
+  PRIMARY KEY (`idempotency_key`)
+) COMMENT='Iceberg REST idempotency records';
+CREATE INDEX IF NOT EXISTS `idx_iim_expires` ON `iceberg_idempotency_meta` (`expires_at`);
+
+
+CREATE TABLE IF NOT EXISTS iceberg_idempotency_generation_meta (
+  stripe INT NOT NULL PRIMARY KEY,
+  generation BIGINT NOT NULL
+) ENGINE=InnoDB;

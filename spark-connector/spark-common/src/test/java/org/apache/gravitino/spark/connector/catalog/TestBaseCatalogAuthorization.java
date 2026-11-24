@@ -19,7 +19,9 @@
 
 package org.apache.gravitino.spark.connector.catalog;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -27,28 +29,46 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableSet;
+import java.lang.reflect.Field;
+import java.time.OffsetDateTime;
+import java.util.Collections;
 import java.util.Map;
-import java.util.Optional;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NoSuchViewException;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.rel.View;
+import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
+import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.authorization.AuthorizationTable;
+import org.apache.gravitino.spark.connector.hive.GravitinoHiveCatalog;
 import org.apache.spark.SparkConf;
+import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
+import org.apache.spark.sql.connector.catalog.TableChange;
+import org.apache.spark.sql.internal.SQLConf;
+import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestBaseCatalogAuthorization {
@@ -70,17 +90,15 @@ public class TestBaseCatalogAuthorization {
   }
 
   @BeforeEach
-  void setUp() {
+  void setUp() throws Exception {
     gravitinoCatalog = mock(Catalog.class);
     gravitinoTableCatalog = mock(TableCatalog.class);
     sparkCatalog = mock(org.apache.spark.sql.connector.catalog.TableCatalog.class);
     when(gravitinoCatalog.asTableCatalog()).thenReturn(gravitinoTableCatalog);
     catalog = new TestCatalog(gravitinoCatalog, sparkCatalog);
-  }
-
-  @AfterEach
-  void clearDeniedTables() {
-    AuthorizationTable.clear();
+    Field converter = BaseCatalog.class.getDeclaredField("sparkTableChangeConverter");
+    converter.setAccessible(true);
+    converter.set(catalog, new SparkTableChangeConverter(new SparkTypeConverter()));
   }
 
   @Test
@@ -110,12 +128,102 @@ public class TestBaseCatalogAuthorization {
 
     Table result = catalog.loadTable(identifier);
 
-    // The underlying Spark table is never loaded for a denied table; a placeholder is returned and
-    // the required privileges are collected for RequiredPrivilegesCheck to report during analysis.
+    // The underlying Spark table is never loaded for a denied table; a placeholder carrying the
+    // failure is returned for RequiredPrivilegesCheck to find in the analyzed plan.
     assertTrue(result instanceof AuthorizationTable);
-    Optional<ForbiddenException> failure = AuthorizationTable.drainFailure();
-    assertTrue(failure.isPresent());
-    assertTrue(failure.get().getMessage().contains("table_a: SELECT_TABLE"));
+    AuthorizationTable deniedTable = (AuthorizationTable) result;
+    assertEquals("null.schema.table_a", deniedTable.tableIdentifier());
+    assertEquals(ImmutableSet.of(Privilege.Name.SELECT_TABLE), deniedTable.requiredPrivileges());
+  }
+
+  /**
+   * In a catalog that reads views, a user denied an existing view gets the deny placeholder, as for
+   * a denied table, and the underlying Spark table is not loaded.
+   */
+  @Test
+  void testDeniedViewSurfacesAuthorizationPlaceholder() throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "view_a");
+    ViewCatalog viewCatalog = stubViewFallback(identifier);
+    ForbiddenException denied = new ForbiddenException("denied view");
+    when(viewCatalog.loadView(NameIdentifier.of("schema", "view_a"))).thenThrow(denied);
+
+    Table result = viewCapableCatalog(mock(Table.class)).loadTable(identifier);
+
+    assertTrue(result instanceof AuthorizationTable);
+    AuthorizationTable deniedView = (AuthorizationTable) result;
+    assertEquals("null.schema.view_a", deniedView.tableIdentifier());
+    assertEquals(ImmutableSet.of(Privilege.Name.SELECT_VIEW), deniedView.requiredPrivileges());
+    assertSame(
+        denied,
+        AuthorizationTable.aggregateFailure(Collections.singletonList(deniedView))
+            .get()
+            .getCause());
+    Mockito.verifyNoInteractions(sparkCatalog);
+  }
+
+  /**
+   * A catalog that cannot read views keeps reporting a denied view lookup as not found: its server
+   * catalog may have no views, and then the denial says nothing about whether the name exists.
+   */
+  @Test
+  void testDeniedViewInCatalogWithoutViewsThrowsNoSuchTable() throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "view_a");
+    ViewCatalog viewCatalog = stubViewFallback(identifier);
+    when(viewCatalog.loadView(NameIdentifier.of("schema", "view_a")))
+        .thenThrow(new ForbiddenException("denied view"));
+
+    assertThrows(NoSuchTableException.class, () -> catalog.loadTable(identifier));
+  }
+
+  /** A missing view, or a view lookup the catalog cannot perform, raises NoSuchTableException. */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testMissingViewStillThrowsNoSuchTable(boolean lookupUnsupported) throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "view_a");
+    ViewCatalog viewCatalog = stubViewFallback(identifier);
+    when(viewCatalog.loadView(NameIdentifier.of("schema", "view_a")))
+        .thenThrow(
+            lookupUnsupported
+                ? new UnsupportedOperationException("no views")
+                : new NoSuchViewException("no such view"));
+
+    assertThrows(
+        NoSuchTableException.class,
+        () -> viewCapableCatalog(mock(Table.class)).loadTable(identifier));
+  }
+
+  /**
+   * A permitted view still loads through the fallback with its catalog-specific wrapper: the deny
+   * branch must not swallow the success path.
+   */
+  @Test
+  void testPermittedViewLoadsThroughFallback() throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "view_a");
+    ViewCatalog viewCatalog = stubViewFallback(identifier);
+    when(viewCatalog.loadView(NameIdentifier.of("schema", "view_a"))).thenReturn(mock(View.class));
+    when(sparkCatalog.loadTable(identifier)).thenReturn(mock(Table.class));
+    Table viewWrapper = mock(Table.class);
+
+    assertSame(viewWrapper, viewCapableCatalog(viewWrapper).loadTable(identifier));
+    verify(sparkCatalog).loadTable(identifier);
+  }
+
+  @Test
+  void testDeniedWriteReportsTheWriteTarget() throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
+    NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
+    ForbiddenException original = new ForbiddenException("denied write");
+    when(gravitinoTableCatalog.loadTable(
+            eq(gravitinoIdentifier), eq(ImmutableSet.of(Privilege.Name.MODIFY_TABLE))))
+        .thenThrow(original);
+
+    ForbiddenException thrown =
+        assertThrows(ForbiddenException.class, () -> catalog.loadForWriting(identifier));
+
+    assertEquals(
+        "Missing required privileges for Spark tables: [null.schema.table_a: MODIFY_TABLE]",
+        thrown.getMessage());
+    assertSame(original, thrown.getCause());
   }
 
   @Test
@@ -135,13 +243,207 @@ public class TestBaseCatalogAuthorization {
         .loadTable(gravitinoIdentifier, ImmutableSet.of(Privilege.Name.MODIFY_TABLE));
   }
 
+  @Test
+  void testAlterTimestampDefaultLoadsTargetSchemaBeforeWriting() throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
+    NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
+    org.apache.gravitino.rel.Table table = mock(org.apache.gravitino.rel.Table.class);
+    when(gravitinoTableCatalog.loadTable(gravitinoIdentifier)).thenReturn(table);
+    when(table.columns())
+        .thenReturn(new Column[] {Column.of("ts", Types.TimestampType.withoutTimeZone(6), null)});
+    Table sparkTable = mock(Table.class);
+    when(sparkCatalog.loadTable(identifier)).thenReturn(sparkTable);
+    SQLConf conf = new SQLConf();
+    conf.setConfString("spark.sql.session.timeZone", "Asia/Shanghai");
+    SQLConf.withExistingConf(
+        conf,
+        () -> {
+          Assertions.assertDoesNotThrow(
+              () ->
+                  catalog.alterTable(
+                      identifier,
+                      updateColumnDefaultValue(
+                          new String[] {"ts"}, "TIMESTAMP_LTZ '2026-11-04 12:34:56.123456'")));
+          return null;
+        });
+    ArgumentCaptor<org.apache.gravitino.rel.TableChange> change =
+        ArgumentCaptor.forClass(org.apache.gravitino.rel.TableChange.class);
+    verify(gravitinoTableCatalog).alterTable(eq(gravitinoIdentifier), change.capture());
+    Assertions.assertEquals(
+        Literals.timestampLiteral("2026-11-04T12:34:56.123456"),
+        ((org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue) change.getValue())
+            .getNewDefaultValue());
+    verify(gravitinoTableCatalog).loadTable(gravitinoIdentifier);
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {"TIMESTAMP_LTZ '2026-11-04 12:34:00'", "DATE '2026-11-04'", "'2026-11-04'"})
+  void testTemporalDefaultRejectsSchemaChangingBatchBeforeWriting(String sql) {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog.alterTable(
+                    identifier,
+                    updateColumnDefaultValue(new String[] {"ts"}, sql),
+                    TableChange.updateColumnType(new String[] {"ts"}, DataTypes.TimestampNTZType)));
+    Assertions.assertTrue(error.getMessage().contains("cannot be combined"));
+    Mockito.verifyNoInteractions(gravitinoTableCatalog, sparkCatalog);
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {"TIMESTAMP_LTZ '2026-11-04 12:34:00'", "DATE '2026-11-04'", "'2026-11-04'"})
+  void testTemporalSchemaReadFailurePreventsWritingAndPreservesCause(String sql) {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
+    NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
+    ForbiddenException denied = new ForbiddenException("denied schema read");
+    when(gravitinoTableCatalog.loadTable(gravitinoIdentifier)).thenThrow(denied);
+    Assertions.assertSame(
+        denied,
+        Assertions.assertThrows(
+            ForbiddenException.class,
+            () ->
+                catalog.alterTable(
+                    identifier, updateColumnDefaultValue(new String[] {"ts"}, sql))));
+    verify(gravitinoTableCatalog).loadTable(gravitinoIdentifier);
+    Mockito.verifyNoMoreInteractions(gravitinoTableCatalog);
+    Mockito.verifyNoInteractions(sparkCatalog);
+  }
+
+  @Test
+  void testDateDefaultUsesSessionZoneBeforeWriting() throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
+    NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
+    org.apache.gravitino.rel.Table table = mock(org.apache.gravitino.rel.Table.class);
+    when(gravitinoTableCatalog.loadTable(gravitinoIdentifier)).thenReturn(table);
+    when(table.columns())
+        .thenReturn(new Column[] {Column.of("ts", Types.TimestampType.withTimeZone(), null)});
+    SQLConf conf = new SQLConf();
+    conf.setConfString("spark.sql.session.timeZone", "Asia/Shanghai");
+    SQLConf.withExistingConf(
+        conf,
+        () -> {
+          Assertions.assertDoesNotThrow(
+              () ->
+                  catalog.alterTable(
+                      identifier,
+                      updateColumnDefaultValue(new String[] {"ts"}, "DATE '2026-11-04'")));
+          return null;
+        });
+    ArgumentCaptor<org.apache.gravitino.rel.TableChange> change =
+        ArgumentCaptor.forClass(org.apache.gravitino.rel.TableChange.class);
+    verify(gravitinoTableCatalog).alterTable(eq(gravitinoIdentifier), change.capture());
+    Assertions.assertEquals(
+        Literals.of(
+            OffsetDateTime.parse("2026-11-03T16:00:00Z"), Types.TimestampType.withTimeZone()),
+        ((org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue) change.getValue())
+            .getNewDefaultValue());
+    verify(gravitinoTableCatalog).loadTable(gravitinoIdentifier);
+  }
+
+  @Test
+  void testStringTimestampDefaultRejectedBeforeWriting() {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
+    NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
+    org.apache.gravitino.rel.Table table = mock(org.apache.gravitino.rel.Table.class);
+    when(gravitinoTableCatalog.loadTable(gravitinoIdentifier)).thenReturn(table);
+    when(table.columns())
+        .thenReturn(new Column[] {Column.of("ts", Types.TimestampType.withTimeZone(), null)});
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog.alterTable(
+                    identifier,
+                    updateColumnDefaultValue(new String[] {"ts"}, "'2026-11-04 12:34:56.123456'")));
+    Assertions.assertTrue(error.getMessage().contains("TIMESTAMP_LTZ or TIMESTAMP_NTZ"));
+    verify(gravitinoTableCatalog).loadTable(gravitinoIdentifier);
+    Mockito.verifyNoMoreInteractions(gravitinoTableCatalog);
+    Mockito.verifyNoInteractions(sparkCatalog);
+  }
+
+  @Test
+  void testNumericDefaultDoesNotReadSchema() throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
+    NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
+    catalog.alterTable(identifier, updateColumnDefaultValue(new String[] {"ts"}, "42"));
+    verify(gravitinoTableCatalog, Mockito.never()).loadTable(gravitinoIdentifier);
+  }
+
+  @Test
+  void testTemporalDefaultsShareOneSchemaRead() throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
+    NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
+    org.apache.gravitino.rel.Table table = mock(org.apache.gravitino.rel.Table.class);
+    when(gravitinoTableCatalog.loadTable(gravitinoIdentifier)).thenReturn(table);
+    when(table.columns())
+        .thenReturn(
+            new Column[] {
+              Column.of("ts", Types.TimestampType.withoutTimeZone(), null),
+              Column.of("label", Types.StringType.get(), null)
+            });
+    catalog.alterTable(
+        identifier,
+        updateColumnDefaultValue(new String[] {"ts"}, "TIMESTAMP_NTZ '2026-11-04 12:34:00'"),
+        updateColumnDefaultValue(new String[] {"ts"}, "TIMESTAMP_NTZ '2026-11-04 00:00:00'"),
+        updateColumnDefaultValue(new String[] {"ts"}, "DATE '2026-11-04'"),
+        updateColumnDefaultValue(new String[] {"label"}, "'label'"));
+    verify(gravitinoTableCatalog).loadTable(gravitinoIdentifier);
+    verify(table).columns();
+  }
+
+  /** The Hive catalog, the one that reads views, reports denied views as denied. */
+  @Test
+  void testHiveCatalogSupportsSparkViews() {
+    BaseCatalog hiveCatalog = new GravitinoHiveCatalog();
+    assertTrue(hiveCatalog.supportsSparkViews());
+  }
+
+  /** Stubs the table load to miss so that loadTable falls back to the returned view catalog. */
+  private ViewCatalog stubViewFallback(Identifier identifier) {
+    NameIdentifier gravitinoIdentifier =
+        NameIdentifier.of(identifier.namespace()[0], identifier.name());
+    when(gravitinoTableCatalog.loadTable(
+            eq(gravitinoIdentifier), eq(ImmutableSet.of(Privilege.Name.SELECT_TABLE))))
+        .thenThrow(new org.apache.gravitino.exceptions.NoSuchTableException("not a table"));
+    ViewCatalog viewCatalog = mock(ViewCatalog.class);
+    when(gravitinoCatalog.asViewCatalog()).thenReturn(viewCatalog);
+    return viewCatalog;
+  }
+
+  /** Returns a catalog that reads views, wrapping each loaded view as {@code viewWrapper}. */
+  private TestCatalog viewCapableCatalog(Table viewWrapper) {
+    return new TestCatalog(gravitinoCatalog, sparkCatalog) {
+      @Override
+      protected boolean supportsSparkViews() {
+        return true;
+      }
+
+      @Override
+      protected Table createSparkView(
+          Identifier ident, View gravitinoView, Table underlyingSparkTable) {
+        return viewWrapper;
+      }
+    };
+  }
+
   private static class TestCatalog extends BaseCatalog {
+
+    private final Catalog gravitinoCatalog;
 
     private TestCatalog(
         Catalog gravitinoCatalog,
         org.apache.spark.sql.connector.catalog.TableCatalog sparkCatalog) {
-      this.gravitinoCatalogClient = gravitinoCatalog;
+      this.gravitinoCatalog = gravitinoCatalog;
       this.sparkCatalog = sparkCatalog;
+    }
+
+    @Override
+    protected Catalog gravitinoCatalog() {
+      return gravitinoCatalog;
     }
 
     private Table loadForWriting(Identifier identifier) throws Exception {
@@ -175,5 +477,13 @@ public class TestBaseCatalogAuthorization {
     protected SparkTransformConverter getSparkTransformConverter() {
       return mock(SparkTransformConverter.class);
     }
+  }
+
+  // Spark 4.1 deprecates the String form of updateColumnDefaultValue; the DefaultValue form that
+  // replaces it does not exist on Spark 3.5 or 4.0. Scoped to this helper so the rest of the class
+  // keeps the -Werror deprecation gate.
+  @SuppressWarnings("deprecation")
+  private static TableChange updateColumnDefaultValue(String[] fieldNames, String sql) {
+    return TableChange.updateColumnDefaultValue(fieldNames, sql);
   }
 }

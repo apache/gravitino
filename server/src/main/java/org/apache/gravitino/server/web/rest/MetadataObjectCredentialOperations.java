@@ -29,7 +29,6 @@ import java.util.Set;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
-import javax.ws.rs.NotSupportedException;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -52,6 +51,8 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
+import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -82,11 +83,18 @@ public class MetadataObjectCredentialOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-credentials." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-credentials", absolute = true)
-  @AuthorizationExpression(expression = AuthorizationExpressionConstants.CAN_ACCESS_METADATA)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.CAN_ACCESS_METADATA,
+      secondaryExpression =
+          AuthorizationExpressionConstants.CATALOG_STATIC_CREDENTIALS_AUTHORIZATION_EXPRESSION,
+      secondaryExpressionCondition = ExpressionCondition.CATALOG_CREDENTIALS)
   public Response getCredentials(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("type") @AuthorizationObjectType String type,
+      @PathParam("type")
+          @AuthorizationObjectType
+          @AuthorizationRequest(type = AuthorizationRequest.RequestType.GET_CREDENTIALS)
+          String type,
       @PathParam("fullName") @AuthorizationFullName String fullName) {
     LOG.info(
         "Received get credentials request for object type: {}, full name: {} under metalake: {}",
@@ -102,13 +110,13 @@ public class MetadataObjectCredentialOperations {
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
             if (!supportsCredentialOperations(object)) {
-              throw new NotSupportedException(
-                  "Doesn't support credential operations for metadata object type");
+              throw new IllegalArgumentException(
+                  "Credential operations are not supported for metadata object type "
+                      + object.type());
             }
 
             NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
             Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object);
-
             Map<String, String> filteredFilesetHeaders =
                 Utils.filterFilesetCredentialHeaders(httpRequest);
             // set the fileset info into the thread local context

@@ -28,11 +28,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.node.BooleanNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import org.apache.iceberg.PartitionSpecParser;
 import org.apache.iceberg.UnboundPartitionSpec;
 import org.apache.iceberg.rest.RESTSerializers;
+import org.apache.iceberg.rest.requests.PlanTableScanRequest;
+import org.apache.iceberg.rest.requests.PlanTableScanRequestParser;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequestParser;
 
@@ -53,6 +56,7 @@ public class IcebergObjectMapper {
     SimpleModule module = new SimpleModule("gravitino-iceberg-rest");
     module.addDeserializer(UnboundPartitionSpec.class, new PartitionSpecDeserializer());
     module.addDeserializer(UpdateTableRequest.class, new UpdateTableRequestDeserializer());
+    module.addDeserializer(PlanTableScanRequest.class, new PlanTableScanRequestDeserializer());
     mapper.registerModule(module);
     return mapper;
   }
@@ -92,6 +96,45 @@ public class IcebergObjectMapper {
         }
       }
       return UpdateTableRequestParser.fromJson(node);
+    }
+  }
+
+  /**
+   * The REST spec writes the constant expressions as {@code {"type": "true"}} and {@code {"type":
+   * "false"}}, while Iceberg's parser accepts them only as JSON booleans. Both forms are accepted.
+   */
+  private static class PlanTableScanRequestDeserializer
+      extends JsonDeserializer<PlanTableScanRequest> {
+    @Override
+    public PlanTableScanRequest deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = parser.getCodec().readTree(parser);
+      if (node instanceof ObjectNode && node.has("filter")) {
+        ((ObjectNode) node).set("filter", normalizeConstants(node.get("filter")));
+      }
+      return PlanTableScanRequestParser.fromJson(node);
+    }
+
+    private static JsonNode normalizeConstants(JsonNode expression) {
+      if (!(expression instanceof ObjectNode)) {
+        return expression;
+      }
+      ObjectNode object = (ObjectNode) expression;
+      JsonNode type = object.get("type");
+      if (type != null && type.isTextual() && object.size() == 1) {
+        if ("true".equals(type.asText())) {
+          return BooleanNode.TRUE;
+        }
+        if ("false".equals(type.asText())) {
+          return BooleanNode.FALSE;
+        }
+      }
+      for (String child : new String[] {"left", "right", "child"}) {
+        if (object.has(child)) {
+          object.set(child, normalizeConstants(object.get(child)));
+        }
+      }
+      return object;
     }
   }
 

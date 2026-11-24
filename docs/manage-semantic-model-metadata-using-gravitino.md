@@ -50,9 +50,11 @@ finished; Java file operations also require the calling method to handle or decl
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.semantic.DataType;
 import org.apache.gravitino.semantic.Dataset;
 import org.apache.gravitino.semantic.DialectExpression;
@@ -71,7 +73,8 @@ import org.apache.gravitino.semantic.SemanticModelMetric;
 
 try (GravitinoClient client = GravitinoClient.builder("http://localhost:8090")
     .withMetalake("example").build()) {
-  SemanticModelCatalog models = client.loadCatalog("sales").asSemanticModelCatalog();
+  Catalog catalog = client.loadCatalog("sales");
+  SemanticModelCatalog models = catalog.asSemanticModelCatalog();
   NameIdentifier ident = NameIdentifier.of("mart", "sales_model");
 
   // Run the Java operation examples here.
@@ -99,7 +102,8 @@ from gravitino.namespace import Namespace
 
 client = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
 try:
-    models = client.load_catalog("sales").as_semantic_model_catalog()
+    catalog = client.load_catalog("sales")
+    models = catalog.as_semantic_model_catalog()
     ident = NameIdentifier.of("mart", "sales_model")
 
     # Run the Python operation examples here.
@@ -121,8 +125,8 @@ metric over orders and links orders to customers by `customer_id`. The native RE
 definition under `definition`. Its field names include `primaryKey` and `datatype`.
 
 The relationship's `from` and `to` name datasets in the model. Its column lists and the datasets'
-keys use source table column names, even when those columns are not listed in `fields`. Each array
-inside `uniqueKeys` defines one unique key.
+keys name fields declared in `fields` by the referenced datasets, not columns of the source
+tables. Each array inside `uniqueKeys` defines one unique key.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -146,6 +150,18 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
               "dialects": [{"dialect": "ANSI_SQL", "expression": "order_amount"}]
             },
             "datatype": "Decimal"
+          },
+          {
+            "name": "order_id",
+            "expression": {
+              "dialects": [{"dialect": "ANSI_SQL", "expression": "order_id"}]
+            }
+          },
+          {
+            "name": "customer_id",
+            "expression": {
+              "dialects": [{"dialect": "ANSI_SQL", "expression": "customer_id"}]
+            }
           }
         ]
       },
@@ -154,7 +170,20 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
         "source": {"namespace": ["sales", "mart"], "name": "customers"},
         "primaryKey": ["customer_id"],
         "uniqueKeys": [["customer_code"]],
-        "fields": []
+        "fields": [
+          {
+            "name": "customer_id",
+            "expression": {
+              "dialects": [{"dialect": "ANSI_SQL", "expression": "customer_id"}]
+            }
+          },
+          {
+            "name": "customer_code",
+            "expression": {
+              "dialects": [{"dialect": "ANSI_SQL", "expression": "customer_code"}]
+            }
+          }
+        ]
       }
     ],
     "relationships": [
@@ -190,15 +219,33 @@ Expression amountExpression = Expression.builder()
     }).build();
 Field amount = Field.builder().withName("order_amount")
     .withExpression(amountExpression).withDatatype(DataType.DECIMAL).build();
+// Key and join fields only need a name and an expression over the source columns.
+private static Expression keyExpression(String column) {
+  return Expression.builder()
+      .withDialects(new DialectExpression[] {
+          DialectExpression.builder().withDialect(Dialects.ANSI_SQL)
+              .withExpression(column).build()
+      }).build();
+}
+Field orderId = Field.builder().withName("order_id")
+    .withExpression(keyExpression("order_id")).build();
+Field orderCustomer = Field.builder().withName("customer_id")
+    .withExpression(keyExpression("customer_id")).build();
+Field customerId = Field.builder().withName("customer_id")
+    .withExpression(keyExpression("customer_id")).build();
+Field customerCode = Field.builder().withName("customer_code")
+    .withExpression(keyExpression("customer_code")).build();
 Dataset orders = Dataset.builder().withName("orders")
     .withSource(NameIdentifier.of("sales", "mart", "orders"))
     .withPrimaryKey(new String[] {"order_id"})
-    .withFields(new Field[] {amount}).build();
+    .withFields(new Field[] {amount, orderId, orderCustomer})
+    .build();
 Dataset customers = Dataset.builder().withName("customers")
     .withSource(NameIdentifier.of("sales", "mart", "customers"))
     .withPrimaryKey(new String[] {"customer_id"})
     .withUniqueKeys(new String[][] {{"customer_code"}})
-    .withFields(new Field[0]).build();
+    .withFields(new Field[] {customerId, customerCode})
+    .build();
 Relationship ordersToCustomers = Relationship.builder().withName("orders_to_customers")
     .withFrom("orders").withTo("customers")
     .withFromColumns(new String[] {"customer_id"})
@@ -228,17 +275,19 @@ amount = Field(
     "order_amount",
     Expression([DialectExpression(Dialects.ANSI_SQL, "order_amount")]),
     datatype=DataType.DECIMAL)
+def key_field(name):
+    return Field(name, Expression([DialectExpression(Dialects.ANSI_SQL, name)]))
 orders = Dataset(
     "orders",
     NameIdentifier.of("sales", "mart", "orders"),
     primary_key=["order_id"],
-    fields=[amount])
+    fields=[amount, key_field("order_id"), key_field("customer_id")])
 customers = Dataset(
     "customers",
     NameIdentifier.of("sales", "mart", "customers"),
     primary_key=["customer_id"],
     unique_keys=[["customer_code"]],
-    fields=[])
+    fields=[key_field("customer_id"), key_field("customer_code")])
 orders_to_customers = Relationship(
     "orders_to_customers",
     from_dataset="orders",
@@ -297,6 +346,90 @@ identifiers = models.list_semantic_models(Namespace.of("mart"))
 
 REST identifiers include the namespace `["example", "sales", "mart"]`. SDK identifiers are relative
 to the loaded catalog, such as `mart.sales_model`.
+
+### Find Semantic Model Datasets by Source
+
+A table or View can list its directly associated datasets across catalogs and schemas in the same
+metalake. The caller needs access to the source metadata. Results include only datasets from models
+the caller can load, with the same catalog and schema access requirements as loading those models.
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+  http://localhost:8090/api/metalakes/example/objects/table/sales.mart.orders/semantic-model-datasets
+```
+
+Use `view` instead of `table` for a View, and URL-encode the source's `catalog.schema.name` path
+component when needed. Other source types are rejected.
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Table source = catalog.asTableCatalog().loadTable(NameIdentifier.of("mart", "orders"));
+NameIdentifier[] datasets = source.supportsSemanticModels().listSemanticModelDatasets();
+// A View returned by catalog.asViewCatalog().loadView(...) exposes the same capability.
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+source = catalog.as_table_catalog().load_table(NameIdentifier.of("mart", "orders"))
+datasets = source.supports_semantic_models().list_semantic_model_datasets()
+# A View returned by catalog.as_view_catalog().load_view(...) exposes the same capability.
+```
+
+</TabItem>
+</Tabs>
+
+All three APIs return fully qualified identifiers, including the metalake and catalog. For example:
+
+```json
+{
+  "code": 0,
+  "identifiers": [
+    {"namespace": ["example", "sales", "mart", "sales_model"], "name": "orders"}
+  ]
+}
+```
+
+* Each identifier's namespace is `[metalake, catalog, schema, semanticModel]`; `name` is the exact
+  dataset alias in the model. Several datasets in one model can reference the same source and each
+  appears separately. Preserve these components: a dataset name such as `orders.raw` is one name.
+* Results are unique and sorted by namespace components, then dataset name, comparing each component
+  case-sensitively by UTF-16 code units. Clients preserve that server order. An
+  existing source with no visible matches returns an empty array. Missing sources and failed
+  queries return errors.
+* To list models only, derive model identifiers from the dataset namespaces and remove duplicates.
+  In Java, use `NameIdentifier.of(dataset.namespace().levels())`; in Python, use
+  `NameIdentifier.of(*dataset.namespace().levels())`. Select each result's catalog before loading
+  its model through the catalog-scoped API.
+
+Associations are stored atomically with a model definition. Creating or importing a model, and
+explicitly replacing its definition, binds each dataset to the registered source ID resolved during
+source validation. A replacement refreshes the binding even if the definition text is unchanged.
+Model rename, comment, and property updates preserve existing bindings.
+
+The lookup has these limits:
+
+* **Source names can drift.** Renaming a source while preserving its registered ID retains the
+  association, but does not rewrite `Dataset.source`. Inspect and explicitly replace affected model
+  definitions when repairing references; a match does not prove that a model can execute.
+* **Source name reuse does not transfer associations.** Dropping and recreating a source gives it a
+  different ID. The new source has no inherited matches. Explicitly replace a model's definition
+  to validate and bind it to the new source, if that is the intended reference.
+* **Only current direct associations are indexed.** View dependencies are not followed, and old
+  model snapshots do not retain historical associations. Models written before this feature have
+  no indexed bindings until an authorized definition replacement; there is no automatic backfill.
+* **Source addressing uses the existing object API format.** Literal dots in source namespace
+  components have the same ambiguity as other metadata-object relationship routes. Dataset names
+  in the response do not have that restriction.
+
+For MCP usage, see the
+[`list_semantic_model_datasets` tool](./gravitino-mcp-server.md#semantic-models).
 
 ### Load a Semantic Model
 
@@ -545,11 +678,31 @@ datasets:
             - dialect: ANSI_SQL
               expression: order_amount
         datatype: Decimal
+      - name: order_id
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: order_id
+      - name: customer_id
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: customer_id
   - name: customers
     source: sales.mart.customers
     primary_key: [customer_id]
     unique_keys: [[customer_code]]
-    fields: []
+    fields:
+      - name: customer_id
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: customer_id
+      - name: customer_code
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: customer_code
 relationships:
   - name: orders_to_customers
     from: orders
@@ -730,7 +883,8 @@ An authorized request for an absent model returns `false` (`dropped: false` in R
 
 The [Gravitino MCP server](./gravitino-mcp-server.md#semantic-models) provides
 `list_of_semantic_models`, `load_semantic_model`, `create_semantic_model`, `alter_semantic_model`,
-`drop_semantic_model`, `list_metrics`, and `list_metric_infos`. Enable the `semantic_model` tool tag
-when filtering tools. Metric discovery tools return the same full namespaces as REST.
+`drop_semantic_model`, `list_metrics`, `list_metric_infos`, and `list_semantic_model_datasets`.
+Enable the `semantic_model` tool tag when filtering tools. Metric discovery tools return the same
+full namespaces as REST.
 Create and alter use the native REST definition format. Use REST or the SDKs for Ossie import and
 export. The current Web UI does not provide Semantic Model workflows.

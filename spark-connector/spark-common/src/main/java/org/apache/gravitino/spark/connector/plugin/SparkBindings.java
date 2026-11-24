@@ -22,6 +22,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -43,18 +45,20 @@ import scala.Function1;
 public final class SparkBindings {
 
   /**
-   * The catalog kinds every connector build must supply. Paimon is absent because Paimon publishes
-   * no artifact for every supported Spark and Scala version, so some builds legitimately ship no
-   * Paimon catalog.
+   * The catalog kinds every connector build must supply. Paimon is optional because it does not
+   * publish artifacts for every supported Spark and Scala version. Doris is optional because its
+   * specialized catalog is currently supplied only by the Spark 3.5 build.
    */
   private static final Set<SparkCatalogKind> REQUIRED_KINDS =
-      EnumSet.complementOf(EnumSet.of(SparkCatalogKind.LAKEHOUSE_PAIMON));
+      EnumSet.complementOf(EnumSet.of(SparkCatalogKind.LAKEHOUSE_PAIMON, SparkCatalogKind.DORIS));
 
   private final Map<SparkCatalogKind, String> catalogClassNames;
+  private final Map<String, String> extensionCatalogClassNames;
   private final String authorizationExtension;
 
   private SparkBindings(Builder builder) {
     this.catalogClassNames = ImmutableMap.copyOf(builder.catalogClassNames);
+    this.extensionCatalogClassNames = ImmutableMap.copyOf(builder.extensionCatalogClassNames);
     this.authorizationExtension = builder.authorizationExtension;
   }
 
@@ -76,6 +80,11 @@ public final class SparkBindings {
     return catalogClassNames;
   }
 
+  @Nullable
+  String extensionCatalogClassName(String provider) {
+    return extensionCatalogClassNames.get(provider.toLowerCase(Locale.ROOT));
+  }
+
   /**
    * Returns the class name of the authorization session extension this build ships.
    *
@@ -90,6 +99,7 @@ public final class SparkBindings {
 
     private final Map<SparkCatalogKind, String> catalogClassNames =
         new EnumMap<>(SparkCatalogKind.class);
+    private final Map<String, String> extensionCatalogClassNames = new HashMap<>();
     @Nullable private String authorizationExtension;
 
     private Builder() {}
@@ -156,7 +166,8 @@ public final class SparkBindings {
      * Builds the bindings, failing if this build left one out.
      *
      * <p>Before validating, merges in any {@link SparkCatalogExtension} discovered on the classpath
-     * for a kind this build did not already bind at compile time.
+     * for a kind this build did not already bind at compile time, or for a provider the connector
+     * does not support directly.
      *
      * @return the bindings
      */
@@ -168,6 +179,19 @@ public final class SparkBindings {
       missing.removeAll(catalogClassNames.keySet());
       Preconditions.checkState(missing.isEmpty(), "No catalog was bound for %s", missing);
       return new SparkBindings(this);
+    }
+
+    Builder extensionCatalog(String provider, String catalogClassName) {
+      Preconditions.checkArgument(StringUtils.isNotBlank(provider), "Blank catalog provider");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(catalogClassName), "Blank catalog class name for %s", provider);
+      String normalized = provider.toLowerCase(Locale.ROOT);
+      Preconditions.checkState(
+          !extensionCatalogClassNames.containsKey(normalized),
+          "Catalog provider %s was bound twice",
+          provider);
+      extensionCatalogClassNames.put(normalized, catalogClassName);
+      return this;
     }
   }
 }

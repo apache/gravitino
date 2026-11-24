@@ -24,6 +24,7 @@ import static org.apache.gravitino.storage.relational.mapper.TableVersionMapper.
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
+import org.apache.gravitino.storage.relational.mapper.provider.MetadataObjectSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.TableVersionBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.ibatis.annotations.Param;
@@ -76,13 +77,15 @@ public class TableVersionPostgreSQLProvider extends TableVersionBaseSQLProvider 
         + TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
-        + " WHERE table_id IN (SELECT table_id FROM "
+        + " WHERE table_id IN (SELECT tm.table_id FROM "
         + TableMetaMapper.TABLE_NAME
-        + " WHERE schema_id IN ("
+        + " tm WHERE tm.schema_id IN ("
         + "<foreach collection='schemaIds' item='schemaId' separator=','>"
         + "#{schemaId}"
         + "</foreach>"
-        + ")) AND deleted_at = 0"
+        + ")"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(TableMetaMapper.TABLE_NAME, "table_id", "tm")
+        + ") AND deleted_at = 0"
         + "</script>";
   }
 
@@ -92,9 +95,11 @@ public class TableVersionPostgreSQLProvider extends TableVersionBaseSQLProvider 
         + TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
-        + " WHERE table_id IN (SELECT table_id FROM "
+        + " WHERE table_id IN (SELECT tm.table_id FROM "
         + TableMetaMapper.TABLE_NAME
-        + " WHERE catalog_id = #{catalogId}) AND deleted_at = 0";
+        + " tm WHERE tm.catalog_id = #{catalogId}"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(TableMetaMapper.TABLE_NAME, "table_id", "tm")
+        + ") AND deleted_at = 0";
   }
 
   @Override
@@ -103,9 +108,12 @@ public class TableVersionPostgreSQLProvider extends TableVersionBaseSQLProvider 
         + TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
-        + " WHERE table_id IN (SELECT table_id FROM "
+        + " WHERE table_id IN (SELECT tm.table_id FROM "
         + TableMetaMapper.TABLE_NAME
-        + " WHERE metalake_id = #{metalakeId}) AND deleted_at = 0";
+        + " tm WHERE tm.metalake_id = #{metalakeId}"
+        + MetadataObjectSQL.excludeOtherActiveMetalakes(
+            TableMetaMapper.TABLE_NAME, "table_id", "tm")
+        + ") AND deleted_at = 0";
   }
 
   @Override

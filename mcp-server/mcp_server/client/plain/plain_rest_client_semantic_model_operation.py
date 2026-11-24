@@ -49,6 +49,30 @@ class PlainRESTClientSemanticModelOperation(SemanticModelOperation):
         )
         return extract_list_from_response(response, "identifiers")
 
+    async def list_semantic_model_datasets(
+        self,
+        source_type: str,
+        catalog_name: str,
+        schema_name: str,
+        source_name: str,
+    ) -> str:
+        encoded_names = [
+            encode_path_segment(name)
+            for name in (catalog_name, schema_name, source_name)
+        ]
+        # The REST fullName format has no escape for dots within a component.
+        if any("." in name for name in encoded_names):
+            raise ValueError(
+                "Source lookup does not support dots in catalog, schema, or table/view names"
+            )
+        full_name = ".".join(encoded_names)
+        response = await self.rest_client.get(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/objects/{encode_path_segment(source_type)}/{full_name}"
+            "/semantic-model-datasets"
+        )
+        return extract_list_from_response(response, "identifiers")
+
     async def list_metric_infos(
         self, catalog_name: str, schema_name: str
     ) -> str:

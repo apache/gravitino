@@ -14,7 +14,7 @@ This page covers the Gravitino API for statistics. For what a statistic is, the 
 reserved and custom, and how partition statistics relate to partitions, see
 [Statistics](./statistics.md).
 
-Statistics attach to tables. Custom names must begin with `custom.` to stay clear of names Gravitino
+Statistics attach to tables. Custom names must begin with `custom-` to stay clear of names Gravitino
 may reserve later.
 
 ## Table Statistics
@@ -44,8 +44,8 @@ maintenance job can therefore fail on a conflict under its existing failure hand
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" -d '{
   "updates": {
-    "custom.last_reviewed": "2026-08-02",
-    "custom.owner_team": "risk"
+    "custom-last_reviewed": "2026-08-02",
+    "custom-owner_team": "risk"
   }
 }' http://localhost:8090/api/metalakes/example/objects/table/sales.public.orders/statistics
 ```
@@ -56,8 +56,8 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 Table orders = ...
 Map<String, StatisticValue<?>> updates = Maps.newHashMap();
-updates.put("custom.last_reviewed", StatisticValues.stringValue("2026-08-02"));
-updates.put("custom.owner_team", StatisticValues.stringValue("risk"));
+updates.put("custom-last_reviewed", StatisticValues.stringValue("2026-08-02"));
+updates.put("custom-owner_team", StatisticValues.stringValue("risk"));
 
 orders.supportsStatistics().updateStatistics(updates);
 ```
@@ -98,7 +98,7 @@ deleted or replaced while dropping existing statistics, the request fails with H
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" -d '{
-  "names": ["custom.owner_team"]
+  "names": ["custom-owner_team"]
 }' http://localhost:8090/api/metalakes/example/objects/table/sales.public.orders/statistics
 ```
 
@@ -106,7 +106,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 <TabItem value="java" label="Java">
 
 ```java
-orders.supportsStatistics().dropStatistics(ImmutableList.of("custom.owner_team"));
+orders.supportsStatistics().dropStatistics(ImmutableList.of("custom-owner_team"));
 ```
 
 </TabItem>
@@ -129,7 +129,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
   "updates": [
     {
       "partitionName": "dt=2026-08-02",
-      "statistics": {"custom.row_estimate": "18000"}
+      "statistics": {"custom-row_estimate": "18000"}
     }
   ]
 }' http://localhost:8090/api/metalakes/example/objects/table/sales.public.orders/statistics/partitions
@@ -140,7 +140,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 Map<String, StatisticValue<?>> stats = Maps.newHashMap();
-stats.put("custom.row_estimate", StatisticValues.longValue(18000L));
+stats.put("custom-row_estimate", StatisticValues.longValue(18000L));
 
 orders.supportsPartitionStatistics().updatePartitionStatistics(
     ImmutableList.of(PartitionStatisticsModification.update("dt=2026-08-02", stats)));
@@ -185,7 +185,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "drops": [
     {
       "partitionName": "dt=2026-08-02",
-      "statisticNames": ["custom.row_estimate"]
+      "statisticNames": ["custom-row_estimate"]
     }
   ]
 }' http://localhost:8090/api/metalakes/example/objects/table/sales.public.orders/statistics/partitions
@@ -198,7 +198,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 orders.supportsPartitionStatistics().dropPartitionStatistics(
     ImmutableList.of(
         PartitionStatisticsModification.drop(
-            "dt=2026-08-02", ImmutableList.of("custom.row_estimate"))));
+            "dt=2026-08-02", ImmutableList.of("custom-row_estimate"))));
 ```
 
 </TabItem>

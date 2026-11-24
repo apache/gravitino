@@ -26,6 +26,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
+import org.apache.gravitino.utils.JdbcUrlUtils;
 
 public class JdbcConfig extends Config {
 
@@ -128,10 +129,10 @@ public class JdbcConfig extends Config {
    * otherwise block the connect-only bound forever. An operator value set directly on the
    * connection or in the {@code jdbc-url} is never overridden.
    *
-   * <p>The value is bounded by {@link Integer#MAX_VALUE} milliseconds because the MySQL and
-   * PostgreSQL driver timeouts are {@code int}s (and the PostgreSQL millisecond-to-seconds
-   * conversion stays within {@code int} range); a larger value would be accepted here and only fail
-   * later when the driver parses it.
+   * <p>The value is bounded by {@link Integer#MAX_VALUE} milliseconds to fit the drivers' integer
+   * millisecond socket timeouts. PostgreSQL's whole-second timeout is capped before conversion back
+   * to milliseconds, shortening values near the upper bound by less than one second to avoid
+   * overflow. Larger millisecond values are rejected here before reaching the driver.
    */
   public static final ConfigEntry<Long> CONNECT_TIMEOUT_MS =
       new ConfigBuilder("jdbc.pool.connect-timeout-ms")
@@ -161,7 +162,12 @@ public class JdbcConfig extends Config {
           .createWithDefault(true);
 
   public String getJdbcUrl() {
-    return get(JDBC_URL);
+    String url = get(JDBC_URL);
+    if (JdbcUrlUtils.containsCredentials(url)) {
+      throw new IllegalArgumentException(
+          "Credentials in jdbc-url are not supported; use jdbc-user and jdbc-password properties");
+    }
+    return url;
   }
 
   public String getJdbcDriver() {
@@ -198,7 +204,7 @@ public class JdbcConfig extends Config {
   }
 
   public boolean getTestOnBorrow() {
-    return get(TEST_ON_BORROW);
+    return strictBoolean(TEST_ON_BORROW);
   }
 
   public long getMaxWaitMs() {
@@ -220,11 +226,21 @@ public class JdbcConfig extends Config {
    * @return {@code true} to verify the backend at create (default); {@code false} to skip the check
    */
   public boolean getVerifyOnCreate() {
-    return get(VERIFY_ON_CREATE);
+    return strictBoolean(VERIFY_ON_CREATE);
   }
 
   public JdbcConfig(Map<String, String> properties) {
     super(false);
     loadFromMap(properties, k -> true);
+  }
+
+  private boolean strictBoolean(ConfigEntry<Boolean> entry) {
+    String value = getAllConfig().get(entry.getKey());
+    if (value != null
+        && !"true".equalsIgnoreCase(value.trim())
+        && !"false".equalsIgnoreCase(value.trim())) {
+      throw new IllegalArgumentException(entry.getKey() + " must be true or false");
+    }
+    return get(entry);
   }
 }

@@ -68,15 +68,12 @@ final class SparkCatalogExtensionLoader {
   private static void registerOne(SparkBindings.Builder builder, SparkCatalogExtension extension) {
     String provider = extension.provider();
     SparkCatalogKind kind = SparkCatalogKind.fromProvider(provider);
-    if (kind == null) {
-      LOG.warn(
-          "Skip {} because provider {} is not supported by this connector.",
-          extension.getClass().getName(),
-          provider);
-      return;
-    }
     try {
-      builder.catalog(kind, extension.catalogClassName());
+      if (kind == null) {
+        builder.extensionCatalog(provider, extension.catalogClassName());
+      } else {
+        builder.catalog(kind, extension.catalogClassName());
+      }
     } catch (RuntimeException e) {
       LOG.warn(
           "Skip {} for provider {}: {}", extension.getClass().getName(), provider, e.getMessage());

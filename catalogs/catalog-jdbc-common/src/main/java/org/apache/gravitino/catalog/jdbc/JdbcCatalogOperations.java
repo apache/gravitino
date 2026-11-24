@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.catalog.jdbc;
 
-import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
@@ -81,7 +79,6 @@ import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
-import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -168,18 +165,17 @@ public class JdbcCatalogOperations
     this.jdbcTablePropertiesMetadata =
         (JdbcTablePropertiesMetadata) propertiesMetadata.tablePropertiesMetadata();
 
-    // Key format like gravitino.bypass.a.b
-    Map<String, String> prefixMap = MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX);
-
-    // Hold keys that lie in JDBC_IMMUTABLE_PROPERTIES
-    Map<String, String> gravitinoConfig =
-        this.jdbcCatalogPropertiesMetadata.transformProperties(conf);
-    Map<String, String> resultConf = Maps.newHashMap(prefixMap);
-    resultConf.putAll(gravitinoConfig);
+    Map<String, String> resultConf = this.jdbcCatalogPropertiesMetadata.jdbcProperties(conf);
 
     this.jdbcConfig = new JdbcConfig(resultConf);
     this.jdbcUrl = jdbcConfig.getJdbcUrl();
     this.dataSource = DataSourceUtils.createDataSource(jdbcConfig);
+    try {
+      configureDataSource(dataSource, jdbcConfig);
+    } catch (RuntimeException e) {
+      DataSourceUtils.closeDataSource(dataSource);
+      throw e;
+    }
 
     checkJDBCDriverVersion();
     this.databaseOperation.initialize(dataSource, exceptionConverter, resultConf);
@@ -199,12 +195,36 @@ public class JdbcCatalogOperations
     }
   }
 
+  /**
+   * Configures the validated, lazy DBCP data source before any connection is borrowed.
+   *
+   * <p>The default makes no changes. A connector whose driver does not enforce a login timeout can
+   * bound physical connection creation with {@link
+   * org.apache.gravitino.utils.BoundedConnectionDriver}:
+   *
+   * <pre>{@code
+   * ((BasicDataSource) dataSource)
+   *     .setDriver(
+   *         new BoundedConnectionDriver(
+   *             DataSourceUtils.configuredDriver(config), config.getConnectTimeoutMs()));
+   * }</pre>
+   *
+   * <p>Implementations must keep the URL, credentials and pool settings that the common JDBC
+   * factory applied. They must not borrow connections or start the pool in this hook, and must not
+   * retain or close the data source; these operations own its lifecycle. A runtime exception closes
+   * the data source and fails initialization.
+   *
+   * @param dataSource the DBCP data source created by the common JDBC factory
+   * @param config validated JDBC configuration
+   */
+  protected void configureDataSource(DataSource dataSource, JdbcConfig config) {}
+
   /** Closes the Jdbc catalog and releases the associated client pool. */
   @Override
   public void close() {
     // Metrics System could be null in UT.
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
-    if (metricsSystem != null) {
+    if (metricsSystem != null && catalogMetricsSource != null) {
       metricsSystem.unregister(catalogMetricsSource);
     }
     DataSourceUtils.closeDataSource(dataSource);
@@ -221,18 +241,15 @@ public class JdbcCatalogOperations
       return null;
     }
 
-    return DriverManager.getDriver(jdbcUrl);
+    return DataSourceUtils.configuredDriver(jdbcConfig);
   }
 
   /**
-   * Initializes the configured driver class so that it registers itself with {@link DriverManager}
-   * before {@link #getDriver()} looks it up.
+   * Initializes the configured driver for provider overrides that still use {@link DriverManager}.
    *
-   * <p>{@code DriverManager} only discovers drivers on the server classpath by itself. A driver in
-   * the catalog's own libs directory registers only when its class is initialized, which the lazy
-   * connection pool does on its first connection. The create-time probe runs before that, so
-   * without this the lookup fails with "No suitable driver". The class is loaded by this catalog's
-   * class loader, which is also the loader {@code DriverManager} checks the caller against.
+   * <p>The default {@link #getDriver()} instantiates the configured driver directly. Legacy
+   * overrides, such as {@link MySQLProtocolCompatibleCatalogOperations#getDriver()}, instead use
+   * DriverManager lookup, which requires drivers in catalog-specific libs to register first.
    */
   private void ensureDriverRegistered() {
     String driverClassName = jdbcConfig.getJdbcDriver();
@@ -471,7 +488,7 @@ public class JdbcCatalogOperations
     String comment = load.comment();
     StringIdentifier id = StringIdentifier.fromComment(comment);
     if (id == null) {
-      LOG.warn("The comment {} does not contain Gravitino id attribute", comment);
+      LOG.debug("The schema {} does not contain Gravitino id attribute in the comment", ident);
       return load;
     }
     Map<String, String> properties =

@@ -15,7 +15,8 @@
 // core/trino-main/src/main/java/io/trino/util/AutoCloseableCloser.java
 package org.apache.gravitino.integration.test.util;
 
-import static com.google.common.base.Throwables.propagateIfPossible;
+import static com.google.common.base.Throwables.throwIfInstanceOf;
+import static com.google.common.base.Throwables.throwIfUnchecked;
 import static java.util.Objects.requireNonNull;
 
 import java.util.ArrayDeque;
@@ -54,7 +55,8 @@ public final class CloseableGroup implements AutoCloseable {
       }
     }
     if (rootCause != null) {
-      propagateIfPossible(rootCause, Exception.class);
+      throwIfInstanceOf(rootCause, Exception.class);
+      throwIfUnchecked(rootCause);
       // not possible
       throw new AssertionError(rootCause);
     }

@@ -20,6 +20,7 @@ package org.apache.gravitino.flink.connector.store;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
@@ -46,7 +47,6 @@ import org.apache.gravitino.flink.connector.catalog.BaseCatalogFactory;
 import org.apache.gravitino.flink.connector.catalog.GravitinoCatalogManager;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
-import org.apache.gravitino.secret.SecretMaterial;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.secret.SupportsSecrets;
@@ -237,15 +237,15 @@ public class TestGravitinoCatalogStore {
     try (SecretManager sm = memorySecretManager()) {
       Map<String, String> entityProps = new HashMap<>();
       entityProps.put("custom-token", "placeholder");
-      java.util.List<SecretMaterial> writes =
-          sm.assembleSecretMaterials(
+      Map<String, String> plaintexts =
+          sm.assembleSecretPlaintexts(
               Map.of(),
               entityProps,
               "catalog",
               2L,
               Map.of("custom-token", new SecretBinding("memory", "mem-tok")),
               Map.of());
-      sm.writeSecrets(writes);
+      sm.stageSecrets(null, entityProps, "catalog", 2L, plaintexts);
       Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
 
       Catalog catalog = mock(Catalog.class);
@@ -285,6 +285,20 @@ public class TestGravitinoCatalogStore {
       assertEquals("mem-pwd", descriptor.get().getConfiguration().toMap().get("jdbc-password"));
       assertEquals("mem-tok", descriptor.get().getConfiguration().toMap().get("custom-token"));
     }
+  }
+
+  @Test
+  public void testCatalogFactoryForUnknownProviderThrowsException() {
+    RuntimeException exception =
+        assertThrows(
+            RuntimeException.class,
+            () -> gravitinoCatalogStore.catalogFactoryForProvider("jdbc-clickhouse"));
+    assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "Failed to correctly match the Flink catalog factory for provider jdbc-clickhouse."));
+    assertTrue(exception.getMessage().contains("It may be served by a separate extension jar."));
   }
 
   private static SecretManager memorySecretManager() {

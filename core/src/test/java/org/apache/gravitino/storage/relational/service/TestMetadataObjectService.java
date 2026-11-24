@@ -30,12 +30,16 @@ import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionDefinitions;
 import org.apache.gravitino.function.FunctionImpl;
@@ -48,6 +52,8 @@ import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.PolicyContent;
@@ -298,6 +304,14 @@ public class TestMetadataObjectService extends TestJDBCBackend {
 
     // Verify all are TABLE type
     assertTrue(metadataObjects.stream().allMatch(obj -> obj.type() == MetadataObject.Type.TABLE));
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(METALAKE_NAME, catalogName, schemaName), Entity.EntityType.SCHEMA);
+    softDeleteSchemaMeta(schemaId);
+    Map<Long, String> missingParents =
+        MetadataObjectService.getTableObjectsFullName(List.of(table1.id(), table2.id()));
+    assertEquals(Set.of(table1.id(), table2.id()), missingParents.keySet());
+    assertTrue(missingParents.values().stream().allMatch(Objects::isNull));
   }
 
   @TestTemplate
@@ -372,6 +386,75 @@ public class TestMetadataObjectService extends TestJDBCBackend {
         MetadataObjectService.fromGenericEntities(functionEntities);
 
     assertTrue(metadataObjects.isEmpty());
+  }
+
+  /** Verifies that function grants resolve both renamed parents from their stable IDs. */
+  @TestTemplate
+  public void testFunctionPrivilegeSurvivesParentRenames() throws IOException {
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "function_catalog");
+    SchemaEntity schema = createAndInsertSchema(METALAKE_NAME, catalog.name(), "function_schema");
+    FunctionEntity function =
+        createAndInsertFunctionEntity(
+            Namespace.of(METALAKE_NAME, catalog.name(), schema.name()), "function");
+    RoleEntity role =
+        RoleEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("function_role")
+            .withNamespace(AuthorizationUtils.ofRoleNamespace(METALAKE_NAME))
+            .withProperties(Map.of())
+            .withAuditInfo(AUDIT_INFO)
+            .withSecurableObjects(
+                List.of(
+                    SecurableObjects.parse(
+                        "function_catalog.function_schema.function",
+                        MetadataObject.Type.FUNCTION,
+                        List.of(Privileges.ExecuteFunction.allow()))))
+            .build();
+    backend.insert(role, false);
+    RoleEntity loaded = backend.get(role.nameIdentifier(), Entity.EntityType.ROLE);
+    assertEquals(
+        "function_catalog.function_schema.function", loaded.securableObjects().get(0).fullName());
+
+    backend.update(
+        catalog.nameIdentifier(),
+        Entity.EntityType.CATALOG,
+        e ->
+            CatalogEntity.builder()
+                .withId(catalog.id())
+                .withName("renamed_catalog")
+                .withNamespace(catalog.namespace())
+                .withType(catalog.getType())
+                .withProvider(catalog.getProvider())
+                .withComment(catalog.getComment())
+                .withProperties(catalog.getProperties())
+                .withAuditInfo(AUDIT_INFO)
+                .build());
+    loaded = backend.get(role.nameIdentifier(), Entity.EntityType.ROLE);
+    assertEquals(
+        "renamed_catalog.function_schema.function", loaded.securableObjects().get(0).fullName());
+
+    backend.update(
+        NameIdentifier.of(METALAKE_NAME, "renamed_catalog", schema.name()),
+        Entity.EntityType.SCHEMA,
+        e ->
+            SchemaEntity.builder()
+                .withId(schema.id())
+                .withName("renamed_schema")
+                .withNamespace(Namespace.of(METALAKE_NAME, "renamed_catalog"))
+                .withComment(schema.comment())
+                .withProperties(schema.properties())
+                .withAuditInfo(AUDIT_INFO)
+                .build());
+    loaded = backend.get(role.nameIdentifier(), Entity.EntityType.ROLE);
+    assertEquals(
+        "renamed_catalog.renamed_schema.function", loaded.securableObjects().get(0).fullName());
+    assertEquals(
+        List.of(Privileges.ExecuteFunction.allow()), loaded.securableObjects().get(0).privileges());
+    assertEquals(
+        function.id(),
+        EntityIdService.getEntityId(
+            NameIdentifier.of(METALAKE_NAME, "renamed_catalog", "renamed_schema", "function"),
+            Entity.EntityType.FUNCTION));
   }
 
   private FunctionEntity createAndInsertFunctionEntity(Namespace namespace, String functionName)

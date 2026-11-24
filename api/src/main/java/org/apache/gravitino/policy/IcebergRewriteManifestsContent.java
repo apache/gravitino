@@ -37,101 +37,80 @@ public class IcebergRewriteManifestsContent extends AbstractExecutablePolicyCont
   public static final String JOB_TEMPLATE_NAME_KEY = "job.template-name";
   /** Rule key for the trigger expression. */
   public static final String TRIGGER_EXPR_KEY = "trigger-expr";
-  /** Rule key for the score expression. */
-  public static final String SCORE_EXPR_KEY = "score-expr";
   /** Strategy type for manifest rewriting. */
   public static final String STRATEGY_TYPE_VALUE = "iceberg-rewrite-manifests";
   /** Built-in rewrite job template. */
   public static final String JOB_TEMPLATE_NAME_VALUE = "builtin-iceberg-rewrite-manifests";
-  /** Rule key for critical manifest count. */
-  public static final String MANIFEST_COUNT_CRITICAL = "manifest_count_critical";
-  /** Default critical manifest count. */
-  public static final long DEFAULT_MANIFEST_COUNT_CRITICAL = 500L;
-  /** Rule key for minimum count for the size trigger. */
-  public static final String MANIFEST_COUNT_WARNING = "manifest_count_warning";
-  /** Default minimum count for the size trigger. */
-  public static final long DEFAULT_MANIFEST_COUNT_WARNING = 100L;
-  /** Rule key for exclusive average size threshold in bytes. */
-  public static final String AVG_MANIFEST_SIZE_THRESHOLD_BYTES =
-      "avg_manifest_size_threshold_bytes";
-  /** Default exclusive average size threshold in bytes. */
-  public static final long DEFAULT_AVG_MANIFEST_SIZE_THRESHOLD_BYTES = 8388608L;
+  /**
+   * Rule key for the inclusive manifest-count trigger. Aligns with Iceberg's {@code
+   * commit.manifest.min-count-to-merge} default.
+   */
+  public static final String MANIFEST_COUNT_THRESHOLD = "manifest_count_threshold";
+  /** Default inclusive manifest-count trigger ({@code commit.manifest.min-count-to-merge}). */
+  public static final long DEFAULT_MANIFEST_COUNT_THRESHOLD = 100L;
+  /** S0 metric: total manifest count (TMS / in-job gate). */
+  public static final String MANIFEST_NUMBER_METRIC = "custom-manifest-number";
+  /** S0 metric: average manifest size in bytes (collected for observability). */
+  public static final String AVG_MANIFEST_SIZE_METRIC = "custom-avg-manifest-size";
+  /** S1 metric: manifests rewritten by the procedure. */
+  public static final String REWRITTEN_MANIFEST_NUMBER_METRIC = "custom-rewritten-manifest-number";
+  /**
+   * Observability field: Iceberg partition-spec id used for before/after metrics. Omitted when the
+   * resolved spec is unpartitioned.
+   */
+  public static final String MANIFEST_SPEC_ID_METRIC = "custom-manifest-spec-id";
+  /**
+   * Observability field: human-readable partition-spec summary for the resolved id. Omitted when
+   * the resolved spec is unpartitioned.
+   */
+  public static final String MANIFEST_PARTITION_SPEC_METRIC = "custom-manifest-partition-spec";
   /** Rule key for the requested partition spec ID; omission selects Iceberg's current default. */
   public static final String SPEC_ID = "spec_id";
   /** Rule key for caching option, or null for the Iceberg default. */
   public static final String USE_CACHING = "use_caching";
 
-  private final Long manifestCountCritical;
-  private final Long manifestCountWarning;
-  private final Long avgManifestSizeThresholdBytes;
+  /**
+   * Default in-job / enqueue trigger: manifest count at or above Iceberg's {@code
+   * commit.manifest.min-count-to-merge} default.
+   */
+  private static final String TRIGGER_EXPR =
+      MANIFEST_NUMBER_METRIC + " >= " + MANIFEST_COUNT_THRESHOLD;
+
+  private final Long manifestCountThreshold;
   private final Integer specId;
   private final Boolean useCaching;
 
   /** Creates default thresholds targeting Iceberg's current default partition spec. */
   public IcebergRewriteManifestsContent() {
-    this(null, null, null, null, null, PolicyExecutionSpec.empty());
+    this(null, null, null, PolicyExecutionSpec.empty());
   }
 
   IcebergRewriteManifestsContent(
-      @Nullable Long manifestCountCritical,
-      @Nullable Long manifestCountWarning,
-      @Nullable Long avgManifestSizeThresholdBytes,
+      @Nullable Long manifestCountThreshold,
       @Nullable Integer specId,
       @Nullable Boolean useCaching) {
-    this(
-        manifestCountCritical,
-        manifestCountWarning,
-        avgManifestSizeThresholdBytes,
-        specId,
-        useCaching,
-        PolicyExecutionSpec.empty());
+    this(manifestCountThreshold, specId, useCaching, PolicyExecutionSpec.empty());
   }
 
   IcebergRewriteManifestsContent(
-      @Nullable Long manifestCountCritical,
-      @Nullable Long manifestCountWarning,
-      @Nullable Long avgManifestSizeThresholdBytes,
+      @Nullable Long manifestCountThreshold,
       @Nullable Integer specId,
       @Nullable Boolean useCaching,
       @Nullable PolicyExecutionSpec executionSpec) {
     super(executionSpec);
-    this.manifestCountCritical =
-        manifestCountCritical == null ? DEFAULT_MANIFEST_COUNT_CRITICAL : manifestCountCritical;
-    this.manifestCountWarning =
-        manifestCountWarning == null ? DEFAULT_MANIFEST_COUNT_WARNING : manifestCountWarning;
-    this.avgManifestSizeThresholdBytes =
-        avgManifestSizeThresholdBytes == null
-            ? DEFAULT_AVG_MANIFEST_SIZE_THRESHOLD_BYTES
-            : avgManifestSizeThresholdBytes;
+    this.manifestCountThreshold =
+        manifestCountThreshold == null ? DEFAULT_MANIFEST_COUNT_THRESHOLD : manifestCountThreshold;
     this.specId = specId;
     this.useCaching = useCaching;
   }
 
   /**
-   * Returns the critical manifest count.
+   * Returns the inclusive manifest-count trigger threshold.
    *
-   * @return critical manifest count
+   * @return inclusive manifest-count threshold
    */
-  public Long manifestCountCritical() {
-    return manifestCountCritical;
-  }
-
-  /**
-   * Returns the minimum count for the size trigger.
-   *
-   * @return minimum count for the size trigger
-   */
-  public Long manifestCountWarning() {
-    return manifestCountWarning;
-  }
-
-  /**
-   * Returns the exclusive average size threshold in bytes.
-   *
-   * @return exclusive average size threshold in bytes
-   */
-  public Long avgManifestSizeThresholdBytes() {
-    return avgManifestSizeThresholdBytes;
+  public Long manifestCountThreshold() {
+    return manifestCountThreshold;
   }
 
   /**
@@ -170,9 +149,8 @@ public class IcebergRewriteManifestsContent extends AbstractExecutablePolicyCont
   @Override
   public Map<String, Object> rules() {
     Map<String, Object> rules = new LinkedHashMap<>();
-    rules.put(MANIFEST_COUNT_CRITICAL, manifestCountCritical);
-    rules.put(MANIFEST_COUNT_WARNING, manifestCountWarning);
-    rules.put(AVG_MANIFEST_SIZE_THRESHOLD_BYTES, avgManifestSizeThresholdBytes);
+    rules.put(MANIFEST_COUNT_THRESHOLD, manifestCountThreshold);
+    rules.put(TRIGGER_EXPR_KEY, TRIGGER_EXPR);
     if (specId != null) {
       rules.put(SPEC_ID, specId);
     }
@@ -185,12 +163,7 @@ public class IcebergRewriteManifestsContent extends AbstractExecutablePolicyCont
   @Override
   public void validate() {
     super.validate();
-    Preconditions.checkArgument(manifestCountWarning > 0, "manifest_count_warning must be > 0");
-    Preconditions.checkArgument(
-        manifestCountCritical >= manifestCountWarning,
-        "manifest_count_critical must be >= manifest_count_warning");
-    Preconditions.checkArgument(
-        avgManifestSizeThresholdBytes > 0, "avg_manifest_size_threshold_bytes must be > 0");
+    Preconditions.checkArgument(manifestCountThreshold > 0, "manifest_count_threshold must be > 0");
     Preconditions.checkArgument(specId == null || specId >= 0, "spec_id must be >= 0");
   }
 
@@ -201,33 +174,21 @@ public class IcebergRewriteManifestsContent extends AbstractExecutablePolicyCont
     }
     IcebergRewriteManifestsContent that = (IcebergRewriteManifestsContent) other;
     return executionFieldsEqual(that)
-        && Objects.equals(manifestCountCritical, that.manifestCountCritical)
-        && Objects.equals(manifestCountWarning, that.manifestCountWarning)
-        && Objects.equals(avgManifestSizeThresholdBytes, that.avgManifestSizeThresholdBytes)
+        && Objects.equals(manifestCountThreshold, that.manifestCountThreshold)
         && Objects.equals(specId, that.specId)
         && Objects.equals(useCaching, that.useCaching);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(
-        executionFieldsHashCode(),
-        manifestCountCritical,
-        manifestCountWarning,
-        avgManifestSizeThresholdBytes,
-        specId,
-        useCaching);
+    return Objects.hash(executionFieldsHashCode(), manifestCountThreshold, specId, useCaching);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder("IcebergRewriteManifestsContent{");
-    sb.append("manifestCountCritical=")
-        .append(manifestCountCritical)
-        .append(", manifestCountWarning=")
-        .append(manifestCountWarning)
-        .append(", avgManifestSizeThresholdBytes=")
-        .append(avgManifestSizeThresholdBytes)
+    sb.append("manifestCountThreshold=")
+        .append(manifestCountThreshold)
         .append(", specId=")
         .append(specId)
         .append(", useCaching=")

@@ -117,6 +117,32 @@ public class TestTableMetaService extends TestJDBCBackend {
     Assertions.assertNull(TableMetaService.getInstance().getMetalakeNameByTableId(table.id() + 1));
   }
 
+  /**
+   * Verifies every relational backend stores the full 300-character column name and its identity.
+   *
+   * @throws IOException if the backend write fails
+   */
+  @TestTemplate
+  public void testLongColumnNamesRoundTrip() throws IOException {
+    createParentEntities(metalakeName, catalogName, schemaName, AUDIT_INFO);
+    Namespace namespace = NamespaceUtil.ofTable(metalakeName, catalogName, schemaName);
+    String name = "c".repeat(300);
+    ColumnEntity original = column(name, Types.StringType.get());
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table_long_column")
+            .withNamespace(namespace)
+            .withColumns(List.of(original))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService service = TableMetaService.getInstance();
+    service.insertTable(table, false);
+    TableEntity loaded = service.getTableByIdentifier(table.nameIdentifier());
+    Assertions.assertEquals(name, loaded.columns().get(0).name());
+    Assertions.assertEquals(original.id(), loaded.columns().get(0).id());
+  }
+
   @TestTemplate
   public void testLegacyTimelineDeleteKeepsLiveVersionsOfSameTable() throws Exception {
     createAndInsertMakeLake(metalakeName);
@@ -184,6 +210,28 @@ public class TestTableMetaService extends TestJDBCBackend {
       Assertions.assertTrue(rs.next());
       return rs.getLong(1);
     }
+  }
+
+  @TestTemplate
+  public void testResolveTableIdWithoutColumnSnapshot() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertSchema(metalakeName, catalogName, schemaName);
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, schemaName),
+            "id_lookup",
+            AUDIT_INFO);
+    backend.insert(table, false);
+    TableMetaService tables = TableMetaService.getInstance();
+    Assertions.assertEquals(table.id(), backend.getTableId(table.nameIdentifier()));
+    // A full read still returns its columns after an ID-only lookup.
+    Assertions.assertEquals(
+        table.columns().size(),
+        tables.getTableByIdentifier(table.nameIdentifier()).columns().size());
+    backend.delete(table.nameIdentifier(), Entity.EntityType.TABLE, false);
+    assertThrows(NoSuchEntityException.class, () -> backend.getTableId(table.nameIdentifier()));
   }
 
   @TestTemplate

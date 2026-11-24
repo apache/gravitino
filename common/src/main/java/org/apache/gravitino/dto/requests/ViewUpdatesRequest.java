@@ -54,6 +54,7 @@ public class ViewUpdatesRequest implements RESTRequest {
     Preconditions.checkArgument(updates != null, "updates must not be null");
     Preconditions.checkArgument(!updates.isEmpty(), "updates must not be empty");
     for (int i = 0; i < updates.size(); i++) {
+      Preconditions.checkArgument(updates.get(i) != null, "updates[%s] must not be null", i);
       updates.get(i).validateWithPrefix("updates[" + i + "].");
     }
   }

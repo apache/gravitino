@@ -24,12 +24,12 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.maintenance.model.TableCandidate;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobTemplates;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
+import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
@@ -45,24 +45,22 @@ class TestCommitJobSpecFactory {
 
   @Test
   void testForCommitBuildsPerTypeTasksAndSharedBags() {
-    CommitJobSpecFactory factory = new CommitJobSpecFactory(configWithUri());
-    CommitChainMember compaction =
-        new CommitChainMember(
-            Policy.BuiltInType.ICEBERG_COMPACTION, compaction(202L), "rewrite_data_files");
-    CommitChainMember expire =
-        new CommitChainMember(
-            Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION, expire(303L), "expire_snapshots");
+    MaintenanceJobSpecFactory factory = new MaintenanceJobSpecFactory(configWithUri());
     MaintenanceJobSpec spec =
         factory.forCommit(
-            List.of(compaction, expire), new ResolvedTableRef(101L, "iceberg", "db.t"));
+            List.of(
+                new TableCandidate(
+                    101L, "iceberg", "db.t", List.of(compaction(202L), expire(303L)))));
 
     Assertions.assertTrue(spec.isValid());
     Assertions.assertEquals(2, spec.getTasks().size());
     Assertions.assertEquals(101L, spec.getTasks().get(0).getTableId());
     Assertions.assertEquals(202L, spec.getTasks().get(0).getPolicyId());
-    Assertions.assertEquals("rewrite_data_files", spec.getTasks().get(0).getMaintenanceType());
-    Assertions.assertEquals("expire_snapshots", spec.getTasks().get(1).getMaintenanceType());
-    Assertions.assertEquals("7d", spec.getTasks().get(1).getParameters().get("older_than"));
+    Assertions.assertEquals("system_iceberg_compaction", spec.getTasks().get(0).getPolicyType());
+    Assertions.assertEquals(
+        "system_iceberg_snapshot_expiration", spec.getTasks().get(1).getPolicyType());
+    String olderThan = spec.getTasks().get(1).getParameters().get("older_than");
+    Assertions.assertEquals("7", olderThan);
     Assertions.assertEquals("10", spec.getTasks().get(1).getParameters().get("retain_last"));
     Assertions.assertTrue(spec.getUpdaterOptions().contains("metalake"));
     Assertions.assertTrue(spec.getSparkConf().contains("spark.executor.memory"));
@@ -70,42 +68,39 @@ class TestCommitJobSpecFactory {
         IcebergSparkConfigUtils.parseFlatJsonMap(spec.getSparkConf(), "spark_conf");
     Assertions.assertEquals("4g", spark.get("spark.executor.memory"));
 
-    Map<String, String> runJob = MaintenanceJobSpecFactory.jobConfForCommitChain(spec);
-    Assertions.assertEquals(
-        "rewrite_data_files,expire_snapshots",
-        runJob.get(MaintenanceJobTemplates.MAINTENANCE_TYPES_KEY));
-    Assertions.assertEquals("202,303", runJob.get(MaintenanceJobTemplates.POLICY_IDS_KEY));
-    Assertions.assertEquals("7d", runJob.get("older_than"));
-    Assertions.assertEquals("10", runJob.get("retain_last"));
-    Assertions.assertEquals("4g", runJob.get("spark_executor_memory"));
-    String rulesByType = runJob.get(MaintenanceJobTemplates.RULES_KEY);
-    Assertions.assertNotNull(rulesByType);
-    Assertions.assertTrue(rulesByType.contains("\"rewrite_data_files\""));
-    Assertions.assertTrue(rulesByType.contains("\"expire_snapshots\""));
-    Assertions.assertTrue(rulesByType.contains("trigger-expr"));
+    Map<String, String> runJob = MaintenanceJobSpecFactory.jobConfForSpec(spec);
+    String tasksJson = runJob.get(MaintenanceJobTemplates.TASKS_KEY);
+    Assertions.assertNotNull(tasksJson);
+    Assertions.assertTrue(tasksJson.contains("system_iceberg_compaction"));
+    Assertions.assertTrue(tasksJson.contains("system_iceberg_snapshot_expiration"));
+    Assertions.assertTrue(tasksJson.contains("\"policy_id\":202"));
+    Assertions.assertTrue(tasksJson.contains("\"policy_id\":303"));
+    Assertions.assertTrue(tasksJson.contains("\"older_than\":\"" + olderThan + "\""));
+    Assertions.assertTrue(tasksJson.contains("\"retain_last\":\"10\""));
+    Assertions.assertFalse(tasksJson.contains("\"action_id\""));
+    Assertions.assertTrue(tasksJson.contains("trigger-expr"));
+    Assertions.assertNull(runJob.get("older_than"));
+    Assertions.assertFalse(runJob.containsKey("spark_executor_memory"));
+    Assertions.assertTrue(runJob.get("spark_conf").contains("spark.executor.memory"));
   }
 
   @Test
-  void testMergeSparkConfMapsMergesByKey() {
+  void testMergeSparkConfMaps() throws Exception {
     Map<String, String> into = new HashMap<>();
     into.put("spark.executor.memory", "4g");
     into.put("shared", "first");
-    CommitJobSpecFactory.mergeSparkConfMaps(
+    MaintenanceJobSpecFactory.mergeSparkConfMaps(
         into,
         "{\"spark.executor.cores\":\"2\",\"shared\":\"later\",\"spark.driver.memory\":\"2g\"}");
-
     Assertions.assertEquals("4g", into.get("spark.executor.memory"));
     Assertions.assertEquals("first", into.get("shared"));
     Assertions.assertEquals("2", into.get("spark.executor.cores"));
     Assertions.assertEquals("2g", into.get("spark.driver.memory"));
-  }
 
-  @Test
-  void testMergeSparkConfMapsAddsWhenMissing() throws Exception {
-    Map<String, String> into = new HashMap<>();
-    CommitJobSpecFactory.mergeSparkConfMaps(
-        into, JsonUtils.anyFieldMapper().writeValueAsString(Map.of("k", "v")));
-    Assertions.assertEquals("v", into.get("k"));
+    Map<String, String> empty = new HashMap<>();
+    MaintenanceJobSpecFactory.mergeSparkConfMaps(
+        empty, JsonUtils.anyFieldMapper().writeValueAsString(Map.of("k", "v")));
+    Assertions.assertEquals("v", empty.get("k"));
   }
 
   private static Config configWithUri() {
@@ -154,11 +149,7 @@ class TestCommitJobSpecFactory {
         .withEnabled(true)
         .withContent(
             PolicyContents.icebergSnapshotExpiration(
-                null,
-                true,
-                null,
-                Map.of("older_than", "7d", "retain_last", "10", "spark_executor_memory", "2g"),
-                Map.of()))
+                7L, 10L, true, null, true, null, Map.of("spark_executor_memory", "2g"), Map.of()))
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.EPOCH).build())
         .build();

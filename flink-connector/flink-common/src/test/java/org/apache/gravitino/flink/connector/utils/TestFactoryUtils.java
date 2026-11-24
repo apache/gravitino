@@ -19,13 +19,58 @@
 package org.apache.gravitino.flink.connector.utils;
 
 import com.google.common.collect.ImmutableList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.ServiceConfigurationError;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.table.catalog.exceptions.CatalogException;
+import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.flink.table.factories.Factory;
+import org.apache.flink.table.factories.FactoryUtil;
+import org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestFactoryUtils {
+
+  private static final String EXCLUDED_CATALOGS_KEY =
+      "table.catalog-store.gravitino.gravitino.excludedCatalogs";
+
+  @Test
+  void testCreateCatalogFactoryHelper_excludedCatalogName_isRejected() {
+    Configuration sessionConfiguration = new Configuration();
+    sessionConfiguration.setString(EXCLUDED_CATALOGS_KEY, "other_catalog; paimon_catalog");
+
+    CatalogException exception =
+        Assertions.assertThrows(
+            CatalogException.class,
+            () ->
+                FactoryUtils.createCatalogFactoryHelper(
+                    new FakeExternalCatalogFactory(),
+                    catalogContext("paimon_catalog", sessionConfiguration)));
+
+    Assertions.assertTrue(exception.getMessage().contains("paimon_catalog"));
+    Assertions.assertTrue(exception.getMessage().contains(FakeExternalCatalogFactory.IDENTIFIER));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(GravitinoCatalogStoreFactoryOptions.GRAVITINO_EXCLUDED_CATALOGS.key()));
+  }
+
+  @Test
+  void testCreateCatalogFactoryHelper_notExcludedCatalogName_isAllowed() {
+    Configuration sessionConfiguration = new Configuration();
+    sessionConfiguration.setString(EXCLUDED_CATALOGS_KEY, "paimon_catalog");
+
+    Assertions.assertNotNull(
+        FactoryUtils.createCatalogFactoryHelper(
+            new FakeExternalCatalogFactory(),
+            catalogContext("PAIMON_CATALOG", sessionConfiguration)));
+    Assertions.assertNotNull(
+        FactoryUtils.createCatalogFactoryHelper(
+            new FakeExternalCatalogFactory(),
+            catalogContext("paimon_catalog", new Configuration())));
+  }
 
   @Test
   void testBuiltInTypesAreGravitinoManaged() {
@@ -113,5 +158,14 @@ public class TestFactoryUtils {
           }
         };
     Assertions.assertFalse(FactoryUtils.isProvidedByCatalogFactory(factories, "any"));
+  }
+
+  private static CatalogFactory.Context catalogContext(
+      String catalogName, Configuration sessionConfiguration) {
+    return new FactoryUtil.DefaultCatalogContext(
+        catalogName,
+        new HashMap<>(),
+        sessionConfiguration,
+        TestFactoryUtils.class.getClassLoader());
   }
 }

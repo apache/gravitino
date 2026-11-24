@@ -45,6 +45,7 @@ import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
+import org.apache.gravitino.iceberg.service.idempotency.IcebergIdempotencyManager;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.iceberg.service.restriction.IcebergReadRestrictionLoader;
 import org.apache.gravitino.listener.api.event.Event;
@@ -68,12 +69,16 @@ import org.apache.gravitino.listener.api.event.IcebergPlanTableScanPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergReportTableMetricsEvent;
+import org.apache.gravitino.listener.api.event.IcebergReportTableMetricsFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergReportTableMetricsPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.listener.api.event.IcebergTableExistsEvent;
 import org.apache.gravitino.listener.api.event.IcebergTableExistsPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateTablePreEvent;
+import org.apache.gravitino.listener.api.event.OperationType;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.iceberg.GenericBlobMetadata;
@@ -106,6 +111,7 @@ import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.types.Types.BooleanType;
 import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.types.Types.StringType;
 import org.apache.iceberg.util.JsonUtil;
@@ -116,6 +122,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
+import org.opentest4j.AssertionFailedError;
 
 @SuppressWarnings("deprecation")
 public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
@@ -123,8 +130,10 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
   private static final Schema tableSchema =
       new Schema(NestedField.of(1, false, "foo_string", StringType.get()));
 
+  // Optional: IRC schema checks reject a new required field without an initial default even when
+  // the table has no snapshots (#14429).
   private static final Schema newTableSchema =
-      new Schema(NestedField.of(2, false, "foo_string1", StringType.get()));
+      new Schema(NestedField.of(2, true, "foo_string1", StringType.get()));
 
   private DummyEventListener dummyEventListener;
 
@@ -524,11 +533,19 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
             .commitMetrics(commitMetrics)
             .build();
     ReportMetricsRequest request = ReportMetricsRequest.of(commitReport);
+    dummyEventListener.clearEvent();
     Response response =
         getReportMetricsClientBuilder("metrics_foo1", namespace)
             .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), response.getStatus());
+    // The report is recorded as its own operation, with no table-exists event for the check.
+    Assertions.assertInstanceOf(
+        IcebergReportTableMetricsPreEvent.class, dummyEventListener.popPreEvent());
+    Assertions.assertInstanceOf(
+        IcebergReportTableMetricsEvent.class, dummyEventListener.popPostEvent());
+    Assertions.assertThrows(AssertionFailedError.class, dummyEventListener::popPostEvent);
+    Assertions.assertThrows(AssertionFailedError.class, dummyEventListener::popPreEvent);
 
     ReportMetricsRequest qualifiedRequest =
         ReportMetricsRequest.of(
@@ -544,10 +561,14 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
             .post(Entity.entity(qualifiedRequest, MediaType.APPLICATION_JSON_TYPE));
     Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), qualifiedResponse.getStatus());
 
+    dummyEventListener.clearEvent();
     Response missingTableResponse =
         getReportMetricsClientBuilder("missing_metrics_table", namespace)
             .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
     Assertions.assertEquals(Status.NOT_FOUND.getStatusCode(), missingTableResponse.getStatus());
+    Event failure = dummyEventListener.popPostEvent();
+    Assertions.assertInstanceOf(IcebergReportTableMetricsFailureEvent.class, failure);
+    Assertions.assertEquals(OperationType.REPORT_TABLE_METRICS, failure.operationType());
 
     ReportMetricsRequest mismatchedRequest =
         ReportMetricsRequest.of(
@@ -700,6 +721,78 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Assertions.assertEquals(
         Status.OK.getStatusCode(),
         getTableClientBuilder(namespace, Optional.of("bad_default_tbl")).get().getStatus());
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testCreateWithInvalidTruncateReturnsBadRequest(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    for (boolean staged : new boolean[] {false, true}) {
+      for (String version : new String[] {null, "2", "3"}) {
+        for (String definition :
+            new String[] {
+              "\"partition-spec\": {\"spec-id\": 0, \"fields\": [{\"source-id\": 1,"
+                  + " \"field-id\": 1000, \"name\": \"p\", \"transform\": \"truncate[4]\"}]}",
+              "\"write-order\": {\"order-id\": 1, \"fields\": [{\"source-id\": 1,"
+                  + " \"transform\": \"truncate[4]\", \"direction\": \"asc\","
+                  + " \"null-order\": \"nulls-first\"}]}"
+            }) {
+          String request =
+              String.format(
+                  "{\"name\": \"bad_truncate_tbl\", \"schema\": {\"type\": \"struct\","
+                      + " \"schema-id\": 0, \"fields\": [{\"id\": 1, \"name\": \"b\","
+                      + " \"required\": false, \"type\": \"boolean\"}]}, %s,"
+                      + " \"stage-create\": %b, \"properties\": %s}",
+                  definition,
+                  staged,
+                  version == null ? "{}" : "{\"format-version\": \"" + version + "\"}");
+          try (Response response =
+              getTableClientBuilder(namespace, Optional.empty())
+                  .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+            assertBadRequest(response, "Cannot truncate type: boolean");
+          }
+          verifyLoadTableFail(namespace, "bad_truncate_tbl", 404);
+        }
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testInvalidTruncateAndUnknownCommitTypesDoNotChangeMetadata(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    String tableName = "bad_commit_tbl";
+    CreateTableRequest create =
+        CreateTableRequest.builder()
+            .withName(tableName)
+            .withSchema(new Schema(NestedField.optional(1, "b", BooleanType.get())))
+            .build();
+    try (Response response =
+        getTableClientBuilder(namespace, Optional.empty())
+            .post(Entity.entity(create, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    }
+    String metadataLocation = getTableMeta(namespace, tableName).metadataFileLocation();
+    Assertions.assertNotNull(metadataLocation);
+    for (String request :
+        new String[] {
+          "{\"requirements\": [], \"updates\": [{\"action\": \"add-spec\", \"spec\":"
+              + " {\"spec-id\": 0, \"fields\": [{\"source-id\": 1, \"field-id\": 1000,"
+              + " \"name\": \"p\", \"transform\": \"truncate[4]\"}]}}]}",
+          "{\"requirements\": [], \"updates\": [{\"action\": \"add-sort-order\", \"sort-order\":"
+              + " {\"order-id\": 1, \"fields\": [{\"source-id\": 1, \"transform\": \"truncate[4]\","
+              + " \"direction\": \"asc\", \"null-order\": \"nulls-first\"}]}}]}",
+          "{\"requirements\": [], \"updates\": [{\"action\": \"frob\"}]}",
+          "{\"requirements\": [{\"type\": \"assert-frob\"}], \"updates\": []}"
+        }) {
+      try (Response response =
+          getTableClientBuilder(namespace, Optional.of(tableName))
+              .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+        assertBadRequest(response, null);
+      }
+      Assertions.assertEquals(
+          metadataLocation, getTableMeta(namespace, tableName).metadataFileLocation());
+    }
   }
 
   private static void assertBadRequest(Response response, String expectedInMessage) {
@@ -1004,27 +1097,36 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   @ParameterizedTest
   @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
-  void testRemoteSigningNotSupported(Namespace namespace) {
+  void testAccessDelegationListIsServed(Namespace namespace) {
     verifyCreateNamespaceSucc(namespace);
 
-    // Attempt to create table with "remote-signing" access delegation
-    // This should fail with UnsupportedOperationException -> 406 Not Acceptable
-    CreateTableRequest createTableRequest =
-        CreateTableRequest.builder()
-            .withName("test_remote_signing")
-            .withSchema(tableSchema)
-            .build();
+    // The header lists the mechanisms the client supports; the server serves the request with the
+    // ones it offers, or none. remote-signing alone, a comma-separated list in either order, and an
+    // unknown mechanism are all served.
+    String[] headers = {
+      "remote-signing",
+      "vended-credentials,remote-signing",
+      "remote-signing, vended-credentials",
+      "invalid-value"
+    };
+    for (int i = 0; i < headers.length; i++) {
+      CreateTableRequest createTableRequest =
+          CreateTableRequest.builder()
+              .withName("delegation_list_" + i)
+              .withSchema(tableSchema)
+              .build();
+      Response create =
+          getTableClientBuilder(namespace, Optional.empty())
+              .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, headers[i])
+              .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
+      Assertions.assertEquals(Status.OK.getStatusCode(), create.getStatus(), headers[i]);
 
-    Response response =
-        getTableClientBuilder(namespace, Optional.empty())
-            .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "remote-signing")
-            .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
-
-    Assertions.assertEquals(406, response.getStatus());
-    String errorBody = response.readEntity(String.class);
-    Assertions.assertTrue(
-        errorBody.contains("remote signing") || errorBody.contains("remote-signing"),
-        "Error message should mention remote signing: " + errorBody);
+      Response load =
+          getTableClientBuilder(namespace, Optional.of("delegation_list_" + i))
+              .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, headers[i])
+              .get();
+      Assertions.assertEquals(Status.OK.getStatusCode(), load.getStatus(), headers[i]);
+    }
   }
 
   @ParameterizedTest
@@ -1061,29 +1163,18 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     verifyDropNamespaceSucc(namespace);
   }
 
-  @ParameterizedTest
-  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
-  void testInvalidAccessDelegation(Namespace namespace) {
-    verifyCreateNamespaceSucc(namespace);
-
-    // Attempt to create table with invalid access delegation value
-    // This should fail with IllegalArgumentException -> 400 Bad Request
-    CreateTableRequest createTableRequest =
-        CreateTableRequest.builder()
-            .withName("test_invalid_delegation")
-            .withSchema(tableSchema)
-            .build();
-
-    Response response =
-        getTableClientBuilder(namespace, Optional.empty())
-            .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "invalid-value")
-            .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
-
-    Assertions.assertEquals(400, response.getStatus());
-    String errorBody = response.readEntity(String.class);
+  @Test
+  void testIsCredentialVendingParsesTheMechanismList() {
+    Assertions.assertFalse(IcebergTableOperations.isCredentialVending(null));
+    Assertions.assertFalse(IcebergTableOperations.isCredentialVending(" "));
+    Assertions.assertFalse(IcebergTableOperations.isCredentialVending("remote-signing"));
+    Assertions.assertFalse(IcebergTableOperations.isCredentialVending("invalid-value"));
+    Assertions.assertTrue(IcebergTableOperations.isCredentialVending("vended-credentials"));
+    Assertions.assertTrue(IcebergTableOperations.isCredentialVending("VENDED-CREDENTIALS"));
     Assertions.assertTrue(
-        errorBody.contains("vended-credentials") && errorBody.contains("illegal"),
-        "Error message should mention valid values: " + errorBody);
+        IcebergTableOperations.isCredentialVending("vended-credentials,remote-signing"));
+    Assertions.assertTrue(
+        IcebergTableOperations.isCredentialVending("remote-signing , vended-credentials"));
   }
 
   @ParameterizedTest
@@ -1350,7 +1441,11 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
         .thenThrow(new IllegalNameIdentifierException("Dotted names are unsupported"));
 
     IcebergTableOperations operations =
-        new IcebergTableOperations(Mockito.mock(IcebergMetricsManager.class), dispatcher, loader);
+        new IcebergTableOperations(
+            Mockito.mock(IcebergMetricsManager.class),
+            dispatcher,
+            Mockito.mock(IcebergIdempotencyManager.class),
+            loader);
     HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
     Mockito.when(request.getRemoteAddr()).thenReturn("127.0.0.1");
     Mockito.when(request.getHeaderNames()).thenReturn(Collections.emptyEnumeration());
@@ -1800,36 +1895,17 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   @ParameterizedTest
   @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
-  void testPlanTableScanRemoteSigningNotSupported(Namespace namespace) {
+  void testPlanTableScanWithOtherAccessDelegationIsServed(Namespace namespace) {
     verifyCreateNamespaceSucc(namespace);
     verifyCreateTableSucc(namespace, "scan_remote_signing");
     PlanTableScanRequest request = PlanTableScanRequest.builder().build();
-    Response response =
-        getTableClientBuilder(namespace, Optional.of("scan_remote_signing/plan"))
-            .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "remote-signing")
-            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(406, response.getStatus());
-    String errorBody = response.readEntity(String.class);
-    Assertions.assertTrue(
-        errorBody.contains("remote signing") || errorBody.contains("remote-signing"),
-        "Error message should mention remote signing: " + errorBody);
-  }
-
-  @ParameterizedTest
-  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
-  void testPlanTableScanInvalidAccessDelegation(Namespace namespace) {
-    verifyCreateNamespaceSucc(namespace);
-    verifyCreateTableSucc(namespace, "scan_invalid_delegation");
-    PlanTableScanRequest request = PlanTableScanRequest.builder().build();
-    Response response =
-        getTableClientBuilder(namespace, Optional.of("scan_invalid_delegation/plan"))
-            .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "invalid-value")
-            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(400, response.getStatus());
-    String errorBody = response.readEntity(String.class);
-    Assertions.assertTrue(
-        errorBody.contains("vended-credentials") && errorBody.contains("illegal"),
-        "Error message should mention valid values: " + errorBody);
+    for (String header : new String[] {"remote-signing", "invalid-value"}) {
+      Response response =
+          getTableClientBuilder(namespace, Optional.of("scan_remote_signing/plan"))
+              .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, header)
+              .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+      Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus(), header);
+    }
   }
 
   private Response doPlanTableScanWithCredentialVending(

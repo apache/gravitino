@@ -19,6 +19,7 @@
 package org.apache.gravitino.trino.connector;
 
 import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
+import static io.trino.spi.StandardErrorCode.TRANSACTION_ALREADY_ABORTED;
 import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_COLUMN_NOT_EXISTS;
 import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_TABLE_NOT_EXISTS;
 
@@ -90,6 +91,7 @@ import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.function.SQLImpl;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
 import org.apache.gravitino.trino.connector.metadata.GravitinoView;
@@ -115,6 +117,14 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
   protected final CatalogConnectorMetadataAdapter metadataAdapter;
 
   protected final ConnectorMetadata internalMetadata;
+
+  private final Object createdTablesLock = new Object();
+  // Tables that beginCreateTable created and called beginInsert on during this transaction,
+  // split by whether the catalog can drop them safely when the transaction fails. Guarded by
+  // createdTablesLock, as is transactionEnded.
+  private final List<SchemaTableName> createdTables = new ArrayList<>();
+  private final List<SchemaTableName> keptTables = new ArrayList<>();
+  private boolean transactionEnded = false;
 
   /**
    * Constructs a new GravitinoMetadata instance.
@@ -271,10 +281,17 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
     }
 
     SchemaTableName tableName = tableMetadata.getTable();
+    boolean canDrop = metadataAdapter.canDropFailedNewTable(tableMetadata);
+    synchronized (createdTablesLock) {
+      if (transactionEnded) {
+        throw transactionEndedException(tableName);
+      }
+    }
 
     // Create the table in the Gravitino catalog
     GravitinoTable table = metadataAdapter.createTable(tableMetadata);
     catalogConnectorMetadata.createTable(table, false);
+    ConnectorInsertTableHandle insertTableHandle;
     try {
       // Get the table handle from the internal connector for the newly created table
       ConnectorTableHandle internalTableHandle =
@@ -304,23 +321,23 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
 
       // Delegate to the internal connector's insert path to write data,
       // avoiding double table creation in the original connector
-      ConnectorInsertTableHandle insertTableHandle =
+      insertTableHandle =
           internalMetadata.beginInsert(session, internalTableHandle, columns, retryMode);
-      return new GravitinoOutputTableHandle(insertTableHandle, tableName);
     } catch (Exception e) {
-      // Clean up the table created in the Gravitino catalog on failure
-      try {
-        catalogConnectorMetadata.dropTable(tableName);
-      } catch (Exception dropException) {
-        LOG.warn(dropException, "Failed to drop table %s during CTAS cleanup", tableName);
-      }
+      // Drop the table unless its catalog cannot drop it safely
+      runUninterrupted(() -> dropFailedTable(tableName, canDrop));
       throw e;
     }
+    recordCreatedTable(tableName, canDrop);
+    return new GravitinoOutputTableHandle(insertTableHandle, tableName);
   }
 
   @Override
   public Optional<ConnectorTableLayout> getNewTableLayout(
       ConnectorSession session, ConnectorTableMetadata tableMetadata) {
+    if (metadataAdapter.skipsInternalNewTableLayout()) {
+      return Optional.empty();
+    }
     try {
       return internalMetadata
           .getNewTableLayout(session, tableMetadata)
@@ -438,10 +455,11 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
   public void setColumnType(
       ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle column, Type type) {
     String columnName = getColumnName(column);
+    GravitinoColumn gravitinoColumn =
+        createColumn(
+            tableHandle, ColumnMetadata.builder().setName(columnName).setType(type).build());
     catalogConnectorMetadata.setColumnType(
-        getTableName(tableHandle),
-        columnName,
-        metadataAdapter.getDataTypeTransformer().getGravitinoType(type));
+        getTableName(tableHandle), columnName, gravitinoColumn.getType());
   }
 
   @Override
@@ -915,8 +933,90 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
     catalogConnectorMetadata.createView(view, replace);
   }
 
+  /**
+   * Converts a column being added to or changed in a table, and checks that the table can hold it.
+   *
+   * @param tableHandle the handle of the table
+   * @param column the Trino column
+   * @return the Gravitino column
+   */
+  protected GravitinoColumn createColumn(ConnectorTableHandle tableHandle, ColumnMetadata column) {
+    GravitinoColumn gravitinoColumn = metadataAdapter.createColumn(column);
+    SchemaTableName tableName = getTableName(tableHandle);
+    metadataAdapter.checkColumnType(
+        gravitinoColumn,
+        () ->
+            catalogConnectorMetadata.getTable(tableName.getSchemaName(), tableName.getTableName()));
+    return gravitinoColumn;
+  }
+
   protected SchemaTableName getTableName(ConnectorTableHandle tableHandle) {
     return ((GravitinoTableHandle) tableHandle).toSchemaTableName();
+  }
+
+  /**
+   * Drops the tables that beginCreateTable recorded and logs the ones whose catalog cannot drop
+   * them safely. Called when the transaction rolls back or fails to commit, and for the metadata of
+   * a transaction that has already ended. After this call, beginCreateTable fails instead of
+   * recording another table.
+   */
+  void dropCreatedTables() {
+    List<SchemaTableName> dropped;
+    List<SchemaTableName> kept;
+    synchronized (createdTablesLock) {
+      transactionEnded = true;
+      dropped = List.copyOf(createdTables);
+      kept = List.copyOf(keptTables);
+      createdTables.clear();
+      keptTables.clear();
+    }
+    dropped.forEach(tableName -> dropFailedTable(tableName, true));
+    kept.forEach(tableName -> dropFailedTable(tableName, false));
+  }
+
+  private void recordCreatedTable(SchemaTableName tableName, boolean canDrop) {
+    synchronized (createdTablesLock) {
+      if (!transactionEnded) {
+        (canDrop ? createdTables : keptTables).add(tableName);
+        return;
+      }
+    }
+    // The transaction ended while beginCreateTable ran, so nothing will drop the table later.
+    runUninterrupted(() -> dropFailedTable(tableName, canDrop));
+    throw transactionEndedException(tableName);
+  }
+
+  // beginCreateTable runs on the planning thread, which Trino interrupts when the query fails.
+  // Clear the interrupt flag while the action runs and restore it afterwards.
+  private static void runUninterrupted(Runnable action) {
+    boolean interrupted = Thread.interrupted();
+    try {
+      action.run();
+    } finally {
+      if (interrupted) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
+
+  private static TrinoException transactionEndedException(SchemaTableName tableName) {
+    return new TrinoException(
+        TRANSACTION_ALREADY_ABORTED, "Transaction ended while creating table " + tableName);
+  }
+
+  private void dropFailedTable(SchemaTableName tableName, boolean canDrop) {
+    if (!canDrop) {
+      LOG.warn(
+          "Not dropping table %s after CREATE TABLE AS SELECT failed: its catalog cannot drop it"
+              + " safely",
+          tableName);
+      return;
+    }
+    try {
+      catalogConnectorMetadata.dropTable(tableName);
+    } catch (Exception e) {
+      LOG.warn(e, "Failed to drop table %s after CREATE TABLE AS SELECT failed", tableName);
+    }
   }
 
   private String getColumnName(ColumnHandle columnHandle) {

@@ -42,6 +42,7 @@ import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
 import javax.ws.rs.HEAD;
 import javax.ws.rs.HeaderParam;
+import javax.ws.rs.HttpMethod;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -51,6 +52,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
@@ -62,6 +64,7 @@ import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
+import org.apache.gravitino.iceberg.service.idempotency.IcebergIdempotencyManager;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.iceberg.service.restriction.IcebergReadRestrictionLoader;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
@@ -78,10 +81,7 @@ import org.apache.iceberg.SnapshotRef;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.exceptions.NoSuchTableException;
-import org.apache.iceberg.metrics.CommitReport;
 import org.apache.iceberg.metrics.MetricsReport;
-import org.apache.iceberg.metrics.ScanReport;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
@@ -112,6 +112,7 @@ public class IcebergTableOperations {
 
   private ObjectMapper icebergObjectMapper;
   private IcebergTableOperationDispatcher tableOperationDispatcher;
+  private IcebergIdempotencyManager idempotencyManager;
   private IcebergReadRestrictionLoader readRestrictionLoader;
 
   @Context private HttpServletRequest httpRequest;
@@ -120,9 +121,11 @@ public class IcebergTableOperations {
   public IcebergTableOperations(
       IcebergMetricsManager icebergMetricsManager,
       IcebergTableOperationDispatcher tableOperationDispatcher,
+      IcebergIdempotencyManager idempotencyManager,
       IcebergReadRestrictionLoader readRestrictionLoader) {
     this.icebergMetricsManager = icebergMetricsManager;
     this.tableOperationDispatcher = tableOperationDispatcher;
+    this.idempotencyManager = idempotencyManager;
     this.icebergObjectMapper = IcebergObjectMapper.getInstance();
     this.readRestrictionLoader = readRestrictionLoader;
   }
@@ -176,18 +179,29 @@ public class IcebergTableOperations {
   @Timed(name = "create-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-table", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TABLE",
+      expression = AuthorizationExpressionConstants.CREATE_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createTable(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
-      CreateTableRequest createTableRequest,
-      @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
+      @IcebergAuthorizationMetadata(type = IcebergAuthorizationMetadata.RequestType.CREATE_TABLE)
+          CreateTableRequest createTableRequest,
+      @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation,
+      @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
+      @Context UriInfo uriInfo) {
     IcebergRESTUtils.validateRequest(createTableRequest, "CreateTableRequest");
+    return idempotencyManager.replayOrExecute(
+        idempotencyKey,
+        IcebergIdempotencyManager.operationBinding(HttpMethod.POST, uriInfo),
+        () -> doCreateTable(prefix, namespace, createTableRequest, accessDelegation));
+  }
+
+  private Response doCreateTable(
+      String prefix,
+      String namespace,
+      CreateTableRequest createTableRequest,
+      String accessDelegation) {
     boolean isCredentialVending = isCredentialVending(accessDelegation);
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
@@ -229,8 +243,19 @@ public class IcebergTableOperations {
           String namespace,
       @AuthorizationMetadata(type = Entity.EntityType.TABLE) @Encoded() @PathParam("table")
           String table,
-      UpdateTableRequest updateTableRequest) {
+      @IcebergAuthorizationMetadata(type = IcebergAuthorizationMetadata.RequestType.UPDATE_TABLE)
+          UpdateTableRequest updateTableRequest,
+      @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
+      @Context UriInfo uriInfo) {
     IcebergRESTUtils.validateRequest(updateTableRequest, "UpdateTableRequest");
+    return idempotencyManager.replayOrExecute(
+        idempotencyKey,
+        IcebergIdempotencyManager.operationBinding(HttpMethod.POST, uriInfo),
+        () -> doUpdateTable(prefix, namespace, table, updateTableRequest));
+  }
+
+  private Response doUpdateTable(
+      String prefix, String namespace, String table, UpdateTableRequest updateTableRequest) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
@@ -273,7 +298,17 @@ public class IcebergTableOperations {
           String namespace,
       @AuthorizationMetadata(type = Entity.EntityType.TABLE) @Encoded() @PathParam("table")
           String table,
-      @DefaultValue("false") @QueryParam("purgeRequested") boolean purgeRequested) {
+      @DefaultValue("false") @QueryParam("purgeRequested") boolean purgeRequested,
+      @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
+      @Context UriInfo uriInfo) {
+    return idempotencyManager.replayOrExecute(
+        idempotencyKey,
+        IcebergIdempotencyManager.operationBinding(HttpMethod.DELETE, uriInfo),
+        () -> doDropTable(prefix, namespace, table, purgeRequested));
+  }
+
+  private Response doDropTable(
+      String prefix, String namespace, String table, boolean purgeRequested) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
@@ -449,26 +484,8 @@ public class IcebergTableOperations {
             IcebergRequestContext context =
                 new IcebergRequestContext(httpServletRequest(), catalogName);
             TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
-            if (!tableOperationDispatcher.tableExists(context, tableIdentifier)) {
-              throw new NoSuchTableException("Table %s not found", tableIdentifier);
-            }
             MetricsReport report = request.report();
-            String reportedTableName;
-            if (report instanceof CommitReport) {
-              reportedTableName = ((CommitReport) report).tableName();
-            } else if (report instanceof ScanReport) {
-              reportedTableName = ((ScanReport) report).tableName();
-            } else {
-              throw new IllegalArgumentException("Unsupported metrics report type");
-            }
-            String qualifiedTableName = tableIdentifier.toString();
-            if (reportedTableName == null
-                || (!tableName.equals(reportedTableName)
-                    && !qualifiedTableName.equals(reportedTableName)
-                    && !reportedTableName.endsWith("." + qualifiedTableName))) {
-              throw new IllegalArgumentException(
-                  "Metrics report table name does not match the requested table");
-            }
+            tableOperationDispatcher.checkTableMetricsReport(context, tableIdentifier, report);
             boolean accepted = icebergMetricsManager.recordMetric(catalogName, icebergNS, report);
             if (accepted) {
               return IcebergRESTUtils.noContent();
@@ -759,25 +776,21 @@ public class IcebergTableOperations {
    * requesting credential vending. Package-private and static so that {@link
    * IcebergNamespaceOperations#registerTable} can reuse the same parsing logic from the same
    * package.
+   *
+   * <p>The header is a comma-separated list of the mechanisms the client supports, and the server
+   * may serve the request with any or none of them, so mechanisms this server does not offer (such
+   * as remote-signing) are ignored.
    */
   static boolean isCredentialVending(String accessDelegation) {
     if (StringUtils.isBlank(accessDelegation)) {
       return false;
     }
-    if ("vended-credentials".equalsIgnoreCase(accessDelegation)) {
-      return true;
+    for (String mechanism : accessDelegation.split(",")) {
+      if ("vended-credentials".equalsIgnoreCase(mechanism.trim())) {
+        return true;
+      }
     }
-    if ("remote-signing".equalsIgnoreCase(accessDelegation)) {
-      throw new UnsupportedOperationException(
-          "Gravitino IcebergRESTServer doesn't support remote signing");
-    } else {
-      throw new IllegalArgumentException(
-          X_ICEBERG_ACCESS_DELEGATION
-              + ": "
-              + accessDelegation
-              + " is illegal, Iceberg REST spec supports: [vended-credentials,remote-signing], "
-              + "Gravitino Iceberg REST server supports: vended-credentials");
-    }
+    return false;
   }
 
   private NameIdentifier[] toNameIdentifiers(

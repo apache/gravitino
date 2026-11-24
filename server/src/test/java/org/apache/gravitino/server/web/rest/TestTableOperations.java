@@ -197,6 +197,7 @@ public class TestTableOperations extends BaseOperationsTest {
   @Test
   public void testRejectNullTableInputsBeforeDispatch() {
     String[][] invalidRequests = {
+      {"{\"name\":\"t\"}", "columns"},
       {"{\"name\":\"t\",\"columns\":null}", "columns"},
       {"{\"name\":\"t\",\"columns\":[null]}", "columns[0]"},
       {
@@ -654,6 +655,18 @@ public class TestTableOperations extends BaseOperationsTest {
     ErrorResponse errorResp = resp1.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp.getCode());
     Assertions.assertEquals(NoSuchTableException.class.getSimpleName(), errorResp.getType());
+
+    doThrow(new NoSuchSchemaException("schema missing")).when(dispatcher).loadTable(any());
+    Response missingSchema =
+        target(tablePath(metalake, catalog, schema) + "table1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), missingSchema.getStatus());
+    ErrorResponse schemaError = missingSchema.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, schemaError.getCode());
+    Assertions.assertEquals(NoSuchSchemaException.class.getSimpleName(), schemaError.getType());
+    Assertions.assertTrue(schemaError.getMessage().contains("schema missing"));
 
     // Test throw RuntimeException
     doThrow(new RuntimeException("mock error")).when(dispatcher).loadTable(any());
