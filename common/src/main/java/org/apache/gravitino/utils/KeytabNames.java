@@ -31,9 +31,9 @@ import java.util.UUID;
  *
  * <p>The JDK keeps the keys of every keytab path it reads until the JVM exits, and returns them
  * while the file at the path keeps its modification time or is not a valid keytab. So a name is
- * reused only for the same keytab URI and content, once the file of its previous user is deleted.
- * The server loads this class once for all catalog class loaders, so names are also reused after a
- * catalog is reloaded.
+ * reused only for the same keytab URI and content, once its previous user deletes the file and
+ * releases the slot. The server loads this class once for all catalog class loaders, so names are
+ * also reused after a catalog is reloaded.
  */
 public final class KeytabNames {
 

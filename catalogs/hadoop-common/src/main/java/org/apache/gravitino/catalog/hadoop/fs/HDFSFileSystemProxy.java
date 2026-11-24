@@ -34,6 +34,7 @@ import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.FileTime;
 import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.Collections;
@@ -98,6 +99,8 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
   @Nullable private File keytabFile;
   @Nullable private String keytabSlotPrefix;
   private int keytabSlot;
+  // The modification time of the keytab when it was named after its content.
+  @Nullable private FileTime keytabModified;
   protected UserGroupInformation initUgi;
   private FileSystem fs;
   private Configuration configuration;
@@ -342,9 +345,16 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     }
     if (keytabFile != null) {
       try {
+        boolean unchanged = keytabUnchanged();
         Files.deleteIfExists(keytabFile.toPath());
         LIVE_KEYTAB_FILES.remove(keytabFile);
-        releaseKeytabSlot();
+        if (unchanged) {
+          releaseKeytabSlot();
+        } else {
+          // A local keytab changed while renewals read it through the link, so the JDK may keep
+          // other keys for this name. It is not reused.
+          keytabSlotPrefix = null;
+        }
       } catch (IOException | RuntimeException e) {
         LOG.warn("Failed to delete the keytab file {}", keytabFile, e);
         // Deleted at exit instead. The shutdown hook would hand it over too, but a catalog class
@@ -389,9 +399,11 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
   }
 
   // Takes the lowest free name for the identifier, the keytab URI and its content, and moves the
-  // fetched file there. See KeytabNames for when a name is reused.
+  // fetched file there. See KeytabNames for when a name is reused, and close() for when it is not.
   private synchronized File moveToKeytabName(String identifier, String keytabUri, File fetched)
       throws IOException {
+    // Read first, so that a change while the content is read is seen on close too.
+    keytabModified = Files.getLastModifiedTime(fetched.toPath());
     String prefix = keytabNamePrefix(identifier, keytabUri, fetched);
     int slot = KeytabNames.reserve(prefix);
     keytabSlotPrefix = prefix;
@@ -417,6 +429,19 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
       }
     }
     return identifier + "-" + KeytabNames.token() + "-" + UUID.randomUUID();
+  }
+
+  // Whether the keytab, which may be a link to a local file, has kept its modification time since
+  // it was named. Otherwise the JDK may have read other keys through the name.
+  private synchronized boolean keytabUnchanged() {
+    if (keytabModified == null) {
+      return true;
+    }
+    try {
+      return keytabModified.equals(Files.getLastModifiedTime(keytabFile.toPath()));
+    } catch (IOException e) {
+      return false;
+    }
   }
 
   private synchronized void releaseKeytabSlot() {

@@ -78,6 +78,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
@@ -540,6 +542,66 @@ public class TestHDFSFileSystemProxy {
       }
       new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy().close();
       assertEquals("gravitino-" + prefix + "-" + held, keytabs.get(1).getName());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testNameOfALinkReplacedWhileItsProxyWasOpenIsNotReused(
+      boolean deletedOnClose, @TempDir File keytabDir, @TempDir File sourceDir) throws Exception {
+    File source = new File(sourceDir, "test.keytab");
+    writeKeytab(source, 1);
+    List<String> versions = new ArrayList<>();
+    List<File> keytabs = new ArrayList<>();
+    KerberosClient client = mock(KerberosClient.class);
+    when(client.login(anyString()))
+        .thenAnswer(
+            invocation -> {
+              File keytab = new File(invocation.<String>getArgument(0));
+              keytabs.add(keytab);
+              versions.add(keyVersions(keytab));
+              return UserGroupInformation.createRemoteUser("test");
+            });
+    try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
+        MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
+      stubKerberosLogin(clients, client);
+      authUtils
+          .when(
+              () ->
+                  KerberosAuthUtils.fetchKeytabFromUri(
+                      anyString(), any(), anyInt(), anyBoolean(), any()))
+          .thenAnswer(
+              invocation -> {
+                File keytab = new File(keytabDir, invocation.<File>getArgument(1).getName());
+                Files.createSymbolicLink(keytab.toPath(), source.toPath());
+                return keytab;
+              });
+
+      FileSystem open = new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy();
+      // The keytab is rotated while the proxy is open, and a renewal reads the new keys through the
+      // link, so the JDK keeps them for this path.
+      FileTime rotated =
+          FileTime.fromMillis(Files.getLastModifiedTime(source.toPath()).toMillis() + 2_000);
+      writeKeytab(source, 2);
+      Files.setLastModifiedTime(source.toPath(), rotated);
+      assertEquals("2", keyVersions(keytabs.get(0)));
+      if (deletedOnClose) {
+        // The proxy cannot tell what changed, so it gives the name up too.
+        Files.delete(source.toPath());
+        open.close();
+      }
+      // Then the old keys come back with the same modification time.
+      writeKeytab(source, 1);
+      Files.setLastModifiedTime(source.toPath(), rotated);
+      if (!deletedOnClose) {
+        open.close();
+      }
+
+      new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy().close();
+      // The next login reads the keys of the file, not those the JDK kept for the old name.
+      assertEquals(Arrays.asList("1", "1"), versions);
+      assertNotEquals(keytabs.get(0).getName(), keytabs.get(1).getName());
+      assertArrayEquals(new String[0], keytabDir.list());
     }
   }
 
