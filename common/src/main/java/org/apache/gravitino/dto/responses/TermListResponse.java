@@ -42,6 +42,7 @@ public class TermListResponse extends BaseResponse {
    */
   public TermListResponse(TermDTO[] terms) {
     super(0);
+    Preconditions.checkArgument(terms != null, "terms must not be null");
     this.terms = terms.clone();
   }
 
@@ -49,7 +50,7 @@ public class TermListResponse extends BaseResponse {
    * @return The returned terms.
    */
   public TermDTO[] getTerms() {
-    return terms.clone();
+    return terms == null ? null : terms.clone();
   }
 
   /** Validates that the list and its entries are present. */

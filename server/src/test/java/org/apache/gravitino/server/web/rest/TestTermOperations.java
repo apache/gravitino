@@ -244,6 +244,23 @@ public class TestTermOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testUnsupportedListFiltersAndMissingBodiesAreRejectedBeforeDispatch() {
+    try (Response r = target(BASE).queryParam("match", "revenue").request().get()) {
+      assertEquals(400, r.getStatus());
+    }
+    try (Response r = target(BASE).queryParam("bindings", "true").request().get()) {
+      assertEquals(400, r.getStatus());
+    }
+    try (Response r = target(BASE).request().post(Entity.json(""))) {
+      assertEquals(400, r.getStatus());
+    }
+    try (Response r = target(BASE + "/T").request().put(Entity.json(""))) {
+      assertEquals(400, r.getStatus());
+    }
+    verifyNoInteractions(dispatcher);
+  }
+
+  @Test
   void testStorageConflictPreservesErrorTypeAndCode() {
     when(dispatcher.drop("test", "T")).thenThrow(new OptimisticLockException("Term changed"));
     try (Response response = target(BASE + "/T").request().delete()) {

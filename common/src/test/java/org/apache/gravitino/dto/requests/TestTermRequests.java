@@ -21,6 +21,7 @@ package org.apache.gravitino.dto.requests;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -172,6 +173,17 @@ class TestTermRequests {
     String list = "{\"code\":0,\"terms\":[" + term + "]}";
     roundTrip(list, TermListResponse.class).validate();
     roundTrip(list, TermTreeResponse.class).validate();
+
+    assertThrows(IllegalArgumentException.class, () -> new TermListResponse(null));
+    TermListResponse missingTerms = mapper.readValue("{\"code\":0}", TermListResponse.class);
+    assertNull(missingTerms.getTerms());
+    assertThrows(IllegalArgumentException.class, missingTerms::validate);
+
+    TermUpdatesRequest invalidInner =
+        mapper.readValue(
+            "{\"updates\":[{\"@type\":\"setStatus\",\"status\":\"BOGUS\"}]}",
+            TermUpdatesRequest.class);
+    assertThrows(IllegalArgumentException.class, invalidInner::validate);
   }
 
   private <T> T roundTrip(String json, Class<T> type) throws Exception {

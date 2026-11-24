@@ -65,7 +65,11 @@ public class TermCreateRequest implements RESTRequest {
   /** Creates an empty request for deserialization. */
   public TermCreateRequest() {}
 
-  /** Creates a request from the client specification, preserving an omitted initial status. */
+  /**
+   * Creates a request from the client specification, preserving an omitted initial status.
+   *
+   * @param spec The term specification.
+   */
   public TermCreateRequest(TermSpec spec) {
     name = spec.name();
     definition = spec.definition();
@@ -82,7 +86,11 @@ public class TermCreateRequest implements RESTRequest {
     properties = spec.properties();
   }
 
-  /** Converts the wire representation to a validated term specification. */
+  /**
+   * Converts the wire representation to a validated term specification.
+   *
+   * @return The validated term specification.
+   */
   public TermSpec toSpec() {
     Preconditions.checkArgument(links != null, "links must be an array");
     return TermSpec.builder(name)

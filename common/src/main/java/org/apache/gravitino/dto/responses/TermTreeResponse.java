@@ -25,7 +25,11 @@ public class TermTreeResponse extends TermListResponse {
   /** Creates an empty response for Jackson. */
   public TermTreeResponse() {}
 
-  /** Creates a successful hierarchy response. */
+  /**
+   * Creates a successful hierarchy response.
+   *
+   * @param terms The visible ancestors or descendants.
+   */
   public TermTreeResponse(TermDTO[] terms) {
     super(terms);
   }

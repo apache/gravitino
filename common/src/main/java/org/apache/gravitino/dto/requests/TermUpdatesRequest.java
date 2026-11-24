@@ -44,21 +44,34 @@ public class TermUpdatesRequest implements RESTRequest {
   /** Creates an empty request for deserialization. */
   public TermUpdatesRequest() {}
 
-  /** Creates an atomic update with an optional revision guard. */
+  /**
+   * Creates an atomic update with an optional revision guard.
+   *
+   * @param expectedRevision The optional expected revision token.
+   * @param updates The ordered term updates to apply.
+   */
   public TermUpdatesRequest(@Nullable String expectedRevision, TermUpdateRequest... updates) {
     this.expectedRevision = expectedRevision;
     this.updates = updates == null ? null : updates.clone();
     validate();
   }
 
-  /** Returns the validated changes in request order. */
+  /**
+   * Returns the validated changes in request order.
+   *
+   * @return The validated term changes.
+   */
   public TermChange[] changes() {
-    validate();
+    validateUpdates();
     return Arrays.stream(updates).map(TermUpdateRequest::toChange).toArray(TermChange[]::new);
   }
 
   @Override
   public void validate() {
+    changes();
+  }
+
+  private void validateUpdates() {
     Preconditions.checkArgument(
         updates != null && updates.length > 0 && Arrays.stream(updates).allMatch(Objects::nonNull),
         "updates must contain one or more changes");

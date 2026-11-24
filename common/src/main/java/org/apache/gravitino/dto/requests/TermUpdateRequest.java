@@ -52,14 +52,23 @@ import org.apache.gravitino.glossary.TermLink;
   @JsonSubTypes.Type(value = TermUpdateRequest.RemoveProperty.class, name = "removeProperty")
 })
 public interface TermUpdateRequest {
-  /** Returns the API change represented by this update. */
+  /**
+   * Returns the API change represented by this update.
+   *
+   * @return The API term change.
+   */
   TermChange toChange();
+
   /** The rename operation. */
   class Rename implements TermUpdateRequest {
     @JsonProperty("newName")
     private final String newName;
 
-    /** Creates the rename update. */
+    /**
+     * Creates the rename update.
+     *
+     * @param newName The new term name.
+     */
     @JsonCreator
     public Rename(@JsonProperty(value = "newName", required = true) String newName) {
       this.newName = newName;
@@ -78,7 +87,11 @@ public interface TermUpdateRequest {
     @JsonProperty("newDefinition")
     private final String newDefinition;
 
-    /** An explicit null clears the value. */
+    /**
+     * Creates the updateDefinition update. An explicit null clears the value.
+     *
+     * @param newDefinition The new definition, or null to clear it.
+     */
     @JsonCreator
     public UpdateDefinition(
         @JsonProperty(value = "newDefinition", required = true) @Nullable String newDefinition) {
@@ -96,7 +109,11 @@ public interface TermUpdateRequest {
     @JsonProperty("status")
     private final String status;
 
-    /** Creates the setStatus update. */
+    /**
+     * Creates the setStatus update.
+     *
+     * @param status The target term status.
+     */
     @JsonCreator
     public SetStatus(@JsonProperty(value = "status", required = true) String status) {
       this.status = status;
@@ -114,7 +131,11 @@ public interface TermUpdateRequest {
     @JsonProperty("synonym")
     private final String synonym;
 
-    /** Creates the addSynonym update. */
+    /**
+     * Creates the addSynonym update.
+     *
+     * @param synonym The synonym to add.
+     */
     @JsonCreator
     public AddSynonym(@JsonProperty(value = "synonym", required = true) String synonym) {
       this.synonym = synonym;
@@ -131,7 +152,11 @@ public interface TermUpdateRequest {
     @JsonProperty("synonym")
     private final String synonym;
 
-    /** Creates the removeSynonym update. */
+    /**
+     * Creates the removeSynonym update.
+     *
+     * @param synonym The synonym to remove.
+     */
     @JsonCreator
     public RemoveSynonym(@JsonProperty(value = "synonym", required = true) String synonym) {
       this.synonym = synonym;
@@ -148,7 +173,11 @@ public interface TermUpdateRequest {
     @JsonProperty("domain")
     private final String domain;
 
-    /** Creates the addDomain update. */
+    /**
+     * Creates the addDomain update.
+     *
+     * @param domain The domain name to add.
+     */
     @JsonCreator
     public AddDomain(@JsonProperty(value = "domain", required = true) String domain) {
       this.domain = domain;
@@ -165,7 +194,11 @@ public interface TermUpdateRequest {
     @JsonProperty("domain")
     private final String domain;
 
-    /** Creates the removeDomain update. */
+    /**
+     * Creates the removeDomain update.
+     *
+     * @param domain The domain name to remove.
+     */
     @JsonCreator
     public RemoveDomain(@JsonProperty(value = "domain", required = true) String domain) {
       this.domain = domain;
@@ -182,7 +215,11 @@ public interface TermUpdateRequest {
     @JsonProperty("broader")
     private final String broader;
 
-    /** Creates the addBroader update. */
+    /**
+     * Creates the addBroader update.
+     *
+     * @param broader The broader term name to add.
+     */
     @JsonCreator
     public AddBroader(@JsonProperty(value = "broader", required = true) String broader) {
       this.broader = broader;
@@ -199,7 +236,11 @@ public interface TermUpdateRequest {
     @JsonProperty("broader")
     private final String broader;
 
-    /** Creates the removeBroader update. */
+    /**
+     * Creates the removeBroader update.
+     *
+     * @param broader The broader term name to remove.
+     */
     @JsonCreator
     public RemoveBroader(@JsonProperty(value = "broader", required = true) String broader) {
       this.broader = broader;
@@ -216,7 +257,11 @@ public interface TermUpdateRequest {
     @JsonProperty("related")
     private final String related;
 
-    /** Creates the addRelated update. */
+    /**
+     * Creates the addRelated update.
+     *
+     * @param related The related term name to add.
+     */
     @JsonCreator
     public AddRelated(@JsonProperty(value = "related", required = true) String related) {
       this.related = related;
@@ -233,7 +278,11 @@ public interface TermUpdateRequest {
     @JsonProperty("related")
     private final String related;
 
-    /** Creates the removeRelated update. */
+    /**
+     * Creates the removeRelated update.
+     *
+     * @param related The related term name to remove.
+     */
     @JsonCreator
     public RemoveRelated(@JsonProperty(value = "related", required = true) String related) {
       this.related = related;
@@ -250,7 +299,11 @@ public interface TermUpdateRequest {
     @JsonProperty("links")
     private final TermLinkDTO[] links;
 
-    /** Creates the updateLinks update. */
+    /**
+     * Creates the updateLinks update.
+     *
+     * @param links The replacement documentation links.
+     */
     @JsonCreator
     public UpdateLinks(@JsonProperty(value = "links", required = true) TermLinkDTO[] links) {
       this.links = links;
@@ -273,7 +326,11 @@ public interface TermUpdateRequest {
     @JsonProperty("sourceRef")
     private final String sourceRef;
 
-    /** An explicit null clears the value. */
+    /**
+     * Creates the setSourceRef update. An explicit null clears the value.
+     *
+     * @param sourceRef The new source reference, or null to clear it.
+     */
     @JsonCreator
     public SetSourceRef(
         @JsonProperty(value = "sourceRef", required = true) @Nullable String sourceRef) {
@@ -294,7 +351,12 @@ public interface TermUpdateRequest {
     @JsonProperty("value")
     private final String value;
 
-    /** Creates the setProperty update. */
+    /**
+     * Creates the setProperty update.
+     *
+     * @param property The property name.
+     * @param value The property value.
+     */
     @JsonCreator
     public SetProperty(
         @JsonProperty(value = "property", required = true) String property,
@@ -314,7 +376,11 @@ public interface TermUpdateRequest {
     @JsonProperty("property")
     private final String property;
 
-    /** Creates the removeProperty update. */
+    /**
+     * Creates the removeProperty update.
+     *
+     * @param property The property name to remove.
+     */
     @JsonCreator
     public RemoveProperty(@JsonProperty(value = "property", required = true) String property) {
       this.property = property;

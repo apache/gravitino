@@ -51,7 +51,25 @@ public class TermDTO {
   private final String revisionToken;
   private final AuditDTO audit;
 
-  /** Creates a snapshot from one glossary revision. */
+  /**
+   * Creates a snapshot from one glossary revision.
+   *
+   * @param name The term name.
+   * @param definition The optional definition.
+   * @param synonyms The term synonyms.
+   * @param status The term status.
+   * @param domains The visible domain memberships.
+   * @param broader The visible direct broader term names.
+   * @param narrower The visible direct narrower term names.
+   * @param related The visible direct related term names.
+   * @param links The documentation links.
+   * @param owner The optional owner.
+   * @param sourceRef The optional source reference.
+   * @param properties The term properties.
+   * @param version The numeric revision version.
+   * @param revisionToken The opaque identity and revision token.
+   * @param audit The audit metadata.
+   */
   @JsonCreator
   public TermDTO(
       @JsonProperty("name") String name,

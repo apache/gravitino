@@ -30,14 +30,24 @@ public class TermLinkDTO {
   @Nullable private final String label;
   private final String url;
 
-  /** Creates a link with an optional label. */
+  /**
+   * Creates a link with an optional label.
+   *
+   * @param label The optional display label.
+   * @param url The link URL.
+   */
   @JsonCreator
   public TermLinkDTO(
       @JsonProperty("label") @Nullable String label, @JsonProperty("url") String url) {
     this.label = label;
     this.url = url;
   }
-  /** Returns the validated API link. */
+
+  /**
+   * Returns the validated API link.
+   *
+   * @return The validated API link.
+   */
   public TermLink toLink() {
     return TermLink.of(label, url);
   }

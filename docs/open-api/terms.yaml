@@ -47,8 +47,7 @@ paths:
             type: string
         - in: query
           name: status
-          description: Apply this status to roots and nested terms. A named root excluded
-            by the filter returns 404.
+          description: Include only terms and nested relation endpoints with this status.
           schema:
             $ref: "#/components/schemas/TermStatus"
       responses:
