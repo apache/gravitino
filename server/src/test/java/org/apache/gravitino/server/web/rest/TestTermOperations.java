@@ -18,20 +18,26 @@
  */
 package org.apache.gravitino.server.web.rest;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.jersey2.InstrumentedResourceMethodApplicationListener;
 import java.io.IOException;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.glossary.TermDTO;
 import org.apache.gravitino.dto.responses.DropResponse;
+import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.TermListResponse;
@@ -39,6 +45,7 @@ import org.apache.gravitino.dto.responses.TermResponse;
 import org.apache.gravitino.dto.responses.TermTreeResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TermAlreadyExistsException;
 import org.apache.gravitino.exceptions.TermVersionConflictException;
 import org.apache.gravitino.glossary.GlossaryManager;
@@ -46,6 +53,7 @@ import org.apache.gravitino.glossary.GlossaryTerm;
 import org.apache.gravitino.glossary.GlossaryTermViews;
 import org.apache.gravitino.glossary.TermSpec;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
@@ -61,6 +69,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 public class TestTermOperations extends BaseOperationsTest {
 
   private static final String BASE = "/metalakes/test/terms";
+  private MetricRegistry metrics;
   private final GlossaryTermViews dispatcher = mock(GlossaryTermViews.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
@@ -84,11 +93,13 @@ public class TestTermOperations extends BaseOperationsTest {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+    metrics = new MetricRegistry();
     return new ResourceConfig(
             TermOperations.class,
             JsonProcessingExceptionMapper.class,
             JsonMappingExceptionMapper.class)
         .register(new ObjectMapperProvider())
+        .register(new InstrumentedResourceMethodApplicationListener(metrics))
         .register(
             new AbstractBinder() {
               @Override
@@ -110,13 +121,14 @@ public class TestTermOperations extends BaseOperationsTest {
                     + "\",\"status\":\"APPROVED\",\"version\":1,\"revisionToken\":\"token\"}",
                 TermDTO.class);
     String item = BASE + "/" + name.replace("/", "%2F");
-    when(dispatcher.get("test", name)).thenReturn(term);
+    when(dispatcher.get("test", name, null)).thenReturn(term);
     when(dispatcher.alter(eq("test"), eq(name), eq("token"), any())).thenReturn(term);
     when(dispatcher.drop("test", name)).thenReturn(true);
-    when(dispatcher.hierarchy("test", name, GlossaryManager.Direction.NARROWER))
+    when(dispatcher.hierarchy("test", name, GlossaryManager.Direction.NARROWER, null))
         .thenReturn(new TermDTO[] {term});
     try (Response r = target(item).request().get()) {
       assertEquals(200, r.getStatus());
+      assertTrue(MediaType.APPLICATION_JSON_TYPE.isCompatible(r.getMediaType()));
       assertEquals(name, r.readEntity(TermResponse.class).getTerm().getName());
     }
     try (Response r =
@@ -126,14 +138,17 @@ public class TestTermOperations extends BaseOperationsTest {
                 Entity.json(
                     "{\"expectedRevision\":\"token\",\"updates\":[{\"@type\":\"setProperty\",\"property\":\"x\",\"value\":\"y\"}]}"))) {
       assertEquals(200, r.getStatus());
+      assertTrue(MediaType.APPLICATION_JSON_TYPE.isCompatible(r.getMediaType()));
       assertEquals("token", r.readEntity(TermResponse.class).getTerm().getRevisionToken());
     }
     try (Response r = target(item + "/hierarchy").request().get()) {
       assertEquals(200, r.getStatus());
+      assertTrue(MediaType.APPLICATION_JSON_TYPE.isCompatible(r.getMediaType()));
       assertEquals(name, r.readEntity(TermTreeResponse.class).getTerms()[0].getName());
     }
     try (Response r = target(item).request().delete()) {
       assertEquals(200, r.getStatus());
+      assertTrue(MediaType.APPLICATION_JSON_TYPE.isCompatible(r.getMediaType()));
       assertTrue(r.readEntity(DropResponse.class).dropped());
     }
   }
@@ -142,11 +157,13 @@ public class TestTermOperations extends BaseOperationsTest {
   void testCreateAndFilter() throws Exception {
     TermDTO term = JsonUtils.objectMapper().readValue("{\"name\":\"Term\"}", TermDTO.class);
     when(dispatcher.create("test", TermSpec.builder("Term").build())).thenReturn(term);
-    when(dispatcher.withStatus(GlossaryTerm.Status.APPROVED)).thenReturn(dispatcher);
-    when(dispatcher.list("test", "Sales", "erm")).thenReturn(new TermDTO[] {term});
-    when(dispatcher.names("test", "Sales", "erm")).thenReturn(new String[] {"Term"});
+    when(dispatcher.list("test", "Sales", "erm", GlossaryTerm.Status.APPROVED))
+        .thenReturn(new TermDTO[] {term});
+    when(dispatcher.names("test", "Sales", "erm", GlossaryTerm.Status.APPROVED))
+        .thenReturn(new String[] {"Term"});
     try (Response r = target(BASE).request().post(Entity.json("{\"name\":\"Term\"}"))) {
       assertEquals(200, r.getStatus());
+      assertTrue(MediaType.APPLICATION_JSON_TYPE.isCompatible(r.getMediaType()));
       assertEquals("Term", r.readEntity(TermResponse.class).getTerm().getName());
     }
     for (boolean details : new boolean[] {false, true}) {
@@ -159,6 +176,7 @@ public class TestTermOperations extends BaseOperationsTest {
               .request()
               .get()) {
         assertEquals(200, r.getStatus());
+        assertTrue(MediaType.APPLICATION_JSON_TYPE.isCompatible(r.getMediaType()));
         assertEquals(
             "Term",
             details
@@ -184,7 +202,7 @@ public class TestTermOperations extends BaseOperationsTest {
         target(item + "/hierarchy").queryParam("direction", "RELATED").request().get()) {
       assertEquals(400, r.getStatus());
     }
-    when(dispatcher.get("test", "T")).thenThrow(new NoSuchTermException("hidden"));
+    when(dispatcher.get("test", "T", null)).thenThrow(new NoSuchTermException("hidden"));
     try (Response r = target(item).request().get()) {
       assertError(r, 404, "NoSuchTermException");
     }
@@ -207,6 +225,57 @@ public class TestTermOperations extends BaseOperationsTest {
                     "{\"expectedRevision\":\"old\",\"updates\":[{\"@type\":\"rename\",\"newName\":\"X\"}]}"))) {
       assertError(r, 409, "TermVersionConflictException");
     }
+  }
+
+  @Test
+  void testExplicitNullRevisionIsRejectedBeforeDispatch() {
+    try (Response response =
+        target(BASE + "/T")
+            .request()
+            .put(
+                Entity.json(
+                    "{\"expectedRevision\":null,\"updates\":[{\"@type\":\"rename\",\"newName\":\"New\"}]}"))) {
+      assertEquals(400, response.getStatus());
+      assertEquals(
+          ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+          response.readEntity(ErrorResponse.class).getCode());
+      verifyNoInteractions(dispatcher);
+    }
+  }
+
+  @Test
+  void testStorageConflictPreservesErrorTypeAndCode() {
+    when(dispatcher.drop("test", "T")).thenThrow(new OptimisticLockException("Term changed"));
+    try (Response response = target(BASE + "/T").request().delete()) {
+      assertEquals(409, response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      assertEquals(ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE, error.getCode());
+      assertEquals("OptimisticLockException", error.getType());
+    }
+  }
+
+  @Test
+  void testDeleteMetricsCountSuccessAndConflict() {
+    when(dispatcher.drop("test", "T"))
+        .thenReturn(true)
+        .thenThrow(new OptimisticLockException("changed"));
+    for (int status : new int[] {200, 409}) {
+      try (Response response = target(BASE + "/T").request().delete()) {
+        assertEquals(status, response.getStatus());
+      }
+    }
+    await()
+        .untilAsserted(
+            () -> {
+              assertEquals(
+                  2L,
+                  metrics
+                      .getTimers()
+                      .get("delete-term." + MetricNames.HTTP_PROCESS_DURATION)
+                      .getCount());
+              assertEquals(1L, metrics.getMeters().get("delete-term.2xx-responses").getCount());
+              assertEquals(1L, metrics.getMeters().get("delete-term.4xx-responses").getCount());
+            });
   }
 
   private static void assertError(Response response, int status, String type) {

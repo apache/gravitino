@@ -34,18 +34,18 @@ import org.apache.gravitino.exceptions.TermVersionConflictException;
  * <p>A term that the caller cannot see, for example a {@link GlossaryTerm.Status#DRAFT} term of
  * another user, is left out of lists, and getting it throws {@link NoSuchTermException}.
  *
- * <p>In Step 1, {@code VIEW_DEFINITION} permits reading approved and deprecated terms. {@code
- * CREATE_DEFINITION} includes view access and permits creating and maintaining terms owned by the
- * caller. {@code MANAGE_DEFINITIONS} includes create and view access and permits managing all
- * terms, including other owners' drafts. Ownership means the current owner, including group
- * members; ownership alone does not replace effective create access. Expand allowed grant
- * implications before applying explicit denies to each required capability. All reads and writes of
- * term definitions require effective {@code VIEW_DEFINITION}. Denying view hides terms from reads
- * and blocks writes even for an owner with create access. Denying create prevents creation even
- * with an allow on manage, but effective manage can still authorize edits. Denying manage removes
- * the all-term path without removing effective create access to own terms. These privileges are
- * granted on the metalake in Step 1. The metalake owner passes privilege checks, but remains
- * subject to the Step 2 workflow and no-self-approval rule.
+ * <p>With authorization enabled in Step 1, {@code VIEW_DEFINITION} permits reading approved and
+ * deprecated terms. {@code CREATE_DEFINITION} includes view access and permits creating and
+ * maintaining terms owned by the caller. {@code MANAGE_DEFINITIONS} includes create and view access
+ * and permits managing all terms, including other owners' drafts. Ownership means the current
+ * owner, including group members; ownership alone does not replace effective create access. Expand
+ * allowed grant implications before applying explicit denies to each required capability. All reads
+ * and writes of term definitions require effective {@code VIEW_DEFINITION}. Denying view hides
+ * terms from reads and blocks writes even for an owner with create access. Denying create prevents
+ * creation even with an allow on manage, but effective manage can still authorize edits. Denying
+ * manage removes the all-term path without removing effective create access to own terms. These
+ * privileges are granted on the metalake in Step 1. The metalake owner passes privilege checks, but
+ * remains subject to the Step 2 workflow and no-self-approval rule.
  *
  * <p>The owner API permits the current term owner or metalake owner to transfer ownership
  * independently of glossary privileges.
@@ -86,7 +86,8 @@ public interface GlossaryOperations {
   GlossaryTerm getTerm(String name) throws NoSuchTermException;
 
   /**
-   * Creates a term in Step 1. The caller becomes its owner. Without a status, the server uses
+   * Creates a term in Step 1. With authorization enabled, the registered caller becomes its owner.
+   * With authorization disabled, creation leaves the owner unset. Without a status, the server uses
    * {@link GlossaryTerm.Status#APPROVED}; this does not mean that a human reviewed the term.
    *
    * <p>The caller needs effective {@code VIEW_DEFINITION}, effective {@code CREATE_DEFINITION}, and

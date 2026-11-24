@@ -114,18 +114,17 @@ public class OwnerMetaService {
           "identifiers should in one metalake");
     }
     Map<Long, NameIdentifier> nameIdentifierMap = new HashMap<>();
-    List<Long> ids = new ArrayList<>(identifiers.size());
     for (NameIdentifier identifier : identifiers) {
       long id = EntityIdService.getEntityId(identifier, type);
-      ids.add(id);
       nameIdentifierMap.put(id, identifier);
     }
-    List<RelationalEntity<?>> result = new ArrayList<>();
-    collectOwners(metalake, nameIdentifierMap, type, ids, result);
-    return result;
+    return batchGetOwnersById(metalake, nameIdentifierMap, type);
   }
 
-  /** Loads owners for objects whose IDs and identifiers were resolved in the caller's snapshot. */
+  /**
+   * Loads user and group owners for live objects of one type in a metalake. The caller must resolve
+   * each ID and its identifier in the same snapshot. Objects without an owner are omitted.
+   */
   public List<RelationalEntity<?>> batchGetOwnersById(
       String metalake, Map<Long, NameIdentifier> nameIdentifierMap, Entity.EntityType type) {
     List<RelationalEntity<?>> result = new ArrayList<>();

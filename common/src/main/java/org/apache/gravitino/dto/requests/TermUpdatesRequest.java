@@ -18,7 +18,10 @@
  */
 package org.apache.gravitino.dto.requests;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Objects;
@@ -31,7 +34,8 @@ import org.apache.gravitino.rest.RESTRequest;
 public class TermUpdatesRequest implements RESTRequest {
   @Getter
   @Nullable
-  @JsonProperty("expectedRevision")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @JsonSetter(value = "expectedRevision", nulls = Nulls.FAIL)
   private String expectedRevision;
 
   @JsonProperty("updates")
@@ -43,7 +47,7 @@ public class TermUpdatesRequest implements RESTRequest {
   /** Creates an atomic update with an optional revision guard. */
   public TermUpdatesRequest(@Nullable String expectedRevision, TermUpdateRequest... updates) {
     this.expectedRevision = expectedRevision;
-    this.updates = updates.clone();
+    this.updates = updates == null ? null : updates.clone();
     validate();
   }
 

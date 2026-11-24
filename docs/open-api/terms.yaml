@@ -55,10 +55,13 @@ paths:
         "200":
           description: Successful glossary operation.
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 oneOf:
-                  - $ref: ./openapi.yaml#/components/schemas/NameListResponse
+                  - allOf:
+                      - $ref: ./openapi.yaml#/components/schemas/NameListResponse
+                      - type: object
+                        required: [code, names]
                   - $ref: "#/components/schemas/TermListResponse"
         "400":
           $ref: "#/components/responses/InvalidRequest"
@@ -74,8 +77,10 @@ paths:
         - glossary
       summary: Create a glossary term
       description: Creates the definition, memberships and relations atomically.
-        Status defaults to APPROVED. Requires CREATE_DEFINITION and access to
-        each requested domain.
+        Status defaults to APPROVED. With authorization enabled, the registered caller
+        becomes the owner and needs effective VIEW_DEFINITION and CREATE_DEFINITION
+        plus read access to each requested domain and referenced term.
+        With authorization disabled, creation leaves the owner unset.
       requestBody:
         required: true
         content:
@@ -86,7 +91,7 @@ paths:
         "200":
           description: Successful glossary operation.
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 $ref: "#/components/schemas/TermResponse"
         "400":
@@ -126,7 +131,7 @@ paths:
         "200":
           description: Successful glossary operation.
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 $ref: "#/components/schemas/TermResponse"
         "400":
@@ -144,7 +149,9 @@ paths:
       summary: Alter a glossary term
       description: Applies all edits in order in one transaction. A matching no-op
         preserves the revision. A stale expectedRevision returns 409. Clearing a
-        definition or source reference requires an explicit null.
+        definition or source reference requires an explicit null. With authorization enabled,
+        editing requires effective VIEW_DEFINITION and either MANAGE_DEFINITIONS or
+        current ownership with CREATE_DEFINITION. Referenced terms and domains must be readable.
       requestBody:
         required: true
         content:
@@ -155,7 +162,7 @@ paths:
         "200":
           description: Successful glossary operation.
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 $ref: "#/components/schemas/TermResponse"
         "400":
@@ -173,8 +180,8 @@ paths:
       tags:
         - glossary
       summary: Drop a glossary term
-      description: Returns dropped=false for an absent or hidden term. Deleting a
-        visible term requires MANAGE_DEFINITIONS.
+      description: Returns dropped=false for an absent or hidden term. With authorization enabled,
+        deleting a visible term requires effective VIEW_DEFINITION and MANAGE_DEFINITIONS.
       responses:
         "200":
           $ref: ./openapi.yaml#/components/responses/DropResponse
@@ -184,6 +191,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         5XX:
           $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
   "/metalakes/{metalake}/terms/{term}/hierarchy":
@@ -222,7 +231,7 @@ paths:
         "200":
           description: Successful glossary operation.
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 $ref: "#/components/schemas/TermTreeResponse"
         "400":
@@ -409,8 +418,9 @@ components:
       properties:
         expectedRevision:
           type: string
-          description: Opaque revisionToken from a prior read. A stale token returns HTTP
-            409.
+          description: Copy revisionToken from a prior read for a conditional edit. Omit
+            this field for an unconditional edit. Null or malformed tokens return 400,
+            and a stale token returns 409.
         updates:
           type: array
           items:
@@ -608,8 +618,8 @@ components:
           schema:
             $ref: ./openapi.yaml#/components/schemas/ErrorModel
     Conflict:
-      description: The name or source reference already exists, or the expected
-        revision is stale.
+      description: The name or source reference already exists, the expected revision is
+        stale, or a concurrent modification prevented the write.
       content:
         application/json:
           schema:

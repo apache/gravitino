@@ -20,6 +20,7 @@ package org.apache.gravitino.dto.requests;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -133,6 +134,19 @@ class TestTermRequests {
               mapper.readValue(
                   "{\"updates\":[{\"@type\":\"" + clear[0] + "\"}]}", TermUpdatesRequest.class));
     }
+  }
+
+  @Test
+  void testOmittedRevisionAndExplicitNullAreDistinct() throws Exception {
+    TermUpdatesRequest unconditional =
+        new TermUpdatesRequest(null, new TermUpdateRequest.Rename("New"));
+    assertFalse(mapper.readTree(mapper.writeValueAsBytes(unconditional)).has("expectedRevision"));
+    assertThrows(
+        MismatchedInputException.class,
+        () ->
+            mapper.readValue(
+                "{\"expectedRevision\":null,\"updates\":[{\"@type\":\"rename\",\"newName\":\"New\"}]}",
+                TermUpdatesRequest.class));
   }
 
   @Test

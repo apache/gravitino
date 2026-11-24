@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.server.web.rest;
 
+import com.codahale.metrics.annotation.ResponseMetered;
+import com.codahale.metrics.annotation.Timed;
 import com.google.common.base.Preconditions;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
@@ -46,21 +48,20 @@ import org.apache.gravitino.dto.responses.TermTreeResponse;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NotFoundException;
-import org.apache.gravitino.exceptions.TermVersionConflictException;
 import org.apache.gravitino.glossary.GlossaryManager;
 import org.apache.gravitino.glossary.GlossaryTerm;
 import org.apache.gravitino.glossary.GlossaryTermViews;
+import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Metalake-scoped glossary term definitions and hierarchy. */
 @Path("/metalakes/{metalake}/terms")
 @Produces("application/vnd.gravitino.v1+json")
 public class TermOperations {
-  private static final Logger LOG = LoggerFactory.getLogger(TermOperations.class);
+  private static final ExceptionHandler COMMON_ERRORS =
+      new ExceptionHandlers.BaseExceptionHandler();
   private final GlossaryTermViews views;
   @Context private HttpServletRequest httpRequest;
 
@@ -72,6 +73,8 @@ public class TermOperations {
 
   /** Lists visible names or full snapshots matching the supplied filters. */
   @GET
+  @Timed(name = "list-terms." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-terms", absolute = true)
   @AuthorizationExpression(expression = "")
   public Response list(
       @PathParam("metalake") @AuthorizationMetadata(type = EntityType.METALAKE) String metalake,
@@ -82,36 +85,50 @@ public class TermOperations {
       @QueryParam("match") String match,
       @QueryParam("bindings") String bindings) {
     return execute(
+        OperationType.LIST,
+        metalake,
+        null,
         () -> {
           Preconditions.checkArgument(
               match == null && bindings == null,
               "Term lookup and binding expansion are not supported");
-          GlossaryTermViews filtered = filtered(status);
+          GlossaryTerm.Status filter = parseStatus(status);
           return details
-              ? Utils.ok(new TermListResponse(filtered.list(metalake, domain, nameContains)))
-              : Utils.ok(new NameListResponse(filtered.names(metalake, domain, nameContains)));
+              ? Utils.ok(new TermListResponse(views.list(metalake, domain, nameContains, filter)))
+              : Utils.ok(new NameListResponse(views.names(metalake, domain, nameContains, filter)));
         });
   }
 
   /** Reads a visible glossary definition. */
   @GET
   @Path("{term}")
+  @Timed(name = "get-term." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "get-term", absolute = true)
   @AuthorizationExpression(expression = "")
   public Response get(
       @PathParam("metalake") @AuthorizationMetadata(type = EntityType.METALAKE) String metalake,
       @PathParam("term") String term,
       @QueryParam("status") String status) {
-    return execute(() -> Utils.ok(new TermResponse(filtered(status).get(metalake, term))));
+    return execute(
+        OperationType.GET,
+        metalake,
+        term,
+        () -> Utils.ok(new TermResponse(views.get(metalake, term, parseStatus(status)))));
   }
 
   /** Creates the definition and its initial relationships atomically. */
   @POST
   @Consumes("application/json")
+  @Timed(name = "create-term." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "create-term", absolute = true)
   @AuthorizationExpression(expression = "")
   public Response create(
       @PathParam("metalake") @AuthorizationMetadata(type = EntityType.METALAKE) String metalake,
       TermCreateRequest request) {
     return execute(
+        OperationType.CREATE,
+        metalake,
+        null,
         () -> {
           Preconditions.checkArgument(request != null, "Request body is required");
           return Utils.ok(new TermResponse(views.create(metalake, request.toSpec())));
@@ -122,12 +139,17 @@ public class TermOperations {
   @PUT
   @Path("{term}")
   @Consumes("application/json")
+  @Timed(name = "alter-term." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "alter-term", absolute = true)
   @AuthorizationExpression(expression = "")
   public Response alter(
       @PathParam("metalake") @AuthorizationMetadata(type = EntityType.METALAKE) String metalake,
       @PathParam("term") String term,
       TermUpdatesRequest request) {
     return execute(
+        OperationType.ALTER,
+        metalake,
+        term,
         () -> {
           Preconditions.checkArgument(request != null, "Request body is required");
           return Utils.ok(
@@ -139,16 +161,24 @@ public class TermOperations {
   /** Drops a visible term and returns whether it existed. */
   @DELETE
   @Path("{term}")
+  @Timed(name = "delete-term." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "delete-term", absolute = true)
   @AuthorizationExpression(expression = "")
   public Response drop(
       @PathParam("metalake") @AuthorizationMetadata(type = EntityType.METALAKE) String metalake,
       @PathParam("term") String term) {
-    return execute(() -> Utils.ok(new DropResponse(views.drop(metalake, term))));
+    return execute(
+        OperationType.DELETE,
+        metalake,
+        term,
+        () -> Utils.ok(new DropResponse(views.drop(metalake, term))));
   }
 
   /** Walks the visible hierarchy transitively in the requested direction. */
   @GET
   @Path("{term}/hierarchy")
+  @Timed(name = "get-term-hierarchy." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "get-term-hierarchy", absolute = true)
   @AuthorizationExpression(expression = "")
   public Response hierarchy(
       @PathParam("metalake") @AuthorizationMetadata(type = EntityType.METALAKE) String metalake,
@@ -156,23 +186,25 @@ public class TermOperations {
       @QueryParam("direction") @DefaultValue("NARROWER") String direction,
       @QueryParam("status") String status) {
     return execute(
+        OperationType.LIST,
+        metalake,
+        term,
         () -> {
           GlossaryManager.Direction walk = GlossaryManager.Direction.valueOf(direction);
           Preconditions.checkArgument(
               walk != GlossaryManager.Direction.RELATED, "direction must be BROADER or NARROWER");
-          return Utils.ok(new TermTreeResponse(filtered(status).hierarchy(metalake, term, walk)));
+          return Utils.ok(
+              new TermTreeResponse(views.hierarchy(metalake, term, walk, parseStatus(status))));
         });
   }
 
-  private GlossaryTermViews filtered(@Nullable String status) {
-    if (status == null) {
-      return views;
-    }
-    GlossaryTerm.Status value = GlossaryTerm.Status.valueOf(status);
-    return views.withStatus(value);
+  @Nullable
+  private static GlossaryTerm.Status parseStatus(@Nullable String status) {
+    return status == null ? null : GlossaryTerm.Status.valueOf(status);
   }
 
-  private Response execute(Supplier<Response> action) {
+  private Response execute(
+      OperationType operation, String metalake, @Nullable String term, Supplier<Response> action) {
     try {
       return Utils.doAs(httpRequest, action::get);
     } catch (IllegalArgumentException e) {
@@ -181,13 +213,10 @@ public class TermOperations {
       return Utils.notFound(e.getMessage(), e);
     } catch (ForbiddenException e) {
       return Utils.forbidden(e.getMessage(), e);
-    } catch (TermVersionConflictException e) {
-      return Utils.optimisticLockConflict(e.getMessage(), e);
     } catch (AlreadyExistsException e) {
       return Utils.alreadyExists(e.getMessage(), e);
     } catch (Exception e) {
-      LOG.error("Glossary operation failed", e);
-      return Utils.internalError("Glossary operation failed", e);
+      return COMMON_ERRORS.handle(operation, term, metalake, e);
     }
   }
 }

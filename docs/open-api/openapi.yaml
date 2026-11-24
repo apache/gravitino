@@ -498,7 +498,7 @@ components:
         side. Used for server 5xx errors without more specific documentation in
         individual routes.
       content:
-        application/vnd.gravitino.v1+json:
+        application/vnd.gravitino.v1+json: &serverErrorJson
           schema:
             $ref: "#/components/schemas/ErrorModel"
           example: {
@@ -509,11 +509,12 @@ components:
               "java.lang.RuntimeException: Internal Server Error"
             ]
           }
+        application/json: *serverErrorJson
 
     DropResponse:
       description: Represents a response for a drop operation
       content:
-        application/vnd.gravitino.v1+json:
+        application/vnd.gravitino.v1+json: &dropJson
           schema:
             type: object
             properties:
@@ -526,6 +527,7 @@ components:
               dropped:
                 type: boolean
                 description: Whether the drop operation was successful
+        application/json: *dropJson
 
     RemoveResponse:
       description: Represents a response for a remove operation
