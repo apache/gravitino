@@ -59,6 +59,7 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.apache.gravitino.exceptions.TermAlreadyExistsException;
@@ -811,6 +812,58 @@ class TestGlossaryAuthorization extends TestJDBCBackend {
     assertEquals(
         "writer2",
         as("writer2", () -> dispatcher.getOwner(LAKE, object(term))).orElseThrow().name());
+  }
+
+  /** An extra visibility filter must hide a term from every read and write, not only relations. */
+  @TestTemplate
+  void testVisibilityFilterAppliesToEveryReadAndWrite() throws Exception {
+    GlossaryTermEntity hidden =
+        as("admin", () -> manager.createTerm(LAKE, TermSpec.builder("Hidden").build()));
+    as("admin", () -> manager.createTerm(LAKE, TermSpec.builder("Shown").build()));
+    GlossaryManager filtered = manager.withTermVisibility(term -> !term.name().equals("Hidden"));
+    as(
+        "admin",
+        () -> {
+          assertTrue(filtered.listTerms(LAKE).stream().anyMatch(t -> t.name().equals("Shown")));
+          assertFalse(filtered.listTerms(LAKE).stream().anyMatch(t -> t.name().equals("Hidden")));
+          assertEquals("Shown", filtered.getTerm(LAKE, "Shown").name());
+          assertThrows(NoSuchTermException.class, () -> filtered.getTerm(LAKE, "Hidden"));
+          assertThrows(
+              NoSuchTermException.class,
+              () -> filtered.alterTerm(LAKE, "Hidden", TermChange.updateDefinition("edited")));
+          assertThrows(
+              NoSuchTermException.class,
+              () ->
+                  filtered.alterTerm(
+                      LAKE,
+                      "Hidden",
+                      hidden.revisionToken(),
+                      TermChange.updateDefinition("edited")));
+          assertFalse(filtered.dropTerm(LAKE, "Hidden"));
+          return null;
+        });
+    assertEquals(
+        hidden.revisionToken(), as("admin", () -> manager.getTerm(LAKE, "Hidden")).revisionToken());
+  }
+
+  /**
+   * Owner reads cannot tell a hidden term from a missing one; a transfer reports the missing term.
+   */
+  @TestTemplate
+  void testOwnerOperationsOnMissingTerm() throws Exception {
+    MetadataObject ghost = MetadataObjects.of(null, "ghost", MetadataObject.Type.GLOSSARY_TERM);
+    for (String user : List.of("lakeOwner", "admin", "viewer")) {
+      assertThrows(ForbiddenException.class, () -> as(user, () -> owners.getOwner(LAKE, ghost)));
+    }
+    assertThrows(
+        NoSuchMetadataObjectException.class,
+        () ->
+            as(
+                "lakeOwner",
+                () -> {
+                  owners.setOwner(LAKE, ghost, "writer", Owner.Type.USER);
+                  return null;
+                }));
   }
 
   private static UserPrincipal principal(String user, @Nullable String group) {

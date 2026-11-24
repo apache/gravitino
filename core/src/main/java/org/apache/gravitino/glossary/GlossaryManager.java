@@ -99,7 +99,11 @@ public final class GlossaryManager {
     this.handler = handler;
   }
 
-  /** Applies an additional visibility filter to hierarchy reads and referenced terms in writes. */
+  /**
+   * Applies an additional visibility filter to every term this manager reads or writes, including
+   * the term an edit targets and the terms a write references. A term the filter rejects is
+   * reported as missing. Filters compose: a term must pass every filter added to this manager.
+   */
   public GlossaryManager withTermVisibility(Predicate<GlossaryTermEntity> visibility) {
     return new GlossaryManager(
         ids, authorizationEnabled, handler, readable.and(visibility), depthLimit);
@@ -204,7 +208,9 @@ public final class GlossaryManager {
    */
   public List<GlossaryTermEntity> listTerms(String metalake, @Nullable String domain) {
     if (!authorizationEnabled && domain == null) {
-      return loadTerms(metalake);
+      List<GlossaryTermEntity> all = loadTerms(metalake);
+      all.removeIf(term -> !readable.test(term));
+      return all;
     }
     return SqlSessions.readSnapshot(
         () -> {
@@ -226,7 +232,7 @@ public final class GlossaryManager {
             Set<Long> scope = domainScope(metalake, metalakeId, domain, access);
             result = terms.getByIds(ns, metalakeId, DOMAINS.termIds(metalakeId, scope));
           }
-          result.removeIf(term -> !access.canRead(term));
+          result.removeIf(term -> !access.canRead(term) || !readable.test(term));
           return visibleDomains(result, access);
         });
   }
@@ -241,7 +247,7 @@ public final class GlossaryManager {
   public GlossaryTermEntity getTerm(String metalake, String name) {
     NameIdentifier ident = NameIdentifierUtil.ofGlossaryTerm(metalake, name);
     if (!authorizationEnabled) {
-      return relationRoot(ident).term();
+      return requireVisible(ident, relationRoot(ident).term());
     }
     return SqlSessions.readSnapshot(
         () -> {
@@ -251,7 +257,7 @@ public final class GlossaryManager {
           if (!access.canRead(term)) {
             throw missingRelationRoot(ident);
           }
-          return visibleDomains(term, access);
+          return visibleDomains(requireVisible(ident, term), access);
         });
   }
 
@@ -358,7 +364,7 @@ public final class GlossaryManager {
             return false;
           }
           GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
-          if (!access.canRead(root)) {
+          if (!access.canRead(root) || !readable.test(root)) {
             return false;
           }
           if (!access.manage()) {
@@ -375,6 +381,10 @@ public final class GlossaryManager {
               locks,
               () -> {
                 GlossaryTermEntity locked = terms.get(ident);
+                // Content-only edits can change visibility while the hierarchy mutex is held.
+                if (!readable.test(locked)) {
+                  return false;
+                }
                 handler.handle(
                     locked,
                     null,
@@ -406,8 +416,10 @@ public final class GlossaryManager {
       boolean conditional,
       @Nullable String token,
       TermChange[] changes) {
+    Preconditions.checkArgument(
+        changes != null && changes.length > 0, "At least one term change is required");
     NameIdentifier ident = NameIdentifierUtil.ofGlossaryTerm(metalake, name);
-    TermChange[] request = changes == null ? new TermChange[0] : changes.clone();
+    TermChange[] request = changes.clone();
     List<TermRelations.Edit> edits = new ArrayList<>();
     List<TermDomains.Edit> domainEdits = new ArrayList<>();
     List<TermChange> content = new ArrayList<>();
@@ -435,7 +447,7 @@ public final class GlossaryManager {
                 access,
                 false,
                 locked -> {
-                  requireEdit(access, ident, locked, readable);
+                  requireEdit(access, ident, locked);
                   checkRevision(ident, locked, conditional, token);
                 },
                 (locked, plan) ->
@@ -459,8 +471,7 @@ public final class GlossaryManager {
           GlossaryTermEntity before =
               locked.orElseThrow(() -> new NoSuchTermException("Term %s does not exist", ident));
           GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
-          requireEdit(access, ident, before, null);
-          Preconditions.checkArgument(request.length > 0, "At least one term change is required");
+          requireEdit(access, ident, before);
           checkRevision(ident, before, conditional, token);
           TermDomains domains =
               domainEdits.isEmpty() && before.domains().length == 0
@@ -472,14 +483,11 @@ public final class GlossaryManager {
         });
   }
 
-  private static void requireEdit(
-      GlossaryAccess access,
-      NameIdentifier ident,
-      GlossaryTermEntity term,
-      @Nullable Predicate<GlossaryTermEntity> relationFilter) {
-    if (!access.canRead(term) || (relationFilter != null && !relationFilter.test(term))) {
+  private void requireEdit(GlossaryAccess access, NameIdentifier ident, GlossaryTermEntity term) {
+    if (!access.canRead(term)) {
       throw missingRelationRoot(ident);
     }
+    requireVisible(ident, term);
     // Draft visibility already required edit access, including any live owner lookup.
     if (term.status() != GlossaryTerm.Status.DRAFT && !access.canEdit(term)) {
       throw new ForbiddenException(
@@ -584,6 +592,13 @@ public final class GlossaryManager {
     } catch (NoSuchEntityException missing) {
       throw missingRelationRoot(ident);
     }
+  }
+
+  private GlossaryTermEntity requireVisible(NameIdentifier ident, GlossaryTermEntity term) {
+    if (!readable.test(term)) {
+      throw missingRelationRoot(ident);
+    }
+    return term;
   }
 
   private GlossaryTermEntity loadRootForView(

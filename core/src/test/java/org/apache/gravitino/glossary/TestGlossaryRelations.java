@@ -57,6 +57,7 @@ import org.apache.gravitino.storage.relational.service.GlossaryInvariants;
 import org.apache.gravitino.storage.relational.service.GlossaryTermRelService.RelationType;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.TestTemplate;
 import org.mockito.AdditionalAnswers;
 import org.mockito.MockedStatic;
@@ -518,6 +519,40 @@ class TestGlossaryRelations extends TestJDBCBackend {
       GlossaryInvariants.assertDomainMembership();
     } finally {
       release.countDown();
+      pool.shutdownNow();
+    }
+  }
+
+  @TestTemplate
+  void testDropRechecksVisibilityAfterConcurrentPropertyEdit() throws Exception {
+    Assumptions.assumeFalse("h2".equals(backendType), "H2 serializes writes on the metalake row");
+    createAndInsertMakeLake(LAKE);
+    create("target", "peer");
+    edit("target", TermChange.addRelated("peer"));
+    String peerRevision = get("peer").revisionToken();
+    CountDownLatch checked = new CountDownLatch(1);
+    CountDownLatch edited = new CountDownLatch(1);
+    GlossaryManager dropper =
+        manager.withTermVisibility(
+            term -> {
+              boolean visible = !term.properties().containsKey("hidden");
+              checked.countDown();
+              await(edited);
+              return visible;
+            });
+    ExecutorService pool = Executors.newSingleThreadExecutor();
+    try {
+      Future<Boolean> dropped = pool.submit(() -> dropper.dropTerm(LAKE, "target"));
+      await(checked);
+      edit("target", TermChange.setProperty("hidden", "true"));
+      edited.countDown();
+      assertFalse(dropped.get(20, TimeUnit.SECONDS));
+      assertEquals("true", get("target").properties().get("hidden"));
+      assertEquals(peerRevision, get("peer").revisionToken());
+      assertEquals(
+          List.of("target"), names(manager.listRelations(LAKE, "peer", RELATED, false, null)));
+    } finally {
+      edited.countDown();
       pool.shutdownNow();
     }
   }

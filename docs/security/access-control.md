@@ -266,6 +266,9 @@ terms. `CREATE_DEFINITION` includes view access and lets callers create terms an
 terms, including drafts. Ownership can be held directly or through a group. `MANAGE_DEFINITIONS`
 includes both privileges and allows viewing, editing, and deleting any term in the metalake.
 
+Deleting a term always requires effective `MANAGE_DEFINITIONS`, in every status. Owning a term
+with `CREATE_DEFINITION` allows editing it, including returning it to draft, but never deleting it.
+
 An explicit deny of view access hides every term and blocks changes to its definition. An explicit
 deny of create access prevents creation even for a manager. The metalake owner can manage all terms.
 

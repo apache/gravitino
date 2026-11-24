@@ -87,7 +87,8 @@ public interface OwnerDispatcher {
    * @param metalake the name of the metalake
    * @param metadataObject the metadata object for which the owner is being retrieved
    * @return an Optional containing the owner if it exists, otherwise an empty Optional
-   * @throws ForbiddenException if the caller cannot view the glossary term
+   * @throws ForbiddenException if a glossary term is hidden from the caller or does not exist;
+   *     reads do not distinguish the two
    */
   Optional<Owner> getOwner(String metalake, MetadataObject metadataObject);
 }

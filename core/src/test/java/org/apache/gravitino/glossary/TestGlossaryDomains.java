@@ -475,6 +475,8 @@ class TestGlossaryDomains extends TestJDBCBackend {
     assertEquals(
         List.of("A", "B", "C"), names(as("lakeOwner", () -> manager.listTerms(LAKE, "Sales"))));
     assertEquals(List.of("B"), names(as("writer", () -> manager.listTerms(LAKE, "Retail"))));
+    GlossaryManager filtered = manager.withTermVisibility(term -> !term.name().equals("B"));
+    assertEquals(List.of("A"), names(as("writer", () -> filtered.listTerms(LAKE, "Sales"))));
   }
 
   /** T7.8: hidden domains never appear in returned terms, and reads change nothing. */
