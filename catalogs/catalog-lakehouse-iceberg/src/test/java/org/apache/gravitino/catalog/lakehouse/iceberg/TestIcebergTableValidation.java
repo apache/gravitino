@@ -89,6 +89,57 @@ class TestIcebergTableValidation {
     assertFalse(operations.tableExists(table("duplicates")));
   }
 
+  @ParameterizedTest
+  @MethodSource("unparsedTypes")
+  void testUnparsedTypeOnCreateIsBadRequest(Type type) {
+    IllegalArgumentException error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> create("unparsed_type", new Column[] {Column.of("id", type)}));
+    assertTrue(error.getMessage().contains("bigintz"));
+    assertTrue(error.getMessage().contains("column 'id'"));
+    assertEquals(400, tableError(OperationType.CREATE, error));
+    assertFalse(operations.tableExists(table("unparsed_type")));
+  }
+
+  @ParameterizedTest
+  @MethodSource("unparsedTypes")
+  void testUnparsedTypeOnAddLeavesSchemaUnchanged(Type type) {
+    createOrdinaryTable("unparsed_add");
+    for (boolean nullable : new boolean[] {true, false}) {
+      IllegalArgumentException error =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  operations.alterTable(
+                      table("unparsed_add"),
+                      TableChange.addColumn(new String[] {"valid"}, Types.StringType.get()),
+                      TableChange.addColumn(new String[] {"bad"}, type, nullable)));
+      assertTrue(error.getMessage().contains("bigintz"));
+      assertEquals(400, tableError(OperationType.ALTER, error));
+      assertOrdinaryColumns("unparsed_add");
+    }
+  }
+
+  @Test
+  void testUnparsedTypeOnUpdateLeavesSchemaUnchanged() {
+    createOrdinaryTable("unparsed_update");
+    IllegalArgumentException error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                operations.alterTable(
+                    table("unparsed_update"),
+                    TableChange.updateColumnType(
+                        new String[] {"id"}, Types.UnparsedType.of("bigintz"))));
+    assertTrue(error.getMessage().contains("bigintz"));
+    assertEquals(400, tableError(OperationType.ALTER, error));
+    assertOrdinaryColumns("unparsed_update");
+    assertEquals(
+        Types.LongType.get(),
+        operations.loadTable(table("unparsed_update")).columns()[0].dataType());
+  }
+
   @Test
   void testRenameColumnConflictLeavesSchemaUnchanged() {
     createOrdinaryTable("rename_column");
@@ -194,6 +245,18 @@ class TestIcebergTableValidation {
         new SortOrder[0],
         new Index[0]);
     assertEquals(type, operations.loadTable(table("version_three")).columns()[0].dataType());
+  }
+
+  private static Stream<Type> unparsedTypes() {
+    Type unparsed = Types.UnparsedType.of("bigintz");
+    return Stream.of(
+        unparsed,
+        Types.ListType.nullable(unparsed),
+        Types.MapType.valueNullable(unparsed, Types.StringType.get()),
+        Types.MapType.valueNullable(Types.StringType.get(), unparsed),
+        Types.StructType.of(Types.StructType.Field.nullableField("nested", unparsed)),
+        Types.ListType.nullable(
+            Types.StructType.of(Types.StructType.Field.nullableField("nested", unparsed))));
   }
 
   private static Stream<Type> versionThreeTypes() {

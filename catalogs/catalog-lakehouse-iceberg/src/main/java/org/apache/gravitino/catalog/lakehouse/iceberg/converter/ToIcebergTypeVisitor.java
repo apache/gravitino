@@ -50,12 +50,17 @@ public class ToIcebergTypeVisitor<T> {
       Types.StructType.Field[] fields = ((Types.StructType) type).fields();
       List<T> fieldResults = Lists.newArrayListWithExpectedSize(fields.length);
       for (Types.StructType.Field field : fields) {
-        fieldResults.add(visitor.field(field, visit(field.type(), visitor)));
+        fieldResults.add(visitField(field, visitor));
       }
       return visitor.struct((Types.StructType) type, fieldResults);
     } else if (type instanceof Types.NullType) {
       // NullType implements Type directly rather than PrimitiveType, so it needs its own dispatch.
       return visitor.nullType((Types.NullType) type);
+    } else if (type instanceof Types.UnparsedType) {
+      throw new IllegalArgumentException(
+          "Unsupported type '"
+              + ((Types.UnparsedType) type).unparsedType()
+              + "' for an Iceberg table");
     } else {
       return visitor.atomic((Type.PrimitiveType) type);
     }
@@ -87,5 +92,14 @@ public class ToIcebergTypeVisitor<T> {
 
   public T nullType(Types.NullType nullType) {
     throw new UnsupportedOperationException();
+  }
+
+  private static <T> T visitField(Types.StructType.Field field, ToIcebergTypeVisitor<T> visitor) {
+    try {
+      return visitor.field(field, visit(field.type(), visitor));
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          "Cannot convert column '" + field.name() + "' to an Iceberg type: " + e.getMessage(), e);
+    }
   }
 }
