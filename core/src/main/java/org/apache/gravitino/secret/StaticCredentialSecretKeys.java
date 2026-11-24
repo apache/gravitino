@@ -43,28 +43,14 @@ import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
 
 /**
- * Static credential types and property keys for {@code getSecrets} authorization filtering ({@code
- * INCLUDE_CREDENTIAL_SECRETS}). Lives in {@code core} with access to {@code api} credential-type
- * constants.
+ * Static credential type → property keys for {@code getSecrets} filtering when the caller has
+ * {@code USE_SECRETS} but not {@code INCLUDE_CREDENTIAL_SECRETS}. Token providers are absent.
  *
- * <p>Includes Glue AWS, Paimon DLF, JDBC, and cloud storage static keys, indexed by
- * credential-provider type. GVFS clients only drop masked {@code properties()} placeholders when
- * merging into HCFS config ({@code BaseGVFSOperations}); they do not re-apply this denylist.
+ * <p>Includes Glue AWS, Paimon DLF, JDBC, and cloud storage static keys. GVFS only drops masked
+ * {@code properties()} placeholders in {@code BaseGVFSOperations}.
  */
-public final class StaticCredentialSecretKeys {
+final class StaticCredentialSecretKeys {
 
-  /** JDBC username property used by the {@code jdbc-user-password} credential provider. */
-  public static final String JDBC_USER = JdbcCredential.GRAVITINO_JDBC_USER;
-
-  /** JDBC password property used by the {@code jdbc-user-password} credential provider. */
-  public static final String JDBC_PASSWORD = JdbcCredential.GRAVITINO_JDBC_PASSWORD;
-
-  /**
-   * Static credential type → property keys omitted from {@code getSecrets()} when the caller has
-   * {@code USE_SECRETS} but not {@code INCLUDE_CREDENTIAL_SECRETS}. Map keys are
-   * credential-provider types ({@link
-   * org.apache.gravitino.credential.Credential#credentialType()}). Token providers are absent.
-   */
   private static final Map<String, Set<String>> KEYS_BY_CREDENTIAL_TYPE =
       ImmutableMap.<String, Set<String>>builder()
           .put(
@@ -96,7 +82,10 @@ public final class StaticCredentialSecretKeys {
                   PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID,
                   PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET,
                   PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN))
-          .put(JdbcCredential.JDBC_CREDENTIAL_TYPE, ImmutableSet.of(JDBC_USER, JDBC_PASSWORD))
+          .put(
+              JdbcCredential.JDBC_CREDENTIAL_TYPE,
+              ImmutableSet.of(
+                  JdbcCredential.GRAVITINO_JDBC_USER, JdbcCredential.GRAVITINO_JDBC_PASSWORD))
           .build();
 
   /**
@@ -116,90 +105,39 @@ public final class StaticCredentialSecretKeys {
 
   private StaticCredentialSecretKeys() {}
 
-  /**
-   * Returns whether {@code key} is a static credential secret for {@code getSecrets} without {@code
-   * INCLUDE_CREDENTIAL_SECRETS}.
-   *
-   * @param key property key
-   * @return true when the key is in the derived static-credential secret set
-   */
-  public static boolean isStaticCredentialSecretKey(@Nullable String key) {
-    return key != null && ALL_STATIC_CREDENTIAL_SECRET_KEYS.contains(key);
+  /** All static credential secret keys (conservative omit when metadata is unavailable). */
+  static Set<String> allKeys() {
+    return ALL_STATIC_CREDENTIAL_SECRET_KEYS;
   }
 
   /**
-   * Returns property keys for a static credential type, or an empty set for unknown or token types.
-   *
-   * @param credentialType credential-provider type
-   * @return property keys for that type; never null
+   * Static credential property keys implied by a comma-separated {@code credential-providers} value
+   * on {@code properties}. Token providers are ignored.
    */
-  public static Set<String> keysForCredentialType(@Nullable String credentialType) {
-    if (credentialType == null || credentialType.isEmpty()) {
+  static Set<String> keysForCredentialProviders(@Nullable Map<String, String> properties) {
+    if (properties == null || properties.isEmpty()) {
       return ImmutableSet.of();
     }
-    Set<String> keys = KEYS_BY_CREDENTIAL_TYPE.get(credentialType.toLowerCase(Locale.ROOT));
-    return keys == null ? ImmutableSet.of() : keys;
-  }
-
-  /**
-   * Returns static credential property keys implied by a comma-separated {@code
-   * credential-providers} value. Token providers are ignored.
-   *
-   * @param credentialProviders raw {@code credential-providers} value, or null
-   * @return union of keys for enabled static types; never null
-   */
-  public static Set<String> keysForCredentialProviders(@Nullable String credentialProviders) {
+    String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
     if (StringUtils.isBlank(credentialProviders)) {
       return ImmutableSet.of();
     }
     Set<String> keys = new HashSet<>();
     for (String provider : credentialProviders.split(",")) {
-      keys.addAll(keysForCredentialType(provider.trim()));
+      String type = provider.trim();
+      if (type.isEmpty()) {
+        continue;
+      }
+      Set<String> forType = KEYS_BY_CREDENTIAL_TYPE.get(type.toLowerCase(Locale.ROOT));
+      if (forType != null) {
+        keys.addAll(forType);
+      }
     }
     return keys;
   }
 
-  /**
-   * Returns static credential keys from {@code credential-providers} on {@code properties}.
-   *
-   * @param properties entity properties, or null
-   * @return union of keys for enabled static types; never null
-   */
-  public static Set<String> keysForCredentialProviders(@Nullable Map<String, String> properties) {
-    if (properties == null || properties.isEmpty()) {
-      return ImmutableSet.of();
-    }
-    return keysForCredentialProviders(properties.get(CredentialConstants.CREDENTIAL_PROVIDERS));
-  }
-
-  /**
-   * Returns all static credential secret keys for conservative {@code getSecrets} omit (when object
-   * metadata is unavailable).
-   */
-  public static Set<String> staticCredentialSecretKeys() {
-    return ALL_STATIC_CREDENTIAL_SECRET_KEYS;
-  }
-
-  /**
-   * Returns a copy of {@code secrets} with every static credential secret key removed. Prefer
-   * {@link #omitStaticCredentialSecrets(Map, Set)} with an object-scoped key set.
-   *
-   * @param secrets plaintext secrets
-   * @return filtered secrets
-   */
-  public static Map<String, String> omitStaticCredentialSecrets(
-      @Nullable Map<String, String> secrets) {
-    return omitStaticCredentialSecrets(secrets, ALL_STATIC_CREDENTIAL_SECRET_KEYS);
-  }
-
-  /**
-   * Returns a copy of {@code secrets} with keys in {@code keysToOmit} removed.
-   *
-   * @param secrets plaintext secrets
-   * @param keysToOmit keys to drop; {@code null} uses the full derived set
-   * @return filtered secrets
-   */
-  public static Map<String, String> omitStaticCredentialSecrets(
+  /** Returns a copy of {@code secrets} with keys in {@code keysToOmit} removed. */
+  static Map<String, String> omit(
       @Nullable Map<String, String> secrets, @Nullable Set<String> keysToOmit) {
     if (secrets == null || secrets.isEmpty()) {
       return ImmutableMap.of();

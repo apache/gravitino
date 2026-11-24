@@ -320,14 +320,14 @@ public class TestSecretPropertyUtils {
             "AKIA");
 
     Map<String, String> jdbcFiltered =
-        SecretPropertyUtils.omitCloudAccessKeyPairSecrets(secrets, jdbcMetadata, null);
+        SecretPropertyUtils.omitStaticCredentialSecrets(secrets, jdbcMetadata, null);
     Assertions.assertEquals("keep", jdbcFiltered.get("custom-secret"));
     Assertions.assertEquals("AKIA", jdbcFiltered.get("s3-access-key-id"));
     Assertions.assertFalse(jdbcFiltered.containsKey("jdbc-user"));
     Assertions.assertFalse(jdbcFiltered.containsKey("jdbc-password"));
 
     Map<String, String> hiveFiltered =
-        SecretPropertyUtils.omitCloudAccessKeyPairSecrets(secrets, hiveMetadata, null);
+        SecretPropertyUtils.omitStaticCredentialSecrets(secrets, hiveMetadata, null);
     Assertions.assertEquals("db-user", hiveFiltered.get("jdbc-user"));
     Assertions.assertEquals("db-pass", hiveFiltered.get("jdbc-password"));
     Assertions.assertEquals("keep", hiveFiltered.get("custom-secret"));
@@ -343,17 +343,10 @@ public class TestSecretPropertyUtils {
         Map.of(CredentialConstants.CREDENTIAL_PROVIDERS, "jdbc-user-password,s3-token");
 
     Map<String, String> filtered =
-        SecretPropertyUtils.omitCloudAccessKeyPairSecrets(secrets, emptyMetadata, raw);
+        SecretPropertyUtils.omitStaticCredentialSecrets(secrets, emptyMetadata, raw);
     Assertions.assertEquals("keep", filtered.get("custom-secret"));
     Assertions.assertFalse(filtered.containsKey("jdbc-user"));
     Assertions.assertFalse(filtered.containsKey("jdbc-password"));
-  }
-
-  @Test
-  void testResolveStaticCredentialKeysToOmitNullMetadataIsConservative() {
-    Assertions.assertEquals(
-        StaticCredentialSecretKeys.staticCredentialSecretKeys(),
-        SecretPropertyUtils.resolveStaticCredentialKeysToOmit(null, null));
   }
 
   @Test

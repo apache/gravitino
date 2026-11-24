@@ -416,62 +416,34 @@ public final class SecretPropertyUtils {
   }
 
   /**
-   * Omits every known static credential key from {@code secrets}. Prefer {@link
-   * #omitCloudAccessKeyPairSecrets(Map, PropertiesMetadata, Map)} so same-named keys are only
-   * dropped when they are credential properties for that metadata object.
-   *
-   * @param secrets plaintext secrets
-   * @return secrets without static credential properties
-   */
-  public static Map<String, String> omitCloudAccessKeyPairSecrets(
-      @Nullable Map<String, String> secrets) {
-    return StaticCredentialSecretKeys.omitStaticCredentialSecrets(secrets);
-  }
-
-  /**
    * Omits static credential properties that apply to this metadata object for {@code USE_SECRETS}
    * callers that lack {@code INCLUDE_CREDENTIAL_SECRETS}.
    *
-   * <p>A key is omitted only when it is in the static-credential key set and either:
-   *
-   * <ul>
-   *   <li>declared in {@code metadata} for this object (for example {@code jdbc-user} on a JDBC
-   *       catalog, but not on a Hive catalog that happens to store the same key name), or
-   *   <li>used by a static {@code credential-providers} entry on {@code rawProperties} (for example
-   *       {@code jdbc-user-password} → {@code jdbc-user} / {@code jdbc-password}).
-   * </ul>
-   *
-   * <p>When {@code metadata} is {@code null}, falls back to omitting the full static-credential key
-   * set (conservative).
+   * <p>A key is omitted only when it is in the static-credential key set and either declared in
+   * {@code metadata}, or used by a static {@code credential-providers} entry on {@code
+   * rawProperties}. When {@code metadata} is {@code null}, omits the full static-credential key
+   * set.
    *
    * @param secrets plaintext secrets
    * @param metadata properties metadata for the object, or null when unavailable
    * @param rawProperties raw entity properties (for {@code credential-providers}), or null
    * @return secrets without object-scoped static credential properties
    */
-  public static Map<String, String> omitCloudAccessKeyPairSecrets(
+  public static Map<String, String> omitStaticCredentialSecrets(
       @Nullable Map<String, String> secrets,
       @Nullable PropertiesMetadata metadata,
       @Nullable Map<String, String> rawProperties) {
-    return StaticCredentialSecretKeys.omitStaticCredentialSecrets(
+    return StaticCredentialSecretKeys.omit(
         secrets, resolveStaticCredentialKeysToOmit(metadata, rawProperties));
   }
 
-  /**
-   * Resolves which static credential keys apply to this metadata object for {@code getSecrets}
-   * filtering.
-   *
-   * @param metadata properties metadata, or null
-   * @param rawProperties raw properties (may contain {@code credential-providers}), or null
-   * @return keys to omit for USE-only callers; never null
-   */
-  static Set<String> resolveStaticCredentialKeysToOmit(
+  private static Set<String> resolveStaticCredentialKeysToOmit(
       @Nullable PropertiesMetadata metadata, @Nullable Map<String, String> rawProperties) {
     if (metadata == null) {
-      return StaticCredentialSecretKeys.staticCredentialSecretKeys();
+      return StaticCredentialSecretKeys.allKeys();
     }
     Set<String> keys = new HashSet<>();
-    for (String key : StaticCredentialSecretKeys.staticCredentialSecretKeys()) {
+    for (String key : StaticCredentialSecretKeys.allKeys()) {
       if (metadata.containsProperty(key)) {
         keys.add(key);
       }

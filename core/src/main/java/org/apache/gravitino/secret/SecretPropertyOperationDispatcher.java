@@ -96,7 +96,7 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
         SecretPropertyUtils.buildSecrets(secretManager, loaded.rawProperties, loaded.metadata);
     if (!includeStaticCredentials) {
       secrets =
-          SecretPropertyUtils.omitCloudAccessKeyPairSecrets(
+          SecretPropertyUtils.omitStaticCredentialSecrets(
               secrets, loaded.metadata, loaded.rawProperties);
     }
     return secrets;
