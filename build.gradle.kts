@@ -392,6 +392,56 @@ abstract class StripShadedAvroTransform : TransformAction<TransformParameters.No
   }
 }
 
+/**
+ * Removes the Avro serializations from the `io.serializations` default in `core-default.xml` of the
+ * bundles that drop the shaded Avro.
+ *
+ * Without the shaded Avro, loading these serialization classes fails with NoClassDefFoundError, which
+ * SerializationFactory does not catch. SequenceFile and other users of SerializationFactory would then
+ * fail even for Writable types. Writable serialization keeps working after this change.
+ */
+@CacheableTransformer
+class ShadedAvroSerializationsTransformer : Transformer {
+  companion object {
+    const val RESOURCE = "core-default.xml"
+    private const val AVRO_SERIALIZATION_PREFIX = "org.apache.hadoop.io.serializer.avro."
+    private val PROPERTY = Regex("<name>io\\.serializations</name>\\s*<value>([^<]*)</value>")
+  }
+
+  private var content: ByteArray? = null
+
+  @Internal
+  override fun getName(): String = javaClass.simpleName
+
+  override fun canTransformResource(element: FileTreeElement): Boolean = element.relativePath.pathString == RESOURCE
+
+  override fun transform(context: TransformerContext) {
+    if (content != null) {
+      throw GradleException("Found more than one $RESOURCE")
+    }
+    val text = context.`is`.use { it.readBytes().toString(Charsets.UTF_8) }
+    val match = PROPERTY.findAll(text).singleOrNull()
+      ?: throw GradleException("Expected exactly one io.serializations property in $RESOURCE")
+    val values = match.groupValues[1].split(',').map { it.trim() }.filter { it.isNotEmpty() }
+    val kept = values.filterNot { it.startsWith(AVRO_SERIALIZATION_PREFIX) }
+    if (kept.size == values.size || kept.isEmpty()) {
+      throw GradleException("Unexpected io.serializations value in $RESOURCE: $values")
+    }
+    content = text.replaceRange(match.groups[1]!!.range, kept.joinToString(", ")).toByteArray(Charsets.UTF_8)
+  }
+
+  override fun hasTransformedResource(): Boolean = content != null
+
+  override fun modifyOutputStream(output: ZipOutputStream, preserveFileTimestamps: Boolean) {
+    val bytes = content ?: return
+    val entry = ZipEntry(RESOURCE)
+    entry.time = TransformerContext.getEntryTimestamp(preserveFileTimestamps, 0)
+    output.putNextEntry(entry)
+    output.write(bytes)
+    output.closeEntry()
+  }
+}
+
 // Projects whose runtime libraries ship hadoop-client-runtime in the distribution.
 val shadedAvroStrippedProjects = setOf(
   ":authorizations:authorization-ranger",
@@ -399,6 +449,15 @@ val shadedAvroStrippedProjects = setOf(
   ":catalogs:catalog-lakehouse-iceberg",
   ":iceberg:iceberg-rest-server",
   ":iceberg:iceberg-rest-server-experiment"
+)
+
+// Bundles whose shaded jars include hadoop-client-runtime.
+val shadedAvroStrippedBundles = setOf(
+  ":bundles:aliyun-bundle",
+  ":bundles:aws-bundle",
+  ":bundles:azure-bundle",
+  ":bundles:gcp-bundle",
+  ":bundles:tencent-bundle"
 )
 
 val snappyJavaVersion: String = libs.versions.snappy.java.get()
@@ -741,6 +800,19 @@ subprojects {
       .configureEach {
         attributes.attribute(StripShadedAvroTransform.STRIPPED, true)
       }
+  }
+  // The bundles drop the same entries from their shaded jars instead. The shadow plugin resolves
+  // the dependency files while it builds the task graph, before project jars exist, so the
+  // artifact transform above cannot run on the bundle classpaths. Remove this together with the
+  // transform.
+  if (project.path in shadedAvroStrippedBundles) {
+    plugins.withId("com.github.johnrengelman.shadow") {
+      tasks.named<ShadowJar>("shadowJar") {
+        exclude("${StripShadedAvroTransform.SHADED_AVRO_PREFIX}**")
+        exclude("${StripShadedAvroTransform.AVRO_METADATA_PREFIX}**")
+        transform(ShadedAvroSerializationsTransformer())
+      }
+    }
   }
 
   repositories {
