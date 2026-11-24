@@ -263,7 +263,8 @@ Tag ownership or a metalake-level `APPLY_TAG` grant alone is not sufficient. The
 can still assign or remove the tag.
 Associating a policy with a tag requires access to both: `APPLY_POLICY` on the policy and
 `APPLY_TAG` on the tag. For descriptive tags and policy association, ownership can satisfy the
-corresponding check.
+corresponding check. For binding an access-control policy, the caller also needs metalake-level
+`CREATE_POLICY` or metalake ownership.
 
 Reading a tag requires `VIEW_TAG` or `APPLY_TAG`; reading a policy requires `VIEW_POLICY` or
 `APPLY_POLICY`. The view privileges do not allow tag assignment or policy-to-tag association.

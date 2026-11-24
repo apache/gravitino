@@ -691,6 +691,30 @@ public class TestPolicyAuthorizationH2 extends TestJDBCBackend {
             "policyDeny",
             List.of(SecurableObjects.ofPolicy("policy", List.of(Privileges.ApplyPolicy.deny()))));
     putUser(store, metalake, "creator", List.of(creatorRoleId), List.of("createPolicy"));
+    putUser(
+        store,
+        metalake,
+        "creatorTag",
+        List.of(creatorRoleId, tagSideId),
+        List.of("createPolicy", "tagSide"));
+    putUser(
+        store,
+        metalake,
+        "creatorPolicy",
+        List.of(creatorRoleId, policySideId),
+        List.of("createPolicy", "policySide"));
+    putUser(
+        store,
+        metalake,
+        "creatorBoth",
+        List.of(creatorRoleId, tagSideId, policySideId),
+        List.of("createPolicy", "tagSide", "policySide"));
+    putUser(
+        store,
+        metalake,
+        "creatorDenied",
+        List.of(creatorRoleId, tagSideId, policySideId, policyDenyId),
+        List.of("createPolicy", "tagSide", "policySide", "policyDeny"));
     putUser(store, metalake, "tagSide", List.of(tagSideId), List.of("tagSide"));
     putUser(store, metalake, "policySide", List.of(policySideId), List.of("policySide"));
     putUser(
@@ -795,6 +819,14 @@ public class TestPolicyAuthorizationH2 extends TestJDBCBackend {
       assertFalse(bindingNames(policies, metalake, "policy").contains("fresh"));
       current.set(new UserPrincipal("creator"));
       assertTrue(authorizer.isMetalakeUser(metalake, new AuthorizationRequestContext()));
+      assertEquals(403, intercept(bindMethod, bindInvocation).getStatus());
+      assertFalse(bindingNames(policies, metalake, "policy").contains("fresh"));
+      for (String user : List.of("creatorTag", "creatorPolicy", "creatorDenied", "association")) {
+        current.set(new UserPrincipal(user));
+        assertEquals(403, intercept(bindMethod, bindInvocation).getStatus(), user);
+        assertFalse(bindingNames(policies, metalake, "policy").contains("fresh"));
+      }
+      current.set(new UserPrincipal("creatorBoth"));
       assertEquals(200, intercept(bindMethod, bindInvocation).getStatus());
       assertTrue(bindingNames(policies, metalake, "policy").contains("fresh"));
       Method unbindMethod = removePolicyFromTagMethod();
@@ -835,6 +867,8 @@ public class TestPolicyAuthorizationH2 extends TestJDBCBackend {
       assertEquals(200, associateCatalogTags(operations, metalake, addFresh).getStatus());
       assertEquals(1, tags.listMetadataObjectsForTag(metalake, "fresh").length);
       current.set(new UserPrincipal("creator"));
+      assertEquals(403, intercept(bindMethod, bindInvocation).getStatus());
+      current.set(new UserPrincipal("allowed"));
       assertEquals(200, intercept(bindMethod, bindInvocation).getStatus());
       assertTrue(bindingNames(policies, metalake, "policy").contains("fresh"));
       current.set(new UserPrincipal("metalakeOwner"));

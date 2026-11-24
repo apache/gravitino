@@ -137,6 +137,13 @@ public class TestBindTagPolicyAuthorizationExecutor {
       environments.when(GravitinoEnv::getInstance).thenReturn(env);
       when(policy.policyType()).thenReturn(Policy.BuiltInType.ACCESS_CONTROL);
       assertEquals(!binding, executor.execute(new AuthorizationRequestContext()));
+      if (binding) {
+        when(access.evaluate(anyMap(), anyMap(), any(), any())).thenReturn(true);
+        when(governance.evaluate(anyMap(), anyMap(), any(), any())).thenReturn(false);
+        assertEquals(false, executor.execute(new AuthorizationRequestContext()));
+        when(governance.evaluate(anyMap(), anyMap(), any(), any())).thenReturn(true);
+        assertTrue(executor.execute(new AuthorizationRequestContext()));
+      }
       when(policy.policyType()).thenReturn(Policy.BuiltInType.CUSTOM);
       assertTrue(executor.execute(new AuthorizationRequestContext()));
       extraChecks.accept(executor, dispatcher);
