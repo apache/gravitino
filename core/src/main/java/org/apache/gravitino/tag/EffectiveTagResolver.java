@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -30,6 +31,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -248,13 +250,15 @@ public class EffectiveTagResolver {
     }
 
     Map<MetadataObject, List<TagEntity>> directTags = new LinkedHashMap<>();
+    // Stored column names per table, so many columns of one table load that table only once.
+    Map<NameIdentifier, Set<String>> tableColumns = new HashMap<>();
     for (Map.Entry<Entity.EntityType, Set<MetadataObject>> entry : objectsByType.entrySet()) {
       List<NameIdentifier> identifiers = new ArrayList<>();
       Map<NameIdentifier, MetadataObject> objectsByIdentifier = new LinkedHashMap<>();
       try {
         for (MetadataObject object : entry.getValue()) {
           NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
-          if (storedOnly && !existsInStore(identifier, entry.getKey())) {
+          if (storedOnly && !existsInStore(identifier, entry.getKey(), tableColumns)) {
             continue;
           }
           identifiers.add(identifier);
@@ -303,22 +307,32 @@ public class EffectiveTagResolver {
     return result;
   }
 
-  private boolean existsInStore(NameIdentifier identifier, Entity.EntityType type)
+  private boolean existsInStore(
+      NameIdentifier identifier,
+      Entity.EntityType type,
+      Map<NameIdentifier, Set<String>> tableColumns)
       throws IOException {
     if (type != Entity.EntityType.COLUMN) {
       return entityStore.exists(identifier, type);
     }
     // Columns are stored with their table rather than as standalone entities.
-    try {
-      TableEntity table =
-          entityStore.get(
-              NameIdentifier.of(identifier.namespace().levels()),
-              Entity.EntityType.TABLE,
-              TableEntity.class);
-      return table.columns().stream().anyMatch(column -> column.name().equals(identifier.name()));
-    } catch (NoSuchEntityException e) {
-      return false;
+    NameIdentifier tableIdentifier = NameIdentifier.of(identifier.namespace().levels());
+    Set<String> columns = tableColumns.get(tableIdentifier);
+    if (columns == null) {
+      try {
+        columns =
+            entityStore
+                .get(tableIdentifier, Entity.EntityType.TABLE, TableEntity.class)
+                .columns()
+                .stream()
+                .map(column -> column.name())
+                .collect(Collectors.toSet());
+      } catch (NoSuchEntityException e) {
+        columns = Collections.emptySet();
+      }
+      tableColumns.put(tableIdentifier, columns);
     }
+    return columns.contains(identifier.name());
   }
 
   /**

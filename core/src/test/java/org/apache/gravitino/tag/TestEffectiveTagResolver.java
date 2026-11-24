@@ -58,6 +58,7 @@ import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -325,6 +326,30 @@ public class TestEffectiveTagResolver {
         Assertions.assertThrows(
             NoSuchMetadataObjectException.class, () -> resolver.resolve(METALAKE, TABLE));
     Assertions.assertSame(exception, actual.getCause());
+  }
+
+  @Test
+  void testDisplayReadLoadsStoredTableOncePerBatchOfColumns() throws Exception {
+    MetadataObject first =
+        MetadataObjects.of(
+            Arrays.asList("catalog", "schema", "table", "first"), MetadataObject.Type.COLUMN);
+    MetadataObject second =
+        MetadataObjects.of(
+            Arrays.asList("catalog", "schema", "table", "second"), MetadataObject.Type.COLUMN);
+    ColumnEntity firstColumn = mock(ColumnEntity.class);
+    when(firstColumn.name()).thenReturn("first");
+    ColumnEntity secondColumn = mock(ColumnEntity.class);
+    when(secondColumn.name()).thenReturn("second");
+    TableEntity stored = mock(TableEntity.class);
+    when(stored.columns()).thenReturn(List.of(firstColumn, secondColumn));
+    when(entityStore.get(any(), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(stored);
+    when(relationOperations.batchListEntitiesByRelation(any(), any(), any()))
+        .thenReturn(Collections.emptyList());
+
+    resolver.resolveWithSourcesForDisplay(METALAKE, List.of(first, second));
+
+    verify(entityStore, times(1)).get(any(), eq(Entity.EntityType.TABLE), eq(TableEntity.class));
   }
 
   @Test

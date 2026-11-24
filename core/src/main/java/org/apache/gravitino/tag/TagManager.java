@@ -21,7 +21,6 @@ package org.apache.gravitino.tag;
 import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
@@ -77,17 +76,7 @@ public class TagManager implements TagDispatcher {
 
   /** Metadata object types that support tag assignments. */
   public static final Set<MetadataObject.Type> SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS =
-      ImmutableSet.of(
-          MetadataObject.Type.CATALOG,
-          MetadataObject.Type.SCHEMA,
-          MetadataObject.Type.TABLE,
-          MetadataObject.Type.VIEW,
-          MetadataObject.Type.FILESET,
-          MetadataObject.Type.TOPIC,
-          MetadataObject.Type.COLUMN,
-          MetadataObject.Type.MODEL,
-          MetadataObject.Type.FUNCTION,
-          MetadataObject.Type.SEMANTIC_MODEL);
+      MetadataObjects.TAG_AND_POLICY_SUPPORTED_TYPES;
 
   private final IdGenerator idGenerator;
 
@@ -435,7 +424,7 @@ public class TagManager implements TagDispatcher {
       TagAssociationMode mode)
       throws NoSuchMetadataObjectException, TagAlreadyAssociatedException {
     Preconditions.checkArgument(
-        MetadataObjects.TAG_AND_POLICY_SUPPORTED_TYPES.contains(metadataObject.type()),
+        SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS.contains(metadataObject.type()),
         "Cannot associate tags for unsupported metadata object type %s",
         metadataObject.type());
     validateTagValuesToAdd(tagsToAdd);

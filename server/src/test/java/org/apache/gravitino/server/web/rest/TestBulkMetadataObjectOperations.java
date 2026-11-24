@@ -29,6 +29,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -60,6 +61,7 @@ import org.apache.gravitino.dto.responses.BulkMetadataObjectTagListResponse;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -316,6 +318,16 @@ public class TestBulkMetadataObjectOperations extends BaseOperationsTest {
     try (Response response = post(kind.equals("tags") ? "policies" : "tags", REQUEST)) {
       Assertions.assertEquals(200, response.getStatus());
     }
+  }
+
+  @Test
+  public void testMissingMetalakeFailsRequestWithoutPerObjectRetries() throws Exception {
+    when(TAGS.listEffectiveTagsForDisplay(eq("demo"), any()))
+        .thenThrow(new NoSuchMetalakeException("Metalake demo does not exist"));
+    try (Response response = post("tags", REQUEST)) {
+      Assertions.assertEquals(404, response.getStatus());
+    }
+    verify(TAGS, times(1)).listEffectiveTagsForDisplay(eq("demo"), any());
   }
 
   @ParameterizedTest

@@ -36,6 +36,7 @@ import org.apache.gravitino.bulk.BulkManager;
 import org.apache.gravitino.dto.responses.BulkError;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 
 /** Reads permitted objects in bulk, isolating object-level failures. */
@@ -63,6 +64,10 @@ final class BulkMetadataObjectReader {
       try {
         values = load.apply(readable);
       } catch (Exception e) {
+        if (e instanceof NoSuchMetalakeException) {
+          // Not specific to any object; retrying each one would only repeat the failure.
+          throw e;
+        }
         batchError = e;
       }
     }

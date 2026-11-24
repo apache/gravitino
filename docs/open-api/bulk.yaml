@@ -34,6 +34,8 @@ paths:
         object is checked for access before loading. Results use only stored metadata without
         validating or importing external objects; out-of-band changes are not checked.
         Unregistered objects have no direct assignments but can inherit from registered ancestors.
+        Names are matched exactly as sent; they are not case-normalized by the catalog. A request
+        containing duplicate objects is rejected with HTTP 400.
         Object-level failures, including denied access, are returned in errors with their
         zero-based request index and full object name. Successful objects remain in results,
         in request order. An accepted request returns HTTP 200 even if every object fails.
