@@ -26,9 +26,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.catalog.glue.GlueConstants;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
-import org.apache.gravitino.credential.JdbcCredential;
-import org.apache.gravitino.credential.S3SecretKeyCredential;
-import org.apache.gravitino.credential.S3TokenCredential;
 import org.junit.jupiter.api.Test;
 
 public class TestCloudStorageCredentialPropertyKeys {
@@ -229,34 +226,5 @@ public class TestCloudStorageCredentialPropertyKeys {
         CloudStorageCredentialPropertyKeys.omitCloudAccessKeyPairProperties(secrets, Set.of());
     assertEquals("db-user", emptyScope.get(CloudStorageCredentialPropertyKeys.JDBC_USER));
     assertEquals("AKIATEST", emptyScope.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
-  }
-
-  @Test
-  void testKeysForCredentialType() {
-    assertEquals(
-        Set.of(
-            S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY),
-        CloudStorageCredentialPropertyKeys.keysForCredentialType(
-            S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE));
-    assertEquals(
-        Set.of(
-            CloudStorageCredentialPropertyKeys.JDBC_USER,
-            CloudStorageCredentialPropertyKeys.JDBC_PASSWORD),
-        CloudStorageCredentialPropertyKeys.keysForCredentialType(
-            JdbcCredential.JDBC_CREDENTIAL_TYPE));
-    assertTrue(
-        CloudStorageCredentialPropertyKeys.keysForCredentialType(
-                S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE)
-            .isEmpty());
-    assertTrue(
-        CloudStorageCredentialPropertyKeys.keysForCredentialProviders(
-                S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE
-                    + ","
-                    + JdbcCredential.JDBC_CREDENTIAL_TYPE)
-            .contains(CloudStorageCredentialPropertyKeys.JDBC_PASSWORD));
-    assertFalse(
-        CloudStorageCredentialPropertyKeys.keysForCredentialProviders(
-                S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE)
-            .contains(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
   }
 }

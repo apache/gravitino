@@ -477,7 +477,7 @@ public final class SecretPropertyUtils {
         keys.add(key);
       }
     }
-    keys.addAll(CloudStorageCredentialPropertyKeys.keysForCredentialProviders(rawProperties));
+    keys.addAll(StaticCredentialPropertyKeys.keysForCredentialProviders(rawProperties));
     return keys;
   }
 
