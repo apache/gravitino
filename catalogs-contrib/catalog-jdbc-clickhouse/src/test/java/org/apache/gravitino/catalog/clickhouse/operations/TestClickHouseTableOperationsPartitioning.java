@@ -17,6 +17,7 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
+import java.util.Map;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
@@ -142,6 +143,27 @@ public class TestClickHouseTableOperationsPartitioning {
     Assertions.assertEquals(
         0, operations.parsePartitioning("toStartOfQuarter(event_time, 1)").length);
     Assertions.assertEquals(0, operations.parsePartitioning("toStartOfYear(event_time, 1)").length);
+  }
+
+  @Test
+  public void testDateTimeConversionIsUnwrapped() {
+    // toDateTime is an identity for a native DateTime column, so it is unwrapped for year/month
+    // granularity functions.
+    Map<String, String> dateTimeColumns = Map.of("ts", "DateTime");
+    Transform[] yearPartitions =
+        ClickHouseTableSqlUtils.parsePartitioning("toYear(toDateTime(ts))", dateTimeColumns);
+    Assertions.assertEquals(1, yearPartitions.length);
+    assertSingleFieldTransform(yearPartitions[0], Transforms.NAME_OF_YEAR, "ts");
+
+    Transform[] monthPartitions =
+        ClickHouseTableSqlUtils.parsePartitioning("toYYYYMM(toDateTime(ts))", dateTimeColumns);
+    Assertions.assertEquals(1, monthPartitions.length);
+    assertSingleFieldTransform(monthPartitions[0], Transforms.NAME_OF_MONTH, "ts");
+
+    // toDateTime over a non-DateTime column is not unwrapped.
+    Map<String, String> dateColumns = Map.of("ts", "Date");
+    Assertions.assertEquals(
+        0, ClickHouseTableSqlUtils.parsePartitioning("toYear(toDateTime(ts))", dateColumns).length);
   }
 
   private void assertFunctionTransform(

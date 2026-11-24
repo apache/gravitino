@@ -21,12 +21,14 @@ package org.apache.gravitino.gcs.credential;
 
 import org.apache.gravitino.credential.CredentialProviderDelegator;
 import org.apache.gravitino.credential.GCSTokenCredential;
+import org.apache.gravitino.credential.SupportsDynamicCredential;
 
 /**
  * A lightweight credential provider for GCS. It delegates the actual credential generation to
  * {@link GCSTokenGenerator} which is loaded via reflection to avoid classpath issues.
  */
-public class GCSTokenProvider extends CredentialProviderDelegator<GCSTokenCredential> {
+public class GCSTokenProvider extends CredentialProviderDelegator<GCSTokenCredential>
+    implements SupportsDynamicCredential {
 
   @Override
   public boolean supportsScheme(String scheme) {

@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.ServiceLoader;
 import java.util.Set;
 import org.apache.gravitino.credential.CredentialProvider;
+import org.apache.gravitino.credential.SupportsDynamicCredential;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -34,6 +35,13 @@ import org.junit.jupiter.api.Test;
  * the regression cannot slip past CI.
  */
 public class TestCOSCredentialProviderSpi {
+
+  /** Checks that only token providers declare dynamic credential support. */
+  @Test
+  public void testDynamicCredentialCapability() {
+    Assertions.assertInstanceOf(SupportsDynamicCredential.class, new COSTokenProvider());
+    Assertions.assertFalse(new COSSecretKeyProvider() instanceof SupportsDynamicCredential);
+  }
 
   @Test
   void testCredentialProviderSpiRegistersBothCosProviders() {
