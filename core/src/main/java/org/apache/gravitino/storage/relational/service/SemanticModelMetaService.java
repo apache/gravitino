@@ -27,6 +27,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -189,7 +190,11 @@ public class SemanticModelMetaService {
                         }
                         persistedPO.set(replacementPO);
                       }),
-              () -> reconcileMetricIdentities(persistedPO.get(), semanticModelEntity.definition()),
+              () ->
+                  reconcileMetricIdentities(
+                      persistedPO.get(),
+                      semanticModelEntity.definition(),
+                      "OVERWRITE_SEMANTIC_MODEL"),
               () -> replaceSources(persistedPO.get(), semanticModelEntity),
               () ->
                   SessionUtils.doWithoutCommit(
@@ -274,7 +279,8 @@ public class SemanticModelMetaService {
                     newSemanticModelPO.getSemanticModelVersionInfoPO().metrics())
                 && !metricNames(oldSemanticModelEntity.definition())
                     .equals(metricNames(newEntity.definition()))) {
-              reconcileMetricIdentities(newSemanticModelPO, newEntity.definition());
+              reconcileMetricIdentities(
+                  newSemanticModelPO, newEntity.definition(), "ALTER_SEMANTIC_MODEL");
             }
           },
           () -> replaceSources(newSemanticModelPO, newEntity),
@@ -424,6 +430,13 @@ public class SemanticModelMetaService {
                 SemanticModelVersionInfoMapper.class,
                 mapper -> mapper.softDeleteSemanticModelVersionsBySemanticModelId(semanticModelId)),
         () ->
+            GlossaryTermBindingService.getInstance()
+                .cleanupSemanticModelBindings(
+                    observedSemanticModelPO.getMetalakeId(),
+                    semanticModelId,
+                    observedSemanticModelPO.getSemanticModelName(),
+                    "DROP_SEMANTIC_MODEL"),
+        () ->
             SessionUtils.doWithoutCommit(
                 SemanticModelMetricMapper.class,
                 mapper -> mapper.softDeleteSemanticModelMetricsBySemanticModelId(semanticModelId)),
@@ -456,11 +469,12 @@ public class SemanticModelMetaService {
   }
 
   private static void reconcileMetricIdentities(
-      SemanticModelPO model, SemanticModelDefinition definition) {
+      SemanticModelPO model, SemanticModelDefinition definition, String triggeringOperation) {
     Set<String> names = metricNames(definition);
 
     // The caller has already inserted or version-checked the model in this transaction. A locking
     // read also observes the latest identities on backends using repeatable-read isolation.
+    Map<Long, String> retiredMetrics = new LinkedHashMap<>();
     SessionUtils.doWithoutCommit(
         SemanticModelMetricMapper.class,
         mapper -> {
@@ -497,13 +511,22 @@ public class SemanticModelMetaService {
                 .forEach(mapper::insertSemanticModelMetrics);
           }
           if (!live.isEmpty()) {
+            for (SemanticModelMetricPO retired : live.values()) {
+              retiredMetrics.put(retired.metricId(), retired.metricName());
+            }
             mapper.softDeleteSemanticModelMetricsByIds(
-                model.getSemanticModelId(),
-                live.values().stream()
-                    .map(SemanticModelMetricPO::metricId)
-                    .collect(Collectors.toList()));
+                model.getSemanticModelId(), new ArrayList<>(retiredMetrics.keySet()));
           }
         });
+    if (!retiredMetrics.isEmpty()) {
+      GlossaryTermBindingService.getInstance()
+          .cleanupMetricBindings(
+              model.getMetalakeId(),
+              model.getSemanticModelId(),
+              model.getSemanticModelName(),
+              retiredMetrics,
+              triggeringOperation);
+    }
   }
 
   private static Set<String> metricNames(SemanticModelDefinition definition) {

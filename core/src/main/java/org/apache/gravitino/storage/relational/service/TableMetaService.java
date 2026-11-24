@@ -24,7 +24,9 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -47,8 +49,10 @@ import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
+import org.apache.gravitino.storage.relational.po.GlossaryTermBindingPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.TablePO;
+import org.apache.gravitino.storage.relational.service.GlossaryTermBindingService.LostBinding;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -151,6 +155,10 @@ public class TableMetaService {
 
       TablePO po = POConverters.initializeTablePOWithVersion(tableEntity, builder);
       AtomicReference<TablePO> persistedPO = new AtomicReference<>(po);
+      List<GlossaryTermBindingPO> pendingBindings = new ArrayList<>();
+      Map<String, LostBinding> pendingBindingMetadata = new LinkedHashMap<>();
+      AtomicReference<Boolean> hasStaleBindings = new AtomicReference<>(false);
+      AtomicReference<Boolean> hasDroppedColumnBindings = new AtomicReference<>(false);
       // The schema lock, table row, version row, and columns share one transaction. If any later
       // step fails, the earlier inserts are rolled back as well.
       SchemaMetaService.getInstance()
@@ -161,7 +169,12 @@ public class TableMetaService {
               po.getMetalakeId(),
               () -> {
                 if (overwrite) {
-                  deleteStaleTableWithSameName(tableEntity.nameIdentifier(), po);
+                  deleteStaleTableWithSameName(
+                      tableEntity.nameIdentifier(),
+                      po,
+                      pendingBindings,
+                      pendingBindingMetadata,
+                      hasStaleBindings);
                 }
               },
               () ->
@@ -206,15 +219,37 @@ public class TableMetaService {
                 if (overwrite) {
                   TablePO storedPO = persistedPO.get();
                   // Reuse stored column IDs when overwriting the same table, for example after an
-                  // out-of-band rename. This preserves their tags, owners, and privileges. If the
-                  // upsert resolves to another table's row, its column IDs are not inherited.
-                  if (columns != null
-                      && po.getTableId().equals(storedPO.getTableId())
+                  // out-of-band rename. This preserves their tags, owners, and privileges, and
+                  // cleans up relations for any dropped columns (including when overwritten with no
+                  // columns). If the upsert resolves to another table's row, its column IDs are not
+                  // inherited.
+                  if (po.getTableId().equals(storedPO.getTableId())
                       && storedPO.getCurrentVersion() > POConverters.INIT_VERSION) {
-                    columns =
+                    Map<Long, String> deletedColumns = new LinkedHashMap<>();
+                    List<ColumnEntity> reconciledColumns =
                         TableColumnMetaService.getInstance()
                             .reuseStoredColumnIds(
-                                storedPO.getTableId(), storedPO.getCurrentVersion(), columns);
+                                storedPO, columns == null ? List.of() : columns, deletedColumns);
+                    if (columns != null) {
+                      columns = reconciledColumns;
+                    }
+                    if (!deletedColumns.isEmpty()) {
+                      GlossaryTermBindingService bindingService =
+                          GlossaryTermBindingService.getInstance();
+                      List<GlossaryTermBindingPO> droppedColBindings =
+                          bindingService.collectColumnBindings(
+                              storedPO.getMetalakeId(),
+                              storedPO.getTableId(),
+                              deletedColumns.keySet(),
+                              "RECONCILE_TABLE_COLUMNS");
+                      if (!droppedColBindings.isEmpty()) {
+                        pendingBindings.addAll(droppedColBindings);
+                        pendingBindingMetadata.putAll(
+                            bindingService.columnBindingMetadata(
+                                storedPO.getTableId(), storedPO.getTableName(), deletedColumns));
+                        hasDroppedColumnBindings.set(true);
+                      }
+                    }
                   }
                   TableColumnMetaService.getInstance()
                       .deleteColumnsByTableId(storedPO.getTableId());
@@ -222,6 +257,23 @@ public class TableMetaService {
 
                 if (columns != null && !columns.isEmpty()) {
                   TableColumnMetaService.getInstance().insertColumnPOs(persistedPO.get(), columns);
+                }
+              },
+              () -> {
+                // Retire stale-table and dropped-column bindings in one ascending-term-ID pass
+                // after all table_meta and table_column_version_info locks are held.
+                if (!pendingBindings.isEmpty()) {
+                  String operation;
+                  if (hasStaleBindings.get() && hasDroppedColumnBindings.get()) {
+                    operation = "OVERWRITE_TABLE";
+                  } else if (hasStaleBindings.get()) {
+                    operation = "DROP_TABLE";
+                  } else {
+                    operation = "RECONCILE_TABLE_COLUMNS";
+                  }
+                  GlossaryTermBindingService.getInstance()
+                      .retireCollectedBindings(
+                          po.getMetalakeId(), pendingBindings, pendingBindingMetadata, operation);
                 }
               });
 
@@ -468,7 +520,12 @@ public class TableMetaService {
    * name's unique key on PostgreSQL. The caller must hold the schema write lock and run this in the
    * same transaction as the insert.
    */
-  private void deleteStaleTableWithSameName(NameIdentifier identifier, TablePO po) {
+  private void deleteStaleTableWithSameName(
+      NameIdentifier identifier,
+      TablePO po,
+      List<GlossaryTermBindingPO> pendingBindings,
+      Map<String, LostBinding> pendingBindingMetadata,
+      AtomicReference<Boolean> hasStaleBindings) {
     TablePO storedPO =
         SessionUtils.getWithoutCommit(
             TableMetaMapper.class,
@@ -483,7 +540,20 @@ public class TableMetaService {
         storedPO.getTableId(),
         po.getTableId());
     deleteTableWithVersion(identifier, storedPO);
-    deleteTableDependents(storedPO);
+    // Collect bindings before soft-deleting columns without locking glossary_term_meta yet;
+    // retirement runs after the incoming table upsert so table_meta locks precede term locks.
+    GlossaryTermBindingService bindingService = GlossaryTermBindingService.getInstance();
+    List<GlossaryTermBindingPO> staleBindings =
+        bindingService.collectTableBindings(
+            storedPO.getMetalakeId(), storedPO.getTableId(), "DROP_TABLE");
+    if (!staleBindings.isEmpty()) {
+      pendingBindings.addAll(staleBindings);
+      pendingBindingMetadata.putAll(
+          bindingService.tableBindingMetadata(
+              storedPO.getTableId(), storedPO.getTableName(), staleBindings));
+      hasStaleBindings.set(true);
+    }
+    deleteTableNonGlossaryDependents(storedPO);
   }
 
   private TablePO tablePOWithPersistedIdentityAndVersions(TablePO incomingPO, TablePO persistedPO) {
@@ -499,6 +569,13 @@ public class TableMetaService {
   private void deleteTableDependents(TablePO tablePO) {
     // The table row has already passed its version check. All cleanup below uses the same database
     // transaction, so either the table and every related row are deleted together, or none are.
+    GlossaryTermBindingService.getInstance()
+        .cleanupTableBindings(
+            tablePO.getMetalakeId(), tablePO.getTableId(), tablePO.getTableName(), "DROP_TABLE");
+    deleteTableNonGlossaryDependents(tablePO);
+  }
+
+  private void deleteTableNonGlossaryDependents(TablePO tablePO) {
     SessionUtils.doWithoutCommit(
         OwnerMetaMapper.class,
         mapper ->

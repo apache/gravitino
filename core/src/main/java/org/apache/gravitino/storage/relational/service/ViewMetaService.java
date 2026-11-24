@@ -251,7 +251,7 @@ public class ViewMetaService {
                                 observedViewPO.getSchemaId(),
                                 observedViewPO.getViewName())),
                 () -> viewWriteFailure(identifier, observedViewPO)),
-        () -> deleteViewDependents(observedViewPO.getViewId()));
+        () -> deleteViewDependents(observedViewPO));
   }
 
   @Monitored(
@@ -414,7 +414,15 @@ public class ViewMetaService {
         .build();
   }
 
-  private void deleteViewDependents(Long viewId) {
+  private void deleteViewDependents(ViewPO viewPO) {
+    Long viewId = viewPO.getViewId();
+    GlossaryTermBindingService.getInstance()
+        .cleanupObjectBindings(
+            viewPO.getMetalakeId(),
+            GlossaryTermBindingService.TargetType.VIEW,
+            viewId,
+            viewPO.getViewName(),
+            "DROP_VIEW");
     SessionUtils.doWithoutCommit(
         ViewVersionInfoMapper.class, mapper -> mapper.softDeleteViewVersionsByViewId(viewId));
     SessionUtils.doWithoutCommit(

@@ -361,12 +361,20 @@ public class TopicMetaService {
                                 observedTopicPO.getSchemaId(),
                                 observedTopicPO.getTopicName())),
                 () -> topicWriteFailure(identifier, observedTopicPO)),
-        () -> deleteTopicDependents(observedTopicPO.getTopicId()));
+        () -> deleteTopicDependents(observedTopicPO));
   }
 
-  private void deleteTopicDependents(Long topicId) {
+  private void deleteTopicDependents(TopicPO topicPO) {
+    Long topicId = topicPO.getTopicId();
     // The topic row has passed its version check. Every cleanup below uses the same transaction,
     // so a later failure also restores the root row and all earlier relationship changes.
+    GlossaryTermBindingService.getInstance()
+        .cleanupObjectBindings(
+            topicPO.getMetalakeId(),
+            GlossaryTermBindingService.TargetType.TOPIC,
+            topicId,
+            topicPO.getTopicName(),
+            "DROP_TOPIC");
     SessionUtils.doWithoutCommit(
         OwnerMetaMapper.class,
         mapper ->

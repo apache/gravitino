@@ -255,6 +255,7 @@ public final class GlossaryTermMetaService {
                       row.getTermId(), Entity.EntityType.GLOSSARY_TERM.name()));
           GlossaryTermRelService.getInstance().removeTerm(metalakeId, row.getTermId());
           GlossaryTermDomainService.getInstance().removeTerm(metalakeId, row.getTermId());
+          GlossaryTermBindingService.getInstance().removeTerm(row.getTermId());
           return true;
         });
   }
@@ -269,6 +270,7 @@ public final class GlossaryTermMetaService {
           mapper.dropMetalakeSynonyms(metalakeId, deletedAt);
           GlossaryTermRelService.getInstance().dropMetalake(metalakeId);
           GlossaryTermDomainService.getInstance().dropMetalake(metalakeId);
+          GlossaryTermBindingService.getInstance().dropMetalake(metalakeId);
         });
   }
 
@@ -281,6 +283,10 @@ public final class GlossaryTermMetaService {
         GlossaryTermMetaMapper.class,
         mapper -> {
           int count = GlossaryTermRelService.getInstance().collect(cutoff, limit);
+          if (count == limit) {
+            return count;
+          }
+          count += GlossaryTermBindingService.getInstance().collect(cutoff, limit - count);
           if (count == limit) {
             return count;
           }
@@ -468,6 +474,29 @@ public final class GlossaryTermMetaService {
               mapper ->
                   definitions(ns, mapper.selectTermSnapshotsByIds(lake, ns.level(0), batch))));
     }
+    return result;
+  }
+
+  /**
+   * Locks live terms in ascending ID order within the caller's transaction and returns their
+   * current definitions keyed by term ID. Missing or concurrently deleted terms are omitted.
+   */
+  public Map<Long, GlossaryTermEntity> lockByIds(Namespace ns, long metalakeId, Set<Long> termIds) {
+    validateNamespace(ns);
+    Map<Long, GlossaryTermEntity> result = new LinkedHashMap<>();
+    if (termIds.isEmpty()) {
+      return result;
+    }
+    SessionUtils.doWithoutCommit(
+        GlossaryTermMetaMapper.class,
+        mapper -> {
+          for (Long id : termIds.stream().sorted().toList()) {
+            GlossaryTermPO row = mapper.getByIdForUpdate(metalakeId, id);
+            if (row != null) {
+              result.put(id, fromPO(row, mapper, ns));
+            }
+          }
+        });
     return result;
   }
 

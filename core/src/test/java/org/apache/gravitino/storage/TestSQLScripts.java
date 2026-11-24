@@ -117,6 +117,18 @@ public class TestSQLScripts extends TestJDBCBackend {
           Assertions.assertTrue(rows.next());
           Assertions.assertEquals(2, rows.getInt(1));
         }
+        String binding =
+            "INSERT INTO glossary_term_binding (metalake_id,term_id,target_type,target_id,deleted_at) VALUES (100,101,'TABLE',301,0)";
+        statement.executeUpdate(binding);
+        Assertions.assertThrows(SQLException.class, () -> statement.executeUpdate(binding));
+        statement.executeUpdate(
+            "UPDATE glossary_term_binding SET deleted_at=123 WHERE deleted_at=0");
+        statement.executeUpdate(binding);
+        try (ResultSet rows =
+            statement.executeQuery("SELECT COUNT(*) FROM glossary_term_binding")) {
+          Assertions.assertTrue(rows.next());
+          Assertions.assertEquals(2, rows.getInt(1));
+        }
       }
     }
   }

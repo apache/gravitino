@@ -501,6 +501,13 @@ public class ModelMetaService {
     Long modelId = modelPO.getModelId();
     // The model row has already passed its version check. All cleanup below uses the same
     // transaction, so a failure restores both the model row and any related rows already removed.
+    GlossaryTermBindingService.getInstance()
+        .cleanupObjectBindings(
+            modelPO.getMetalakeId(),
+            GlossaryTermBindingService.TargetType.MODEL,
+            modelId,
+            modelPO.getModelName(),
+            "DROP_MODEL");
     SessionUtils.doWithoutCommit(
         ModelVersionAliasRelMapper.class,
         mapper -> mapper.softDeleteModelVersionAliasRelsByModelId(modelId));

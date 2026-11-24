@@ -72,6 +72,7 @@ import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewVersionInfoMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.FunctionPO;
+import org.apache.gravitino.storage.relational.po.GlossaryTermBindingPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -329,6 +330,8 @@ public class SchemaMetaService {
 
     if (cascade) {
       AtomicReference<List<Long>> schemaIds = new AtomicReference<>();
+      AtomicReference<List<GlossaryTermBindingPO>> cascadeBindings =
+          new AtomicReference<>(List.of());
       SessionUtils.doMultipleWithCommit(
           () -> {
             // Take the parent catalog lock first, then delete this schema, and only then look at
@@ -344,6 +347,14 @@ public class SchemaMetaService {
             descendants.stream().map(SchemaPO::getSchemaId).forEach(ids::add);
             schemaIds.set(ids);
           },
+          () ->
+              // Collect live bindings before child entity rows are soft-deleted, without locking
+              // glossary terms yet. Term locks are acquired only at the end of the transaction
+              // after all child endpoint locks are held, preserving endpoint -> term lock order.
+              cascadeBindings.set(
+                  GlossaryTermBindingService.getInstance()
+                      .collectSchemaCascadeBindings(
+                          schemaPO.getMetalakeId(), schemaIds.get(), "DROP_SCHEMA")),
           () ->
               SessionUtils.doWithoutCommit(
                   TableMetaMapper.class,
@@ -427,7 +438,11 @@ public class SchemaMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   SemanticModelSourceMapper.class,
-                  mapper -> mapper.softDeleteBySchemaIds(schemaIds.get())));
+                  mapper -> mapper.softDeleteBySchemaIds(schemaIds.get())),
+          () ->
+              GlossaryTermBindingService.getInstance()
+                  .retireCollectedBindings(
+                      schemaPO.getMetalakeId(), cascadeBindings.get(), "DROP_SCHEMA"));
     } else {
       SessionUtils.doMultipleWithCommit(
           () -> {
@@ -463,6 +478,14 @@ public class SchemaMetaService {
                   mapper ->
                       mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
                           schemaId, MetadataObject.Type.SCHEMA.name())),
+          () ->
+              GlossaryTermBindingService.getInstance()
+                  .cleanupObjectBindings(
+                      schemaPO.getMetalakeId(),
+                      GlossaryTermBindingService.TargetType.SCHEMA,
+                      schemaId,
+                      schemaPO.getSchemaName(),
+                      "DROP_SCHEMA"),
           () ->
               SessionUtils.doWithoutCommit(
                   StatisticMetaMapper.class,

@@ -42,6 +42,20 @@ public class GlossaryTermMetaSQLProviderFactory {
     return getProvider().getForUpdate(metalakeId, key);
   }
 
+  /** Delegates {@link GlossaryTermMetaBaseSQLProvider#getByIdForUpdate}. */
+  public static String getByIdForUpdate(
+      @Param("metalakeId") long metalakeId, @Param("termId") long termId) {
+    return getProvider().getByIdForUpdate(metalakeId, termId);
+  }
+
+  /** Delegates {@link GlossaryTermMetaBaseSQLProvider#incrementVersion}. */
+  public static String incrementVersion(
+      @Param("metalakeId") long metalakeId,
+      @Param("termId") long termId,
+      @Param("version") long version) {
+    return getProvider().incrementVersion(metalakeId, termId, version);
+  }
+
   /** Delegates {@link GlossaryTermMetaBaseSQLProvider#getIds}. */
   public static String getIds(
       @Param("metalakeId") long metalakeId,

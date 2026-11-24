@@ -24,12 +24,14 @@ import com.google.common.collect.Lists;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -154,13 +156,43 @@ public class TableColumnMetaService {
    * kept is dropped, so its relations are removed in the same transaction, as for a column dropped
    * by an alter.
    *
-   * @param tableId the id of the stored table
-   * @param tableVersion the table version whose columns are reused
+   * @param tablePO the stored table whose column identities are reused
    * @param columns the columns to write
    * @return the columns, with the stored ids where the names match
    */
+  List<ColumnEntity> reuseStoredColumnIds(TablePO tablePO, List<ColumnEntity> columns) {
+    return reuseStoredColumnIds(
+        tablePO.getMetalakeId(),
+        tablePO.getTableId(),
+        tablePO.getTableName(),
+        tablePO.getCurrentVersion(),
+        columns,
+        null);
+  }
+
+  List<ColumnEntity> reuseStoredColumnIds(
+      TablePO tablePO, List<ColumnEntity> columns, Map<Long, String> deletedColumnsOut) {
+    return reuseStoredColumnIds(
+        tablePO.getMetalakeId(),
+        tablePO.getTableId(),
+        tablePO.getTableName(),
+        tablePO.getCurrentVersion(),
+        columns,
+        deletedColumnsOut);
+  }
+
   List<ColumnEntity> reuseStoredColumnIds(
       Long tableId, Long tableVersion, List<ColumnEntity> columns) {
+    return reuseStoredColumnIds(null, tableId, null, tableVersion, columns, null);
+  }
+
+  private List<ColumnEntity> reuseStoredColumnIds(
+      Long metalakeId,
+      Long tableId,
+      String tableName,
+      Long tableVersion,
+      List<ColumnEntity> columns,
+      @Nullable Map<Long, String> deletedColumnsOut) {
     List<ColumnPO> storedColumns = getColumnsByTableIdAndVersion(tableId, tableVersion);
     if (storedColumns.isEmpty()) {
       return columns;
@@ -190,12 +222,26 @@ public class TableColumnMetaService {
     }
 
     Set<Long> keptIds = result.stream().map(ColumnEntity::id).collect(Collectors.toSet());
-    deleteColumnRelations(
-        storedColumns.stream()
-            .map(ColumnPO::getColumnId)
-            .filter(id -> !keptIds.contains(id))
-            .distinct()
-            .collect(Collectors.toList()));
+    Map<Long, String> deletedColumns = new LinkedHashMap<>();
+    Long resolvedMetalakeId = metalakeId;
+    for (ColumnPO storedColumn : storedColumns) {
+      if (resolvedMetalakeId == null) {
+        resolvedMetalakeId = storedColumn.getMetalakeId();
+      }
+      if (!keptIds.contains(storedColumn.getColumnId())) {
+        deletedColumns.putIfAbsent(storedColumn.getColumnId(), storedColumn.getColumnName());
+      }
+    }
+    deleteColumnRelations(Lists.newArrayList(deletedColumns.keySet()));
+    if (!deletedColumns.isEmpty()) {
+      if (deletedColumnsOut != null) {
+        deletedColumnsOut.putAll(deletedColumns);
+      } else if (resolvedMetalakeId != null) {
+        GlossaryTermBindingService.getInstance()
+            .cleanupColumnBindings(
+                resolvedMetalakeId, tableId, tableName, deletedColumns, "RECONCILE_TABLE_COLUMNS");
+      }
+    }
     return result;
   }
 
@@ -262,12 +308,12 @@ public class TableColumnMetaService {
     }
 
     // Mark the columns to DELETE if they are not existed in new columns.
-    List<Long> deletedColumnIds = Lists.newArrayList();
+    Map<Long, String> deletedColumnNamesById = new LinkedHashMap<>();
     for (ColumnEntity oldColumn : oldColumns.values()) {
       if (!newColumns.containsKey(oldColumn.id())) {
         columnPOsToInsert.add(
             POConverters.initializeColumnPO(newTablePO, oldColumn, ColumnPO.ColumnOpType.DELETE));
-        deletedColumnIds.add(oldColumn.id());
+        deletedColumnNamesById.put(oldColumn.id(), oldColumn.name());
       }
     }
 
@@ -287,7 +333,16 @@ public class TableColumnMetaService {
     }
 
     insertColumnPOsInBatches(columnPOsToInsert);
-    deleteColumnRelations(deletedColumnIds);
+    deleteColumnRelations(Lists.newArrayList(deletedColumnNamesById.keySet()));
+    if (!deletedColumnNamesById.isEmpty()) {
+      GlossaryTermBindingService.getInstance()
+          .cleanupColumnBindings(
+              newTablePO.getMetalakeId(),
+              newTablePO.getTableId(),
+              newTablePO.getTableName(),
+              deletedColumnNamesById,
+              "ALTER_TABLE");
+    }
   }
 
   private void deleteColumnRelations(List<Long> columnIds) {
