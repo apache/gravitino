@@ -680,17 +680,7 @@ class AccessControlContentDTO(PolicyContentDTO):
         return list(self._applicable_roles) if self._applicable_roles else []
 
     def supported_object_types(self) -> set:
-        return {
-            MetadataObject.Type.CATALOG,
-            MetadataObject.Type.SCHEMA,
-            MetadataObject.Type.TABLE,
-            MetadataObject.Type.VIEW,
-            MetadataObject.Type.FILESET,
-            MetadataObject.Type.TOPIC,
-            MetadataObject.Type.MODEL,
-            MetadataObject.Type.FUNCTION,
-            MetadataObject.Type.SEMANTIC_MODEL,
-        }
+        return self.to_domain_content().supported_object_types()
 
     def properties(self) -> dict:
         return {}

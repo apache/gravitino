@@ -354,6 +354,11 @@ class SecurableObjects:
         )
 
     @staticmethod
+    def of_ontology(name: str, privileges: list[Privilege]) -> SecurableObject:
+        """Binds privileges to the named ontology."""
+        return SecurableObjects.of(MetadataObject.Type.ONTOLOGY, [name], privileges)
+
+    @staticmethod
     def of_semantic_model(
         schema: SecurableObject,
         semantic_model: str,

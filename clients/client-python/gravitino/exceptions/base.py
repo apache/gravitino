@@ -365,3 +365,31 @@ class BackingTagAlreadyBoundException(AlreadyExistsException):
 
 class NonEmptyDomainException(NotEmptyException):
     """A domain with subdomains cannot be deleted."""
+
+
+class IllegalOntologyException(IllegalArgumentException):
+    """An ontology document or definition is invalid."""
+
+
+class IllegalOntologyMappingException(IllegalArgumentException):
+    """An ontology mapping document or reference is invalid."""
+
+
+class NoSuchOntologyException(NotFoundException):
+    """The ontology does not exist."""
+
+
+class NoSuchOntologyMappingException(NotFoundException):
+    """The ontology mapping does not exist."""
+
+
+class OntologyAlreadyExistsException(AlreadyExistsException):
+    """An ontology with the same name already exists."""
+
+
+class OntologyMappingAlreadyExistsException(AlreadyExistsException):
+    """A mapping with the same name already exists under the model."""
+
+
+class OntologyInUseException(InUseException):
+    """Live mappings prevent the ontology change."""
