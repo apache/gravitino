@@ -183,7 +183,21 @@ class TestTermRequests {
         mapper.readValue(
             "{\"updates\":[{\"@type\":\"setStatus\",\"status\":\"BOGUS\"}]}",
             TermUpdatesRequest.class);
-    assertThrows(IllegalArgumentException.class, invalidInner::validate);
+    IllegalArgumentException invalidStatus =
+        assertThrows(IllegalArgumentException.class, invalidInner::validate);
+    assertEquals(
+        "Invalid term status 'BOGUS', expected one of [DRAFT, APPROVED, DEPRECATED]",
+        invalidStatus.getMessage());
+    IllegalArgumentException invalidCreate =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                mapper
+                    .readValue("{\"name\":\"T\",\"status\":\"draft\"}", TermCreateRequest.class)
+                    .validate());
+    assertEquals(
+        "Invalid term status 'draft', expected one of [DRAFT, APPROVED, DEPRECATED]",
+        invalidCreate.getMessage());
   }
 
   private <T> T roundTrip(String json, Class<T> type) throws Exception {

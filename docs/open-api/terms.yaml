@@ -68,6 +68,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/MetalakeNotInUse"
         5XX:
           $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
     post:
@@ -139,6 +141,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/MetalakeNotInUse"
         5XX:
           $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
     put:
@@ -239,6 +243,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/MetalakeNotInUse"
         5XX:
           $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
 components:
@@ -616,9 +622,15 @@ components:
         application/json:
           schema:
             $ref: ./openapi.yaml#/components/schemas/ErrorModel
+    MetalakeNotInUse:
+      description: The metalake is not in use.
+      content:
+        application/json:
+          schema:
+            $ref: ./openapi.yaml#/components/schemas/ErrorModel
     Conflict:
-      description: The name or source reference already exists, the expected revision is
-        stale, or a concurrent modification prevented the write.
+      description: The metalake is not in use, the name or source reference already exists,
+        the expected revision is stale, or a concurrent modification prevented the write.
       content:
         application/json:
           schema:

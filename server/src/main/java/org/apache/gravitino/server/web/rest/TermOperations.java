@@ -21,6 +21,7 @@ package org.apache.gravitino.server.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -48,9 +49,11 @@ import org.apache.gravitino.dto.responses.TermTreeResponse;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.NotInUseException;
 import org.apache.gravitino.glossary.GlossaryManager;
 import org.apache.gravitino.glossary.GlossaryTerm;
 import org.apache.gravitino.glossary.GlossaryTermViews;
+import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
@@ -190,9 +193,7 @@ public class TermOperations {
         metalake,
         term,
         () -> {
-          GlossaryManager.Direction walk = GlossaryManager.Direction.valueOf(direction);
-          Preconditions.checkArgument(
-              walk != GlossaryManager.Direction.RELATED, "direction must be BROADER or NARROWER");
+          GlossaryManager.Direction walk = parseDirection(direction);
           return Utils.ok(
               new TermTreeResponse(views.hierarchy(metalake, term, walk, parseStatus(status))));
         });
@@ -200,13 +201,40 @@ public class TermOperations {
 
   @Nullable
   private static GlossaryTerm.Status parseStatus(@Nullable String status) {
-    return status == null ? null : GlossaryTerm.Status.valueOf(status);
+    if (status == null) {
+      return null;
+    }
+    try {
+      return GlossaryTerm.Status.valueOf(status);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Invalid term status '%s', expected one of %s",
+              status, Arrays.toString(GlossaryTerm.Status.values())),
+          e);
+    }
+  }
+
+  private static GlossaryManager.Direction parseDirection(String direction) {
+    Preconditions.checkArgument(
+        GlossaryManager.Direction.BROADER.name().equals(direction)
+            || GlossaryManager.Direction.NARROWER.name().equals(direction),
+        "Invalid hierarchy direction '%s', expected BROADER or NARROWER",
+        direction);
+    return GlossaryManager.Direction.valueOf(direction);
   }
 
   private Response execute(
       OperationType operation, String metalake, @Nullable String term, Supplier<Response> action) {
     try {
-      return Utils.doAs(httpRequest, action::get);
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            // Like other metalake-scoped resources, glossary terms are unavailable while the
+            // metalake is disabled. This also maps a missing metalake to NoSuchMetalakeException.
+            MetalakeManager.checkMetalakeInUse(metalake);
+            return action.get();
+          });
     } catch (IllegalArgumentException e) {
       return Utils.illegalArguments(e.getMessage(), e);
     } catch (NotFoundException e) {
@@ -215,6 +243,8 @@ public class TermOperations {
       return Utils.forbidden(e.getMessage(), e);
     } catch (AlreadyExistsException e) {
       return Utils.alreadyExists(e.getMessage(), e);
+    } catch (NotInUseException e) {
+      return Utils.notInUse(e.getMessage(), e);
     } catch (Exception e) {
       return COMMON_ERRORS.handle(operation, term, metalake, e);
     }
