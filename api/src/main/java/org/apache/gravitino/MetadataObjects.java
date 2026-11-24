@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.kb.KnowledgeBaseArticle;
 
 /** The helper class for {@link MetadataObject}. */
 public class MetadataObjects {
@@ -50,7 +51,8 @@ public class MetadataObjects {
           MetadataObject.Type.JOB_TEMPLATE,
           MetadataObject.Type.POLICY,
           MetadataObject.Type.DOMAIN,
-          MetadataObject.Type.GLOSSARY_TERM);
+          MetadataObject.Type.GLOSSARY_TERM,
+          MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE);
 
   private static final Set<MetadataObject.Type> VALID_TWO_LEVEL_NAME_TYPES =
       Sets.newHashSet(MetadataObject.Type.SCHEMA);
@@ -233,7 +235,8 @@ public class MetadataObjects {
      */
     public MetadataObjectImpl(String parent, String name, Type type) {
       this.parent = parent;
-      this.name = name;
+      this.name =
+          type == Type.KNOWLEDGE_BASE_ARTICLE ? KnowledgeBaseArticle.normalizeName(name) : name;
       this.type = type;
     }
 
