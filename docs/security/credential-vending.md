@@ -143,18 +143,28 @@ The inferred provider list is returned as the catalog's `credential-providers` p
 
 Four providers have no inference rule and must always be set explicitly: `s3-token`, `oss-token`, `adls-token`, and `aws-irsa`. In particular, setting `s3-role-arn` without `credential-providers` does not enable `s3-token`. The catalog falls back to `s3-secret-key` and vends the static access key instead, which is long-lived and not scoped to the table path. Set `credential-providers` explicitly whenever you want token-based vending.
 
-### Static providers and `getCredentials` privileges
+### Catalog `getCredentials` privileges (token vs static)
 
-Static providers return the configured source account's long-lived credentials. Catalog-level
-`getCredentials` requires metadata access plus both `USE_SECRETS` and
-`INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership. Grant these privileges only to trusted
-connectors/operators: the credentials carry all source-account permissions and do not enforce
-Gravitino table-level grants or denies when used directly against the source.
+Catalog-level `getCredentials` always requires metadata access. Privilege rules then depend on
+provider kind:
+
+| Provider kind | Examples | Privileges |
+|---------------|----------|------------|
+| **Token** (short-lived / scoped) | `s3-token`, `oss-token`, `cos-token`, `adls-token`, `gcs-token`, `aws-irsa` | Metadata access is enough |
+| **Static** (long-lived account) | `s3-secret-key`, `oss-secret-key`, `cos-secret-key`, `azure-account-key`, `aws-secret-key`, `dlf-secret-key`, `jdbc-user-password` | Also need `USE_SECRETS` and `INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership |
+
+When the caller lacks the static privileges, the response contains **only** token credentials
+(possibly none). With both privileges (or metalake ownership), token and static credentials are
+returned together.
+
+Grant static privileges only to trusted connectors/operators: static credentials carry all
+source-account permissions and do not enforce Gravitino table-level grants or denies when used
+directly against the source.
 
 Fileset credential authorization remains path-based. Static fileset credentials may still
 have broader source access than the requested path, so prefer short-lived scoped providers
-(`s3-token`, `oss-token`, `adls-token`, `gcs-token`, `cos-token`, `aws-irsa`) when available.
-Do not grant fileset access backed by unrestricted static accounts to untrusted principals.
+when available. Do not grant fileset access backed by unrestricted static accounts to untrusted
+principals.
 
 ## S3
 
@@ -502,7 +512,7 @@ Bundle jars on Maven Central:
 
 ## Upgrading From a Release Earlier Than 1.3.0
 
-Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `jdbc-password`, `aws-access-key-id` / `aws-secret-access-key` (Glue), and `dlf-access-key-id` / `dlf-access-key-secret` / `dlf-security-token` (Paimon DLF) are masked or excluded from the default `GET /api/metalakes/{metalake}/catalogs/{catalog}` response (`jdbc-user` and `azure-storage-account-name` are returned in plaintext when not hidden). Plaintext non-static secrets are available via `getSecrets` when the caller holds `USE_SECRETS` (or is metalake owner). Static credential properties that apply to the metadata object — keys declared in that object's properties metadata, or used by an enabled static `credential-providers` entry (`jdbc-user-password`, `s3-secret-key`, and similar) — are included in `getSecrets` only with `INCLUDE_CREDENTIAL_SECRETS` (or metalake owner). The same key name on another object where it is not a credential property (for example undeclared `jdbc-user` on a non-JDBC catalog) remains visible with `USE_SECRETS` alone. Connectors use both `USE_SECRETS` and `INCLUDE_CREDENTIAL_SECRETS` (or metalake ownership) with catalog-level `getCredentials` / `GET .../credentials` to recover S3/OSS/COS/Azure/JDBC static credentials, as well as Glue AWS API keys (`AwsSecretKeyCredential`) and Paimon DLF pairs (`DlfSecretKeyCredential`). Vended-only fields such as `s3-session-token` are not catalog properties. Clients written against earlier releases that read those properties directly from the default load lose access to them.
+Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `jdbc-password`, `aws-access-key-id` / `aws-secret-access-key` (Glue), and `dlf-access-key-id` / `dlf-access-key-secret` / `dlf-security-token` (Paimon DLF) are masked or excluded from the default `GET /api/metalakes/{metalake}/catalogs/{catalog}` response (`jdbc-user` and `azure-storage-account-name` are returned in plaintext when not hidden). Plaintext non-static secrets are available via `getSecrets` when the caller holds `USE_SECRETS` (or is metalake owner). Static credential properties that apply to the metadata object — keys declared in that object's properties metadata, or used by an enabled static `credential-providers` entry (`jdbc-user-password`, `s3-secret-key`, and similar) — are included in `getSecrets` only with `INCLUDE_CREDENTIAL_SECRETS` (or metalake owner). The same key name on another object where it is not a credential property (for example undeclared `jdbc-user` on a non-JDBC catalog) remains visible with `USE_SECRETS` alone. Connectors use catalog-level `getCredentials` / `GET .../credentials` for vending. Static credentials (S3/OSS/COS/Azure/JDBC, Glue AWS API keys, Paimon DLF) need both `USE_SECRETS` and `INCLUDE_CREDENTIAL_SECRETS` (or metalake ownership); short-lived token providers need only metadata access. Vended-only fields such as `s3-session-token` are not catalog properties. Clients written against earlier releases that read those properties directly from the default load lose access to them.
 
 
 For a zero-downtime migration, set the following in `gravitino.conf`:
@@ -515,14 +525,17 @@ The Gravitino server then re-includes the hidden properties in its catalog GET r
 
 ### Catalog credential access
 
-With authorization enabled, catalog-level credential vending requires both `USE_SECRETS`
-and `INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership, in addition to metadata access.
-`USE_CATALOG` alone does not allow retrieving the source account. Engine users that need
-catalog credentials must receive these privileges explicitly. Catalog credentials are
-unscoped: they carry the source account's privileges, including access beyond a single
-Gravitino table. Fileset path-based credential authorization is unchanged. GVFS skips an optional catalog
-credential lookup when it is forbidden, then uses the fileset credential endpoint; denial at
-that fileset endpoint still prevents access.
+With authorization enabled, catalog-level credential vending always requires metadata access.
+**Static** providers additionally require both `USE_SECRETS` and `INCLUDE_CREDENTIAL_SECRETS`,
+or metalake ownership — `USE_CATALOG` alone does not allow retrieving the source account.
+**Token** providers (short-lived scoped credentials) do not require those secrets privileges.
+Callers without the static privileges receive only token credentials (static ones are omitted,
+not forbidden). Engine users that need static catalog credentials must receive the secrets
+privileges explicitly. Static catalog credentials are unscoped: they carry the source account's
+privileges, including access beyond a single Gravitino table. Fileset path-based credential
+authorization is unchanged. GVFS skips an optional catalog credential lookup when it is
+forbidden, then uses the fileset credential endpoint; denial at that fileset endpoint still
+prevents access.
 
 For relational JDBC catalogs, `jdbc-url` must not contain passwords, tokens, or inline user
 information. Move login credentials to `jdbc-user` and `jdbc-password` (or secret references)
