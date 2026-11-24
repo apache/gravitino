@@ -484,9 +484,10 @@ so unrelated writes that take the fence can still serialize within a metalake.
   while holding that exclusive Domain lock. A concurrent add either commits first and blocks
   the drop, or fails because the Domain was dropped. A detach that commits first can let
   the drop proceed.
-- For the dedicated detach operation, recheck `MANAGE_DOMAIN` in the write transaction after
-  locking the Domain, using its current parent to evaluate inherited privileges. Hold the Domain
-  lock through commit so a concurrent move cannot change the applicable scope during the write.
+- For Article creation with Domains, `updateDomains` and the dedicated detach, recheck
+  `MANAGE_DOMAIN` in the write transaction for each affected Domain after locking it. Use each
+  Domain's current parent to evaluate inherited privileges. Apply changes only after all checks
+  pass and hold the Domain locks through commit.
 - New bindings use the target's normal endpoint fence and revalidate its identity. Target removal
   takes its existing endpoint locks without acquiring linked Article locks. Background orphan
   cleanup conditionally removes only stale binding rows and does not update Article state.
@@ -1026,9 +1027,11 @@ OpenAPI definitions and validation with `./gradlew :docs:build`.
       Term member. Publish the Domain and verify that dropping it returns `400` with an
       instruction to unpublish. Unpublish it and verify `409 NonEmptyDomainException`. Verify
       that the administrator can list and detach the Term, then drop the Domain.
-      Pause an Article detach after its initial permission check. Before it takes the Domain
-      lock, commit a Domain move that removes the caller's inherited `MANAGE_DOMAIN`. Verify
-      that detach returns `403` and leaves the membership and Article `revision` unchanged.
+      Test a concurrent move of a `PUBLISHED` Domain with both a dedicated detach and an alter
+      combining `updateBody` and `updateDomains` to add the Domain. For each case, pause the
+      write after its initial permission check. Before it takes the Domain lock, commit a move
+      that removes the caller's inherited `MANAGE_DOMAIN`. Verify that the write returns `403`
+      and leaves the body, memberships and Article `revision` unchanged.
       Depends on: T4, Domain prerequisites.
 - [ ] **T6. Add bindings and asynchronous cleanup** (`core/`). Resolve structured asset and Term
       targets to stable IDs. Implement binding changes, paged binding reads, Term and asset list
