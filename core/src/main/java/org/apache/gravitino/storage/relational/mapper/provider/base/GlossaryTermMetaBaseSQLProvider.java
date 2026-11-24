@@ -21,8 +21,8 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.GlossaryTermDomainRelMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.po.GlossaryTermPO;
@@ -58,8 +58,8 @@ public class GlossaryTermMetaBaseSQLProvider {
           + " s ON kind.domain_row=0 AND s.term_id=t.term_id "
           + "AND s.metalake_id=t.metalake_id AND s.deleted_at=0 "
           + "LEFT JOIN "
-          + GlossaryTermDomainRelMapper.TABLE_NAME
-          + " r ON kind.domain_row=1 AND r.term_id=t.term_id "
+          + DomainMemberMapper.TABLE_NAME
+          + " r ON kind.domain_row=1 AND r.member_type='GLOSSARY_TERM' AND r.member_id=t.term_id "
           + "AND r.metalake_id=t.metalake_id AND r.deleted_at=0 "
           + "LEFT JOIN "
           + DomainMetaMapper.DOMAIN_TABLE_NAME

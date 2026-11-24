@@ -206,9 +206,14 @@ public class DomainManager implements DomainDispatcher {
           domainOperations()
               .deleteDomain(
                   NameIdentifierUtil.ofDomain(metalake, name),
-                  domain ->
-                      mutationCheck.accept(
-                          new LockedDomainState(domain, null, Collections.emptyList())));
+                  domain -> {
+                    mutationCheck.accept(
+                        new LockedDomainState(domain, null, Collections.emptyList()));
+                    Preconditions.checkArgument(
+                        domain.status() == Domain.Status.DRAFT,
+                        "Unpublish Domain %s before deleting it",
+                        name);
+                  });
       return deleted;
     } catch (NonEmptyEntityException e) {
       throw new NonEmptyDomainException(

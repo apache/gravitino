@@ -48,6 +48,7 @@ import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.EntityChangeLogWriter;
+import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.DomainRelMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
@@ -478,7 +479,7 @@ public class DomainMetaService {
    * @param identifier The domain identifier.
    * @return True if the domain is deleted, false if it does not exist.
    * @throws NonEmptyEntityException If the domain has sub-domains.
-   * @throws NonEmptyDomainException If glossary terms still belong to the domain.
+   * @throws NonEmptyDomainException If definitions still belong to the domain.
    */
   public boolean deleteDomain(NameIdentifier identifier) {
     return deleteDomain(identifier, domain -> {});
@@ -517,6 +518,7 @@ public class DomainMetaService {
   public int deleteDomainMetasByLegacyTimeline(long legacyTimeline, int limit) {
     int[] domainDeletedCount = new int[] {0};
     int[] domainRelDeletedCount = new int[] {0};
+    int[] memberDeletedCount = new int[] {0};
 
     SessionUtils.doMultipleWithCommit(
         () ->
@@ -528,9 +530,13 @@ public class DomainMetaService {
             domainRelDeletedCount[0] =
                 SessionUtils.getWithoutCommit(
                     DomainRelMapper.class,
-                    mapper -> mapper.deleteDomainRelsByLegacyTimeline(legacyTimeline, limit)));
+                    mapper -> mapper.deleteDomainRelsByLegacyTimeline(legacyTimeline, limit)),
+        () ->
+            memberDeletedCount[0] =
+                SessionUtils.getWithoutCommit(
+                    DomainMemberMapper.class, mapper -> mapper.purge(legacyTimeline, limit)));
 
-    return domainDeletedCount[0] + domainRelDeletedCount[0];
+    return domainDeletedCount[0] + domainRelDeletedCount[0] + memberDeletedCount[0];
   }
 
   /**
@@ -594,11 +600,10 @@ public class DomainMetaService {
             DomainRelService.getInstance().checkDomainHasNoSubDomains(identifier, domainId);
             // A plain read at read committed sees every membership committed before this
             // exclusive lock: term writers hold a share lock on the domain row while adding.
-            if (GlossaryTermDomainService.getInstance().hasTerms(domainId)) {
+            if (SessionUtils.getWithoutCommit(
+                DomainMemberMapper.class, mapper -> mapper.hasMembers(domainId))) {
               throw new NonEmptyDomainException(
-                  "Domain %s under metalake %s still has glossary terms. Ask a term owner with"
-                      + " CREATE_DEFINITION, or a user with MANAGE_DEFINITIONS, who can use the"
-                      + " domain to remove the terms from it first",
+                  "Domain %s under metalake %s contains definition members. Detach them before deleting it.",
                   identifier.name(), identifier.namespace().level(0));
             }
             deleteDomainWithVersion(identifier, lockedDomainPO);

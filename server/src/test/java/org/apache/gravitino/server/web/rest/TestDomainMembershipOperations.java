@@ -34,6 +34,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Application;
@@ -42,6 +43,8 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.domain.DefinitionMember;
+import org.apache.gravitino.domain.DefinitionMemberPage;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.domain.DomainDispatcher;
 import org.apache.gravitino.domain.DomainMember;
@@ -55,6 +58,7 @@ import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.glossary.GlossaryManager;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
@@ -75,6 +79,7 @@ public class TestDomainMembershipOperations extends BaseOperationsTest {
   private static final String OBJECT_DOMAINS =
       "/metalakes/test/objects/table/cat.schema.table/domains";
 
+  private final GlossaryManager glossary = mock(GlossaryManager.class);
   private final DomainDispatcher dispatcher = mock(DomainDispatcher.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
@@ -99,16 +104,47 @@ public class TestDomainMembershipOperations extends BaseOperationsTest {
       throw new RuntimeException(e);
     }
     return new ResourceConfig(
-            DomainMembershipOperations.class, MetadataObjectDomainOperations.class)
+            DomainOperations.class,
+            DomainMembershipOperations.class,
+            MetadataObjectDomainOperations.class,
+            DefinitionMembershipOperations.class,
+            TermDomainOperations.class)
         .register(new ObjectMapperProvider())
         .register(
             new AbstractBinder() {
               @Override
               protected void configure() {
+                bind(glossary).to(GlossaryManager.class);
                 bind(dispatcher).to(DomainDispatcher.class);
                 bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
               }
             });
+  }
+
+  @Test
+  public void testDefinitionAdministration() throws Exception {
+    DefinitionMember draft = mock(DefinitionMember.class);
+    when(draft.type()).thenReturn(DefinitionMember.Type.GLOSSARY_TERM);
+    when(draft.name()).thenReturn("Draft");
+    when(glossary.listDefinitionMembers("test", "Finance", 20, 0))
+        .thenReturn(new DefinitionMemberPage(List.of(draft), true));
+    try (Response response =
+        target("/metalakes/test/domains/Finance/definition-members").request().get()) {
+      assertEquals(200, response.getStatus());
+      assertEquals(
+          JsonUtils.anyFieldMapper()
+              .readTree(
+                  "{\"code\":0,\"members\":[{\"type\":\"GLOSSARY_TERM\",\"name\":\"Draft\"}],\"hasMore\":true}"),
+          JsonUtils.anyFieldMapper().readTree(response.readEntity(String.class)));
+    }
+    try (Response response =
+        target("/metalakes/test/terms/Draft/domains/Finance").request().delete()) {
+      assertEquals(200, response.getStatus());
+      assertEquals(
+          JsonUtils.anyFieldMapper().readTree("{\"code\":0}"),
+          JsonUtils.anyFieldMapper().readTree(response.readEntity(String.class)));
+    }
+    verify(glossary).detachTermDomain("test", "Draft", "Finance");
   }
 
   @Test

@@ -294,6 +294,12 @@ paths:
   /metalakes/{metalake}/secrets/providers:
     $ref: "./secrets.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1secrets~1providers"
 
+  /metalakes/{metalake}/domains/{domain}/definition-members:
+    $ref: "./domains.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1domains~1%7Bdomain%7D~1definition-members"
+
+  /metalakes/{metalake}/terms/{term}/domains/{domain}:
+    $ref: "./domains.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1terms~1%7Bterm%7D~1domains~1%7Bdomain%7D"
+
   /metalakes/{metalake}/domains/{domain}/objects:
     $ref: "./domains.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1domains~1%7Bdomain%7D~1objects"
 

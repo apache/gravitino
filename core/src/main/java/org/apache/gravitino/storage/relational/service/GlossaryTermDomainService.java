@@ -33,6 +33,7 @@ import java.util.TreeSet;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
+import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermDomainRelMapper;
 import org.apache.gravitino.storage.relational.po.DomainPO;
@@ -64,7 +65,8 @@ public final class GlossaryTermDomainService {
    * @param metalakeId The live metalake ID.
    * @param members The current member domain IDs of the locked term.
    * @param requestedNames The names supplied by the caller.
-   * @param checkRequested The authorization check for each requested live domain.
+   * @param checkRequested The authorization check run before and after locking each requested
+   *     Domain.
    * @return The locked domain rows by ID.
    */
   public Map<Long, DomainPO> lockDomains(
@@ -77,12 +79,14 @@ public final class GlossaryTermDomainService {
         mapper -> {
           Map<String, Long> observedIds = new HashMap<>();
           Set<Long> ids = new TreeSet<>(members);
-          for (String name : requestedNames) {
+          for (String name : new TreeSet<>(requestedNames)) {
             DomainPO row = mapper.selectDomainMetaByMetalakeIdAndName(metalakeId, name);
-            if (row != null && name.equals(row.domainName())) {
-              observedIds.put(name, row.domainId());
-              ids.add(row.domainId());
+            if (row == null || !name.equals(row.domainName())) {
+              throw new NoSuchDomainException("Domain %s does not exist", name);
             }
+            checkRequested.accept(row);
+            observedIds.put(name, row.domainId());
+            ids.add(row.domainId());
           }
           Map<Long, DomainPO> locked = new LinkedHashMap<>();
           for (long id : ids) {
@@ -158,12 +162,6 @@ public final class GlossaryTermDomainService {
     return result;
   }
 
-  /** Whether a domain still has live member terms. A plain read at read committed. */
-  public boolean hasTerms(long domainId) {
-    return SessionUtils.getWithoutCommit(
-        GlossaryTermDomainRelMapper.class, mapper -> mapper.hasTerms(domainId));
-  }
-
   /** Adds a live membership row. The caller holds the term and domain locks. */
   public void add(long metalakeId, long termId, long domainId) {
     SessionUtils.doWithoutCommit(
@@ -177,10 +175,16 @@ public final class GlossaryTermDomainService {
   }
 
   /** Retires a live membership row if present. The caller holds the term row lock. */
-  public void remove(long termId, long domainId) {
+  public void remove(long metalakeId, long termId, long domainId) {
     SessionUtils.doWithoutCommit(
-        GlossaryTermDomainRelMapper.class,
-        mapper -> mapper.remove(termId, domainId, nextDeletedAt(mapper.lastDeletedAt(termId))));
+        DomainMemberMapper.class,
+        mapper ->
+            mapper.remove(
+                metalakeId,
+                DomainMemberMapper.MemberType.GLOSSARY_TERM,
+                termId,
+                domainId,
+                System.currentTimeMillis()));
   }
 
   /** Retires every membership row of a term inside its deletion transaction. */
@@ -193,10 +197,8 @@ public final class GlossaryTermDomainService {
   /** Retires every membership row of a metalake inside its deletion transaction. */
   public void dropMetalake(long metalakeId) {
     SessionUtils.doWithoutCommit(
-        GlossaryTermDomainRelMapper.class,
-        mapper ->
-            mapper.dropMetalake(
-                metalakeId, nextDeletedAt(mapper.lastDeletedAtInMetalake(metalakeId))));
+        DomainMemberMapper.class,
+        mapper -> mapper.dropMetalake(metalakeId, System.currentTimeMillis()));
   }
 
   /** Purges at most limit retired rows older than cutoff, in the caller's transaction. */
@@ -209,8 +211,8 @@ public final class GlossaryTermDomainService {
         GlossaryTermDomainRelMapper.class,
         mapper -> {
           int count = 0;
-          for (GlossaryTermDomainRelPO row : mapper.expired(cutoff, limit)) {
-            count += mapper.purge(row);
+          for (long id : mapper.expired(cutoff, limit)) {
+            count += mapper.purge(id);
           }
           return count;
         });

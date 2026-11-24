@@ -507,8 +507,8 @@ public class DomainRelService {
     return lockMetalakeAndDomains(identifier, observedPO, null).getLeft();
   }
 
-  // The parent name is read under the lock on the domain, which every writer of its edge holds.
-  DomainEntity toEntityWithParent(DomainPO domainPO, Namespace namespace) {
+  /** Resolves the current parent for a Domain row in the caller's session. */
+  public DomainEntity toEntityWithParent(DomainPO domainPO, Namespace namespace) {
     return DomainPO.fromDomainPO(
         domainPO, namespace, getParentDomainName(domainPO.domainId()).orElse(null));
   }

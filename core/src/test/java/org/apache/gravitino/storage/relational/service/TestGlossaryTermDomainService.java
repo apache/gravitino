@@ -31,10 +31,12 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
+import org.apache.gravitino.exceptions.NonEmptyDomainException;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermDomainRelMapper;
 import org.apache.gravitino.storage.relational.po.DomainPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -73,7 +75,7 @@ public class TestGlossaryTermDomainService extends TestJDBCBackend {
         read(() -> service.domainNames(LAKE_ID, List.of(101L, 102L, 103L))));
     Assertions.assertEquals(
         Set.of(101L, 102L), read(() -> service.termIds(LAKE_ID, Set.of(sales))));
-    run(() -> service.remove(101, sales));
+    run(() -> service.remove(LAKE_ID, 101, sales));
     Assertions.assertEquals(Set.of(finance), read(() -> service.domainIds(101)));
   }
 
@@ -83,16 +85,19 @@ public class TestGlossaryTermDomainService extends TestJDBCBackend {
     long retained = Long.MAX_VALUE - 3;
     run(() -> service.add(LAKE_ID, 101, sales));
     SessionUtils.doWithCommit(
-        GlossaryTermDomainRelMapper.class, mapper -> mapper.remove(101, sales, retained));
+        DomainMemberMapper.class,
+        mapper ->
+            mapper.remove(
+                LAKE_ID, DomainMemberMapper.MemberType.GLOSSARY_TERM, 101, sales, retained));
     for (int i = 1; i <= 2; i++) {
       run(() -> service.add(LAKE_ID, 101, sales));
-      run(() -> service.remove(101, sales));
+      run(() -> service.remove(LAKE_ID, 101, sales));
       Assertions.assertEquals(
-          retained + i, scalar("SELECT MAX(deleted_at) FROM glossary_term_domain_rel"));
+          retained + i, scalar("SELECT MAX(deleted_at) FROM domain_member_rel"));
     }
     Assertions.assertTrue(read(() -> service.domainIds(101)).isEmpty());
     Assertions.assertEquals(
-        3, scalar("SELECT COUNT(*) FROM glossary_term_domain_rel WHERE deleted_at > 0"));
+        3, scalar("SELECT COUNT(*) FROM domain_member_rel WHERE deleted_at > 0"));
   }
 
   @TestTemplate
@@ -102,14 +107,43 @@ public class TestGlossaryTermDomainService extends TestJDBCBackend {
     run(() -> service.add(LAKE_ID, 102, sales));
     Assertions.assertTrue(
         GlossaryTermMetaService.getInstance().delete(NameIdentifier.of(NS, "Term101")));
-    Assertions.assertFalse(read(() -> service.hasTerms(finance)));
-    Assertions.assertTrue(read(() -> service.hasTerms(sales)));
+    Assertions.assertFalse(
+        SessionUtils.getWithoutCommit(DomainMemberMapper.class, m -> m.hasMembers(finance))
+            .booleanValue());
+    Assertions.assertTrue(
+        SessionUtils.getWithoutCommit(DomainMemberMapper.class, m -> m.hasMembers(sales))
+            .booleanValue());
     run(() -> GlossaryTermMetaService.getInstance().dropMetalake(LAKE_ID));
-    Assertions.assertFalse(read(() -> service.hasTerms(sales)));
+    Assertions.assertFalse(
+        SessionUtils.getWithoutCommit(DomainMemberMapper.class, m -> m.hasMembers(sales))
+            .booleanValue());
     Assertions.assertEquals(
-        0, scalar("SELECT COUNT(*) FROM glossary_term_domain_rel WHERE deleted_at = 0"));
+        0, scalar("SELECT COUNT(*) FROM domain_member_rel WHERE deleted_at = 0"));
     GlossaryTermMetaService.getInstance().collect(Long.MAX_VALUE, 1000);
-    Assertions.assertEquals(0, scalar("SELECT COUNT(*) FROM glossary_term_domain_rel"));
+    Assertions.assertEquals(0, scalar("SELECT COUNT(*) FROM domain_member_rel"));
+  }
+
+  @TestTemplate
+  public void testSameNumericIdAcrossMemberTypes() throws Exception {
+    setup();
+    run(() -> service.add(LAKE_ID, 101, sales));
+    SessionUtils.doWithCommit(
+        DomainMemberMapper.class,
+        m ->
+            m.add(LAKE_ID, DomainMemberMapper.MemberType.KNOWLEDGE_BASE_ARTICLE, 101, sales, "{}"));
+    run(() -> service.removeTerm(101));
+    run(() -> service.collect(Long.MAX_VALUE, 10));
+    Assertions.assertTrue(read(() -> service.domainIds(101)).isEmpty());
+    Assertions.assertThrows(
+        NonEmptyDomainException.class,
+        () ->
+            DomainMetaService.getInstance()
+                .deleteDomain(NameIdentifier.of(NamespaceUtil.ofDomain(LAKE), "Sales")));
+    Assertions.assertEquals(
+        List.of(sales),
+        SessionUtils.getWithoutCommit(
+            DomainMemberMapper.class,
+            m -> m.domains(LAKE_ID, DomainMemberMapper.MemberType.KNOWLEDGE_BASE_ARTICLE, 101)));
   }
 
   @TestTemplate

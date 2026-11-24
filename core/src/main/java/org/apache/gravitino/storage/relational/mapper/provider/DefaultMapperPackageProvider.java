@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.DomainRelMapper;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
@@ -72,6 +73,7 @@ public class DefaultMapperPackageProvider implements MapperPackageProvider {
     return ImmutableList.of(
         CatalogMetaMapper.class,
         DomainMetaMapper.class,
+        DomainMemberMapper.class,
         DomainRelMapper.class,
         EntityChangeLogMapper.class,
         FilesetMetaMapper.class,

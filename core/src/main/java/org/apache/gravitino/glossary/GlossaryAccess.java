@@ -34,7 +34,9 @@ import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.DomainAccess;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege.Name;
+import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.GlossaryTermEntity;
@@ -191,6 +193,22 @@ public final class GlossaryAccess {
       return this == UNRESTRICTED;
     }
     return visibleDomains.computeIfAbsent(name, key -> domains.test(key, domain));
+  }
+
+  /** Evaluates management independently of glossary privileges using the current parent. */
+  static void requireDomainManagement(String metalake, DomainEntity domain) {
+    if (!DomainAccess.allowed(
+        GravitinoEnv.getInstance().gravitinoAuthorizer(),
+        PrincipalUtils.getCurrentPrincipal(),
+        metalake,
+        DomainAccess.scopes(metalake, domain),
+        Name.MANAGE_DOMAIN,
+        new AuthorizationRequestContext())) {
+      if (domain.status() == Domain.Status.DRAFT) {
+        throw new NoSuchDomainException("Domain %s does not exist", domain.name());
+      }
+      throw new ForbiddenException("Managing domain %s requires MANAGE_DOMAIN", domain.name());
+    }
   }
 
   void requireCreate() {

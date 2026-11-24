@@ -91,6 +91,7 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 import org.mockito.AdditionalAnswers;
@@ -150,11 +151,19 @@ class TestGlossaryDomains extends TestJDBCBackend {
     metalakeRole("manage", Privileges.allow("MANAGE_DEFINITIONS"));
     metalakeRole("domainAdmin", Privileges.allow("MANAGE_DOMAIN"));
     domainRole("useSales", "Sales");
-    domainRole("useFinance", "Finance");
+    role(
+        "manageSales",
+        SecurableObjects.parse(
+            "Sales", MetadataObject.Type.DOMAIN, List.of(Privileges.allow("MANAGE_DOMAIN"))));
+    role(
+        "manageFinance",
+        SecurableObjects.parse(
+            "Finance", MetadataObject.Type.DOMAIN, List.of(Privileges.allow("MANAGE_DOMAIN"))));
+    user("useOnly", "create", "useSales");
     user("viewer", "view", "useSales");
-    user("writer", "create", "useSales");
-    user("writer2", "create", "useSales");
-    user("admin", "manage", "useSales", "useFinance");
+    user("writer", "create", "manageSales");
+    user("writer2", "create", "manageSales");
+    user("admin", "manage", "manageSales", "manageFinance");
     user("domainAdmin", "domainAdmin");
     user("lakeOwner");
     OwnerMetaService.getInstance()
@@ -194,6 +203,48 @@ class TestGlossaryDomains extends TestJDBCBackend {
     GlossaryTermEntity term = as("lakeOwner", () -> manager.getTerm(LAKE, "Churn"));
     assertArrayEquals(new String[] {"Retail", "Sales"}, term.domains());
     assertEquals(1, term.version());
+  }
+
+  @TestTemplate
+  void testUseOnlyCannotChangeMembership() throws Exception {
+    assertThrows(
+        ForbiddenException.class,
+        () ->
+            as(
+                "useOnly",
+                () ->
+                    manager.createTerm(
+                        LAKE, TermSpec.builder("Rejected").withDomains("Sales").build())));
+    assertThrows(
+        NoSuchTermException.class, () -> as("lakeOwner", () -> manager.getTerm(LAKE, "Rejected")));
+    GlossaryTermEntity before =
+        as("useOnly", () -> manager.createTerm(LAKE, TermSpec.builder("Owned").build()));
+    assertThrows(
+        ForbiddenException.class,
+        () ->
+            as(
+                "useOnly",
+                () ->
+                    manager.alterTerm(
+                        LAKE,
+                        "Owned",
+                        TermChange.updateDefinition("changed"),
+                        TermChange.addDomain("Sales"))));
+    assertEquals(
+        before.revisionToken(),
+        as("useOnly", () -> manager.getTerm(LAKE, "Owned")).revisionToken());
+    assertThrows(
+        ForbiddenException.class,
+        () -> as("useOnly", () -> manager.listDefinitionMembers(LAKE, "Sales", 1, 0)));
+    assertThrows(
+        ForbiddenException.class,
+        () ->
+            as(
+                "useOnly",
+                () -> {
+                  manager.detachTermDomain(LAKE, "absent", "Sales");
+                  return null;
+                }));
   }
 
   /** T7.2. */
@@ -471,12 +522,12 @@ class TestGlossaryDomains extends TestJDBCBackend {
     create("B", "Retail");
     create("C", "HiddenSub");
     create("D", "Finance");
-    assertEquals(List.of("A", "B"), names(as("writer", () -> manager.listTerms(LAKE, "Sales"))));
+    assertEquals(List.of("A", "B"), names(as("viewer", () -> manager.listTerms(LAKE, "Sales"))));
     assertEquals(
         List.of("A", "B", "C"), names(as("lakeOwner", () -> manager.listTerms(LAKE, "Sales"))));
-    assertEquals(List.of("B"), names(as("writer", () -> manager.listTerms(LAKE, "Retail"))));
+    assertEquals(List.of("B"), names(as("viewer", () -> manager.listTerms(LAKE, "Retail"))));
     GlossaryManager filtered = manager.withTermVisibility(term -> !term.name().equals("B"));
-    assertEquals(List.of("A"), names(as("writer", () -> filtered.listTerms(LAKE, "Sales"))));
+    assertEquals(List.of("A"), names(as("viewer", () -> filtered.listTerms(LAKE, "Sales"))));
   }
 
   /** T7.8: hidden domains never appear in returned terms, and reads change nothing. */
@@ -667,9 +718,109 @@ class TestGlossaryDomains extends TestJDBCBackend {
         ForbiddenException.class, () -> as("writer", () -> manager.listTerms(LAKE, "Finance")));
   }
 
+  @TestTemplate
+  void testMemberPageUsesStableIdsAndLiveNames() throws Exception {
+    GlossaryTermEntity first = create("Zed", "Sales");
+    create("ChildOnly", "Retail");
+    create("Alpha", "Sales");
+    as("lakeOwner", () -> manager.alterTerm(LAKE, first.name(), TermChange.rename("Renamed")));
+    as(
+        "domainAdmin",
+        () -> {
+          var page = manager.listDefinitionMembers(LAKE, "Sales", 1, 0);
+          assertTrue(page.hasMore());
+          assertEquals("Renamed", page.members().get(0).name());
+          var last = manager.listDefinitionMembers(LAKE, "Sales", 1, 1);
+          assertFalse(last.hasMore());
+          assertEquals("Alpha", last.members().get(0).name());
+          assertTrue(manager.listDefinitionMembers(LAKE, "Sales", 1, 2).members().isEmpty());
+          return null;
+        });
+    assertTrue(as("lakeOwner", () -> manager.dropTerm(LAKE, "Renamed")));
+    assertEquals(
+        "Alpha",
+        as("domainAdmin", () -> manager.listDefinitionMembers(LAKE, "Sales", 1, 0))
+            .members()
+            .get(0)
+            .name());
+  }
+
+  @TestTemplate
+  void testReparentDuringAdminDetach() throws Exception {
+    verifyReparentDuringMembershipEdit(true);
+  }
+
+  @TestTemplate
+  void testReparentDuringMixedAlter() throws Exception {
+    // H2 serializes both writers on its exclusive metalake row lock.
+    Assumptions.assumeFalse("h2".equalsIgnoreCase(backendType));
+    verifyReparentDuringMembershipEdit(false);
+  }
+
+  private void verifyReparentDuringMembershipEdit(boolean detach) throws Exception {
+    TermSpec spec =
+        detach
+            ? TermSpec.builder("Term").withDomains("Retail").build()
+            : TermSpec.builder("Term").build();
+    GlossaryTermEntity before = as("writer", () -> manager.createTerm(LAKE, spec));
+    CountDownLatch checked = new CountDownLatch(1);
+    CountDownLatch moved = new CountDownLatch(1);
+    GravitinoAuthorizer observed =
+        Mockito.mock(GravitinoAuthorizer.class, AdditionalAnswers.delegatesTo(authorizer));
+    Mockito.doAnswer(
+            call -> {
+              Object granted = AdditionalAnswers.delegatesTo(authorizer).answer(call);
+              if (Boolean.TRUE.equals(granted) && checked.getCount() > 0) {
+                checked.countDown();
+                await(moved);
+              }
+              return granted;
+            })
+        .when(observed)
+        .authorize(
+            Mockito.any(),
+            Mockito.eq(LAKE),
+            Mockito.eq(MetadataObjects.of(null, "Sales", MetadataObject.Type.DOMAIN)),
+            Mockito.eq(Privilege.Name.MANAGE_DOMAIN),
+            Mockito.any());
+    env.setGravitinoAuthorizer(observed);
+    ExecutorService worker = Executors.newSingleThreadExecutor();
+    try {
+      Future<?> edit =
+          worker.submit(
+              () ->
+                  assertThrows(
+                      ForbiddenException.class,
+                      () ->
+                          as(
+                              "writer",
+                              () -> {
+                                if (detach) manager.detachTermDomain(LAKE, "Term", "Retail");
+                                else
+                                  manager.alterTerm(
+                                      LAKE,
+                                      "Term",
+                                      TermChange.updateDefinition("changed"),
+                                      TermChange.addDomain("Retail"));
+                                return null;
+                              })));
+      await(checked);
+      env.internalDomainDispatcher().attachDomain(LAKE, "Retail", "Finance");
+      moved.countDown();
+      edit.get(30, TimeUnit.SECONDS);
+      GlossaryTermEntity after = as("lakeOwner", () -> manager.getTerm(LAKE, "Term"));
+      assertEquals(before.revisionToken(), after.revisionToken());
+      assertEquals(before.definition(), after.definition());
+      assertArrayEquals(before.domains(), after.domains());
+    } finally {
+      moved.countDown();
+      worker.shutdownNow();
+    }
+  }
+
   /** Covers T7.9. */
   @TestTemplate
-  void testDomainAdminCannotClearHiddenDraft() throws Exception {
+  void testDomainAdminClearsHiddenDraft() throws Exception {
     Mockito.when(env.config().get(Configs.ENABLE_AUTHORIZATION)).thenReturn(true);
     DomainDispatcher domains = DomainAuthzHelper.managed(env.internalDomainDispatcher(), LAKE);
     GlossaryTermEntity draft =
@@ -681,18 +832,20 @@ class TestGlossaryDomains extends TestJDBCBackend {
                     TermSpec.builder("PrivateDraft")
                         .withDefinition("original")
                         .withStatus(GlossaryTerm.Status.DRAFT)
-                        .withDomains("Retail")
+                        .withDomains("Sales", "Retail")
                         .build()));
     assertThrows(
         ForbiddenException.class, () -> as("viewer", () -> domains.deleteDomain(LAKE, "Retail")));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> as("domainAdmin", () -> domains.deleteDomain(LAKE, "Retail")));
+    as("domainAdmin", () -> domains.unpublishDomain(LAKE, "Retail"));
     NonEmptyDomainException error =
         assertThrows(
             NonEmptyDomainException.class,
             () -> as("domainAdmin", () -> domains.deleteDomain(LAKE, "Retail")));
     assertEquals(
-        "Domain Retail under metalake glossary still has glossary terms. Ask a term owner with "
-            + "CREATE_DEFINITION, or a user with MANAGE_DEFINITIONS, who can use the domain to "
-            + "remove the terms from it first",
+        "Domain Retail under metalake glossary contains definition members. Detach them before deleting it.",
         error.getMessage());
     assertThrows(
         NoSuchTermException.class,
@@ -702,13 +855,31 @@ class TestGlossaryDomains extends TestJDBCBackend {
                 () -> manager.alterTerm(LAKE, draft.name(), TermChange.removeDomain("Retail"))));
     GlossaryTermEntity before = as("writer", () -> manager.getTerm(LAKE, draft.name()));
     assertEquals(draft.revisionToken(), before.revisionToken());
-    assertArrayEquals(new String[] {"Retail"}, before.domains());
-    as("writer", () -> manager.alterTerm(LAKE, draft.name(), TermChange.removeDomain("Retail")));
+    assertArrayEquals(new String[] {"Retail", "Sales"}, before.domains());
+    assertThrows(
+        NoSuchTermException.class,
+        () -> as("domainAdmin", () -> manager.getTerm(LAKE, draft.name())));
+    assertEquals(
+        draft.name(),
+        as("domainAdmin", () -> manager.listDefinitionMembers(LAKE, "Retail", 1, 0))
+            .members()
+            .get(0)
+            .name());
+    for (String name : List.of(draft.name(), draft.name(), "absent")) {
+      as(
+          "domainAdmin",
+          () -> {
+            manager.detachTermDomain(LAKE, name, "Retail");
+            return null;
+          });
+    }
     assertTrue(as("domainAdmin", () -> domains.deleteDomain(LAKE, "Retail")));
     GlossaryTermEntity after = as("writer", () -> manager.getTerm(LAKE, draft.name()));
     assertEquals(draft.id(), after.id());
     assertEquals("original", after.definition());
-    assertArrayEquals(new String[0], after.domains());
+    assertEquals(before.version() + 1, after.version());
+    assertEquals("domainAdmin", after.auditInfo().lastModifier());
+    assertArrayEquals(new String[] {"Sales"}, after.domains());
   }
 
   @TestTemplate
@@ -719,6 +890,7 @@ class TestGlossaryDomains extends TestJDBCBackend {
     assertTrue(as("admin", () -> manager.dropTerm(LAKE, "Churn")));
     as("admin", () -> manager.createTerm(LAKE, TermSpec.builder("Churn").build()));
     assertArrayEquals(new String[0], as("admin", () -> manager.getTerm(LAKE, "Churn")).domains());
+    env.internalDomainDispatcher().unpublishDomain(LAKE, "Finance");
     assertTrue(as("lakeOwner", () -> env.internalDomainDispatcher().deleteDomain(LAKE, "Finance")));
   }
 
@@ -726,6 +898,10 @@ class TestGlossaryDomains extends TestJDBCBackend {
   @TestTemplate
   void testDropDomainWithTermsFails() throws Exception {
     create("Churn", "Finance");
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> env.internalDomainDispatcher().deleteDomain(LAKE, "Finance"));
+    env.internalDomainDispatcher().unpublishDomain(LAKE, "Finance");
     assertThrows(
         NonEmptyDomainException.class,
         () -> env.internalDomainDispatcher().deleteDomain(LAKE, "Finance"));
@@ -749,8 +925,7 @@ class TestGlossaryDomains extends TestJDBCBackend {
     boolean dropFirst = round % 2 == 0;
     String domain = (dropFirst ? "DropFirst" : "AddFirst") + round;
     long domainId =
-        GlossaryDomainFixtures.insertDomain(
-            LAKE, domain, Domain.Status.PUBLISHED, null, AUDIT_INFO);
+        GlossaryDomainFixtures.insertDomain(LAKE, domain, Domain.Status.DRAFT, null, AUDIT_INFO);
     assertTrue(canLockDomain(domainId));
     GlossaryTermEntity before = create(domain);
     CountDownLatch locked = new CountDownLatch(1);

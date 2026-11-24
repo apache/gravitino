@@ -24,7 +24,6 @@ import java.util.Collection;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.GlossaryTermDomainRelBaseSQLProvider;
-import org.apache.gravitino.storage.relational.po.GlossaryTermDomainRelPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
@@ -44,34 +43,15 @@ public class GlossaryTermDomainRelSQLProviderFactory {
     return getProvider().insert(metalakeId, termId, domainId);
   }
 
-  /** Delegates {@link GlossaryTermDomainRelBaseSQLProvider#remove}. */
-  public static String remove(
-      @Param("termId") long termId,
-      @Param("domainId") long domainId,
-      @Param("deletedAt") long deletedAt) {
-    return getProvider().remove(termId, domainId, deletedAt);
-  }
-
   /** Delegates {@link GlossaryTermDomainRelBaseSQLProvider#removeTerm}. */
   public static String removeTerm(
       @Param("termId") long termId, @Param("deletedAt") long deletedAt) {
     return getProvider().removeTerm(termId, deletedAt);
   }
 
-  /** Delegates {@link GlossaryTermDomainRelBaseSQLProvider#dropMetalake}. */
-  public static String dropMetalake(
-      @Param("metalakeId") long metalakeId, @Param("deletedAt") long deletedAt) {
-    return getProvider().dropMetalake(metalakeId, deletedAt);
-  }
-
   /** Delegates {@link GlossaryTermDomainRelBaseSQLProvider#lastDeletedAt}. */
   public static String lastDeletedAt(@Param("termId") long termId) {
     return getProvider().lastDeletedAt(termId);
-  }
-
-  /** Delegates {@link GlossaryTermDomainRelBaseSQLProvider#lastDeletedAtInMetalake}. */
-  public static String lastDeletedAtInMetalake(@Param("metalakeId") long metalakeId) {
-    return getProvider().lastDeletedAtInMetalake(metalakeId);
   }
 
   /** Delegates {@link GlossaryTermDomainRelBaseSQLProvider#listDomainNames}. */
@@ -91,19 +71,14 @@ public class GlossaryTermDomainRelSQLProviderFactory {
     return getProvider().listTermIds(metalakeId, domainIds);
   }
 
-  /** Delegates {@link GlossaryTermDomainRelBaseSQLProvider#hasTerms}. */
-  public static String hasTerms(@Param("domainId") long domainId) {
-    return getProvider().hasTerms(domainId);
-  }
-
   /** Delegates {@link GlossaryTermDomainRelBaseSQLProvider#expired}. */
   public static String expired(@Param("cutoff") long cutoff, @Param("limit") int limit) {
     return getProvider().expired(cutoff, limit);
   }
 
   /** Delegates {@link GlossaryTermDomainRelBaseSQLProvider#purge}. */
-  public static String purge(@Param("row") GlossaryTermDomainRelPO row) {
-    return getProvider().purge(row);
+  public static String purge(@Param("id") long id) {
+    return getProvider().purge(id);
   }
 
   private static GlossaryTermDomainRelBaseSQLProvider getProvider() {

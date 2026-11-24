@@ -50,6 +50,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -164,13 +165,16 @@ public class TestDomainManager {
   @AfterEach
   public void cleanUp() throws IOException {
     DomainEntity[] domains = domainManager.listDomainInfos(METALAKE);
-    // Sub-domains first, since a domain with sub-domains cannot be deleted.
+    // Clear children before unpublishing and deleting their parents.
     Arrays.stream(domains)
-        .filter(domain -> domain.parent().isPresent())
-        .forEach(domain -> domainManager.deleteDomain(METALAKE, domain.name()));
-    Arrays.stream(domains)
-        .filter(domain -> !domain.parent().isPresent())
-        .forEach(domain -> domainManager.deleteDomain(METALAKE, domain.name()));
+        .sorted(Comparator.comparing(domain -> domain.parent().isEmpty()))
+        .forEach(
+            domain -> {
+              if (domain.status() == Domain.Status.PUBLISHED) {
+                domainManager.unpublishDomain(METALAKE, domain.name());
+              }
+              domainManager.deleteDomain(METALAKE, domain.name());
+            });
     for (TagEntity tag :
         entityStore.list(NamespaceUtil.ofTag(METALAKE), TagEntity.class, Entity.EntityType.TAG)) {
       entityStore.delete(tag.nameIdentifier(), Entity.EntityType.TAG);

@@ -981,3 +981,30 @@ CREATE TABLE IF NOT EXISTS glossary_term_domain_rel (
     KEY idx_glossary_domain_rel_metalake (metalake_id, deleted_at),
     KEY idx_glossary_domain_rel_deleted (deleted_at, term_id, domain_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'explicit glossary term domain membership';
+
+CREATE TABLE IF NOT EXISTS domain_member_rel (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT 'Membership row ID',
+    metalake_id BIGINT NOT NULL COMMENT 'Owning metalake ID',
+    domain_id BIGINT NOT NULL COMMENT 'Domain ID',
+    member_type VARCHAR(64) NOT NULL COMMENT 'GLOSSARY_TERM or KNOWLEDGE_BASE_ARTICLE',
+    member_id BIGINT NOT NULL COMMENT 'Stable member ID',
+    current_version INT NOT NULL DEFAULT 1 COMMENT 'Current row version',
+    last_version INT NOT NULL DEFAULT 1 COMMENT 'Last row version',
+    audit_info MEDIUMTEXT NOT NULL COMMENT 'Audit information',
+    deleted_at BIGINT NOT NULL DEFAULT 0 COMMENT 'Soft deletion time in milliseconds, zero for live rows',
+    CONSTRAINT uk_domain_member UNIQUE (member_type, member_id, domain_id, deleted_at),
+    INDEX idx_domain_members (domain_id, deleted_at, member_type, member_id),
+    INDEX idx_domain_member_metalake (metalake_id, deleted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Explicit Domain memberships';
+
+-- Preserve live memberships and retired generations from the earlier Glossary schema.
+INSERT INTO domain_member_rel (metalake_id, domain_id, member_type, member_id, audit_info, deleted_at)
+SELECT r.metalake_id, r.domain_id, 'GLOSSARY_TERM', r.term_id, COALESCE(t.audit_info, '{}'), r.deleted_at
+FROM glossary_term_domain_rel r
+LEFT JOIN glossary_term_meta t ON t.term_id = r.term_id AND t.metalake_id = r.metalake_id
+WHERE NOT EXISTS (
+    SELECT 1 FROM domain_member_rel m
+    WHERE m.member_type = 'GLOSSARY_TERM' AND m.member_id = r.term_id
+      AND m.domain_id = r.domain_id AND m.metalake_id = r.metalake_id AND m.deleted_at = r.deleted_at
+);
+DROP TABLE glossary_term_domain_rel;

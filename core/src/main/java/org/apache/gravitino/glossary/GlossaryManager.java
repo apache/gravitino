@@ -39,6 +39,7 @@ import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.domain.DefinitionMemberPage;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
@@ -51,6 +52,7 @@ import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.meta.GlossaryTermNames;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper;
 import org.apache.gravitino.storage.relational.po.DomainPO;
 import org.apache.gravitino.storage.relational.po.GlossaryTermRelPO;
 import org.apache.gravitino.storage.relational.service.DomainRelService;
@@ -62,6 +64,7 @@ import org.apache.gravitino.storage.relational.service.GlossaryTermRelService.Re
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 
@@ -300,7 +303,8 @@ public final class GlossaryManager {
               true,
               ignored -> {},
               (fresh, plan) -> {
-                TermDomains domains = planDomains(lake, term, domainEdits, access);
+                TermDomains domains =
+                    planDomains(lake, term, domainEdits, row -> requireManagement(metalake, row));
                 GlossaryTermEntity created =
                     domains.changed() ? TermEdits.withDomains(term, domains.names()) : term;
                 terms.checkTermNames(created);
@@ -410,6 +414,56 @@ public final class GlossaryManager {
         missing -> false);
   }
 
+  /** Lists the direct, live definitions administered through a Domain. */
+  public DefinitionMemberPage listDefinitionMembers(
+      String metalake, String domain, int limit, int offset) {
+    Preconditions.checkArgument(
+        limit >= 1 && limit <= 1000 && offset >= 0, "Invalid membership page");
+    return SqlSessions.readSnapshot(
+        () -> {
+          DomainPO row = managedDomain(metalake, domain);
+          List<DomainMemberMapper.NamedMember> members =
+              SessionUtils.getWithoutCommit(
+                  DomainMemberMapper.class,
+                  mapper ->
+                      mapper.namedMembers(row.metalakeId(), row.domainId(), limit + 1, offset));
+          return new DefinitionMemberPage(
+              new ArrayList<>(members.subList(0, Math.min(limit, members.size()))),
+              members.size() > limit);
+        });
+  }
+
+  /** Detaches the named Term, including a hidden draft, with Domain management authority. */
+  public void detachTermDomain(String metalake, String term, String domain) {
+    DomainPO observed = SqlSessions.readSnapshot(() -> managedDomain(metalake, domain));
+    NameIdentifier ident = NameIdentifierUtil.ofGlossaryTerm(metalake, term);
+    Consumer<DomainPO> check =
+        row -> {
+          if (!row.domainId().equals(observed.domainId())) {
+            throw new NoSuchDomainException("Domain %s does not exist", domain);
+          }
+          requireManagement(metalake, row);
+        };
+    terms.withLockedTerm(
+        ident,
+        false,
+        locked -> {
+          if (locked.isEmpty()) {
+            DOMAINS.lockDomains(observed.metalakeId(), Set.of(), Set.of(domain), check);
+          } else {
+            GlossaryTermEntity before = locked.get();
+            TermDomains plan =
+                planDomains(
+                    observed.metalakeId(),
+                    before,
+                    List.of(new TermDomains.Edit(domain, false)),
+                    check);
+            applyChanges(ident, before, new TermChange[0], null, plan);
+          }
+          return null;
+        });
+  }
+
   private GlossaryTermEntity alter(
       String metalake,
       String name,
@@ -457,7 +511,11 @@ public final class GlossaryManager {
                             locked,
                             content.toArray(new TermChange[0]),
                             plan,
-                            planDomains(lake, locked, domainEdits, access)),
+                            planDomains(
+                                lake,
+                                locked,
+                                domainEdits,
+                                row -> requireManagement(metalake, row))),
                         access));
           },
           missing -> {
@@ -476,7 +534,8 @@ public final class GlossaryManager {
           TermDomains domains =
               domainEdits.isEmpty() && before.domains().length == 0
                   ? null
-                  : planDomains(lakeOf(ident), before, domainEdits, access);
+                  : planDomains(
+                      lakeOf(ident), before, domainEdits, row -> requireManagement(metalake, row));
           return visibleDomains(
               applyChanges(ident, before, content.toArray(new TermChange[0]), null, domains),
               access);
@@ -626,12 +685,35 @@ public final class GlossaryManager {
     return new NoSuchTermException("Term %s does not exist", requested);
   }
 
+  private DomainPO managedDomain(String metalake, String name) {
+    long lake;
+    try {
+      lake = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+    } catch (NoSuchEntityException missing) {
+      throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", metalake);
+    }
+    DomainPO row = DOMAINS.findDomain(lake, name);
+    if (row == null || !name.equals(row.domainName())) {
+      throw new NoSuchDomainException("Domain %s does not exist", name);
+    }
+    requireManagement(metalake, row);
+    return row;
+  }
+
+  private void requireManagement(String metalake, DomainPO row) {
+    if (authorizationEnabled) {
+      DomainEntity domain =
+          DomainRelService.getInstance().toEntityWithParent(row, NamespaceUtil.ofDomain(metalake));
+      GlossaryAccess.requireDomainManagement(metalake, domain);
+    }
+  }
+
   /**
    * Resolves, authorizes and locks every requested domain after all term rows of the request are
    * locked. A missing domain and a hidden draft domain report the same error.
    */
   private TermDomains planDomains(
-      long lake, GlossaryTermEntity term, List<TermDomains.Edit> edits, GlossaryAccess access) {
+      long lake, GlossaryTermEntity term, List<TermDomains.Edit> edits, Consumer<DomainPO> check) {
     Set<Long> members = term.domains().length == 0 ? Set.of() : DOMAINS.domainIds(term.id());
     Set<String> requested = new HashSet<>();
     for (TermDomains.Edit edit : edits) {
@@ -648,7 +730,7 @@ public final class GlossaryManager {
             requested,
             domain -> {
               String name = domain.domainName();
-              requireVisibleDomain(name, domain, access);
+              check.accept(domain);
               targets.put(name, domain);
             });
     Map<Long, String> current = new HashMap<>();

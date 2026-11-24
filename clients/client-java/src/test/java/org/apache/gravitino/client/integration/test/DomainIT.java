@@ -211,6 +211,8 @@ public class DomainIT extends BaseIT {
     assertEquals(Domain.Status.PUBLISHED, draft.publish().status());
     assertEquals(Domain.Status.DRAFT, replacement.status());
 
+    assertThrows(IllegalArgumentException.class, () -> metalake.deleteDomain(name));
+    replacement.unpublish();
     assertTrue(metalake.deleteDomain(name));
     assertFalse(metalake.deleteDomain(name));
     assertTrue(metalake.deleteDomain(changed.name()));
@@ -253,6 +255,7 @@ public class DomainIT extends BaseIT {
     assertTrue(child.updateBackingTag(null).backingTag().isEmpty());
     assertEquals(TagValue.noValue("child tag"), child.backingTag().orElseThrow());
     assertNotNull(metalake.getTag("child tag"));
+    parent.unpublish();
     assertTrue(metalake.deleteDomain(parent.name()));
   }
 

@@ -282,10 +282,12 @@ draft = domain.unpublish()
 
 ### Delete a Domain
 
-Delete or detach subdomains and remove glossary term memberships before deleting a domain.
-A term owner with `CREATE_DEFINITION` or a glossary manager with `MANAGE_DEFINITIONS` can remove
-membership from a term they can edit in a domain they can access. Domain deletion returns HTTP 409
-while any glossary term belongs to the domain, including drafts hidden from the domain manager.
+Unpublish the domain before deleting it. A draft domain with subdomains or direct definition
+members returns HTTP 409. Delete or detach its subdomains, then use
+`GET /metalakes/{metalake}/domains/{domain}/definition-members` to list its direct members,
+including hidden draft terms. The list requires `MANAGE_DOMAIN` and returns each member's type
+and current name. To detach a term, call `DELETE /metalakes/{metalake}/terms/{term}/domains/{domain}`.
+The same Domain permission authorizes the detach. Repeating the request returns HTTP 200.
 Tagged objects, backing tags and tag assignments survive deletion. An absent domain returns false.
 
 <Tabs groupId='language' queryString>
@@ -917,6 +919,8 @@ public class DomainExample {
         if (Arrays.asList(model.supportsDomains().listDomains()).contains("Finance")) {
           throw new IllegalStateException("Detached membership must stop rolling up");
         }
+        child.unpublish();
+        published.unpublish();
         lake.deleteDomain(child.name());
         lake.deleteDomain(published.name());
         // Domain deletion keeps tags and assignments. Remove the assignment explicitly.
@@ -978,6 +982,8 @@ try:
     assert len(model.supports_domains().list_domains_info()) == 2
     child = child.detach_from_parent()
     assert "Finance" not in model.supports_domains().list_domains()
+    child.unpublish()
+    published.unpublish()
     lake.delete_domain(child.name())
     lake.delete_domain(published.name())
     model.supports_tags().associate_tags([], ["planning"])
@@ -1003,15 +1009,15 @@ unsafe segments before sending a request; the server enforces the full naming ru
 Backing tags, metadata object names and `nameContains` search text have separate rules.
 Encode metadata path parameters individually and supply query values with `--data-urlencode`.
 
-| HTTP status | Typical Domain behavior                                                                                                                                                                               |
-| ---         | ---                                                                                                                                                                                                   |
-| 200         | Success with `code: 0`; empty queries return empty arrays; deleting an absent domain returns `dropped: false`.                                                                                        |
-| 400         | Invalid request: invalid domain names or filters, unsupported member types, illegal hierarchy/status transition, disallowed tag value, or a value supplied while creating a new backing tag.          |
-| 403         | Insufficient permission on a published domain, a required backing tag, or a reverse-lookup object.                                                                                                    |
-| 404         | Missing metalake/domain/parent/tag/object, or a draft hidden from the caller.                                                                                                                         |
-| 409         | Duplicate domain/tag name, backing-tag binding conflict, deleting a domain with subdomains or glossary terms, disabled metalake, or an optimistic lock conflict during domain alteration or deletion. |
-| 415         | Unsupported request Content-Type; the error response uses `application/json`.                                                                                                                         |
-| 5xx         | Server failure; inspect the error response and server log.                                                                                                                                            |
+| HTTP status | Typical Domain behavior                                                                                                                                                                                  |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 200         | Success with `code: 0`; empty queries return empty arrays; deleting an absent domain returns `dropped: false`.                                                                                           |
+| 400         | Invalid request: invalid domain names or filters, unsupported member types, illegal hierarchy/status transition, disallowed tag value, or a value supplied while creating a new backing tag.             |
+| 403         | Insufficient permission on a published domain, a required backing tag, or a reverse-lookup object.                                                                                                       |
+| 404         | Missing metalake/domain/parent/tag/object, or a draft hidden from the caller.                                                                                                                            |
+| 409         | Duplicate domain/tag name, backing-tag binding conflict, deleting a draft domain with subdomains or definitions, disabled metalake, or an optimistic lock conflict during domain alteration or deletion. |
+| 415         | Unsupported request Content-Type; the error response uses `application/json`.                                                                                                                            |
+| 5xx         | Server failure; inspect the error response and server log.                                                                                                                                               |
 
 Authentication failures follow the configured authenticator. The JSON error response contains the
 exception type and message; do not infer authorization from empty lists alone. Validation and
