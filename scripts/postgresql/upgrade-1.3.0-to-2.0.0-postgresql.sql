@@ -555,6 +555,25 @@ COMMENT ON COLUMN domain_rel.current_version IS 'domain relation current version
 COMMENT ON COLUMN domain_rel.last_version IS 'domain relation last version';
 COMMENT ON COLUMN domain_rel.deleted_at IS 'domain relation deleted at';
 
+CREATE TABLE IF NOT EXISTS glossary_term_version_head (
+    term_id BIGINT PRIMARY KEY,
+    metalake_id BIGINT NOT NULL,
+    last_version BIGINT NOT NULL,
+    published_version BIGINT,
+    candidate_version BIGINT,
+    reserved_name VARCHAR(384),
+    CONSTRAINT uk_glossary_candidate_name UNIQUE (metalake_id, reserved_name)
+);
+
+CREATE TABLE IF NOT EXISTS glossary_term_version_info (
+    term_id BIGINT NOT NULL,
+    version_id BIGINT NOT NULL,
+    base_revision BIGINT NOT NULL,
+    lifecycle VARCHAR(16) NOT NULL,
+    snapshot TEXT NOT NULL,
+    PRIMARY KEY (term_id, version_id)
+);
+
 CREATE TABLE IF NOT EXISTS glossary_term_meta (
     term_id BIGINT NOT NULL PRIMARY KEY,
     metalake_id BIGINT NOT NULL,

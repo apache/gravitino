@@ -66,13 +66,31 @@ final class TermEdits {
     if (Arrays.equals(term.domains(), domains)) {
       return term;
     }
+    return project(term, domains, term.publication());
+  }
+
+  static GlossaryTermEntity project(
+      GlossaryTermEntity term, String[] domains, @Nullable TermPublication publication) {
+    GlossaryTerm.Status status =
+        publication != null && publication.state() != TermPublication.State.PUBLISHED
+            ? GlossaryTerm.Status.DRAFT
+            : term.status();
+    return copy(term, domains, publication, status);
+  }
+
+  static GlossaryTermEntity copy(
+      GlossaryTermEntity term,
+      String[] domains,
+      @Nullable TermPublication publication,
+      GlossaryTerm.Status status) {
     return GlossaryTermEntity.builder()
+        .withPublication(publication)
         .withId(term.id())
         .withNamespace(term.namespace())
         .withName(term.name())
         .withDefinition(term.definition())
         .withSynonyms(term.synonyms())
-        .withStatus(term.status())
+        .withStatus(status)
         .withLinks(term.links())
         .withProperties(term.properties())
         .withSourceRef(term.sourceRef())

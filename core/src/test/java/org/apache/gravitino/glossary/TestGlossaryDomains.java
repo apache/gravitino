@@ -552,8 +552,11 @@ class TestGlossaryDomains extends TestJDBCBackend {
   /** Review focus: membership follows the domain ID across a rename. */
   @TestTemplate
   void testDomainRenameFollowsId() throws Exception {
-    create("Churn", "Sales");
+    GlossaryTermEntity created = create("Churn", "Sales");
     env.internalDomainDispatcher().alterDomain(LAKE, "Sales", DomainChange.rename("Revenue"));
+    assertArrayEquals(
+        new String[] {"Sales"},
+        as("lakeOwner", () -> manager.getTermVersion(LAKE, created.id(), 1)).term().domains());
     assertArrayEquals(
         new String[] {"Revenue"}, as("lakeOwner", () -> manager.getTerm(LAKE, "Churn")).domains());
     assertThrows(

@@ -829,6 +829,25 @@ CREATE TABLE IF NOT EXISTS `domain_rel` (
     KEY `domain_rel_idx_metalake` (`metalake_id`, `deleted_at`)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS glossary_term_version_head (
+    term_id BIGINT PRIMARY KEY,
+    metalake_id BIGINT NOT NULL,
+    last_version BIGINT NOT NULL,
+    published_version BIGINT,
+    candidate_version BIGINT,
+    reserved_name VARCHAR(384),
+    CONSTRAINT uk_glossary_candidate_name UNIQUE (metalake_id, reserved_name)
+);
+
+CREATE TABLE IF NOT EXISTS glossary_term_version_info (
+    term_id BIGINT NOT NULL,
+    version_id BIGINT NOT NULL,
+    base_revision BIGINT NOT NULL,
+    lifecycle VARCHAR(16) NOT NULL,
+    snapshot CLOB NOT NULL,
+    PRIMARY KEY (term_id, version_id)
+);
+
 CREATE TABLE IF NOT EXISTS glossary_term_meta (
     term_id BIGINT NOT NULL PRIMARY KEY COMMENT 'globally unique glossary term id',
     metalake_id BIGINT NOT NULL COMMENT 'owning metalake id',

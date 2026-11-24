@@ -40,6 +40,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -50,6 +51,7 @@ import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermRelService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermRelService.RelationType;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
@@ -80,6 +82,162 @@ class TestGlossaryManager extends TestJDBCBackend {
         .thenReturn(true);
     GravitinoEnv.getInstance().setGravitinoAuthorizer(authorizer);
     return new GlossaryManager(ids::incrementAndGet, true);
+  }
+
+  private GlossaryManager approvalManager() {
+    TermPublicationPolicy policy =
+        new TermPublicationPolicy() {
+          @Override
+          public boolean requiresApproval(String lake) {
+            return true;
+          }
+
+          @Override
+          public boolean canDecide(String lake, long id, long version) {
+            return true;
+          }
+        };
+    return new GlossaryManager(ids::incrementAndGet, false, policy);
+  }
+
+  @TestTemplate
+  void testPublicationFailurePreservesCandidateAndLiveGraph() throws IOException {
+    createAndInsertMakeLake(LAKE);
+    GlossaryManager gated = approvalManager();
+    GlossaryTermEntity root = manager.createTerm(LAKE, TermSpec.builder("root").build());
+    manager.createTerm(LAKE, TermSpec.builder("peer").build());
+    gated.alterTerm(
+        LAKE, "root", TermChange.addBroader("peer"), TermChange.updateDefinition("candidate"));
+    manager.alterTerm(LAKE, "peer", TermChange.addBroader("root"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> gated.publishCandidate(LAKE, root.id(), 2));
+    Assertions.assertNull(manager.getTerm(LAKE, "root").definition());
+    Assertions.assertTrue(
+        manager
+            .listRelations(LAKE, "root", GlossaryManager.Direction.BROADER, false, null)
+            .isEmpty());
+    Assertions.assertEquals(
+        TermPublication.State.SUBMITTED,
+        gated.getTermVersion(LAKE, root.id(), 2).term().publication().state());
+    gated.rejectCandidate(LAKE, root.id(), 2);
+    gated.alterTerm(LAKE, "root", TermChange.updateDefinition("replacement"));
+    manager.createTerm(LAKE, TermSpec.builder("neighbor").withRelated("root").build());
+    Assertions.assertThrows(
+        TermVersionConflictException.class, () -> gated.publishCandidate(LAKE, root.id(), 3));
+    Assertions.assertNull(manager.getTerm(LAKE, "root").definition());
+  }
+
+  @TestTemplate
+  void testCandidatePublicationAndHistory() throws IOException {
+    createAndInsertMakeLake(LAKE);
+    GlossaryManager gated = approvalManager();
+    GlossaryTermEntity parent = manager.createTerm(LAKE, TermSpec.builder("parent").build());
+    Assertions.assertEquals(TermPublication.State.PUBLISHED, parent.publication().state());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            gated.createTerm(
+                LAKE, TermSpec.builder("child").withStatus(GlossaryTerm.Status.APPROVED).build()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            gated.createTerm(
+                LAKE,
+                TermSpec.builder("retired").withStatus(GlossaryTerm.Status.DEPRECATED).build()));
+    GlossaryTermEntity child =
+        gated.createTerm(
+            LAKE, TermSpec.builder("child").withDefinition("one").withBroader("parent").build());
+    long id = child.id();
+    Assertions.assertEquals(TermPublication.State.SUBMITTED, child.publication().state());
+    Assertions.assertNull(child.publication().publishedVersionId());
+    Assertions.assertEquals(GlossaryTerm.Status.DRAFT, child.status());
+    Assertions.assertThrows(NoSuchTermException.class, () -> manager.getTerm(LAKE, "child"));
+    Assertions.assertThrows(ForbiddenException.class, () -> manager.publishCandidate(LAKE, id, 1));
+    Assertions.assertEquals(Set.of(parent.id()), gated.getTermVersion(LAKE, id, 1).broader());
+    gated.publishCandidate(LAKE, id, 1);
+    Assertions.assertEquals(id, manager.getTerm(LAKE, "child").id());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> gated.alterTerm(LAKE, "child", TermChange.setStatus(GlossaryTerm.Status.APPROVED)));
+    GlossaryTermEntity v2 =
+        gated.alterTerm(
+            LAKE, "child", TermChange.updateDefinition("two"), TermChange.removeBroader("parent"));
+    Assertions.assertEquals(1L, v2.publication().publishedVersionId());
+    Assertions.assertEquals(Set.of(), gated.getTermVersion(LAKE, id, 2).broader());
+    Assertions.assertEquals("one", manager.getTerm(LAKE, "child").definition());
+    GlossaryTermEntity v3 = gated.alterTerm(LAKE, "child", TermChange.updateDefinition("three"));
+    Assertions.assertNotEquals(v2.revisionToken(), v3.revisionToken());
+    Assertions.assertThrows(
+        TermVersionConflictException.class, () -> gated.publishCandidate(LAKE, id, 2));
+    Assertions.assertEquals(
+        TermPublication.State.SUPERSEDED,
+        gated.getTermVersion(LAKE, id, 2).term().publication().state());
+    gated.rejectCandidate(LAKE, id, 3);
+    Assertions.assertEquals("one", manager.getTerm(LAKE, "child").definition());
+    gated.alterTerm(
+        LAKE, "child", TermChange.rename("renamed"), TermChange.removeBroader("parent"));
+    gated.publishCandidate(LAKE, id, 4);
+    Assertions.assertEquals(id, manager.getTerm(LAKE, "renamed").id());
+    Assertions.assertEquals("child", gated.getTermVersion(LAKE, id, 1).term().name());
+    Assertions.assertEquals(List.of(4L, 3L, 2L, 1L), gated.listTermVersions(LAKE, id));
+    manager.dropTerm(LAKE, "parent");
+    Assertions.assertEquals(Set.of(parent.id()), gated.getTermVersion(LAKE, id, 1).broader());
+    GlossaryTermEntity draft =
+        gated.createTerm(
+            LAKE, TermSpec.builder("draft").withStatus(GlossaryTerm.Status.DRAFT).build());
+    Assertions.assertEquals(TermPublication.State.DRAFT, draft.publication().state());
+    Assertions.assertThrows(
+        TermVersionConflictException.class, () -> gated.publishCandidate(LAKE, draft.id(), 1));
+    GlossaryTermEntity revised =
+        gated.alterTerm(
+            LAKE,
+            "draft",
+            draft.revisionToken(),
+            TermChange.updateDefinition("saved"),
+            TermChange.setStatus(GlossaryTerm.Status.DRAFT));
+    Assertions.assertEquals(TermPublication.State.DRAFT, revised.publication().state());
+    Assertions.assertThrows(
+        TermVersionConflictException.class,
+        () ->
+            gated.alterTerm(
+                LAKE, "draft", draft.revisionToken(), TermChange.updateDefinition("stale")));
+    Assertions.assertThrows(
+        TermVersionConflictException.class, () -> gated.submitDraft(LAKE, draft.id(), 1));
+    gated.submitDraft(LAKE, draft.id(), 2);
+    gated.publishCandidate(LAKE, draft.id(), 3);
+    Assertions.assertEquals("saved", manager.getTerm(LAKE, "draft").definition());
+    Assertions.assertEquals(GlossaryTerm.Status.APPROVED, manager.getTerm(LAKE, "draft").status());
+  }
+
+  @TestTemplate
+  void testLegacyTermAndRolledBackPublication() throws IOException {
+    createAndInsertMakeLake(LAKE);
+    GlossaryTermEntity legacy =
+        TermEdits.create(
+            ids.incrementAndGet(),
+            NamespaceUtil.ofGlossaryTerm(LAKE),
+            TermSpec.builder("legacy").withDefinition("original").build());
+    GlossaryTermMetaService.getInstance().insert(legacy, false);
+    GlossaryManager gated = approvalManager();
+    Assertions.assertEquals(List.of(1L), gated.listTermVersions(LAKE, legacy.id()));
+    GlossaryTermEntity staged =
+        gated.alterTerm(LAKE, "legacy", TermChange.updateDefinition("pending"));
+    long candidate = staged.publication().versionId();
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () ->
+            SessionUtils.doWithCommit(
+                OwnerMetaMapper.class,
+                ignored -> {
+                  gated.publishCandidate(LAKE, legacy.id(), candidate);
+                  throw new IllegalStateException("roll back enclosing transaction");
+                }));
+    Assertions.assertEquals("original", manager.getTerm(LAKE, "legacy").definition());
+    TermPublication state = gated.getTermVersion(LAKE, legacy.id(), candidate).term().publication();
+    Assertions.assertEquals(TermPublication.State.SUBMITTED, state.state());
+    Assertions.assertEquals(1L, state.publishedVersionId());
+    gated.publishCandidate(LAKE, legacy.id(), candidate);
+    Assertions.assertEquals("pending", manager.getTerm(LAKE, "legacy").definition());
   }
 
   @TestTemplate

@@ -50,6 +50,7 @@ import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.meta.GlossaryTermNames;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.GlossaryTermVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.GlossaryTermPO;
@@ -265,6 +266,12 @@ public final class GlossaryTermMetaService {
     SessionUtils.doWithoutCommit(
         GlossaryTermMetaMapper.class,
         mapper -> {
+          SessionUtils.doWithoutCommit(
+              GlossaryTermVersionMapper.class,
+              versions -> {
+                versions.deleteMetalakeVersions(metalakeId);
+                versions.deleteMetalakeHeads(metalakeId);
+              });
           mapper.dropMetalake(metalakeId, deletedAt);
           mapper.dropMetalakeSynonyms(metalakeId, deletedAt);
           GlossaryTermRelService.getInstance().dropMetalake(metalakeId);
@@ -285,6 +292,12 @@ public final class GlossaryTermMetaService {
             return count;
           }
           for (Long id : mapper.expired(cutoff, limit - count)) {
+            SessionUtils.doWithoutCommit(
+                GlossaryTermVersionMapper.class,
+                versions -> {
+                  versions.deleteVersions(id);
+                  versions.deleteHead(id);
+                });
             mapper.purgeSynonyms(id);
             count += mapper.purge(id);
           }
@@ -522,7 +535,7 @@ public final class GlossaryTermMetaService {
         (key, value) -> mapper.addSynonym(row.getTermId(), row.getMetalakeId(), value, key));
   }
 
-  private GlossaryTermPO toPO(GlossaryTermEntity entity, long metalakeId) {
+  GlossaryTermPO toPO(GlossaryTermEntity entity, long metalakeId) {
     GlossaryTermPO row = new GlossaryTermPO();
     row.setTermId(entity.id());
     row.setMetalakeId(metalakeId);
@@ -560,7 +573,7 @@ public final class GlossaryTermMetaService {
         ns);
   }
 
-  private GlossaryTermEntity fromPO(
+  GlossaryTermEntity fromPO(
       GlossaryTermPO row, List<String> synonyms, @Nullable List<String> domains, Namespace ns) {
     try {
       List<Map<String, String>> links =

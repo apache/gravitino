@@ -37,8 +37,8 @@ is linked to the columns, tables and metrics behind it. An agent can look up a w
 find the approved term, and follow its links to the data.
 
 The glossary is built in two steps. **Step 1** is this design: terms, relations, bindings, status,
-privileges on the metalake, APIs and agent lookup. **Step 2** adds review of changes, version
-history and grants on domains. Implementation Steps lists what each step contains.
+privileges on the metalake, APIs, agent lookup and business version history. **Step 2** adds the review workflow,
+version comparisons and grants on domains. Implementation Steps lists what each step contains.
 
 ## Goals
 
@@ -55,7 +55,7 @@ history and grants on domains. Implementation Steps lists what each step contain
 4. **Domains**: a term belongs to zero or more domains. A domain is optional when a term is
    created. In Step 1, domains group and filter terms. They do not change who can see or manage a
    term.
-5. **Status**: `DRAFT`, `APPROVED` or `DEPRECATED`. New terms are `APPROVED`. Anyone who can edit a
+5. **OSS default status policy**: new terms are `APPROVED`. Anyone who can edit a
    term can set its status, in the create or update call. There are no transition rules. Glossary
    queries for agents return only readable `APPROVED` terms. Step 1 has no approval decision;
    `APPROVED` means available for agent use.
@@ -64,16 +64,15 @@ history and grants on domains. Implementation Steps lists what each step contain
    editing and deleting any term, without an approval role in Step 1. Drafts are visible only to
    their owner with CREATE and to MANAGE. Deny wins over allow. REST and MCP use the same rules.
 7. **Revisions**: every content change increases the revision number of the term, and is audited.
-   There are no content snapshots and no history API in Step 1.
+   Business versions separately identify immutable snapshots of published and proposed content.
 8. **APIs**: REST, Java and Python clients, read-only MCP tools, events and audit. A normal term
    view or question lookup needs one or two REST calls. Larger binding lists use bounded pages,
    and an agent can continue reading them without treating an incomplete list as complete.
 
 ## Non-Goals
 
-1. **Approval workflow, version history and grants on domains**: these come in Step 2 (see
-   Implementation Steps). In Step 1, edits take effect at once. Step 2 plugs in through
-   `TermChangeHandler` (see Status and versions).
+1. **Approval workflow and grants on domains** come in Step 2. Step 1 supplies snapshot
+   storage and a server publication policy. The OSS default applies writes immediately.
 2. **CSV import/export in Step 1, external connectors and SKOS export**: Step 1 provides APIs
    and a source reference for future importers. CSV is retained as Step 2 task S2.6, not dropped
    from the feature plan. External connectors and SKOS export remain later work.
@@ -96,7 +95,7 @@ also lists design requirements assigned to Step 2, including CSV import/export. 
 | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | Terms, explicit domain membership, hierarchy, asset/metric bindings, REST, clients and exact MCP lookup | Covered by this document and T1–T19; membership uses selected Option A       | Step 2 extends the same identities and live store                   |
 | Definition grants on domains                                                                            | Metalake grants only                                                         | S2.3: domain grants and inherited authorization                     |
-| Version snapshots and history                                                                           | Revision and audit only; no snapshots                                        | S2.2: approved snapshots, history and diffs                         |
+| Version snapshots and history                                                                           | Published and candidate snapshots; history by stable term ID                 | S2.2: version comparisons                                           |
 | Independent review and no self-approval                                                                 | No review; default APPROVED and immediate edits                              | S2.1: proposed changes, reviewer authorization and no self-approval |
 | CSV import/export                                                                                       | No CSV endpoint or format; APIs and source references are prerequisites only | S2.6: a separate CSV design and implementation task                 |
 
@@ -140,7 +139,7 @@ GlossaryTerm { id, name, definition, synonyms[], status: DRAFT | APPROVED | DEPR
 TermRelation { fromTermId, toTermId, type: BROADER | RELATED, audit_info }
 TermDomain   { metalakeId, termId, domainId, deletedAt }     // Option A in Domain membership
 TermBinding  { termId, targetId, targetType, audit_info }
-TermVersion  { termId, version, state, snapshot, audit_info }   // Step 2 only; schema defined then
+TermVersion  { termId, version, state, snapshot, audit_info }   // Step 1 business version
 ```
 
 | Table                      | Unique key                                                                     | Other index                              |
@@ -481,7 +480,7 @@ pending-content rules are specified separately below.
 | `APPROVED` (default) | `VIEW_DEFINITION`; MCP also requires this privilege              | `MANAGE_DEFINITIONS` |
 | `DEPRECATED`         | `VIEW_DEFINITION`; not MCP                                       | `MANAGE_DEFINITIONS` |
 
-- **Status is an ordinary field in Step 1.** It is set in the create request (default `APPROVED`) or with
+- **Under the default publication policy**, status is an ordinary field. It is set in the create request (default `APPROVED`) or with
   `setStatus` in the update request. Anyone who can edit the term can set it: the owner with
   `CREATE_DEFINITION`, or `MANAGE_DEFINITIONS`. There are no transition rules and no separate
   status endpoint.
@@ -535,19 +534,25 @@ pending-content rules are specified separately below.
   changes no revisions; failed cleanup commits neither losses nor revision increments. These
   are required cleanup effects, applied with the endpoint deletion rather than left pending for
   review in Step 2.
-- **No snapshots in Step 1**: the audit log holds the change record. There is no history API.
-  Do not create `glossary_term_version_info` in Step 1. Step 2 designs its snapshot format and
-  creates it through that release's upgrade scripts. A revision is not an approved version.
-- **Workflow hook**: `GlossaryManager` sends every change to a `TermChangeHandler`: content, status,
-  relations, domains, and both binding paths. The default handler applies the change at once. In
-  Step 2, a review handler keeps the proposed change apart from the live tables until it is
-  approved.
-- **Step 2 publication**: new terms default to `DRAFT`; a create request specifying another
-  initial status is rejected. A create request or ordinary update,
-  including `setStatus(APPROVED)`, cannot publish a term without review. This applies to CREATE,
-  MANAGE and the metalake owner; publication requires an explicit approval decision on a
-  submitted proposal by another principal. A request that tries to publish directly is rejected,
-  rather than silently treated as approved. No initial-status setting may bypass this rule.
+- **Business versions** are numbered within a stable term ID. Each snapshot freezes the name,
+  definition, synonyms, links, source reference, properties, intended status, audit, domain
+  memberships and direct broader/related IDs. Narrower links are derived. Ownership, tags and
+  asset/metric bindings follow the term ID across versions. The concurrency revision guards
+  the live row. Multiple proposals against one revision receive distinct business versions.
+- **Writes** return the exact version, its lifecycle and the current published and candidate
+  version IDs. The OSS policy publishes in one request. With an approval policy, omitting
+  status submits the proposed content. Explicit DRAFT saves a draft, and explicit APPROVED
+  fails even for a manager. The legacy status field shows DRAFT on pending results. Clients
+  requiring effective content should read the published term after a write or inspect the
+  publication result. Ordinary reads, search and traversal only see materialized definitions.
+- **Decisions** target the stable ID and exact submitted version. Further proposals against the
+  live term supersede the previous candidate. Publication checks the base revision and referenced
+  identities under lock, then updates the definition, relationships and published pointer in
+  one transaction. Rejection keeps the previous published version. Existing definitions acquire
+  a baseline snapshot on first history access or mutation. Existing audit describes creation;
+  a baseline does not imply a reviewer decision. The extension supplies reviewer authorization.
+- With approval enabled, deletion through the boolean drop API is disabled until a deletion
+  proposal and its result can be represented. The OSS policy retains ordinary drop behavior.
 - **Step 2 live and pending content**: an edit to an approved term creates proposed content;
   its existing approved version and bindings remain live for ordinary readers and agents until
   approval. Pending content is visible only to the current owner with effective CREATE, or to
@@ -555,7 +560,7 @@ pending-content rules are specified separately below.
   grant continued read access. Proposal status is separate from the
   live term's status. Rejection leaves the approved version unchanged; approval replaces it.
 - Dropping a term soft-deletes its synonyms, relations, domain links and bindings in the same
-  transaction; Step 2 also cleans up its version rows once that storage exists. Dropping a
+  transaction. Collection also removes the deleted term’s version rows. Dropping a
   metalake soft-deletes all its glossary rows in
   `MetalakeMetaService#deleteMetalake`, next to the tag cleanup.
 
@@ -802,7 +807,7 @@ TermsAssociateRequest { termsToAdd: [name], termsToRemove: [name] }
 - **Alter** applies all updates in one transaction and increases the revision once only if the
   effective state changes. `narrower` is
   computed and cannot be set. `version` is the current revision. `updateLinks` replaces the whole
-  link list. `status` defaults to `APPROVED` on create.
+  link list. On create, omitting `status` delegates publication to the server policy.
 - **Terms of an object**: `children=true` works on `table` and `semantic_model` after target-read
   authorization. It adds one entry to `children` for each table column or metric with terms
   passing the authorization and optional status filter. A semantic model itself has no terms;
@@ -1168,7 +1173,7 @@ tag. The second case cannot be blocked without changing how tags work.
    built-in role for all users. Should we add one (for example `PUBLIC`) with `VIEW_DEFINITION` on
    the metalake, or should admins grant it?
 4. **Two-step governance (decided)**: Step 1 defaults to APPROVED with immediate changes and no
-   review. Step 2 defaults to DRAFT and adds approval/rejection to MANAGE's existing administration
+   review. With approval enabled, normal creates submit candidates. Step 2 adds approval/rejection to MANAGE's existing administration
    rights, with no self-approval or direct-publication bypass. Combining administration and review
    is a deliberate simplification of the PRD's independent modify and approve privileges.
 
@@ -1229,7 +1234,7 @@ For one metalake, it reads the glossary tables directly and checks the live rows
 6. Every binding has non-NULL `term_id`, `target_type` and `target_id`, and resolves to a live
    target of that type. `METRIC` uses the metric's own ID, not the containing model's ID. No two
    live bindings have the same `(term_id, target_type, target_id)`.
-7. `glossary_hierarchy_lock` has at most one row for the metalake. Step 1 creates no version table.
+7. `glossary_hierarchy_lock` has at most one row for the metalake. Version pointers and immutable content are stored per stable term ID.
 
 Integration tests cannot read the tables. They use the REST form of the helper. It reads all terms
 and their hierarchies as the metalake owner, and checks rules 2, 4 and 5.
@@ -1329,8 +1334,7 @@ also need `-PskipDockerTests=false` and a running Docker.
 - T2.12 Garbage collection removes soft-deleted glossary rows after the retention time.
 - T2.13 `TestSQLScripts`: the 2.0.0 schema and the result of the `upgrade-1.3.0-to-2.0.0` scripts
   have the same glossary tables, columns and keys. Running the MySQL upgrade script twice works.
-- T2.14 Fresh and upgraded Step 1 schemas contain no `glossary_term_version_info`; ordinary
-  create/read/alter/drop and GC do not query that future table. **(guard)**
+- T2.14 Fresh and upgraded Step 1 schemas provide identical glossary version storage.
 
 **T3. Relation storage**
 
@@ -1958,12 +1962,10 @@ are not issue numbers, and no follow-up issues have been created by this documen
       authorization and rejection of self-approval, including content, status, relations,
       membership, both binding paths and requested deletion. Ordinary MANAGE writes cannot
       bypass review; its own submissions need another authorized MANAGE reviewer.
-- [ ] **S2.2. Version snapshots and history**: design the snapshot format and add
-      `glossary_term_version_info` in the Step 2 upgrade, plus history/diff APIs and atomic commit
-      with the approved live change. Step 1 creates no placeholder version table.
+- [ ] **S2.2. Version comparisons**: expose diffs between Step 1 snapshots.
 - [ ] **S2.3. Domain grants**: grants on domains, inherited by subdomains, with deny handling
       and revalidation when membership changes.
-- [ ] **S2.4. Creation defaults and upgrade behavior**: default new terms to DRAFT and reject
+- [ ] **S2.4. Creation defaults and upgrade behavior**: submit ordinary creates, save explicit drafts and reject
       direct publication through create/update, including for MANAGE. No initial-status setting
       bypasses review. Preserve existing term IDs and statuses when enabling Step 2; an existing
       Step 1 APPROVED term is not relabeled as human-reviewed or given a fabricated decision.
@@ -1988,19 +1990,19 @@ are not issue numbers, and no follow-up issues have been created by this documen
   return the previous approved state, never pending content. Rejection preserves that state;
   approval exposes the new state. A requested deletion remains pending until approval.
 - Enabling Step 2 preserves existing IDs/statuses and records no invented reviewer decisions;
-  newly created terms default to DRAFT, regardless of the caller's management privileges.
+  normal creates return SUBMITTED candidates with legacy status DRAFT, including for managers.
 - An existing client omitting status gets a successful create response with `status=DRAFT`
   after the upgrade. It must not interpret object creation as publication. Verify the response
   shape remains stable; no extra compatibility parameter or automatic APPROVED setting is used.
 
 ## Implementation Steps
 
-The glossary is built in two steps. Step 1 is this design. Step 2 adds review, history and grants
+The glossary is built in two steps. Step 1 is this design. Step 2 adds reviewer workflows, version comparisons and grants
 on domains on top of it. Both steps preserve existing term IDs, relations, bindings and statuses.
-Step 2 adds its own proposal/version storage through upgrade scripts.
+Workflow-specific tables can reference the Step 1 term and business version IDs.
 
 **Creation default after upgrade**: Step 1 creates APPROVED terms by default; Step 2 creates
-DRAFT terms by default and publishes only after review. This is the intended behavior change
+SUBMITTED candidates by default and publishes only after review. This is the intended behavior change
 when introducing approval, not a reason to keep automatic publication enabled. Existing terms
 retain their statuses, and subsequent changes use the review workflow. Creation responses
 continue to report the actual status: a successful create does not mean the object is published.
@@ -2016,9 +2018,9 @@ publication. Public request/response shapes remain reusable; write behavior inte
 | Tags                 | Ordinary tags on terms through the existing tag APIs                                                                      | Same                                                                                     |
 | Bindings             | Catalogs, schemas, tables, views, table columns, filesets, topics, models and metrics; both privilege paths               | Binding changes are reviewed, on both paths                                              |
 | Privileges           | Metalake grants; CREATE maintains own terms; MANAGE reads, edits and deletes any term; private drafts, deny and filtering | MANAGE retains scoped administration and adds approval/rejection; grants also on domains |
-| Status               | Default `APPROVED`, immediately readable with VIEW; ordinary status edits; no approval decision                           | Default `DRAFT`; explicit approval required, including for MANAGE submissions            |
+| Status               | Default `APPROVED`, immediately readable with VIEW; ordinary status edits; no approval decision                           | Submitted by default; explicit approval required, including for MANAGE submissions       |
 | Changes              | Take effect at once; `TermChangeHandler` is the write hook                                                                | Always reviewed; proposed changes are kept apart; nobody approves their own change       |
-| Versions and history | Revision number and audit only                                                                                            | A snapshot of each approved change, readable history and diffs                           |
+| Versions and history | Business versions, history, concurrency revision and audit                                                                | Reviewer decisions and version comparisons                                               |
 | APIs and clients     | REST, Java and Python clients, OpenAPI                                                                                    | Proposal, decision and history APIs                                                      |
 | CSV import/export    | Not delivered; APIs and source references support future importers                                                        | Planned as S2.6, with permissions and review                                             |
 | Agent lookup         | Exact match on names and synonyms; approved terms only; ambiguous and unmatched words                                     | Same lookup on the current approved state while proposed changes await review            |
@@ -2027,10 +2029,8 @@ publication. Public request/response shapes remain reusable; write behavior inte
 
 ### Storage for Step 2
 
-- Step 2 defines and creates `glossary_term_version_info`; its upgrade includes the selected
-  snapshot schema. The table is absent from Step 1. Snapshot identity is per term and approved
-  version; format and indexes are specified with S2.2 rather than frozen in an unused table now.
-- Step 2 keeps term IDs, relation keys and existing data. It adds storage for proposed changes.
+- Step 2 reuses the stable term ID, business version and published/candidate pointers introduced
+  in Step 1. Workflow-specific tasks, reviewer decisions and comments can reference an exact version.
 - The write hook covers content, status, relations, membership and both binding paths. So Step 2
   can review every change.
 - On approval, Step 2 checks effective MANAGE in scope, rejects the submitting principal, checks

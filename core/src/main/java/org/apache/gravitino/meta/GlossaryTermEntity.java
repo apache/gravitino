@@ -35,6 +35,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.glossary.GlossaryTerm.Status;
 import org.apache.gravitino.glossary.TermLink;
+import org.apache.gravitino.glossary.TermPublication;
 
 /**
  * Persisted glossary definition with its stored domain names. Relations and authorized API
@@ -81,6 +82,7 @@ public final class GlossaryTermEntity implements Entity, HasIdentifier, Auditabl
   private TermLink[] links;
   @Nullable private String sourceRef;
   private Map<String, String> properties;
+  @Nullable private TermPublication publication;
   private long version;
   private Audit auditInfo;
   private String[] domains;
@@ -124,6 +126,11 @@ public final class GlossaryTermEntity implements Entity, HasIdentifier, Auditabl
   public Map<String, String> properties() {
     return properties;
   }
+  /** Business version and decision state for a mutation or history result. */
+  @Nullable
+  public TermPublication publication() {
+    return publication;
+  }
   /** Returns the version. */
   public long version() {
     return version;
@@ -133,6 +140,9 @@ public final class GlossaryTermEntity implements Entity, HasIdentifier, Auditabl
    */
   public String revisionToken() {
     String identity = namespace.level(0) + ":" + id + ":" + version;
+    if (publication != null && publication.state() != TermPublication.State.PUBLISHED) {
+      identity += ":candidate:" + publication.versionId();
+    }
     return UUID.nameUUIDFromBytes(identity.getBytes(StandardCharsets.UTF_8)).toString();
   }
   /** Returns the auditInfo. */
@@ -248,6 +258,11 @@ public final class GlossaryTermEntity implements Entity, HasIdentifier, Auditabl
       value.properties = Collections.unmodifiableMap(new LinkedHashMap<>(v));
       return this;
     }
+    /** Attaches the business version returned by the publication policy. */
+    public Builder withPublication(@Nullable TermPublication publication) {
+      value.publication = publication;
+      return this;
+    }
     /** Sets the version. */
     public Builder withVersion(long v) {
       value.version = v;
@@ -301,6 +316,7 @@ public final class GlossaryTermEntity implements Entity, HasIdentifier, Auditabl
       copy.links = value.links.clone();
       copy.sourceRef = value.sourceRef;
       copy.properties = value.properties;
+      copy.publication = value.publication;
       copy.version = value.version;
       copy.auditInfo = value.auditInfo;
       copy.domains = value.domains.clone();

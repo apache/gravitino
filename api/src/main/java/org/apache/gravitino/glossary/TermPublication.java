@@ -1,0 +1,83 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+package org.apache.gravitino.glossary;
+
+import javax.annotation.Nullable;
+import org.apache.gravitino.annotation.Evolving;
+
+/** Result of a glossary write or history read. Version numbers are scoped to the stable term ID. */
+@Evolving
+public final class TermPublication {
+  /** Lifecycle of this exact version. */
+  public enum State {
+    /** Published at least once. The published version ID identifies the currently live snapshot. */
+    PUBLISHED,
+    /** Saved privately without submission. */
+    DRAFT,
+    /** Awaiting a publication decision. */
+    SUBMITTED,
+    /** A decision declined this exact candidate. */
+    REJECTED,
+    /** A newer candidate replaced this one. */
+    SUPERSEDED
+  }
+
+  private final long termId;
+  private final long versionId;
+  private final State state;
+  @Nullable private final Long publishedVersionId;
+  @Nullable private final Long candidateVersionId;
+
+  /** Identifies the returned snapshot and the current published and candidate pointers. */
+  public TermPublication(
+      long termId,
+      long versionId,
+      State state,
+      @Nullable Long publishedVersionId,
+      @Nullable Long candidateVersionId) {
+    this.termId = termId;
+    this.versionId = versionId;
+    this.state = state;
+    this.publishedVersionId = publishedVersionId;
+    this.candidateVersionId = candidateVersionId;
+  }
+  /** Stable identity retained across renames and publication. */
+  public long termId() {
+    return termId;
+  }
+  /** Immutable business version of the returned content. */
+  public long versionId() {
+    return versionId;
+  }
+  /** Actual outcome of this version. */
+  public State state() {
+    return state;
+  }
+  /** Current published version, absent before first publication. */
+  @Nullable
+  public Long publishedVersionId() {
+    return publishedVersionId;
+  }
+  /** Current candidate, absent when there is no outstanding proposal. */
+  @Nullable
+  public Long candidateVersionId() {
+    return candidateVersionId;
+  }
+}

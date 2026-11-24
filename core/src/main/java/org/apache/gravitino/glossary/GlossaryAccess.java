@@ -193,6 +193,10 @@ public final class GlossaryAccess {
     return visibleDomains.computeIfAbsent(name, key -> domains.test(key, domain));
   }
 
+  boolean canCreate() {
+    return create.get();
+  }
+
   void requireCreate() {
     if (!create.get()) {
       throw new ForbiddenException(

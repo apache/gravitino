@@ -50,11 +50,10 @@ import org.apache.gravitino.exceptions.TermVersionConflictException;
  * <p>The owner API permits the current term owner or metalake owner to transfer ownership
  * independently of glossary privileges.
  *
- * <p>The write methods describe Step 1: changes take effect immediately, without review. Step 2
- * adds scoped management and review: new terms default to draft, and another authorized manage user
- * must approve a submitted change. Neither management privileges nor a direct status update
- * bypasses that workflow. Proposal and decision APIs are separate from these immediate-write
- * operations.
+ * <p>The server publication policy controls whether a write takes effect immediately. The default
+ * policy publishes in one request. A policy requiring approval returns an unpublished candidate.
+ * Inspect {@link GlossaryTerm#publication()} to distinguish a saved draft, submission and
+ * publication. A candidate keeps the legacy DRAFT status until publication.
  */
 @Evolving
 public interface GlossaryOperations {
@@ -86,8 +85,9 @@ public interface GlossaryOperations {
   GlossaryTerm getTerm(String name) throws NoSuchTermException;
 
   /**
-   * Creates a term in Step 1. The caller becomes its owner. Without a status, the server uses
-   * {@link GlossaryTerm.Status#APPROVED}; this does not mean that a human reviewed the term.
+   * Creates a term. The creator owns the published identity. Without an explicit status the default
+   * policy publishes an APPROVED term, and an approval policy submits a private candidate. With
+   * approval enabled use DRAFT to save without submitting. Explicit APPROVED is rejected.
    *
    * <p>The caller needs effective {@code VIEW_DEFINITION}, effective {@code CREATE_DEFINITION}, and
    * read access to each requested domain ({@code USE_DOMAIN} for published domains, {@code
@@ -95,7 +95,7 @@ public interface GlossaryOperations {
    * relations follow the same visibility rules as reads.
    *
    * @param spec The content of the term.
-   * @return The created term.
+   * @return The published term or candidate with its actual publication outcome.
    * @throws TermAlreadyExistsException If a term with the same name or the same source reference
    *     already exists.
    * @throws NoSuchTermException If a broader or related term does not exist or is not visible to
@@ -111,13 +111,13 @@ public interface GlossaryOperations {
           IllegalArgumentException;
 
   /**
-   * Alters a term in Step 1. All changes take effect immediately and together: if one fails, none
-   * is applied. The revision increases once only when the final effective state changes; a no-op
-   * preserves both the revision and {@link GlossaryTerm#revisionToken()}. This overload is
-   * unconditional and applies changes to the current term, even if its name has been reused since
-   * the caller read it. Use {@link #alterTerm(String, String, TermChange...)} to guard against
-   * stale edits. Use {@link TermChange#setStatus(GlossaryTerm.Status)} to change the status without
-   * an approval decision.
+   * Alters a term atomically. Under an approval policy, effective edits propose a candidate and
+   * ordinary reads keep returning the published term. The revision increases once only when the
+   * final effective state changes; a no-op preserves both the revision and {@link
+   * GlossaryTerm#revisionToken()}. This overload is unconditional and applies changes to the
+   * current term, even if its name has been reused since the caller read it. Use {@link
+   * #alterTerm(String, String, TermChange...)} to guard against stale edits. Setting APPROVED
+   * explicitly is rejected when the policy requires approval.
    *
    * <p>The caller needs effective {@code VIEW_DEFINITION}, plus effective {@code
    * MANAGE_DEFINITIONS} or current ownership with effective {@code CREATE_DEFINITION}. Read access
@@ -126,7 +126,7 @@ public interface GlossaryOperations {
    *
    * @param name The name of the term.
    * @param changes The changes to apply.
-   * @return The altered term.
+   * @return The published term or candidate resulting from the request.
    * @throws NoSuchTermException If the term, or a broader or related term in the changes, does not
    *     exist or is not visible to the caller.
    * @throws TermAlreadyExistsException If the term is renamed to the name of another term, or its
@@ -165,7 +165,7 @@ public interface GlossaryOperations {
    * @param name The name of the term.
    * @param expectedRevision The required nonblank opaque token from the last read.
    * @param changes The changes to apply.
-   * @return The altered term.
+   * @return The published term or candidate resulting from the request.
    * @throws NoSuchTermException If the term or a referenced term is missing or hidden.
    * @throws TermAlreadyExistsException If a name or source reference conflicts with another term.
    * @throws NotFoundException If a domain to add or remove is missing or is a draft hidden from the

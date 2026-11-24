@@ -1234,12 +1234,15 @@ public class TestSQLScripts extends TestJDBCBackend {
               "SELECT term_id, metalake_id, synonym, synonym_key, deleted_at FROM glossary_term_synonym WHERE 1=0")) {
         Assertions.assertEquals(5, rows.getMetaData().getColumnCount());
       }
-      try (ResultSet tables =
-          connection.getMetaData().getTables(null, null, "%", new String[] {"TABLE"})) {
-        while (tables.next())
-          Assertions.assertNotEquals(
-              "glossary_term_version_info",
-              tables.getString("TABLE_NAME").toLowerCase(Locale.ROOT));
+      try (ResultSet rows =
+          statement.executeQuery(
+              "SELECT term_id, version_id, base_revision, lifecycle, snapshot FROM glossary_term_version_info WHERE 1=0")) {
+        Assertions.assertEquals(5, rows.getMetaData().getColumnCount());
+      }
+      try (ResultSet rows =
+          statement.executeQuery(
+              "SELECT term_id, metalake_id, published_version, candidate_version, last_version, reserved_name FROM glossary_term_version_head WHERE 1=0")) {
+        Assertions.assertEquals(6, rows.getMetaData().getColumnCount());
       }
     }
   }
