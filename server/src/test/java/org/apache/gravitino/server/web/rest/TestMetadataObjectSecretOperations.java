@@ -172,17 +172,18 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
       Assertions.assertEquals(0, secretResponse.getCode());
       Assertions.assertTrue(secretResponse.getSecrets().isEmpty());
       verify(secretPropertyOperationDispatcher, never())
-          .getSecrets(any(), any(Entity.EntityType.class), any(Boolean.class));
+          .getSecrets(any(), any(Entity.EntityType.class));
+      verify(secretPropertyOperationDispatcher, never())
+          .getSecretsWithoutStaticCredentials(any(), any(Entity.EntityType.class));
     }
   }
 
   @Test
-  public void testGetSecretsPassesIncludeFlagFalseWithUseSecretsOnly() throws Exception {
+  public void testGetSecretsOmitsStaticCredentialsWithUseSecretsOnly() throws Exception {
     MetadataObject metadataObject =
         MetadataObjects.parse("catalog.schema.fileset", MetadataObject.Type.FILESET);
-    // Dispatcher applies object-scoped omit when includeCredentialSecrets is false.
-    when(secretPropertyOperationDispatcher.getSecrets(
-            any(), any(Entity.EntityType.class), eq(false)))
+    when(secretPropertyOperationDispatcher.getSecretsWithoutStaticCredentials(
+            any(), any(Entity.EntityType.class)))
         .thenReturn(Map.of("custom-secret", "plaintext"));
 
     MetadataObjectSecretOperations operations =
@@ -220,17 +221,18 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
       Assertions.assertEquals(0, secretResponse.getCode());
       Assertions.assertEquals("plaintext", secretResponse.getSecrets().get("custom-secret"));
       verify(secretPropertyOperationDispatcher)
-          .getSecrets(any(), any(Entity.EntityType.class), eq(false));
+          .getSecretsWithoutStaticCredentials(any(), any(Entity.EntityType.class));
+      verify(secretPropertyOperationDispatcher, never())
+          .getSecrets(any(), any(Entity.EntityType.class));
     }
   }
 
   @Test
-  public void testGetSecretsPassesIncludeFlagTrueWithUseSecretsAndIncludeCredentialSecrets()
+  public void testGetSecretsIncludesAllWithUseSecretsAndIncludeCredentialSecrets()
       throws Exception {
     MetadataObject metadataObject =
         MetadataObjects.parse("catalog.schema.fileset", MetadataObject.Type.FILESET);
-    when(secretPropertyOperationDispatcher.getSecrets(
-            any(), any(Entity.EntityType.class), eq(true)))
+    when(secretPropertyOperationDispatcher.getSecrets(any(), any(Entity.EntityType.class)))
         .thenReturn(
             Map.of(
                 "s3-access-key-id",
@@ -276,14 +278,17 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
       Assertions.assertEquals("AKIA", secretResponse.getSecrets().get("s3-access-key-id"));
       Assertions.assertEquals("secret", secretResponse.getSecrets().get("s3-secret-access-key"));
       Assertions.assertEquals("db-pass", secretResponse.getSecrets().get("jdbc-password"));
-      verify(secretPropertyOperationDispatcher)
-          .getSecrets(any(), any(Entity.EntityType.class), eq(true));
+      verify(secretPropertyOperationDispatcher).getSecrets(any(), any(Entity.EntityType.class));
+      verify(secretPropertyOperationDispatcher, never())
+          .getSecretsWithoutStaticCredentials(any(), any(Entity.EntityType.class));
     }
   }
 
   private void testGetSecretsForObject(MetadataObject metadataObject) {
-    when(secretPropertyOperationDispatcher.getSecrets(
-            any(), any(Entity.EntityType.class), any(Boolean.class)))
+    when(secretPropertyOperationDispatcher.getSecrets(any(), any(Entity.EntityType.class)))
+        .thenReturn(Map.of("custom-secret", "plaintext"));
+    when(secretPropertyOperationDispatcher.getSecretsWithoutStaticCredentials(
+            any(), any(Entity.EntityType.class)))
         .thenReturn(Map.of("custom-secret", "plaintext"));
 
     Response response =
@@ -300,8 +305,10 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
     Assertions.assertEquals(0, secretResponse.getCode());
     Assertions.assertEquals("plaintext", secretResponse.getSecrets().get("custom-secret"));
 
-    when(secretPropertyOperationDispatcher.getSecrets(
-            any(), any(Entity.EntityType.class), any(Boolean.class)))
+    when(secretPropertyOperationDispatcher.getSecrets(any(), any(Entity.EntityType.class)))
+        .thenReturn(Map.of());
+    when(secretPropertyOperationDispatcher.getSecretsWithoutStaticCredentials(
+            any(), any(Entity.EntityType.class)))
         .thenReturn(Map.of());
     response =
         target(basePath(metalake))

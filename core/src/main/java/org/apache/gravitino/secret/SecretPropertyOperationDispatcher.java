@@ -79,40 +79,34 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
 
   /**
    * Returns plaintext secret properties for the given metadata object, including static credential
-   * keys. Equivalent to {@link #getSecrets(NameIdentifier, Entity.EntityType, boolean)} with {@code
-   * includeCredentialSecrets = true}.
+   * keys.
    *
    * @param identifier The entity name identifier.
    * @param entityType The entity type.
    * @return secret plaintext properties; never null
    */
   public Map<String, String> getSecrets(NameIdentifier identifier, Entity.EntityType entityType) {
-    return getSecrets(identifier, entityType, true);
+    return loadSecrets(identifier, entityType).secrets();
   }
 
   /**
-   * Returns plaintext secret properties for the given metadata object.
-   *
-   * <p>When {@code includeCredentialSecrets} is {@code false}, static credential keys that apply to
-   * this object (declared in its {@link PropertiesMetadata} and/or used by an enabled static {@code
-   * credential-providers} entry) are omitted. Other secrets remain.
+   * Returns plaintext secrets with object-scoped static credential keys omitted. Used by the REST
+   * layer when the caller has {@code USE_SECRETS} but not {@code INCLUDE_CREDENTIAL_SECRETS}.
    *
    * @param identifier The entity name identifier.
    * @param entityType The entity type.
-   * @param includeCredentialSecrets whether to include object-scoped static credential secrets
-   * @return secret plaintext properties; never null
+   * @return secrets without static credential properties for this object; never null
    */
-  public Map<String, String> getSecrets(
-      NameIdentifier identifier, Entity.EntityType entityType, boolean includeCredentialSecrets) {
+  public Map<String, String> getSecretsWithoutStaticCredentials(
+      NameIdentifier identifier, Entity.EntityType entityType) {
+    return loadSecrets(identifier, entityType).withoutStaticCredentialSecrets();
+  }
+
+  private LoadedSecrets loadSecrets(NameIdentifier identifier, Entity.EntityType entityType) {
     RawPropertiesAndMetadata loaded = loadRawPropertiesAndMetadata(identifier, entityType);
     Map<String, String> secrets =
         SecretPropertyUtils.buildSecrets(secretManager, loaded.rawProperties, loaded.metadata);
-    if (!includeCredentialSecrets) {
-      secrets =
-          SecretPropertyUtils.omitCloudAccessKeyPairSecrets(
-              secrets, loaded.metadata, loaded.rawProperties);
-    }
-    return secrets;
+    return new LoadedSecrets(secrets, loaded.metadata, loaded.rawProperties);
   }
 
   /**
@@ -295,6 +289,30 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
       throw e;
     } catch (Exception e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  /** Plaintext secrets plus metadata context for object-scoped static-credential filtering. */
+  private static final class LoadedSecrets {
+    private final Map<String, String> secrets;
+    private final PropertiesMetadata metadata;
+    private final Map<String, String> rawProperties;
+
+    private LoadedSecrets(
+        Map<String, String> secrets,
+        PropertiesMetadata metadata,
+        Map<String, String> rawProperties) {
+      this.secrets = secrets;
+      this.metadata = metadata;
+      this.rawProperties = rawProperties;
+    }
+
+    private Map<String, String> secrets() {
+      return secrets;
+    }
+
+    private Map<String, String> withoutStaticCredentialSecrets() {
+      return SecretPropertyUtils.omitCloudAccessKeyPairSecrets(secrets, metadata, rawProperties);
     }
   }
 
