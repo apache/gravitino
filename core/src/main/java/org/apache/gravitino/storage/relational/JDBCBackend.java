@@ -143,6 +143,11 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   }
 
   @Override
+  public List<NameIdentifier> listSemanticModelIdentifiers(Namespace namespace) throws IOException {
+    return SemanticModelMetaService.getInstance().listSemanticModelIdentifiers(namespace);
+  }
+
+  @Override
   public List<NameIdentifier> listSemanticModelMetrics(Namespace namespace) throws IOException {
     return SemanticModelMetricService.getInstance().listMetrics(namespace);
   }
@@ -211,6 +216,9 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
 
   @Override
   public boolean exists(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
+    if (entityType == Entity.EntityType.SEMANTIC_MODEL) {
+      return SemanticModelMetaService.getInstance().semanticModelExists(ident);
+    }
     try {
       Entity entity = get(ident, entityType);
       return entity != null;

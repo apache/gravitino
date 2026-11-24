@@ -260,6 +260,11 @@ public class RelationalEntityStore
   }
 
   @Override
+  public List<NameIdentifier> listSemanticModelIdentifiers(Namespace namespace) throws IOException {
+    return backend.listSemanticModelIdentifiers(namespace);
+  }
+
+  @Override
   public List<NameIdentifier> listSemanticModelMetrics(Namespace namespace) throws IOException {
     return backend.listSemanticModelMetrics(namespace);
   }

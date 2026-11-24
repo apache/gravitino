@@ -106,9 +106,10 @@ public class SemanticModelVersionInfoSQLProviderFactory {
   public static String softDeleteSemanticModelVersionsByRetentionLine(
       @Param("semanticModelId") Long semanticModelId,
       @Param("versionRetentionLine") long versionRetentionLine,
+      @Param("activeVersion") int activeVersion,
       @Param("limit") int limit) {
     return getProvider()
         .softDeleteSemanticModelVersionsByRetentionLine(
-            semanticModelId, versionRetentionLine, limit);
+            semanticModelId, versionRetentionLine, activeVersion, limit);
   }
 }

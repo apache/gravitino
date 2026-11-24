@@ -21,7 +21,10 @@ package org.apache.gravitino.dto.semantic;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import com.google.common.base.Preconditions;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -32,12 +35,23 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelRevision;
 
 /** DTO for a schema-scoped Semantic Model. */
 @EqualsAndHashCode
 @ToString
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@JsonPropertyOrder({"name", "comment", "definition", "properties", "audit"})
+@JsonPropertyOrder({
+  "name",
+  "revision",
+  "status",
+  "publishedBy",
+  "publishedAt",
+  "comment",
+  "definition",
+  "properties",
+  "audit"
+})
 public class SemanticModelDTO implements SemanticModel {
 
   @JsonProperty("name")
@@ -56,6 +70,21 @@ public class SemanticModelDTO implements SemanticModel {
   @JsonProperty("audit")
   private AuditDTO audit;
 
+  @JsonProperty("revision")
+  private Integer revision;
+
+  @JsonProperty("status")
+  @JsonSerialize(using = ToStringSerializer.class)
+  private Status status;
+
+  @Nullable
+  @JsonProperty("publishedBy")
+  private String publishedBy;
+
+  @Nullable
+  @JsonProperty("publishedAt")
+  private Instant publishedAt;
+
   private SemanticModelDTO() {}
 
   private SemanticModelDTO(
@@ -63,12 +92,41 @@ public class SemanticModelDTO implements SemanticModel {
       @Nullable String comment,
       SemanticModelDefinitionDTO definition,
       @Nullable Map<String, String> properties,
-      AuditDTO audit) {
+      AuditDTO audit,
+      @Nullable SemanticModelRevision revisionInfo) {
     this.name = name;
     this.comment = comment;
     this.definition = definition;
     this.properties = immutableProperties(properties);
     this.audit = audit;
+    if (revisionInfo != null) {
+      this.revision = revisionInfo.revision();
+      this.status = revisionInfo.status();
+      this.publishedBy = revisionInfo.publishedBy();
+      this.publishedAt = revisionInfo.publishedAt();
+    }
+  }
+
+  @Override
+  public int revision() {
+    return revision == null ? 0 : revision;
+  }
+
+  @Override
+  public Status status() {
+    return status;
+  }
+
+  @Override
+  @Nullable
+  public String publishedBy() {
+    return publishedBy;
+  }
+
+  @Override
+  @Nullable
+  public Instant publishedAt() {
+    return publishedAt;
   }
 
   @Override
@@ -124,6 +182,7 @@ public class SemanticModelDTO implements SemanticModel {
     private SemanticModelDefinitionDTO definition;
     @Nullable private Map<String, String> properties;
     private AuditDTO audit;
+    @Nullable private SemanticModelRevision revisionInfo;
 
     private Builder() {}
 
@@ -182,6 +241,12 @@ public class SemanticModelDTO implements SemanticModel {
       return this;
     }
 
+    /** Sets the revision and its publication metadata. */
+    public Builder withRevision(SemanticModelRevision revisionInfo) {
+      this.revisionInfo = revisionInfo;
+      return this;
+    }
+
     /**
      * Builds a Semantic Model DTO.
      *
@@ -193,7 +258,7 @@ public class SemanticModelDTO implements SemanticModel {
       Preconditions.checkArgument(definition != null, "definition cannot be null");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
 
-      return new SemanticModelDTO(name, comment, definition, properties, audit);
+      return new SemanticModelDTO(name, comment, definition, properties, audit, revisionInfo);
     }
   }
 

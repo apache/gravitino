@@ -127,15 +127,18 @@ public class TestSemanticModelMetricDiscovery extends TestJDBCBackend {
     Namespace namespace = parents();
     SemanticModelEntity original = model(namespace, "before", metric("removed"), metric("kept"));
     backend.insert(original, false);
-    SemanticModelEntity replacement = copy(original, "after", metric("added"), metric("kept"));
+    SemanticModelEntity replacement =
+        copy(original, original.name(), metric("added"), metric("kept"));
     backend.update(original.nameIdentifier(), original.type(), old -> replacement);
+    SemanticModelEntity renamed = copy(replacement, "after", metric("added"), metric("kept"));
+    backend.update(replacement.nameIdentifier(), replacement.type(), old -> renamed);
     ManagedSemanticModelOperations operations = operations();
     NameIdentifier[] expected = {
       identifier(namespace, "after", "added"), identifier(namespace, "after", "kept")
     };
     assertArrayEquals(expected, operations.listMetrics(namespace));
     assertArrayEquals(expected, identifiers(operations.listMetricInfos(namespace)));
-    backend.delete(replacement.nameIdentifier(), replacement.type(), false);
+    backend.delete(renamed.nameIdentifier(), renamed.type(), false);
     assertEquals(0, operations.listMetrics(namespace).length);
     assertEquals(0, operations.listMetricInfos(namespace).length);
     backend.insert(model(namespace, "after", metric("new")), false);
@@ -168,40 +171,43 @@ public class TestSemanticModelMetricDiscovery extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testNamesDoNotReadSnapshotsAndDetailsDoNotReadIdentities() throws Exception {
+  void testDiscoveryUsesActiveSnapshotsAndDetectsMissingSnapshots() throws Exception {
     Namespace namespace = parents();
     SemanticModelEntity model = model(namespace, "sales", metric("revenue"));
     backend.insert(model, false);
     execute("DELETE FROM semantic_model_metric_meta WHERE semantic_model_id = ?", model.id());
-    assertTrue(backend.listSemanticModelMetrics(namespace).isEmpty());
+    assertEquals(
+        List.of(identifier(namespace, "sales", "revenue")),
+        backend.listSemanticModelMetrics(namespace));
     assertEquals(
         metric("revenue"), backend.listSemanticModelMetricInfos(namespace).get(0).metric());
-    SemanticModelEntity independent = model(namespace, "names_only", metric("count"));
-    backend.insert(independent, false);
-    execute(
-        "DELETE FROM semantic_model_version_info WHERE semantic_model_id = ?", independent.id());
-    assertEquals(
-        List.of(identifier(namespace, "names_only", "count")),
-        backend.listSemanticModelMetrics(namespace));
+    execute("DELETE FROM semantic_model_version_info WHERE semantic_model_id = ?", model.id());
+    assertThrows(
+        IllegalStateException.class, () -> backend.get(model.nameIdentifier(), model.type()));
+    assertThrows(IllegalStateException.class, () -> backend.listSemanticModelMetrics(namespace));
     assertThrows(
         IllegalStateException.class, () -> backend.listSemanticModelMetricInfos(namespace));
   }
 
   @TestTemplate
-  void testMalformedMetricsFailWholeDetailedRead() throws Exception {
+  void testMalformedMetricsFailTheReadAndNamesOnlyRequireNames() throws Exception {
     Namespace namespace = parents();
     backend.insert(model(namespace, "valid", metric("good")), false);
     SemanticModelEntity broken = model(namespace, "broken", metric("bad"));
     backend.insert(broken, false);
-    for (String json : List.of("not-json", "null", "{}", "[null]", "[{\"name\":\"bad\"}]")) {
-      execute(
-          "UPDATE semantic_model_version_info SET metrics = ? WHERE semantic_model_id = ?",
-          json,
-          broken.id());
-      assertEquals(2, backend.listSemanticModelMetrics(namespace).size());
+    String update =
+        "UPDATE semantic_model_version_info SET metrics = ? WHERE semantic_model_id = ?";
+    for (String json : List.of("not-json", "null", "{}", "[null]")) {
+      execute(update, json, broken.id());
+      assertThrows(
+          IllegalStateException.class, () -> backend.listSemanticModelMetrics(namespace), json);
       assertThrows(
           IllegalStateException.class, () -> backend.listSemanticModelMetricInfos(namespace), json);
     }
+    execute(update, "[{\"name\":\"bad\"}]", broken.id());
+    assertEquals(2, backend.listSemanticModelMetrics(namespace).size());
+    assertThrows(
+        IllegalStateException.class, () -> backend.listSemanticModelMetricInfos(namespace));
   }
 
   @TestTemplate
@@ -228,12 +234,12 @@ public class TestSemanticModelMetricDiscovery extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testReadsDuringReplaceAndRenameSeeOnlyCommittedState() throws Exception {
+  void testReadsDuringReplacementSeeOnlyCommittedState() throws Exception {
     for (boolean rollback : List.of(false, true)) {
       Namespace namespace = parents();
       SemanticModelEntity original = model(namespace, "before", metric("before"));
       backend.insert(original, false);
-      SemanticModelEntity replacement = copy(original, "after", metric("after"));
+      SemanticModelEntity replacement = copy(original, original.name(), metric("after"));
       CountDownLatch staged = new CountDownLatch(1);
       CountDownLatch finish = new CountDownLatch(1);
       ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -269,7 +275,8 @@ public class TestSemanticModelMetricDiscovery extends TestJDBCBackend {
                   return null;
                 });
         assertTrue(staged.await(30, TimeUnit.SECONDS));
-        // The writer has updated the name, version pointer, and identities, but has not committed.
+        // The writer has advanced the version pointer and updated identities inside its
+        // transaction.
         assertArrayEquals(
             new NameIdentifier[] {identifier(namespace, "before", "before")},
             operations().listMetrics(namespace));
@@ -280,10 +287,10 @@ public class TestSemanticModelMetricDiscovery extends TestJDBCBackend {
         writer.get(30, TimeUnit.SECONDS);
         String committed = rollback ? "before" : "after";
         assertArrayEquals(
-            new NameIdentifier[] {identifier(namespace, committed, committed)},
+            new NameIdentifier[] {identifier(namespace, original.name(), committed)},
             operations().listMetrics(namespace));
         assertArrayEquals(
-            new NameIdentifier[] {identifier(namespace, committed, committed)},
+            new NameIdentifier[] {identifier(namespace, original.name(), committed)},
             identifiers(operations().listMetricInfos(namespace)));
       } finally {
         finish.countDown();

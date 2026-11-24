@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import static org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper.TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
@@ -31,31 +32,15 @@ import org.apache.ibatis.annotations.Param;
 /** Provides MySQL-compatible SQL for Semantic Model metric identities. */
 public class SemanticModelMetricBaseSQLProvider {
 
-  /** Returns a single statement selecting live metric names and their current model names. */
-  public String listMetricNames(
-      @Param("metalakeName") String metalakeName,
-      @Param("catalogName") String catalogName,
-      @Param("schemaName") String schemaName) {
-    return discoverySelect(
-        "metric.metric_name AS metricName",
-        "LEFT JOIN "
-            + TABLE_NAME
-            + " metric"
-            + " ON model.semantic_model_id = metric.semantic_model_id AND metric.deleted_at = 0");
-  }
-
-  /** Returns a single statement selecting only metrics from each current model snapshot. */
+  /** Returns a single statement selecting only metrics from each selected model snapshot. */
   public String listMetricSnapshots(
       @Param("metalakeName") String metalakeName,
       @Param("catalogName") String catalogName,
-      @Param("schemaName") String schemaName) {
+      @Param("schemaName") String schemaName,
+      @Param("selector") SemanticModelRevisionSelector selector) {
     return discoverySelect(
         "snapshot.version, snapshot.metrics",
-        "LEFT JOIN "
-            + SemanticModelMetaMapper.VERSION_TABLE_NAME
-            + " snapshot"
-            + " ON model.semantic_model_id = snapshot.semantic_model_id"
-            + " AND model.current_version = snapshot.version AND snapshot.deleted_at = 0");
+        SemanticModelMetaBaseSQLProvider.snapshotJoin("model", "snapshot", selector));
   }
 
   /** Returns SQL for inserting new identities in one statement. */
@@ -135,7 +120,7 @@ public class SemanticModelMetricBaseSQLProvider {
 
   private String discoverySelect(String projection, String metricJoin) {
     // Left joins distinguish an empty schema from a missing schema. They also keep a live model
-    // whose current snapshot is missing, so detailed discovery fails instead of silently omitting
+    // whose active snapshot is missing, so detailed discovery fails instead of silently omitting
     // it.
     return """
         SELECT schema_meta.schema_id AS schemaId, model.semantic_model_id AS semanticModelId,
@@ -145,7 +130,7 @@ public class SemanticModelMetricBaseSQLProvider {
             AND catalog.catalog_name = #{catalogName} AND catalog.deleted_at = 0
         LEFT JOIN %s schema_meta ON catalog.catalog_id = schema_meta.catalog_id
             AND schema_meta.schema_name = #{schemaName} AND schema_meta.deleted_at = 0
-        LEFT JOIN %s model ON schema_meta.schema_id = model.schema_id AND model.deleted_at = 0
+        LEFT JOIN %s model ON schema_meta.schema_id = model.schema_id AND model.deleted_at = 0 AND model.active_version > 0
         %s
         WHERE metalake.metalake_name = #{metalakeName} AND metalake.deleted_at = 0
         """
