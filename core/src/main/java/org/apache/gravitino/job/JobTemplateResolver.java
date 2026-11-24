@@ -25,13 +25,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.connector.job.JobResourceUtils;
 import org.apache.gravitino.meta.JobTemplateEntity;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Resolves a job template into the runtime job template of a job run: the template with its
@@ -44,8 +43,6 @@ import org.slf4j.LoggerFactory;
  * template, use {@link #validate}.
  */
 public final class JobTemplateResolver {
-
-  private static final Logger LOG = LoggerFactory.getLogger(JobTemplateResolver.class);
 
   private final JobTemplateEntity jobTemplateEntity;
 
@@ -89,24 +86,18 @@ public final class JobTemplateResolver {
   }
 
   /**
-   * Checks that a job configuration provides every required parameter of the template, and logs a
-   * warning for the keys that the template does not use. It fetches nothing, so it can run before
-   * any resource is created for the job.
+   * Checks that a job configuration provides every required parameter of the template, and that it
+   * does not supply keys the template does not use. It fetches nothing, so it can run before any
+   * resource is created for the job.
    *
    * @param jobConf the job configuration, may be null
-   * @throws IllegalArgumentException listing all the required parameters that have no value
+   * @throws IllegalArgumentException listing missing required parameters, or unused configuration
+   *     keys together with the template's parameters
    */
   public void checkJobConf(@Nullable Map<String, String> jobConf) {
     Map<String, String> conf = jobConf == null ? Collections.emptyMap() : jobConf;
     checkRequiredParameters(conf);
-
-    Set<String> unusedKeys = JobTemplatePlaceholderUtils.findUnusedKeys(parameters, conf);
-    if (!unusedKeys.isEmpty()) {
-      LOG.warn(
-          "Job configuration keys {} are not used by job template {}",
-          unusedKeys,
-          jobTemplateEntity.name());
-    }
+    checkUnusedKeys(conf);
   }
 
   /**
@@ -115,8 +106,9 @@ public final class JobTemplateResolver {
    *
    * @param jobConf the job configuration, may be null
    * @return the runtime job template
-   * @throws IllegalArgumentException if a required parameter has no value, or the resolved
-   *     environments, custom fields or configs contain duplicate keys
+   * @throws IllegalArgumentException if a required parameter has no value, a configuration key is
+   *     unused by the template, or the resolved environments, custom fields or configs contain
+   *     duplicate keys
    */
   public JobTemplate resolve(@Nullable Map<String, String> jobConf) {
     String name = jobTemplateEntity.name();
@@ -124,8 +116,8 @@ public final class JobTemplateResolver {
 
     JobTemplateEntity.TemplateContent content = jobTemplateEntity.templateContent();
     Map<String, String> conf = jobConf == null ? Collections.emptyMap() : jobConf;
-    // Check every parameter first, so all the missing parameters are reported at once.
-    checkRequiredParameters(conf);
+    // Reject missing required parameters and unused keys before replacing placeholders.
+    checkJobConf(conf);
     Function<String, String> resolver =
         value -> JobTemplatePlaceholderUtils.replacePlaceholders(value, conf, parameters);
 
@@ -174,6 +166,17 @@ public final class JobTemplateResolver {
                   + "job configuration, or give them a default value in the template, for example "
                   + "{{name:-default}}",
               missing, jobTemplateEntity.name()));
+    }
+  }
+
+  private void checkUnusedKeys(Map<String, String> jobConf) {
+    Set<String> unusedKeys = JobTemplatePlaceholderUtils.findUnusedKeys(parameters, jobConf);
+    if (!unusedKeys.isEmpty()) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Job configuration key(s) %s are not used by job template %s. Template parameters "
+                  + "are %s",
+              unusedKeys, jobTemplateEntity.name(), new TreeSet<>(parameters.keySet())));
     }
   }
 
