@@ -296,6 +296,7 @@ CREATE TABLE IF NOT EXISTS user_meta (
     PRIMARY KEY (user_id),
     UNIQUE (metalake_id, user_name, deleted_at)
 );
+CREATE INDEX IF NOT EXISTS idx_user_meta_live ON user_meta (metalake_id) WHERE deleted_at = 0;
 COMMENT ON TABLE user_meta IS 'user metadata';
 
 COMMENT ON COLUMN user_meta.user_id IS 'user id';
@@ -321,6 +322,7 @@ CREATE TABLE IF NOT EXISTS role_meta (
     UNIQUE (metalake_id, role_name, deleted_at)
 );
 
+CREATE INDEX IF NOT EXISTS idx_role_meta_live ON role_meta (metalake_id) WHERE deleted_at = 0;
 COMMENT ON TABLE role_meta IS 'role metadata';
 
 COMMENT ON COLUMN role_meta.role_id IS 'role id';
@@ -348,6 +350,7 @@ CREATE TABLE IF NOT EXISTS role_meta_securable_object (
 );
 
 CREATE INDEX IF NOT EXISTS role_meta_securable_object_idx_role_id ON role_meta_securable_object (role_id);
+CREATE INDEX IF NOT EXISTS idx_role_meta_securable_object_live ON role_meta_securable_object (metadata_object_id, type) WHERE deleted_at = 0;
 COMMENT ON TABLE role_meta_securable_object IS 'role to securable object relation metadata';
 
 COMMENT ON COLUMN role_meta_securable_object.id IS 'auto increment id';
@@ -375,6 +378,7 @@ CREATE TABLE IF NOT EXISTS user_role_rel (
 
 CREATE INDEX IF NOT EXISTS user_role_rel_idx_user_id ON user_role_rel (user_id);
 CREATE INDEX IF NOT EXISTS user_role_rel_idx_role_id ON user_role_rel (role_id);
+CREATE INDEX IF NOT EXISTS idx_user_role_rel_live ON user_role_rel (role_id) WHERE deleted_at = 0;
 COMMENT ON TABLE user_role_rel IS 'user role relation metadata';
 
 COMMENT ON COLUMN user_role_rel.id IS 'auto increment id';
@@ -515,6 +519,7 @@ CREATE TABLE IF NOT EXISTS tag_meta (
     UNIQUE (metalake_id, tag_name, deleted_at)
 );
 
+CREATE INDEX IF NOT EXISTS idx_tag_meta_live ON tag_meta (metalake_id) WHERE deleted_at = 0;
 COMMENT ON TABLE tag_meta IS 'tag metadata';
 
 COMMENT ON COLUMN tag_meta.tag_id IS 'tag id';
@@ -543,6 +548,7 @@ CREATE TABLE IF NOT EXISTS tag_relation_meta (
 CREATE INDEX IF NOT EXISTS tag_relation_meta_idx_tag_id ON tag_relation_meta (tag_id);
 CREATE INDEX IF NOT EXISTS tag_relation_meta_idx_metadata_object_id ON tag_relation_meta (metadata_object_id);
 CREATE INDEX IF NOT EXISTS tag_relation_meta_idx_tag_id_value ON tag_relation_meta (tag_id, tag_value);
+CREATE INDEX IF NOT EXISTS idx_tag_relation_meta_live ON tag_relation_meta (metadata_object_id, metadata_object_type) WHERE deleted_at = 0;
 COMMENT ON TABLE tag_relation_meta IS 'tag metadata object relation';
 COMMENT ON COLUMN tag_relation_meta.id IS 'auto increment id';
 COMMENT ON COLUMN tag_relation_meta.tag_id IS 'tag id';
@@ -698,6 +704,7 @@ CREATE TABLE IF NOT EXISTS policy_meta (
     UNIQUE (metalake_id, policy_name, deleted_at)
 );
 
+CREATE INDEX IF NOT EXISTS idx_policy_meta_live ON policy_meta (metalake_id) WHERE deleted_at = 0;
 COMMENT ON TABLE policy_meta IS 'policy metadata';
 COMMENT ON COLUMN policy_meta.policy_id IS 'policy id';
 COMMENT ON COLUMN policy_meta.policy_name IS 'policy name';
@@ -749,6 +756,7 @@ CREATE TABLE IF NOT EXISTS policy_tag_relation_meta (
 );
 
 CREATE INDEX IF NOT EXISTS policy_tag_relation_meta_idx_tag_id ON policy_tag_relation_meta (tag_id);
+CREATE INDEX IF NOT EXISTS idx_policy_tag_relation_meta_live ON policy_tag_relation_meta (tag_id) WHERE deleted_at = 0;
 COMMENT ON TABLE policy_tag_relation_meta IS 'policy tag relation';
 COMMENT ON COLUMN policy_tag_relation_meta.id IS 'auto increment id';
 COMMENT ON COLUMN policy_tag_relation_meta.policy_id IS 'policy id';
