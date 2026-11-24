@@ -663,10 +663,10 @@ updates in one transaction, and hold the locks until commit or rollback. If a re
 the plan needs an earlier lock or an additional term row that would break ID order, roll back
 and rebuild the plan before writing.
 
-For Step 1 detach, recheck `MANAGE_DOMAIN` in the write transaction after locking the Domain.
-Use its current parent relationship to evaluate inherited privileges, as in existing Domain
-mutations. Hold the Domain lock through commit so a concurrent move cannot change the applicable
-scope between the check and the membership write.
+In Step 1, Term creation with Domains, `addDomain`, `removeDomain` and explicit detach all
+recheck `MANAGE_DOMAIN` in the write transaction for each affected Domain after locking it.
+Use each Domain's current parent relationship to evaluate inherited privileges, as in existing
+Domain mutations. Apply changes only after all checks pass and hold the locks through commit.
 
 | Operation                                           | Locks                                                                                                                 | Conflict it prevents                                    |
 | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
@@ -1520,8 +1520,10 @@ The users for these cases:
 **T7. Domain membership**
 
 - T7.1 Create with two Domains the caller can manage. Get returns both.
-- T7.2 A caller with Term create or edit rights and only `USE_DOMAIN` cannot add a membership.
-  Create returns 403 without creating a Term. A mixed alter also fails without changing any field.
+- T7.2 Use a `PUBLISHED` Domain. The caller has Term create or edit permission and only
+  `USE_DOMAIN` on the target Domain. Verify that creating a Term with this Domain returns
+  `403` and creates no Term. Verify that an alter combining `updateDefinition` and `addDomain`
+  also returns `403` and leaves the Term definition, memberships and revision unchanged.
 - T7.3 `domain=Sales` returns the terms of Sales and of its subdomains that the caller can see. It
   leaves out the terms of hidden subdomains.
 - T7.4 An authorized caller drops a `PUBLISHED` Domain with a Term member and no subdomains.
@@ -1552,10 +1554,12 @@ The users for these cases:
   and the now-empty Domain can be dropped.
   The same caller cannot use the ordinary alter to edit or add membership. **(guard)**
 - T7.10 Use published Domains Finance, Risk and Trading, with Trading initially under Finance.
-  Give the caller `MANAGE_DOMAIN` on Finance only. Pause a detach from Trading after its
-  initial management check. In another session, move Trading under Risk and commit before
-  the detach obtains the Domain lock. Verify the locked check returns `403` for the original
-  caller and preserves the membership and Term revision. **(guard)**
+  Give a Term editor `MANAGE_DOMAIN` on Finance only. Run the race for an explicit detach
+  from Trading and, with a fresh fixture, for a mixed alter that updates a Term's definition
+  and adds it to Trading. In each case, pause the write after its initial management check.
+  Move Trading under Risk in another session and commit before the write obtains the Domain
+  lock. Verify `403` and confirm that the definition, membership and Term revision are
+  unchanged. **(guard)**
 
 **T8. REST**
 
