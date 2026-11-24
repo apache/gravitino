@@ -39,7 +39,6 @@ import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.storage.AWSProperties;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.COSProperties;
-import org.apache.gravitino.storage.GvfsStaticCredentialProperties;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
 
@@ -48,10 +47,9 @@ import org.apache.gravitino.storage.S3Properties;
  * INCLUDE_CREDENTIAL_SECRETS}). Lives in {@code core} with access to {@code api} credential-type
  * constants.
  *
- * <p>Key set is broader than GVFS HCFS stripping in {@link GvfsStaticCredentialProperties}
- * (includes Glue AWS, Paimon DLF, JDBC, etc.) and is indexed by credential-provider type. Do not
- * merge the two classes: GVFS must stay dependency-light and must not omit metastore-only keys from
- * {@code properties()} merges.
+ * <p>Includes Glue AWS, Paimon DLF, JDBC, and cloud storage static keys, indexed by
+ * credential-provider type. GVFS clients only drop masked {@code properties()} placeholders when
+ * merging into HCFS config ({@code BaseGVFSOperations}); they do not re-apply this denylist.
  */
 public final class StaticCredentialSecretKeys {
 
