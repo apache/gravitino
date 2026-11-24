@@ -197,16 +197,18 @@ public interface GlossaryOperations {
    * <ol>
    *   <li>If the term does not exist, or the caller cannot see it, nothing is dropped and the
    *       result is false. Both cases give the same result, so a hidden term stays hidden.
-   *   <li>If the caller can see the term but lacks the required management privilege, a {@link
-   *       ForbiddenException} is thrown. Owning the term with create access does not permit its
-   *       deletion, even after changing its status.
+   *   <li>If the caller can see the term but lacks the required management privilege, or if the
+   *       server publication policy requires approval, a {@link ForbiddenException} is thrown.
+   *       Owning the term with create access does not permit its deletion, even after changing its
+   *       status.
    *   <li>Otherwise the term is dropped, whether draft, approved or deprecated.
    * </ol>
    *
    * @param name The name of the term.
    * @return True if the term was dropped, false if it does not exist or is not visible to the
    *     caller.
-   * @throws ForbiddenException If the caller can see the term but may not drop it.
+   * @throws ForbiddenException If the caller can see the term but may not drop it, or if deletion
+   *     is disabled while the publication policy requires approval.
    */
   boolean dropTerm(String name) throws ForbiddenException;
 

@@ -419,7 +419,8 @@ public final class GlossaryManager {
   /**
    * Drops a visible term of any status. Missing and hidden terms both return false.
    *
-   * @throws ForbiddenException if the term is visible but the caller lacks management access
+   * @throws ForbiddenException if the term is visible but the caller lacks management access, or if
+   *     deletion is disabled while publication requires approval
    */
   public boolean dropTerm(String metalake, String name) {
     NameIdentifier ident = NameIdentifierUtil.ofGlossaryTerm(metalake, name);
@@ -532,10 +533,13 @@ public final class GlossaryManager {
           List<Long> result = new ArrayList<>();
           GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
           while (upper > 0 && result.size() < limit) {
-            int batchSize = Math.min(100, limit - result.size());
+            int batchSize = Math.min(100, Math.max(limit - result.size(), 16));
             List<Version> rows = mapper.listVersionsByTermId(termId, upper, batchSize);
             for (Version row : rows) {
-              if (canReadTermVersion(metalake, head, row, access)) result.add(row.getVersionId());
+              if (canReadTermVersion(metalake, head, row, access)) {
+                result.add(row.getVersionId());
+                if (result.size() == limit) break;
+              }
             }
             if (rows.size() < batchSize) break;
             upper = rows.get(rows.size() - 1).getVersionId() - 1;
@@ -544,7 +548,11 @@ public final class GlossaryManager {
         });
   }
 
-  /** Reads the definition, domain names and direct edges frozen for the exact version. */
+  /**
+   * Reads the definition, domain names and direct edges frozen for the exact version. When
+   * authorization or visibility filtering is active, deleted or hidden domains and relation targets
+   * are omitted.
+   */
   public TermVersion getTermVersion(String metalake, long termId, long versionId) {
     return readHistory(
         metalake,
@@ -682,7 +690,11 @@ public final class GlossaryManager {
                     mapper.getVersionByTermIdAndVersionId(live.id(), head.getCandidateVersion());
                 if (!canReadTermVersion(metalake, head, row, access))
                   throw missingRelationRoot(ident);
-                if (row.getBaseRevision() != live.version()) throw staleCandidateConflict();
+                if (row.getBaseRevision() != live.version()
+                    || !edges
+                        .listRelated(lake, live.id())
+                        .equals(GlossaryTermVersions.decodeSnapshot(row).baseRelated()))
+                  throw staleCandidateConflict();
                 return editTermCandidate(ident, lake, head, row, true, token, changes);
               });
         });
@@ -733,6 +745,9 @@ public final class GlossaryManager {
           }
           resolved.put(targetKey, removedId);
           relations.edit(edge, removedId);
+        } else if (head.getPublishedVersion() == null
+            && GlossaryTermNames.key(term.name()).equals(targetKey)) {
+          relations.edit(edge, term.id());
         } else {
           GlossaryTermEntity endpoint =
               relationRoot(NameIdentifierUtil.ofGlossaryTerm(metalake, edge.target())).term();
@@ -764,6 +779,9 @@ public final class GlossaryManager {
       edited =
           TermEdits.copyWithStatus(edited, domains.names(), null, GlossaryTerm.Status.APPROVED);
     }
+    Preconditions.checkArgument(
+        head.getPublishedVersion() != null || edited.status() != GlossaryTerm.Status.DEPRECATED,
+        "Omit status to submit a new term or specify DRAFT to save it.");
     terms.validateTermNameSynonymsAndSourceRef(edited);
     checkTermNameReservation(lake, edited);
     String key = GlossaryTermNames.key(edited.name());
@@ -923,12 +941,16 @@ public final class GlossaryManager {
       return TermEdits.toPublicationView(
           after, after.domains(), GlossaryTermVersions.toPublicationResult(head, row));
     }
+    GlossaryTermEntity target =
+        state == State.SUBMITTED && after.status() == GlossaryTerm.Status.DRAFT
+            ? TermEdits.copyWithStatus(after, after.domains(), null, GlossaryTerm.Status.APPROVED)
+            : after;
     if (approval || TermEdits.needsHierarchyLock(request)) {
-      terms.validateTermNameSynonymsAndSourceRef(after);
-      checkTermNameReservation(lake, after);
+      terms.validateTermNameSynonymsAndSourceRef(target);
+      checkTermNameReservation(lake, target);
     }
     loadOrCreateVersionHead(lake, before);
-    Snapshot frozen = captureTermWithRelationships(lake, after, plan, domains);
+    Snapshot frozen = captureTermWithRelationships(lake, target, plan, domains);
     if (before == after && state == State.DRAFT) {
       frozen.definition().setCurrentVersion(Math.incrementExact(before.version()));
     }
@@ -936,13 +958,13 @@ public final class GlossaryManager {
         state == State.PUBLISHED
             ? frozen
             : frozen.withCandidateReferences(
-                after, Map.of(), edges.listRelated(lake, after.id()), null);
+                target, Map.of(), edges.listRelated(lake, target.id()), null);
     if (state == State.PUBLISHED)
       handler.handle(
           before,
-          after,
+          target,
           () -> {
-            persistDefinition(ident, after);
+            persistDefinition(ident, target);
             if (plan != null) {
               plan.persist();
             }
@@ -952,7 +974,7 @@ public final class GlossaryManager {
           });
     TermPublication result =
         GlossaryTermVersions.recordTermVersion(lake, snapshot, before.version(), state, null);
-    return TermEdits.toPublicationView(snapshot.term(ident.namespace()), after.domains(), result);
+    return TermEdits.toPublicationView(snapshot.term(ident.namespace()), target.domains(), result);
   }
 
   private static State resolvePublicationState(
@@ -1091,6 +1113,11 @@ public final class GlossaryManager {
 
   private boolean canReadTermVersion(
       String metalake, Head head, Version row, GlossaryAccess access) {
+    if (!State.PUBLISHED.name().equals(row.getLifecycle())
+        && head.getPublishedVersion() != null
+        && !access.canEdit(head.getTermId())) {
+      return false;
+    }
     Snapshot snapshot = GlossaryTermVersions.decodeSnapshot(row);
     return canReadTermVersion(
         head, row, access, snapshot, snapshot.term(NamespaceUtil.ofGlossaryTerm(metalake)));
@@ -1136,12 +1163,19 @@ public final class GlossaryManager {
                     locks.addAll(snapshot.related());
                     locks.addAll(snapshot.broader());
                   }
-                  if (head.getPublishedVersion() != null) locks.add(termId);
+                  if (head.getPublishedVersion() != null) {
+                    if (terms.getByIds(ns, lake, Set.of(termId)).isEmpty()) {
+                      throw new NoSuchTermException("Glossary term %s does not exist", termId);
+                    }
+                    locks.add(termId);
+                  }
+                  boolean[] lockedEntered = {false};
                   try {
                     return edges.withHierarchyLock(
                         lake,
                         locks,
                         () -> {
+                          lockedEntered[0] = true;
                           SessionUtils.clearSessionCache();
                           Head locked = mapper.getVersionHeadByMetalakeAndTermId(lake, termId);
                           if (!Objects.equals(locked.getCandidateVersion(), candidateVersionId))
@@ -1162,7 +1196,11 @@ public final class GlossaryManager {
                           return GlossaryTermVersions.toPublicationResult(locked, row);
                         });
                   } catch (NoSuchEntityException missing) {
-                    throw new NoSuchTermException(missing, "Referenced term is no longer visible");
+                    if (!lockedEntered[0]) {
+                      throw new NoSuchTermException(
+                          missing, "Referenced term is no longer visible");
+                    }
+                    throw missing;
                   }
                 }));
   }

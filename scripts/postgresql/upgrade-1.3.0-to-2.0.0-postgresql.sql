@@ -561,7 +561,7 @@ CREATE TABLE IF NOT EXISTS glossary_term_version_head (
     last_version BIGINT NOT NULL,
     published_version BIGINT,
     candidate_version BIGINT,
-    reserved_name VARCHAR(384),
+    reserved_name VARCHAR(384) COLLATE "C",
     CONSTRAINT uk_glossary_candidate_name UNIQUE (metalake_id, reserved_name)
 );
 COMMENT ON TABLE glossary_term_version_head IS 'Publication pointers and pending name reservation for one glossary term';

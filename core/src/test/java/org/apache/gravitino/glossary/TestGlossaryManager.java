@@ -391,6 +391,64 @@ class TestGlossaryManager extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testCandidateStatusPromotionSelfRefStaleRelatedAndDroppedLiveTerm() throws IOException {
+    createAndInsertMakeLake(LAKE);
+    GlossaryManager gated = approvalManager();
+
+    // Editing a live DRAFT term under approval policy without setStatus(DRAFT) submits APPROVED.
+    GlossaryTermEntity liveDraft =
+        manager.createTerm(
+            LAKE, TermSpec.builder("liveDraft").withStatus(GlossaryTerm.Status.DRAFT).build());
+    GlossaryTermEntity submittedFromLiveDraft =
+        gated.alterTerm(LAKE, "liveDraft", TermChange.updateDefinition("ready"));
+    Assertions.assertEquals(
+        TermPublication.State.SUBMITTED, submittedFromLiveDraft.publication().state());
+    gated.publishCandidate(LAKE, liveDraft.id(), submittedFromLiveDraft.publication().versionId());
+    GlossaryTermEntity publishedLiveDraft = manager.getTerm(LAKE, "liveDraft");
+    Assertions.assertEquals(GlossaryTerm.Status.APPROVED, publishedLiveDraft.status());
+    Assertions.assertEquals("ready", publishedLiveDraft.definition());
+
+    // Unpublished candidate rejects DEPRECATED and self-reference with IllegalArgumentException.
+    GlossaryTermEntity unpublished =
+        gated.createTerm(
+            LAKE, TermSpec.builder("unpublished").withStatus(GlossaryTerm.Status.DRAFT).build());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            gated.alterTerm(
+                LAKE, "unpublished", TermChange.setStatus(GlossaryTerm.Status.DEPRECATED)));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> gated.alterTerm(LAKE, "unpublished", TermChange.addBroader("unpublished")));
+    Assertions.assertEquals(
+        TermPublication.State.DRAFT,
+        gated.getTermVersion(LAKE, unpublished.id(), 1).term().publication().state());
+
+    // Continuing a candidate fails fast when a live symmetric RELATED edge changed.
+    GlossaryTermEntity root = manager.createTerm(LAKE, TermSpec.builder("root").build());
+    GlossaryTermEntity cand = gated.alterTerm(LAKE, "root", TermChange.updateDefinition("pending"));
+    manager.createTerm(LAKE, TermSpec.builder("neighbor").withRelated("root").build());
+    Assertions.assertThrows(
+        TermVersionConflictException.class,
+        () ->
+            gated.alterTerm(LAKE, "root", cand.revisionToken(), TermChange.setProperty("a", "b")));
+    Assertions.assertEquals(List.of(2L, 1L), gated.listTermVersions(LAKE, root.id()));
+
+    // Drop is rejected under approval policy; dropping live term while disabled hides its
+    // candidate without blaming a referenced term.
+    Assertions.assertThrows(ForbiddenException.class, () -> gated.dropTerm(LAKE, "root"));
+    Assertions.assertTrue(manager.dropTerm(LAKE, "root"));
+    NoSuchTermException missingOnReject =
+        Assertions.assertThrows(
+            NoSuchTermException.class, () -> gated.rejectCandidate(LAKE, root.id(), 2));
+    Assertions.assertFalse(missingOnReject.getMessage().contains("Referenced term"));
+    NoSuchTermException missingOnPublish =
+        Assertions.assertThrows(
+            NoSuchTermException.class, () -> gated.publishCandidate(LAKE, root.id(), 2));
+    Assertions.assertFalse(missingOnPublish.getMessage().contains("Referenced term"));
+  }
+
+  @TestTemplate
   void testMissingParentMakesTermAbsent() {
     TermChange change = TermChange.updateDefinition("new");
     Assertions.assertThrows(NoSuchTermException.class, () -> manager.getTerm(LAKE, "term"));

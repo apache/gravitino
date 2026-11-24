@@ -577,6 +577,14 @@ class TestGlossaryDomains extends TestJDBCBackend {
                 gated.alterTerm(
                     LAKE, "published", TermChange.setStatus(GlossaryTerm.Status.DRAFT)));
     assertEquals(List.of(1L), as("viewer", () -> gated.listTermVersions(LAKE, live.id(), null, 1)));
+    assertEquals(
+        List.of(draft.publication().versionId()),
+        as("lakeOwner", () -> gated.listTermVersions(LAKE, live.id(), null, 1)));
+    assertEquals(
+        List.of(1L),
+        as(
+            "lakeOwner",
+            () -> gated.listTermVersions(LAKE, live.id(), draft.publication().versionId(), 1)));
     for (long version : List.of(1L, draft.publication().versionId(), 3L)) {
       assertThrows(
           NoSuchTermException.class,

@@ -64,6 +64,12 @@ public final class TermPublication {
       @Nullable Long candidateVersionId) {
     Preconditions.checkArgument(versionId >= 1, "versionId must be positive");
     Preconditions.checkArgument(state != null, "state cannot be null");
+    Preconditions.checkArgument(
+        publishedVersionId == null || publishedVersionId >= 1,
+        "publishedVersionId must be positive");
+    Preconditions.checkArgument(
+        candidateVersionId == null || candidateVersionId >= 1,
+        "candidateVersionId must be positive");
     this.termId = termId;
     this.versionId = versionId;
     this.state = state;
