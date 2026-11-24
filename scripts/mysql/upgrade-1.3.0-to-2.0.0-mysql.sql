@@ -971,13 +971,18 @@ CREATE TABLE IF NOT EXISTS glossary_hierarchy_lock (
     metalake_id BIGINT NOT NULL PRIMARY KEY COMMENT 'owning metalake id, one database mutex row per metalake'
 ) ENGINE=InnoDB COMMENT 'serializes glossary hierarchy and name checks within a metalake';
 
-CREATE TABLE IF NOT EXISTS glossary_term_domain_rel (
-    metalake_id BIGINT NOT NULL COMMENT 'owning metalake id',
-    term_id BIGINT NOT NULL COMMENT 'member glossary term id',
-    domain_id BIGINT NOT NULL COMMENT 'domain id',
-    deleted_at BIGINT NOT NULL DEFAULT 0 COMMENT 'retirement time in epoch milliseconds, advanced past retained generations to avoid collisions, 0 means live',
-    PRIMARY KEY (term_id, domain_id, deleted_at),
-    KEY idx_glossary_domain_rel_domain (domain_id, deleted_at),
-    KEY idx_glossary_domain_rel_metalake (metalake_id, deleted_at),
-    KEY idx_glossary_domain_rel_deleted (deleted_at, term_id, domain_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'explicit glossary term domain membership';
+CREATE TABLE IF NOT EXISTS domain_member_rel (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT 'Membership row ID',
+    metalake_id BIGINT NOT NULL COMMENT 'Owning metalake ID',
+    domain_id BIGINT NOT NULL COMMENT 'Domain ID',
+    member_type VARCHAR(64) NOT NULL COMMENT 'GLOSSARY_TERM or KNOWLEDGE_BASE_ARTICLE',
+    member_id BIGINT NOT NULL COMMENT 'Stable member ID',
+    current_version INT NOT NULL DEFAULT 1 COMMENT 'Current membership row version, initialized to 1 on each attachment',
+    last_version INT NOT NULL DEFAULT 1 COMMENT 'Last membership row version, initialized to 1 on each attachment',
+    audit_info MEDIUMTEXT NOT NULL COMMENT 'Audit information',
+    deleted_at BIGINT NOT NULL DEFAULT 0 COMMENT 'Soft deletion time in milliseconds, zero for live rows',
+    CONSTRAINT uk_domain_member UNIQUE (member_type, member_id, domain_id, deleted_at),
+    INDEX idx_domain_members (domain_id, deleted_at, member_type, member_id),
+    INDEX idx_domain_member_metalake (metalake_id, deleted_at),
+    INDEX idx_domain_member_deleted (deleted_at, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Explicit Domain memberships';

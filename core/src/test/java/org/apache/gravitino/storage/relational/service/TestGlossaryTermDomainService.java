@@ -19,28 +19,35 @@
 package org.apache.gravitino.storage.relational.service;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
+import org.apache.gravitino.exceptions.NonEmptyDomainException;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper;
+import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper.MemberType;
+import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper.Membership;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermDomainRelMapper;
 import org.apache.gravitino.storage.relational.po.DomainPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.TransactionIsolationLevel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
@@ -73,8 +80,8 @@ public class TestGlossaryTermDomainService extends TestJDBCBackend {
         read(() -> service.domainNames(LAKE_ID, List.of(101L, 102L, 103L))));
     Assertions.assertEquals(
         Set.of(101L, 102L), read(() -> service.termIds(LAKE_ID, Set.of(sales))));
-    run(() -> service.remove(101, sales));
-    Assertions.assertEquals(Set.of(finance), read(() -> service.domainIds(101)));
+    run(() -> service.remove(LAKE_ID, 101, sales));
+    Assertions.assertEquals(Set.of(finance), read(() -> service.domainIds(LAKE_ID, 101)));
   }
 
   @TestTemplate
@@ -83,16 +90,19 @@ public class TestGlossaryTermDomainService extends TestJDBCBackend {
     long retained = Long.MAX_VALUE - 3;
     run(() -> service.add(LAKE_ID, 101, sales));
     SessionUtils.doWithCommit(
-        GlossaryTermDomainRelMapper.class, mapper -> mapper.remove(101, sales, retained));
+        DomainMemberMapper.class,
+        mapper ->
+            mapper.retire(
+                LAKE_ID, DomainMemberMapper.MemberType.GLOSSARY_TERM, 101, sales, retained));
     for (int i = 1; i <= 2; i++) {
       run(() -> service.add(LAKE_ID, 101, sales));
-      run(() -> service.remove(101, sales));
+      run(() -> service.remove(LAKE_ID, 101, sales));
       Assertions.assertEquals(
-          retained + i, scalar("SELECT MAX(deleted_at) FROM glossary_term_domain_rel"));
+          retained + i, scalar("SELECT MAX(deleted_at) FROM domain_member_rel"));
     }
-    Assertions.assertTrue(read(() -> service.domainIds(101)).isEmpty());
+    Assertions.assertTrue(read(() -> service.domainIds(LAKE_ID, 101)).isEmpty());
     Assertions.assertEquals(
-        3, scalar("SELECT COUNT(*) FROM glossary_term_domain_rel WHERE deleted_at > 0"));
+        3, scalar("SELECT COUNT(*) FROM domain_member_rel WHERE deleted_at > 0"));
   }
 
   @TestTemplate
@@ -102,14 +112,98 @@ public class TestGlossaryTermDomainService extends TestJDBCBackend {
     run(() -> service.add(LAKE_ID, 102, sales));
     Assertions.assertTrue(
         GlossaryTermMetaService.getInstance().delete(NameIdentifier.of(NS, "Term101")));
-    Assertions.assertFalse(read(() -> service.hasTerms(finance)));
-    Assertions.assertTrue(read(() -> service.hasTerms(sales)));
+    Assertions.assertFalse(
+        SessionUtils.getWithoutCommit(DomainMemberMapper.class, m -> m.hasMembers(finance))
+            .booleanValue());
+    Assertions.assertTrue(
+        SessionUtils.getWithoutCommit(DomainMemberMapper.class, m -> m.hasMembers(sales))
+            .booleanValue());
     run(() -> GlossaryTermMetaService.getInstance().dropMetalake(LAKE_ID));
-    Assertions.assertFalse(read(() -> service.hasTerms(sales)));
+    Assertions.assertFalse(
+        SessionUtils.getWithoutCommit(DomainMemberMapper.class, m -> m.hasMembers(sales))
+            .booleanValue());
     Assertions.assertEquals(
-        0, scalar("SELECT COUNT(*) FROM glossary_term_domain_rel WHERE deleted_at = 0"));
+        0, scalar("SELECT COUNT(*) FROM domain_member_rel WHERE deleted_at = 0"));
     GlossaryTermMetaService.getInstance().collect(Long.MAX_VALUE, 1000);
-    Assertions.assertEquals(0, scalar("SELECT COUNT(*) FROM glossary_term_domain_rel"));
+    Assertions.assertEquals(2, scalar("SELECT COUNT(*) FROM domain_member_rel"));
+    Assertions.assertEquals(
+        2, DomainMetaService.getInstance().deleteDomainMetasByLegacyTimeline(Long.MAX_VALUE, 1000));
+    Assertions.assertEquals(0, scalar("SELECT COUNT(*) FROM domain_member_rel"));
+  }
+
+  @TestTemplate
+  public void testSameNumericIdAcrossMemberTypes() throws Exception {
+    setup();
+    run(() -> service.add(LAKE_ID, 101, sales));
+    SessionUtils.doWithCommit(
+        DomainMemberMapper.class,
+        m ->
+            m.add(LAKE_ID, DomainMemberMapper.MemberType.KNOWLEDGE_BASE_ARTICLE, 101, sales, "{}"));
+    run(() -> service.removeTerm(LAKE_ID, 101));
+    DomainMetaService.getInstance().deleteDomainMetasByLegacyTimeline(Long.MAX_VALUE, 10);
+    Assertions.assertTrue(read(() -> service.domainIds(LAKE_ID, 101)).isEmpty());
+    Assertions.assertThrows(
+        NonEmptyDomainException.class,
+        () ->
+            DomainMetaService.getInstance()
+                .deleteDomain(NameIdentifier.of(NamespaceUtil.ofDomain(LAKE), "Sales")));
+    Assertions.assertEquals(
+        List.of(sales),
+        SessionUtils.getWithoutCommit(
+            DomainMemberMapper.class,
+            m -> m.domains(LAKE_ID, DomainMemberMapper.MemberType.KNOWLEDGE_BASE_ARTICLE, 101)));
+  }
+
+  @TestTemplate
+  public void testTypedListAndDirectMemberPages() throws Exception {
+    setup();
+    SessionUtils.doWithCommit(
+        DomainMemberMapper.class,
+        mapper -> {
+          MemberType term = MemberType.GLOSSARY_TERM;
+          MemberType article = MemberType.KNOWLEDGE_BASE_ARTICLE;
+          mapper.add(LAKE_ID, article, 101, sales, "{}");
+          mapper.add(LAKE_ID, term, 102, sales, "{}");
+          mapper.add(LAKE_ID, term, 101, sales, "{}");
+          mapper.add(LAKE_ID, term, 103, finance, "{}");
+          mapper.retire(LAKE_ID, term, 102, sales, 10);
+
+          Membership salesTerm = new Membership(term, 101, sales);
+          Membership salesArticle = new Membership(article, 101, sales);
+          Assertions.assertEquals(List.of(salesArticle), mapper.list(LAKE_ID, article));
+          List<Membership> terms = mapper.list(LAKE_ID, term);
+          Assertions.assertEquals(2, terms.size());
+          Assertions.assertEquals(
+              Set.of(salesTerm, new Membership(term, 103, finance)), Set.copyOf(terms));
+          Assertions.assertEquals(List.of(salesTerm), mapper.members(LAKE_ID, sales, 1, 0));
+          Assertions.assertEquals(List.of(salesArticle), mapper.members(LAKE_ID, sales, 1, 1));
+          Assertions.assertTrue(mapper.members(LAKE_ID, sales, 1, 2).isEmpty());
+        });
+  }
+
+  @TestTemplate
+  public void testMembershipReadsRefreshAfterDomainLock() throws Exception {
+    setup();
+    assertFreshAfterLock(101, mapper -> mapper.domains(LAKE_ID, MemberType.GLOSSARY_TERM, 101));
+    assertFreshAfterLock(102, mapper -> mapper.list(LAKE_ID, MemberType.GLOSSARY_TERM));
+    assertFreshAfterLock(103, mapper -> mapper.members(LAKE_ID, sales, 10, 0));
+  }
+
+  @TestTemplate
+  public void testPurgeOldestMembershipFirst() throws Exception {
+    setup();
+    SessionUtils.doWithCommit(
+        DomainMemberMapper.class,
+        mapper -> {
+          MemberType type = MemberType.GLOSSARY_TERM;
+          mapper.add(LAKE_ID, type, 101, sales, "{}");
+          mapper.add(LAKE_ID, type, 102, sales, "{}");
+          mapper.retire(LAKE_ID, type, 102, sales, 10);
+          mapper.retire(LAKE_ID, type, 101, sales, 20);
+          Assertions.assertEquals(1, mapper.purge(30, 1));
+          Assertions.assertEquals(0, mapper.lastRetirement(LAKE_ID, type, 102));
+          Assertions.assertEquals(20, mapper.lastRetirement(LAKE_ID, type, 101));
+        });
   }
 
   @TestTemplate
@@ -147,6 +241,30 @@ public class TestGlossaryTermDomainService extends TestJDBCBackend {
     Assertions.assertEquals(
         List.of(101L, 102L), List.copyOf(read(() -> service.termIds(LAKE_ID, scope))));
     Assertions.assertTrue(read(() -> service.termIds(LAKE_ID, Set.of())).isEmpty());
+  }
+
+  private void assertFreshAfterLock(long termId, Function<DomainMemberMapper, List<?>> query)
+      throws Exception {
+    try (SqlSession reader =
+        SqlSessionFactoryHelper.getInstance()
+            .getSqlSessionFactory()
+            .openSession(TransactionIsolationLevel.READ_COMMITTED)) {
+      DomainMemberMapper mapper = reader.getMapper(DomainMemberMapper.class);
+      int before = query.apply(mapper).size();
+      // The writer commits through its own session while the reader retains its local cache.
+      run(() -> service.add(LAKE_ID, termId, sales));
+      // Acquire the fence via JDBC so the lock itself cannot flush the MyBatis cache.
+      try (PreparedStatement lock =
+          reader
+              .getConnection()
+              .prepareStatement("SELECT domain_id FROM domain_meta WHERE domain_id=? FOR UPDATE")) {
+        lock.setLong(1, sales);
+        try (ResultSet rows = lock.executeQuery()) {
+          Assertions.assertTrue(rows.next());
+        }
+      }
+      Assertions.assertEquals(before + 1, query.apply(mapper).size());
+    }
   }
 
   private void setup() throws Exception {

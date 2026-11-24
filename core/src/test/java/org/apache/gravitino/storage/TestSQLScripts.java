@@ -68,6 +68,21 @@ public class TestSQLScripts extends TestJDBCBackend {
               SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
           Connection connection = session.getConnection();
           Statement statement = connection.createStatement()) {
+        String table =
+            connection.getMetaData().storesUpperCaseIdentifiers()
+                ? "DOMAIN_MEMBER_REL"
+                : "domain_member_rel";
+        List<String> indexes =
+            readSchemaIndexes(Set.of(table)).stream()
+                .map(index -> index.toLowerCase(Locale.ROOT))
+                .toList();
+        Assertions.assertTrue(
+            indexes.contains("domain_member_rel:idx_domain_member_deleted:1:deleted_at:true"),
+            indexes.toString());
+        Assertions.assertTrue(
+            indexes.contains("domain_member_rel:idx_domain_member_deleted:2:id:true"),
+            indexes.toString());
+
         statement.executeUpdate("INSERT INTO glossary_hierarchy_lock (metalake_id) VALUES (100)");
         Assertions.assertThrows(
             SQLException.class,
@@ -85,14 +100,20 @@ public class TestSQLScripts extends TestJDBCBackend {
           Assertions.assertEquals(2, rows.getInt(1));
         }
         String member =
-            "INSERT INTO glossary_term_domain_rel (metalake_id,term_id,domain_id,deleted_at) VALUES (100,101,201,0)";
+            "INSERT INTO domain_member_rel (metalake_id,member_type,member_id,domain_id,audit_info) VALUES (100,'GLOSSARY_TERM',101,201,'{}')";
         statement.executeUpdate(member);
         Assertions.assertThrows(SQLException.class, () -> statement.executeUpdate(member));
         statement.executeUpdate(
-            "UPDATE glossary_term_domain_rel SET deleted_at=123 WHERE deleted_at=0");
+            "UPDATE domain_member_rel SET deleted_at=123 WHERE metalake_id=100 AND deleted_at=0");
         statement.executeUpdate(member);
+        Assertions.assertThrows(
+            SQLException.class,
+            () ->
+                statement.executeUpdate(
+                    "INSERT INTO domain_member_rel (metalake_id,member_type,member_id,domain_id,audit_info,deleted_at) VALUES (100,'GLOSSARY_TERM',101,201,'{}',123)"));
         try (ResultSet rows =
-            statement.executeQuery("SELECT COUNT(*) FROM glossary_term_domain_rel")) {
+            statement.executeQuery(
+                "SELECT COUNT(*) FROM domain_member_rel WHERE metalake_id=100")) {
           Assertions.assertTrue(rows.next());
           Assertions.assertEquals(2, rows.getInt(1));
         }

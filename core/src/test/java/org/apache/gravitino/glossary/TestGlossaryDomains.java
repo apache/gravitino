@@ -32,6 +32,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -68,6 +69,8 @@ import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.apache.gravitino.exceptions.NonEmptyDomainException;
 import org.apache.gravitino.exceptions.TermAlreadyExistsException;
+import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.server.authorization.DomainAuthzHelper;
@@ -194,6 +197,40 @@ class TestGlossaryDomains extends TestJDBCBackend {
     GlossaryTermEntity term = as("lakeOwner", () -> manager.getTerm(LAKE, "Churn"));
     assertArrayEquals(new String[] {"Retail", "Sales"}, term.domains());
     assertEquals(1, term.version());
+  }
+
+  @TestTemplate
+  void testMembershipRecordsTheAttachingUser() throws Exception {
+    GlossaryTermEntity term =
+        as("writer", () -> manager.createTerm(LAKE, TermSpec.builder("Churn").build()));
+    Instant start = Instant.ofEpochMilli(System.currentTimeMillis());
+    GlossaryTermEntity updated =
+        as("admin", () -> manager.alterTerm(LAKE, term.name(), TermChange.addDomain("Sales")));
+    Instant end = Instant.now();
+    assertEquals("writer", updated.auditInfo().creator());
+    assertEquals(term.auditInfo().createTime(), updated.auditInfo().createTime());
+    assertEquals("admin", updated.auditInfo().lastModifier());
+
+    // Repeating the add as the Term creator must preserve the original attachment.
+    as("writer", () -> manager.alterTerm(LAKE, term.name(), TermChange.addDomain("Sales")));
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession();
+        PreparedStatement query =
+            session
+                .getConnection()
+                .prepareStatement(
+                    "SELECT audit_info FROM domain_member_rel WHERE member_type='GLOSSARY_TERM' AND member_id=? AND deleted_at=0")) {
+      query.setLong(1, term.id());
+      try (ResultSet rows = query.executeQuery()) {
+        assertTrue(rows.next());
+        AuditInfo membership =
+            JsonUtils.anyFieldMapper().readValue(rows.getString(1), AuditInfo.class);
+        assertEquals("admin", membership.creator());
+        assertFalse(membership.createTime().isBefore(start));
+        assertFalse(membership.createTime().isAfter(end));
+        assertFalse(rows.next());
+      }
+    }
   }
 
   /** T7.2. */
@@ -690,9 +727,9 @@ class TestGlossaryDomains extends TestJDBCBackend {
             NonEmptyDomainException.class,
             () -> as("domainAdmin", () -> domains.deleteDomain(LAKE, "Retail")));
     assertEquals(
-        "Domain Retail under metalake glossary still has glossary terms. Ask a term owner with "
-            + "CREATE_DEFINITION, or a user with MANAGE_DEFINITIONS, who can use the domain to "
-            + "remove the terms from it first",
+        "Domain Retail under metalake glossary contains definition members. Remove their memberships first."
+            + " For glossary terms, ask the term owner with CREATE_DEFINITION or a glossary manager"
+            + " with MANAGE_DEFINITIONS to remove the membership. Both roles require access to this domain.",
         error.getMessage());
     assertThrows(
         NoSuchTermException.class,

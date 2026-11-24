@@ -85,7 +85,7 @@ final class TermDomains {
     }
     for (Long id : before.keySet()) {
       if (!after.containsKey(id)) {
-        DOMAINS.remove(termId, id);
+        DOMAINS.remove(lake, termId, id);
       }
     }
   }

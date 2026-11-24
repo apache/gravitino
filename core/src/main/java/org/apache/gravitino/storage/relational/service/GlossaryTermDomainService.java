@@ -19,8 +19,13 @@
 
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.storage.relational.mapper.DomainMemberMapper.MemberType.GLOSSARY_TERM;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import java.io.UncheckedIOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -33,11 +38,15 @@ import java.util.TreeSet;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
+import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermDomainRelMapper;
 import org.apache.gravitino.storage.relational.po.DomainPO;
 import org.apache.gravitino.storage.relational.po.GlossaryTermDomainRelPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
  * Explicit glossary term domain membership. Only the glossary term write path changes it. Every
@@ -137,10 +146,10 @@ public final class GlossaryTermDomainService {
   }
 
   /** Returns the live domain IDs of a term. */
-  public Set<Long> domainIds(long termId) {
+  public Set<Long> domainIds(long metalakeId, long termId) {
     return new HashSet<>(
         SessionUtils.getWithoutCommit(
-            GlossaryTermDomainRelMapper.class, mapper -> mapper.listDomainIds(termId)));
+            DomainMemberMapper.class, mapper -> mapper.domains(metalakeId, GLOSSARY_TERM, termId)));
   }
 
   /** Returns the live member term IDs in ascending order for stable batched definition reads. */
@@ -158,62 +167,61 @@ public final class GlossaryTermDomainService {
     return result;
   }
 
-  /** Whether a domain still has live member terms. A plain read at read committed. */
-  public boolean hasTerms(long domainId) {
-    return SessionUtils.getWithoutCommit(
-        GlossaryTermDomainRelMapper.class, mapper -> mapper.hasTerms(domainId));
-  }
-
   /** Adds a live membership row. The caller holds the term and domain locks. */
   public void add(long metalakeId, long termId, long domainId) {
+    AuditInfo audit =
+        AuditInfo.builder()
+            .withCreator(PrincipalUtils.getCurrentUserName())
+            .withCreateTime(Instant.now())
+            .build();
+    String auditJson;
+    try {
+      auditJson = JsonUtils.anyFieldMapper().writeValueAsString(audit);
+    } catch (JsonProcessingException e) {
+      throw new UncheckedIOException("Cannot serialize Domain membership audit information", e);
+    }
     SessionUtils.doWithoutCommit(
         GlossaryTermDomainRelMapper.class,
         mapper ->
             Preconditions.checkState(
-                mapper.insert(metalakeId, termId, domainId) == 1,
+                mapper.insert(metalakeId, termId, domainId, auditJson) == 1,
                 "Failed to add term %s to domain %s",
                 termId,
                 domainId));
   }
 
   /** Retires a live membership row if present. The caller holds the term row lock. */
-  public void remove(long termId, long domainId) {
+  public void remove(long metalakeId, long termId, long domainId) {
     SessionUtils.doWithoutCommit(
-        GlossaryTermDomainRelMapper.class,
-        mapper -> mapper.remove(termId, domainId, nextDeletedAt(mapper.lastDeletedAt(termId))));
+        DomainMemberMapper.class,
+        mapper ->
+            mapper.retire(
+                metalakeId,
+                GLOSSARY_TERM,
+                termId,
+                domainId,
+                nextDeletedAt(mapper.lastRetirement(metalakeId, GLOSSARY_TERM, termId))));
   }
 
   /** Retires every membership row of a term inside its deletion transaction. */
-  public void removeTerm(long termId) {
+  public void removeTerm(long metalakeId, long termId) {
     SessionUtils.doWithoutCommit(
-        GlossaryTermDomainRelMapper.class,
-        mapper -> mapper.removeTerm(termId, nextDeletedAt(mapper.lastDeletedAt(termId))));
+        DomainMemberMapper.class,
+        mapper ->
+            mapper.retireMember(
+                metalakeId,
+                GLOSSARY_TERM,
+                termId,
+                nextDeletedAt(mapper.lastRetirement(metalakeId, GLOSSARY_TERM, termId))));
   }
 
   /** Retires every membership row of a metalake inside its deletion transaction. */
   public void dropMetalake(long metalakeId) {
     SessionUtils.doWithoutCommit(
-        GlossaryTermDomainRelMapper.class,
+        DomainMemberMapper.class,
         mapper ->
-            mapper.dropMetalake(
-                metalakeId, nextDeletedAt(mapper.lastDeletedAtInMetalake(metalakeId))));
-  }
-
-  /** Purges at most limit retired rows older than cutoff, in the caller's transaction. */
-  public int collect(long cutoff, int limit) {
-    Preconditions.checkArgument(limit >= 0, "limit must be nonnegative");
-    if (limit == 0) {
-      return 0;
-    }
-    return SessionUtils.getWithoutCommit(
-        GlossaryTermDomainRelMapper.class,
-        mapper -> {
-          int count = 0;
-          for (GlossaryTermDomainRelPO row : mapper.expired(cutoff, limit)) {
-            count += mapper.purge(row);
-          }
-          return count;
-        });
+            mapper.retireMetalake(
+                metalakeId, nextDeletedAt(mapper.lastMetalakeRetirement(metalakeId))));
   }
 
   // A repeated same-millisecond change must not collide with a retained generation of the row.

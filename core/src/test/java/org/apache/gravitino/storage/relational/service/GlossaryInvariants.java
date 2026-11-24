@@ -100,10 +100,10 @@ public final class GlossaryInvariants {
         Statement statement = connection.createStatement();
         ResultSet rows =
             statement.executeQuery(
-                "SELECT r.term_id, r.domain_id, t.term_id, d.domain_id FROM glossary_term_domain_rel r "
-                    + "LEFT JOIN glossary_term_meta t ON t.term_id=r.term_id AND t.metalake_id=r.metalake_id AND t.deleted_at=0 "
+                "SELECT r.member_id, r.domain_id, t.term_id, d.domain_id FROM domain_member_rel r "
+                    + "LEFT JOIN glossary_term_meta t ON t.term_id=r.member_id AND t.metalake_id=r.metalake_id AND t.deleted_at=0 "
                     + "LEFT JOIN domain_meta d ON d.domain_id=r.domain_id AND d.metalake_id=r.metalake_id AND d.deleted_at=0 "
-                    + "WHERE r.deleted_at=0")) {
+                    + "WHERE r.member_type='GLOSSARY_TERM' AND r.deleted_at=0")) {
       while (rows.next()) {
         Assertions.assertNotNull(
             rows.getObject(3), "Live membership of term " + rows.getLong(1) + " needs a live term");
