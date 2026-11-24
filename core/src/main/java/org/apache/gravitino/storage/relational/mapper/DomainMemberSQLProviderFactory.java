@@ -72,6 +72,11 @@ public class DomainMemberSQLProviderFactory {
     return getProvider().lastMetalakeRetirement();
   }
 
+  /** Delegates {@link DomainMemberBaseSQLProvider#retireMember}. */
+  public static String retireMember() {
+    return getProvider().retireMember();
+  }
+
   /** Delegates {@link DomainMemberBaseSQLProvider#retireMetalake}. */
   public static String retireMetalake() {
     return getProvider().retireMetalake();

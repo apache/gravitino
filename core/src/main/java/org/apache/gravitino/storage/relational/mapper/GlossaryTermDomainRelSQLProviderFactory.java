@@ -43,42 +43,16 @@ public class GlossaryTermDomainRelSQLProviderFactory {
     return getProvider().insert(metalakeId, termId, domainId);
   }
 
-  /** Delegates {@link GlossaryTermDomainRelBaseSQLProvider#removeTerm}. */
-  public static String removeTerm(
-      @Param("termId") long termId, @Param("deletedAt") long deletedAt) {
-    return getProvider().removeTerm(termId, deletedAt);
-  }
-
-  /** Delegates {@link GlossaryTermDomainRelBaseSQLProvider#lastDeletedAt}. */
-  public static String lastDeletedAt(@Param("termId") long termId) {
-    return getProvider().lastDeletedAt(termId);
-  }
-
   /** Delegates {@link GlossaryTermDomainRelBaseSQLProvider#listDomainNames}. */
   public static String listDomainNames(
       @Param("metalakeId") long metalakeId, @Param("termIds") Collection<Long> termIds) {
     return getProvider().listDomainNames(metalakeId, termIds);
   }
 
-  /** Delegates {@link GlossaryTermDomainRelBaseSQLProvider#listDomainIds}. */
-  public static String listDomainIds(@Param("termId") long termId) {
-    return getProvider().listDomainIds(termId);
-  }
-
   /** Delegates {@link GlossaryTermDomainRelBaseSQLProvider#listTermIds}. */
   public static String listTermIds(
       @Param("metalakeId") long metalakeId, @Param("domainIds") Collection<Long> domainIds) {
     return getProvider().listTermIds(metalakeId, domainIds);
-  }
-
-  /** Delegates {@link GlossaryTermDomainRelBaseSQLProvider#expired}. */
-  public static String expired(@Param("cutoff") long cutoff, @Param("limit") int limit) {
-    return getProvider().expired(cutoff, limit);
-  }
-
-  /** Delegates {@link GlossaryTermDomainRelBaseSQLProvider#purge}. */
-  public static String purge(@Param("id") long id) {
-    return getProvider().purge(id);
   }
 
   private static GlossaryTermDomainRelBaseSQLProvider getProvider() {

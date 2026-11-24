@@ -481,30 +481,14 @@ CREATE TABLE IF NOT EXISTS glossary_hierarchy_lock (
 COMMENT ON TABLE glossary_hierarchy_lock IS 'serializes glossary hierarchy and name checks within a metalake';
 COMMENT ON COLUMN glossary_hierarchy_lock.metalake_id IS 'owning metalake id, one database mutex row per metalake';
 
-CREATE TABLE IF NOT EXISTS glossary_term_domain_rel (
-    metalake_id BIGINT NOT NULL,
-    term_id BIGINT NOT NULL,
-    domain_id BIGINT NOT NULL,
-    deleted_at BIGINT NOT NULL DEFAULT 0,
-    PRIMARY KEY (term_id, domain_id, deleted_at)
-);
-CREATE INDEX IF NOT EXISTS idx_glossary_domain_rel_domain ON glossary_term_domain_rel (domain_id, deleted_at);
-CREATE INDEX IF NOT EXISTS idx_glossary_domain_rel_metalake ON glossary_term_domain_rel (metalake_id, deleted_at);
-CREATE INDEX IF NOT EXISTS idx_glossary_domain_rel_deleted ON glossary_term_domain_rel (deleted_at, term_id, domain_id);
-COMMENT ON TABLE glossary_term_domain_rel IS 'explicit glossary term domain membership';
-COMMENT ON COLUMN glossary_term_domain_rel.metalake_id IS 'owning metalake id';
-COMMENT ON COLUMN glossary_term_domain_rel.term_id IS 'member glossary term id';
-COMMENT ON COLUMN glossary_term_domain_rel.domain_id IS 'domain id';
-COMMENT ON COLUMN glossary_term_domain_rel.deleted_at IS 'retirement time in epoch milliseconds, advanced past retained generations to avoid collisions, 0 means live';
-
 CREATE TABLE IF NOT EXISTS domain_member_rel (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT 'Membership row ID',
     metalake_id BIGINT NOT NULL COMMENT 'Owning metalake ID',
     domain_id BIGINT NOT NULL COMMENT 'Domain ID',
     member_type VARCHAR(64) NOT NULL COMMENT 'GLOSSARY_TERM or KNOWLEDGE_BASE_ARTICLE',
     member_id BIGINT NOT NULL COMMENT 'Stable member ID',
-    current_version INT NOT NULL DEFAULT 1 COMMENT 'Current row version',
-    last_version INT NOT NULL DEFAULT 1 COMMENT 'Last row version',
+    current_version INT NOT NULL DEFAULT 1 COMMENT 'Current membership row version, initialized to 1 on each attachment',
+    last_version INT NOT NULL DEFAULT 1 COMMENT 'Last membership row version, initialized to 1 on each attachment',
     audit_info CLOB NOT NULL COMMENT 'Audit information',
     deleted_at BIGINT NOT NULL DEFAULT 0 COMMENT 'Soft deletion time in milliseconds, zero for live rows',
     CONSTRAINT uk_domain_member UNIQUE (member_type, member_id, domain_id, deleted_at)
@@ -512,15 +496,3 @@ CREATE TABLE IF NOT EXISTS domain_member_rel (
 CREATE INDEX IF NOT EXISTS idx_domain_members ON domain_member_rel (domain_id, deleted_at, member_type, member_id);
 CREATE INDEX IF NOT EXISTS idx_domain_member_metalake ON domain_member_rel (metalake_id, deleted_at);
 CREATE INDEX IF NOT EXISTS idx_domain_member_deleted ON domain_member_rel (deleted_at, id);
-
--- Preserve live memberships and retired generations from the earlier Glossary schema.
-INSERT INTO domain_member_rel (metalake_id, domain_id, member_type, member_id, audit_info, deleted_at)
-SELECT r.metalake_id, r.domain_id, 'GLOSSARY_TERM', r.term_id, COALESCE(t.audit_info, '{}'), r.deleted_at
-FROM glossary_term_domain_rel r
-LEFT JOIN glossary_term_meta t ON t.term_id = r.term_id AND t.metalake_id = r.metalake_id
-WHERE NOT EXISTS (
-    SELECT 1 FROM domain_member_rel m
-    WHERE m.member_type = 'GLOSSARY_TERM' AND m.member_id = r.term_id
-      AND m.domain_id = r.domain_id AND m.metalake_id = r.metalake_id AND m.deleted_at = r.deleted_at
-);
-DROP TABLE glossary_term_domain_rel;

@@ -78,6 +78,14 @@ public class DomainMemberBaseSQLProvider {
     return "SELECT COALESCE(MAX(deleted_at), 0) FROM domain_member_rel WHERE metalake_id=#{lake}";
   }
 
+  /** Retires all live pairs for a locked definition. */
+  public String retireMember() {
+    return """
+      UPDATE domain_member_rel SET deleted_at=#{now}
+      WHERE metalake_id=#{lake} AND member_type=#{type} AND member_id=#{member} AND deleted_at=0
+      """;
+  }
+
   /** Retires all live pairs in the locked metalake. */
   public String retireMetalake() {
     return "UPDATE domain_member_rel SET deleted_at=#{now} WHERE metalake_id=#{lake} AND deleted_at=0";

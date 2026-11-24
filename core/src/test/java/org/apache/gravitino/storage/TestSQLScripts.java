@@ -61,11 +61,6 @@ public class TestSQLScripts extends TestJDBCBackend {
       dropAllTables();
       executeScript(scripts.resolve("schema-" + initialVersion + suffix).toFile());
       if (initialVersion.equals("1.3.0")) {
-        executeStatements(
-            List.of(
-                "CREATE TABLE glossary_term_domain_rel (metalake_id BIGINT NOT NULL, term_id BIGINT NOT NULL, domain_id BIGINT NOT NULL, deleted_at BIGINT NOT NULL, PRIMARY KEY(term_id, domain_id, deleted_at))",
-                "INSERT INTO glossary_term_domain_rel VALUES (110,111,211,0),(110,111,211,123)"),
-            "existing Glossary membership");
         executeScript(upgrade);
         executeScript(upgrade);
       }
@@ -88,17 +83,6 @@ public class TestSQLScripts extends TestJDBCBackend {
             indexes.contains("domain_member_rel:idx_domain_member_deleted:2:id:true"),
             indexes.toString());
 
-        if (initialVersion.equals("1.3.0")) {
-          try (ResultSet migrated =
-              statement.executeQuery(
-                  "SELECT deleted_at FROM domain_member_rel WHERE metalake_id=110 AND member_type='GLOSSARY_TERM' AND member_id=111 AND domain_id=211 ORDER BY deleted_at")) {
-            Assertions.assertTrue(migrated.next());
-            Assertions.assertEquals(0, migrated.getLong(1));
-            Assertions.assertTrue(migrated.next());
-            Assertions.assertEquals(123, migrated.getLong(1));
-            Assertions.assertFalse(migrated.next());
-          }
-        }
         statement.executeUpdate("INSERT INTO glossary_hierarchy_lock (metalake_id) VALUES (100)");
         Assertions.assertThrows(
             SQLException.class,

@@ -506,7 +506,7 @@ public class DomainMetaService {
   }
 
   /**
-   * Hard-deletes the domains and the parent edges soft-deleted before the given time.
+   * Hard-deletes domains, parent edges and shared memberships soft-deleted before the given time.
    *
    * @param legacyTimeline The time before which soft-deleted rows are removed.
    * @param limit The maximum number of rows to remove from each table.

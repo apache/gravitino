@@ -51,11 +51,13 @@ public interface DomainMemberMapper {
   boolean hasMembers(@Param("domain") long domain);
 
   /** Loads the complete Domain set of one typed member. */
+  @Options(useCache = false, flushCache = Options.FlushCachePolicy.TRUE)
   @SelectProvider(type = DomainMemberSQLProviderFactory.class, method = "domains")
   List<Long> domains(
       @Param("lake") long lake, @Param("type") MemberType type, @Param("member") long member);
 
   /** Loads memberships of one feature for a metalake snapshot. */
+  @Options(useCache = false, flushCache = Options.FlushCachePolicy.TRUE)
   @SelectProvider(type = DomainMemberSQLProviderFactory.class, method = "list")
   @ConstructorArgs({
     @Arg(column = "member_type", javaType = MemberType.class),
@@ -65,6 +67,7 @@ public interface DomainMemberMapper {
   List<Membership> list(@Param("lake") long lake, @Param("type") MemberType type);
 
   /** Lists direct members in stable order across both features. */
+  @Options(useCache = false, flushCache = Options.FlushCachePolicy.TRUE)
   @SelectProvider(type = DomainMemberSQLProviderFactory.class, method = "members")
   @ConstructorArgs({
     @Arg(column = "member_type", javaType = MemberType.class),
@@ -86,16 +89,6 @@ public interface DomainMemberMapper {
       @Param("domain") long domain,
       @Param("audit") String audit);
 
-  /** Retires one live typed membership without colliding with a retained generation. */
-  default void remove(long lake, MemberType type, long member, long domain, long now) {
-    retire(
-        lake,
-        type,
-        member,
-        domain,
-        Math.max(now, Math.addExact(lastRetirement(lake, type, member), 1)));
-  }
-
   /** Returns the latest retirement for the locked member. */
   @Options(useCache = false, flushCache = Options.FlushCachePolicy.TRUE)
   @SelectProvider(type = DomainMemberSQLProviderFactory.class, method = "lastRetirement")
@@ -111,10 +104,13 @@ public interface DomainMemberMapper {
       @Param("domain") long domain,
       @Param("now") long now);
 
-  /** Retires the memberships of all definitions under the exclusive metalake fence. */
-  default void dropMetalake(long lake, long now) {
-    retireMetalake(lake, Math.max(now, Math.addExact(lastMetalakeRetirement(lake), 1)));
-  }
+  /** Retires all live memberships of one locked definition. */
+  @UpdateProvider(type = DomainMemberSQLProviderFactory.class, method = "retireMember")
+  void retireMember(
+      @Param("lake") long lake,
+      @Param("type") MemberType type,
+      @Param("member") long member,
+      @Param("now") long now);
 
   /** Returns the latest retained generation for a metalake. */
   @Options(useCache = false, flushCache = Options.FlushCachePolicy.TRUE)
