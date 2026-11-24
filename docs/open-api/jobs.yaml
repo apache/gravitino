@@ -134,6 +134,15 @@ paths:
           $ref: "./openapi.yaml#/components/responses/DropResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "409":
+          description: Conflict - The job template has active (queued, started or cancelling) jobs associated with it
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                JobTemplateInUseException:
+                  $ref: "#/components/examples/JobTemplateInUseException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -213,7 +222,7 @@ paths:
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "404":
-          description: Not Found - The specified metalake does not exist
+          description: Not Found - The specified metalake does not exist, or the job template specified by `jobTemplateName` does not exist
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -221,6 +230,8 @@ paths:
               examples:
                 NoSuchMetalakeException:
                   $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchJobTemplateException:
+                  $ref: "#/components/examples/NoSuchJobTemplateException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -232,7 +243,7 @@ paths:
       description: Runs a job based on the specified job template in the specified metalake
       requestBody:
         content:
-          application/json:
+          application/vnd.gravitino.v1+json:
             schema:
               $ref: "#/components/requests/JobRunRequest"
             examples:
@@ -253,7 +264,7 @@ paths:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
               examples:
-                JobTemplateAlreadyExistsException:
+                NoSuchJobTemplateException:
                   $ref: "#/components/examples/NoSuchJobTemplateException"
         "400":
           description: Bad Request - The job cannot be launched by the job executor, for example, a required job executor configuration is missing
@@ -367,11 +378,10 @@ components:
     jobTemplateName:
       name: jobTemplateName
       in: query
-      description: list the jobs by the job template name
+      description: List the jobs of the specified job template. If omitted, all the jobs in the metalake are listed. An empty value is rejected as an invalid name.
       required: false
       schema:
         type: string
-        default: ""
     includeOutput:
       name: includeOutput
       in: query
@@ -1193,6 +1203,17 @@ components:
         "message": "Failed to operate job template(s) [my_job] operation [GET] under metalake [my_test_metalake], reason [NoSuchJobTemplateException]",
         "stack": [
           "org.apache.gravitino.exceptions.NoSuchJobTemplateException: Job template xxx does not exist",
+          "..."
+        ]
+      }
+
+    JobTemplateInUseException:
+      value: {
+        "code": 1010,
+        "type": "InUseException",
+        "message": "Failed to operate job template(s) [my_job] operation [DELETE] under object [my_test_metalake], reason [Job template my_job under metalake my_test_metalake has active jobs associated with it]",
+        "stack": [
+          "org.apache.gravitino.exceptions.InUseException: Job template my_job under metalake my_test_metalake has active jobs associated with it",
           "..."
         ]
       }
