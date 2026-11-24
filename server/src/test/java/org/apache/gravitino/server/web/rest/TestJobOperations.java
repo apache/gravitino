@@ -396,6 +396,58 @@ public class TestJobOperations extends JerseyTest {
   }
 
   @Test
+  public void testRegisterJobTemplateRejectsNullElementsAndValues() {
+    String nullArgument =
+        "{\"jobTemplate\": {\"jobType\": \"shell\", \"name\": \"t1\","
+            + " \"executable\": \"/bin/echo\", \"arguments\": [\"a\", null, \"b\"]}}";
+    assertJobTemplateRequestRejected(
+        target(jobTemplatePath())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(nullArgument, APPLICATION_JSON_TYPE)),
+        "\"arguments\" must not contain null elements, found one at index 1");
+
+    String nullEnvironment =
+        "{\"jobTemplate\": {\"jobType\": \"shell\", \"name\": \"t1\","
+            + " \"executable\": \"/bin/echo\", \"environments\": {\"Z\": null}}}";
+    assertJobTemplateRequestRejected(
+        target(jobTemplatePath())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(nullEnvironment, APPLICATION_JSON_TYPE)),
+        "\"environments\" must not contain null values, found one for key \"Z\"");
+
+    verify(jobOperationDispatcher, never()).registerJobTemplate(any(), any());
+  }
+
+  @Test
+  public void testAlterJobTemplateRejectsNullElementsAndValues() {
+    String nullArgument =
+        "{\"updates\": [{\"@type\": \"updateTemplate\", \"newTemplate\":"
+            + " {\"@type\": \"shell\", \"newArguments\": [\"a\", null]}}]}";
+    assertJobTemplateRequestRejected(
+        target(jobTemplatePath())
+            .path("shell_template_1")
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(nullArgument, APPLICATION_JSON_TYPE)),
+        "\"newArguments\" must not contain null elements, found one at index 1");
+
+    String nullConfig =
+        "{\"updates\": [{\"@type\": \"updateTemplate\", \"newTemplate\":"
+            + " {\"@type\": \"spark\", \"newConfigs\": {\"spark.master\": null}}}]}";
+    assertJobTemplateRequestRejected(
+        target(jobTemplatePath())
+            .path("spark_template_1")
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(nullConfig, APPLICATION_JSON_TYPE)),
+        "\"newConfigs\" must not contain null values, found one for key \"spark.master\"");
+
+    verify(jobOperationDispatcher, never()).alterJobTemplate(any(), any(), any());
+  }
+
+  @Test
   public void testGetJobTemplate() {
     JobTemplateEntity template =
         newShellJobTemplateEntity("shell_template_1", "Test Shell Template 1");
@@ -1755,5 +1807,17 @@ public class TestJobOperations extends JerseyTest {
         .withStartedAt(startedAt)
         .withFinishedAt(finishedAt)
         .build();
+  }
+
+  private static void assertJobTemplateRequestRejected(Response resp, String expectedMessage) {
+    try (Response response = resp) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(
+          error.getMessage().contains(expectedMessage),
+          () -> "Unexpected error message: " + error.getMessage());
+    }
   }
 }

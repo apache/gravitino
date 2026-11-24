@@ -236,6 +236,9 @@ public interface JobTemplateChange {
      * @param builder The builder to construct the TemplateUpdate.
      */
     protected TemplateUpdate(BaseBuilder<?, ?> builder) {
+      JobTemplateValidations.checkNoNullElements("newArguments", builder.newArguments);
+      JobTemplateValidations.checkNoNullEntries("newEnvironments", builder.newEnvironments);
+      JobTemplateValidations.checkNoNullEntries("newCustomFields", builder.newCustomFields);
       this.newExecutable = builder.newExecutable;
       this.newArguments = builder.newArguments;
       this.newEnvironments = builder.newEnvironments;
@@ -383,6 +386,7 @@ public interface JobTemplateChange {
 
     private ShellTemplateUpdate(Builder builder) {
       super(builder);
+      JobTemplateValidations.checkNoNullElements("newScripts", builder.newScripts);
       this.newScripts = builder.newScripts;
     }
 
@@ -483,6 +487,10 @@ public interface JobTemplateChange {
 
     private SparkTemplateUpdate(Builder builder) {
       super(builder);
+      JobTemplateValidations.checkNoNullElements("newJars", builder.newJars);
+      JobTemplateValidations.checkNoNullElements("newFiles", builder.newFiles);
+      JobTemplateValidations.checkNoNullElements("newArchives", builder.newArchives);
+      JobTemplateValidations.checkNoNullEntries("newConfigs", builder.newConfigs);
       this.newClassName = builder.newClassName;
       this.newJars = builder.newJars;
       this.newFiles = builder.newFiles;

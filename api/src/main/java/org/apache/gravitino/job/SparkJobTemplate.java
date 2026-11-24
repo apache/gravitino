@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.job;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -289,10 +287,10 @@ public class SparkJobTemplate extends JobTemplate {
     protected void validate() {
       super.validate();
 
-      this.jars = jars != null ? ImmutableList.copyOf(jars) : ImmutableList.of();
-      this.files = files != null ? ImmutableList.copyOf(files) : ImmutableList.of();
-      this.archives = archives != null ? ImmutableList.copyOf(archives) : ImmutableList.of();
-      this.configs = configs != null ? ImmutableMap.copyOf(configs) : ImmutableMap.of();
+      this.jars = JobTemplateValidations.immutableListCopy("jars", jars);
+      this.files = JobTemplateValidations.immutableListCopy("files", files);
+      this.archives = JobTemplateValidations.immutableListCopy("archives", archives);
+      this.configs = JobTemplateValidations.immutableMapCopy("configs", configs);
     }
   }
 }

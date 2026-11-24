@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.job;
 
-import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Objects;
 
@@ -141,7 +140,7 @@ public class ShellJobTemplate extends JobTemplate {
     protected void validate() {
       super.validate();
 
-      this.scripts = scripts != null ? ImmutableList.copyOf(scripts) : ImmutableList.of();
+      this.scripts = JobTemplateValidations.immutableListCopy("scripts", scripts);
     }
   }
 }
