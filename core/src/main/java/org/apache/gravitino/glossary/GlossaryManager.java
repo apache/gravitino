@@ -109,6 +109,14 @@ public final class GlossaryManager {
         ids, authorizationEnabled, handler, readable.and(visibility), depthLimit);
   }
 
+  boolean canProject(GlossaryTermEntity term, GlossaryAccess access) {
+    return access.canRead(term) && readable.test(term);
+  }
+
+  GlossaryAccess access(String metalake) {
+    return GlossaryAccess.forRequest(metalake, authorizationEnabled);
+  }
+
   /** Selects the direction of a hierarchy walk or the symmetric direct related terms. */
   public enum Direction {
     /** Follow child-to-parent edges. */
@@ -137,51 +145,57 @@ public final class GlossaryManager {
     Preconditions.checkArgument(
         direction != Direction.RELATED || !transitive, "RELATED is not transitive");
     return SqlSessions.readSnapshot(
-        () -> {
-          NameIdentifier ident = NameIdentifierUtil.ofGlossaryTerm(metalake, name);
-          long lake = termReadMetalakeId(ident);
-          GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
-          GlossaryTermEntity root = loadRootForView(ident, lake, access);
-          Predicate<GlossaryTermEntity> visible =
-              term ->
-                  (status == null || status == term.status())
-                      && access.canRead(term)
-                      && readable.test(term);
-          if (!visible.test(root)) {
-            throw missingRelationRoot(ident);
-          }
-          List<GlossaryTermEntity> result = new ArrayList<>();
-          Set<Long> seen = new HashSet<>(Set.of(root.id()));
-          Set<Long> frontier = Set.of(root.id());
-          do {
-            Set<Long> next = new LinkedHashSet<>();
-            List<GlossaryTermRelPO> links =
-                switch (direction) {
-                  case BROADER -> edges.listBroaderEdges(lake, frontier);
-                  case NARROWER -> edges.listNarrowerEdges(lake, frontier);
-                  case RELATED -> edges.listRelatedEdges(lake, frontier);
-                };
-            for (GlossaryTermRelPO link : links) {
-              long id =
-                  direction == Direction.NARROWER
-                          || (direction == Direction.RELATED
-                              && link.getToTermId().equals(root.id()))
-                      ? link.getFromTermId()
-                      : link.getToTermId();
-              if (seen.add(id)) {
-                next.add(id);
-              }
-            }
-            frontier = new LinkedHashSet<>();
-            for (GlossaryTermEntity term : terms.getByIds(root.namespace(), lake, next)) {
-              if (visible.test(term)) {
-                result.add(term);
-                frontier.add(term.id());
-              }
-            }
-          } while (transitive && !frontier.isEmpty());
-          return visibleDomains(result, access);
-        });
+        () -> listRelationsInSnapshot(metalake, name, direction, transitive, status));
+  }
+
+  List<GlossaryTermEntity> listRelationsInSnapshot(
+      String metalake,
+      String name,
+      Direction direction,
+      boolean transitive,
+      @Nullable GlossaryTerm.Status status) {
+    NameIdentifier ident = NameIdentifierUtil.ofGlossaryTerm(metalake, name);
+    long lake = termReadMetalakeId(ident);
+    GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
+    GlossaryTermEntity root = loadRootForView(ident, lake, access);
+    Predicate<GlossaryTermEntity> visible =
+        term ->
+            (status == null || status == term.status())
+                && access.canRead(term)
+                && readable.test(term);
+    if (!visible.test(root)) {
+      throw missingRelationRoot(ident);
+    }
+    List<GlossaryTermEntity> result = new ArrayList<>();
+    Set<Long> seen = new HashSet<>(Set.of(root.id()));
+    Set<Long> frontier = Set.of(root.id());
+    do {
+      Set<Long> next = new LinkedHashSet<>();
+      List<GlossaryTermRelPO> links =
+          switch (direction) {
+            case BROADER -> edges.listBroaderEdges(lake, frontier);
+            case NARROWER -> edges.listNarrowerEdges(lake, frontier);
+            case RELATED -> edges.listRelatedEdges(lake, frontier);
+          };
+      for (GlossaryTermRelPO link : links) {
+        long id =
+            direction == Direction.NARROWER
+                    || (direction == Direction.RELATED && link.getToTermId().equals(root.id()))
+                ? link.getFromTermId()
+                : link.getToTermId();
+        if (seen.add(id)) {
+          next.add(id);
+        }
+      }
+      frontier = new LinkedHashSet<>();
+      for (GlossaryTermEntity term : terms.getByIds(root.namespace(), lake, next)) {
+        if (visible.test(term)) {
+          result.add(term);
+          frontier.add(term.id());
+        }
+      }
+    } while (transitive && !frontier.isEmpty());
+    return visibleDomains(result, access);
   }
 
   /**
@@ -212,29 +226,30 @@ public final class GlossaryManager {
       all.removeIf(term -> !readable.test(term));
       return all;
     }
-    return SqlSessions.readSnapshot(
-        () -> {
-          long metalakeId;
-          try {
-            metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
-          } catch (NoSuchEntityException missing) {
-            throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", metalake);
-          }
-          GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
-          if (!access.canView()) {
-            return new ArrayList<>();
-          }
-          Namespace ns = NamespaceUtil.ofGlossaryTerm(metalake);
-          List<GlossaryTermEntity> result;
-          if (domain == null) {
-            result = terms.list(ns, metalakeId);
-          } else {
-            Set<Long> scope = domainScope(metalake, metalakeId, domain, access);
-            result = terms.getByIds(ns, metalakeId, DOMAINS.termIds(metalakeId, scope));
-          }
-          result.removeIf(term -> !access.canRead(term) || !readable.test(term));
-          return visibleDomains(result, access);
-        });
+    return SqlSessions.readSnapshot(() -> listTermsInSnapshot(metalake, domain));
+  }
+
+  List<GlossaryTermEntity> listTermsInSnapshot(String metalake, @Nullable String domain) {
+    long metalakeId;
+    try {
+      metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+    } catch (NoSuchEntityException missing) {
+      throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", metalake);
+    }
+    GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
+    if (!access.canView()) {
+      return new ArrayList<>();
+    }
+    Namespace ns = NamespaceUtil.ofGlossaryTerm(metalake);
+    List<GlossaryTermEntity> result;
+    if (domain == null) {
+      result = terms.list(ns, metalakeId);
+    } else {
+      Set<Long> scope = domainScope(metalake, metalakeId, domain, access);
+      result = terms.getByIds(ns, metalakeId, DOMAINS.termIds(metalakeId, scope));
+    }
+    result.removeIf(term -> !access.canRead(term) || !readable.test(term));
+    return visibleDomains(result, access);
   }
 
   /**
@@ -249,16 +264,18 @@ public final class GlossaryManager {
     if (!authorizationEnabled) {
       return requireVisible(ident, relationRoot(ident).term());
     }
-    return SqlSessions.readSnapshot(
-        () -> {
-          long lake = termReadMetalakeId(ident);
-          GlossaryAccess access = GlossaryAccess.forRequest(metalake, true);
-          GlossaryTermEntity term = loadRootForView(ident, lake, access);
-          if (!access.canRead(term)) {
-            throw missingRelationRoot(ident);
-          }
-          return visibleDomains(requireVisible(ident, term), access);
-        });
+    return SqlSessions.readSnapshot(() -> getTermInSnapshot(metalake, name));
+  }
+
+  GlossaryTermEntity getTermInSnapshot(String metalake, String name) {
+    NameIdentifier ident = NameIdentifierUtil.ofGlossaryTerm(metalake, name);
+    long lake = termReadMetalakeId(ident);
+    GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
+    GlossaryTermEntity term = loadRootForView(ident, lake, access);
+    if (!access.canRead(term)) {
+      throw missingRelationRoot(ident);
+    }
+    return visibleDomains(requireVisible(ident, term), access);
   }
 
   /**

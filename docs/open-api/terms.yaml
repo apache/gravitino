@@ -1,0 +1,616 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+---
+
+paths:
+  "/metalakes/{metalake}/terms":
+    parameters:
+      - $ref: ./openapi.yaml#/components/parameters/metalake
+    get:
+      operationId: listTerms
+      tags:
+        - glossary
+      summary: List glossary terms
+      description: Lists terms visible to the caller. Domain and status filters also
+        apply to detailed results.
+      parameters:
+        - in: query
+          name: details
+          description: Return term definitions and visible relations.
+          schema:
+            type: boolean
+            default: false
+        - in: query
+          name: domain
+          description: Include terms in the domain and its visible subdomains.
+          schema:
+            type: string
+        - in: query
+          name: nameContains
+          description: Case-insensitive substring of the term name.
+          schema:
+            type: string
+        - in: query
+          name: status
+          description: Apply this status to roots and nested terms. A named root excluded
+            by the filter returns 404.
+          schema:
+            $ref: "#/components/schemas/TermStatus"
+      responses:
+        "200":
+          description: Successful glossary operation.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                oneOf:
+                  - $ref: ./openapi.yaml#/components/schemas/NameListResponse
+                  - $ref: "#/components/schemas/TermListResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        5XX:
+          $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+    post:
+      operationId: createTerm
+      tags:
+        - glossary
+      summary: Create a glossary term
+      description: Creates the definition, memberships and relations atomically.
+        Status defaults to APPROVED. Requires CREATE_DEFINITION and access to
+        each requested domain.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TermCreateRequest"
+      responses:
+        "200":
+          description: Successful glossary operation.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/TermResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        5XX:
+          $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+  "/metalakes/{metalake}/terms/{term}":
+    parameters:
+      - $ref: ./openapi.yaml#/components/parameters/metalake
+      - name: term
+        in: path
+        required: true
+        description: Term name. Encode a slash in the name as %2F.
+        schema:
+          type: string
+    get:
+      operationId: getTerm
+      tags:
+        - glossary
+      summary: Get a glossary term
+      description: Returns the definition and its visible direct broader, narrower and
+        related terms.
+      parameters:
+        - in: query
+          name: status
+          description: Apply this status to roots and nested terms. A named root excluded
+            by the filter returns 404.
+          schema:
+            $ref: "#/components/schemas/TermStatus"
+      responses:
+        "200":
+          description: Successful glossary operation.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/TermResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        5XX:
+          $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+    put:
+      operationId: alterTerm
+      tags:
+        - glossary
+      summary: Alter a glossary term
+      description: Applies all edits in order in one transaction. A matching no-op
+        preserves the revision. A stale expectedRevision returns 409. Clearing a
+        definition or source reference requires an explicit null.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TermUpdatesRequest"
+      responses:
+        "200":
+          description: Successful glossary operation.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/TermResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        5XX:
+          $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+    delete:
+      operationId: dropTerm
+      tags:
+        - glossary
+      summary: Drop a glossary term
+      description: Returns dropped=false for an absent or hidden term. Deleting a
+        visible term requires MANAGE_DEFINITIONS.
+      responses:
+        "200":
+          $ref: ./openapi.yaml#/components/responses/DropResponse
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        5XX:
+          $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+  "/metalakes/{metalake}/terms/{term}/hierarchy":
+    parameters:
+      - $ref: ./openapi.yaml#/components/parameters/metalake
+      - name: term
+        in: path
+        required: true
+        description: Term name. Encode a slash in the name as %2F.
+        schema:
+          type: string
+    get:
+      operationId: getTermHierarchy
+      tags:
+        - glossary
+      summary: Get the glossary term hierarchy
+      description: Returns each reachable term once, excluding the root. Traversal
+        stops at hidden or filtered nodes.
+      parameters:
+        - in: query
+          name: direction
+          description: Walk ancestors or descendants.
+          schema:
+            type: string
+            enum:
+              - BROADER
+              - NARROWER
+            default: NARROWER
+        - in: query
+          name: status
+          description: Apply this status to roots and nested terms. A named root excluded
+            by the filter returns 404.
+          schema:
+            $ref: "#/components/schemas/TermStatus"
+      responses:
+        "200":
+          description: Successful glossary operation.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/TermTreeResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        5XX:
+          $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+components:
+  schemas:
+    TermStatus:
+      type: string
+      enum:
+        - DRAFT
+        - APPROVED
+        - DEPRECATED
+    TermLink:
+      type: object
+      required:
+        - url
+      properties:
+        label:
+          type: string
+          nullable: true
+        url:
+          type: string
+          format: uri
+          description: An absolute HTTP or HTTPS URL.
+    TermCreateRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        definition:
+          type: string
+          nullable: true
+        synonyms:
+          type: array
+          items:
+            type: string
+        status:
+          description: Omit to create an APPROVED term.
+          allOf:
+            - $ref: "#/components/schemas/TermStatus"
+        domains:
+          type: array
+          items:
+            type: string
+        broader:
+          type: array
+          items:
+            type: string
+        related:
+          type: array
+          items:
+            type: string
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/TermLink"
+        sourceRef:
+          type: string
+          nullable: true
+        properties:
+          type: object
+          additionalProperties:
+            type: string
+    Term:
+      type: object
+      required:
+        - name
+        - status
+        - revisionToken
+        - version
+        - audit
+        - synonyms
+        - links
+        - properties
+        - domains
+        - broader
+        - narrower
+        - related
+      properties:
+        name:
+          type: string
+        definition:
+          type: string
+          nullable: true
+        synonyms:
+          type: array
+          items:
+            type: string
+        status:
+          $ref: "#/components/schemas/TermStatus"
+        domains:
+          type: array
+          items:
+            type: string
+        broader:
+          type: array
+          items:
+            type: string
+        related:
+          type: array
+          items:
+            type: string
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/TermLink"
+        sourceRef:
+          type: string
+          nullable: true
+        properties:
+          type: object
+          additionalProperties:
+            type: string
+        narrower:
+          type: array
+          items:
+            type: string
+        owner:
+          type: object
+          nullable: true
+          properties:
+            name:
+              type: string
+            type:
+              type: string
+              enum:
+                - user
+                - group
+          required:
+            - name
+            - type
+        audit:
+          $ref: ./openapi.yaml#/components/schemas/Audit
+        version:
+          type: integer
+          format: int64
+        revisionToken:
+          type: string
+          description: Opaque identity and revision to copy into expectedRevision for
+            conditional edits.
+    TermResponse:
+      type: object
+      required:
+        - code
+        - term
+      properties:
+        code:
+          type: integer
+          enum:
+            - 0
+        term:
+          $ref: "#/components/schemas/Term"
+    TermListResponse:
+      type: object
+      required:
+        - code
+        - terms
+      properties:
+        code:
+          type: integer
+          enum:
+            - 0
+        terms:
+          type: array
+          items:
+            $ref: "#/components/schemas/Term"
+    TermTreeResponse:
+      description: Distinct visible ancestors or descendants, excluding the root.
+        Direct relation names in each snapshot identify edges in the hierarchy.
+      allOf:
+        - $ref: "#/components/schemas/TermListResponse"
+    TermUpdatesRequest:
+      type: object
+      required:
+        - updates
+      properties:
+        expectedRevision:
+          type: string
+          description: Opaque revisionToken from a prior read. A stale token returns HTTP
+            409.
+        updates:
+          type: array
+          items:
+            oneOf:
+              - type: object
+                required:
+                  - "@type"
+                  - newName
+                properties:
+                  "@type":
+                    type: string
+                    enum:
+                      - rename
+                  newName:
+                    type: string
+              - type: object
+                required:
+                  - "@type"
+                  - newDefinition
+                properties:
+                  "@type":
+                    type: string
+                    enum:
+                      - updateDefinition
+                  newDefinition:
+                    type: string
+                    nullable: true
+              - type: object
+                required:
+                  - "@type"
+                  - status
+                properties:
+                  "@type":
+                    type: string
+                    enum:
+                      - setStatus
+                  status:
+                    $ref: "#/components/schemas/TermStatus"
+              - type: object
+                required:
+                  - "@type"
+                  - synonym
+                properties:
+                  "@type":
+                    type: string
+                    enum:
+                      - addSynonym
+                  synonym:
+                    type: string
+              - type: object
+                required:
+                  - "@type"
+                  - synonym
+                properties:
+                  "@type":
+                    type: string
+                    enum:
+                      - removeSynonym
+                  synonym:
+                    type: string
+              - type: object
+                required:
+                  - "@type"
+                  - domain
+                properties:
+                  "@type":
+                    type: string
+                    enum:
+                      - addDomain
+                  domain:
+                    type: string
+              - type: object
+                required:
+                  - "@type"
+                  - domain
+                properties:
+                  "@type":
+                    type: string
+                    enum:
+                      - removeDomain
+                  domain:
+                    type: string
+              - type: object
+                required:
+                  - "@type"
+                  - broader
+                properties:
+                  "@type":
+                    type: string
+                    enum:
+                      - addBroader
+                  broader:
+                    type: string
+              - type: object
+                required:
+                  - "@type"
+                  - broader
+                properties:
+                  "@type":
+                    type: string
+                    enum:
+                      - removeBroader
+                  broader:
+                    type: string
+              - type: object
+                required:
+                  - "@type"
+                  - related
+                properties:
+                  "@type":
+                    type: string
+                    enum:
+                      - addRelated
+                  related:
+                    type: string
+              - type: object
+                required:
+                  - "@type"
+                  - related
+                properties:
+                  "@type":
+                    type: string
+                    enum:
+                      - removeRelated
+                  related:
+                    type: string
+              - type: object
+                required:
+                  - "@type"
+                  - links
+                properties:
+                  "@type":
+                    type: string
+                    enum:
+                      - updateLinks
+                  links:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TermLink"
+              - type: object
+                required:
+                  - "@type"
+                  - sourceRef
+                properties:
+                  "@type":
+                    type: string
+                    enum:
+                      - setSourceRef
+                  sourceRef:
+                    type: string
+                    nullable: true
+              - type: object
+                required:
+                  - "@type"
+                  - property
+                  - value
+                properties:
+                  "@type":
+                    type: string
+                    enum:
+                      - setProperty
+                  property:
+                    type: string
+                  value:
+                    type: string
+              - type: object
+                required:
+                  - "@type"
+                  - property
+                properties:
+                  "@type":
+                    type: string
+                    enum:
+                      - removeProperty
+                  property:
+                    type: string
+          minItems: 1
+  responses:
+    InvalidRequest:
+      description: Invalid request, filter, hierarchy direction or glossary change.
+      content:
+        application/json:
+          schema:
+            $ref: ./openapi.yaml#/components/schemas/ErrorModel
+    Forbidden:
+      description: The caller lacks the required privilege.
+      content:
+        application/json:
+          schema:
+            $ref: ./openapi.yaml#/components/schemas/ErrorModel
+    NotFound:
+      description: The named resource is missing or hidden.
+      content:
+        application/json:
+          schema:
+            $ref: ./openapi.yaml#/components/schemas/ErrorModel
+    Conflict:
+      description: The name or source reference already exists, or the expected
+        revision is stale.
+      content:
+        application/json:
+          schema:
+            $ref: ./openapi.yaml#/components/schemas/ErrorModel

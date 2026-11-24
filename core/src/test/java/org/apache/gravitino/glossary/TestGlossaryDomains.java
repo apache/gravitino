@@ -33,6 +33,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -63,11 +64,13 @@ import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.domain.DomainChange;
 import org.apache.gravitino.domain.DomainDispatcher;
 import org.apache.gravitino.domain.DomainManager;
+import org.apache.gravitino.dto.glossary.TermDTO;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.apache.gravitino.exceptions.NonEmptyDomainException;
 import org.apache.gravitino.exceptions.TermAlreadyExistsException;
+import org.apache.gravitino.exceptions.TermVersionConflictException;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.server.authorization.DomainAuthzHelper;
@@ -194,6 +197,85 @@ class TestGlossaryDomains extends TestJDBCBackend {
     GlossaryTermEntity term = as("lakeOwner", () -> manager.getTerm(LAKE, "Churn"));
     assertArrayEquals(new String[] {"Retail", "Sales"}, term.domains());
     assertEquals(1, term.version());
+  }
+
+  @TestTemplate
+  void testTermResponseSnapshot() throws Exception {
+    GlossaryTermViews views = new GlossaryTermViews(manager);
+    GlossaryTermViews approved = views.withStatus(GlossaryTerm.Status.APPROVED);
+    GlossaryTermEntity leaf = create("Leaf", "Sales", "Finance");
+    as("lakeOwner", () -> transfer(leaf, "writer"));
+    as(
+        "lakeOwner",
+        () -> {
+          views.create(LAKE, TermSpec.builder("Root").build());
+          views.create(
+              LAKE, TermSpec.builder("Peer").withStatus(GlossaryTerm.Status.DEPRECATED).build());
+          views.create(
+              LAKE,
+              TermSpec.builder("Middle")
+                  .withStatus(GlossaryTerm.Status.DRAFT)
+                  .withBroader("Root")
+                  .build());
+          TermDTO result =
+              views.alter(
+                  LAKE,
+                  "Leaf",
+                  leaf.revisionToken(),
+                  new TermChange[] {
+                    TermChange.addBroader("Middle"), TermChange.addRelated("Peer")
+                  });
+          assertArrayEquals(new String[] {"Middle"}, result.getBroader());
+          assertEquals("writer", result.getOwner().name());
+          assertThrows(
+              TermVersionConflictException.class,
+              () ->
+                  views.alter(
+                      LAKE,
+                      "Leaf",
+                      leaf.revisionToken(),
+                      new TermChange[] {TermChange.rename("Gone")}));
+          assertEquals(2, views.hierarchy(LAKE, "Root", GlossaryManager.Direction.NARROWER).length);
+          assertEquals(
+              0, approved.hierarchy(LAKE, "Root", GlossaryManager.Direction.NARROWER).length);
+          assertThrows(NoSuchTermException.class, () -> approved.get(LAKE, "Middle"));
+          assertThrows(
+              NoSuchTermException.class,
+              () -> approved.hierarchy(LAKE, "Middle", GlossaryManager.Direction.BROADER));
+          assertEquals(0, approved.get(LAKE, "Leaf").getBroader().length);
+          assertArrayEquals(new String[] {"Peer"}, result.getRelated());
+          assertEquals(0, approved.get(LAKE, "Leaf").getRelated().length);
+          assertEquals(0, approved.get(LAKE, "Root").getNarrower().length);
+          assertFalse(Arrays.asList(approved.names(LAKE, null, null)).contains("Middle"));
+          return null;
+        });
+    as(
+        "writer",
+        () -> {
+          String[] visible = {"Sales"};
+          assertArrayEquals(
+              visible,
+              views
+                  .create(
+                      LAKE,
+                      TermSpec.builder("Child").withDomains("Sales").withBroader("Leaf").build())
+                  .getDomains());
+          assertArrayEquals(visible, views.get(LAKE, "Leaf").getDomains());
+          assertArrayEquals(visible, views.list(LAKE, "Sales", "eAF")[0].getDomains());
+          assertArrayEquals(
+              visible,
+              views.hierarchy(LAKE, "Child", GlossaryManager.Direction.BROADER)[0].getDomains());
+          assertArrayEquals(
+              visible,
+              views
+                  .alter(
+                      LAKE, "Leaf", null, new TermChange[] {TermChange.updateDefinition("changed")})
+                  .getDomains());
+          return null;
+        });
+    assertArrayEquals(
+        new String[] {"Finance", "Sales"},
+        as("lakeOwner", () -> views.get(LAKE, "Leaf")).getDomains());
   }
 
   /** T7.2. */
