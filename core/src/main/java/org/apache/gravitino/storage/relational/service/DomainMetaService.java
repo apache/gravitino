@@ -603,7 +603,9 @@ public class DomainMetaService {
             if (SessionUtils.getWithoutCommit(
                 DomainMemberMapper.class, mapper -> mapper.hasMembers(domainId))) {
               throw new NonEmptyDomainException(
-                  "Domain %s under metalake %s contains definition members. Detach them before deleting it.",
+                  "Domain %s under metalake %s contains definition members. Remove their memberships first."
+                      + " For glossary terms, ask the term owner with CREATE_DEFINITION or a glossary manager"
+                      + " with MANAGE_DEFINITIONS to remove the membership. Both roles require access to this domain.",
                   identifier.name(), identifier.namespace().level(0));
             }
             deleteDomainWithVersion(identifier, lockedDomainPO);

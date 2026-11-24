@@ -21,12 +21,12 @@ package org.apache.gravitino.storage.relational.mapper;
 import java.util.List;
 import org.apache.ibatis.annotations.Arg;
 import org.apache.ibatis.annotations.ConstructorArgs;
-import org.apache.ibatis.annotations.Delete;
-import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.DeleteProvider;
+import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
-import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.SelectProvider;
+import org.apache.ibatis.annotations.UpdateProvider;
 
 /**
  * Shared persistence of explicit Domain memberships. Writers fence the member and Domain in their
@@ -47,26 +47,16 @@ public interface DomainMemberMapper {
 
   /** Checks all member types after the caller has acquired the exclusive Domain lock. */
   @Options(useCache = false, flushCache = Options.FlushCachePolicy.TRUE)
-  @Select(
-      "SELECT EXISTS (SELECT 1 FROM domain_member_rel WHERE domain_id=#{domain} AND deleted_at=0)")
+  @SelectProvider(type = DomainMemberSQLProviderFactory.class, method = "hasMembers")
   boolean hasMembers(@Param("domain") long domain);
 
   /** Loads the complete Domain set of one typed member. */
-  @Select(
-      """
-      SELECT domain_id FROM domain_member_rel
-      WHERE metalake_id=#{lake} AND member_type=#{type} AND member_id=#{member} AND deleted_at=0
-      ORDER BY domain_id
-      """)
+  @SelectProvider(type = DomainMemberSQLProviderFactory.class, method = "domains")
   List<Long> domains(
       @Param("lake") long lake, @Param("type") MemberType type, @Param("member") long member);
 
   /** Loads memberships of one feature for a metalake snapshot. */
-  @Select(
-      """
-      SELECT member_type, member_id, domain_id FROM domain_member_rel
-      WHERE metalake_id=#{lake} AND member_type=#{type} AND deleted_at=0
-      """)
+  @SelectProvider(type = DomainMemberSQLProviderFactory.class, method = "list")
   @ConstructorArgs({
     @Arg(column = "member_type", javaType = MemberType.class),
     @Arg(column = "member_id", javaType = long.class),
@@ -75,12 +65,7 @@ public interface DomainMemberMapper {
   List<Membership> list(@Param("lake") long lake, @Param("type") MemberType type);
 
   /** Lists direct members in stable order across both features. */
-  @Select(
-      """
-      SELECT member_type, member_id, domain_id FROM domain_member_rel
-      WHERE metalake_id=#{lake} AND domain_id=#{domain} AND deleted_at=0
-      ORDER BY member_type, member_id LIMIT #{limit} OFFSET #{offset}
-      """)
+  @SelectProvider(type = DomainMemberSQLProviderFactory.class, method = "members")
   @ConstructorArgs({
     @Arg(column = "member_type", javaType = MemberType.class),
     @Arg(column = "member_id", javaType = long.class),
@@ -93,11 +78,7 @@ public interface DomainMemberMapper {
       @Param("offset") int offset);
 
   /** Adds a verified live member and Domain pair. */
-  @Insert(
-      """
-      INSERT INTO domain_member_rel (metalake_id, domain_id, member_type, member_id, audit_info)
-      VALUES (#{lake}, #{domain}, #{type}, #{member}, #{audit})
-      """)
+  @InsertProvider(type = DomainMemberSQLProviderFactory.class, method = "add")
   void add(
       @Param("lake") long lake,
       @Param("type") MemberType type,
@@ -117,17 +98,12 @@ public interface DomainMemberMapper {
 
   /** Returns the latest retirement for the locked member. */
   @Options(useCache = false, flushCache = Options.FlushCachePolicy.TRUE)
-  @Select(
-      "SELECT COALESCE(MAX(deleted_at), 0) FROM domain_member_rel WHERE metalake_id=#{lake} AND member_type=#{type} AND member_id=#{member}")
+  @SelectProvider(type = DomainMemberSQLProviderFactory.class, method = "lastRetirement")
   long lastRetirement(
       @Param("lake") long lake, @Param("type") MemberType type, @Param("member") long member);
 
   /** Retires a pair using the generation selected under the member lock. */
-  @Update(
-      """
-      UPDATE domain_member_rel SET deleted_at=#{now}
-      WHERE metalake_id=#{lake} AND domain_id=#{domain} AND member_type=#{type} AND member_id=#{member} AND deleted_at=0
-      """)
+  @UpdateProvider(type = DomainMemberSQLProviderFactory.class, method = "retire")
   void retire(
       @Param("lake") long lake,
       @Param("type") MemberType type,
@@ -142,24 +118,14 @@ public interface DomainMemberMapper {
 
   /** Returns the latest retained generation for a metalake. */
   @Options(useCache = false, flushCache = Options.FlushCachePolicy.TRUE)
-  @Select("SELECT COALESCE(MAX(deleted_at), 0) FROM domain_member_rel WHERE metalake_id=#{lake}")
+  @SelectProvider(type = DomainMemberSQLProviderFactory.class, method = "lastMetalakeRetirement")
   long lastMetalakeRetirement(@Param("lake") long lake);
 
   /** Retires all live pairs in the locked metalake. */
-  @Update(
-      "UPDATE domain_member_rel SET deleted_at=#{now} WHERE metalake_id=#{lake} AND deleted_at=0")
+  @UpdateProvider(type = DomainMemberSQLProviderFactory.class, method = "retireMetalake")
   void retireMetalake(@Param("lake") long lake, @Param("now") long now);
 
   /** Collects a bounded batch of tombstones for both member types. */
-  @Delete(
-      """
-      DELETE FROM domain_member_rel WHERE id IN (
-        SELECT id FROM (
-          SELECT id FROM domain_member_rel
-          WHERE deleted_at>0 AND deleted_at<#{cutoff}
-          ORDER BY id LIMIT #{limit}
-        ) expired
-      )
-      """)
+  @DeleteProvider(type = DomainMemberSQLProviderFactory.class, method = "purge")
   int purge(@Param("cutoff") long cutoff, @Param("limit") int limit);
 }

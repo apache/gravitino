@@ -19,8 +19,11 @@
 
 package org.apache.gravitino.storage.relational.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import java.io.UncheckedIOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -33,12 +36,15 @@ import java.util.TreeSet;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
+import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermDomainRelMapper;
 import org.apache.gravitino.storage.relational.po.DomainPO;
 import org.apache.gravitino.storage.relational.po.GlossaryTermDomainRelPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
  * Explicit glossary term domain membership. Only the glossary term write path changes it. Every
@@ -161,11 +167,22 @@ public final class GlossaryTermDomainService {
 
   /** Adds a live membership row. The caller holds the term and domain locks. */
   public void add(long metalakeId, long termId, long domainId) {
+    AuditInfo audit =
+        AuditInfo.builder()
+            .withCreator(PrincipalUtils.getCurrentUserName())
+            .withCreateTime(Instant.now())
+            .build();
+    String auditJson;
+    try {
+      auditJson = JsonUtils.anyFieldMapper().writeValueAsString(audit);
+    } catch (JsonProcessingException e) {
+      throw new UncheckedIOException("Cannot serialize Domain membership audit information", e);
+    }
     SessionUtils.doWithoutCommit(
         GlossaryTermDomainRelMapper.class,
         mapper ->
             Preconditions.checkState(
-                mapper.insert(metalakeId, termId, domainId) == 1,
+                mapper.insert(metalakeId, termId, domainId, auditJson) == 1,
                 "Failed to add term %s to domain %s",
                 termId,
                 domainId));

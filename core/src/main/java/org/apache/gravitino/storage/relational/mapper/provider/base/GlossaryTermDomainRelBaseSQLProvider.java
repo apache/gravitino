@@ -36,7 +36,7 @@ public class GlossaryTermDomainRelBaseSQLProvider {
     return "INSERT INTO "
         + TABLE
         + " (metalake_id, member_type, member_id, domain_id, audit_info)"
-        + " SELECT metalake_id, 'GLOSSARY_TERM', term_id, #{domainId}, audit_info FROM glossary_term_meta"
+        + " SELECT metalake_id, 'GLOSSARY_TERM', term_id, #{domainId}, #{audit} FROM glossary_term_meta"
         + " WHERE metalake_id=#{metalakeId} AND term_id=#{termId} AND deleted_at=0";
   }
 

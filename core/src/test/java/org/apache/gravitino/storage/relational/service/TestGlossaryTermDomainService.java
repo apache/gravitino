@@ -37,6 +37,8 @@ import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper;
+import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper.MemberType;
+import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper.Membership;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermDomainRelMapper;
 import org.apache.gravitino.storage.relational.po.DomainPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -144,6 +146,50 @@ public class TestGlossaryTermDomainService extends TestJDBCBackend {
         SessionUtils.getWithoutCommit(
             DomainMemberMapper.class,
             m -> m.domains(LAKE_ID, DomainMemberMapper.MemberType.KNOWLEDGE_BASE_ARTICLE, 101)));
+  }
+
+  @TestTemplate
+  public void testTypedListAndDirectMemberPages() throws Exception {
+    setup();
+    SessionUtils.doWithCommit(
+        DomainMemberMapper.class,
+        mapper -> {
+          MemberType term = MemberType.GLOSSARY_TERM;
+          MemberType article = MemberType.KNOWLEDGE_BASE_ARTICLE;
+          mapper.add(LAKE_ID, article, 101, sales, "{}");
+          mapper.add(LAKE_ID, term, 102, sales, "{}");
+          mapper.add(LAKE_ID, term, 101, sales, "{}");
+          mapper.add(LAKE_ID, term, 103, finance, "{}");
+          mapper.remove(LAKE_ID, term, 102, sales, 10);
+
+          Membership salesTerm = new Membership(term, 101, sales);
+          Membership salesArticle = new Membership(article, 101, sales);
+          Assertions.assertEquals(List.of(salesArticle), mapper.list(LAKE_ID, article));
+          List<Membership> terms = mapper.list(LAKE_ID, term);
+          Assertions.assertEquals(2, terms.size());
+          Assertions.assertEquals(
+              Set.of(salesTerm, new Membership(term, 103, finance)), Set.copyOf(terms));
+          Assertions.assertEquals(List.of(salesTerm), mapper.members(LAKE_ID, sales, 1, 0));
+          Assertions.assertEquals(List.of(salesArticle), mapper.members(LAKE_ID, sales, 1, 1));
+          Assertions.assertTrue(mapper.members(LAKE_ID, sales, 1, 2).isEmpty());
+        });
+  }
+
+  @TestTemplate
+  public void testPurgeOldestMembershipFirst() throws Exception {
+    setup();
+    SessionUtils.doWithCommit(
+        DomainMemberMapper.class,
+        mapper -> {
+          MemberType type = MemberType.GLOSSARY_TERM;
+          mapper.add(LAKE_ID, type, 101, sales, "{}");
+          mapper.add(LAKE_ID, type, 102, sales, "{}");
+          mapper.remove(LAKE_ID, type, 102, sales, 10);
+          mapper.remove(LAKE_ID, type, 101, sales, 20);
+          Assertions.assertEquals(1, mapper.purge(30, 1));
+          Assertions.assertEquals(0, mapper.lastRetirement(LAKE_ID, type, 102));
+          Assertions.assertEquals(20, mapper.lastRetirement(LAKE_ID, type, 101));
+        });
   }
 
   @TestTemplate

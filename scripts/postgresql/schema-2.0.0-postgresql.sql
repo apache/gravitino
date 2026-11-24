@@ -1513,3 +1513,4 @@ COMMENT ON COLUMN domain_member_rel.audit_info IS 'Audit information';
 COMMENT ON COLUMN domain_member_rel.deleted_at IS 'Soft deletion time in milliseconds, zero for live rows';
 CREATE INDEX IF NOT EXISTS idx_domain_members ON domain_member_rel (domain_id, deleted_at, member_type, member_id);
 CREATE INDEX IF NOT EXISTS idx_domain_member_metalake ON domain_member_rel (metalake_id, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_domain_member_deleted ON domain_member_rel (deleted_at, id);

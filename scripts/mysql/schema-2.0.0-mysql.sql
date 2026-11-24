@@ -876,5 +876,6 @@ CREATE TABLE IF NOT EXISTS domain_member_rel (
     deleted_at BIGINT NOT NULL DEFAULT 0 COMMENT 'Soft deletion time in milliseconds, zero for live rows',
     CONSTRAINT uk_domain_member UNIQUE (member_type, member_id, domain_id, deleted_at),
     INDEX idx_domain_members (domain_id, deleted_at, member_type, member_id),
-    INDEX idx_domain_member_metalake (metalake_id, deleted_at)
+    INDEX idx_domain_member_metalake (metalake_id, deleted_at),
+    INDEX idx_domain_member_deleted (deleted_at, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Explicit Domain memberships';

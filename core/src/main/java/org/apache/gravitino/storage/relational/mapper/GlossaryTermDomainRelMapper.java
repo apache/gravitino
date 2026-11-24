@@ -37,7 +37,8 @@ public interface GlossaryTermDomainRelMapper {
   int insert(
       @Param("metalakeId") long metalakeId,
       @Param("termId") long termId,
-      @Param("domainId") long domainId);
+      @Param("domainId") long domainId,
+      @Param("audit") String audit);
 
   /** Retires every live membership row of a term. */
   @UpdateProvider(type = GlossaryTermDomainRelSQLProviderFactory.class, method = "removeTerm")

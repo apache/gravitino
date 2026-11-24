@@ -73,6 +73,21 @@ public class TestSQLScripts extends TestJDBCBackend {
               SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
           Connection connection = session.getConnection();
           Statement statement = connection.createStatement()) {
+        String table =
+            connection.getMetaData().storesUpperCaseIdentifiers()
+                ? "DOMAIN_MEMBER_REL"
+                : "domain_member_rel";
+        List<String> indexes =
+            readSchemaIndexes(Set.of(table)).stream()
+                .map(index -> index.toLowerCase(Locale.ROOT))
+                .toList();
+        Assertions.assertTrue(
+            indexes.contains("domain_member_rel:idx_domain_member_deleted:1:deleted_at:true"),
+            indexes.toString());
+        Assertions.assertTrue(
+            indexes.contains("domain_member_rel:idx_domain_member_deleted:2:id:true"),
+            indexes.toString());
+
         if (initialVersion.equals("1.3.0")) {
           try (ResultSet migrated =
               statement.executeQuery(

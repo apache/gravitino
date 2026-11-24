@@ -511,6 +511,7 @@ CREATE TABLE IF NOT EXISTS domain_member_rel (
 ) COMMENT='Explicit Domain memberships';
 CREATE INDEX IF NOT EXISTS idx_domain_members ON domain_member_rel (domain_id, deleted_at, member_type, member_id);
 CREATE INDEX IF NOT EXISTS idx_domain_member_metalake ON domain_member_rel (metalake_id, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_domain_member_deleted ON domain_member_rel (deleted_at, id);
 
 -- Preserve live memberships and retired generations from the earlier Glossary schema.
 INSERT INTO domain_member_rel (metalake_id, domain_id, member_type, member_id, audit_info, deleted_at)
