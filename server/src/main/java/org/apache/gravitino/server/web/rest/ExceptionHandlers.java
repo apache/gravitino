@@ -39,6 +39,8 @@ import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
+import org.apache.gravitino.exceptions.NoSuchSemanticModelRevisionException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
 import org.apache.gravitino.exceptions.NonEmptyDomainException;
 import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
@@ -1099,6 +1101,11 @@ public class ExceptionHandlers {
 
       if (e instanceof IllegalArgumentException) {
         return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NoSuchSemanticModelRevisionException
+          || e instanceof NoSuchSemanticModelException) {
+        // A hidden draft and a missing snapshot must have the same public error shape.
+        return Utils.notFound(e.getClass().getSimpleName(), errorMsg);
 
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);

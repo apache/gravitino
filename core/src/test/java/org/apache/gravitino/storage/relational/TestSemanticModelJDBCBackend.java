@@ -634,9 +634,12 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
     SemanticModelEntity renamed =
         semanticModel(
             original.id(), namespace, "renamed_sales_model", false, original.properties());
-    backend.update(original.nameIdentifier(), Entity.EntityType.SEMANTIC_MODEL, ignored -> renamed);
+    assertEquals(
+        renamed,
+        backend.update(
+            original.nameIdentifier(), Entity.EntityType.SEMANTIC_MODEL, ignored -> renamed));
     assertFalse(backend.exists(original.nameIdentifier(), Entity.EntityType.SEMANTIC_MODEL));
-    assertSnapshot(renamed, 2);
+    assertEquals(renamed, backend.get(renamed.nameIdentifier(), Entity.EntityType.SEMANTIC_MODEL));
 
     assertTrue(backend.delete(renamed.nameIdentifier(), Entity.EntityType.SEMANTIC_MODEL, false));
     assertFalse(backend.exists(renamed.nameIdentifier(), Entity.EntityType.SEMANTIC_MODEL));

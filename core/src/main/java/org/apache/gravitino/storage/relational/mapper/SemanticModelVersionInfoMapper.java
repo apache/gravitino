@@ -23,6 +23,7 @@ import org.apache.gravitino.storage.relational.po.SemanticModelVersionInfoPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
@@ -45,6 +46,17 @@ public interface SemanticModelVersionInfoMapper {
       method = "selectSemanticModelVersionInfoBySemanticModelIdAndVersion")
   SemanticModelVersionInfoPO selectSemanticModelVersionInfoBySemanticModelIdAndVersion(
       @Param("semanticModelId") Long semanticModelId, @Param("version") Integer version);
+
+  /** Lists the metadata of retained revisions without loading their definitions. */
+  @Select(
+      """
+      SELECT version, publication_status AS publicationStatus, published_by AS publishedBy,
+        published_at AS publishedAt, audit_info AS auditInfo
+      FROM semantic_model_version_info
+      WHERE semantic_model_id = #{modelId} AND deleted_at = 0
+      ORDER BY version DESC
+      """)
+  List<SemanticModelVersionInfoPO> listRevisionInfo(@Param("modelId") long modelId);
 
   /** Soft-deletes all snapshots for a Semantic Model ID. */
   @UpdateProvider(
