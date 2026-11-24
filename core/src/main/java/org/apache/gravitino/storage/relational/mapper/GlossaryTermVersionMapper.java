@@ -26,6 +26,7 @@ import lombok.Setter;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
@@ -94,10 +95,23 @@ public interface GlossaryTermVersionMapper {
       @Param("termId") long termId, @Param("versionId") long versionId);
 
   /** Lists snapshots and their publication states, newest first. */
+  @Options(useCache = false, flushCache = Options.FlushCachePolicy.TRUE)
   @SelectProvider(
       type = GlossaryTermVersionSQLProviderFactory.class,
       method = "listVersionsByTermId")
-  List<Version> listVersionsByTermId(@Param("termId") long termId);
+  List<Version> listVersionsByTermId(
+      @Param("termId") long termId,
+      @Param("maxVersionId") long maxVersionId,
+      @Param("limit") int limit);
+
+  /** Lists business version IDs, newest first. */
+  @SelectProvider(
+      type = GlossaryTermVersionSQLProviderFactory.class,
+      method = "listVersionIdsByTermId")
+  List<Long> listVersionIdsByTermId(
+      @Param("termId") long termId,
+      @Param("maxVersionId") long maxVersionId,
+      @Param("limit") int limit);
 
   /** Records the decision without replacing the snapshot. */
   @UpdateProvider(

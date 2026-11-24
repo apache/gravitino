@@ -48,6 +48,7 @@ import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
+import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.TermAlreadyExistsException;
 import org.apache.gravitino.exceptions.TermVersionConflictException;
 import org.apache.gravitino.glossary.TermPublication.State;
@@ -58,8 +59,10 @@ import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermVersionMapper.Head;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermVersionMapper.Version;
+import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.po.DomainPO;
 import org.apache.gravitino.storage.relational.po.GlossaryTermRelPO;
+import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.service.DomainRelService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermDomainService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
@@ -70,6 +73,7 @@ import org.apache.gravitino.storage.relational.service.GlossaryTermVersions;
 import org.apache.gravitino.storage.relational.service.GlossaryTermVersions.Snapshot;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
+import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -367,6 +371,17 @@ public final class GlossaryManager {
                         domains.ids(),
                         plan == null ? Set.of() : plan.broader(),
                         plan == null ? Set.of() : plan.related());
+                if (state != State.PUBLISHED) {
+                  Long creatorId =
+                      authorizationEnabled
+                          ? UserMetaService.getInstance()
+                              .getUserIdByMetalakeIdAndName(lake, created.auditInfo().creator())
+                          : null;
+                  if (authorizationEnabled)
+                    lockCandidateCreator(lake, created.auditInfo().creator(), creatorId);
+                  snapshot =
+                      snapshot.withCandidateReferences(created, Map.of(), Set.of(), creatorId);
+                }
                 TermPublication result =
                     GlossaryTermVersions.recordTermVersion(
                         lake,
@@ -499,14 +514,38 @@ public final class GlossaryManager {
 
   /** Lists accessible business versions newest first for a stable term identity. */
   public List<Long> listTermVersions(String metalake, long termId) {
+    return listTermVersions(metalake, termId, null, Integer.MAX_VALUE);
+  }
+
+  /**
+   * Returns at most limit visible version IDs in descending order. Pass null for the first page and
+   * its last returned ID as the exclusive cursor for the next page.
+   */
+  public List<Long> listTermVersions(
+      String metalake, long termId, @Nullable Long beforeVersionId, int limit) {
+    Preconditions.checkArgument(limit > 0, "limit must be positive");
+    Preconditions.checkArgument(
+        beforeVersionId == null || beforeVersionId > 0, "beforeVersionId must be positive");
     return readHistory(
         metalake,
         termId,
         (mapper, head) -> {
-          GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
+          long upper =
+              beforeVersionId == null
+                  ? head.getLastVersion()
+                  : Math.min(head.getLastVersion(), beforeVersionId - 1);
+          if (!authorizationEnabled && readable == ALL_TERMS)
+            return mapper.listVersionIdsByTermId(termId, upper, limit);
           List<Long> result = new ArrayList<>();
-          for (Version row : mapper.listVersionsByTermId(termId)) {
-            if (canReadTermVersion(metalake, head, row, access)) result.add(row.getVersionId());
+          GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
+          while (upper > 0 && result.size() < limit) {
+            int batchSize = Math.min(100, limit - result.size());
+            List<Version> rows = mapper.listVersionsByTermId(termId, upper, batchSize);
+            for (Version row : rows) {
+              if (canReadTermVersion(metalake, head, row, access)) result.add(row.getVersionId());
+            }
+            if (rows.size() < batchSize) break;
+            upper = rows.get(rows.size() - 1).getVersionId() - 1;
           }
           return result;
         });
@@ -519,11 +558,12 @@ public final class GlossaryManager {
         termId,
         (mapper, head) -> {
           Version row = mapper.getVersionByTermIdAndVersionId(termId, versionId);
-          if (row == null || !canReadTermVersion(metalake, head, row))
-            throw new NoSuchTermException("Glossary version does not exist");
+          if (row == null) throw new NoSuchTermException("Glossary version does not exist");
           Snapshot snapshot = GlossaryTermVersions.decodeSnapshot(row);
           GlossaryTermEntity term = snapshot.term(NamespaceUtil.ofGlossaryTerm(metalake));
           GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
+          if (!canReadTermVersion(head, row, access, snapshot, term))
+            throw new NoSuchTermException("Glossary version does not exist");
           TermPublication publication = GlossaryTermVersions.toPublicationResult(head, row);
           if (!access.canEdit(term) && head.getPublishedVersion() != null) {
             publication =
@@ -556,6 +596,7 @@ public final class GlossaryManager {
     return withLockedHistory(
         NamespaceUtil.ofGlossaryTerm(metalake),
         termId,
+        true,
         (mapper, head) -> {
           if (!Objects.equals(head.getCandidateVersion(), draftVersionId))
             throw staleCandidateConflict();
@@ -607,11 +648,13 @@ public final class GlossaryManager {
                     Version row =
                         mapper.getVersionByTermIdAndVersionId(id, head.getCandidateVersion());
                     if (!canReadTermVersion(metalake, head, row)) throw missingRelationRoot(ident);
-                    return editUnpublishedCandidate(
-                        ident, lake, head, row, conditional, token, changes);
+                    return editTermCandidate(ident, lake, head, row, conditional, token, changes);
                   });
             }
-            return editPublishedTerm(metalake, ident, conditional, token, changes, true);
+            if (conditional) {
+              return editWithPublicationToken(metalake, ident, lake, token, changes);
+            }
+            return editPublishedTerm(metalake, ident, false, null, changes, true);
           },
           missing -> {
             throw missingRelationRoot(ident);
@@ -620,7 +663,39 @@ public final class GlossaryManager {
     return editPublishedTerm(metalake, ident, conditional, token, changes, false);
   }
 
-  private GlossaryTermEntity editUnpublishedCandidate(
+  private GlossaryTermEntity editWithPublicationToken(
+      String metalake,
+      NameIdentifier ident,
+      long lake,
+      @Nullable String token,
+      TermChange[] changes) {
+    return terms.withLockedTerm(
+        ident,
+        false,
+        locked -> {
+          GlossaryTermEntity live = locked.orElseThrow(() -> missingRelationRoot(ident));
+          GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
+          requireEdit(access, ident, live);
+          validateRevisionToken(token);
+          if (live.revisionToken().equals(token)) {
+            return editPublishedTerm(metalake, ident, true, token, changes, true);
+          }
+          return withVersionMapper(
+              mapper -> {
+                Head head = mapper.getVersionHeadByMetalakeAndTermId(lake, live.id());
+                if (head == null || head.getCandidateVersion() == null)
+                  throw staleCandidateConflict();
+                Version row =
+                    mapper.getVersionByTermIdAndVersionId(live.id(), head.getCandidateVersion());
+                if (!canReadTermVersion(metalake, head, row, access))
+                  throw missingRelationRoot(ident);
+                if (row.getBaseRevision() != live.version()) throw staleCandidateConflict();
+                return editTermCandidate(ident, lake, head, row, true, token, changes);
+              });
+        });
+  }
+
+  private GlossaryTermEntity editTermCandidate(
       NameIdentifier ident,
       long lake,
       Head head,
@@ -636,7 +711,8 @@ public final class GlossaryManager {
         ident, TermEdits.toPublicationView(term, term.domains(), publication), conditional, token);
     GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
     List<TermChange> content = new ArrayList<>();
-    TermRelations relations = new TermRelations(lake, term.id(), true);
+    TermRelations relations =
+        new TermRelations(lake, term.id(), head.getPublishedVersion() == null);
     relations.replace(previous.broader(), previous.related());
     List<TermDomains.Edit> domainEdits = new ArrayList<>();
     State state = State.SUBMITTED;
@@ -644,11 +720,27 @@ public final class GlossaryManager {
       TermRelations.Edit edge = TermRelations.Edit.from(change);
       TermDomains.Edit domain = TermDomains.Edit.from(change);
       if (edge != null) {
-        GlossaryTermEntity endpoint =
-            relationRoot(NameIdentifierUtil.ofGlossaryTerm(metalake, edge.target())).term();
-        if (!access.canRead(endpoint) || !readable.test(endpoint))
-          throw new NoSuchTermException("Referenced term does not exist");
-        relations.edit(edge, endpoint.id());
+        Long removedId =
+            edge.add()
+                ? null
+                : findSnapshotReference(
+                    previous.referenceNames(),
+                    edge.type() == RelationType.BROADER ? relations.broader() : relations.related(),
+                    edge.target());
+        if (removedId != null) {
+          for (GlossaryTermEntity target :
+              terms.getByIds(term.namespace(), lake, Set.of(removedId))) {
+            if (!access.canRead(target) || !readable.test(target))
+              throw missingRelationRoot(target.nameIdentifier());
+          }
+          relations.edit(edge, removedId);
+        } else {
+          GlossaryTermEntity endpoint =
+              relationRoot(NameIdentifierUtil.ofGlossaryTerm(metalake, edge.target())).term();
+          if (!access.canRead(endpoint) || !readable.test(endpoint))
+            throw new NoSuchTermException("Referenced term does not exist");
+          relations.edit(edge, endpoint.id());
+        }
       } else if (domain != null) {
         domainEdits.add(domain);
       } else {
@@ -675,7 +767,8 @@ public final class GlossaryManager {
     terms.checkTermNames(edited);
     checkTermNameReservation(lake, edited);
     String key = GlossaryTermNames.key(edited.name());
-    if (!terms.getIdsByKeys(lake, Set.of(key)).isEmpty())
+    Long existingId = terms.getIdsByKeys(lake, Set.of(key)).get(key);
+    if (existingId != null && !existingId.equals(term.id()))
       throw new TermAlreadyExistsException("Term name already exists");
     if (edited == term && state == publication.state())
       return visibleDomains(
@@ -683,8 +776,17 @@ public final class GlossaryManager {
     Snapshot next =
         GlossaryTermVersions.captureSnapshot(
             lake, edited, domains.ids(), relations.broader(), relations.related());
-    next.definition().setCurrentVersion(1L);
-    TermPublication result = GlossaryTermVersions.recordTermVersion(lake, next, 0, state, key);
+    next =
+        next.withCandidateReferences(
+            edited, previous.referenceNames(), previous.baseRelated(), previous.creatorUserId());
+    next.definition().setCurrentVersion(Math.incrementExact(row.getBaseRevision()));
+    TermPublication result =
+        GlossaryTermVersions.recordTermVersion(
+            lake,
+            next,
+            row.getBaseRevision(),
+            state,
+            head.getPublishedVersion() == null ? key : null);
     return visibleDomains(
         TermEdits.toPublicationView(next.term(ident.namespace()), domains.names(), result), access);
   }
@@ -780,13 +882,17 @@ public final class GlossaryManager {
       boolean conditional,
       @Nullable String token) {
     if (conditional) {
-      Preconditions.checkArgument(
-          token != null && token.length() == 36 && UUID.fromString(token).toString().equals(token),
-          "Malformed glossary revision token");
+      validateRevisionToken(token);
       if (!before.revisionToken().equals(token)) {
         throw new TermVersionConflictException("Term %s has changed", ident);
       }
     }
+  }
+
+  private static void validateRevisionToken(@Nullable String token) {
+    Preconditions.checkArgument(
+        token != null && token.length() == 36 && UUID.fromString(token).toString().equals(token),
+        "Malformed glossary revision token");
   }
 
   private GlossaryTermEntity applyChanges(
@@ -832,7 +938,8 @@ public final class GlossaryManager {
     Snapshot snapshot =
         state == State.PUBLISHED
             ? frozen
-            : frozen.withBaseRelated(edges.listRelated(lake, after.id()));
+            : frozen.withCandidateReferences(
+                after, Map.of(), edges.listRelated(lake, after.id()), null);
     if (state == State.PUBLISHED)
       handler.handle(
           before,
@@ -921,14 +1028,17 @@ public final class GlossaryManager {
                 throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", metalake);
               }
               return withVersionMapper(
-                  mapper -> readScopedVersion(metalake, lake, id, mapper, read, false));
+                  mapper -> readScopedVersion(metalake, lake, id, mapper, read, false, false));
             });
     // Only a legacy live term without pointers needs a write transaction for its baseline.
-    return result != null ? result : withLockedHistory(ns, id, read);
+    return result != null ? result : withLockedHistory(ns, id, false, read);
   }
 
   private <T> T withLockedHistory(
-      Namespace ns, long id, BiFunction<GlossaryTermVersionMapper, Head, T> read) {
+      Namespace ns,
+      long id,
+      boolean requireEditor,
+      BiFunction<GlossaryTermVersionMapper, Head, T> read) {
     return terms.withHierarchyLock(
         ns,
         lake -> {
@@ -938,7 +1048,9 @@ public final class GlossaryManager {
               locks,
               () ->
                   withVersionMapper(
-                      mapper -> readScopedVersion(ns.level(0), lake, id, mapper, read, true)));
+                      mapper ->
+                          readScopedVersion(
+                              ns.level(0), lake, id, mapper, read, true, requireEditor)));
         });
   }
 
@@ -949,7 +1061,8 @@ public final class GlossaryManager {
       long id,
       GlossaryTermVersionMapper mapper,
       BiFunction<GlossaryTermVersionMapper, Head, T> read,
-      boolean mayInitialize) {
+      boolean mayInitialize,
+      boolean requireEditor) {
     List<GlossaryTermEntity> live =
         terms.getByIds(NamespaceUtil.ofGlossaryTerm(metalake), lake, Set.of(id));
     Head head = mapper.getVersionHeadByMetalakeAndTermId(lake, id);
@@ -961,8 +1074,10 @@ public final class GlossaryManager {
         throw new NoSuchTermException("Glossary term does not exist");
     } else {
       GlossaryTermEntity current = live.get(0);
+      GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
       if (!readable.test(current)
-          || !GlossaryAccess.forRequest(metalake, authorizationEnabled).canRead(current))
+          || !access.canRead(current)
+          || (requireEditor && !access.canEdit(current)))
         throw new NoSuchTermException("Glossary term does not exist");
       if (head == null) {
         if (!mayInitialize) return null;
@@ -979,14 +1094,26 @@ public final class GlossaryManager {
 
   private boolean canReadTermVersion(
       String metalake, Head head, Version row, GlossaryAccess access) {
-    GlossaryTermEntity term =
-        GlossaryTermVersions.decodeSnapshot(row).term(NamespaceUtil.ofGlossaryTerm(metalake));
+    Snapshot snapshot = GlossaryTermVersions.decodeSnapshot(row);
+    return canReadTermVersion(
+        head, row, access, snapshot, snapshot.term(NamespaceUtil.ofGlossaryTerm(metalake)));
+  }
+
+  private boolean canReadTermVersion(
+      Head head, Version row, GlossaryAccess access, Snapshot snapshot, GlossaryTermEntity term) {
     if (!readable.test(term)) return false;
     if (State.PUBLISHED.name().equals(row.getLifecycle())) return access.canRead(term);
     if (head.getPublishedVersion() != null) return access.canEdit(term);
     if (access.manage()) return true;
     if (!term.auditInfo().creator().equals(PrincipalUtils.getCurrentUserName())) return false;
-    return access.canCreate();
+    if (!access.canCreate()) return false;
+    Long currentUserId =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            m ->
+                m.selectUserIdByMetalakeIdAndName(
+                    snapshot.definition().getMetalakeId(), term.auditInfo().creator()));
+    return currentUserId != null && currentUserId.equals(snapshot.creatorUserId());
   }
 
   private TermPublication recordCandidateDecision(
@@ -1083,6 +1210,9 @@ public final class GlossaryManager {
     if (before != null) {
       before = TermEdits.withDomains(before, domains.originalNames());
     }
+    if (before == null && authorizationEnabled) {
+      lockCandidateCreator(lake, after.auditInfo().creator(), snapshot.creatorUserId());
+    }
     GlossaryTermEntity resolvedAfter = TermEdits.withDomains(after, domains.names());
     checkTermNameReservation(lake, resolvedAfter);
     terms.checkTermNames(resolvedAfter);
@@ -1102,6 +1232,28 @@ public final class GlossaryManager {
 
   private static TermVersionConflictException staleCandidateConflict() {
     return new TermVersionConflictException("The exact submitted candidate is no longer current");
+  }
+
+  private static void lockCandidateCreator(long lake, String name, @Nullable Long expectedId) {
+    UserPO creator =
+        expectedId == null
+            ? null
+            : SessionUtils.getWithoutCommit(
+                UserMetaMapper.class, m -> m.selectUserMetaByIdForShare(expectedId));
+    if (creator == null || creator.getMetalakeId() != lake || !name.equals(creator.getUserName())) {
+      throw new NoSuchUserException("Original candidate creator %s no longer exists", name);
+    }
+  }
+
+  @Nullable
+  private static Long findSnapshotReference(
+      Map<Long, String> names, Set<Long> members, String name) {
+    String key = GlossaryTermNames.key(name);
+    for (long id : members) {
+      String previous = names.get(id);
+      if (previous != null && key.equals(GlossaryTermNames.key(previous))) return id;
+    }
+    return null;
   }
 
   private void persistNewTerm(
@@ -1238,15 +1390,10 @@ public final class GlossaryManager {
       List<TermDomains.Edit> edits,
       GlossaryAccess access) {
     Set<String> requested = new HashSet<>();
-    List<TermDomains.Edit> liveEdits = new ArrayList<>();
+    Map<String, Long> snapshotIdsByName = new HashMap<>();
+    previousDomains.forEach((id, name) -> snapshotIdsByName.put(name, id));
     for (TermDomains.Edit edit : edits) {
-      if (!edit.add()
-          && previousDomains.containsValue(edit.domain())
-          && DOMAINS.findDomain(lake, edit.domain()) == null) {
-        continue;
-      }
-      liveEdits.add(edit);
-      requested.add(edit.domain());
+      if (edit.add() || !snapshotIdsByName.containsKey(edit.domain())) requested.add(edit.domain());
     }
     if (previousDomains.isEmpty() && requested.isEmpty()) {
       return new TermDomains(lake, termId, Map.of());
@@ -1271,9 +1418,15 @@ public final class GlossaryManager {
       }
     }
     TermDomains plan = new TermDomains(lake, termId, current);
-    for (TermDomains.Edit edit : liveEdits) {
-      DomainPO target = targets.get(edit.domain());
-      plan.edit(edit, target.domainId(), target.domainName());
+    for (TermDomains.Edit edit : edits) {
+      // After a name is added in this request, later removals refer to that live identity.
+      if (edit.add()) snapshotIdsByName.remove(edit.domain());
+      Long originalId = snapshotIdsByName.get(edit.domain());
+      DomainPO target = originalId == null ? targets.get(edit.domain()) : locked.get(originalId);
+      if (target != null) {
+        requireVisibleDomain(target.domainName(), target, access);
+        plan.edit(edit, target.domainId(), target.domainName());
+      }
     }
     return plan;
   }

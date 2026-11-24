@@ -155,6 +155,11 @@ public interface GlossaryOperations {
    * revision. A hidden or missing root throws {@link NoSuchTermException} before comparing the
    * token. A matching no-op preserves the revision and token.
    *
+   * <p>Under an approval policy, a current candidate token continues editing that candidate and
+   * preserves its pending content. A live token starts a proposal from the published definition.
+   * Address an already-published term by its live name until a proposed rename is published. For a
+   * term awaiting first publication use the current candidate name.
+   *
    * <p>The authorization and change-validation rules of {@link #alterTerm(String, TermChange...)}
    * also apply. After a conflict, reload and reconcile the changes before explicitly resubmitting;
    * do not automatically replay a stale replacement list. Implementations that do not support

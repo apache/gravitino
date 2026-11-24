@@ -89,7 +89,19 @@ public class GlossaryTermVersionBaseSQLProvider {
           SELECT version_id AS versionId, base_revision AS baseRevision, lifecycle, snapshot
           FROM glossary_term_version_info
           WHERE term_id = #{termId}
-          ORDER BY version_id DESC
+            AND version_id <= #{maxVersionId}
+          ORDER BY version_id DESC LIMIT #{limit}
+          """;
+  }
+
+  /** Lists business version IDs, newest first. */
+  public String listVersionIdsByTermId() {
+    return """
+          SELECT version_id
+          FROM glossary_term_version_info
+          WHERE term_id = #{termId}
+            AND version_id <= #{maxVersionId}
+          ORDER BY version_id DESC LIMIT #{limit}
           """;
   }
 

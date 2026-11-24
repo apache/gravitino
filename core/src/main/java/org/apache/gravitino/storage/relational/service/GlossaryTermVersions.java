@@ -22,6 +22,7 @@ package org.apache.gravitino.storage.relational.service;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -51,13 +52,35 @@ public final class GlossaryTermVersions {
       Map<Long, String> domains,
       Set<Long> broader,
       Set<Long> related,
-      Set<Long> baseRelated) {
-    /**
-     * Records the peer edges at submission so approval can detect changes made from another term.
-     */
-    public Snapshot withBaseRelated(Set<Long> current) {
-      return new Snapshot(definition, synonyms, domains, broader, related, current);
+      Set<Long> baseRelated,
+      Map<Long, String> referenceNames,
+      @Nullable Long creatorUserId) {
+    /** Older snapshots may omit the display names of relation targets. */
+    public Snapshot {
+      referenceNames = referenceNames == null ? Map.of() : Map.copyOf(referenceNames);
     }
+
+    /**
+     * Keeps the submitted identities and display names so later edits can remove retired targets.
+     */
+    public Snapshot withCandidateReferences(
+        GlossaryTermEntity term,
+        Map<Long, String> previousNames,
+        Set<Long> originalRelated,
+        @Nullable Long creatorId) {
+      Set<Long> ids = new HashSet<>(broader);
+      ids.addAll(related);
+      Map<Long, String> names = new HashMap<>(previousNames);
+      names.keySet().retainAll(ids);
+      for (GlossaryTermEntity endpoint :
+          GlossaryTermMetaService.getInstance()
+              .getByIds(term.namespace(), definition.getMetalakeId(), ids)) {
+        names.put(endpoint.id(), endpoint.name());
+      }
+      return new Snapshot(
+          definition, synonyms, domains, broader, related, originalRelated, names, creatorId);
+    }
+
     /** Frozen domain identities used to revalidate membership on publication. */
     public Set<Long> domainIds() {
       return domains.keySet();
@@ -92,7 +115,9 @@ public final class GlossaryTermVersions {
         names,
         broader,
         related,
-        Set.of());
+        Set.of(),
+        Map.of(),
+        null);
   }
 
   /** Decodes the exact version previously recorded. */

@@ -241,6 +241,68 @@ class TestGlossaryManager extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testCandidateTokenContinuesPendingEditsAndPaginatesHistory() throws IOException {
+    createAndInsertMakeLake(LAKE);
+    GlossaryTermEntity term =
+        manager.createTerm(LAKE, TermSpec.builder("Child").withDefinition("live").build());
+    GlossaryManager gated = approvalManager();
+    GlossaryTermEntity first =
+        gated.alterTerm(LAKE, "Child", TermChange.updateDefinition("pending"));
+    String token =
+        gated
+            .getTermVersion(LAKE, term.id(), first.publication().versionId())
+            .term()
+            .revisionToken();
+    GlossaryTermEntity next =
+        gated.alterTerm(LAKE, "Child", token, TermChange.setProperty("x", "y"));
+    Assertions.assertEquals("pending", next.definition());
+    Assertions.assertEquals("live", manager.getTerm(LAKE, "Child").definition());
+    Assertions.assertThrows(
+        TermVersionConflictException.class,
+        () -> gated.alterTerm(LAKE, "Child", token, TermChange.updateDefinition("stale")));
+    gated.publishCandidate(LAKE, term.id(), next.publication().versionId());
+    Assertions.assertEquals("pending", manager.getTerm(LAKE, "Child").definition());
+    Assertions.assertEquals("y", manager.getTerm(LAKE, "Child").properties().get("x"));
+    for (GlossaryManager reader : List.of(gated, gated.withTermVisibility(ignored -> true))) {
+      Assertions.assertEquals(List.of(3L, 2L), reader.listTermVersions(LAKE, term.id(), null, 2));
+      Assertions.assertEquals(List.of(1L), reader.listTermVersions(LAKE, term.id(), 2L, 2));
+      Assertions.assertTrue(reader.listTermVersions(LAKE, term.id(), 1L, 2).isEmpty());
+    }
+  }
+
+  @TestTemplate
+  void testRemoveDeletedAndRecreatedCandidateReferences() throws IOException {
+    createAndInsertMakeLake(LAKE);
+    GlossaryManager gated = approvalManager();
+    manager.createTerm(LAKE, TermSpec.builder("parent").build());
+    manager.createTerm(LAKE, TermSpec.builder("peer").build());
+    GlossaryTermEntity child =
+        gated.createTerm(
+            LAKE, TermSpec.builder("child").withBroader("parent").withRelated("peer").build());
+    manager.dropTerm(LAKE, "parent");
+    manager.dropTerm(LAKE, "peer");
+    manager.createTerm(LAKE, TermSpec.builder("parent").build());
+    Assertions.assertThrows(
+        NoSuchTermException.class, () -> gated.publishCandidate(LAKE, child.id(), 1));
+    GlossaryTermEntity repaired =
+        gated.alterTerm(
+            LAKE,
+            "child",
+            child.revisionToken(),
+            TermChange.removeBroader("parent"),
+            TermChange.removeRelated("peer"));
+    gated.publishCandidate(LAKE, child.id(), repaired.publication().versionId());
+    Assertions.assertTrue(
+        gated
+            .listRelations(LAKE, "child", GlossaryManager.Direction.RELATED, false, null)
+            .isEmpty());
+    Assertions.assertTrue(
+        gated
+            .listRelations(LAKE, "child", GlossaryManager.Direction.BROADER, false, null)
+            .isEmpty());
+  }
+
+  @TestTemplate
   void testDeletedRelationTargetAndMissingMetalakeHistory() throws IOException {
     createAndInsertMakeLake(LAKE);
     GlossaryManager gated = approvalManager();
@@ -348,6 +410,10 @@ class TestGlossaryManager extends TestJDBCBackend {
     Assertions.assertThrows(
         NoSuchEntityException.class,
         () -> PrincipalUtils.doAs(new UserPrincipal("alice"), () -> owned.createTerm(LAKE, spec)));
+    GlossaryManager gated = new GlossaryManager(ids::incrementAndGet, true, lake -> true);
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> PrincipalUtils.doAs(new UserPrincipal("alice"), () -> gated.createTerm(LAKE, spec)));
     Assertions.assertTrue(owned.listTerms(LAKE).isEmpty());
 
     for (String user : List.of("alice", "bob")) {

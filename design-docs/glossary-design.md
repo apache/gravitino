@@ -546,7 +546,9 @@ pending-content rules are specified separately below.
   requiring effective content should read the published term after a write or inspect the
   publication result. Ordinary reads, search and traversal only see materialized definitions.
 - **Decisions** target the stable ID and exact submitted version. Further proposals against the
-  live term supersede the previous candidate. Publication checks the base revision and referenced
+  live term supersede the previous candidate. A conditional edit with the current candidate token
+  continues from that candidate. Until a proposed rename is published, edits to an already
+  published term use its live name. Unpublished ownership follows the registered creator ID. Publication checks the base revision and referenced
   identities under lock, then updates the definition, relationships and published pointer in
   one transaction. Rejection keeps the previous published version. Existing definitions acquire
   a baseline snapshot on first history access or mutation. Existing audit describes creation;

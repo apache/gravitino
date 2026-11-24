@@ -68,6 +68,11 @@ public class GlossaryTermVersionSQLProviderFactory {
     return getProvider().listVersionsByTermId();
   }
 
+  /** Delegates {@link GlossaryTermVersionBaseSQLProvider#listVersionIdsByTermId}. */
+  public static String listVersionIdsByTermId() {
+    return getProvider().listVersionIdsByTermId();
+  }
+
   /** Delegates {@link GlossaryTermVersionBaseSQLProvider#updateVersionLifecycle}. */
   public static String updateVersionLifecycle() {
     return getProvider().updateVersionLifecycle();
