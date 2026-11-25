@@ -75,8 +75,11 @@ REST API described at the end of this page.
 A tag name is unique within its metalake and is the identifier used everywhere else, so renaming a
 tag changes what every stored request has to ask for.
 
-A name is up to 64 characters of letters, digits, underscores, slashes, equals signs, and hyphens.
-A separator convention such as `pii/email` keeps a growing set readable.
+The server accepts a name of up to 128 characters with any characters, and rejects a longer name
+with a 400 error. The UI create form is stricter: up to 64 characters of letters, digits,
+underscores, slashes, equals signs, and hyphens. A separator convention such as `pii/email` keeps a
+growing set readable. In REST paths, percent-encode a `/` or any other reserved URL character in the
+name, for example `pii%2Femail`; an unencoded `/` is read as an extra path segment.
 
 Properties are free-form key and value pairs on the tag itself rather than on the attachment, so
 every object carrying the tag sees the same values. Properties suit facts about the tag, such as
