@@ -603,3 +603,35 @@ CREATE INDEX IF NOT EXISTS idx_tag_relation_meta_live ON tag_relation_meta (meta
 CREATE INDEX IF NOT EXISTS idx_role_meta_securable_object_live ON role_meta_securable_object (metadata_object_id, type) WHERE deleted_at = 0;
 CREATE INDEX IF NOT EXISTS idx_user_role_rel_live ON user_role_rel (role_id) WHERE deleted_at = 0;
 CREATE INDEX IF NOT EXISTS idx_policy_tag_relation_meta_live ON policy_tag_relation_meta (tag_id) WHERE deleted_at = 0;
+
+CREATE TABLE IF NOT EXISTS ontology_meta (
+    ontology_id BIGINT NOT NULL,
+    ontology_name VARCHAR(128) NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    audit_info TEXT NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (ontology_id),
+    CONSTRAINT uk_onm_mid_name_del UNIQUE (metalake_id, ontology_name, deleted_at)
+);
+
+CREATE INDEX IF NOT EXISTS idx_onm_deleted ON ontology_meta (deleted_at);
+
+CREATE TABLE IF NOT EXISTS ontology_version_info (
+    id BIGSERIAL,
+    metalake_id BIGINT NOT NULL,
+    ontology_id BIGINT NOT NULL,
+    version INT NOT NULL,
+    ontology_comment TEXT DEFAULT NULL,
+    definition TEXT NOT NULL,
+    properties TEXT DEFAULT NULL,
+    audit_info TEXT NOT NULL,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_onvi_oid_ver_del UNIQUE (ontology_id, version, deleted_at)
+);
+
+CREATE INDEX IF NOT EXISTS idx_onvi_mid ON ontology_version_info (metalake_id) WHERE deleted_at = 0;
+
+CREATE INDEX IF NOT EXISTS idx_onvi_deleted ON ontology_version_info (deleted_at);
