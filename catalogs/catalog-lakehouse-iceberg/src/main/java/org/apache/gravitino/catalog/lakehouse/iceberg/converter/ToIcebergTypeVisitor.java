@@ -41,26 +41,7 @@ public class ToIcebergTypeVisitor<T> {
    * @throws IllegalArgumentException If the type contains an unrecognized type.
    */
   public static <T> T visit(Type type, ToIcebergTypeVisitor<T> visitor) {
-<<<<<<< HEAD
-    if (type instanceof Types.MapType) {
-      Types.MapType map = (Types.MapType) type;
-      return visitor.map(map, visit(map.keyType(), visitor), visit(map.valueType(), visitor));
-    } else if (type instanceof Types.ListType) {
-      Types.ListType list = (Types.ListType) type;
-      return visitor.array(list, visit(list.elementType(), visitor));
-    } else if (type instanceof Types.StructType) {
-      Types.StructType.Field[] fields = ((Types.StructType) type).fields();
-      List<T> fieldResults = Lists.newArrayListWithExpectedSize(fields.length);
-      for (Types.StructType.Field field : fields) {
-        fieldResults.add(visitor.field(field, visit(field.type(), visitor)));
-      }
-      return visitor.struct((Types.StructType) type, fieldResults);
-    } else {
-      return visitor.atomic((Type.PrimitiveType) type);
-    }
-=======
     return visit(type, visitor, "");
->>>>>>> ec348efae ([#15257] fix(iceberg): Return 400 for unrecognized column types (#15258))
   }
 
   public T struct(IcebergTable struct, List<T> fieldResults) {
@@ -86,12 +67,6 @@ public class ToIcebergTypeVisitor<T> {
   public T atomic(Type.PrimitiveType primitive) {
     throw new UnsupportedOperationException();
   }
-<<<<<<< HEAD
-=======
-
-  public T nullType(Types.NullType nullType) {
-    throw new UnsupportedOperationException();
-  }
 
   private static <T> T visit(Type type, ToIcebergTypeVisitor<T> visitor, String columnPath) {
     if (type instanceof Types.MapType) {
@@ -111,9 +86,6 @@ public class ToIcebergTypeVisitor<T> {
         fieldResults.add(visitor.field(field, visit(field.type(), visitor, fieldPath)));
       }
       return visitor.struct((Types.StructType) type, fieldResults);
-    } else if (type instanceof Types.NullType) {
-      // NullType implements Type directly rather than PrimitiveType, so it needs its own dispatch.
-      return visitor.nullType((Types.NullType) type);
     } else if (type instanceof Types.UnparsedType) {
       String column = columnPath.isEmpty() ? "" : " for column '" + columnPath + "'";
       throw new IllegalArgumentException(
@@ -126,5 +98,4 @@ public class ToIcebergTypeVisitor<T> {
       return visitor.atomic((Type.PrimitiveType) type);
     }
   }
->>>>>>> ec348efae ([#15257] fix(iceberg): Return 400 for unrecognized column types (#15258))
 }
