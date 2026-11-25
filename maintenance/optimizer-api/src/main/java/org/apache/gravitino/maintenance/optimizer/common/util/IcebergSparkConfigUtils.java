@@ -116,24 +116,13 @@ public final class IcebergSparkConfigUtils {
     params.put("catalog_name", catalogName);
     params.putAll(resolveTemplateSparkPlaceholders(catalogName, sparkConf, flat));
     if (!sparkConf.isEmpty()) {
-      params.put("spark_conf", toSparkConfJson(sparkConf));
+      try {
+        params.put("spark_conf", MAPPER.writeValueAsString(new TreeMap<>(sparkConf)));
+      } catch (JsonProcessingException e) {
+        throw new IllegalArgumentException("Failed to serialize spark_conf", e);
+      }
     }
     return params;
-  }
-
-  /**
-   * Serializes a flat Spark conf map to JSON for the {@code spark_conf} template parameter.
-   *
-   * @param sparkConf flat Spark configuration entries
-   * @return canonical JSON object text
-   */
-  public static String toSparkConfJson(Map<String, String> sparkConf) {
-    Preconditions.checkNotNull(sparkConf, "sparkConf");
-    try {
-      return MAPPER.writeValueAsString(new TreeMap<>(sparkConf));
-    } catch (JsonProcessingException e) {
-      throw new IllegalArgumentException("Failed to serialize spark_conf", e);
-    }
   }
 
   /**

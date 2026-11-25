@@ -97,7 +97,14 @@ public final class JobTemplateResolver {
   public void checkJobConf(@Nullable Map<String, String> jobConf) {
     Map<String, String> conf = jobConf == null ? Collections.emptyMap() : jobConf;
     checkRequiredParameters(conf);
-    checkUnusedKeys(conf);
+    Set<String> unusedKeys = JobTemplatePlaceholderUtils.findUnusedKeys(parameters, conf);
+    if (!unusedKeys.isEmpty()) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Job configuration key(s) %s are not used by job template %s. Template parameters "
+                  + "are %s",
+              unusedKeys, jobTemplateEntity.name(), new TreeSet<>(parameters.keySet())));
+    }
   }
 
   /**
@@ -166,17 +173,6 @@ public final class JobTemplateResolver {
                   + "job configuration, or give them a default value in the template, for example "
                   + "{{name:-default}}",
               missing, jobTemplateEntity.name()));
-    }
-  }
-
-  private void checkUnusedKeys(Map<String, String> jobConf) {
-    Set<String> unusedKeys = JobTemplatePlaceholderUtils.findUnusedKeys(parameters, jobConf);
-    if (!unusedKeys.isEmpty()) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Job configuration key(s) %s are not used by job template %s. Template parameters "
-                  + "are %s",
-              unusedKeys, jobTemplateEntity.name(), new TreeSet<>(parameters.keySet())));
     }
   }
 
