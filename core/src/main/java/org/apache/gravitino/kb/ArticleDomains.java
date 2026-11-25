@@ -137,17 +137,22 @@ final class ArticleDomains {
     if (article.domainIds().isEmpty()) {
       return article;
     }
-    Set<Long> ids = new HashSet<>();
-    List<String> names = new ArrayList<>();
-    for (long id : article.domainIds()) {
+    Map<Long, String> visible = visibleNames(article.domainIds());
+    return article.toBuilder()
+        .withDomains(visible.values().stream().sorted().toList())
+        .withDomainIds(visible.keySet())
+        .build();
+  }
+
+  Map<Long, String> visibleNames(Iterable<Long> domainIds) {
+    Map<Long, String> result = new HashMap<>();
+    for (long id : domainIds) {
       Optional<String> visible = visibleNames.computeIfAbsent(id, this::visibleName);
       if (visible.isPresent()) {
-        ids.add(id);
-        names.add(visible.get());
+        result.put(id, visible.get());
       }
     }
-    names.sort(String::compareTo);
-    return article.toBuilder().withDomains(names).withDomainIds(ids).build();
+    return result;
   }
 
   private Optional<String> visibleName(long id) {

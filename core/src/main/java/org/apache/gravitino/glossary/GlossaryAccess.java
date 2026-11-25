@@ -79,7 +79,8 @@ public final class GlossaryAccess {
     return manage.get();
   }
 
-  static GlossaryAccess forRequest(String metalake, boolean enabled) {
+  /** Returns the current principal's Glossary access for a single operation. */
+  public static GlossaryAccess forRequest(String metalake, boolean enabled) {
     if (!enabled) {
       return UNRESTRICTED;
     }
@@ -164,12 +165,21 @@ public final class GlossaryAccess {
   }
 
   boolean canRead(GlossaryTermEntity term) {
-    return view && (term.status() != GlossaryTerm.Status.DRAFT || canEdit(term));
+    return canRead(term.id(), term.status());
+  }
+
+  /** Checks visibility of the supplied live identity and status in the caller's snapshot. */
+  public boolean canRead(long id, GlossaryTerm.Status status) {
+    return view && (status != GlossaryTerm.Status.DRAFT || canEdit(id));
   }
 
   boolean canEdit(GlossaryTermEntity term) {
     // Listing drafts as a creator requires a current owner lookup per draft to observe transfers.
-    return manage() || (create.get() && owns.test(term.id()));
+    return canEdit(term.id());
+  }
+
+  private boolean canEdit(long id) {
+    return manage() || (create.get() && owns.test(id));
   }
 
   /**
