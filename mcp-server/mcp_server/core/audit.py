@@ -40,6 +40,12 @@ class _WriteTargetSpec:
     type_field: str = ""
 
 
+_ONTOLOGY_TARGET = _WriteTargetSpec("ontology", ("name",))
+_ONTOLOGY_MAPPING_TARGET = _WriteTargetSpec(
+    "ontology_mapping",
+    ("catalog_name", "schema_name", "semantic_model_name", "name"),
+)
+
 # Every mutating (write / delete / action) MCP tool and how to derive the
 # target metadata object from its arguments for audit records.
 WRITE_TARGET_SPECS: dict[str, _WriteTargetSpec] = {
@@ -124,6 +130,13 @@ WRITE_TARGET_SPECS: dict[str, _WriteTargetSpec] = {
         "semantic_model",
         ("catalog_name", "schema_name", "semantic_model_name"),
     ),
+    # Ontologies and their semantic model mappings
+    "create_ontology": _ONTOLOGY_TARGET,
+    "alter_ontology": _ONTOLOGY_TARGET,
+    "drop_ontology": _ONTOLOGY_TARGET,
+    "create_ontology_mapping": _ONTOLOGY_MAPPING_TARGET,
+    "alter_ontology_mapping": _ONTOLOGY_MAPPING_TARGET,
+    "drop_ontology_mapping": _ONTOLOGY_MAPPING_TARGET,
     # Tags and tag associations
     "create_tag": _WriteTargetSpec("tag", ("name",)),
     "alter_tag": _WriteTargetSpec("tag", ("name",)),

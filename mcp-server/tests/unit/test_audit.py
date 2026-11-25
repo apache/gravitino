@@ -560,6 +560,29 @@ class TestAuditMiddlewareIntegration(unittest.TestCase):
 class TestExtractWriteTarget(unittest.TestCase):
     """Unit tests for audit.extract_write_target() and write-tool coverage."""
 
+    def test_ontology_and_mapping_targets(self):
+        mapping = {
+            "catalog_name": "sales",
+            "schema_name": "public",
+            "semantic_model_name": "orders",
+            "name": "customers",
+            "ontology": "Sales",
+        }
+        for action in ("create", "alter", "drop"):
+            with self.subTest(action=action):
+                self.assertEqual(
+                    audit.extract_write_target(
+                        f"{action}_ontology", {"name": "Sales"}, "ml"
+                    ),
+                    ("ontology", "ml.Sales"),
+                )
+                self.assertEqual(
+                    audit.extract_write_target(
+                        f"{action}_ontology_mapping", mapping, "ml"
+                    ),
+                    ("ontology_mapping", "ml.sales.public.orders.customers"),
+                )
+
     def test_extracts_hierarchical_and_special_targets(self):
         self.assertEqual(
             audit.extract_write_target(
