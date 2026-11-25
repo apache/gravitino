@@ -817,6 +817,25 @@ CREATE TABLE IF NOT EXISTS `domain_rel` (
     KEY `domain_rel_idx_metalake` (`metalake_id`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'domain parent relation';
 
+CREATE TABLE IF NOT EXISTS glossary_term_version_head (
+    term_id BIGINT PRIMARY KEY COMMENT 'Stable term ID shared by all versions, including candidates created before first publication',
+    metalake_id BIGINT NOT NULL COMMENT 'Metalake that owns the term and scopes its reserved name',
+    last_version BIGINT NOT NULL COMMENT 'Highest business version allocated for this term, including superseded and rejected versions',
+    published_version BIGINT COMMENT 'Version currently served to readers, NULL until the first publication',
+    candidate_version BIGINT COMMENT 'Current draft or submitted version, NULL when the term has no pending changes',
+    reserved_name VARCHAR(384) COLLATE utf8mb4_bin COMMENT 'Normalized term name held by an unpublished candidate, released on publication or rejection',
+    CONSTRAINT uk_glossary_candidate_name UNIQUE (metalake_id, reserved_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Publication pointers and pending name reservation for one glossary term';
+
+CREATE TABLE IF NOT EXISTS glossary_term_version_info (
+    term_id BIGINT NOT NULL COMMENT 'Stable term ID to which this snapshot belongs',
+    version_id BIGINT NOT NULL COMMENT 'Business version number within the term, used to address this exact snapshot',
+    base_revision BIGINT NOT NULL COMMENT 'Concurrency revision of the live definition when this snapshot was taken, zero for an unpublished creation',
+    lifecycle VARCHAR(16) NOT NULL COMMENT 'Publication state of this version: DRAFT, SUBMITTED, PUBLISHED, REJECTED or SUPERSEDED',
+    snapshot LONGTEXT NOT NULL COMMENT 'JSON containing the definition, audit fields, synonyms, domain membership and term relationships at capture time',
+    PRIMARY KEY (term_id, version_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Historical glossary term snapshots and their publication outcomes';
+
 CREATE TABLE IF NOT EXISTS glossary_term_meta (
     term_id BIGINT NOT NULL PRIMARY KEY COMMENT 'globally unique glossary term id',
     metalake_id BIGINT NOT NULL COMMENT 'owning metalake id',

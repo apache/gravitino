@@ -21,6 +21,7 @@ package org.apache.gravitino.glossary;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -70,6 +71,7 @@ import org.apache.gravitino.dto.glossary.TermDTO;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
+import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.NonEmptyDomainException;
 import org.apache.gravitino.exceptions.TermAlreadyExistsException;
 import org.apache.gravitino.exceptions.TermVersionConflictException;
@@ -775,14 +777,305 @@ class TestGlossaryDomains extends TestJDBCBackend {
   /** Review focus: membership follows the domain ID across a rename. */
   @TestTemplate
   void testDomainRenameFollowsId() throws Exception {
-    create("Churn", "Sales");
+    GlossaryTermEntity created = create("Churn", "Sales");
     env.internalDomainDispatcher().alterDomain(LAKE, "Sales", DomainChange.rename("Revenue"));
+    assertArrayEquals(
+        new String[] {"Sales"},
+        as("lakeOwner", () -> manager.getTermVersion(LAKE, created.id(), 1)).term().domains());
     assertArrayEquals(
         new String[] {"Revenue"}, as("lakeOwner", () -> manager.getTerm(LAKE, "Churn")).domains());
     assertThrows(
         NoSuchDomainException.class,
         () ->
             as("lakeOwner", () -> manager.alterTerm(LAKE, "Churn", TermChange.addDomain("Sales"))));
+  }
+
+  @TestTemplate
+  void testViewerCannotSubmitPrivateDraftOrDistinguishVersionNumbers() throws Exception {
+    GlossaryTermEntity live = create("published");
+    GlossaryManager gated = new GlossaryManager(ids::incrementAndGet, true, lake -> true);
+    GlossaryTermEntity draft =
+        as(
+            "lakeOwner",
+            () ->
+                gated.alterTerm(
+                    LAKE, "published", TermChange.setStatus(GlossaryTerm.Status.DRAFT)));
+    assertEquals(List.of(1L), as("viewer", () -> gated.listTermVersions(LAKE, live.id(), null, 1)));
+    assertEquals(
+        List.of(draft.publication().versionId()),
+        as("lakeOwner", () -> gated.listTermVersions(LAKE, live.id(), null, 1)));
+    assertEquals(
+        List.of(1L),
+        as(
+            "lakeOwner",
+            () -> gated.listTermVersions(LAKE, live.id(), draft.publication().versionId(), 1)));
+    for (long version : List.of(1L, draft.publication().versionId(), 3L)) {
+      assertThrows(
+          NoSuchTermException.class,
+          () -> as("viewer", () -> gated.submitDraft(LAKE, live.id(), version)));
+    }
+    assertEquals(
+        TermPublication.State.DRAFT,
+        as(
+                "lakeOwner",
+                () -> gated.getTermVersion(LAKE, live.id(), draft.publication().versionId()))
+            .term()
+            .publication()
+            .state());
+  }
+
+  @TestTemplate
+  void testRecreatedUserCannotInheritCandidate() throws Exception {
+    TermPublicationPolicy policy =
+        new TermPublicationPolicy() {
+          public boolean requiresApproval(String lake) {
+            return true;
+          }
+
+          public boolean canPublishOrRejectCandidate(String lake, long id, long version) {
+            return true;
+          }
+        };
+    GlossaryManager gated = new GlossaryManager(ids::incrementAndGet, true, policy);
+    GlossaryTermEntity candidate =
+        as("writer", () -> gated.createTerm(LAKE, TermSpec.builder("candidate").build()));
+    backend.delete(NameIdentifierUtil.ofUser(LAKE, "writer"), Entity.EntityType.USER, false);
+    user("writer", "create", "useSales");
+    assertThrows(
+        NoSuchTermException.class,
+        () -> as("writer", () -> gated.getTermVersion(LAKE, candidate.id(), 1)));
+    assertThrows(
+        NoSuchTermException.class,
+        () ->
+            as(
+                "writer",
+                () ->
+                    gated.alterTerm(
+                        LAKE, "candidate", TermChange.updateDefinition("replacement"))));
+    assertThrows(
+        NoSuchUserException.class,
+        () -> as("lakeOwner", () -> gated.publishCandidate(LAKE, candidate.id(), 1)));
+    assertThrows(
+        NoSuchTermException.class, () -> as("lakeOwner", () -> manager.getTerm(LAKE, "candidate")));
+    as("lakeOwner", () -> gated.rejectCandidate(LAKE, candidate.id(), 1));
+  }
+
+  @TestTemplate
+  void testCandidatePublicationHandlesRenamedAndDeletedDomains() throws Exception {
+    TermPublicationPolicy policy =
+        new TermPublicationPolicy() {
+          @Override
+          public boolean requiresApproval(String lake) {
+            return true;
+          }
+
+          @Override
+          public boolean canPublishOrRejectCandidate(String lake, long id, long version) {
+            return true;
+          }
+        };
+    List<String[]> observedAfterDomains = new ArrayList<>();
+    GlossaryManager gated =
+        new GlossaryManager(
+            ids::incrementAndGet,
+            true,
+            (before, after, persist) -> {
+              if (after != null) {
+                observedAfterDomains.add(after.domains());
+              }
+              persist.run();
+            },
+            term -> true,
+            GlossaryManager.MAX_HIERARCHY_DEPTH,
+            policy);
+
+    GlossaryTermEntity renamedCandidate =
+        as(
+            "lakeOwner",
+            () ->
+                gated.createTerm(
+                    LAKE, TermSpec.builder("RenamedDomTerm").withDomains("Sales").build()));
+    GlossaryTermEntity toRemove =
+        as(
+            "lakeOwner",
+            () ->
+                gated.createTerm(
+                    LAKE, TermSpec.builder("removeDomain").withDomains("Sales").build()));
+    env.internalDomainDispatcher().alterDomain(LAKE, "Sales", DomainChange.rename("Revenue"));
+    as("lakeOwner", () -> gated.publishCandidate(LAKE, renamedCandidate.id(), 1));
+    assertEquals(1, observedAfterDomains.size());
+    assertArrayEquals(new String[] {"Revenue"}, observedAfterDomains.get(0));
+    assertArrayEquals(
+        new String[] {"Revenue"},
+        as("lakeOwner", () -> manager.getTerm(LAKE, "RenamedDomTerm")).domains());
+
+    GlossaryDomainFixtures.insertDomain(LAKE, "Sales", Domain.Status.PUBLISHED, null, AUDIT_INFO);
+    GlossaryTermEntity removed =
+        as(
+            "lakeOwner",
+            () -> gated.alterTerm(LAKE, "removeDomain", TermChange.removeDomain("Sales")));
+    assertArrayEquals(new String[0], removed.domains());
+    as(
+        "lakeOwner",
+        () -> gated.publishCandidate(LAKE, toRemove.id(), removed.publication().versionId()));
+    assertArrayEquals(
+        new String[0], as("lakeOwner", () -> manager.getTerm(LAKE, "removeDomain")).domains());
+    GlossaryTermEntity deletedDomainCandidate =
+        as(
+            "lakeOwner",
+            () ->
+                gated.createTerm(
+                    LAKE, TermSpec.builder("DeletedDomTerm").withDomains("Finance").build()));
+    GlossaryTermEntity deletedDomainDraft =
+        as(
+            "lakeOwner",
+            () ->
+                gated.createTerm(
+                    LAKE,
+                    TermSpec.builder("DeletedDomDraft")
+                        .withStatus(GlossaryTerm.Status.DRAFT)
+                        .withDomains("Finance")
+                        .build()));
+    env.internalDomainDispatcher().deleteDomain(LAKE, "Finance");
+    assertThrows(
+        NoSuchDomainException.class,
+        () -> as("lakeOwner", () -> gated.publishCandidate(LAKE, deletedDomainCandidate.id(), 1)));
+    assertThrows(
+        NoSuchDomainException.class,
+        () ->
+            as(
+                "lakeOwner",
+                () ->
+                    gated.alterTerm(LAKE, "DeletedDomDraft", TermChange.updateDefinition("new"))));
+    GlossaryTermEntity cleaned =
+        as(
+            "lakeOwner",
+            () ->
+                gated.alterTerm(
+                    LAKE,
+                    "DeletedDomDraft",
+                    TermChange.removeDomain("Finance"),
+                    TermChange.setStatus(GlossaryTerm.Status.DRAFT)));
+    assertArrayEquals(new String[0], cleaned.domains());
+    as(
+        "lakeOwner",
+        () -> gated.submitDraft(LAKE, deletedDomainDraft.id(), cleaned.publication().versionId()));
+    as(
+        "lakeOwner",
+        () ->
+            gated.publishCandidate(
+                LAKE, deletedDomainDraft.id(), cleaned.publication().versionId() + 1));
+    assertArrayEquals(
+        new String[0], as("lakeOwner", () -> manager.getTerm(LAKE, "DeletedDomDraft")).domains());
+  }
+
+  @TestTemplate
+  void testNonOwnerApproverPublishesHiddenDomainAndHidesRenamedDraftDomain() throws Exception {
+    TermPublicationPolicy policy =
+        new TermPublicationPolicy() {
+          @Override
+          public boolean requiresApproval(String lake) {
+            return true;
+          }
+
+          @Override
+          public boolean canPublishOrRejectCandidate(String lake, long id, long version) {
+            return true;
+          }
+        };
+    user("reviewer", "manage", "useSales");
+    GlossaryManager gated = new GlossaryManager(ids::incrementAndGet, true, policy);
+
+    // Content-only edit on a term with an unchanged hidden domain can be published by a
+    // non-lakeOwner approver without access to Finance, preserving the Finance membership.
+    GlossaryTermEntity term =
+        as(
+            "admin",
+            () ->
+                manager.createTerm(
+                    LAKE, TermSpec.builder("HiddenDomainTerm").withDomains("Finance").build()));
+    GlossaryTermEntity edit =
+        as(
+            "admin",
+            () ->
+                gated.alterTerm(LAKE, "HiddenDomainTerm", TermChange.updateDefinition("typo fix")));
+    as("reviewer", () -> gated.publishCandidate(LAKE, term.id(), edit.publication().versionId()));
+    GlossaryTermEntity published = as("admin", () -> manager.getTerm(LAKE, "HiddenDomainTerm"));
+    assertEquals("typo fix", published.definition());
+    assertArrayEquals(new String[] {"Finance"}, published.domains());
+
+    // Publishing a candidate whose added domain was renamed to a hidden DRAFT domain must not
+    // disclose the hidden new name.
+    GlossaryTermEntity draftDomCand =
+        as(
+            "lakeOwner",
+            () ->
+                gated.createTerm(
+                    LAKE, TermSpec.builder("RenamedDraftDom").withDomains("DraftX").build()));
+    env.internalDomainDispatcher().alterDomain(LAKE, "DraftX", DomainChange.rename("SecretDraft"));
+    NoSuchDomainException missing =
+        assertThrows(
+            NoSuchDomainException.class,
+            () -> as("reviewer", () -> gated.publishCandidate(LAKE, draftDomCand.id(), 1)));
+    assertTrue(missing.getMessage().contains("DraftX"));
+    assertFalse(missing.getMessage().contains("SecretDraft"));
+  }
+
+  @TestTemplate
+  void testOwnershipTransferUpdatesCandidateVisibilityAndSubmission() throws Exception {
+    TermPublicationPolicy policy =
+        new TermPublicationPolicy() {
+          @Override
+          public boolean requiresApproval(String lake) {
+            return true;
+          }
+
+          @Override
+          public boolean canPublishOrRejectCandidate(String lake, long id, long version) {
+            return true;
+          }
+        };
+    GlossaryManager gated = new GlossaryManager(ids::incrementAndGet, true, policy);
+
+    GlossaryTermEntity owned =
+        as("writer", () -> manager.createTerm(LAKE, TermSpec.builder("OwnedTerm").build()));
+    GlossaryTermEntity draft =
+        as(
+            "writer",
+            () ->
+                gated.alterTerm(
+                    LAKE,
+                    "OwnedTerm",
+                    TermChange.updateDefinition("draft edit"),
+                    TermChange.setStatus(GlossaryTerm.Status.DRAFT)));
+    as("lakeOwner", () -> transfer(owned, "writer2"));
+
+    // Former owner can still read published history with candidateVersionId masked, but cannot
+    // read, continue, or submit the private draft.
+    TermPublication formerView =
+        as("writer", () -> gated.getTermVersion(LAKE, owned.id(), 1)).term().publication();
+    assertNull(formerView.candidateVersionId());
+    assertEquals(List.of(1L), as("writer", () -> gated.listTermVersions(LAKE, owned.id())));
+    assertThrows(
+        NoSuchTermException.class,
+        () ->
+            as(
+                "writer",
+                () -> gated.getTermVersion(LAKE, owned.id(), draft.publication().versionId())));
+    assertThrows(
+        NoSuchTermException.class,
+        () ->
+            as(
+                "writer",
+                () -> gated.submitDraft(LAKE, owned.id(), draft.publication().versionId())));
+
+    // New owner inherits draft visibility and can submit it for publication.
+    assertEquals(
+        List.of(draft.publication().versionId(), 1L),
+        as("writer2", () -> gated.listTermVersions(LAKE, owned.id())));
+    TermPublication submitted =
+        as("writer2", () -> gated.submitDraft(LAKE, owned.id(), draft.publication().versionId()));
+    assertEquals(TermPublication.State.SUBMITTED, submitted.state());
   }
 
   @TestTemplate

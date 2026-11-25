@@ -171,6 +171,27 @@ public class TestGlossaryContracts {
         IllegalArgumentException.class, () -> TermBindingPage.of(tooMany, null));
   }
 
+  @Test
+  void testTermPublicationValidation() {
+    TermPublication p = new TermPublication(10L, 2L, TermPublication.State.SUBMITTED, 1L, 2L);
+    Assertions.assertEquals(10L, p.termId());
+    Assertions.assertEquals(2L, p.versionId());
+    Assertions.assertEquals(TermPublication.State.SUBMITTED, p.state());
+    Assertions.assertEquals(1L, p.publishedVersionId());
+    Assertions.assertEquals(2L, p.candidateVersionId());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> new TermPublication(10L, 0L, TermPublication.State.DRAFT, null, null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new TermPublication(10L, 1L, null, null, null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> new TermPublication(10L, 1L, TermPublication.State.PUBLISHED, 0L, null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> new TermPublication(10L, 1L, TermPublication.State.SUBMITTED, null, 0L));
+  }
+
   private static TermBinding binding() {
     return TermBinding.implementedBy(
         MetadataObjects.parse("dw.sales.customers", MetadataObject.Type.TABLE));

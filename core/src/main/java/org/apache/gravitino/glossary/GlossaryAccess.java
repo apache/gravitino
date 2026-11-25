@@ -56,6 +56,7 @@ public final class GlossaryAccess {
   private final LongPredicate owns;
   private final BiPredicate<String, DomainEntity> domains;
   private final Map<String, Boolean> visibleDomains = new HashMap<>();
+  private final Map<Long, Boolean> ownedTerms = new HashMap<>();
 
   private GlossaryAccess(
       boolean view,
@@ -168,8 +169,15 @@ public final class GlossaryAccess {
   }
 
   boolean canEdit(GlossaryTermEntity term) {
+    return canEdit(term.id());
+  }
+
+  boolean canEdit(long termId) {
     // Listing drafts as a creator requires a current owner lookup per draft to observe transfers.
-    return manage() || (create.get() && owns.test(term.id()));
+    return manage()
+        || (create.get()
+            && (this == UNRESTRICTED
+                || (this != DENIED && ownedTerms.computeIfAbsent(termId, owns::test))));
   }
 
   /**
@@ -191,6 +199,10 @@ public final class GlossaryAccess {
       return this == UNRESTRICTED;
     }
     return visibleDomains.computeIfAbsent(name, key -> domains.test(key, domain));
+  }
+
+  boolean canCreate() {
+    return create.get();
   }
 
   void requireCreate() {

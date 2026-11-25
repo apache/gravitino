@@ -227,6 +227,19 @@ public class GlossaryTermMetaBaseSQLProvider {
         + "LIMIT 1</script>";
   }
 
+  /** Finds another live term using the same source reference. */
+  public String findOtherTermIdBySourceRef() {
+    return "SELECT term_id FROM "
+        + GlossaryTermMetaMapper.TABLE_NAME
+        + " WHERE metalake_id=#{metalakeId} AND deleted_at=0 AND term_id != #{excludedTermId} AND "
+        + sourceRefPredicate();
+  }
+
+  /** Compares source references with the same semantics as the unique index. */
+  protected String sourceRefPredicate() {
+    return "source_ref=#{sourceRef}";
+  }
+
   /** Finds a different live term whose synonym matches the proposed term name. */
   public String conflictingSynonym(
       @Param("metalakeId") long metalakeId,

@@ -46,6 +46,18 @@ import org.apache.gravitino.exceptions.TermVersionConflictException;
 @Evolving
 public interface GlossaryTerm extends Auditable {
 
+  /**
+   * Identifies the returned business version and its publication outcome on a version-aware write
+   * or history read. A submitted or saved candidate is private and uses DRAFT in the legacy status
+   * field.
+   *
+   * @return the publication metadata, or null for an unversioned result
+   */
+  @Nullable
+  default TermPublication publication() {
+    return null;
+  }
+
   /** The status of a term. */
   enum Status {
     /**

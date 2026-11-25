@@ -42,6 +42,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.TermAlreadyExistsException;
 import org.apache.gravitino.glossary.GlossaryTerm.Status;
 import org.apache.gravitino.glossary.TermLink;
 import org.apache.gravitino.json.JsonUtils;
@@ -50,6 +51,7 @@ import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.meta.GlossaryTermNames;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.GlossaryTermVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.GlossaryTermPO;
@@ -265,6 +267,12 @@ public final class GlossaryTermMetaService {
     SessionUtils.doWithoutCommit(
         GlossaryTermMetaMapper.class,
         mapper -> {
+          SessionUtils.doWithoutCommit(
+              GlossaryTermVersionMapper.class,
+              versions -> {
+                versions.deleteVersionsByMetalakeId(metalakeId);
+                versions.deleteVersionHeadsByMetalakeId(metalakeId);
+              });
           mapper.dropMetalake(metalakeId, deletedAt);
           mapper.dropMetalakeSynonyms(metalakeId, deletedAt);
           GlossaryTermRelService.getInstance().dropMetalake(metalakeId);
@@ -285,6 +293,15 @@ public final class GlossaryTermMetaService {
             return count;
           }
           for (Long id : mapper.expired(cutoff, limit - count)) {
+            // Purges version history for expired published terms. Rejected unpublished candidates
+            // have no glossary_term_meta row and remain retained until Step 2 workflow retention
+            // or metalake deletion.
+            SessionUtils.doWithoutCommit(
+                GlossaryTermVersionMapper.class,
+                versions -> {
+                  versions.deleteVersionsByTermId(id);
+                  versions.deleteVersionHeadByTermId(id);
+                });
             mapper.purgeSynonyms(id);
             count += mapper.purge(id);
           }
@@ -334,13 +351,19 @@ public final class GlossaryTermMetaService {
     return transaction(ns, true, missingParent, (mapper, lake) -> operation.apply(lake));
   }
 
-  /** Checks indexed name/synonym conflicts inside the caller's hierarchy transaction. */
-  public void checkTermNames(GlossaryTermEntity term) {
+  /** Checks for conflicting live names, synonyms and external source references. */
+  public void validateTermNameSynonymsAndSourceRef(GlossaryTermEntity term) {
     String name = GlossaryTermNames.key(term.name());
     long metalakeId = metalake(term.namespace()).getMetalakeId();
     SessionUtils.doWithoutCommit(
         GlossaryTermMetaMapper.class,
         mapper -> {
+          if (mapper.conflictingName(metalakeId, term.id(), List.of(name)) != null
+              || (term.sourceRef() != null
+                  && mapper.findOtherTermIdBySourceRef(metalakeId, term.id(), term.sourceRef())
+                      != null)) {
+            throw new TermAlreadyExistsException("Term name or source reference already exists");
+          }
           Preconditions.checkArgument(
               mapper.conflictingSynonym(metalakeId, term.id(), name) == null,
               "Term name conflicts with a synonym");
@@ -523,7 +546,7 @@ public final class GlossaryTermMetaService {
         (key, value) -> mapper.addSynonym(row.getTermId(), row.getMetalakeId(), value, key));
   }
 
-  private GlossaryTermPO toPO(GlossaryTermEntity entity, long metalakeId) {
+  GlossaryTermPO toPO(GlossaryTermEntity entity, long metalakeId) {
     GlossaryTermPO row = new GlossaryTermPO();
     row.setTermId(entity.id());
     row.setMetalakeId(metalakeId);
@@ -561,7 +584,7 @@ public final class GlossaryTermMetaService {
         ns);
   }
 
-  private GlossaryTermEntity fromPO(
+  GlossaryTermEntity fromPO(
       GlossaryTermPO row, List<String> synonyms, @Nullable List<String> domains, Namespace ns) {
     try {
       List<Map<String, String>> links =
