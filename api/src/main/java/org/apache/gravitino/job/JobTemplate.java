@@ -19,8 +19,6 @@
 package org.apache.gravitino.job;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -330,11 +328,12 @@ public abstract class JobTemplate {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(executable), "Executable must not be null or empty");
 
-      this.arguments = arguments != null ? ImmutableList.copyOf(arguments) : ImmutableList.of();
-      this.environments =
-          environments != null ? ImmutableMap.copyOf(environments) : ImmutableMap.of();
-      this.customFields =
-          customFields != null ? ImmutableMap.copyOf(customFields) : ImmutableMap.of();
+      JobTemplateValidations.checkNoNullElements("arguments", arguments);
+      JobTemplateValidations.checkNoBlankKeysOrNullValues("environments", environments);
+      JobTemplateValidations.checkNoBlankKeysOrNullValues("customFields", customFields);
+      this.arguments = JobTemplateValidations.immutableListCopy(arguments);
+      this.environments = JobTemplateValidations.immutableMapCopy(environments);
+      this.customFields = JobTemplateValidations.immutableMapCopy(customFields);
     }
   }
 }
