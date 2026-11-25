@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.domain.SupportsDomains;
+import org.apache.gravitino.ontology.SupportsOntologyMappings;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.tag.SupportsTags;
 
@@ -114,6 +115,13 @@ public interface SemanticModel extends SemanticModelRevision {
    */
   default SupportsPolicies supportsPolicies() {
     throw new UnsupportedOperationException("Semantic Model does not support policy operations.");
+  }
+
+  /**
+   * @return The ontology mapping operations for this Semantic Model.
+   */
+  default SupportsOntologyMappings supportsOntologyMappings() {
+    throw new UnsupportedOperationException("Semantic Model does not support ontology mappings.");
   }
 
   /**

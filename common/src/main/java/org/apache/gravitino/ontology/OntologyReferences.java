@@ -23,9 +23,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +35,7 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
 import org.apache.gravitino.exceptions.IllegalOntologyException;
+import org.apache.gravitino.exceptions.IllegalOntologyMappingException;
 
 /** Indexes a structurally validated ontology and checks its structured references. */
 public final class OntologyReferences {
@@ -75,6 +78,7 @@ public final class OntologyReferences {
                     throw new IllegalOntologyException(
                         "%s: identifying relationship '%s' must be binary", path, identifier);
                   }
+                  concept.identifiers.add(relationship);
                 }));
   }
 
@@ -82,10 +86,34 @@ public final class OntologyReferences {
    * Validates ontology names, inheritance, and relationship references and builds an index.
    *
    * @param definition The ontology definition after structural validation.
-   * @return The validated ontology index.
+   * @return The index for validating one or more mappings.
    */
   public static OntologyReferences of(OntologyDefinition definition) {
     return new OntologyReferences(definition);
+  }
+
+  /**
+   * Validates the structured concept and relationship references in a mapping.
+   *
+   * @param definition The mapping definition after structural validation.
+   */
+  public void validateMapping(OntologyMappingDefinition definition) {
+    JsonNode root = MAPPER.valueToTree(definition.fields());
+    visit(
+        root.path("conceptMappings"),
+        "$.conceptMappings",
+        (node, path) -> {
+          String concept = node.path("concept").asText();
+          requireMappingConcept(concept, path + ".concept");
+          visit(
+              node.path("objectMappings"),
+              path + ".objectMappings",
+              (object, objectPath) -> checkObjectMapping(object, concept, objectPath));
+          visit(
+              node.path("linkMappings"),
+              path + ".linkMappings",
+              (link, linkPath) -> checkLinkMapping(link, concept, linkPath, 1));
+        });
   }
 
   private void validateDeclaration(Concept concept) {
@@ -162,6 +190,20 @@ public final class OntologyReferences {
   }
 
   @Nullable
+  private JsonNode findRelationship(String concept, String name) {
+    if (name.contains(".")) {
+      int separator = name.indexOf('.');
+      String qualifier = name.substring(0, separator);
+      if (!lineage(concept).contains(qualifier)) {
+        return null;
+      }
+      concept = qualifier;
+      name = name.substring(separator + 1);
+    }
+    return findRelationshipByDeclaredName(concept, name);
+  }
+
+  @Nullable
   private JsonNode findRelationshipByDeclaredName(String concept, String name) {
     for (String ancestor : lineage(concept)) {
       Concept declaration = concepts.get(ancestor);
@@ -193,6 +235,81 @@ public final class OntologyReferences {
     return ordered;
   }
 
+  private void checkObjectMapping(JsonNode node, @Nullable String concept, String path) {
+    String target = concept;
+    if (node.has("concept")) {
+      target = node.path("concept").asText();
+      requireMappingConcept(target, path + ".concept");
+    }
+    checkObjectReference(node, target, path);
+  }
+
+  private void checkObjectReference(JsonNode node, @Nullable String concept, String path) {
+    JsonNode referents = node.path("referentMappings");
+    Concept target = concepts.get(concept);
+    if (node.has("expression")
+        && referents.isEmpty()
+        && target != null
+        && target.identifiers.size() > 1
+        && "EntityType".equals(target.node.path("type").asText())) {
+      throw new IllegalOntologyMappingException(
+          "%s.expression: concept '%s' has a compound identifier and requires referent mappings",
+          path, concept);
+    }
+    checkReferents(referents, concept, path + ".referentMappings");
+  }
+
+  private void checkReferents(JsonNode nodes, @Nullable String concept, String path) {
+    visit(
+        nodes,
+        path,
+        (node, here) -> {
+          String name = node.path("relationship").asText();
+          JsonNode relationship = requireRelationship(concept, name, here + ".relationship");
+          if (!concepts.get(concept).identifiers.contains(relationship)) {
+            throw new IllegalOntologyMappingException(
+                "%s.relationship: '%s' is not an identifying relationship of '%s'",
+                here, name, concept);
+          }
+          checkObjectReference(node, lastRole(relationship), here);
+        });
+  }
+
+  private void checkLinkMapping(JsonNode node, String concept, String path, int depth) {
+    JsonNode relationship = null;
+    if (node.has("relationship")) {
+      String name = node.path("relationship").asText();
+      relationship = requireRelationship(concept, name, path + ".relationship");
+      int arity = 1 + relationship.path("roles").size();
+      if (arity != depth) {
+        throw new IllegalOntologyMappingException(
+            "%s.relationship: '%s' has arity %s but is mapped at depth %s",
+            path, name, arity, depth);
+      }
+    }
+    checkObjectMapping(
+        node.path("objectMapping"),
+        depth == 1 ? concept : lastRole(relationship),
+        path + ".objectMapping");
+    visit(
+        node.path("children"),
+        path + ".children",
+        (child, childPath) -> checkLinkMapping(child, concept, childPath, depth + 1));
+  }
+
+  private JsonNode requireRelationship(@Nullable String concept, String name, String path) {
+    if (concept == null) {
+      throw new IllegalOntologyMappingException(
+          "%s: no concept to resolve relationship '%s' on", path, name);
+    }
+    JsonNode result = findRelationship(concept, name);
+    if (result == null) {
+      throw new IllegalOntologyMappingException(
+          "%s: relationship '%s' is not declared or inherited by '%s'", path, name, concept);
+    }
+    return result;
+  }
+
   private boolean hasConcept(String name) {
     return BUILT_INS.contains(name) || concepts.containsKey(name);
   }
@@ -201,6 +318,21 @@ public final class OntologyReferences {
     if (!hasConcept(name)) {
       throw new IllegalOntologyException("%s: unknown concept '%s'", path, name);
     }
+  }
+
+  private void requireMappingConcept(String name, String path) {
+    if (!hasConcept(name)) {
+      throw new IllegalOntologyMappingException("%s: unknown concept '%s'", path, name);
+    }
+  }
+
+  @Nullable
+  private static String lastRole(@Nullable JsonNode relationship) {
+    if (relationship == null) {
+      return null;
+    }
+    JsonNode roles = relationship.path("roles");
+    return roles.isEmpty() ? null : roles.get(roles.size() - 1).path("concept").asText();
   }
 
   private static void visit(JsonNode items, String path, BiConsumer<JsonNode, String> visitor) {
@@ -215,6 +347,8 @@ public final class OntologyReferences {
     private final String path;
     private final List<String> parents = new ArrayList<>();
     private final Map<String, JsonNode> relationships = new HashMap<>();
+    // Track the resolved declarations so identical JSON in different concepts stays distinct.
+    private final Set<JsonNode> identifiers = Collections.newSetFromMap(new IdentityHashMap<>());
 
     private Concept(JsonNode node, String path) {
       this.node = node;

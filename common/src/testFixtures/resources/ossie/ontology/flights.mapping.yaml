@@ -1,0 +1,314 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+version: 0.3.0.dev0
+name: flights_mapping
+description: Maps the Flights ontology onto the Flights semantic model
+ontology_ref:
+  name: Flights
+  iri: ./flights.ontology.yaml
+semantic_model_ref:
+  name: Flights semantic model
+  iri: ./flights.semantic_model.yaml
+concept_mappings:
+- concept: Runway
+  object_mappings:
+  - referent_mappings:
+    - relationship: designator
+      expression: RUNWAY.designator
+    - relationship: airport
+      referent_mappings:
+      - relationship: code
+        expression: RUNWAY.airport_code
+  link_mappings:
+  - object_mapping:
+      referent_mappings:
+      - relationship: designator
+        expression: RUNWAY.designator
+      - relationship: airport
+        referent_mappings:
+        - relationship: code
+          expression: RUNWAY.airport_code
+    children:
+    - object_mapping:
+        concept: RunwayLength
+        expression: RUNWAY.length
+      relationship: length
+    - object_mapping:
+        concept: RunwayGeometry
+        expression: RUNWAY.shape
+      relationship: geometry
+- concept: Manufacturer
+  object_mappings:
+  - referent_mappings:
+    - relationship: name
+      expression: AIRCRAFT.manufacturer
+- concept: Model
+  object_mappings:
+  - referent_mappings:
+    - relationship: name
+      expression: AIRCRAFT.model
+    - relationship: manufacturer
+      referent_mappings:
+        - relationship: name
+          expression: AIRCRAFT.manufacturer
+- concept: Aircraft
+  object_mappings:
+  - referent_mappings:
+    - relationship: tailnum
+      expression: AIRCRAFT.tail_nr
+  link_mappings:
+  - object_mapping:
+      referent_mappings:
+      - relationship: tailnum
+        expression: AIRCRAFT.tail_nr
+    children:
+    - object_mapping:
+        concept: SerialNr
+        expression: AIRCRAFT.serial_nr
+      relationship: serial_number
+    - object_mapping:
+        concept: String
+        expression: AIRCRAFT.name
+      relationship: name
+    - object_mapping:
+        concept: Integer
+        expression: AIRCRAFT.nr_seats
+      relationship: number_of_seats
+    - object_mapping:
+        concept: Model
+        referent_mappings:
+        - relationship: name
+          expression: AIRCRAFT.model
+        - relationship: manufacturer
+          referent_mappings:
+          - relationship: name
+            expression: AIRCRAFT.manufacturer
+      relationship: model
+    - object_mapping:
+        concept: Year
+        expression: AIRCRAFT.year
+      relationship: year_manufactured
+    - object_mapping:
+        concept: Capacity
+        expression: AIRCRAFT.capacity
+      relationship: capacity
+    - object_mapping:
+        concept: Carrier
+        referent_mappings:
+        - relationship: code
+          expression: AIRCRAFT.carrier_code
+      relationship: carrier
+- concept: State
+  object_mappings:
+  - referent_mappings:
+    - relationship: code
+      expression: AIRPORT.state_code
+  link_mappings:
+  - object_mapping:
+      referent_mappings:
+      - relationship: code
+        expression: AIRPORT.state_code
+    children:
+    - object_mapping:
+        concept: StateName
+        expression: AIRPORT.state_nm
+      relationship: name
+- concept: City
+  object_mappings:
+  - referent_mappings:
+    - relationship: name
+      expression: AIRPORT.city_nm
+    - relationship: state
+      referent_mappings:
+      - relationship: code
+        expression: AIRPORT.state_code
+- concept: Market
+  object_mappings:
+  - referent_mappings:
+    - relationship: name
+      expression: AIRPORT.market_nm
+- concept: Airport
+  object_mappings:
+  - referent_mappings:
+    - relationship: code
+      expression: AIRPORT.code
+  link_mappings:
+  - object_mapping:
+      referent_mappings:
+      - relationship: code
+        expression: AIRPORT.code
+    children:
+    - object_mapping:
+        concept: City
+        referent_mappings:
+        - relationship: name
+          expression: AIRPORT.city_nm
+        - relationship: state
+          referent_mappings:
+          - relationship: code
+            expression: AIRPORT.state_code
+      relationship: city
+    - object_mapping:
+        concept: Market
+        referent_mappings:
+        - relationship: name
+          expression: AIRPORT.market_nm
+      relationship: serves
+    - object_mapping:
+        concept: DegreesLongitude
+        expression: AIRPORT.longitude
+      relationship: longitude
+    - object_mapping:
+        concept: AirportName
+        expression: AIRPORT.name
+      relationship: name
+    - object_mapping:
+        concept: DegreesLatitude
+        expression: AIRPORT.latitude
+      relationship: latitude
+- concept: Flight
+  object_mappings:
+  - referent_mappings:
+    - relationship: id
+      expression: FLIGHT.id
+  link_mappings:
+  - object_mapping:
+      referent_mappings:
+      - relationship: id
+        expression: FLIGHT.id WHERE ( FLIGHT.diverted == TRUE )
+    relationship: diverted
+  - object_mapping:
+      referent_mappings:
+      - relationship: id
+        expression: FLIGHT.id WHERE ( FLIGHT.cancelled == TRUE )
+    relationship: canceled
+  - object_mapping:
+      referent_mappings:
+      - relationship: id
+        expression: FLIGHT.id
+    children:
+    - object_mapping:
+        concept: Delay
+        expression: FLIGHT.arr_delay
+      relationship: arrival_delay
+    - object_mapping:
+        concept: Delay
+        expression: FLIGHT.dep_delay
+      relationship: departure_delay
+    - object_mapping:
+        concept: FlightNr
+        expression: FLIGHT.nr
+      relationship: number
+    - object_mapping:
+        concept: DateTime
+        expression: FLIGHT.scheduled_departure
+      relationship: scheduled_departure
+    - object_mapping:
+        concept: CancelationReason
+        referent_mappings:
+        - relationship: code
+          expression: FLIGHT.cancel_code
+      relationship: canceled_due_to
+    - object_mapping:
+        concept: Distance
+        expression: FLIGHT.distance
+      relationship: distance
+    - object_mapping:
+        concept: DateTime
+        expression: FLIGHT.scheduled_arrival
+      relationship: scheduled_arrival
+    - object_mapping:
+        concept: Date
+        expression: FLIGHT.date
+      relationship: date
+    - object_mapping:
+        concept: DateTime
+        expression: FLIGHT.departure
+      relationship: departs_at
+    - object_mapping:
+        concept: DateTime
+        expression: FLIGHT.arrival
+      relationship: arrives_at
+    - object_mapping:
+        concept: Route
+        referent_mappings:
+        - relationship: id
+          expression: FLIGHT.route_id
+      relationship: route
+    - object_mapping:
+        concept: Aircraft
+        referent_mappings:
+        - relationship: tailnum
+          expression: FLIGHT.tail_nr
+      relationship: aircraft
+    - object_mapping:
+        concept: Carrier
+        referent_mappings:
+        - relationship: code
+          expression: FLIGHT.carrier_code
+      relationship: operated_by
+- concept: Carrier
+  object_mappings:
+  - referent_mappings:
+    - relationship: code
+      expression: CARRIER.code
+  link_mappings:
+  - object_mapping:
+      referent_mappings:
+      - relationship: code
+        expression: CARRIER.code
+    children:
+    - object_mapping:
+        concept: CarrierName
+        expression: CARRIER.name
+      relationship: name
+- concept: Route
+  object_mappings:
+  - referent_mappings:
+    - relationship: id
+      expression: ROUTE.id
+  link_mappings:
+  - object_mapping:
+      referent_mappings:
+      - relationship: id
+        expression: ROUTE.id
+    children:
+    - object_mapping:
+        concept: Distance
+        expression: ROUTE.distance
+      relationship: distance
+    - object_mapping:
+        concept: DistanceGroup
+        expression: ROUTE.dist_grp
+      relationship: lies_in
+    - object_mapping:
+        concept: String
+        expression: ROUTE.name
+      relationship: route_name
+    - object_mapping:
+        concept: Airport
+        referent_mappings:
+        - relationship: code
+          expression: ROUTE.dest_airport_code
+      relationship: destination
+    - object_mapping:
+        concept: Airport
+        referent_mappings:
+        - relationship: code
+          expression: ROUTE.orig_airport_code
+      relationship: departure

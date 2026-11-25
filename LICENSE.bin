@@ -206,7 +206,7 @@
    This product bundles various third-party components also under the
    Apache Software License 2.0 from:
 
-   Apache Ossie (ontology schema)
+   Apache Ossie (ontology and mapping schemas)
    NetworkNT JSON Schema Validator
    Ethlo Time ITU
    Apache Hive
