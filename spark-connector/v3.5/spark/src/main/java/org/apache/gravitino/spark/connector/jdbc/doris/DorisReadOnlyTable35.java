@@ -22,6 +22,8 @@ package org.apache.gravitino.spark.connector.jdbc.doris;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
+import javax.annotation.Nullable;
 import org.apache.gravitino.spark.connector.jdbc.SparkJdbcTable;
 import org.apache.spark.sql.connector.catalog.SupportsRead;
 import org.apache.spark.sql.connector.catalog.Table;
@@ -34,9 +36,20 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 final class DorisReadOnlyTable35 implements Table, SupportsRead {
 
   private final SparkJdbcTable jdbcTable;
+  @Nullable private final Supplier<Table> nativeTable;
+  private final Runnable validateNativeOptions;
 
   DorisReadOnlyTable35(SparkJdbcTable jdbcTable) {
+    this(jdbcTable, null, () -> {});
+  }
+
+  DorisReadOnlyTable35(
+      SparkJdbcTable jdbcTable,
+      @Nullable Supplier<Table> nativeTable,
+      Runnable validateNativeOptions) {
     this.jdbcTable = jdbcTable;
+    this.nativeTable = nativeTable;
+    this.validateNativeOptions = validateNativeOptions;
   }
 
   @Override
@@ -63,6 +76,21 @@ final class DorisReadOnlyTable35 implements Table, SupportsRead {
   @Override
   public ScanBuilder newScanBuilder(CaseInsensitiveStringMap options) {
     DorisPropertiesConverter35.validateReadOptions(options);
-    return jdbcTable.newScanBuilder(options);
+    if (nativeTable == null) {
+      return jdbcTable.newScanBuilder(options);
+    }
+    DorisPropertiesConverter35.validateNativeReadOptions(options);
+    // Creating the JDBC builder also checks the vended credential and JDBC connection snapshot.
+    ScanBuilder jdbcBuilder = jdbcTable.newScanBuilder(options);
+    validateNativeOptions.run();
+    Table delegate = nativeTable.get();
+    if (delegate == null) {
+      return jdbcBuilder;
+    }
+    return new DorisHybridScanBuilder35(
+        ((SupportsRead) delegate)
+            .newScanBuilder(new CaseInsensitiveStringMap(Collections.emptyMap())),
+        jdbcBuilder,
+        jdbcTable.schema());
   }
 }

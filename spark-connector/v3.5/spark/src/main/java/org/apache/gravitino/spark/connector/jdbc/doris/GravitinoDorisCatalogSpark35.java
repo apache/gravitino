@@ -20,8 +20,11 @@
 package org.apache.gravitino.spark.connector.jdbc.doris;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.JdbcCredential;
@@ -33,6 +36,7 @@ import org.apache.gravitino.spark.connector.jdbc.SparkJdbcTable;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.NamespaceChange;
+import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.catalog.TableChange;
 import org.apache.spark.sql.connector.catalog.TableWritePrivilege;
@@ -43,10 +47,15 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 /** Spark 3.5 Gravitino-owned, read-only Doris catalog facade. */
 public class GravitinoDorisCatalogSpark35 extends GravitinoJdbcCatalogSpark35 {
+  private Map<String, String> nativeOptions = Collections.emptyMap();
 
   @Override
   protected TableCatalog createAndInitSparkCatalog(
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
+    nativeOptions = DorisPropertiesConverter35.nativeOptions(properties);
+    if (!nativeOptions.isEmpty()) {
+      DorisPropertiesConverter35.validateNativeReadOptions(options);
+    }
     return initializeJdbcTableCatalog(
         name, options, jdbcOptions(gravitinoCatalog(), options, properties));
   }
@@ -94,7 +103,49 @@ public class GravitinoDorisCatalogSpark35 extends GravitinoJdbcCatalogSpark35 {
                 propertiesConverter,
                 sparkTransformConverter,
                 sparkTypeConverter);
-    return new DorisReadOnlyTable35(jdbcTable);
+    if (nativeOptions.isEmpty() || !supportsNativeIdentifier(identifier)) {
+      return new DorisReadOnlyTable35(jdbcTable);
+    }
+    Map<String, String> options = new HashMap<>(nativeOptions);
+    JdbcCredential credential = requiredJdbcCredential(gravitinoCatalog());
+    return new DorisReadOnlyTable35(
+        jdbcTable,
+        () -> createNativeTable(identifier, jdbcTable.schema(), options, credential),
+        () -> validateNativeOptionsUnchanged(options));
+  }
+
+  private static boolean supportsNativeIdentifier(Identifier identifier) {
+    return identifier.namespace().length == 1
+        && !identifier.namespace()[0].contains(".")
+        && !identifier.name().contains(".")
+        && !identifier.namespace()[0].contains("`")
+        && !identifier.name().contains("`");
+  }
+
+  @Nullable
+  private static Table createNativeTable(
+      Identifier identifier,
+      StructType schema,
+      Map<String, String> options,
+      JdbcCredential credential) {
+    if (!scala.util.Properties$.MODULE$.versionNumberString().startsWith("2.12.")) {
+      throw new IllegalStateException("Doris native reads require Scala 2.12");
+    }
+    try {
+      return DorisNativeTableFactory35.create(identifier, schema, options, credential);
+    } catch (LinkageError e) {
+      throw new IllegalStateException(
+          "Doris native reads require the Spark 3.5 Doris connector on the classpath");
+    }
+  }
+
+  private void validateNativeOptionsUnchanged(Map<String, String> options) {
+    Map<String, String> current =
+        DorisPropertiesConverter35.nativeOptions(propertiesWithSecrets(refreshGravitinoCatalog()));
+    if (!options.equals(current)) {
+      throw new IllegalStateException(
+          "Doris native catalog settings changed; restart the Spark session before reading");
+    }
   }
 
   @Override

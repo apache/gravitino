@@ -17,6 +17,7 @@
  * under the License.
  */
 import com.diffplug.gradle.spotless.SpotlessExtension
+import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
 
 plugins {
   `maven-publish`
@@ -113,6 +114,7 @@ dependencies {
   }
   compileOnly("org.apache.spark:spark-core_$scalaVersion:$sparkVersion")
   compileOnly("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion")
+  compileOnly("org.apache.doris:spark-doris-connector-spark-3.5:26.1.0")
   compileOnly("org.scala-lang.modules:scala-java8-compat_$scalaVersion:$scalaJava8CompatVersion")
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
   compileOnly("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
@@ -230,6 +232,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.lance.namespace.apache.client)
   testImplementation(libs.mysql.driver)
+  testImplementation("org.apache.doris:spark-doris-connector-spark-3.5:26.1.0")
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
   testImplementation(libs.aws.policy)
@@ -264,6 +267,18 @@ dependencies {
 }
 
 tasks.test {
+  if (!project.hasProperty("dorisStandaloneIT")) {
+    useJUnitPlatform {
+      excludeTags("doris-standalone")
+    }
+  }
+  // Standalone executors use uninstrumented JARs. Instrumenting only the test driver changes the
+  // default serialVersionUID of classes without an explicit value and breaks task serialization.
+  if (System.getenv("GRAVITINO_TEST_SPARK_MASTER") != null) {
+    extensions.configure<JacocoTaskExtension> {
+      isEnabled = false
+    }
+  }
   val skipITs = project.hasProperty("skipITs")
   val enableSparkSQLITs = project.hasProperty("enableSparkSQLITs")
   if (!enableSparkSQLITs) {
@@ -285,6 +300,7 @@ tasks.test {
     dependsOn(":catalogs:catalog-lakehouse-paimon:jar")
     dependsOn(":catalogs:catalog-jdbc-mysql:jar")
     dependsOn(":catalogs:catalog-jdbc-postgresql:jar")
+    dependsOn(":catalogs:catalog-jdbc-doris:jar")
   }
 }
 
