@@ -101,12 +101,19 @@ public class SemanticModelVersionInfoBaseSQLProvider {
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
 
-  /** Returns SQL for finding Semantic Models that exceed a version retention count. */
+  /** Returns SQL for finding Semantic Models with snapshots eligible for retention cleanup. */
   public String selectSemanticModelVersionsByRetentionCount(
       @Param("versionRetentionCount") Long versionRetentionCount) {
-    return "SELECT semantic_model_id AS semanticModelId, current_version AS version FROM "
+    // Keep the cutoff nonnegative for unsigned version columns.
+    return "SELECT smm.semantic_model_id AS semanticModelId, smm.current_version AS version FROM "
         + SemanticModelMetaMapper.TABLE_NAME
-        + " WHERE current_version > #{versionRetentionCount} AND deleted_at = 0";
+        + " smm WHERE smm.current_version > #{versionRetentionCount} AND smm.deleted_at = 0"
+        + " AND EXISTS (SELECT 1 FROM "
+        + SemanticModelVersionInfoMapper.TABLE_NAME
+        + " smvi WHERE smvi.semantic_model_id = smm.semantic_model_id"
+        + " AND smvi.version <= smm.current_version"
+        + " - LEAST(smm.current_version, #{versionRetentionCount})"
+        + " AND smvi.version <> smm.active_version AND smvi.deleted_at = 0)";
   }
 
   /** Returns SQL for soft-deleting snapshots through a per-model retention line. */

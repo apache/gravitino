@@ -1073,7 +1073,7 @@ COMMENT ON COLUMN semantic_model_version_info.catalog_id IS 'catalog id';
 COMMENT ON COLUMN semantic_model_version_info.schema_id IS 'schema id';
 COMMENT ON COLUMN semantic_model_version_info.semantic_model_id IS 'semantic model id';
 COMMENT ON COLUMN semantic_model_version_info.version IS 'semantic model version';
-COMMENT ON COLUMN semantic_model_version_info.publication_status IS 'DRAFT, PUBLISHED_ON_SAVE, or PUBLISHED_EXPLICITLY';
+COMMENT ON COLUMN semantic_model_version_info.publication_status IS 'publication status of the revision';
 COMMENT ON COLUMN semantic_model_version_info.published_by IS 'publishing principal, empty for a draft';
 COMMENT ON COLUMN semantic_model_version_info.published_at IS 'publication time in epoch millis, 0 for a draft';
 COMMENT ON COLUMN semantic_model_version_info.semantic_model_comment IS 'semantic model comment snapshot';

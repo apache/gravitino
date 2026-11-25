@@ -605,7 +605,7 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
     `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'semantic model id',
     `version` INT UNSIGNED NOT NULL COMMENT 'semantic model version',
-    `publication_status` VARCHAR(32) NOT NULL DEFAULT 'DRAFT' COMMENT 'DRAFT, PUBLISHED_ON_SAVE, or PUBLISHED_EXPLICITLY',
+    `publication_status` VARCHAR(32) NOT NULL DEFAULT 'DRAFT' COMMENT 'publication status of the revision',
     `published_by` VARCHAR(128) NOT NULL DEFAULT '' COMMENT 'publishing principal, empty for a draft',
     `published_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'publication time in epoch millis, 0 for a draft',
     `semantic_model_comment` CLOB DEFAULT NULL COMMENT 'semantic model comment snapshot',

@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -524,6 +525,7 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
               .updateSemanticModel(current.nameIdentifier(), ignored -> next);
     }
 
+    assertTrue(isRetentionCandidate(current.id(), 1L));
     assertEquals(
         2,
         SemanticModelMetaService.getInstance()
@@ -532,6 +534,7 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
     assertTrue(retainedVersions.get(1).deletedAt > 0L);
     assertTrue(retainedVersions.get(2).deletedAt > 0L);
     assertEquals(0L, retainedVersions.get(3).deletedAt);
+    assertFalse(isRetentionCandidate(current.id(), 1L));
 
     SemanticModelEntity finalCurrent = current;
     long lastChangeId = maxEntityChangeId();
@@ -551,6 +554,14 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
     assertEquals(7, deleted);
     assertEquals(0, listSemanticModelVersions(finalCurrent.id()).size());
     assertEquals(0, countSemanticModelIdentities(finalCurrent.id()));
+  }
+
+  private boolean isRetentionCandidate(long modelId, long retentionCount) {
+    return SessionUtils.getWithoutCommit(
+        SemanticModelVersionInfoMapper.class,
+        mapper ->
+            mapper.selectSemanticModelVersionsByRetentionCount(retentionCount).stream()
+                .anyMatch(candidate -> candidate.semanticModelId() == modelId));
   }
 
   private SemanticModelEntity semanticModelEntity(
