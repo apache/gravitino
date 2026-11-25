@@ -725,7 +725,6 @@ public final class GlossaryManager {
       TermChange[] changes) {
     String metalake = ident.namespace().level(0);
     Snapshot previous = GlossaryTermVersions.decodeSnapshot(row);
-    restoreDraftDefinitionStatus(previous, live);
     GlossaryTermEntity term = previous.term(ident.namespace());
     TermPublication publication = GlossaryTermVersions.toPublicationResult(head, row);
     checkRevision(
@@ -804,6 +803,9 @@ public final class GlossaryManager {
     Snapshot next =
         GlossaryTermVersions.captureSnapshot(
             lake, edited, domains.ids(), relations.broader(), relations.related());
+    if (state == State.SUBMITTED) {
+      restoreDraftDefinitionStatus(next, live);
+    }
     next =
         next.withCandidateReferences(
             edited, previous.referenceNames(), previous.baseRelated(), previous.creatorUserId());
@@ -964,7 +966,7 @@ public final class GlossaryManager {
     }
     loadOrCreateVersionHead(lake, before);
     Snapshot frozen = captureTermWithRelationships(lake, after, plan, domains);
-    if (approval) {
+    if (state == State.SUBMITTED) {
       restoreDraftDefinitionStatus(frozen, before);
     }
     if (before == after && state == State.DRAFT) {
@@ -1179,6 +1181,13 @@ public final class GlossaryManager {
       @Nullable Map<Long, Long> currentUserIds) {
     if (!readable.test(term)) return false;
     if (State.PUBLISHED.name().equals(row.getLifecycle())) return access.canRead(term);
+    // A candidate's stored definition and its private DRAFT view must both pass the filter.
+    if (readable != ALL_TERMS
+        && !readable.test(
+            TermEdits.toPublicationView(
+                term, term.domains(), GlossaryTermVersions.toPublicationResult(head, row)))) {
+      return false;
+    }
     if (head.getPublishedVersion() != null) return access.canEdit(term);
     if (access.manage()) return true;
     String currentUser = PrincipalUtils.getCurrentUserName();

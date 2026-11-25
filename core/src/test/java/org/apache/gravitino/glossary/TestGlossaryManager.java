@@ -267,6 +267,58 @@ class TestGlossaryManager extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testHistoryStatusFilterHidesPendingDrafts() throws IOException {
+    createAndInsertMakeLake(LAKE);
+    GlossaryTermEntity live = manager.createTerm(LAKE, TermSpec.builder("published").build());
+    GlossaryManager gated = approvalManager();
+    GlossaryManager approvedOnly =
+        gated.withTermVisibility(term -> term.status() == GlossaryTerm.Status.APPROVED);
+    GlossaryTermEntity draft =
+        gated.alterTerm(LAKE, live.name(), TermChange.setStatus(GlossaryTerm.Status.DRAFT));
+    long draftVersion = draft.publication().versionId();
+    Assertions.assertEquals(
+        List.of(live.publication().versionId()), approvedOnly.listTermVersions(LAKE, live.id()));
+    Assertions.assertThrows(
+        NoSuchTermException.class,
+        () -> approvedOnly.getTermVersion(LAKE, live.id(), draftVersion));
+    Assertions.assertThrows(
+        NoSuchTermException.class, () -> approvedOnly.submitDraft(LAKE, live.id(), draftVersion));
+    TermPublication submitted = gated.submitDraft(LAKE, live.id(), draftVersion);
+    Assertions.assertThrows(
+        NoSuchTermException.class,
+        () -> approvedOnly.getTermVersion(LAKE, live.id(), submitted.versionId()));
+    gated.publishCandidate(LAKE, live.id(), submitted.versionId());
+    Assertions.assertEquals(
+        List.of(submitted.versionId(), live.publication().versionId()),
+        approvedOnly.listTermVersions(LAKE, live.id()));
+    Assertions.assertEquals(
+        GlossaryTerm.Status.APPROVED,
+        approvedOnly.getTermVersion(LAKE, live.id(), submitted.versionId()).term().status());
+
+    GlossaryManager draftsOnly =
+        gated.withTermVisibility(term -> term.status() == GlossaryTerm.Status.DRAFT);
+    GlossaryTermEntity liveDraft =
+        manager.createTerm(
+            LAKE, TermSpec.builder("draft").withStatus(GlossaryTerm.Status.DRAFT).build());
+    GlossaryTermEntity saved =
+        draftsOnly.alterTerm(
+            LAKE, liveDraft.name(), TermChange.setStatus(GlossaryTerm.Status.DRAFT));
+    GlossaryTermEntity revised =
+        draftsOnly.alterTerm(
+            LAKE,
+            liveDraft.name(),
+            saved.revisionToken(),
+            TermChange.updateDefinition("revised"),
+            TermChange.setStatus(GlossaryTerm.Status.DRAFT));
+    Assertions.assertEquals(
+        "revised",
+        draftsOnly
+            .getTermVersion(LAKE, liveDraft.id(), revised.publication().versionId())
+            .term()
+            .definition());
+  }
+
+  @TestTemplate
   void testSubmittingOlderDraftSnapshotsUsesLiveStatus() throws IOException {
     long lakeId = createAndInsertMakeLake(LAKE).id();
     GlossaryManager gated = approvalManager();
