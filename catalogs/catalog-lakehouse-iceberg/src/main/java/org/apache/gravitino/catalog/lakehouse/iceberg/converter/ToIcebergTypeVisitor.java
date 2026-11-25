@@ -38,32 +38,10 @@ public class ToIcebergTypeVisitor<T> {
    * @param visitor Visitor of Iceberg type
    * @param <T> Iceberg type
    * @return Iceberg type
+   * @throws IllegalArgumentException If the type contains an unrecognized type.
    */
   public static <T> T visit(Type type, ToIcebergTypeVisitor<T> visitor) {
-    if (type instanceof Types.MapType) {
-      Types.MapType map = (Types.MapType) type;
-      return visitor.map(map, visit(map.keyType(), visitor), visit(map.valueType(), visitor));
-    } else if (type instanceof Types.ListType) {
-      Types.ListType list = (Types.ListType) type;
-      return visitor.array(list, visit(list.elementType(), visitor));
-    } else if (type instanceof Types.StructType) {
-      Types.StructType.Field[] fields = ((Types.StructType) type).fields();
-      List<T> fieldResults = Lists.newArrayListWithExpectedSize(fields.length);
-      for (Types.StructType.Field field : fields) {
-        fieldResults.add(visitField(field, visitor));
-      }
-      return visitor.struct((Types.StructType) type, fieldResults);
-    } else if (type instanceof Types.NullType) {
-      // NullType implements Type directly rather than PrimitiveType, so it needs its own dispatch.
-      return visitor.nullType((Types.NullType) type);
-    } else if (type instanceof Types.UnparsedType) {
-      throw new IllegalArgumentException(
-          "Unsupported type '"
-              + ((Types.UnparsedType) type).unparsedType()
-              + "' for an Iceberg table");
-    } else {
-      return visitor.atomic((Type.PrimitiveType) type);
-    }
+    return visit(type, visitor, "");
   }
 
   public T struct(IcebergTable struct, List<T> fieldResults) {
@@ -94,12 +72,37 @@ public class ToIcebergTypeVisitor<T> {
     throw new UnsupportedOperationException();
   }
 
-  private static <T> T visitField(Types.StructType.Field field, ToIcebergTypeVisitor<T> visitor) {
-    try {
-      return visitor.field(field, visit(field.type(), visitor));
-    } catch (IllegalArgumentException e) {
+  private static <T> T visit(Type type, ToIcebergTypeVisitor<T> visitor, String columnPath) {
+    if (type instanceof Types.MapType) {
+      Types.MapType map = (Types.MapType) type;
+      return visitor.map(
+          map,
+          visit(map.keyType(), visitor, columnPath),
+          visit(map.valueType(), visitor, columnPath));
+    } else if (type instanceof Types.ListType) {
+      Types.ListType list = (Types.ListType) type;
+      return visitor.array(list, visit(list.elementType(), visitor, columnPath));
+    } else if (type instanceof Types.StructType) {
+      Types.StructType.Field[] fields = ((Types.StructType) type).fields();
+      List<T> fieldResults = Lists.newArrayListWithExpectedSize(fields.length);
+      for (Types.StructType.Field field : fields) {
+        String fieldPath = columnPath.isEmpty() ? field.name() : columnPath + "." + field.name();
+        fieldResults.add(visitor.field(field, visit(field.type(), visitor, fieldPath)));
+      }
+      return visitor.struct((Types.StructType) type, fieldResults);
+    } else if (type instanceof Types.NullType) {
+      // NullType implements Type directly rather than PrimitiveType, so it needs its own dispatch.
+      return visitor.nullType((Types.NullType) type);
+    } else if (type instanceof Types.UnparsedType) {
+      String column = columnPath.isEmpty() ? "" : " for column '" + columnPath + "'";
       throw new IllegalArgumentException(
-          "Cannot convert column '" + field.name() + "' to an Iceberg type: " + e.getMessage(), e);
+          "Unsupported type '"
+              + ((Types.UnparsedType) type).unparsedType()
+              + "'"
+              + column
+              + " in an Iceberg table");
+    } else {
+      return visitor.atomic((Type.PrimitiveType) type);
     }
   }
 }

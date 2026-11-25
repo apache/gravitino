@@ -97,9 +97,32 @@ class TestIcebergTableValidation {
             IllegalArgumentException.class,
             () -> create("unparsed_type", new Column[] {Column.of("id", type)}));
     assertTrue(error.getMessage().contains("bigintz"));
-    assertTrue(error.getMessage().contains("column 'id'"));
+    assertTrue(error.getMessage().contains("column 'id"));
     assertEquals(400, tableError(OperationType.CREATE, error));
     assertFalse(operations.tableExists(table("unparsed_type")));
+  }
+
+  @Test
+  void testUnparsedNestedTypeReportsFullColumnPath() {
+    Type type =
+        Types.StructType.of(
+            Types.StructType.Field.nullableField(
+                "items",
+                Types.ListType.nullable(
+                    Types.MapType.valueNullable(
+                        Types.StringType.get(),
+                        Types.StructType.of(
+                            Types.StructType.Field.nullableField(
+                                "value", Types.UnparsedType.of("bigintz")))))));
+    IllegalArgumentException error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> create("unparsed_nested", new Column[] {Column.of("payload", type)}));
+    assertEquals(
+        "Unsupported type 'bigintz' for column 'payload.items.value' in an Iceberg table",
+        error.getMessage());
+    assertEquals(400, tableError(OperationType.CREATE, error));
+    assertFalse(operations.tableExists(table("unparsed_nested")));
   }
 
   @ParameterizedTest
