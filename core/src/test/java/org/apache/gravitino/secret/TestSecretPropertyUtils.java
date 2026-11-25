@@ -366,6 +366,42 @@ public class TestSecretPropertyUtils {
     Assertions.assertFalse(filtered.containsKey("s3-secret-access-key"));
   }
 
+  /**
+   * When metadata does not declare S3 keys, omit still drops the pair if those keys are present on
+   * the property map (inferred providers or leftover static pairs beside a token-only list).
+   */
+  @Test
+  void testOmitStaticCredentialSecretsWhenStaticKeysPresentOnProperties() {
+    PropertiesMetadata emptyMetadata = () -> Map.of();
+    Map<String, String> secrets =
+        Map.of(
+            "s3-access-key-id", "AKIA", "s3-secret-access-key", "secret", "custom-secret", "keep");
+
+    Map<String, String> entityRawWithoutProviders =
+        Map.of("s3-access-key-id", "AKIA", "s3-secret-access-key", "secret");
+    Map<String, String> fromPresence =
+        SecretPropertyUtils.omitStaticCredentialSecrets(
+            secrets, emptyMetadata, entityRawWithoutProviders);
+    Assertions.assertEquals("keep", fromPresence.get("custom-secret"));
+    Assertions.assertFalse(fromPresence.containsKey("s3-access-key-id"));
+    Assertions.assertFalse(fromPresence.containsKey("s3-secret-access-key"));
+
+    Map<String, String> tokenOnlyWithLeftoverStatic =
+        Map.of(
+            "s3-access-key-id",
+            "AKIA",
+            "s3-secret-access-key",
+            "secret",
+            CredentialConstants.CREDENTIAL_PROVIDERS,
+            "s3-token");
+    Map<String, String> filtered =
+        SecretPropertyUtils.omitStaticCredentialSecrets(
+            secrets, emptyMetadata, tokenOnlyWithLeftoverStatic);
+    Assertions.assertEquals("keep", filtered.get("custom-secret"));
+    Assertions.assertFalse(filtered.containsKey("s3-access-key-id"));
+    Assertions.assertFalse(filtered.containsKey("s3-secret-access-key"));
+  }
+
   @Test
   void testIsStaticCredentialType() {
     Assertions.assertTrue(StaticCredentialSecretKeys.isStaticCredentialType("s3-secret-key"));

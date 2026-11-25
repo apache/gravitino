@@ -19,9 +19,11 @@
 package org.apache.gravitino.server.web.rest;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -35,8 +37,10 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
+import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.dto.responses.CredentialResponse;
@@ -93,15 +97,27 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
     return resourceConfig;
   }
 
-  /** Without USE+INCLUDE, static catalog credentials are omitted (200 empty), not forbidden. */
+  /**
+   * Without USE+INCLUDE, catalog and fileset requests invoke only dynamic providers ({@code
+   * dynamicProvidersOnly=true}); static providers are never called.
+   */
   @Test
-  public void testCatalogStaticCredentialsOmittedWithoutIncludePrivilege() throws Exception {
-    S3SecretKeyCredential staticCredential = new S3SecretKeyCredential("ak", "sk");
+  public void testUsesDynamicProvidersOnlyWithoutIncludePrivilege() throws Exception {
+    S3TokenCredential token =
+        new S3TokenCredential("ak", "sk", "session-token", System.currentTimeMillis() + 60_000);
     for (boolean useSecrets : new boolean[] {false, true}) {
       for (boolean includeCredentials : new boolean[] {false, true}) {
+        boolean canInclude = useSecrets && includeCredentials;
         CredentialOperationDispatcher dispatcher = mock(CredentialOperationDispatcher.class);
-        when(dispatcher.getCredentials(any(), any()))
-            .thenReturn(Collections.singletonList(staticCredential));
+        when(dispatcher.getCredentials(any(), any(), anyBoolean()))
+            .thenAnswer(
+                invocation -> {
+                  boolean dynamicOnly = invocation.getArgument(2);
+                  if (dynamicOnly) {
+                    return Collections.singletonList(token);
+                  }
+                  return Arrays.asList(new S3SecretKeyCredential("ak", "sk"), token);
+                });
         MetadataObjectCredentialOperations operations =
             new MetadataObjectCredentialOperations(dispatcher);
         FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
@@ -110,28 +126,51 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
           try (Response response = operations.getCredentials(metalake, "catalog", "catalog")) {
             Assertions.assertEquals(200, response.getStatus());
             CredentialResponse body = (CredentialResponse) response.getEntity();
-            if (useSecrets && includeCredentials) {
-              Assertions.assertEquals(1, body.getCredentials().length);
+            if (canInclude) {
+              Assertions.assertEquals(2, body.getCredentials().length);
             } else {
-              Assertions.assertEquals(0, body.getCredentials().length);
+              Assertions.assertEquals(1, body.getCredentials().length);
+              Assertions.assertEquals(
+                  S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE,
+                  body.getCredentials()[0].credentialType());
             }
           }
+          verify(dispatcher)
+              .getCredentials(
+                  eq(NameIdentifier.of(metalake, "catalog")),
+                  eq(CredentialPrivilege.READ),
+                  eq(!canInclude));
           try (Response response =
               operations.getCredentials(metalake, "fileset", "catalog.schema.fileset")) {
             Assertions.assertEquals(200, response.getStatus());
+            CredentialResponse body = (CredentialResponse) response.getEntity();
+            if (canInclude) {
+              Assertions.assertEquals(2, body.getCredentials().length);
+            } else {
+              Assertions.assertEquals(1, body.getCredentials().length);
+              Assertions.assertEquals(
+                  S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE,
+                  body.getCredentials()[0].credentialType());
+            }
           }
+          verify(dispatcher)
+              .getCredentials(
+                  eq(NameIdentifier.of(metalake, "catalog", "schema", "fileset")),
+                  eq(CredentialPrivilege.READ),
+                  eq(!canInclude));
         }
       }
     }
   }
 
-  /** Token catalog credentials are returned with metadata access alone. */
+  /** Token catalog credentials are returned when dynamic-only providers are used. */
   @Test
   public void testCatalogTokenCredentialsWithoutIncludePrivilege() throws Exception {
     S3TokenCredential token =
         new S3TokenCredential("ak", "sk", "session-token", System.currentTimeMillis() + 60_000);
     CredentialOperationDispatcher dispatcher = mock(CredentialOperationDispatcher.class);
-    when(dispatcher.getCredentials(any(), any())).thenReturn(Collections.singletonList(token));
+    when(dispatcher.getCredentials(any(), any(), eq(true)))
+        .thenReturn(Collections.singletonList(token));
     MetadataObjectCredentialOperations operations =
         new MetadataObjectCredentialOperations(dispatcher);
     FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
@@ -144,41 +183,18 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
         Assertions.assertEquals(
             S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE, body.getCredentials()[0].credentialType());
       }
+      verify(dispatcher).getCredentials(any(), eq(CredentialPrivilege.READ), eq(true));
     }
   }
 
-  /** Mixed providers without INCLUDE return only token credentials. */
-  @Test
-  public void testCatalogMixedCredentialsFilterToTokensWithoutInclude() throws Exception {
-    S3TokenCredential token =
-        new S3TokenCredential("ak", "sk", "session-token", System.currentTimeMillis() + 60_000);
-    S3SecretKeyCredential staticCredential = new S3SecretKeyCredential("static-ak", "static-sk");
-    CredentialOperationDispatcher dispatcher = mock(CredentialOperationDispatcher.class);
-    when(dispatcher.getCredentials(any(), any()))
-        .thenReturn(Arrays.asList(staticCredential, token));
-    MetadataObjectCredentialOperations operations =
-        new MetadataObjectCredentialOperations(dispatcher);
-    FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
-    try (MockedStatic<MetadataAuthzHelper> auth = mockStatic(MetadataAuthzHelper.class)) {
-      stubSecretPrivilegeChecks(auth, true, false);
-      try (Response response = operations.getCredentials(metalake, "catalog", "catalog")) {
-        Assertions.assertEquals(200, response.getStatus());
-        CredentialResponse body = (CredentialResponse) response.getEntity();
-        Assertions.assertEquals(1, body.getCredentials().length);
-        Assertions.assertEquals(
-            S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE, body.getCredentials()[0].credentialType());
-      }
-    }
-  }
-
-  /** Mixed providers with USE+INCLUDE return both token and static credentials. */
+  /** With USE+INCLUDE, all providers are invoked and both credential kinds are returned. */
   @Test
   public void testCatalogMixedCredentialsWithIncludeReturnsBoth() throws Exception {
     S3TokenCredential token =
         new S3TokenCredential("ak", "sk", "session-token", System.currentTimeMillis() + 60_000);
     S3SecretKeyCredential staticCredential = new S3SecretKeyCredential("static-ak", "static-sk");
     CredentialOperationDispatcher dispatcher = mock(CredentialOperationDispatcher.class);
-    when(dispatcher.getCredentials(any(), any()))
+    when(dispatcher.getCredentials(any(), any(), eq(false)))
         .thenReturn(Arrays.asList(staticCredential, token));
     MetadataObjectCredentialOperations operations =
         new MetadataObjectCredentialOperations(dispatcher);
@@ -195,6 +211,7 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
         Assertions.assertEquals(
             S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE, body.getCredentials()[1].credentialType());
       }
+      verify(dispatcher).getCredentials(any(), eq(CredentialPrivilege.READ), eq(false));
     }
   }
 
@@ -244,7 +261,7 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
     String message = unsupported.readEntity(ErrorResponse.class).getMessage();
     Assertions.assertTrue(message.contains("catalog.schema.table"));
     Assertions.assertTrue(message.contains("TABLE"));
-    when(credentialOperationDispatcher.getCredentials(any(), any()))
+    when(credentialOperationDispatcher.getCredentials(any(), any(), anyBoolean()))
         .thenThrow(new IllegalArgumentException("Invalid provider"));
     Response invalid =
         target(basePath(metalake))
@@ -273,7 +290,7 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
   @Test
   public void testInvalidCredentialLocationResponse() {
     String path = "wasbs://container@account.blob.core.windows.net/warehouse/table";
-    when(credentialOperationDispatcher.getCredentials(any(), any()))
+    when(credentialOperationDispatcher.getCredentials(any(), any(), anyBoolean()))
         .thenThrow(
             new IllegalArgumentException(
                 "adls-token requires an abfs or abfss location; unsupported location: " + path));
@@ -297,7 +314,7 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
 
     S3SecretKeyCredential credential = new S3SecretKeyCredential("access-id", "secret-key");
     // Test return one credential
-    when(credentialOperationDispatcher.getCredentials(any(), any()))
+    when(credentialOperationDispatcher.getCredentials(any(), any(), anyBoolean()))
         .thenReturn(Arrays.asList(credential));
     Response response =
         target(basePath(metalake))
@@ -320,7 +337,7 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
     Assertions.assertEquals(0, credentialToTest.expireTimeInMs());
 
     // Test doesn't return credential
-    when(credentialOperationDispatcher.getCredentials(any(), any())).thenReturn(null);
+    when(credentialOperationDispatcher.getCredentials(any(), any(), anyBoolean())).thenReturn(null);
     response =
         target(basePath(metalake))
             .path(metadataObject.type().toString())

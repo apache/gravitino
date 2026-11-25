@@ -152,6 +152,23 @@ public final class StaticCredentialSecretKeys {
     return keys;
   }
 
+  /**
+   * Known static credential secret keys that are present as keys on {@code properties}. Covers
+   * leftover static pairs when {@code credential-providers} lists only token providers.
+   */
+  static Set<String> keysPresentInProperties(@Nullable Map<String, String> properties) {
+    if (properties == null || properties.isEmpty()) {
+      return ImmutableSet.of();
+    }
+    Set<String> keys = new HashSet<>();
+    for (String key : ALL_STATIC_CREDENTIAL_SECRET_KEYS) {
+      if (properties.containsKey(key)) {
+        keys.add(key);
+      }
+    }
+    return keys;
+  }
+
   /** Returns a copy of {@code secrets} with keys in {@code keysToOmit} removed. */
   static Map<String, String> omit(
       @Nullable Map<String, String> secrets, @Nullable Set<String> keysToOmit) {

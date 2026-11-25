@@ -22,7 +22,6 @@ package org.apache.gravitino.server.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.collect.ImmutableSet;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -48,7 +47,6 @@ import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.responses.CredentialResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
-import org.apache.gravitino.secret.StaticCredentialSecretKeys;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
@@ -130,13 +128,15 @@ public class MetadataObjectCredentialOperations {
                             .FILTER_WRITE_FILESET_AUTHORIZATION_EXPRESSION)
                     ? CredentialPrivilege.WRITE
                     : CredentialPrivilege.READ;
+            // Catalog and fileset requests without static-secret privileges only invoke
+            // SupportsDynamicCredential providers so unmarked custom providers cannot return
+            // stored keys to metadata-only callers.
+            boolean dynamicProvidersOnly = !canIncludeStaticCredentials(identifier, entityType);
             List<Credential> credentials =
-                credentialOperationDispatcher.getCredentials(identifier, privilege);
+                credentialOperationDispatcher.getCredentials(
+                    identifier, privilege, dynamicProvidersOnly);
             if (credentials == null) {
               credentials = Collections.emptyList();
-            }
-            if (object.type() == MetadataObject.Type.CATALOG) {
-              credentials = filterCatalogCredentials(identifier, entityType, credentials);
             }
             if (credentials.isEmpty()) {
               return Utils.ok(new CredentialResponse(new CredentialDTO[0]));
@@ -154,33 +154,20 @@ public class MetadataObjectCredentialOperations {
   }
 
   /**
-   * Catalog credentials are filtered by privilege, not rejected: with {@code USE_SECRETS} and
-   * {@code INCLUDE_CREDENTIAL_SECRETS} return token and static credentials; without them return
-   * token credentials only (possibly empty).
+   * Returns whether the caller may receive static credentials ({@code USE_SECRETS} and {@code
+   * INCLUDE_CREDENTIAL_SECRETS}, or metalake ownership).
    */
-  private static List<Credential> filterCatalogCredentials(
-      NameIdentifier identifier, Entity.EntityType entityType, List<Credential> credentials) {
-    boolean canIncludeStatic =
-        MetadataAuthzHelper.checkAccess(
-                identifier,
-                entityType,
-                AuthorizationExpressionConstants.FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION)
-            && MetadataAuthzHelper.checkAccess(
-                identifier,
-                entityType,
-                AuthorizationExpressionConstants
-                    .FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION);
-    if (canIncludeStatic) {
-      return credentials;
-    }
-    List<Credential> nonStatic = new ArrayList<>();
-    for (Credential credential : credentials) {
-      if (credential != null
-          && !StaticCredentialSecretKeys.isStaticCredentialType(credential.credentialType())) {
-        nonStatic.add(credential);
-      }
-    }
-    return nonStatic;
+  private static boolean canIncludeStaticCredentials(
+      NameIdentifier identifier, Entity.EntityType entityType) {
+    return MetadataAuthzHelper.checkAccess(
+            identifier,
+            entityType,
+            AuthorizationExpressionConstants.FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION)
+        && MetadataAuthzHelper.checkAccess(
+            identifier,
+            entityType,
+            AuthorizationExpressionConstants
+                .FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION);
   }
 
   private static boolean supportsCredentialOperations(MetadataObject metadataObject) {

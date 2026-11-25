@@ -306,7 +306,10 @@ public class AuthorizationExpressionConstants {
                   ANY_INCLUDE_CREDENTIAL_SECRETS
                   """;
 
-  /** Both secret privileges, or metalake ownership, required for static catalog credentials. */
+  /**
+   * Soft check: both secret privileges (or metalake ownership) to include static catalog/fileset
+   * credentials; without them static providers are omitted rather than forbidden.
+   */
   public static final String CATALOG_STATIC_CREDENTIALS_AUTHORIZATION_EXPRESSION =
       "("
           + FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION
