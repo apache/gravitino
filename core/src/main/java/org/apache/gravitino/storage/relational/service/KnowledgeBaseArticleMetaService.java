@@ -119,12 +119,23 @@ public final class KnowledgeBaseArticleMetaService {
 
   /** Returns the requested live entities in input order, omitting missing entries. */
   public List<KnowledgeBaseArticleEntity> batchGet(List<NameIdentifier> idents) {
+    Map<Namespace, List<String>> groups = new LinkedHashMap<>();
+    for (NameIdentifier ident : idents) {
+      groups
+          .computeIfAbsent(ident.namespace(), unused -> new ArrayList<>())
+          .add(KnowledgeBaseArticle.normalizeName(ident.name()));
+    }
+    Map<NameIdentifier, KnowledgeBaseArticleEntity> found = new HashMap<>();
+    groups.forEach(
+        (ns, names) -> readBatch(ns, names).forEach(e -> found.put(e.nameIdentifier(), e)));
     List<KnowledgeBaseArticleEntity> result = new ArrayList<>();
     for (NameIdentifier ident : idents) {
-      try {
-        result.add(get(ident));
-      } catch (NoSuchEntityException ignored) {
-        /* Omit missing entries. */
+      KnowledgeBaseArticleEntity entity =
+          found.get(
+              NameIdentifier.of(
+                  ident.namespace(), KnowledgeBaseArticle.normalizeName(ident.name())));
+      if (entity != null) {
+        result.add(entity);
       }
     }
     return result;
@@ -322,35 +333,7 @@ public final class KnowledgeBaseArticleMetaService {
       // A caller's READ_COMMITTED transaction may contain uncommitted writes. A single
       // statement observes them without splitting the row and its bindings across snapshots.
       return SessionUtils.getWithoutCommitFresh(
-          KnowledgeBaseArticleMapper.class,
-          m -> {
-            List<KnowledgeBaseArticlePO> rows = m.joined(metalake, name);
-            Map<Long, Set<Binding>> bindings = new LinkedHashMap<>();
-            Map<Long, Set<Long>> domains = new HashMap<>();
-            Map<Long, KnowledgeBaseArticlePO> articles = new LinkedHashMap<>();
-            for (KnowledgeBaseArticlePO row : rows) {
-              articles.putIfAbsent(row.getArticleId(), row);
-              Set<Binding> targets =
-                  bindings.computeIfAbsent(row.getArticleId(), unused -> new HashSet<>());
-              if (row.getDomainId() != null) {
-                domains
-                    .computeIfAbsent(row.getArticleId(), unused -> new HashSet<>())
-                    .add(row.getDomainId());
-              }
-              if (row.getTargetId() != null) {
-                targets.add(new Binding(row.getTargetType(), row.getTargetId()));
-              }
-            }
-            return articles.values().stream()
-                .map(
-                    row ->
-                        decode(
-                            ns,
-                            row,
-                            bindings.get(row.getArticleId()),
-                            domains.getOrDefault(row.getArticleId(), Set.of())))
-                .toList();
-          });
+          KnowledgeBaseArticleMapper.class, m -> aggregate(ns, m.joined(metalake, name)));
     }
     return SqlSessions.readSnapshot(
         () ->
@@ -389,6 +372,52 @@ public final class KnowledgeBaseArticleMetaService {
                                   domains.getOrDefault(row.getArticleId(), Set.of())))
                       .toList();
                 }));
+  }
+
+  private List<KnowledgeBaseArticleEntity> readBatch(Namespace ns, List<String> names) {
+    String metalake = metalakeName(ns);
+    if (names.isEmpty()) {
+      return List.of();
+    }
+    if (SqlSessions.hasActiveSession()) {
+      return SessionUtils.getWithoutCommitFresh(
+          KnowledgeBaseArticleMapper.class, m -> aggregate(ns, m.joinedBatch(metalake, names)));
+    }
+    return SqlSessions.readSnapshot(
+        () ->
+            SessionUtils.getWithoutCommit(
+                KnowledgeBaseArticleMapper.class,
+                m -> aggregate(ns, m.joinedBatch(metalake, names))));
+  }
+
+  /** Folds one joined row per Article, binding and membership into complete entities. */
+  private List<KnowledgeBaseArticleEntity> aggregate(
+      Namespace ns, List<KnowledgeBaseArticlePO> rows) {
+    Map<Long, Set<Binding>> bindings = new LinkedHashMap<>();
+    Map<Long, Set<Long>> domains = new HashMap<>();
+    Map<Long, KnowledgeBaseArticlePO> articles = new LinkedHashMap<>();
+    for (KnowledgeBaseArticlePO row : rows) {
+      articles.putIfAbsent(row.getArticleId(), row);
+      Set<Binding> targets =
+          bindings.computeIfAbsent(row.getArticleId(), unused -> new HashSet<>());
+      if (row.getDomainId() != null) {
+        domains
+            .computeIfAbsent(row.getArticleId(), unused -> new HashSet<>())
+            .add(row.getDomainId());
+      }
+      if (row.getTargetId() != null) {
+        targets.add(new Binding(row.getTargetType(), row.getTargetId()));
+      }
+    }
+    return articles.values().stream()
+        .map(
+            row ->
+                decode(
+                    ns,
+                    row,
+                    bindings.get(row.getArticleId()),
+                    domains.getOrDefault(row.getArticleId(), Set.of())))
+        .toList();
   }
 
   @Nullable
@@ -482,11 +511,7 @@ public final class KnowledgeBaseArticleMetaService {
         before.id().equals(proposed.id())
             && before.nameIdentifier().equals(proposed.nameIdentifier()),
         "An Article edit must retain its ID, name and metalake");
-    if (before.equals(
-        proposed.toBuilder()
-            .withRevision(before.revision())
-            .withAuditInfo(before.auditInfo())
-            .build())) {
+    if (before.equals(proposed.toBuilder().withRevision(before.revision()).build())) {
       return before;
     }
     KnowledgeBaseArticleEntity after =

@@ -85,6 +85,10 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
     assertEquals(List.of(entity, second), backend.list(entity.namespace(), TYPE, true));
     assertEquals(
         List.of(entity), backend.batchGet(List.of(NameIdentifier.of("lake", "absent"), nfd), TYPE));
+    assertEquals(
+        List.of(second, entity),
+        backend.batchGet(
+            List.of(second.nameIdentifier(), NameIdentifier.of("lake", "absent"), nfd), TYPE));
   }
 
   @TestTemplate

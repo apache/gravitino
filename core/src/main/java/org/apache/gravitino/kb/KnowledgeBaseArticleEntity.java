@@ -36,10 +36,14 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.meta.AuditInfo;
 
-/** Current persisted Article, including the complete set of stable binding identities. */
+/**
+ * Current persisted Article, including the complete set of stable binding identities. Equality
+ * covers identity, content and bindings; audit metadata does not distinguish two states of the same
+ * content.
+ */
 @Getter
 @Accessors(fluent = true)
-@EqualsAndHashCode
+@EqualsAndHashCode(exclude = "auditInfo")
 public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, Auditable {
   /** Stable identity of a bound Term or asset. */
   public record Binding(String targetType, long targetId) {

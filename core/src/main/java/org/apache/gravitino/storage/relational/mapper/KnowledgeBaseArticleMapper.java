@@ -100,6 +100,33 @@ public interface KnowledgeBaseArticleMapper {
   List<KnowledgeBaseArticlePO> joined(
       @Param("metalake") String metalake, @Param("name") @Nullable String name);
 
+  /** Reads a batch of complete Articles in one statement, participating in a caller's session. */
+  @Select(
+      """
+      <script>
+      SELECT a.title, a.status, a.synonyms, a.properties, a.revision, a.article_id AS articleId,
+          a.metalake_id AS metalakeId, a.article_name AS articleName, a.body_format AS
+          bodyFormat, a.body_content AS bodyContent, a.article_comment AS articleComment,
+          a.source_reference AS sourceReference, a.audit_info AS auditInfo, b.target_type AS
+          targetType, b.target_id AS targetId, b.domain_id AS domainId
+      FROM kb_article_meta a
+      JOIN metalake_meta m ON m.metalake_id=a.metalake_id
+      LEFT JOIN (
+        SELECT article_id, target_type, target_id, NULL AS domain_id
+        FROM kb_article_relation_meta WHERE deleted_at=0
+        UNION ALL
+        SELECT member_id, NULL, NULL, domain_id FROM domain_member_rel
+        WHERE member_type='KNOWLEDGE_BASE_ARTICLE' AND deleted_at=0
+      ) b ON b.article_id=a.article_id
+      WHERE m.metalake_name=#{metalake} AND m.deleted_at=0 AND a.deleted_at=0
+        AND a.article_name IN
+        <foreach item="name" collection="names" open="(" separator="," close=")">#{name}</foreach>
+      ORDER BY a.article_id
+      </script>
+      """)
+  List<KnowledgeBaseArticlePO> joinedBatch(
+      @Param("metalake") String metalake, @Param("names") List<String> names);
+
   /** Loads the stored fields used for an Article summary, without fetching content. */
   @Select(
       "SELECT article_id AS articleId, article_name AS articleName, title, status, audit_info AS auditInfo"
