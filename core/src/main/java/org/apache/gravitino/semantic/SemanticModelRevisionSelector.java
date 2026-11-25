@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.semantic;
 
+import static org.apache.gravitino.semantic.SemanticModelCatalog.LATEST_REVISION;
+
 import com.google.common.base.Preconditions;
 
 /** Selects a snapshot relative to the Semantic Model identity. */
@@ -39,6 +41,18 @@ public final class SemanticModelRevisionSelector {
   public static SemanticModelRevisionSelector numbered(int number) {
     Preconditions.checkArgument(number > 0, "Revision must be positive: %s", number);
     return new SemanticModelRevisionSelector(number);
+  }
+
+  /** Returns the selector represented by a REST revision path segment. */
+  public static SemanticModelRevisionSelector parse(String revision) {
+    if (LATEST_REVISION.equals(revision)) {
+      return LATEST;
+    }
+    try {
+      return numbered(Integer.parseInt(revision));
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException("Expected a positive revision number or 'latest'", e);
+    }
   }
 
   /**

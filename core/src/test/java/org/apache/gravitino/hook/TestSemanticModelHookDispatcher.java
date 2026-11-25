@@ -285,7 +285,9 @@ public class TestSemanticModelHookDispatcher {
     Namespace namespace = Namespace.of("metalake1", "catalog1", "schema1");
     Mockito.when(dispatcher.listSemanticModels(namespace)).thenReturn(listed);
     Mockito.when(dispatcher.loadSemanticModel(IDENT)).thenReturn(loaded);
-    Mockito.when(dispatcher.alterSemanticModel(IDENT, SemanticModelSourceUpdate.preserve(), change))
+    Mockito.when(
+            dispatcher.alterSemanticModel(
+                IDENT, null, SemanticModelSourceUpdate.preserve(), change))
         .thenReturn(altered);
     Mockito.when(dispatcher.dropSemanticModel(IDENT)).thenReturn(true);
     Mockito.when(dispatcher.semanticModelExists(IDENT)).thenReturn(true);
@@ -316,7 +318,9 @@ public class TestSemanticModelHookDispatcher {
     GravitinoEnv env = Mockito.mock(GravitinoEnv.class);
     Mockito.when(env.gravitinoAuthorizer()).thenReturn(authorizer);
     SemanticModelChange rename = SemanticModelChange.rename("renamed");
-    Mockito.when(dispatcher.alterSemanticModel(IDENT, SemanticModelSourceUpdate.preserve(), rename))
+    Mockito.when(
+            dispatcher.alterSemanticModel(
+                IDENT, null, SemanticModelSourceUpdate.preserve(), rename))
         .thenThrow(new IllegalArgumentException("rejected"));
     try (MockedStatic<GravitinoEnv> mocked = Mockito.mockStatic(GravitinoEnv.class)) {
       mocked.when(GravitinoEnv::getInstance).thenReturn(env);

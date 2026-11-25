@@ -5647,7 +5647,8 @@ public class TestJcasbinAuthorizer {
     SemanticModel renamed = mock(SemanticModel.class);
     when(renamed.name()).thenReturn(newIdent.name());
     SemanticModelChange rename = SemanticModelChange.rename(newIdent.name());
-    when(dispatcher.alterSemanticModel(oldIdent, SemanticModelSourceUpdate.preserve(), rename))
+    when(dispatcher.alterSemanticModel(
+            oldIdent, null, SemanticModelSourceUpdate.preserve(), rename))
         .thenReturn(renamed);
     when(dispatcher.dropSemanticModel(newIdent)).thenReturn(true);
     when(gravitinoEnv.gravitinoAuthorizer()).thenReturn(jcasbinAuthorizer);

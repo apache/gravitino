@@ -172,9 +172,11 @@ class TestSemanticModelAuthorization(AuthorizationIntegrationTestEnv):
             "iceberg"
         ).as_semantic_model_catalog()
         for model_name in ("sales", "hidden"):
+            ident = NameIdentifier.of("semantic", model_name)
             models.alter_semantic_model(
-                NameIdentifier.of("semantic", model_name),
+                ident,
                 SemanticModelChange.replace_definition(definition),
+                expected_revision=models.load_semantic_model(ident).revision(),
             )
         namespace = Namespace.of("semantic")
         expected = [
