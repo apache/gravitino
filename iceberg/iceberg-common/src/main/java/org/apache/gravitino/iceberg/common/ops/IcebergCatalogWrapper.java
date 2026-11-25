@@ -515,7 +515,9 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       // As in createTable: an invalid update, not an unsupported operation. updateTable has no 406.
       throw new BadRequestException("Invalid table update: %s", e.getMessage());
     } catch (IllegalStateException e) {
-      throwIfSchemaIncompatible(e);
+      if (fromSchemaCheck(e)) {
+        throw new BadRequestException("%s", e.getMessage());
+      }
       throw e;
     }
     if (loadTableResponse != null) {
@@ -542,7 +544,9 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       try {
         transaction.commitTransaction();
       } catch (IllegalStateException e) {
-        throwIfSchemaIncompatible(e);
+        if (fromSchemaCheck(e)) {
+          throw new BadRequestException("%s", e.getMessage());
+        }
         throw e;
       }
     } finally {
@@ -574,7 +578,9 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       change = builder.apply(getCatalog());
     } catch (IllegalStateException e) {
       // UpdateSchema.commit can fail Schema.checkCompatibility before a change is returned.
-      throwIfSchemaIncompatible(e);
+      if (fromSchemaCheck(e)) {
+        throw new BadRequestException("%s", e.getMessage());
+      }
       throw e;
     }
     return updateTable(change);
@@ -840,11 +846,8 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     }
   }
 
-  /**
-   * Maps {@link Schema#checkCompatibility} failures that escape as {@link IllegalStateException} to
-   * {@link BadRequestException}. Other illegal states are left alone.
-   */
-  private static void throwIfSchemaIncompatible(IllegalStateException e) {
+  /** Whether {@code e} comes from Iceberg {@link Schema#checkCompatibility}. */
+  private static boolean fromSchemaCheck(IllegalStateException e) {
     for (Throwable current = e; current != null; current = current.getCause()) {
       if (!(current instanceof IllegalStateException)) {
         continue;
@@ -852,10 +855,11 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       for (StackTraceElement frame : current.getStackTrace()) {
         if ("org.apache.iceberg.Schema".equals(frame.getClassName())
             && "checkCompatibility".equals(frame.getMethodName())) {
-          throw new BadRequestException("%s", e.getMessage());
+          return true;
         }
       }
     }
+    return false;
   }
 
   private void validateTableLocation(@Nullable String location) {
