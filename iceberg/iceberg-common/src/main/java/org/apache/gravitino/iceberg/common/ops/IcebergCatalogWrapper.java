@@ -515,9 +515,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       // As in createTable: an invalid update, not an unsupported operation. updateTable has no 406.
       throw new BadRequestException("Invalid table update: %s", e.getMessage());
     } catch (IllegalStateException e) {
-      if (fromSchemaCheck(e)) {
-        throw new BadRequestException("%s", e.getMessage());
-      }
+      convertToBadRequest(e);
       throw e;
     }
     if (loadTableResponse != null) {
@@ -544,9 +542,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       try {
         transaction.commitTransaction();
       } catch (IllegalStateException e) {
-        if (fromSchemaCheck(e)) {
-          throw new BadRequestException("%s", e.getMessage());
-        }
+        convertToBadRequest(e);
         throw e;
       }
     } finally {
@@ -578,9 +574,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       change = builder.apply(getCatalog());
     } catch (IllegalStateException e) {
       // UpdateSchema.commit can fail Schema.checkCompatibility before a change is returned.
-      if (fromSchemaCheck(e)) {
-        throw new BadRequestException("%s", e.getMessage());
-      }
+      convertToBadRequest(e);
       throw e;
     }
     return updateTable(change);
@@ -846,8 +840,11 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     }
   }
 
-  /** Whether {@code e} comes from Iceberg {@link Schema#checkCompatibility}. */
-  private static boolean fromSchemaCheck(IllegalStateException e) {
+  /**
+   * Converts {@link Schema#checkCompatibility} failures to {@link BadRequestException}; other
+   * illegal states are left for the caller to rethrow.
+   */
+  private static void convertToBadRequest(IllegalStateException e) {
     for (Throwable current = e; current != null; current = current.getCause()) {
       if (!(current instanceof IllegalStateException)) {
         continue;
@@ -855,11 +852,10 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       for (StackTraceElement frame : current.getStackTrace()) {
         if ("org.apache.iceberg.Schema".equals(frame.getClassName())
             && "checkCompatibility".equals(frame.getMethodName())) {
-          return true;
+          throw new BadRequestException("%s", e.getMessage());
         }
       }
     }
-    return false;
   }
 
   private void validateTableLocation(@Nullable String location) {
