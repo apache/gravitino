@@ -113,6 +113,7 @@ import org.apache.gravitino.listener.api.event.TestConnectionEvent;
 import org.apache.gravitino.listener.api.event.TestConnectionFailureEvent;
 import org.apache.gravitino.listener.api.event.domain.DomainEvent;
 import org.apache.gravitino.listener.api.event.domain.DomainFailureEvent;
+import org.apache.gravitino.listener.api.event.ontology.OntologyEvents;
 import org.apache.gravitino.listener.api.event.semantic.AlterSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.AlterSemanticModelFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.CreateSemanticModelEvent;
@@ -600,6 +601,20 @@ public interface AuditLog {
     IMPORT_SEMANTIC_MODEL,
     /** Export a Semantic Model as an Ossie document. */
     EXPORT_SEMANTIC_MODEL,
+    /** Create an ontology. */
+    CREATE_ONTOLOGY,
+    /** Load an ontology. */
+    LOAD_ONTOLOGY,
+    /** Alter an ontology. */
+    ALTER_ONTOLOGY,
+    /** Drop an ontology. */
+    DROP_ONTOLOGY,
+    /** List ontologies. */
+    LIST_ONTOLOGY,
+    /** Import an ontology. */
+    IMPORT_ONTOLOGY,
+    /** Export an ontology. */
+    EXPORT_ONTOLOGY,
 
     REGISTER_FUNCTION,
 
@@ -618,7 +633,10 @@ public interface AuditLog {
     UNKNOWN_OPERATION;
 
     public static Operation fromEvent(Event event) {
-      if (event instanceof DomainEvent || event instanceof DomainFailureEvent) {
+      if (event instanceof DomainEvent
+          || event instanceof DomainFailureEvent
+          || event instanceof OntologyEvents.Success
+          || event instanceof OntologyEvents.Failure) {
         try {
           return Operation.valueOf(event.operationType().name());
         } catch (IllegalArgumentException e) {

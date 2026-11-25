@@ -24,6 +24,7 @@ import static org.apache.gravitino.server.authorization.expression.Authorization
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_METALAKE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_MODEL_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_ONTOLOGY_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_ROLE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_SCHEMA_AUTHORIZATION_EXPRESSION;
@@ -188,6 +189,7 @@ public class AuthorizationExpressionConverter {
               ( entityType == 'COLUMN' && (%s)) ||
               ( entityType == 'FUNCTION' && (%s)) ||
               ( entityType == 'SEMANTIC_MODEL' && (%s)) ||
+              ( entityType == 'ONTOLOGY' && (%s)) ||
               ( entityType == 'DOMAIN' && (authorizer.canAccessDomain(principal,METALAKE_NAME,DOMAIN,authorizationContext))))
               """
             .formatted(
@@ -206,7 +208,8 @@ public class AuthorizationExpressionConverter {
                 LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION,
                 LOAD_TABLE_AUTHORIZATION_EXPRESSION,
                 LOAD_FUNCTION_AUTHORIZATION_EXPRESSION,
-                LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION));
+                LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION,
+                LOAD_ONTOLOGY_AUTHORIZATION_EXPRESSION));
   }
 
   /**
@@ -373,6 +376,16 @@ public class AuthorizationExpressionConverter {
             "ANY_WRITE_FILESET",
             "((ANY(WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET))"
                 + "&& !(ANY(DENY_WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET)))");
+    expression =
+        expression.replaceAll(
+            "ANY_MODIFY_ONTOLOGY",
+            "((ANY(MODIFY_ONTOLOGY, METALAKE, ONTOLOGY))"
+                + " && !(ANY(DENY_MODIFY_ONTOLOGY, METALAKE, ONTOLOGY)))");
+    expression =
+        expression.replaceAll(
+            "ANY_USE_ONTOLOGY",
+            "((ANY(USE_ONTOLOGY, METALAKE, ONTOLOGY))"
+                + " && !(ANY(DENY_USE_ONTOLOGY, METALAKE, ONTOLOGY)))");
     expression =
         expression.replaceAll(
             "ANY_VIEW_TAG",

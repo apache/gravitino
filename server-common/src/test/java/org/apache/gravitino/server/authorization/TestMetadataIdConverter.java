@@ -453,6 +453,27 @@ public class TestMetadataIdConverter {
   }
 
   @Test
+  void testOntologyIdLookupDoesNotLoadDefinition() throws IOException {
+    RelationalEntityStore store = mock(RelationalEntityStore.class);
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    when(env.entityStore()).thenReturn(store);
+    NameIdentifier ident = NameIdentifier.of("metalake", "system", "ontology", "Sales");
+    MetadataObject object = MetadataObjects.of(null, "Sales", MetadataObject.Type.ONTOLOGY);
+    when(store.getOntologyId(ident))
+        .thenReturn(7L)
+        .thenThrow(new NoSuchEntityException("Missing ontology"));
+    try (MockedStatic<GravitinoEnv> mocked = mockStatic(GravitinoEnv.class)) {
+      mocked.when(GravitinoEnv::getInstance).thenReturn(env);
+      Assertions.assertEquals(
+          Optional.of(7L), MetadataIdConverter.getIdForNormalizedObject(object, "metalake"));
+      Assertions.assertEquals(
+          Optional.empty(), MetadataIdConverter.getIdForNormalizedObject(object, "metalake"));
+      Mockito.verify(store, Mockito.times(2)).getOntologyId(ident);
+      Mockito.verifyNoMoreInteractions(store);
+    }
+  }
+
+  @Test
   void testTableIdLookupSupportsStoresWithoutOptimizedLookup() throws IOException {
     EntityStore store = mock(EntityStore.class, CALLS_REAL_METHODS);
     GravitinoEnv env = mock(GravitinoEnv.class);

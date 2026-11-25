@@ -186,7 +186,13 @@ public interface Privilege {
     /** The privilege to manage domains, including draft domains. */
     MANAGE_DOMAIN(0L, 1L << 42),
     /** The privilege to discover published domains and browse their members. */
-    USE_DOMAIN(0L, 1L << 43);
+    USE_DOMAIN(0L, 1L << 43),
+    /** The privilege to create ontologies. */
+    CREATE_ONTOLOGY(0L, 1L << 44),
+    /** The privilege to load and export ontologies. */
+    USE_ONTOLOGY(0L, 1L << 45),
+    /** The privilege to alter ontologies. */
+    MODIFY_ONTOLOGY(0L, 1L << 46);
 
     private final long highBits;
     private final long lowBits;

@@ -260,6 +260,12 @@ public class Privileges {
         return ManageDomain.allow();
       case USE_DOMAIN:
         return UseDomain.allow();
+      case CREATE_ONTOLOGY:
+        return CreateOntology.allow();
+      case USE_ONTOLOGY:
+        return UseOntology.allow();
+      case MODIFY_ONTOLOGY:
+        return ModifyOntology.allow();
 
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
@@ -408,6 +414,12 @@ public class Privileges {
         return ManageDomain.deny();
       case USE_DOMAIN:
         return UseDomain.deny();
+      case CREATE_ONTOLOGY:
+        return CreateOntology.deny();
+      case USE_ONTOLOGY:
+        return UseOntology.deny();
+      case MODIFY_ONTOLOGY:
+        return ModifyOntology.deny();
 
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
@@ -1901,6 +1913,102 @@ public class Privileges {
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.DOMAIN;
+    }
+  }
+
+  /** The privilege to create ontologies. */
+  public static class CreateOntology extends GenericPrivilege<CreateOntology> {
+
+    private static final CreateOntology ALLOW_INSTANCE =
+        new CreateOntology(Condition.ALLOW, Name.CREATE_ONTOLOGY);
+    private static final CreateOntology DENY_INSTANCE =
+        new CreateOntology(Condition.DENY, Name.CREATE_ONTOLOGY);
+
+    private CreateOntology(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The allowed privilege.
+     */
+    public static CreateOntology allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The denied privilege.
+     */
+    public static CreateOntology deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE;
+    }
+  }
+
+  /** The privilege to load and export ontologies. */
+  public static class UseOntology extends GenericPrivilege<UseOntology> {
+
+    private static final UseOntology ALLOW_INSTANCE =
+        new UseOntology(Condition.ALLOW, Name.USE_ONTOLOGY);
+    private static final UseOntology DENY_INSTANCE =
+        new UseOntology(Condition.DENY, Name.USE_ONTOLOGY);
+
+    private UseOntology(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The allowed privilege.
+     */
+    public static UseOntology allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The denied privilege.
+     */
+    public static UseOntology deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.ONTOLOGY;
+    }
+  }
+
+  /** The privilege to alter ontologies. */
+  public static class ModifyOntology extends GenericPrivilege<ModifyOntology> {
+
+    private static final ModifyOntology ALLOW_INSTANCE =
+        new ModifyOntology(Condition.ALLOW, Name.MODIFY_ONTOLOGY);
+    private static final ModifyOntology DENY_INSTANCE =
+        new ModifyOntology(Condition.DENY, Name.MODIFY_ONTOLOGY);
+
+    private ModifyOntology(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The allowed privilege.
+     */
+    public static ModifyOntology allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The denied privilege.
+     */
+    public static ModifyOntology deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.ONTOLOGY;
     }
   }
 }

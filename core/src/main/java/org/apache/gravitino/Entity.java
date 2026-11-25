@@ -64,6 +64,9 @@ public interface Entity extends Serializable {
   /** The domain schema name in the system catalog. */
   String DOMAIN_SCHEMA_NAME = "domain";
 
+  /** Virtual schema for metalake-wide ontologies. */
+  String ONTOLOGY_SCHEMA_NAME = "ontology";
+
   /** Enumeration defining the types of entities in the Gravitino framework. */
   @Getter
   enum EntityType {
@@ -88,7 +91,8 @@ public interface Entity extends Serializable {
     JOB,
     AUDIT,
     FUNCTION,
-    DOMAIN;
+    DOMAIN,
+    ONTOLOGY;
   }
 
   /**

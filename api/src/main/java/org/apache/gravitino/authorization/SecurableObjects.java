@@ -198,6 +198,17 @@ public class SecurableObjects {
   }
 
   /**
+   * Creates a securable ontology with the given privileges.
+   *
+   * @param name The ontology name.
+   * @param privileges The privileges to bind.
+   * @return The securable ontology.
+   */
+  public static SecurableObject ofOntology(String name, List<Privilege> privileges) {
+    return of(MetadataObject.Type.ONTOLOGY, Lists.newArrayList(name), privileges);
+  }
+
+  /**
    * Create the policy {@link SecurableObject} with the given policy name and privileges.
    *
    * @param policy The policy name

@@ -54,6 +54,7 @@ import org.apache.gravitino.RelationQuery;
 import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsDomainOperations;
+import org.apache.gravitino.SupportsOntologyIdLookup;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.SupportsTableIdLookup;
 import org.apache.gravitino.cache.BaseEntityCache;
@@ -102,6 +103,7 @@ import org.slf4j.LoggerFactory;
 public class RelationalEntityStore
     implements EntityStore,
         SupportsTableIdLookup,
+        SupportsOntologyIdLookup,
         SupportsRelationOperations,
         SupportsDomainOperations,
         SupportsEntityChangeLog {
@@ -412,6 +414,11 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> E get(
       NameIdentifier ident, Entity.EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException {
+    // Ontology mutations use the versioned service directly. Governance reads resolve its
+    // identity from the same store without retaining a pre-rename or pre-drop snapshot.
+    if (entityType == Entity.EntityType.ONTOLOGY) {
+      return backend.get(ident, entityType);
+    }
     Optional<E> cached =
         cache.withCacheLock(
             EntityCacheKey.of(ident, entityType),
@@ -449,6 +456,12 @@ public class RelationalEntityStore
       return cachedId.get();
     }
     return backend.getTableId(ident);
+  }
+
+  /** Ontologies are never cached, so their IDs always come from the backend's ID-only query. */
+  @Override
+  public long getOntologyId(NameIdentifier ident) throws IOException {
+    return backend.getOntologyId(ident);
   }
 
   @Override

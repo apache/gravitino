@@ -45,6 +45,10 @@ public interface OntologyMapper {
   @Select(ONTOLOGY_SELECT + " AND o.metalake_id = #{metalakeId} AND o.ontology_name = #{name}")
   OntologySnapshotPO loadOntology(@Param("metalakeId") long metalakeId, @Param("name") String name);
 
+  /** Returns the current snapshot by stable ontology ID. */
+  @Select(ONTOLOGY_SELECT + " AND o.ontology_id = #{id}")
+  OntologySnapshotPO loadOntologyById(@Param("id") long id);
+
   /** Looks up the identity without loading the definition. */
   @Select(
       "SELECT ontology_id FROM ontology_meta WHERE metalake_id = #{metalakeId}"

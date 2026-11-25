@@ -30,6 +30,7 @@ import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.OntologyMapper;
 import org.apache.gravitino.storage.relational.mapper.OrphanedMetadataObjectRelationMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
@@ -82,6 +83,9 @@ public class OrphanedMetadataObjectRelationService {
           .put(
               MetadataObject.Type.FUNCTION,
               new EntityTable(FunctionMetaMapper.TABLE_NAME, "function_id"))
+          .put(
+              MetadataObject.Type.ONTOLOGY,
+              new EntityTable(OntologyMapper.ONTOLOGY_TABLE, "ontology_id"))
           .put(
               MetadataObject.Type.DOMAIN,
               new EntityTable(DomainMetaMapper.DOMAIN_TABLE_NAME, "domain_id"))

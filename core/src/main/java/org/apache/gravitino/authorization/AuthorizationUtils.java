@@ -99,6 +99,7 @@ public class AuthorizationUtils {
           MetadataObject.Type.JOB_TEMPLATE,
           MetadataObject.Type.TAG,
           MetadataObject.Type.DOMAIN,
+          MetadataObject.Type.ONTOLOGY,
           MetadataObject.Type.POLICY,
           MetadataObject.Type.VIEW,
           // Semantic models live only in Gravitino, underlying connectors know nothing about
@@ -136,7 +137,10 @@ public class AuthorizationUtils {
           Privilege.Name.USE_SEMANTIC_MODEL,
           Privilege.Name.MODIFY_SEMANTIC_MODEL,
           Privilege.Name.MANAGE_DOMAIN,
-          Privilege.Name.USE_DOMAIN);
+          Privilege.Name.USE_DOMAIN,
+          Privilege.Name.CREATE_ONTOLOGY,
+          Privilege.Name.USE_ONTOLOGY,
+          Privilege.Name.MODIFY_ONTOLOGY);
 
   private AuthorizationUtils() {}
 
@@ -510,8 +514,8 @@ public class AuthorizationUtils {
         .build();
   }
 
-  // Compare the connector-visible states before choosing the callback and its payload. A
-  // Semantic Model-only change must neither contact a connector nor leak into its role snapshot.
+  // Compare connector-visible states so Gravitino-only changes stay out of callbacks and role
+  // snapshots.
   static void notifyRolePrivilegesUpdated(
       String metalake,
       RoleEntity role,

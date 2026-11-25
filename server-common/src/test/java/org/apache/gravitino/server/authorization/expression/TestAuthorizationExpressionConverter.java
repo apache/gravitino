@@ -131,6 +131,24 @@ public class TestAuthorizationExpressionConverter {
   }
 
   @Test
+  public void testReplaceAnyPrivilegeForOntologyPrivileges() {
+    Assertions.assertEquals(
+        "((ANY(USE_ONTOLOGY, METALAKE, ONTOLOGY)) && !(ANY(DENY_USE_ONTOLOGY, METALAKE, ONTOLOGY)))",
+        AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_USE_ONTOLOGY"));
+    Assertions.assertEquals(
+        "((ANY(MODIFY_ONTOLOGY, METALAKE, ONTOLOGY))"
+            + " && !(ANY(DENY_MODIFY_ONTOLOGY, METALAKE, ONTOLOGY)))",
+        AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_MODIFY_ONTOLOGY"));
+    Assertions.assertTrue(
+        AuthorizationExpressionConverter.replaceCanAccessMetadataPrivilege(
+                AuthorizationExpressionConstants.CAN_ACCESS_METADATA)
+            .contains(
+                "( entityType == 'ONTOLOGY' && ("
+                    + AuthorizationExpressionConstants.LOAD_ONTOLOGY_AUTHORIZATION_EXPRESSION
+                    + "))"));
+  }
+
+  @Test
   public void testReplaceAnyPrivilegeForAnyUseSecretss() {
     String replaced = AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_USE_SECRETS");
     Assertions.assertEquals(

@@ -259,6 +259,20 @@ public enum OperationType {
   IMPORT_SEMANTIC_MODEL,
   /** Export a Semantic Model as an Ossie document. */
   EXPORT_SEMANTIC_MODEL,
+  /** Create an ontology. */
+  CREATE_ONTOLOGY,
+  /** Load an ontology. */
+  LOAD_ONTOLOGY,
+  /** Alter an ontology. */
+  ALTER_ONTOLOGY,
+  /** Drop an ontology. */
+  DROP_ONTOLOGY,
+  /** List ontologies. */
+  LIST_ONTOLOGY,
+  /** Import an ontology. */
+  IMPORT_ONTOLOGY,
+  /** Export an ontology. */
+  EXPORT_ONTOLOGY,
 
   // Function operations
   REGISTER_FUNCTION,
