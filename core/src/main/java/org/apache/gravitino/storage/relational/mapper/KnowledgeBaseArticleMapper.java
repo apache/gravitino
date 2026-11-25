@@ -91,11 +91,11 @@ public interface KnowledgeBaseArticleMapper {
       """
       <script>
       SELECT a.title, a.status, a.synonyms, a.properties, a.revision, a.article_id AS articleId,
-          a.metalake_id AS metalakeId, a.article_name AS articleName, a.article_comment AS articleComment,
+          m.metalake_id AS metalakeId, a.article_name AS articleName, a.article_comment AS articleComment,
           a.source_reference AS sourceReference, a.audit_info AS auditInfo, b.target_type AS
           targetType, b.target_id AS targetId, b.domain_id AS domainId
-      FROM kb_article_meta a
-      JOIN metalake_meta m ON m.metalake_id=a.metalake_id
+      FROM metalake_meta m
+      LEFT JOIN kb_article_meta a ON a.metalake_id=m.metalake_id AND a.deleted_at=0
       LEFT JOIN (
         SELECT article_id, target_type, target_id, NULL AS domain_id
         FROM kb_article_relation_meta WHERE deleted_at=0
@@ -103,7 +103,7 @@ public interface KnowledgeBaseArticleMapper {
         SELECT member_id, NULL, NULL, domain_id FROM domain_member_rel
         WHERE member_type='KNOWLEDGE_BASE_ARTICLE' AND deleted_at=0
       ) b ON b.article_id=a.article_id
-      WHERE m.metalake_name=#{metalake} AND m.deleted_at=0 AND a.deleted_at=0
+      WHERE m.metalake_name=#{metalake} AND m.deleted_at=0
       <if test='name != null'>AND a.article_name=#{name}</if>
       ORDER BY a.article_id
       </script>
