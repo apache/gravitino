@@ -327,7 +327,7 @@ public class TestArticleDomainMembership extends TestJDBCBackend {
         .withId(60L)
         .withName("guide")
         .withTitle("Guide")
-        .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "Body"))
+        .withBodyUpdate(ArticleBody.of(ArticleBody.Format.MARKDOWN, "Body"))
         .withDomainIds(domains)
         .withAuditInfo(AUDIT_INFO)
         .build();

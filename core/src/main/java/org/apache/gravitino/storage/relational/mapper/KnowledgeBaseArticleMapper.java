@@ -39,7 +39,7 @@ public interface KnowledgeBaseArticleMapper {
   String COLUMNS =
       """
       article_id AS articleId, metalake_id AS metalakeId, article_name AS articleName, title,
-          body_format AS bodyFormat, body_content AS bodyContent, status, article_comment AS
+          status, article_comment AS
           articleComment, synonyms, source_reference AS sourceReference, properties, revision,
           audit_info AS auditInfo
       """;
@@ -47,7 +47,10 @@ public interface KnowledgeBaseArticleMapper {
   String LIVE = " FROM kb_article_meta WHERE metalake_id=#{metalakeId} AND deleted_at=0";
 
   /** Loads the live row under an exclusive lock. */
-  @Select("SELECT " + COLUMNS + LIVE + " AND article_name=#{name} FOR UPDATE")
+  @Select(
+      "SELECT article_id AS articleId, metalake_id AS metalakeId, revision"
+          + LIVE
+          + " AND article_name=#{name} FOR UPDATE")
   @Nullable
   KnowledgeBaseArticlePO lock(@Param("metalakeId") long metalakeId, @Param("name") String name);
 
@@ -59,6 +62,17 @@ public interface KnowledgeBaseArticleMapper {
   /** Lists current rows in stable identity order. */
   @Select("SELECT " + COLUMNS + LIVE + " ORDER BY article_id")
   List<KnowledgeBaseArticlePO> list(@Param("metalakeId") long metalakeId);
+
+  /** Reads the stored body and its revision in one statement. */
+  @Select(
+      """
+      SELECT a.metalake_id AS metalakeId, a.article_id AS articleId, a.revision,
+          a.body_format AS bodyFormat, a.body_content AS bodyContent
+      FROM kb_article_meta a JOIN metalake_meta m ON a.metalake_id=m.metalake_id
+      WHERE m.metalake_name=#{metalake} AND m.deleted_at=0 AND a.article_name=#{name} AND a.deleted_at=0
+      """)
+  @Nullable
+  KnowledgeBaseArticlePO content(@Param("metalake") String metalake, @Param("name") String name);
 
   /** Resolves identity without reading the body. */
   @Select(
@@ -72,15 +86,12 @@ public interface KnowledgeBaseArticleMapper {
   @Nullable
   KnowledgeBaseArticlePO ids(@Param("metalake") String metalake, @Param("name") String name);
 
-  /**
-   * Reads a complete Article in one statement when participating in a caller's write transaction.
-   */
+  /** Reads metadata and relations together in a caller's transaction. */
   @Select(
       """
       <script>
       SELECT a.title, a.status, a.synonyms, a.properties, a.revision, a.article_id AS articleId,
-          a.metalake_id AS metalakeId, a.article_name AS articleName, a.body_format AS
-          bodyFormat, a.body_content AS bodyContent, a.article_comment AS articleComment,
+          a.metalake_id AS metalakeId, a.article_name AS articleName, a.article_comment AS articleComment,
           a.source_reference AS sourceReference, a.audit_info AS auditInfo, b.target_type AS
           targetType, b.target_id AS targetId, b.domain_id AS domainId
       FROM kb_article_meta a
@@ -100,13 +111,12 @@ public interface KnowledgeBaseArticleMapper {
   List<KnowledgeBaseArticlePO> joined(
       @Param("metalake") String metalake, @Param("name") @Nullable String name);
 
-  /** Reads a batch of complete Articles in one statement, participating in a caller's session. */
+  /** Reads metadata and relations for a batch of Articles from the same snapshot. */
   @Select(
       """
       <script>
       SELECT a.title, a.status, a.synonyms, a.properties, a.revision, a.article_id AS articleId,
-          a.metalake_id AS metalakeId, a.article_name AS articleName, a.body_format AS
-          bodyFormat, a.body_content AS bodyContent, a.article_comment AS articleComment,
+          a.metalake_id AS metalakeId, a.article_name AS articleName, a.article_comment AS articleComment,
           a.source_reference AS sourceReference, a.audit_info AS auditInfo, b.target_type AS
           targetType, b.target_id AS targetId, b.domain_id AS domainId
       FROM kb_article_meta a
@@ -169,17 +179,39 @@ public interface KnowledgeBaseArticleMapper {
       """)
   void insert(KnowledgeBaseArticlePO row);
 
-  /** Replaces the locked row's mutable fields. */
+  /**
+   * Compares an explicit replacement without returning the stored text. The byte length also
+   * distinguishes trailing spaces under MySQL PAD SPACE collations.
+   */
+  @Select(
+      """
+      SELECT COUNT(*) FROM kb_article_meta WHERE article_id=#{id} AND deleted_at=0
+          AND body_format=#{format} AND body_content=#{content} AND OCTET_LENGTH(body_content)=#{bytes}
+      """)
+  boolean matchesBody(
+      @Param("id") long id,
+      @Param("format") String format,
+      @Param("content") String content,
+      @Param("bytes") int bytes);
+
+  /** Updates changed metadata and advances the revision while the Article is locked. */
   @Update(
       """
-      UPDATE kb_article_meta
-      SET title=#{title}, body_format=#{bodyFormat}, body_content=#{bodyContent},
-          status=#{status}, article_comment=#{articleComment}, synonyms=#{synonyms},
-          source_reference=#{sourceReference}, properties=#{properties}, revision=#{revision},
-          audit_info=#{auditInfo}
-      WHERE article_id=#{articleId} AND deleted_at=0
+      <script>
+      UPDATE kb_article_meta SET
+        <if test="before.title != after.title">title=#{after.title},</if>
+        <if test="before.status != after.status">status=#{after.status},</if>
+        <if test="before.articleComment != after.articleComment">article_comment=#{after.articleComment},</if>
+        <if test="before.synonyms != after.synonyms">synonyms=#{after.synonyms},</if>
+        <if test="before.sourceReference != after.sourceReference">source_reference=#{after.sourceReference},</if>
+        <if test="before.properties != after.properties">properties=#{after.properties},</if>
+        <if test="after.bodyContent != null">body_format=#{after.bodyFormat}, body_content=#{after.bodyContent},</if>
+        revision=#{after.revision}, audit_info=#{after.auditInfo}
+      WHERE article_id=#{after.articleId} AND deleted_at=0
+      </script>
       """)
-  void update(KnowledgeBaseArticlePO row);
+  void update(
+      @Param("before") KnowledgeBaseArticlePO before, @Param("after") KnowledgeBaseArticlePO after);
 
   /** Adds a new binding in the same transaction as the Article revision. */
   @Insert(

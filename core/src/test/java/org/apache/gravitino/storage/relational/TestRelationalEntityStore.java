@@ -116,7 +116,7 @@ public class TestRelationalEntityStore {
             .withNamespace(ident.namespace())
             .withName(ident.name())
             .withTitle("Article")
-            .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "Body"))
+            .withBodyUpdate(ArticleBody.of(ArticleBody.Format.MARKDOWN, "Body"))
             .withAuditInfo(AUDIT_INFO)
             .build();
     Mockito.when(backend.exists(ident, type)).thenReturn(true);

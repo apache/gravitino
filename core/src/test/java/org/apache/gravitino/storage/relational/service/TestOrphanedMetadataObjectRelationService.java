@@ -217,7 +217,7 @@ public class TestOrphanedMetadataObjectRelationService extends TestJDBCBackend {
             .withId(123L)
             .withName("guide")
             .withTitle("Guide")
-            .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "Guide"))
+            .withBodyUpdate(ArticleBody.of(ArticleBody.Format.MARKDOWN, "Guide"))
             .withAuditInfo(AUDIT_INFO)
             .build();
     backend.insert(article, false);

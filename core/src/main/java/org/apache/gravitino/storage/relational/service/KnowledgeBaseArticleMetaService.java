@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Utf8;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -83,6 +84,9 @@ public final class KnowledgeBaseArticleMetaService {
   /** Stable identity and revision decoded from an editing token by the caller. */
   public record ExpectedRevision(long metalakeId, long articleId, long revision) {}
 
+  /** Body and stable revision identity read from the same live row. */
+  public record StoredContent(ArticleBody body, ExpectedRevision revision) {}
+
   private KnowledgeBaseArticleMetaService() {}
 
   /** Returns the shared Article service. */
@@ -90,7 +94,7 @@ public final class KnowledgeBaseArticleMetaService {
     return INSTANCE;
   }
 
-  /** Returns a complete Article from one snapshot. */
+  /** Returns Article metadata and binding identities from one snapshot. */
   public KnowledgeBaseArticleEntity get(NameIdentifier ident) {
     String name = KnowledgeBaseArticle.normalizeName(ident.name());
     List<KnowledgeBaseArticleEntity> result = read(ident.namespace(), name);
@@ -100,9 +104,24 @@ public final class KnowledgeBaseArticleMetaService {
     return result.get(0);
   }
 
-  /** Lists complete stored entities. API summary callers use the body-free mapper projection. */
+  /** Lists stored metadata and binding identities. */
   public List<KnowledgeBaseArticleEntity> list(Namespace namespace) {
     return read(namespace, null);
+  }
+
+  /** Reads only the current content and its editing identity. */
+  public StoredContent getContent(NameIdentifier ident) {
+    String metalake = metalakeName(ident.namespace());
+    String name = KnowledgeBaseArticle.normalizeName(ident.name());
+    KnowledgeBaseArticlePO row =
+        SessionUtils.getWithoutCommitFresh(
+            KnowledgeBaseArticleMapper.class, mapper -> mapper.content(metalake, name));
+    if (row == null) {
+      throw missing(ident);
+    }
+    return new StoredContent(
+        ArticleBody.of(ArticleBody.Format.valueOf(row.getBodyFormat()), row.getBodyContent()),
+        new ExpectedRevision(row.getMetalakeId(), row.getArticleId(), row.getRevision()));
   }
 
   /** Resolves the stable ID without fetching the Article body. */
@@ -161,8 +180,14 @@ public final class KnowledgeBaseArticleMetaService {
               return null;
             }
             requireDomainsLive(lockLiveDomains(metalakeId, entity.domainIds()));
-            KnowledgeBaseArticleEntity initial = entity.toBuilder().withRevision(1).build();
+            KnowledgeBaseArticleEntity initial =
+                entity.toBuilder().withBodyUpdate(null).withRevision(1).build();
             KnowledgeBaseArticlePO row = encode(initial, metalakeId);
+            ArticleBody body =
+                Preconditions.checkNotNull(
+                    entity.bodyUpdate(), "An initial Article body is required");
+            row.setBodyFormat(body.format().name());
+            row.setBodyContent(body.content());
             mapper.insert(row);
             initial.bindings().forEach(binding -> mapper.bind(row, binding));
             changeMemberships(row, Set.of(), initial.domainIds());
@@ -511,13 +536,29 @@ public final class KnowledgeBaseArticleMetaService {
         before.id().equals(proposed.id())
             && before.nameIdentifier().equals(proposed.nameIdentifier()),
         "An Article edit must retain its ID, name and metalake");
-    if (before.equals(proposed.toBuilder().withRevision(before.revision()).build())) {
+    ArticleBody body = proposed.bodyUpdate();
+    boolean bodyChanged =
+        body != null
+            && !mapper.matchesBody(
+                before.id(),
+                body.format().name(),
+                body.content(),
+                Utf8.encodedLength(body.content()));
+    if (!bodyChanged
+        && before.equals(proposed.toBuilder().withRevision(before.revision()).build())) {
       return before;
     }
     KnowledgeBaseArticleEntity after =
-        proposed.toBuilder().withRevision(Math.incrementExact(before.revision())).build();
+        proposed.toBuilder()
+            .withBodyUpdate(null)
+            .withRevision(Math.incrementExact(before.revision()))
+            .build();
     KnowledgeBaseArticlePO next = encode(after, row.getMetalakeId());
-    mapper.update(next);
+    if (bodyChanged) {
+      next.setBodyFormat(body.format().name());
+      next.setBodyContent(body.content());
+    }
+    mapper.update(encode(before, row.getMetalakeId()), next);
     long now = System.currentTimeMillis();
     for (Binding removed : Sets.difference(before.bindings(), after.bindings())) {
       mapper.unbind(before.id(), removed, now);
@@ -548,8 +589,6 @@ public final class KnowledgeBaseArticleMetaService {
           .withNamespace(ns)
           .withName(row.getArticleName())
           .withTitle(row.getTitle())
-          .withBody(
-              ArticleBody.of(ArticleBody.Format.valueOf(row.getBodyFormat()), row.getBodyContent()))
           .withStatus(ArticleStatus.valueOf(row.getStatus()))
           .withComment(row.getArticleComment())
           .withSynonyms(
@@ -575,8 +614,6 @@ public final class KnowledgeBaseArticleMetaService {
     row.setMetalakeId(metalakeId);
     row.setArticleName(entity.name());
     row.setTitle(entity.title());
-    row.setBodyFormat(entity.body().format().name());
-    row.setBodyContent(entity.body().content());
     row.setStatus(entity.status().name());
     row.setArticleComment(entity.comment());
     row.setSourceReference(entity.sourceReference());

@@ -66,11 +66,12 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
             .withTitle("𠀀".repeat(512))
             .withComment("𠀀".repeat(256))
             .withSourceReference("𠀀".repeat(1024))
-            .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, body))
+            .withBodyUpdate(ArticleBody.of(ArticleBody.Format.MARKDOWN, body))
             .build();
     backend.insert(entity, false);
     NameIdentifier nfd = NameIdentifier.of("lake", "𠀀".repeat(127) + "e\u0301");
     assertEquals(entity, backend.get(nfd, TYPE));
+    assertEquals(body, STORE.getContent(nfd).body().content());
     assertTrue(backend.exists(nfd, TYPE));
     assertEquals(31, STORE.getIds(nfd).entityId());
     assertThrows(
@@ -89,6 +90,74 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
         List.of(second, entity),
         backend.batchGet(
             List.of(second.nameIdentifier(), NameIdentifier.of("lake", "absent"), nfd), TYPE));
+  }
+
+  @TestTemplate
+  void testSeparateContentAndRevision() throws IOException {
+    long lake = createAndInsertMakeLake("lake").id();
+    var entity = article(31, "guide");
+    var name = entity.nameIdentifier();
+    STORE.insert(entity, false);
+    var initial = STORE.getContent(name);
+    assertEquals(entity.bodyUpdate(), initial.body());
+    assertEquals(new ExpectedRevision(lake, 31, 1), initial.revision());
+    assertNull(STORE.get(name).bodyUpdate());
+    SessionUtils.doMultipleWithCommit(
+        () -> {
+          var metadata =
+              STORE.update(
+                  name,
+                  initial.revision(),
+                  a -> a.toBuilder().withTitle("New").build(),
+                  (before, after) -> assertNull(after.bodyUpdate()));
+          var content = STORE.getContent(name);
+          assertEquals(initial.body(), content.body());
+          assertEquals(metadata.revision(), content.revision().revision());
+          assertThrows(
+              ArticleRevisionConflictException.class,
+              () ->
+                  STORE.update(
+                      name,
+                      initial.revision(),
+                      a -> a.toBuilder().withBodyUpdate(initial.body()).build(),
+                      (before, after) -> {}));
+        });
+    long revision = 2;
+    for (ArticleBody body :
+        List.of(
+            ArticleBody.of(ArticleBody.Format.MARKDOWN, "Case"),
+            ArticleBody.of(ArticleBody.Format.MARKDOWN, "case"),
+            ArticleBody.of(ArticleBody.Format.MARKDOWN, "case "),
+            ArticleBody.of(ArticleBody.Format.HTML, "case "),
+            ArticleBody.of(ArticleBody.Format.MARKDOWN, "é𠀀 "))) {
+      var changed =
+          STORE.update(
+              name, (KnowledgeBaseArticleEntity a) -> a.toBuilder().withBodyUpdate(body).build());
+      assertEquals(++revision, changed.revision());
+      assertNull(changed.bodyUpdate());
+      assertEquals(body, STORE.getContent(name).body());
+      assertEquals(
+          revision,
+          STORE
+              .update(
+                  name,
+                  null,
+                  a -> a.toBuilder().withBodyUpdate(body).build(),
+                  (before, after) -> fail("no-op"))
+              .revision());
+    }
+    var last = STORE.getContent(name);
+    assertThrows(
+        IllegalStateException.class,
+        () ->
+            STORE.update(
+                name,
+                last.revision(),
+                a -> a.toBuilder().withBodyUpdate(initial.body()).build(),
+                (before, after) -> {
+                  throw new IllegalStateException("rollback");
+                }));
+    assertEquals(last, STORE.getContent(name));
   }
 
   @TestTemplate
@@ -273,7 +342,7 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
         .withNamespace(Namespace.of("lake"))
         .withName(name)
         .withTitle("Title")
-        .withBody(ArticleBody.of(ArticleBody.Format.HTML, "<p>Body</p>"))
+        .withBodyUpdate(ArticleBody.of(ArticleBody.Format.HTML, "<p>Body</p>"))
         .withProperties(Map.of("lang", "中文"))
         .withSynonyms(List.of("Article", "alternative"))
         .withBindings(Set.of(TABLE, TERM))

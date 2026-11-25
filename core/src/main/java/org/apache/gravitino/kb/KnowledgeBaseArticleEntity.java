@@ -37,13 +37,12 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.meta.AuditInfo;
 
 /**
- * Current persisted Article, including the complete set of stable binding identities. Equality
- * covers identity, content and bindings; audit metadata does not distinguish two states of the same
- * content.
+ * Article metadata and stable binding identities. A write may also carry a replacement body. Read
+ * results and transaction hooks contain metadata only.
  */
 @Getter
 @Accessors(fluent = true)
-@EqualsAndHashCode(exclude = "auditInfo")
+@EqualsAndHashCode(exclude = {"auditInfo", "bodyUpdate"})
 public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, Auditable {
   /** Stable identity of a bound Term or asset. */
   public record Binding(String targetType, long targetId) {
@@ -72,7 +71,6 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
   private static final Field ID = Field.required("id", Long.class, "Article id");
   private static final Field NAME = Field.required("name", String.class, "Article name");
   private static final Field TITLE = Field.required("title", String.class, "Article title");
-  private static final Field BODY = Field.required("body", ArticleBody.class, "Article body");
   private static final Field STATUS =
       Field.required("status", ArticleStatus.class, "Article status");
   private static final Field COMMENT = Field.optional("comment", String.class, "Article comment");
@@ -91,7 +89,9 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
   private final Long id;
   private final String name;
   private final String title;
-  private final ArticleBody body;
+  /** Body supplied on create or explicit replacement. Absent from persisted metadata results. */
+  @Nullable private final ArticleBody bodyUpdate;
+
   private final ArticleStatus status;
   @Nullable private final String comment;
   private final List<String> synonyms;
@@ -108,7 +108,7 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
       Long id,
       String name,
       String title,
-      ArticleBody body,
+      @Nullable ArticleBody bodyUpdate,
       ArticleStatus status,
       @Nullable String comment,
       List<String> synonyms,
@@ -126,7 +126,7 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
     this.id = Preconditions.checkNotNull(id, "id");
     this.name = KnowledgeBaseArticle.normalizeName(name);
     this.title = ArticleValidation.title(title);
-    this.body = Preconditions.checkNotNull(body, "body");
+    this.bodyUpdate = bodyUpdate;
     this.status = status == null ? ArticleStatus.PUBLISHED : status;
     this.comment =
         ArticleValidation.length(comment, KnowledgeBaseArticle.COMMENT_MAX_LENGTH, "Comment");
@@ -153,7 +153,6 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
     values.put(ID, id);
     values.put(NAME, name);
     values.put(TITLE, title);
-    values.put(BODY, body);
     values.put(STATUS, status);
     values.put(COMMENT, comment);
     values.put(SYNONYMS, synonyms);
