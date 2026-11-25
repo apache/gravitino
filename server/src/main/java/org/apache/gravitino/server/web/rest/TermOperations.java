@@ -21,6 +21,10 @@ package org.apache.gravitino.server.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.base.Preconditions;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -40,13 +44,17 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity.EntityType;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.dto.glossary.TermBindingDTO;
 import org.apache.gravitino.dto.requests.TermCreateRequest;
 import org.apache.gravitino.dto.requests.TermUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
+import org.apache.gravitino.dto.responses.TermBindingListResponse;
 import org.apache.gravitino.dto.responses.TermListResponse;
 import org.apache.gravitino.dto.responses.TermResponse;
 import org.apache.gravitino.dto.responses.TermTreeResponse;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NotFoundException;
@@ -54,6 +62,7 @@ import org.apache.gravitino.exceptions.NotInUseException;
 import org.apache.gravitino.glossary.GlossaryManager;
 import org.apache.gravitino.glossary.GlossaryTerm;
 import org.apache.gravitino.glossary.GlossaryTermViews;
+import org.apache.gravitino.glossary.TermBinding;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
@@ -76,12 +85,14 @@ public class TermOperations {
   private static final ExceptionHandler COMMON_ERRORS =
       new ExceptionHandlers.BaseExceptionHandler();
   private final GlossaryTermViews views;
+  private final BindingPageTokens tokens;
   @Context private HttpServletRequest httpRequest;
 
   /** Creates a term resource using the server's glossary manager. */
   @Inject
-  public TermOperations(GlossaryTermViews views) {
+  public TermOperations(GlossaryTermViews views, BindingPageTokens tokens) {
     this.views = views;
+    this.tokens = tokens;
   }
 
   /**
@@ -259,6 +270,53 @@ public class TermOperations {
         });
   }
 
+  /** Lists one bounded page of visible objects or metrics bound to the requested term. */
+  @GET
+  @Path("{term}/objects")
+  @Timed(name = "list-term-bindings." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-term-bindings", absolute = true)
+  @AuthorizationExpression(expression = "")
+  public Response listTermBindings(
+      @PathParam("metalake") @AuthorizationMetadata(type = EntityType.METALAKE) String metalake,
+      @PathParam("term") String term,
+      @QueryParam("kind") String kind,
+      @QueryParam("types") List<String> types,
+      @QueryParam("status") String status,
+      @QueryParam("pageSize") @DefaultValue("100") String size,
+      @QueryParam("pageToken") String token) {
+    return execute(
+        OperationType.LIST,
+        metalake,
+        term,
+        () -> {
+          Set<MetadataObject.Type> filter = EnumSet.noneOf(MetadataObject.Type.class);
+          for (String values : types) {
+            for (String type : values.split(",", -1)) {
+              filter.add(MetadataObject.Type.valueOf(type.trim().toUpperCase(Locale.ROOT)));
+            }
+          }
+          GlossaryManager.BindingPage page =
+              views.listTermBindings(
+                  metalake,
+                  term,
+                  kind == null ? null : TermBinding.Kind.valueOf(kind.toUpperCase(Locale.ROOT)),
+                  filter,
+                  parseStatus(status),
+                  Integer.parseInt(size),
+                  token == null ? null : tokens.decode(token));
+          TermBindingDTO[] bindings =
+              page.bindings().stream()
+                  .map(
+                      b ->
+                          new TermBindingDTO(
+                              b.kind(), DTOConverters.toDTO(b.object()), b.metric().orElse(null)))
+                  .toArray(TermBindingDTO[]::new);
+          return Utils.ok(
+              new TermBindingListResponse(
+                  bindings, page.next() == null ? null : tokens.encode(page.next())));
+        });
+  }
+
   /** Optional query parameters for browsing glossary terms. Combine filters to narrow the list. */
   public static class ListTermsQuery {
     /** Return full definitions with true, or names only with false (default). */
@@ -395,7 +453,7 @@ public class TermOperations {
   }
 
   @Nullable
-  private static GlossaryTerm.Status parseStatus(@Nullable String status) {
+  static GlossaryTerm.Status parseStatus(@Nullable String status) {
     return status == null ? null : GlossaryTerm.Status.fromString(status);
   }
 
@@ -413,6 +471,15 @@ public class TermOperations {
 
   private Response execute(
       OperationType operation, String metalake, @Nullable String term, Supplier<Response> action) {
+    return execute(httpRequest, operation, metalake, term, action);
+  }
+
+  static Response execute(
+      HttpServletRequest httpRequest,
+      OperationType operation,
+      String metalake,
+      @Nullable String term,
+      Supplier<Response> action) {
     try {
       return Utils.doAs(
           httpRequest,

@@ -255,8 +255,302 @@ paths:
           $ref: "#/components/responses/MetalakeNotInUse"
         5XX:
           $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+  "/metalakes/{metalake}/terms/{term}/objects":
+    parameters:
+      - $ref: ./openapi.yaml#/components/parameters/metalake
+      - in: path
+        name: term
+        required: true
+        description: Glossary term name.
+        schema:
+          type: string
+    get:
+      operationId: listTermBindings
+      tags: [glossary]
+      summary: List a bounded page of visible glossary bindings
+      parameters:
+        - in: query
+          name: kind
+          description: Restrict the binding kind.
+          schema:
+            type: string
+            enum: [IMPLEMENTED_BY, USED_BY]
+        - in: query
+          name: types
+          description: Filter by metadata object types. Use SEMANTIC_MODEL for metrics.
+          schema:
+            type: array
+            items:
+              type: string
+        - in: query
+          name: pageSize
+          description: Maximum visible bindings to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 100
+        - in: query
+          name: pageToken
+          description: >-
+            Continue with the same filters even after an empty page. Each request examines at
+            most 1,000 candidates. Changed filters or an invalid token return 400. A changed
+            visible term identity or revision returns 409 and requires restarting the scan.
+          schema:
+            type: string
+        - in: query
+          name: status
+          description: Restrict term visibility to this status.
+          schema:
+            $ref: "#/components/schemas/TermStatusInput"
+      responses:
+        "200":
+          description: Successful glossary binding operation.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/TermBindingListResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        5XX:
+          $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+  "/metalakes/{metalake}/objects/{type}/{fullName}/terms":
+    parameters:
+      - $ref: ./openapi.yaml#/components/parameters/metalake
+      - in: path
+        name: type
+        required: true
+        description: Metadata object type, ignoring case.
+        schema:
+          type: string
+      - in: path
+        name: fullName
+        required: true
+        description: Fully qualified metadata object name.
+        schema:
+          type: string
+    get:
+      operationId: listObjectTerms
+      tags: [glossary]
+      summary: List visible glossary terms of a metadata object
+      parameters:
+        - in: query
+          name: details
+          description: Return term definitions in place of names.
+          schema:
+            type: boolean
+            default: false
+        - in: query
+          name: children
+          description: Include matching columns or metrics and return details. Supported on tables and semantic models.
+          schema:
+            type: boolean
+            default: false
+        - in: query
+          name: status
+          description: Restrict term visibility to this status.
+          schema:
+            $ref: "#/components/schemas/TermStatusInput"
+      responses:
+        "200":
+          description: Successful glossary binding operation.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                oneOf:
+                  - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+                  - $ref: "#/components/schemas/ObjectTermsResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        5XX:
+          $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+    post:
+      operationId: associateObjectTerms
+      tags: [glossary]
+      summary: Update the glossary terms of a metadata object
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TermsAssociateRequest"
+      responses:
+        "200":
+          description: Successful glossary binding operation.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        5XX:
+          $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+  "/metalakes/{metalake}/objects/semantic_model/{fullName}/metrics/{metric}/terms":
+    parameters:
+      - $ref: ./openapi.yaml#/components/parameters/metalake
+      - in: path
+        name: fullName
+        required: true
+        description: Fully qualified metadata object name.
+        schema:
+          type: string
+      - in: path
+        name: metric
+        required: true
+        description: Exact metric name within the semantic model.
+        schema:
+          type: string
+    get:
+      operationId: listMetricTerms
+      tags: [glossary]
+      summary: List visible glossary terms of a semantic-model metric
+      parameters:
+        - in: query
+          name: details
+          description: Return term definitions in place of names.
+          schema:
+            type: boolean
+            default: false
+        - in: query
+          name: status
+          description: Restrict term visibility to this status.
+          schema:
+            $ref: "#/components/schemas/TermStatusInput"
+      responses:
+        "200":
+          description: Successful glossary binding operation.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                oneOf:
+                  - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+                  - $ref: "#/components/schemas/TermListResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        5XX:
+          $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+    post:
+      operationId: associateMetricTerms
+      tags: [glossary]
+      summary: Update the glossary terms of a semantic-model metric
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TermsAssociateRequest"
+      responses:
+        "200":
+          description: Successful glossary binding operation.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        5XX:
+          $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
 components:
   schemas:
+    TermsAssociateRequest:
+      type: object
+      anyOf:
+        - required: [termsToAdd]
+        - required: [termsToRemove]
+      properties:
+        termsToAdd:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        termsToRemove:
+          type: array
+          items:
+            type: string
+            minLength: 1
+    TermBindingListResponse:
+      type: object
+      required: [code, bindings]
+      properties:
+        code:
+          type: integer
+          enum: [0]
+        bindings:
+          type: array
+          items:
+            $ref: "#/components/schemas/TermBinding"
+        nextPageToken:
+          type: string
+          description: Present while more candidates remain. Bound to the term, its revision and the filters.
+    TermBinding:
+      type: object
+      required: [kind, object]
+      properties:
+        kind:
+          type: string
+          enum: [IMPLEMENTED_BY, USED_BY]
+        object:
+          $ref: ./tags.yaml#/components/schemas/MetadataObject
+        metric:
+          type: string
+          description: Exact metric name for USED_BY bindings.
+    ObjectTermsResponse:
+      type: object
+      required: [code, terms, children]
+      properties:
+        code:
+          type: integer
+          enum: [0]
+        terms:
+          type: array
+          items:
+            $ref: "#/components/schemas/Term"
+        children:
+          type: array
+          items:
+            type: object
+            required: [name, terms]
+            properties:
+              name:
+                type: string
+              terms:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Term"
     TermStatusInput:
       type: string
       description: Case-insensitive term status.
@@ -644,7 +938,8 @@ components:
             $ref: ./openapi.yaml#/components/schemas/ErrorModel
     Conflict:
       description: The metalake is not in use, the name or source reference already exists,
-        the expected revision is stale, or a concurrent modification prevented the write.
+        the expected revision is stale, a binding continuation refers to a replaced or modified term,
+        or a concurrent modification prevented the write.
       content:
         application/json:
           schema:

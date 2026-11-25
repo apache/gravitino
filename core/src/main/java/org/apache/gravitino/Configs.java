@@ -387,6 +387,15 @@ public class Configs {
           .longConf()
           .createWithDefault(CLEAN_INTERVAL_IN_SECS);
 
+  /** Shared secret used to protect glossary binding continuations across servers and restarts. */
+  public static final ConfigEntry<String> GLOSSARY_BINDING_PAGE_TOKEN_SECRET =
+      new ConfigBuilder("gravitino.glossary.bindingPageTokenSecret")
+          .doc(
+              "Base64-encoded 256-bit key for glossary binding page tokens. An empty value uses a process-local key.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .createWithDefault("");
+
   public static final ConfigEntry<Boolean> ENABLE_AUTHORIZATION =
       new ConfigBuilder("gravitino.authorization.enable")
           .doc("Enable the authorization")

@@ -21,6 +21,7 @@ package org.apache.gravitino.glossary;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
@@ -36,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.function.BiFunction;
@@ -75,6 +77,7 @@ import org.apache.gravitino.storage.relational.mapper.GlossaryTermVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermVersionMapper.Head;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermVersionMapper.Version;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper;
+import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.po.DomainPO;
 import org.apache.gravitino.storage.relational.po.GlossaryTermBindingPO;
@@ -634,8 +637,8 @@ public final class GlossaryManager {
   public List<GlossaryTermEntity> listObjectTerms(
       String metalake, MetadataObject object, @Nullable GlossaryTerm.Status status) {
     Preconditions.checkArgument(object != null, "Bound object cannot be null");
-    TargetType targetType = TargetType.fromMetadataObjectType(object.type());
-    return listTargetTerms(metalake, object, targetType, null, status);
+    TargetType.fromMetadataObjectType(object.type());
+    return readTargetTerms(metalake, object, null, false, true, status, BoundTerms::direct);
   }
 
   /**
@@ -659,7 +662,8 @@ public final class GlossaryManager {
         "Expected a SEMANTIC_MODEL object, got %s",
         semanticModel.type());
     Preconditions.checkArgument(StringUtils.isNotBlank(metricName), "Metric name cannot be blank");
-    return listTargetTerms(metalake, semanticModel, TargetType.METRIC, metricName, status);
+    return readTargetTerms(
+        metalake, semanticModel, metricName, false, true, status, BoundTerms::direct);
   }
 
   /** A bounded page of authorized bindings and the position of the next scan. */
@@ -945,12 +949,30 @@ public final class GlossaryManager {
         });
   }
 
-  private List<GlossaryTermEntity> listTargetTerms(
+  record BoundTerms(
+      long lake,
+      GlossaryAccess access,
+      List<GlossaryTermEntity> direct,
+      Map<String, List<GlossaryTermEntity>> children) {}
+
+  <R> R readTargetTerms(
       String metalake,
       MetadataObject targetObject,
-      TargetType targetType,
       @Nullable String metricName,
-      @Nullable GlossaryTerm.Status status) {
+      boolean children,
+      boolean includeDomains,
+      @Nullable GlossaryTerm.Status status,
+      Function<BoundTerms, R> project) {
+    boolean model = targetObject.type() == MetadataObject.Type.SEMANTIC_MODEL;
+    Preconditions.checkArgument(
+        metricName == null || (model && StringUtils.isNotBlank(metricName)),
+        "Expected a semantic model and a nonblank metric name");
+    Preconditions.checkArgument(
+        !children
+            || (metricName == null && (model || targetObject.type() == MetadataObject.Type.TABLE)),
+        "Only tables and semantic models support children");
+    TargetType targetType =
+        model ? TargetType.METRIC : TargetType.fromMetadataObjectType(targetObject.type());
     Preconditions.checkState(
         !SqlSessions.hasActiveSession(),
         "A snapshot read must start outside an active SQL session");
@@ -979,25 +1001,113 @@ public final class GlossaryManager {
                 "Caller lacks read access to target %s", targetObject.fullName());
           }
           long metalakeId = ids.namespaceIds()[0];
-          long targetId = resolveTargetId(ids.entityId(), targetObject, targetType, metricName);
-          GlossaryAccess termAccess = GlossaryAccess.forRequest(metalake, authorizationEnabled);
-          if (!termAccess.canView()) {
-            return List.of();
+          long targetId =
+              metricName == null
+                  ? ids.entityId()
+                  : resolveTargetId(ids.entityId(), targetObject, targetType, metricName);
+          GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
+          if (!access.canView() || (model && metricName == null && !children)) {
+            return project.apply(new BoundTerms(metalakeId, access, List.of(), Map.of()));
           }
-          Set<Long> boundIds = BINDINGS.listTermIds(metalakeId, targetType, targetId);
-          if (boundIds.isEmpty()) {
-            return List.of();
-          }
-          Namespace ns = NamespaceUtil.ofGlossaryTerm(metalake);
-          List<GlossaryTermEntity> visible = new ArrayList<>();
-          for (GlossaryTermEntity term : terms.listTermsByIds(ns, metalakeId, boundIds)) {
-            if (isTermVisible(term, termAccess, status)) {
-              visible.add(visibleDomains(term, termAccess));
-            }
-          }
-          visible.sort(Comparator.comparing(GlossaryTermEntity::name));
-          return visible;
+          BoundTerms bound =
+              visibleTargetTerms(
+                  metalake,
+                  metalakeId,
+                  targetType,
+                  targetId,
+                  children,
+                  includeDomains,
+                  status,
+                  access);
+          return project.apply(bound);
         });
+  }
+
+  private BoundTerms visibleTargetTerms(
+      String metalake,
+      long metalakeId,
+      TargetType targetType,
+      long targetId,
+      boolean children,
+      boolean includeDomains,
+      @Nullable GlossaryTerm.Status status,
+      GlossaryAccess access) {
+    Set<Long> direct = new HashSet<>();
+    Map<Long, Set<Long>> byChild = new HashMap<>();
+    if (children) {
+      List<GlossaryTermBindingPO> rows =
+          SessionUtils.getWithoutCommit(
+              GlossaryTermBindingMapper.class,
+              mapper ->
+                  targetType == TargetType.METRIC
+                      ? mapper.listBySemanticModel(metalakeId, targetId)
+                      : mapper.listByTable(metalakeId, targetId));
+      for (GlossaryTermBindingPO row : rows) {
+        if (TargetType.TABLE.name().equals(row.getTargetType())) {
+          direct.add(row.getTermId());
+        } else {
+          byChild
+              .computeIfAbsent(row.getTargetId(), ignored -> new HashSet<>())
+              .add(row.getTermId());
+        }
+      }
+    } else {
+      direct.addAll(BINDINGS.listTermIds(metalakeId, targetType, targetId));
+    }
+    Set<Long> termIds = new HashSet<>(direct);
+    byChild.values().forEach(termIds::addAll);
+    Map<Long, GlossaryTermEntity> visible = new HashMap<>();
+    for (GlossaryTermEntity term :
+        terms.listTermsByIds(NamespaceUtil.ofGlossaryTerm(metalake), metalakeId, termIds)) {
+      if (isTermVisible(term, access, status)) {
+        visible.put(term.id(), includeDomains ? visibleDomains(term, access) : term);
+      }
+    }
+    return new BoundTerms(
+        metalakeId,
+        access,
+        sortedVisibleTerms(direct, visible),
+        visibleChildTerms(targetType, byChild, visible));
+  }
+
+  private static Map<String, List<GlossaryTermEntity>> visibleChildTerms(
+      TargetType targetType, Map<Long, Set<Long>> byChild, Map<Long, GlossaryTermEntity> visible) {
+    Map<String, List<GlossaryTermEntity>> childTerms = new TreeMap<>();
+    Map<Long, List<GlossaryTermEntity>> visibleChildren = new HashMap<>();
+    byChild.forEach(
+        (id, bound) -> {
+          List<GlossaryTermEntity> matches = sortedVisibleTerms(bound, visible);
+          if (!matches.isEmpty()) {
+            visibleChildren.put(id, matches);
+          }
+        });
+    for (List<Long> batch : Lists.partition(List.copyOf(visibleChildren.keySet()), 500)) {
+      if (targetType == TargetType.METRIC) {
+        SessionUtils.getWithoutCommit(
+                SemanticModelMetricMapper.class,
+                mapper -> mapper.listSemanticModelMetricsByMetricIds(batch))
+            .forEach(
+                metric ->
+                    childTerms.put(metric.metricName(), visibleChildren.get(metric.metricId())));
+      } else {
+        SessionUtils.getWithoutCommit(
+                TableColumnMapper.class, mapper -> mapper.listColumnPOsByColumnIds(batch))
+            .forEach(
+                column ->
+                    childTerms.put(
+                        column.getColumnName(), visibleChildren.get(column.getColumnId())));
+      }
+    }
+    return childTerms;
+  }
+
+  private static List<GlossaryTermEntity> sortedVisibleTerms(
+      Set<Long> ids, Map<Long, GlossaryTermEntity> visible) {
+    return ids.stream()
+        .map(visible::get)
+        .filter(Objects::nonNull)
+        .sorted(Comparator.comparing(GlossaryTermEntity::name))
+        .toList();
   }
 
   @Nullable

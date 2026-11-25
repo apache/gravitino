@@ -21,6 +21,8 @@ package org.apache.gravitino.server.web.rest;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -33,25 +35,34 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.jersey2.InstrumentedResourceMethodApplicationListener;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Base64;
+import java.util.List;
+import java.util.Set;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
+import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.dto.glossary.TermDTO;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
+import org.apache.gravitino.dto.responses.ObjectTermsResponse;
+import org.apache.gravitino.dto.responses.TermBindingListResponse;
 import org.apache.gravitino.dto.responses.TermListResponse;
 import org.apache.gravitino.dto.responses.TermResponse;
 import org.apache.gravitino.dto.responses.TermTreeResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
@@ -60,6 +71,7 @@ import org.apache.gravitino.exceptions.TermVersionConflictException;
 import org.apache.gravitino.glossary.GlossaryManager;
 import org.apache.gravitino.glossary.GlossaryTerm;
 import org.apache.gravitino.glossary.GlossaryTermViews;
+import org.apache.gravitino.glossary.TermBinding;
 import org.apache.gravitino.glossary.TermSpec;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -81,6 +93,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 public class TestTermOperations extends BaseOperationsTest {
 
   private static final String BASE = "/metalakes/test/terms";
+  private static final String TABLE_TERMS = "/metalakes/test/objects/table/dw.sales.table/terms";
+  private static final String METRIC_TERMS =
+      "/metalakes/test/objects/semantic_model/dw.sales.model/metrics/revenue%20net/terms";
   private static final String ACCEPT_V1 = "application/vnd.gravitino.v1+json";
   private MetricRegistry metrics;
   private final GlossaryTermViews dispatcher = mock(GlossaryTermViews.class);
@@ -123,6 +138,7 @@ public class TestTermOperations extends BaseOperationsTest {
     metrics = new MetricRegistry();
     return new ResourceConfig(
             TermOperations.class,
+            MetadataObjectTermOperations.class,
             JsonProcessingExceptionMapper.class,
             JsonMappingExceptionMapper.class)
         .register(new ObjectMapperProvider())
@@ -131,6 +147,7 @@ public class TestTermOperations extends BaseOperationsTest {
             new AbstractBinder() {
               @Override
               protected void configure() {
+                bind(new BindingPageTokens("")).to(BindingPageTokens.class);
                 bind(dispatcher).to(GlossaryTermViews.class);
                 bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
               }
@@ -197,7 +214,7 @@ public class TestTermOperations extends BaseOperationsTest {
         .thenReturn(new String[] {"Draft term"});
     when(dispatcher.listTerms("test", "Sales", "rev", GlossaryTerm.Status.APPROVED))
         .thenReturn(new TermDTO[0]);
-    TermOperations ops = new TermOperations(dispatcher);
+    TermOperations ops = new TermOperations(dispatcher, new BindingPageTokens(""));
     FieldUtils.writeField(ops, "httpRequest", mock(HttpServletRequest.class), true);
 
     TermOperations.ListTermsQuery defaults = new TermOperations.ListTermsQuery();
@@ -387,7 +404,12 @@ public class TestTermOperations extends BaseOperationsTest {
             target(item).request().get(),
             target(item).request().put(Entity.json(update)),
             target(item).request().delete(),
-            target(item + "/hierarchy").request().get())) {
+            target(item + "/hierarchy").request().get(),
+            target(item + "/objects").request().get(),
+            target(TABLE_TERMS).queryParam("children", true).request().get(),
+            target(TABLE_TERMS).request().post(Entity.json("{\"termsToRemove\":[]}")),
+            target(METRIC_TERMS).request().get(),
+            target(METRIC_TERMS).request().post(Entity.json("{\"termsToRemove\":[]}")))) {
       try (r) {
         assertEquals(409, r.getStatus());
         ErrorResponse error = r.readEntity(ErrorResponse.class);
@@ -411,7 +433,12 @@ public class TestTermOperations extends BaseOperationsTest {
                 .request()
                 .put(Entity.json("{\"updates\":[{\"@type\":\"rename\",\"newName\":\"X\"}]}")),
             target(item).request().delete(),
-            target(item + "/hierarchy").request().get())) {
+            target(item + "/hierarchy").request().get(),
+            target(item + "/objects").request().get(),
+            target(TABLE_TERMS).queryParam("children", true).request().get(),
+            target(TABLE_TERMS).request().post(Entity.json("{\"termsToRemove\":[]}")),
+            target(METRIC_TERMS).request().get(),
+            target(METRIC_TERMS).request().post(Entity.json("{\"termsToRemove\":[]}")))) {
       try (r) {
         assertError(r, 404, NoSuchMetalakeException.class.getSimpleName());
       }
@@ -499,6 +526,164 @@ public class TestTermOperations extends BaseOperationsTest {
       }
     }
     verifyNoInteractions(dispatcher);
+  }
+
+  @Test
+  void testReverseReadsAndWrites() throws Exception {
+    MetadataObject table = MetadataObjects.parse("dw.sales.table", MetadataObject.Type.TABLE);
+    MetadataObject model =
+        MetadataObjects.parse("dw.sales.model", MetadataObject.Type.SEMANTIC_MODEL);
+    String[] names = {"Revenue"};
+    TermDTO term =
+        JsonUtils.objectMapper()
+            .readValue(
+                "{\"name\":\"Revenue\",\"status\":\"APPROVED\",\"version\":1,\"revisionToken\":\"v\"}",
+                TermDTO.class);
+    ObjectTermsResponse detail =
+        new ObjectTermsResponse(
+            new TermDTO[] {term}, List.of(new ObjectTermsResponse.Child("amount", List.of(term))));
+    when(dispatcher.listTargetTermNames("test", table, null, null)).thenReturn(names);
+    when(dispatcher.listTargetTermNames("test", model, "revenue net", null)).thenReturn(names);
+    when(dispatcher.listTargetTerms("test", table, null, true, GlossaryTerm.Status.APPROVED))
+        .thenReturn(detail);
+    when(dispatcher.listTargetTerms("test", model, "revenue net", false, null)).thenReturn(detail);
+    when(dispatcher.associateTerms("test", table, null, names, null)).thenReturn(names);
+    when(dispatcher.associateTerms("test", model, "revenue net", names, null)).thenReturn(names);
+    for (String path : List.of(TABLE_TERMS, METRIC_TERMS)) {
+      try (Response r = target(path).request(ACCEPT_V1).get()) {
+        assertEquals(200, r.getStatus());
+        assertArrayEquals(names, r.readEntity(NameListResponse.class).getNames());
+      }
+      try (Response r =
+          target(path).request().post(Entity.json("{\"termsToAdd\":[\"Revenue\"]}"))) {
+        assertEquals(200, r.getStatus());
+        assertArrayEquals(names, r.readEntity(NameListResponse.class).getNames());
+      }
+    }
+    try (Response r =
+        target(TABLE_TERMS)
+            .queryParam("children", true)
+            .queryParam("status", "approved")
+            .request()
+            .get()) {
+      assertEquals(200, r.getStatus());
+      ObjectTermsResponse result = r.readEntity(ObjectTermsResponse.class);
+      assertEquals("Revenue", result.getTerms()[0].getName());
+      assertEquals("amount", result.getChildren().get(0).getName());
+      assertEquals("Revenue", result.getChildren().get(0).getTerms().get(0).getName());
+    }
+    try (Response r = target(METRIC_TERMS).queryParam("details", true).request().get()) {
+      assertEquals(200, r.getStatus());
+      assertEquals("Revenue", r.readEntity(TermListResponse.class).getTerms()[0].getName());
+    }
+  }
+
+  @Test
+  void testBindingPagesAndConflicts() {
+    MetadataObject model =
+        MetadataObjects.parse("dw.sales.model", MetadataObject.Type.SEMANTIC_MODEL);
+    Set<MetadataObject.Type> types =
+        Set.of(MetadataObject.Type.TABLE, MetadataObject.Type.SEMANTIC_MODEL);
+    GlossaryManager.BindingCursor cursor =
+        new GlossaryManager.BindingCursor(7, 11, 5, null, types, null, "COLUMN", 81);
+    when(dispatcher.listTermBindings("test", "Revenue", null, types, null, 1, null))
+        .thenReturn(new GlossaryManager.BindingPage(List.of(), cursor));
+    when(dispatcher.listTermBindings("test", "Revenue", null, types, null, 1, cursor))
+        .thenReturn(
+            new GlossaryManager.BindingPage(List.of(TermBinding.usedBy(model, "revenue")), null))
+        .thenThrow(new TermVersionConflictException("changed"));
+    WebTarget endpoint =
+        target(BASE + "/Revenue/objects")
+            .queryParam("types", "table,semantic_model")
+            .queryParam("pageSize", 1);
+    String token;
+    try (Response r = endpoint.request().get()) {
+      assertEquals(200, r.getStatus());
+      TermBindingListResponse first = r.readEntity(TermBindingListResponse.class);
+      assertEquals(0, first.getBindings().length);
+      token = first.getNextPageToken();
+    }
+    try (Response r = endpoint.queryParam("pageToken", token).request().get()) {
+      assertEquals(200, r.getStatus());
+      TermBindingListResponse last = r.readEntity(TermBindingListResponse.class);
+      assertEquals("revenue", last.getBindings()[0].getMetric());
+      assertEquals(model.fullName(), last.getBindings()[0].getObject().getFullName());
+      assertEquals(TermBinding.Kind.USED_BY, last.getBindings()[0].getKind());
+      assertNull(last.getNextPageToken());
+    }
+    try (Response r = endpoint.queryParam("pageToken", token).request().get()) {
+      assertError(r, 409, "TermVersionConflictException");
+    }
+  }
+
+  @Test
+  void testHiddenRootAndDeniedOrMissingTarget() {
+    MetadataObject table = MetadataObjects.parse("dw.sales.table", MetadataObject.Type.TABLE);
+    MetadataObject model =
+        MetadataObjects.parse("dw.sales.model", MetadataObject.Type.SEMANTIC_MODEL);
+    when(dispatcher.listTermBindings(
+            "test", "Private", null, Set.of(), GlossaryTerm.Status.APPROVED, 100, null))
+        .thenThrow(new NoSuchTermException("missing"));
+    when(dispatcher.listTargetTerms("test", table, null, true, null))
+        .thenThrow(new ForbiddenException("denied"));
+    when(dispatcher.listTargetTermNames("test", model, "revenue net", null))
+        .thenThrow(new NoSuchMetadataObjectException("missing metric"));
+    try (Response r =
+        target(BASE + "/Private/objects").queryParam("status", "APPROVED").request().get()) {
+      assertError(r, 404, "NoSuchTermException");
+    }
+    try (Response r = target(TABLE_TERMS).queryParam("children", true).request().get()) {
+      assertError(r, 403, "ForbiddenException");
+    }
+    try (Response r = target(METRIC_TERMS).request().get()) {
+      assertError(r, 404, "NoSuchMetadataObjectException");
+    }
+  }
+
+  @Test
+  void testInvalidBindingParametersAndBodies() {
+    String table = "/metalakes/test/objects/table/dw.sales.table/terms";
+    for (Response r :
+        List.of(
+            target(BASE + "/T/objects").queryParam("pageToken", "broken").request().get(),
+            target(BASE + "/T/objects").queryParam("pageSize", "abc").request().get(),
+            target(BASE + "/T/objects").queryParam("types", "unknown").request().get(),
+            target("/metalakes/test/objects/view/dw.sales.v/terms")
+                .queryParam("children", true)
+                .request()
+                .get(),
+            target(table).queryParam("details", "sometimes").request().get(),
+            target(table).request().post(Entity.json("{}")),
+            target(table).request().post(Entity.json("{\"termsToAdd\":[null]}")))) {
+      try (r) {
+        assertEquals(400, r.getStatus());
+      }
+    }
+    verifyNoInteractions(dispatcher);
+  }
+
+  @Test
+  void testTokenRoundTripAcrossServersAndRejectsTampering() {
+    String key = Base64.getEncoder().encodeToString(new byte[32]);
+    BindingPageTokens writer = new BindingPageTokens(key);
+    BindingPageTokens reader = new BindingPageTokens(key);
+    GlossaryManager.BindingCursor cursor =
+        new GlossaryManager.BindingCursor(
+            3,
+            4,
+            7,
+            TermBinding.Kind.USED_BY,
+            Set.of(MetadataObject.Type.SEMANTIC_MODEL),
+            GlossaryTerm.Status.APPROVED,
+            "METRIC",
+            91);
+    String token = writer.encode(cursor);
+    assertEquals(cursor, reader.decode(token));
+    String changed =
+        token.substring(0, 12) + (token.charAt(12) == 'A' ? "B" : "A") + token.substring(13);
+    assertThrows(IllegalArgumentException.class, () -> reader.decode(changed));
+    assertThrows(IllegalArgumentException.class, () -> new BindingPageTokens("").decode(token));
+    assertThrows(IllegalArgumentException.class, () -> new BindingPageTokens("bad"));
   }
 
   private void setMetalakeInUse(boolean inUse) throws Exception {

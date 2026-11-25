@@ -33,6 +33,7 @@ import java.security.PrivilegedExceptionAction;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -72,6 +73,9 @@ import org.apache.gravitino.catalog.TableOperationDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
+import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.dto.glossary.TermDTO;
+import org.apache.gravitino.dto.responses.ObjectTermsResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -98,9 +102,14 @@ import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.GlossaryTermBindingMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper;
+import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
+import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.po.SemanticModelMetricPO;
+import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
+import org.apache.gravitino.storage.relational.service.GlossaryDomainFixtures;
 import org.apache.gravitino.storage.relational.service.GlossaryInvariants;
 import org.apache.gravitino.storage.relational.service.GlossaryTermBindingService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermBindingService.BindingLossAuditRecord;
@@ -2343,7 +2352,7 @@ class TestGlossaryBindings extends TestJDBCBackend {
         openManager.createTerm(
             LAKE, TermSpec.builder("Paged").withStatus(GlossaryTerm.Status.APPROVED).build());
     List<ColumnEntity> columns =
-        IntStream.range(0, 1000).mapToObj(i -> col("col_" + i, i)).toList();
+        IntStream.range(0, 1001).mapToObj(i -> col("col_" + i, i)).toList();
     insertTable("wide", columns);
     long lake = MetalakeMetaService.getInstance().getMetalakeIdByName(LAKE);
     SessionUtils.doMultipleWithCommit(
@@ -2388,6 +2397,299 @@ class TestGlossaryBindings extends TestJDBCBackend {
         Set.of(TermBinding.usedBy(model, "net_revenue"), TermBinding.usedBy(model, "active_users")),
         Set.of(one.bindings().get(0), two.bindings().get(0)));
     assertNull(two.next());
+  }
+
+  @TestTemplate
+  void testReverseBindingChildrenAndDomainVisibility() throws Exception {
+    String modelName = "three_metrics";
+    SemanticModelMetaService.getInstance()
+        .insertSemanticModel(
+            semanticModel(ids.incrementAndGet(), modelName, List.of("one", "two", "three")), false);
+    MetadataObject model =
+        MetadataObjects.of(List.of(CAT, SCH, modelName), MetadataObject.Type.SEMANTIC_MODEL);
+    MetadataObject table = MetadataObjects.of(List.of(CAT, SCH, TBL), MetadataObject.Type.TABLE);
+    MetadataObject view = MetadataObjects.of(List.of(CAT, SCH, VIEW), MetadataObject.Type.VIEW);
+    GlossaryDomainFixtures.insertDomain(LAKE, "Visible", Domain.Status.PUBLISHED, null, AUDIT_INFO);
+    GlossaryDomainFixtures.insertDomain(LAKE, "Private", Domain.Status.PUBLISHED, null, AUDIT_INFO);
+    role(
+        "readVisible",
+        SecurableObjects.parse(
+            "Visible", MetadataObject.Type.DOMAIN, List.of(Privileges.UseDomain.allow())));
+    role("readView", SecurableObjects.ofMetalake(LAKE, List.of(Privileges.allow("SELECT_VIEW"))));
+    user("limited", "manageDef", "readTable", "readModel", "readVisible", "readView");
+    user("viewerOnly", "viewDef");
+    openManager.createTerm(
+        LAKE,
+        TermSpec.builder("Approved")
+            .withStatus(GlossaryTerm.Status.APPROVED)
+            .withDomains("Visible", "Private")
+            .build());
+    openManager.createTerm(
+        LAKE,
+        TermSpec.builder("Other")
+            .withStatus(GlossaryTerm.Status.APPROVED)
+            .withDomains("Private")
+            .build());
+    openManager.createTerm(
+        LAKE, TermSpec.builder("Draft").withStatus(GlossaryTerm.Status.DRAFT).build());
+    String[] all = {"Approved", "Other", "Draft"};
+    openManager.associateTerms(LAKE, table, all, null);
+    openManager.associateTerms(LAKE, view, all, null);
+    String[] columns = {"customer_id", "email", "is_active"};
+    String[] metrics = {"one", "two", "three"};
+    for (int i = 0; i < 3; i++) {
+      MetadataObject col =
+          MetadataObjects.of(List.of(CAT, SCH, TBL, columns[i]), MetadataObject.Type.COLUMN);
+      openManager.associateTerms(LAKE, col, new String[] {all[i]}, null);
+      openManager.associateMetricTerms(LAKE, model, metrics[i], new String[] {all[i]}, null);
+    }
+    GlossaryTermViews views = new GlossaryTermViews(manager);
+    List<String> calls = new ArrayList<>();
+    try (MockedStatic<SqlSessions> ignored =
+        Mockito.mockStatic(
+            SqlSessions.class,
+            lookup -> {
+              Object mapper = lookup.callRealMethod();
+              if (!lookup.getMethod().getName().equals("getMapper")) return mapper;
+              Class<?> type = lookup.getArgument(0);
+              if (type != GlossaryTermBindingMapper.class
+                  && type != SemanticModelMetricMapper.class
+                  && type != TableColumnMapper.class) return mapper;
+              return Mockito.mock(
+                  type,
+                  call -> {
+                    calls.add(call.getMethod().getName());
+                    return AdditionalAnswers.delegatesTo(mapper).answer(call);
+                  });
+            })) {
+      for (String user : List.of("glossaryOnlyAdmin", "viewerOnly")) {
+        for (MetadataObject target : List.of(table, model)) {
+          assertThrows(
+              ForbiddenException.class,
+              () -> as(user, () -> views.listTargetTerms(LAKE, target, null, true, null)));
+        }
+        assertThrows(
+            ForbiddenException.class,
+            () -> as(user, () -> views.listTargetTermNames(LAKE, model, "unknown", null)));
+      }
+      assertEquals(List.of(), calls);
+      for (MetadataObject target : List.of(table, model)) {
+        calls.clear();
+        boolean isTable = target.type() == MetadataObject.Type.TABLE;
+        ObjectTermsResponse result =
+            as(
+                "limited",
+                () ->
+                    views.listTargetTerms(LAKE, target, null, true, GlossaryTerm.Status.APPROVED));
+        assertEquals(
+            isTable ? List.of("customer_id", "email") : List.of("one", "two"),
+            result.getChildren().stream().map(ObjectTermsResponse.Child::getName).toList());
+        assertEquals(isTable ? 2 : 0, result.getTerms().length);
+        if (isTable) assertArrayEquals(new String[] {"Visible"}, result.getTerms()[0].getDomains());
+        TermDTO withDomain = result.getChildren().get(0).getTerms().get(0);
+        TermDTO withoutDomain = result.getChildren().get(1).getTerms().get(0);
+        assertEquals("Approved", withDomain.getName());
+        assertArrayEquals(new String[] {"Visible"}, withDomain.getDomains());
+        assertEquals("Other", withoutDomain.getName());
+        assertArrayEquals(new String[0], withoutDomain.getDomains());
+        assertEquals(
+            List.of(
+                isTable ? "listByTable" : "listBySemanticModel",
+                isTable ? "listColumnPOsByColumnIds" : "listSemanticModelMetricsByMetricIds"),
+            calls);
+        assertEquals(
+            3,
+            as("limited", () -> views.listTargetTerms(LAKE, target, null, true, null))
+                .getChildren()
+                .size());
+      }
+    }
+    assertArrayEquals(
+        new String[] {"Approved", "Other"},
+        as(
+            "limited",
+            () -> views.listTargetTermNames(LAKE, view, null, GlossaryTerm.Status.APPROVED)));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> as("limited", () -> views.listTargetTerms(LAKE, view, null, true, null)));
+    assertArrayEquals(
+        new String[0], as("limited", () -> views.listTargetTermNames(LAKE, model, null, null)));
+    assertArrayEquals(
+        new String[] {"Visible"},
+        as("limited", () -> views.listTargetTerms(LAKE, model, "one", false, null))
+            .getTerms()[0]
+            .getDomains());
+    assertThrows(
+        NoSuchMetadataObjectException.class,
+        () -> as("limited", () -> views.listTargetTermNames(LAKE, model, "absent", null)));
+  }
+
+  @TestTemplate
+  void testBindingPageSnapshotAcrossStatusAndBindingCommits() throws Exception {
+    MetadataObject table = MetadataObjects.of(List.of(CAT, SCH, TBL), MetadataObject.Type.TABLE);
+    MetadataObject view = MetadataObjects.of(List.of(CAT, SCH, VIEW), MetadataObject.Type.VIEW);
+    openManager.createTerm(
+        LAKE, TermSpec.builder("Snapshot").withStatus(GlossaryTerm.Status.APPROVED).build());
+    openManager.associateTerms(LAKE, table, new String[] {"Snapshot"}, null);
+    as(
+        "writer",
+        () ->
+            manager.createTerm(
+                LAKE,
+                TermSpec.builder("OwnedDraft").withStatus(GlossaryTerm.Status.DRAFT).build()));
+    for (String reader : List.of("writer", "admin")) {
+      assertThrows(
+          NoSuchTermException.class,
+          () ->
+              as(
+                  reader,
+                  () ->
+                      manager.listTermBindings(
+                          LAKE, "OwnedDraft", null, null, GlossaryTerm.Status.APPROVED)));
+    }
+    ExecutorService writer = Executors.newSingleThreadExecutor();
+    try {
+      for (boolean changeStatusFirst : List.of(false, true)) {
+        GlossaryManager paused =
+            manager.withTermVisibility(
+                root -> {
+                  try {
+                    writer
+                        .submit(
+                            () -> {
+                              if (changeStatusFirst)
+                                openManager.alterTerm(
+                                    LAKE,
+                                    "Snapshot",
+                                    TermChange.setStatus(GlossaryTerm.Status.DEPRECATED));
+                              openManager.associateTerms(
+                                  LAKE, view, new String[] {"Snapshot"}, null);
+                              if (!changeStatusFirst)
+                                openManager.alterTerm(
+                                    LAKE,
+                                    "Snapshot",
+                                    TermChange.setStatus(GlossaryTerm.Status.DEPRECATED));
+                            })
+                        .get(15, TimeUnit.SECONDS);
+                  } catch (Exception e) {
+                    throw new AssertionError("Writer could not commit during binding read", e);
+                  }
+                  return true;
+                });
+        assertEquals(
+            List.of(TermBinding.implementedBy(table)),
+            as(
+                    "lakeOwner",
+                    () ->
+                        paused.listTermBindings(
+                            LAKE, "Snapshot", null, null, GlossaryTerm.Status.APPROVED))
+                .bindings());
+        assertThrows(
+            NoSuchTermException.class,
+            () ->
+                as(
+                    "lakeOwner",
+                    () ->
+                        manager.listTermBindings(
+                            LAKE, "Snapshot", null, null, GlossaryTerm.Status.APPROVED)));
+        openManager.alterTerm(LAKE, "Snapshot", TermChange.setStatus(GlossaryTerm.Status.APPROVED));
+        assertEquals(
+            2,
+            as(
+                    "lakeOwner",
+                    () ->
+                        manager.listTermBindings(
+                            LAKE, "Snapshot", null, null, GlossaryTerm.Status.APPROVED))
+                .bindings()
+                .size());
+        openManager.associateTerms(LAKE, view, null, new String[] {"Snapshot"});
+      }
+    } finally {
+      writer.shutdownNow();
+    }
+  }
+
+  @TestTemplate
+  void testVisibleTablePagesAndReplacedRoot() throws Exception {
+    GlossaryTermEntity term =
+        openManager.createTerm(
+            LAKE, TermSpec.builder("ManyTables").withStatus(GlossaryTerm.Status.APPROVED).build());
+    long lake = MetalakeMetaService.getInstance().getMetalakeIdByName(LAKE);
+    Set<String> expected = new HashSet<>();
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            SessionUtils.doWithoutCommit(
+                TableMetaMapper.class,
+                tables -> {
+                  TablePO template = tables.selectTableByFullQualifiedName(LAKE, CAT, SCH, TBL);
+                  for (int i = 0; i < 1001; i++) {
+                    String name = "paged_table_" + i;
+                    long id = ids.incrementAndGet();
+                    tables.insertTableMeta(
+                        TablePO.builder(template).withTableName(name).withTableId(id).build());
+                    GlossaryTermBindingService.getInstance()
+                        .add(lake, term.id(), TargetType.TABLE, id);
+                    expected.add(name);
+                  }
+                }));
+    Set<MetadataObject.Type> types = Set.of(MetadataObject.Type.TABLE);
+    GlossaryManager.BindingCursor cursor = null;
+    GlossaryManager.BindingCursor first = null;
+    Set<String> names = new HashSet<>();
+    for (int page = 0; page < 11; page++) {
+      GlossaryManager.BindingCursor after = cursor;
+      GlossaryManager.BindingPage result =
+          as(
+              "viewerWithTableRead",
+              () ->
+                  manager.listTermBindings(
+                      LAKE,
+                      "ManyTables",
+                      TermBinding.Kind.IMPLEMENTED_BY,
+                      types,
+                      null,
+                      100,
+                      after));
+      assertEquals(page == 10 ? 1 : 100, result.bindings().size());
+      for (TermBinding binding : result.bindings()) assertTrue(names.add(binding.object().name()));
+      cursor = result.next();
+      if (page == 0) first = cursor;
+      if (page < 10) assertNotNull(cursor);
+    }
+    assertNull(cursor);
+    assertEquals(expected, names);
+    GlossaryManager.BindingCursor saved = first;
+    openManager.dropTerm(LAKE, "ManyTables");
+    openManager.createTerm(
+        LAKE, TermSpec.builder("ManyTables").withStatus(GlossaryTerm.Status.DRAFT).build());
+    assertThrows(
+        NoSuchTermException.class,
+        () ->
+            as(
+                "viewerWithTableRead",
+                () ->
+                    manager.listTermBindings(
+                        LAKE,
+                        "ManyTables",
+                        TermBinding.Kind.IMPLEMENTED_BY,
+                        types,
+                        null,
+                        100,
+                        saved)));
+    assertThrows(
+        TermVersionConflictException.class,
+        () ->
+            as(
+                "lakeOwner",
+                () ->
+                    manager.listTermBindings(
+                        LAKE,
+                        "ManyTables",
+                        TermBinding.Kind.IMPLEMENTED_BY,
+                        types,
+                        null,
+                        100,
+                        saved)));
   }
 
   @TestTemplate

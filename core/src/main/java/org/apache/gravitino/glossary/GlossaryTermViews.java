@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -32,12 +33,16 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity.EntityType;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.dto.authorization.OwnerDTO;
 import org.apache.gravitino.dto.glossary.TermDTO;
 import org.apache.gravitino.dto.glossary.TermLinkDTO;
+import org.apache.gravitino.dto.responses.ObjectTermsResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermRelService;
@@ -81,6 +86,104 @@ public final class GlossaryTermViews {
       @Nullable GlossaryTerm.Status status) {
     return SqlSessions.readSnapshot(
         () -> manager.listTermNamesInSnapshot(metalake, domain, matchesName(nameContains), status));
+  }
+
+  /**
+   * Lists a page of authorized bindings. An empty page may carry a continuation.
+   *
+   * @see GlossaryManager#listTermBindings(String, String, TermBinding.Kind, Set,
+   *     GlossaryTerm.Status, int, GlossaryManager.BindingCursor)
+   */
+  public GlossaryManager.BindingPage listTermBindings(
+      String metalake,
+      String term,
+      @Nullable TermBinding.Kind kind,
+      @Nullable Set<MetadataObject.Type> types,
+      @Nullable GlossaryTerm.Status status,
+      int pageSize,
+      @Nullable GlossaryManager.BindingCursor cursor) {
+    return manager.listTermBindings(metalake, term, kind, types, status, pageSize, cursor);
+  }
+
+  /**
+   * Atomically changes bindings on an object or an exact metric name and returns its visible direct
+   * term names. A missing target or term and an unauthorized write fail the entire change.
+   */
+  public String[] associateTerms(
+      String metalake,
+      MetadataObject object,
+      @Nullable String metric,
+      @Nullable String[] add,
+      @Nullable String[] remove) {
+    return metric == null
+        ? manager.associateTerms(metalake, object, add, remove)
+        : manager.associateMetricTerms(metalake, object, metric, add, remove);
+  }
+
+  /** Lists visible direct term names without projecting owners, domains, relations or children. */
+  public String[] listTargetTermNames(
+      String metalake,
+      MetadataObject object,
+      @Nullable String metric,
+      @Nullable GlossaryTerm.Status status) {
+    return manager.readTargetTerms(
+        metalake,
+        object,
+        metric,
+        false,
+        false,
+        status,
+        bound -> bound.direct().stream().map(GlossaryTermEntity::name).toArray(String[]::new));
+  }
+
+  /**
+   * Returns visible direct terms and, when requested, the matching children of a table or semantic
+   * model. A semantic model has no direct terms. Target authorization, status and nested domain
+   * visibility are evaluated within the binding read snapshot.
+   *
+   * @throws IllegalArgumentException when the target does not support the requested expansion
+   * @throws ForbiddenException when the caller cannot read the target
+   * @throws NoSuchMetadataObjectException when the authorized target or metric is missing
+   */
+  public ObjectTermsResponse listTargetTerms(
+      String metalake,
+      MetadataObject object,
+      @Nullable String metric,
+      boolean children,
+      @Nullable GlossaryTerm.Status status) {
+    return manager.readTargetTerms(
+        metalake,
+        object,
+        metric,
+        children,
+        true,
+        status,
+        bound -> {
+          Map<Long, GlossaryTermEntity> distinct = new LinkedHashMap<>();
+          bound.direct().forEach(term -> distinct.put(term.id(), term));
+          bound
+              .children()
+              .values()
+              .forEach(terms -> terms.forEach(term -> distinct.putIfAbsent(term.id(), term)));
+          List<GlossaryTermEntity> roots = List.copyOf(distinct.values());
+          TermDTO[] projected =
+              projectTermSnapshots(metalake, bound.lake(), bound.access(), roots, status);
+          Map<Long, TermDTO> byId = new HashMap<>();
+          for (int i = 0; i < roots.size(); i++) {
+            byId.put(roots.get(i).id(), projected[i]);
+          }
+          TermDTO[] direct =
+              bound.direct().stream().map(term -> byId.get(term.id())).toArray(TermDTO[]::new);
+          List<ObjectTermsResponse.Child> result = new ArrayList<>();
+          bound
+              .children()
+              .forEach(
+                  (name, terms) ->
+                      result.add(
+                          new ObjectTermsResponse.Child(
+                              name, terms.stream().map(term -> byId.get(term.id())).toList())));
+          return new ObjectTermsResponse(direct, result);
+        });
   }
 
   /** Drops the term if it is visible and the caller may delete it. */
