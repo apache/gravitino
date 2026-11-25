@@ -122,11 +122,13 @@ plus Iceberg REST on object storage), also set:
 
 3. **Object-store data plane** — Spark must reach table storage through Iceberg REST. On object
    storage that usually means enabling Iceberg vended credentials
-   (`spark.sql.catalog.<catalog>.header.X-Iceberg-Access-Delegation=vended-credentials`) and
-   configuring IRC `rest.auth.*` for your catalog's auth mode in `spark_conf` (or the matching
-   `gravitino.maintenance.ircAuth.*` cluster settings for the in-process service). Do not copy
-   local `file:///` samples as-is. See
-   [Configuration](./optimizer-configuration.md) (IRC / `spark-conf` auth) and
+   (`spark.sql.catalog.<catalog>.header.X-Iceberg-Access-Delegation=vended-credentials`, or
+   `gravitino.maintenance.ircAuth.header.X-Iceberg-Access-Delegation=vended-credentials` for
+   in-process TMS) and configuring IRC `rest.auth.*` for your catalog's auth mode in
+   `spark_conf` (or the matching `gravitino.maintenance.ircAuth.*` cluster settings). Do not
+   copy local `file:///` samples as-is. See
+   [Iceberg REST / Spark auth](./optimizer-configuration.md#iceberg-rest-spark-auth-gravitinomaintenanceircauth-arbitrary-passthrough),
+   [Credential vending](../security/credential-vending.md#requesting-vended-credentials), and
    [Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures).
 
 ### Demo environment
