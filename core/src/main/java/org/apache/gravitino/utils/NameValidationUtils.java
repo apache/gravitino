@@ -19,6 +19,7 @@
 package org.apache.gravitino.utils;
 
 import com.google.common.base.Preconditions;
+import java.util.Locale;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObjects;
@@ -63,11 +64,11 @@ public final class NameValidationUtils {
   @Nullable
   public static String nameValidationError(String type, String name, Pattern syntax) {
     if (!syntax.matcher(name).matches()) {
-      return String.format("The %s name '%s' is illegal.", type, name);
+      return String.format(Locale.ROOT, "The %s name '%s' is illegal.", type, name);
     }
     if (name.codePointCount(0, name.length()) > DEFAULT_MAX_NAME_LENGTH) {
       return String.format(
-          "The %s name must not exceed %d characters.", type, DEFAULT_MAX_NAME_LENGTH);
+          Locale.ROOT, "The %s name must not exceed %d characters.", type, DEFAULT_MAX_NAME_LENGTH);
     }
     return null;
   }
