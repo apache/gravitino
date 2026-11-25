@@ -84,6 +84,10 @@ public class TermOperations {
   private static final Logger LOG = LoggerFactory.getLogger(TermOperations.class);
   private static final ExceptionHandler COMMON_ERRORS =
       new ExceptionHandlers.BaseExceptionHandler();
+  // VersioningFilter prepends the default vendor type to a plain JSON Accept header. Prefer
+  // plain JSON when both types are present, while honoring an explicitly versioned request.
+  static final String BINDING_V1_JSON = "application/vnd.gravitino.v1+json;qs=0.9";
+
   private final GlossaryTermViews views;
   private final BindingPageTokens tokens;
   @Context private HttpServletRequest httpRequest;
@@ -273,7 +277,7 @@ public class TermOperations {
   /** Lists one bounded page of visible objects or metrics bound to the requested term. */
   @GET
   @Path("{term}/objects")
-  @Produces({"application/json", "application/vnd.gravitino.v1+json"})
+  @Produces({"application/json", BINDING_V1_JSON})
   @Timed(name = "list-term-bindings." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-term-bindings", absolute = true)
   @AuthorizationExpression(expression = "")

@@ -97,6 +97,8 @@ public class TestTermOperations extends BaseOperationsTest {
   private static final String METRIC_TERMS =
       "/metalakes/test/objects/semantic_model/dw.sales.model/metrics/revenue%20net/terms";
   private static final String ACCEPT_V1 = "application/vnd.gravitino.v1+json";
+  // The production servlet filter passes this header to Jersey for an application/json request.
+  private static final String NORMALIZED_JSON_ACCEPT = ACCEPT_V1 + ", application/json";
   private MetricRegistry metrics;
   private final GlossaryTermViews dispatcher = mock(GlossaryTermViews.class);
   private final EntityStore entityStore = mock(EntityStore.class);
@@ -550,16 +552,20 @@ public class TestTermOperations extends BaseOperationsTest {
     when(dispatcher.associateTerms("test", table, null, names, null)).thenReturn(names);
     when(dispatcher.associateTerms("test", model, "revenue net", names, null)).thenReturn(names);
     for (String path : List.of(TABLE_TERMS, METRIC_TERMS)) {
-      for (String accept : List.of(MediaType.APPLICATION_JSON, ACCEPT_V1)) {
+      for (String accept : List.of(MediaType.APPLICATION_JSON, ACCEPT_V1, NORMALIZED_JSON_ACCEPT)) {
+        MediaType expected =
+            accept.equals(ACCEPT_V1)
+                ? MediaType.valueOf(ACCEPT_V1)
+                : MediaType.APPLICATION_JSON_TYPE;
         try (Response r = target(path).request(accept).get()) {
           assertEquals(200, r.getStatus());
-          assertTrue(MediaType.valueOf(accept).isCompatible(r.getMediaType()));
+          assertTrue(expected.isCompatible(r.getMediaType()));
           assertArrayEquals(names, r.readEntity(NameListResponse.class).getNames());
         }
         try (Response r =
             target(path).request(accept).post(Entity.json("{\"termsToAdd\":[\"Revenue\"]}"))) {
           assertEquals(200, r.getStatus());
-          assertTrue(MediaType.valueOf(accept).isCompatible(r.getMediaType()));
+          assertTrue(expected.isCompatible(r.getMediaType()));
           assertArrayEquals(names, r.readEntity(NameListResponse.class).getNames());
         }
       }
@@ -609,7 +615,7 @@ public class TestTermOperations extends BaseOperationsTest {
       token = first.getNextPageToken();
     }
     try (Response r =
-        endpoint.queryParam("pageToken", token).request(MediaType.APPLICATION_JSON).get()) {
+        endpoint.queryParam("pageToken", token).request(NORMALIZED_JSON_ACCEPT).get()) {
       assertEquals(200, r.getStatus());
       assertTrue(MediaType.APPLICATION_JSON_TYPE.isCompatible(r.getMediaType()));
       TermBindingListResponse last = r.readEntity(TermBindingListResponse.class);
@@ -619,7 +625,7 @@ public class TestTermOperations extends BaseOperationsTest {
       assertNull(last.getNextPageToken());
     }
     try (Response r =
-        endpoint.queryParam("pageToken", token).request(MediaType.APPLICATION_JSON).get()) {
+        endpoint.queryParam("pageToken", token).request(NORMALIZED_JSON_ACCEPT).get()) {
       assertError(r, 409, "TermVersionConflictException");
     }
   }
