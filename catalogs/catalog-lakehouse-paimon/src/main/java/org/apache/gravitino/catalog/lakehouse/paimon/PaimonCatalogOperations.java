@@ -100,6 +100,8 @@ public class PaimonCatalogOperations
   private static final String TABLE_ALREADY_EXISTS_EXCEPTION = "Paimon table %s already exists.";
   private static final String NO_SUCH_COLUMN_EXCEPTION =
       "Paimon column of table %s does not exist.";
+  private static final String HADOOP_S3A_PREFIX = "hadoop.fs.s3a.";
+  private static final String PAIMON_S3A_PREFIX = "fs.s3a.";
 
   /**
    * Initializes the Paimon catalog operations with the provided configuration.
@@ -134,9 +136,20 @@ public class PaimonCatalogOperations
     // Key format like gravitino.bypass.a.b
     Map<String, String> resultConf =
         Maps.newHashMap(MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX));
+    addS3AOptionsForPaimonS3(resultConf);
     // Hold keys that lie in GRAVITINO_CONFIG_TO_PAIMON
     resultConf.putAll(catalogPropertiesMetadata.transformProperties(conf));
     return new PaimonConfig(resultConf);
+  }
+
+  /**
+   * Since Paimon 2.0, paimon-s3 also serves s3a:// paths (apache/paimon#9814). It reads only the
+   * s3., s3a. and fs.s3a. options, so the hadoop.fs.s3a. options documented for Hadoop S3A would no
+   * longer reach it. Copy each hadoop.fs.s3a. option to fs.s3a. unless that option is already set.
+   */
+  private static void addS3AOptionsForPaimonS3(Map<String, String> paimonConf) {
+    Map<String, String> s3aOptions = MapUtils.getPrefixMap(paimonConf, HADOOP_S3A_PREFIX);
+    s3aOptions.forEach((key, value) -> paimonConf.putIfAbsent(PAIMON_S3A_PREFIX + key, value));
   }
 
   /**
