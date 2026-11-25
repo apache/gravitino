@@ -111,9 +111,6 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   private static final int MAX_FORMAT_VERSION = 3;
 
-  /** Matches Iceberg {@code TableMetadata.DEFAULT_TABLE_FORMAT_VERSION}. */
-  private static final int DEFAULT_TABLE_FORMAT_VERSION = 2;
-
   // Iceberg JdbcCatalog declares iceberg_namespace_properties.property_value as VARCHAR(1000).
   private static final int MAX_JDBC_NAMESPACE_PROPERTY_VALUE_LENGTH = 1000;
 
@@ -774,12 +771,13 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   private static int formatVersion(@Nullable Map<String, String> properties) {
+    // Iceberg TableMetadata defaults to format version 2 when the property is unset.
     if (properties == null) {
-      return DEFAULT_TABLE_FORMAT_VERSION;
+      return 2;
     }
     String value = properties.get(TableProperties.FORMAT_VERSION);
     if (value == null) {
-      return DEFAULT_TABLE_FORMAT_VERSION;
+      return 2;
     }
     int formatVersion;
     try {
