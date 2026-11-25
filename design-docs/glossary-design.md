@@ -562,9 +562,11 @@ pending-content rules are specified separately below.
   grant continued read access. Proposal status is separate from the
   live term's status. Rejection leaves the approved version unchanged; approval replaces it.
 - Dropping a term soft-deletes its synonyms, relations, domain links and bindings in the same
-  transaction. Collection also removes the deleted term’s version rows. Dropping a
-  metalake soft-deletes all its glossary rows in
-  `MetalakeMetaService#deleteMetalake`, next to the tag cleanup.
+  transaction. Collection also removes the deleted term’s version rows. Until then, each
+  effective edit retains a full snapshot, including under immediate publication. A rejected
+  term that was never published has no live row for collection. Its history and version head
+  remain until metalake deletion. `MetalakeMetaService#deleteMetalake` removes the metalake’s
+  glossary version rows and soft-deletes its definitions and relationships alongside tag cleanup.
 
 ### Access control
 
@@ -1983,6 +1985,10 @@ are not issue numbers, and no follow-up issues have been created by this documen
       permission-filtered exports, repeat-import identity using `sourceRef`, batch failure
       semantics, and imports through the same review and no-self-approval checks as other
       writes. This remains planned work, outside Step 1; public APIs alone do not deliver CSV.
+- [ ] **S2.7. Version history retention**. Define how long to retain older snapshots of active
+      terms and rejected terms that were never published. Collect expired snapshots in bounded
+      batches and remove the version head when a never-published term's history expires. Protect
+      the current published and candidate versions and document which versions callers can retrieve.
 
 **Step 2 acceptance requirements** (implemented with S2.1, S2.2, S2.3 and S2.4, not Step 1):
 
