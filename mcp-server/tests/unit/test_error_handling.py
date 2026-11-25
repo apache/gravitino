@@ -553,6 +553,38 @@ class TestEndToEndMcpErrorMapping(unittest.TestCase):
                     target_name="job-42",
                 )
 
+    def test_unresolved_metalake_omits_tenant_and_target_from_audit(self):
+        for default, arguments in (("prod", {"metalake": False}), ("", {})):
+            with self.subTest(default=default, arguments=arguments):
+                rest = MagicMock()
+                with patch("mcp_server.core.audit._audit_logger.info") as log:
+                    result = self._call_with_transport(
+                        rest,
+                        "drop_table",
+                        {
+                            "catalog_name": "c",
+                            "schema_name": "s",
+                            "table_name": "t",
+                            **arguments,
+                        },
+                        setting=Setting(metalake=default),
+                    )
+                self.assertTrue(result.isError)
+                self.assertEqual(
+                    result.meta["org.apache.gravitino/error"],
+                    {
+                        "code": JSONRPC_INVALID_PARAMS,
+                        "category": "invalid_params",
+                    },
+                )
+                rest.assert_not_called()
+                log.assert_called_once()
+                record = json.loads(log.call_args.args[0])
+                self.assertEqual(record["outcome"], "error")
+                self.assertEqual(record["error_category"], "invalid_params")
+                for field in ("metalake", "target_type", "target_name"):
+                    self.assertNotIn(field, record)
+
     def test_model_version_audit_matches_the_rest_target(self):
         for version in (1.0, "01", True):
             with self.subTest(version=version):
@@ -654,13 +686,37 @@ class TestEndToEndMcpErrorMapping(unittest.TestCase):
                     emit.call_args.kwargs["error_category"], "rate_limited"
                 )
 
-    def test_malformed_oauth_responses_are_upstream_errors(self):
+    def _assert_oauth_failure(self, response, code, category, error_type):
         setting = Setting(
             metalake="m",
             oauth_token_endpoint="https://idp.example/token",
             oauth_client_id="client",
             oauth_client_secret="secret",
         )
+        idp = MagicMock(return_value=response)
+        rest = MagicMock()
+        with patch(
+            "mcp_server.core.oauth.httpx.AsyncClient",
+            return_value=httpx.AsyncClient(transport=httpx.MockTransport(idp)),
+        ), patch("mcp_server.core.audit._audit_logger.info") as log:
+            result = self._call_with_transport(
+                rest, "get_list_of_catalogs", {}, setting=setting
+            )
+        idp.assert_called_once()
+        rest.assert_not_called()
+        self.assertTrue(result.isError)
+        self.assertEqual(
+            result.meta["org.apache.gravitino/error"],
+            {"code": code, "category": category},
+        )
+        log.assert_called_once()
+        record = json.loads(log.call_args.args[0])
+        self.assertEqual(record["error_type"], error_type)
+        self.assertEqual(record["error_category"], category)
+        self.assertEqual(record["outcome"], "error")
+        return result.content[0].text
+
+    def test_malformed_oauth_responses_are_upstream_errors(self):
         for body in (
             b"{}",
             b"bad JSON",
@@ -668,35 +724,35 @@ class TestEndToEndMcpErrorMapping(unittest.TestCase):
             b'{"access_token":"opaque","expires_in":"invalid"}',
         ):
             with self.subTest(body=body):
-                idp = MagicMock(return_value=httpx.Response(200, content=body))
-                rest = MagicMock(
-                    side_effect=AssertionError(
-                        "Must obtain a token before calling Gravitino"
-                    )
-                )
-                async_client = httpx.AsyncClient
-                with patch(
-                    "mcp_server.core.oauth.httpx.AsyncClient",
-                    return_value=async_client(
-                        transport=httpx.MockTransport(idp)
-                    ),
-                ), patch("mcp_server.server.audit.emit") as emit:
-                    result = self._call_with_transport(
-                        rest, "get_list_of_catalogs", {}, setting=setting
-                    )
-                idp.assert_called_once()
-                rest.assert_not_called()
-                self.assertTrue(result.isError)
-                self.assertEqual(
-                    result.meta["org.apache.gravitino/error"],
-                    {"code": -32603, "category": "internal_error"},
-                )
-                self.assertIn("OAuth token response", result.content[0].text)
-                self.assertEqual(
-                    emit.call_args.kwargs["error_type"],
+                text = self._assert_oauth_failure(
+                    httpx.Response(200, content=body),
+                    JSONRPC_INTERNAL_ERROR,
+                    "internal_error",
                     "OAuthTokenResponseError",
                 )
-                self.assertEqual(emit.call_args.kwargs["outcome"], "error")
+                self.assertIn("OAuth token response", text)
+
+    def test_oauth_endpoint_failures_are_distinct_from_gravitino_errors(self):
+        for status, code, category in (
+            (400, JSONRPC_INTERNAL_ERROR, "internal_error"),
+            (401, JSONRPC_INTERNAL_ERROR, "internal_error"),
+            (403, JSONRPC_INTERNAL_ERROR, "internal_error"),
+            (404, JSONRPC_INTERNAL_ERROR, "internal_error"),
+            (408, JSONRPC_SERVER_ERROR, "timeout"),
+            (429, JSONRPC_SERVER_ERROR, "rate_limited"),
+            (503, JSONRPC_INTERNAL_ERROR, "unavailable"),
+        ):
+            with self.subTest(status=status):
+                text = self._assert_oauth_failure(
+                    httpx.Response(status, json={"error": "invalid_client"}),
+                    code,
+                    category,
+                    "OAuthTokenEndpointError",
+                )
+                if category == "internal_error":
+                    self.assertIn(
+                        f"OAuth token endpoint returned HTTP {status}", text
+                    )
 
     def test_read_timeout_maps_to_request_timeout_with_actionable_text(self):
         def timeout_handler(request):

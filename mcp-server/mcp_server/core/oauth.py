@@ -43,6 +43,10 @@ DEFAULT_REFRESH_SKEW_SECONDS = 60
 _TokenTuple = Union[tuple[str, str], tuple[str, str, Union[int, str]]]
 
 
+class OAuthTokenEndpointError(httpx.HTTPStatusError):
+    """The service identity's OAuth token endpoint returned an HTTP error."""
+
+
 class OAuthTokenResponseError(ValueError):
     """The identity provider returned an unusable token response."""
 
@@ -163,8 +167,14 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
         return data
 
     def _token_tuple(self, response: httpx.Response) -> _TokenTuple:
-        self._log_token_http_error(response)
-        response.raise_for_status()
+        if not response.is_success:
+            message = (
+                f"OAuth token endpoint returned HTTP {response.status_code}"
+            )
+            _LOG.error("%s", message)
+            raise OAuthTokenEndpointError(
+                message, request=response.request, response=response
+            )
         try:
             body = response.json()
         except ValueError as exc:
@@ -228,13 +238,6 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
             except ValueError:
                 return False
         return False
-
-    @staticmethod
-    def _log_token_http_error(response: httpx.Response) -> None:
-        if response.status_code >= 400:
-            _LOG.error(
-                "OAuth token request failed: HTTP %s", response.status_code
-            )
 
     def _cached_bearer(self) -> Optional[str]:
         try:

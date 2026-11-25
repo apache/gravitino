@@ -161,7 +161,7 @@ def extract_write_target(
     Never raises: runs on both success and failure audit paths, including when
     a call failed validation because arguments were missing or malformed.
     Returns ``("", "")`` for read-only tools or when required target fields are
-    absent or invalid.
+    absent or invalid, including an unresolved tenant for a scoped target.
     """
     spec = WRITE_TARGET_SPECS.get(tool)
     if spec is None or not isinstance(arguments, dict):
@@ -182,11 +182,11 @@ def extract_write_target(
             return "", ""
         parts.append(part)
 
-    if spec.include_metalake and metalake and target_type != "metalake":
+    if spec.include_metalake and target_type != "metalake":
+        if not metalake:
+            return "", ""
         parts.insert(0, metalake)
-    target_name = ".".join(parts)
-
-    return target_type, target_name
+    return target_type, ".".join(parts)
 
 
 def _extract_principal(authorization: str) -> str:
@@ -240,7 +240,7 @@ def emit(
         principal: Identity derived from the request (e.g. "bearer:f39dac6cbaba535e" or "anonymous").
         tool:      MCP tool name that was invoked.
         outcome:   "allow" for successful calls, "deny" for authentication or
-                   authorization denials (401/403, PermissionError, or
+                   authorization denials (Gravitino 401/403, PermissionError, or
                    --no-service-identity-fallback rejection), and "error" for
                    all other failures.
         error_type: Original Gravitino error type (e.g. "ForbiddenException",
@@ -253,15 +253,13 @@ def emit(
                         when outcome is "deny" or "error"; empty on "allow".
         metalake:  Metalake the call operated on, resolved - so a call that
                    relied on the server default records that default. Empty
-                   only for tools that are not metalake-scoped, such as the
-                   metalake listing, which spans every tenant the caller can
-                   see. Recorded because one server can now serve several
-                   metalakes, so "which tenant did this touch" is no longer
-                   answerable from the server config alone.
+                   when the tenant could not be resolved or when the tool
+                   spans tenants, such as the metalake listing.
         target_type: Metadata object type for write/delete tools (e.g.
-                     "table", "schema", "catalog"); empty for read-only tools.
+                     "table", "schema", "catalog"); empty for read-only tools
+                     and unresolved targets.
         target_name: Target object full name for write/delete tools (e.g.
-                     "authz.mcpcat.alice_s"); empty for read-only tools.
+                     "authz.mcpcat.alice_s"); empty when target_type is empty.
     """
     record = {
         "timestamp": datetime.now(timezone.utc).isoformat(),

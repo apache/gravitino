@@ -89,7 +89,7 @@ class AuditMiddleware(Middleware):
         """
         if tool_name in TOOLS_WITHOUT_METALAKE:
             return ""
-        return get_request_metalake() or self._default_metalake
+        return get_request_metalake(self._default_metalake)
 
     async def on_call_tool(
         self,

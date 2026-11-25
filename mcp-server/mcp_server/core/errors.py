@@ -35,7 +35,10 @@ from mcp.types import ErrorData
 
 from mcp_server.client.plain.exception import GravitinoException
 from mcp_server.core.context import ServiceIdentityFallbackDisabled
-from mcp_server.core.oauth import OAuthTokenResponseError
+from mcp_server.core.oauth import (
+    OAuthTokenEndpointError,
+    OAuthTokenResponseError,
+)
 
 # Standard JSON-RPC error codes and server-defined codes (-32000..-32099).
 JSONRPC_INVALID_PARAMS = -32602
@@ -125,17 +128,21 @@ _INTERNAL_ERROR_RULE: _Rule = (
     "",
 )
 
+_UPSTREAM_STATUS_RULES: dict[int, _Rule] = {
+    408: _TIMEOUT_RULE,
+    429: _RATE_LIMIT_RULE,
+    502: _UNAVAILABLE_RULE,
+    503: _UNAVAILABLE_RULE,
+}
+
 _HTTP_STATUS_RULES: dict[int, _Rule] = {
+    **_UPSTREAM_STATUS_RULES,
     400: _INVALID_PARAMS_RULE,
     401: _UNAUTHORIZED_RULE,
     403: _PERMISSION_DENIED_RULE,
     404: _NOT_FOUND_RULE,
-    408: _TIMEOUT_RULE,
     409: _CONFLICT_RULE,
     422: _INVALID_PARAMS_RULE,
-    429: _RATE_LIMIT_RULE,
-    502: _UNAVAILABLE_RULE,
-    503: _UNAVAILABLE_RULE,
 }
 
 _GRAVITINO_CODE_RULES: dict[int, _Rule] = {
@@ -217,14 +224,18 @@ def _classify_http_status(
     error_type: str,
     default_error_type: str,
     method: str = "",
+    token_endpoint: bool = False,
 ) -> Optional[ErrorClassification]:
     """Map an HTTP status code (>= 400) to an ErrorClassification, or None."""
     if status_code is None or status_code < 400:
         return None
-    rule = _HTTP_STATUS_RULES.get(status_code)
-    if rule is None:
-        rule = (
-            _INVALID_PARAMS_RULE if status_code < 500 else _INTERNAL_ERROR_RULE
+    if token_endpoint:
+        # The MCP server supplies the endpoint, credentials and scope.
+        rule = _UPSTREAM_STATUS_RULES.get(status_code, _INTERNAL_ERROR_RULE)
+    else:
+        rule = _HTTP_STATUS_RULES.get(
+            status_code,
+            _INVALID_PARAMS_RULE if status_code < 500 else _INTERNAL_ERROR_RULE,
         )
     return _from_rule(
         rule,
@@ -308,6 +319,7 @@ def classify_error(exc: BaseException, method: str = "") -> ErrorClassification:
             error_type=type(root).__name__,
             default_error_type="HTTPStatusError",
             method=method,
+            token_endpoint=isinstance(root, OAuthTokenEndpointError),
         )
         if by_status is not None:
             return by_status

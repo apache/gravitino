@@ -624,7 +624,7 @@ class TestExtractWriteTarget(unittest.TestCase):
             audit.extract_write_target(
                 "drop_schema", {"catalog_name": "c", "schema_name": "s"}, ""
             ),
-            ("schema", "c.s"),
+            ("", ""),
         )
 
     def test_missing_or_invalid_arguments_return_empty_target(self):
