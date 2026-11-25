@@ -81,7 +81,7 @@ public interface FunctionUpdateRequest extends RESTRequest {
 
     @Override
     public void validate() throws IllegalArgumentException {
-      // newComment can be null or empty to clear the comment
+      // FunctionChange.updateComment requires a nonblank value when converting this request.
     }
   }
 

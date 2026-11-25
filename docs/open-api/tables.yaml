@@ -511,6 +511,8 @@ components:
         - $ref: "#/components/schemas/UpdateTableColumnNullabilityRequest"
         - $ref: "#/components/schemas/UpdateTableColumnDefaultValueRequest"
         - $ref: "#/components/schemas/DeleteTableColumnRequest"
+        - $ref: "#/components/schemas/AddTableIndexRequest"
+        - $ref: "#/components/schemas/DeleteTableIndexRequest"
       discriminator:
         propertyName: "@type"
         mapping:
@@ -526,6 +528,8 @@ components:
           updateColumnNullability: "#/components/schemas/UpdateTableColumnNullabilityRequest"
           updateColumnDefaultValue: "#/components/schemas/UpdateTableColumnDefaultValueRequest"
           deleteColumn: "#/components/schemas/DeleteTableColumnRequest"
+          addTableIndex: "#/components/schemas/AddTableIndexRequest"
+          deleteTableIndex: "#/components/schemas/DeleteTableIndexRequest"
 
     RenameTableRequest:
       type: object
@@ -827,6 +831,46 @@ components:
         "ifExists": true
       }
 
+    AddTableIndexRequest:
+      type: object
+      required:
+        - "@type"
+        - index
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "addTableIndex"
+        index:
+          $ref: "./indexes.yaml#/components/schemas/IndexSpec"
+      example:
+        "@type": addTableIndex
+        index:
+          indexType: UNIQUE_KEY
+          name: email_uk
+          fieldNames: [[email]]
+
+    DeleteTableIndexRequest:
+      type: object
+      required:
+        - "@type"
+        - name
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "deleteTableIndex"
+        name:
+          type: string
+          description: The name of the index to delete
+        ifExists:
+          type: boolean
+          description: If true, ignore a missing index
+          default: false
+      example:
+        "@type": deleteTableIndex
+        name: email_uk
+        ifExists: true
 
     ColumnPosition:
       oneOf:
@@ -939,18 +983,16 @@ components:
                 {
                   "name": "position",
                   "type": "string",
-                  "nullable": true,
-                  "comment": "position field comment"
+                  "nullable": true
                 },
                 {
                   "name": "contact",
                   "type": {
                     "type": "list",
                     "elementType": "integer",
-                    "containsNull": false
+                    "containsNull": true
                   },
-                  "nullable": true,
-                  "comment": "contact field comment"
+                  "nullable": true
                 },
                 {
                   "name": "rating",
@@ -958,10 +1000,9 @@ components:
                     "type": "map",
                     "keyType": "string",
                     "valueType": "integer",
-                    "valueContainsNull": false
+                    "valueContainsNull": true
                   },
-                  "nullable": true,
-                  "comment": "rating field comment"
+                  "nullable": true
                 }
               ]
             },
@@ -1004,7 +1045,7 @@ components:
         "properties": {
           "format": "ORC"
         },
-        indexes:[ ]
+        "indexes": [ ]
       }
 
     MysqlTableCreate:
@@ -1045,17 +1086,17 @@ components:
         ],
         "indexes": [
           {
-            "indexType": "primary_key",
+            "indexType": "PRIMARY_KEY",
             "name": "PRIMARY",
             "fieldNames": [["id"]]
           },
           {
-            "indexType": "unique_key",
+            "indexType": "UNIQUE_KEY",
             "name": "uk_1",
             "fieldNames": [["name"]]
           },
           {
-            "indexType": "unique_key",
+            "indexType": "UNIQUE_KEY",
             "name": "uk_2",
             "fieldNames": [["name"] ,["age"] ,["dt"]]
           }
@@ -1099,17 +1140,17 @@ components:
         ],
         "indexes": [
           {
-            "indexType": "primary_key",
+            "indexType": "PRIMARY_KEY",
             "name": "PRIMARY",
             "fieldNames": [["id"]]
           },
           {
-            "indexType": "unique_key",
+            "indexType": "UNIQUE_KEY",
             "name": "uk_1",
             "fieldNames": [["name"]]
           },
           {
-            "indexType": "unique_key",
+            "indexType": "UNIQUE_KEY",
             "name": "uk_2",
             "fieldNames": [["name"] ,["age"] ,["dt"]]
           }
@@ -1293,17 +1334,17 @@ components:
           "partitioning": [ ],
           "indexes": [
             {
-              "indexType": "primary_key",
+              "indexType": "PRIMARY_KEY",
               "name": "PRIMARY",
               "fieldNames": [["id"]]
             },
             {
-              "indexType": "unique_key",
+              "indexType": "UNIQUE_KEY",
               "name": "uk_1",
               "fieldNames": [["name"]]
             },
             {
-              "indexType": "unique_key",
+              "indexType": "UNIQUE_KEY",
               "name": "uk_2",
               "fieldNames": [["name"] ,["age"] ,["dt"]]
             }
@@ -1354,17 +1395,17 @@ components:
           "partitioning": [ ],
           "indexes": [
             {
-              "indexType": "primary_key",
+              "indexType": "PRIMARY_KEY",
               "name": "PRIMARY",
               "fieldNames": [["id"]]
             },
             {
-              "indexType": "unique_key",
+              "indexType": "UNIQUE_KEY",
               "name": "uk_1",
               "fieldNames": [["name"]]
             },
             {
-              "indexType": "unique_key",
+              "indexType": "UNIQUE_KEY",
               "name": "uk_2",
               "fieldNames": [["name"] ,["age"] ,["dt"]]
             }

@@ -432,22 +432,14 @@ public class ManagedFunctionOperations implements FunctionCatalog {
    */
   private void validateRemoveDefinition(
       List<FunctionDefinition> definitions, FunctionParam[] paramsToRemove) {
+    if (definitions.stream().noneMatch(def -> parametersMatch(def.parameters(), paramsToRemove))) {
+      throw new IllegalArgumentException(
+          "Cannot remove definition: no definition found with the specified parameters");
+    }
+
     if (definitions.size() == 1) {
       throw new IllegalArgumentException(
           "Cannot remove the only definition. Use dropFunction to remove the entire function.");
-    }
-
-    boolean found = false;
-    for (FunctionDefinition def : definitions) {
-      if (parametersMatch(def.parameters(), paramsToRemove)) {
-        found = true;
-        break;
-      }
-    }
-
-    if (!found) {
-      throw new IllegalArgumentException(
-          "Cannot remove definition: no definition found with the specified parameters");
     }
   }
 
