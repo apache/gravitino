@@ -371,3 +371,41 @@ Overview for Access Roles in the Web V2.
 Click **Create Role** to open the create form. A role can include multiple securable objects. Different securable object types have different available privileges. For details, see [Access control](security/access-control.md).
 
 ![roles-create](./assets/webui-v2/roles-create.png)
+
+### MCP
+
+The **MCP** section manages the
+[Apache Gravitino MCP Gateway](https://github.com/apache/gravitino-mcp-gateway/blob/main/docs/gravitino-mcp-gateway.md),
+which controls who may use which MCP servers and keeps an audit log of their calls. It appears
+when Gravitino signs people in with OIDC and `conf/gravitino.conf` names the gateway:
+
+```text
+gravitino.mcpGateway.uri = https://mcp-gateway.example.com
+gravitino.server.visibleConfigs = gravitino.mcpGateway.uri
+```
+
+Use an https URL, or http on `localhost`, because the browser sends each person's token there. If
+`gravitino.server.visibleConfigs` already lists keys, add `gravitino.mcpGateway.uri` to them.
+
+The web UI calls the gateway from the browser with the person's Gravitino sign-in, so the gateway
+must accept it:
+
+- The web UI's tokens must carry the gateway's `JWT_AUDIENCE`.
+- The web UI's OAuth client, `gravitino.authenticator.oauth.clientId`, must be in the gateway's
+  `GATEWAY_OAUTH_ADDITIONAL_CLIENT_IDS`, unless the gateway sets `GATEWAY_OAUTH_ACCEPT_ANY_CLIENT`.
+- The web UI's origin must be in the gateway's `CORS_ALLOWED_ORIGINS`.
+- The gateway's `GRAVITINO_URI` should point at Gravitino, so that Gravitino's service admins are
+  the gateway's admins too.
+
+The pages are:
+
+- **My Servers** lists the gateway's MCP servers, with your access to each and the URL MCP
+  clients use. Ask for access, read an admin's note on a denied request, or connect to and
+  disconnect from a server that has its own sign-in.
+- **Manage Servers** (gateway admins): register MCP servers, and edit, deactivate or delete them.
+- **Access Requests** (gateway admins): approve or deny requests, and revoke granted access.
+- **Audit Log** lists the calls you made through the gateway, including the ones it refused
+  because you lacked access. Gateway admins see everyone's calls, people's and service accounts',
+  and can narrow the list to one account. Export the list as CSV.
+- **Service Accounts** (gateway admins): register the workloads that call MCP servers with their
+  GKE, GCE or EKS identity, choose the servers each may call, and delete them.

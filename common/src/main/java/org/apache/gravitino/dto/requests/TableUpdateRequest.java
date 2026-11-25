@@ -36,6 +36,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.dto.rel.expressions.FunctionArg;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
@@ -44,6 +46,7 @@ import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rest.RESTRequest;
+import org.apache.gravitino.utils.WritableDataTypeValidator;
 
 /** Represents a request to update a table. */
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -97,6 +100,19 @@ public interface TableUpdateRequest extends RESTRequest {
    * @return An instance of TableChange.
    */
   TableChange tableChange();
+
+  /**
+   * Validates the request with a prefix for writable-type field paths.
+   *
+   * <p>The default implementation delegates to {@link #validate()} and preserves existing
+   * validation messages.
+   *
+   * @param fieldPrefix the field path prefix, including a trailing dot when nonempty
+   * @throws IllegalArgumentException if the request is invalid
+   */
+  default void validateWithPrefix(String fieldPrefix) throws IllegalArgumentException {
+    validate();
+  }
 
   /** Represents a request to rename a table. */
   @EqualsAndHashCode
@@ -397,13 +413,7 @@ public interface TableUpdateRequest extends RESTRequest {
      */
     @Override
     public void validate() throws IllegalArgumentException {
-      Preconditions.checkArgument(
-          fieldName != null
-              && fieldName.length > 0
-              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
-          "\"fieldName\" field is required and cannot be empty");
-      Preconditions.checkArgument(
-          dataType != null, "\"type\" field is required and cannot be empty");
+      validateWithPrefix("");
     }
 
     /**
@@ -412,7 +422,30 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public TableChange tableChange() {
       return TableChange.addColumn(
-          fieldName, dataType, comment, position, nullable, autoIncrement, defaultValue);
+          fieldName,
+          dataType,
+          comment,
+          position,
+          nullable,
+          autoIncrement,
+          defaultValue instanceof FunctionArg
+              ? DTOConverters.fromFunctionArg((FunctionArg) defaultValue)
+              : defaultValue);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void validateWithPrefix(String fieldPrefix) {
+      Preconditions.checkArgument(
+          fieldName != null
+              && fieldName.length > 0
+              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
+          "\"%sfieldName\" field is required and cannot be empty",
+          fieldPrefix);
+      Preconditions.checkArgument(
+          dataType != null, "\"%stype\" field is required and cannot be empty", fieldPrefix);
+      WritableDataTypeValidator.validate(dataType, fieldPrefix + "type");
+      WritableDataTypeValidator.validateExpression(defaultValue, fieldPrefix + "defaultValue");
     }
   }
 
@@ -509,14 +542,7 @@ public interface TableUpdateRequest extends RESTRequest {
      */
     @Override
     public void validate() throws IllegalArgumentException {
-      Preconditions.checkArgument(
-          fieldName != null
-              && fieldName.length > 0
-              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
-          "\"fieldName\" field is required and cannot be empty");
-      Preconditions.checkArgument(
-          (newDefaultValue != null && newDefaultValue != DEFAULT_VALUE_NOT_SET),
-          "\"newDefaultValue\" field is required and cannot be empty");
+      validateWithPrefix("");
     }
 
     /**
@@ -524,7 +550,28 @@ public interface TableUpdateRequest extends RESTRequest {
      */
     @Override
     public TableChange tableChange() {
-      return TableChange.updateColumnDefaultValue(fieldName, newDefaultValue);
+      return TableChange.updateColumnDefaultValue(
+          fieldName,
+          newDefaultValue instanceof FunctionArg
+              ? DTOConverters.fromFunctionArg((FunctionArg) newDefaultValue)
+              : newDefaultValue);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void validateWithPrefix(String fieldPrefix) {
+      Preconditions.checkArgument(
+          fieldName != null
+              && fieldName.length > 0
+              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
+          "\"%sfieldName\" field is required and cannot be empty",
+          fieldPrefix);
+      Preconditions.checkArgument(
+          (newDefaultValue != null && newDefaultValue != DEFAULT_VALUE_NOT_SET),
+          "\"%snewDefaultValue\" field is required and cannot be empty",
+          fieldPrefix);
+      WritableDataTypeValidator.validateExpression(
+          newDefaultValue, fieldPrefix + "newDefaultValue");
     }
   }
 
@@ -566,13 +613,7 @@ public interface TableUpdateRequest extends RESTRequest {
      */
     @Override
     public void validate() throws IllegalArgumentException {
-      Preconditions.checkArgument(
-          fieldName != null
-              && fieldName.length > 0
-              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
-          "\"fieldName\" field is required and cannot be empty");
-      Preconditions.checkArgument(
-          newType != null, "\"newType\" field is required and cannot be empty");
+      validateWithPrefix("");
     }
 
     /**
@@ -581,6 +622,20 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public TableChange tableChange() {
       return TableChange.updateColumnType(fieldName, newType);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void validateWithPrefix(String fieldPrefix) {
+      Preconditions.checkArgument(
+          fieldName != null
+              && fieldName.length > 0
+              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
+          "\"%sfieldName\" field is required and cannot be empty",
+          fieldPrefix);
+      Preconditions.checkArgument(
+          newType != null, "\"%snewType\" field is required and cannot be empty", fieldPrefix);
+      WritableDataTypeValidator.validate(newType, fieldPrefix + "newType");
     }
   }
 

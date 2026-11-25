@@ -21,11 +21,40 @@ package org.apache.gravitino.credential;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 public class TestCatalogCredentialManager {
+  /**
+   * Checks capability queries against real configured providers, including an empty catalog.
+   *
+   * @param dynamic whether an explicitly dynamic provider is configured
+   * @param stored whether a static provider is configured
+   */
+  @ParameterizedTest
+  @CsvSource({"false,false", "false,true", "true,false", "true,true"})
+  public void testHasOnlyDynamicCredentialProviders(boolean dynamic, boolean stored) {
+    List<String> providers = new ArrayList<>();
+    if (dynamic) {
+      providers.add(DummyCredentialProvider.CREDENTIAL_TYPE);
+    }
+    if (stored) {
+      providers.add(JdbcCredential.JDBC_CREDENTIAL_TYPE);
+    }
+    Map<String, String> properties =
+        ImmutableMap.of(
+            CredentialConstants.CREDENTIAL_PROVIDERS, String.join(",", providers),
+            JdbcCredential.GRAVITINO_JDBC_USER, "user",
+            JdbcCredential.GRAVITINO_JDBC_PASSWORD, "password");
+    try (CatalogCredentialManager manager = new CatalogCredentialManager("catalog", properties)) {
+      Assertions.assertEquals(!stored, manager.hasOnlyDynamicCredentialProviders());
+    }
+  }
 
   @Test
   void testSelectsStorageCredentialWhenJdbcProviderIsAlsoConfigured() {
@@ -53,6 +82,22 @@ public class TestCatalogCredentialManager {
       Assertions.assertInstanceOf(DummyCredentialProvider.DummyCredential.class, credential);
       Assertions.assertTrue(
           credentialManager.getCredentialProvider(JdbcCredential.JDBC_CREDENTIAL_TYPE).isPresent());
+    }
+  }
+
+  @Test
+  void testSupportsPathOnlyWhenAProviderCoversTheScheme() {
+    try (CatalogCredentialManager noProviders =
+        new CatalogCredentialManager("no-providers", ImmutableMap.of())) {
+      Assertions.assertFalse(noProviders.supportsPath("s3://bucket/warehouse/table"));
+    }
+    try (CatalogCredentialManager storageProvider =
+        new CatalogCredentialManager(
+            "storage",
+            ImmutableMap.of(
+                CredentialConstants.CREDENTIAL_PROVIDERS,
+                DummyCredentialProvider.CREDENTIAL_TYPE))) {
+      Assertions.assertTrue(storageProvider.supportsPath("s3://bucket/warehouse/table"));
     }
   }
 }

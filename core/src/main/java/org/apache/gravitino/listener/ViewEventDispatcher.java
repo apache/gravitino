@@ -44,6 +44,7 @@ import org.apache.gravitino.listener.api.event.view.LoadViewEvent;
 import org.apache.gravitino.listener.api.event.view.LoadViewFailureEvent;
 import org.apache.gravitino.listener.api.event.view.LoadViewPreEvent;
 import org.apache.gravitino.listener.api.info.ViewInfo;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
@@ -67,6 +68,12 @@ public class ViewEventDispatcher implements ViewDispatcher {
   public ViewEventDispatcher(EventBus eventBus, ViewDispatcher dispatcher) {
     this.eventBus = eventBus;
     this.dispatcher = dispatcher;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public View importView(NameIdentifier ident, AuditInfo auditInfo) throws NoSuchViewException {
+    return dispatcher.importView(ident, auditInfo);
   }
 
   @Override

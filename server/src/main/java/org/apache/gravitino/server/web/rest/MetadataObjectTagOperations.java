@@ -54,6 +54,7 @@ import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.policy.HiddenPolicyTag;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
@@ -114,9 +115,8 @@ public class MetadataObjectTagOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            MetadataObject object =
-                MetadataObjects.parse(
-                    fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+            MetadataObject object = parseMetadataObject(metalake, type, fullName);
+            TagOperations.checkVisibleTag(metalake, tagName);
             Optional<Tag> tag = getTagForObject(metalake, object, tagName);
             Optional<TagDTO> tagDTO = tag.map(t -> DTOConverters.toDTO(t, Optional.of(false)));
 
@@ -184,14 +184,13 @@ public class MetadataObjectTagOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            MetadataObject object =
-                MetadataObjects.parse(
-                    fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+            MetadataObject object = parseMetadataObject(metalake, type, fullName);
 
             Map<String, TagDTO> tags = new LinkedHashMap<>();
             Tag[] nonInheritedTags = tagDispatcher.listTagsInfoForMetadataObject(metalake, object);
             if (ArrayUtils.isNotEmpty(nonInheritedTags)) {
               Arrays.stream(nonInheritedTags)
+                  .filter(tag -> !HiddenPolicyTag.isReservedName(tag.name()))
                   .map(t -> DTOConverters.toDTO(t, Optional.of(false)))
                   .forEach(tag -> tags.putIfAbsent(tag.name(), tag));
             }
@@ -202,6 +201,7 @@ public class MetadataObjectTagOperations {
                   tagDispatcher.listTagsInfoForMetadataObject(metalake, parentObject);
               if (ArrayUtils.isNotEmpty(inheritedTags)) {
                 Arrays.stream(inheritedTags)
+                    .filter(tag -> !HiddenPolicyTag.isReservedName(tag.name()))
                     .map(t -> DTOConverters.toDTO(t, Optional.of(true)))
                     .forEach(tag -> tags.putIfAbsent(tag.name(), tag));
               }
@@ -305,11 +305,17 @@ public class MetadataObjectTagOperations {
           httpRequest,
           () -> {
             request.validate();
-            MetadataObject object = parseMetadataObject(type, fullName);
+            MetadataObject object = parseMetadataObject(metalake, type, fullName);
+            Arrays.stream(ArrayUtils.addAll(request.getTagsToAdd(), request.getTagsToRemove()))
+                .forEach(name -> TagOperations.checkVisibleTag(metalake, name));
             String[] tagNames =
                 tagDispatcher.associateTagsForMetadataObject(
                     metalake, object, request.getTagsToAdd(), request.getTagsToRemove());
             tagNames = tagNames == null ? new String[0] : tagNames;
+            tagNames =
+                Arrays.stream(tagNames)
+                    .filter(name -> !HiddenPolicyTag.isReservedName(name))
+                    .toArray(String[]::new);
             logAssociatedTags(type, fullName, metalake, tagNames);
             return Utils.ok(new NameListResponse(tagNames));
           });
@@ -340,11 +346,17 @@ public class MetadataObjectTagOperations {
           httpRequest,
           () -> {
             request.validate();
-            MetadataObject object = parseMetadataObject(type, fullName);
+            MetadataObject object = parseMetadataObject(metalake, type, fullName);
+            Arrays.stream(ArrayUtils.addAll(request.tagNamesToAdd(), request.tagNamesToRemove()))
+                .forEach(name -> TagOperations.checkVisibleTag(metalake, name));
             String[] tagNames =
                 tagDispatcher.associateTagValuesForMetadataObject(
                     metalake, object, request.tagValuesToAdd(), request.tagValuesToRemove());
             tagNames = tagNames == null ? new String[0] : tagNames;
+            tagNames =
+                Arrays.stream(tagNames)
+                    .filter(name -> !HiddenPolicyTag.isReservedName(name))
+                    .toArray(String[]::new);
             logAssociatedTags(type, fullName, metalake, tagNames);
             return Response.ok(new NameListResponse(tagNames), TAG_VALUES_MEDIA_TYPE).build();
           });
@@ -355,9 +367,11 @@ public class MetadataObjectTagOperations {
     }
   }
 
-  private static MetadataObject parseMetadataObject(String type, String fullName) {
-    return MetadataObjects.parse(
-        fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+  private static MetadataObject parseMetadataObject(String metalake, String type, String fullName) {
+    MetadataObject object =
+        MetadataObjects.parse(fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+    TagOperations.checkVisibleTag(metalake, object);
+    return object;
   }
 
   private static void logAssociatedTags(

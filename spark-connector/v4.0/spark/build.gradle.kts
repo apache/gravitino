@@ -45,8 +45,9 @@ val jakartaValidationVersion: String = "2.0.2"
 val artifactName = "${rootProject.name}-spark-${sparkMajorVersion}_$scalaVersion"
 
 // The connector's shared sources are compiled here rather than consumed as a jar, so that every
-// supported Spark version builds them against its own API. Everything a Spark 4 build needs its own
-// copy of lives in this module's own src/main/java, so no flavor directory is composed in.
+// supported Spark version builds them against its own API. The spark40 directory holds the shared
+// classes whose superclass constructor differs on this line; everything else this build needs its
+// own copy of lives in src/main/java.
 val sparkCommonDir = project(":spark-connector").projectDir.resolve("spark-common")
 
 sourceSets {
@@ -55,6 +56,7 @@ sourceSets {
       setSrcDirs(
         listOf(
           "$sparkCommonDir/src/main/java",
+          "$sparkCommonDir/src/main/spark40",
           "src/main/java"
         )
       )
@@ -208,10 +210,15 @@ dependencies {
   testImplementation(libs.aws.kms)
   testImplementation(libs.aws.s3)
   testImplementation(libs.aws.sts)
-  testImplementation(libs.hadoop3.aws)
+  testImplementation(libs.hadoop3.aws) {
+    exclude("software.amazon.awssdk", "bundle")
+  }
+  testImplementation(libs.bundles.hadoop.aws.sdk)
   // hadoop-aws declares hadoop-client-api as provided; add it explicitly so S3AFileSystem can load
   // org.apache.hadoop.fs.impl.prefetch.PrefetchingStatistics (added in 3.3.5) at runtime.
   testImplementation(libs.hadoop3.client.api)
+  // Spark brings an older hadoop-client-runtime; keep it on the same version as hadoop-client-api.
+  testImplementation(libs.hadoop3.client.runtime)
   testImplementation(libs.hive2.common) {
     exclude("com.sun.jersey")
     exclude("org.apache.curator")

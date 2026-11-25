@@ -45,6 +45,39 @@ import org.junit.jupiter.params.provider.MethodSource;
 public class TestStarRocksUtils {
 
   @Test
+  void testQuotedIdentifiersRejectBackticks() {
+    for (String name : new String[] {"vic`tim", "`victim`", "vic``tim"}) {
+      Assertions.assertFalse(StarRocksUtils.checkIdentifier(name).supported());
+      IllegalArgumentException error =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> StarRocksUtils.quoteIdentifier(name));
+      Assertions.assertTrue(error.getMessage().contains(name));
+      Assertions.assertTrue(error.getMessage().contains("must not contain backticks"));
+    }
+    String name = "native column\\path; --";
+    Assertions.assertTrue(StarRocksUtils.checkIdentifier(name).supported());
+    Assertions.assertEquals("`" + name + "`", StarRocksUtils.quoteIdentifier(name));
+  }
+
+  @Test
+  void testPartitionFragmentsRejectBackticks() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            StarRocksUtils.generatePartitionSqlFragment(
+                Partitions.range(
+                    "p`1", Literals.integerLiteral(10), null, Collections.emptyMap())));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            StarRocksUtils.generatePartitionSqlFragment(
+                Partitions.list(
+                    "p`1",
+                    new Literal<?>[][] {{Literals.integerLiteral(1)}},
+                    Collections.emptyMap())));
+  }
+
+  @Test
   public void testGeneratePropertiesSql() {
     // Test when properties is null
     Map<String, String> properties = null;

@@ -238,7 +238,7 @@ differs by environment:
 | Environment            | Jar providing the Azure Data Lake Storage filesystem                                                                                                                                                      |
 |------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | No Hadoop installed    | [`gravitino-azure-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle), a fat jar bundling the Azure Data Lake Storage filesystem implementation and its dependencies |
-| Hadoop already present | `hadoop-azure-${hadoop-version}.jar`, `azure-storage-7.0.1.jar` and `wildfly-openssl-1.0.7.Final.jar`, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`                                  |
+| Hadoop already present | `hadoop-azure-${hadoop-version}.jar`, `azure-storage-7.0.1.jar` and `wildfly-openssl-${version}.jar`, shipped with Hadoop (see below)                                                                     |
 
 The artifacts in full:
 
@@ -250,9 +250,10 @@ The artifacts in full:
   `gravitino-azure` functionality. Java and Hadoop-based clients require it to access Gravitino
   filesets.
 - `hadoop-azure-${hadoop-version}.jar`, `azure-storage-7.0.1.jar` and
-  `wildfly-openssl-1.0.7.Final.jar`: the standard Hadoop dependencies for Azure Data Lake Storage
-  access, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`. Supply them yourself
-  when running inside an existing Hadoop environment.
+  `wildfly-openssl-${version}.jar`: the standard Hadoop dependencies for Azure Data Lake Storage
+  access. Hadoop 3.3 ships them under `${HADOOP_HOME}/share/hadoop/tools/lib`. Hadoop 3.4.3 ships
+  them under `${HADOOP_HOME}/share/hadoop/common/lib`, which is already on the Hadoop classpath.
+  Supply them yourself when running inside an existing Hadoop environment.
 - [`gravitino-azure-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure):
   a "thin" jar carrying only the Azure integration code. It is already contained in both jars above,
   so it is not needed as a direct dependency unless you prefer to manage all Hadoop and Azure
@@ -407,7 +408,7 @@ implementations passed with `--jars`. If that happens, add the jars to the Spark
 2. Add these jars to the Hadoop classpath:
 
    - `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, from Maven Central.
-   - `hadoop-azure-${hadoop-version}.jar`, `azure-storage-7.0.1.jar` and `wildfly-openssl-1.0.7.Final.jar`, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`.
+   - `hadoop-azure-${hadoop-version}.jar`, `azure-storage-7.0.1.jar` and `wildfly-openssl-${version}.jar`. Hadoop 3.3 ships them under `${HADOOP_HOME}/share/hadoop/tools/lib`. Hadoop 3.4.3 ships them under `${HADOOP_HOME}/share/hadoop/common/lib`, which is already on the Hadoop classpath.
 
 3. Access the fileset:
 

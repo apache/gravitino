@@ -84,6 +84,36 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
     return resourceConfig;
   }
 
+  /** Checks credential client errors identify the requested object. */
+  @Test
+  public void testUnsupportedObjectAndProviderErrorsIdentifyTheObject() {
+    Response unsupported =
+        target(basePath(metalake))
+            .path("table")
+            .path("catalog.schema.table")
+            .path("credentials")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(400, unsupported.getStatus());
+    String message = unsupported.readEntity(ErrorResponse.class).getMessage();
+    Assertions.assertTrue(message.contains("catalog.schema.table"));
+    Assertions.assertTrue(message.contains("TABLE"));
+    when(credentialOperationDispatcher.getCredentials(any(), any()))
+        .thenThrow(new IllegalArgumentException("Invalid provider"));
+    Response invalid =
+        target(basePath(metalake))
+            .path("fileset")
+            .path("catalog.schema.fileset")
+            .path("credentials")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(400, invalid.getStatus());
+    Assertions.assertTrue(
+        invalid.readEntity(ErrorResponse.class).getMessage().contains("catalog.schema.fileset"));
+  }
+
   @Test
   public void testGetCredentialsForCatalog() {
     testGetCredentialsForObject(MetadataObjects.parse("catalog", MetadataObject.Type.CATALOG));

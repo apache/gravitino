@@ -24,6 +24,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
 import org.apache.gravitino.server.web.Utils;
 import org.glassfish.jersey.server.ParamException;
+import org.glassfish.jersey.server.ParamException.QueryParamException;
 
 /**
  * ParamExceptionMapper returns a structured JSON error body when Jersey fails to convert a request
@@ -33,6 +34,9 @@ import org.glassfish.jersey.server.ParamException;
  * <p>{@link ParamException} is thrown by Jersey itself while binding request parameters, before any
  * resource method runs, so this mapper is the only place such a conversion failure can be
  * intercepted.
+ *
+ * <p>Query parameter conversion failures return 400 to match other request-validation errors. Other
+ * URI parameter conversion failures retain Jersey's 404 response.
  */
 @Priority(1)
 public class ParamExceptionMapper implements ExceptionMapper<ParamException> {
@@ -45,6 +49,10 @@ public class ParamExceptionMapper implements ExceptionMapper<ParamException> {
             exception.getParameterType().getSimpleName(),
             exception.getParameterName(),
             causeMessage(exception.getCause()));
+
+    if (exception instanceof QueryParamException) {
+      return Utils.illegalArguments(message);
+    }
 
     if (exception.getResponse().getStatus() == Response.Status.NOT_FOUND.getStatusCode()) {
       return Utils.notFound(exception.getClass().getSimpleName(), message);

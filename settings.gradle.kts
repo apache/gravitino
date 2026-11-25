@@ -17,7 +17,7 @@
  * under the License.
  */
 plugins {
-  id("org.gradle.toolchains.foojay-resolver-convention") version("0.7.0")
+  id("org.gradle.toolchains.foojay-resolver-convention") version("1.0.0")
 }
 
 rootProject.name = "gravitino"
@@ -72,12 +72,12 @@ val skipTrinoConnector: Boolean =
   gradle.startParameter.projectProperties["skipTrinoConnector"]?.toBoolean() ?: false
 if (!skipTrinoConnector) {
   include(
-    "trino-connector:trino-connector",
-    "trino-connector:trino-connector-440-445",
-    "trino-connector:trino-connector-446-451",
-    "trino-connector:trino-connector-452-468",
     "trino-connector:trino-connector-469-472",
-    "trino-connector:trino-connector-473-478",
+    "trino-connector:trino-connector-473-477",
+    "trino-connector:trino-connector-478-479",
+    "trino-connector:trino-connector-480",
+    "trino-connector:trino-connector-481",
+    "trino-connector:trino-connector-482-483",
     "trino-connector:integration-test"
   )
 } else {
@@ -119,6 +119,9 @@ project(":spark-connector:spark-runtime-3.5").projectDir = file("spark-connector
 include("spark-connector:spark-4.0", "spark-connector:spark-runtime-4.0")
 project(":spark-connector:spark-4.0").projectDir = file("spark-connector/v4.0/spark")
 project(":spark-connector:spark-runtime-4.0").projectDir = file("spark-connector/v4.0/spark-runtime")
+include("spark-connector:spark-4.1", "spark-connector:spark-runtime-4.1")
+project(":spark-connector:spark-4.1").projectDir = file("spark-connector/v4.1/spark")
+project(":spark-connector:spark-runtime-4.1").projectDir = file("spark-connector/v4.1/spark-runtime")
 include("web:web", "web:integration-test")
 include("web-v2:web", "web-v2:integration-test")
 include("docs")

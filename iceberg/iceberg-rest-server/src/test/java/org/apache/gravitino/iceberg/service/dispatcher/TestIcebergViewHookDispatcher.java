@@ -42,6 +42,7 @@ import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Namespace;
@@ -56,6 +57,7 @@ import org.apache.iceberg.types.Types;
 import org.apache.iceberg.view.ImmutableSQLViewRepresentation;
 import org.apache.iceberg.view.ImmutableViewVersion;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -174,6 +176,15 @@ public class TestIcebergViewHookDispatcher {
     LoadViewResponse mockResponse = mock(LoadViewResponse.class);
     when(mockExecutor.createView(mockContext, namespace, createRequest)).thenReturn(mockResponse);
 
+    when(mockInternalViewDispatcher.importView(any(), any()))
+        .thenAnswer(
+            invocation -> {
+              AuditInfo audit = invocation.getArgument(1);
+              Assertions.assertEquals(USER, audit.creator());
+              Assertions.assertNotNull(audit.createTime());
+              return null;
+            });
+
     LoadViewResponse response = hookDispatcher.createView(mockContext, namespace, createRequest);
 
     // Verify view was created in underlying catalog
@@ -181,8 +192,10 @@ public class TestIcebergViewHookDispatcher {
 
     // Verify view was imported into Gravitino
     NameIdentifier expectedIdent = NameIdentifier.of(METALAKE, CATALOG, SCHEMA_NAME, VIEW_NAME);
-    verify(mockInternalViewDispatcher, times(1)).loadView(eq(expectedIdent));
-    verify(mockViewDispatcher, never()).loadView(any());
+    verify(mockInternalViewDispatcher, times(1)).importView(eq(expectedIdent), any());
+    verify(mockViewDispatcher, never()).importView(any(), any());
+
+    verify(mockEntityStore, never()).update(any(), any(), any(), any());
 
     // Verify ownership was set
     verify(mockInternalOwnerDispatcher, times(1)).setOwner(any(), any(), eq(USER), any());
@@ -218,7 +231,7 @@ public class TestIcebergViewHookDispatcher {
     // Simulate import failure
     doThrow(new RuntimeException("Import failed"))
         .when(mockInternalViewDispatcher)
-        .loadView(any(NameIdentifier.class));
+        .importView(any(NameIdentifier.class), any());
 
     // Should not throw - import is best-effort
     LoadViewResponse response = hookDispatcher.createView(mockContext, namespace, createRequest);
@@ -261,8 +274,8 @@ public class TestIcebergViewHookDispatcher {
             () -> hookDispatcher.createView(mockContext, namespace, createRequest));
     assertEquals("Set owner failed", thrown.getMessage());
     verify(mockExecutor, times(1)).createView(mockContext, namespace, createRequest);
-    verify(mockInternalViewDispatcher, times(1)).loadView(any(NameIdentifier.class));
-    verify(mockViewDispatcher, never()).loadView(any());
+    verify(mockInternalViewDispatcher, times(1)).importView(any(NameIdentifier.class), any());
+    verify(mockViewDispatcher, never()).importView(any(), any());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
 
@@ -292,8 +305,8 @@ public class TestIcebergViewHookDispatcher {
     NameIdentifier expectedIdent =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, viewIdent, ":");
     verify(mockEntityStore, never()).delete(eq(expectedIdent), eq(Entity.EntityType.VIEW));
-    verify(mockInternalViewDispatcher, times(1)).loadView(eq(expectedIdent));
-    verify(mockViewDispatcher, never()).loadView(any());
+    verify(mockInternalViewDispatcher, times(1)).importView(eq(expectedIdent), any());
+    verify(mockViewDispatcher, never()).importView(any(), any());
   }
 
   @Test
@@ -307,8 +320,8 @@ public class TestIcebergViewHookDispatcher {
     NameIdentifier expectedIdent =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, viewIdent, ":");
     verify(mockEntityStore, times(1)).delete(eq(expectedIdent), eq(Entity.EntityType.VIEW));
-    verify(mockInternalViewDispatcher, times(1)).loadView(eq(expectedIdent));
-    verify(mockViewDispatcher, never()).loadView(any());
+    verify(mockInternalViewDispatcher, times(1)).importView(eq(expectedIdent), any());
+    verify(mockViewDispatcher, never()).importView(any(), any());
   }
 
   @Test
@@ -395,8 +408,8 @@ public class TestIcebergViewHookDispatcher {
     NameIdentifier destGravitinoIdent =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, destIdent, ":");
     verify(mockEntityStore, times(1)).delete(eq(sourceGravitinoIdent), eq(Entity.EntityType.VIEW));
-    verify(mockInternalViewDispatcher, times(1)).loadView(eq(destGravitinoIdent));
-    verify(mockViewDispatcher, never()).loadView(any());
+    verify(mockInternalViewDispatcher, times(1)).importView(eq(destGravitinoIdent), any());
+    verify(mockViewDispatcher, never()).importView(any(), any());
   }
 
   @Test

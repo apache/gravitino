@@ -22,8 +22,8 @@ import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
-import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.domain.SupportsDomains;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.tag.SupportsTags;
 
@@ -32,7 +32,15 @@ import org.apache.gravitino.tag.SupportsTags;
  * Ossie-compatible definition with Gravitino properties and audit information.
  */
 @Evolving
-public interface SemanticModel extends Auditable {
+public interface SemanticModel extends SemanticModelRevision {
+
+  /** The publication status of a Semantic Model revision. */
+  enum Status {
+    /** Saved and awaiting publication. */
+    DRAFT,
+    /** Published as the active revision at least once. */
+    PUBLISHED
+  }
 
   /**
    * The property key for the Apache Ossie document version.
@@ -86,6 +94,16 @@ public interface SemanticModel extends Auditable {
    */
   default SupportsTags supportsTags() {
     throw new UnsupportedOperationException("Semantic Model does not support tag operations.");
+  }
+
+  /**
+   * Returns the domain operations for this Semantic Model.
+   *
+   * @return The {@link SupportsDomains} if the Semantic Model supports domain operations.
+   * @throws UnsupportedOperationException If the Semantic Model does not support domain operations.
+   */
+  default SupportsDomains supportsDomains() {
+    throw new UnsupportedOperationException("Semantic Model does not support domain operations.");
   }
 
   /**

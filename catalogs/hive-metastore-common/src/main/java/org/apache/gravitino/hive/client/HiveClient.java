@@ -19,6 +19,8 @@
 package org.apache.gravitino.hive.client;
 
 import java.util.List;
+import javax.annotation.Nullable;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
@@ -50,6 +52,18 @@ public interface HiveClient extends AutoCloseable {
       String catalogName, String databaseName, String filter, short pageSize);
 
   HiveTable getTable(String catalogName, String databaseName, String tableName);
+
+  /**
+   * Reads the live table's Gravitino string identifier without loading its columns or constraints.
+   *
+   * @param catalogName the Hive catalog name
+   * @param databaseName the database name
+   * @param tableName the table name
+   * @return the identifier property, or null if the existing table has no identifier
+   * @throws NoSuchTableException if the object is absent or a view
+   */
+  @Nullable
+  String getTableIdentifier(String catalogName, String databaseName, String tableName);
 
   default void alterTable(
       String catalogName, String databaseName, String tableName, HiveTable alteredHiveTable) {
@@ -110,6 +124,20 @@ public interface HiveClient extends AutoCloseable {
 
   List<HiveTable> getTableObjectsByName(
       String catalogName, String databaseName, List<String> allTables);
+
+  /**
+   * Returns names of tables whose storage input format starts with the supplied prefix.
+   *
+   * <p>This metadata-only operation does not resolve column schemas or load constraints.
+   *
+   * @param catalogName The Hive catalog name.
+   * @param databaseName The database name.
+   * @param allTables The table names to inspect.
+   * @param inputFormatPrefix The required input format prefix.
+   * @return Matching table names.
+   */
+  List<String> getTableNamesByInputFormatPrefix(
+      String catalogName, String databaseName, List<String> allTables, String inputFormatPrefix);
 
   List<String> getCatalogs();
 

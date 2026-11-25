@@ -26,6 +26,9 @@ plugins {
 
 dependencies {
   implementation(project(":bundles:tencent"))
+  // cos-sts-java 3.0.8 (from hadoop-cos) pulls in org.json:json 20180130. Declare it directly so
+  // that both the shaded jar and the published POM resolve the version in the catalog.
+  implementation(libs.org.json)
 
   implementation(libs.commons.collections3)
   implementation(libs.commons.io)
@@ -34,6 +37,8 @@ dependencies {
   implementation(libs.hadoop3.cos)
   implementation(libs.httpclient)
   implementation(libs.tencentcloud.sdk.sts)
+  testImplementation(libs.junit.jupiter.api)
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks.withType(ShadowJar::class.java) {
@@ -77,4 +82,11 @@ tasks.jar {
 
 tasks.compileJava {
   dependsOn(":catalogs:catalog-fileset:runtimeJars")
+}
+
+tasks.test {
+  val bundle = tasks.named<ShadowJar>("shadowJar")
+  dependsOn(bundle)
+  inputs.file(bundle.flatMap { it.archiveFile })
+  doFirst { systemProperty("shadowJarPath", bundle.get().archiveFile.get().asFile.absolutePath) }
 }

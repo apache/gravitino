@@ -102,6 +102,12 @@ public class AuthorizationExpressionConstants {
                   ANY_MODIFY_TABLE || ANY_CREATE_TABLE)
                   """;
 
+  /** Authorizes table creation on the containing schema, including staged-create commits. */
+  public static final String CREATE_TABLE_AUTHORIZATION_EXPRESSION =
+      "ANY(OWNER, METALAKE, CATALOG) || "
+          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TABLE";
+
   public static final String MODIFY_TABLE_AUTHORIZATION_EXPRESSION =
       """
                   ANY(OWNER, METALAKE, CATALOG) ||
@@ -299,6 +305,14 @@ public class AuthorizationExpressionConstants {
                   METALAKE::OWNER ||
                   ANY_INCLUDE_CREDENTIAL_SECRETS
                   """;
+
+  /** Both secret privileges, or metalake ownership, required for static catalog credentials. */
+  public static final String CATALOG_STATIC_CREDENTIALS_AUTHORIZATION_EXPRESSION =
+      "("
+          + FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION
+          + ") && ("
+          + FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION
+          + ")";
 
   public static final String FILTER_TOPICS_AUTHORIZATION_EXPRESSION =
       """

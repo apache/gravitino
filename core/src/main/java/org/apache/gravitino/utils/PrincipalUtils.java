@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.utils;
 
-import com.google.common.base.Throwables;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.security.PrivilegedActionException;
@@ -54,7 +53,12 @@ public class PrincipalUtils {
     } catch (PrivilegedActionException pae) {
       LOG.error("doAs method encountered an exception", pae);
       Throwable cause = pae.getCause();
-      Throwables.propagateIfPossible(cause, Exception.class);
+      if (cause instanceof Exception) {
+        throw (Exception) cause;
+      }
+      if (cause instanceof Error) {
+        throw (Error) cause;
+      }
       throw new RuntimeException("doAs method encountered an unexpected exception", pae);
     } catch (Error error) {
       LOG.error("doAs method encountered an unexpected error", error);

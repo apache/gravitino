@@ -133,6 +133,15 @@ dependencies {
   testImplementation(project(":api")) {
     exclude("org.apache.logging.log4j")
   }
+  if (scalaVersion == "2.12") {
+    // Reuse backend metadata conversion without adding another Hive dependency tree.
+    testImplementation(project(":catalogs:catalog-lakehouse-paimon")) {
+      isTransitive = false
+    }
+    tasks.named("compileTestJava") {
+      dependsOn(":catalogs:catalog-lakehouse-paimon:runtimeJars")
+    }
+  }
   testImplementation(project(":catalogs:catalog-glue")) {
     exclude("org.apache.logging.log4j")
   }
@@ -177,7 +186,10 @@ dependencies {
   testImplementation(libs.aws.kms)
   testImplementation(libs.aws.s3)
   testImplementation(libs.aws.sts)
-  testImplementation(libs.hadoop3.aws)
+  testImplementation(libs.hadoop3.aws) {
+    exclude("software.amazon.awssdk", "bundle")
+  }
+  testImplementation(libs.bundles.hadoop.aws.sdk)
   // hadoop-aws declares hadoop-client-api as provided; add it explicitly so S3AFileSystem can load
   // org.apache.hadoop.fs.impl.prefetch.PrefetchingStatistics (added in 3.3.5) at runtime.
   testImplementation(libs.hadoop3.client.api)

@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.glue;
 import static org.apache.gravitino.catalog.glue.GlueConstants.METADATA_LOCATION;
 import static org.apache.gravitino.catalog.glue.GlueConstants.TABLE_FORMAT;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,11 @@ class TestGlueTablePropertiesMetadata {
   @Test
   void testTableFormatIsNotHidden() {
     assertFalse(metadata.isHiddenProperty(TABLE_FORMAT));
+  }
+
+  @Test
+  void testTableFormatIsImmutable() {
+    assertTrue(metadata.isImmutableProperty(TABLE_FORMAT));
   }
 
   @Test

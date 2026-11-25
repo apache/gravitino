@@ -267,9 +267,7 @@ public final class ExecutablePolicyContentSerde {
         IcebergRewriteManifestsContent value, JsonGenerator gen, SerializerProvider serializers)
         throws IOException {
       gen.writeStartObject();
-      gen.writeNumberField("manifestCountCritical", value.manifestCountCritical());
-      gen.writeNumberField("manifestCountWarning", value.manifestCountWarning());
-      gen.writeNumberField("avgManifestSizeThresholdBytes", value.avgManifestSizeThresholdBytes());
+      gen.writeNumberField("manifestCountThreshold", value.manifestCountThreshold());
       if (value.specId() != null) {
         gen.writeNumberField("specId", value.specId());
       }
@@ -293,9 +291,7 @@ public final class ExecutablePolicyContentSerde {
           "Cannot parse rewrite-manifests content from invalid JSON: %s",
           node);
       return PolicyContents.icebergRewriteManifests(
-          longOrNull(node, "manifestCountCritical"),
-          longOrNull(node, "manifestCountWarning"),
-          longOrNull(node, "avgManifestSizeThresholdBytes"),
+          longOrNull(node, "manifestCountThreshold"),
           integerOrNull(node, "specId"),
           booleanOrNull(node, "useCaching"),
           textOrNull(node, "timeTrigger"),

@@ -30,6 +30,8 @@ import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.gravitino.maintenance.jobs.BuiltInJobTemplateProvider;
+import org.apache.gravitino.maintenance.optimizer.common.util.OrphanFileLocationUtils;
+import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.junit.jupiter.api.Test;
 
 /** Tests orphan cleanup templates, SQL arguments, and location boundaries. */
@@ -103,16 +105,24 @@ public class TestIcebergRemoveOrphanFilesJob {
     assertTrue(sql.contains("/a/b\\'c"));
   }
 
+  @Test
+  public void testOrphanAfterMetricNames() {
+    assertEquals(
+        "custom-removed-file-number", IcebergOrphanFileRemovalContent.REMOVED_FILE_NUMBER_METRIC);
+    assertEquals(
+        "custom-removed-file-size", IcebergOrphanFileRemovalContent.REMOVED_FILE_SIZE_METRIC);
+  }
+
   /** Verifies location boundaries. */
   @Test
   public void testLocationBoundaries() {
     assertDoesNotThrow(
         () ->
-            IcebergRemoveOrphanFilesJob.validateLocation(
+            OrphanFileLocationUtils.validateLocation(
                 "s3://bucket/db/table", "s3://bucket/db/table/data/"));
     assertDoesNotThrow(
         () ->
-            IcebergRemoveOrphanFilesJob.validateLocation(
+            OrphanFileLocationUtils.validateLocation(
                 "s3://bucket/db/table/", "s3://bucket/db/table"));
     for (String location :
         new String[] {
@@ -127,7 +137,7 @@ public class TestIcebergRemoveOrphanFilesJob {
         }) {
       assertThrows(
           IllegalArgumentException.class,
-          () -> IcebergRemoveOrphanFilesJob.validateLocation("s3://bucket/db/table", location),
+          () -> OrphanFileLocationUtils.validateLocation("s3://bucket/db/table", location),
           location);
     }
   }

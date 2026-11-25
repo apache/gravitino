@@ -80,6 +80,28 @@ connect to Aliyun DLF, more information can be found in the [Paimon REST Catalog
 
 Any properties not defined by Gravitino with `gravitino.bypass.` prefix will pass to Paimon catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.table.type`, `table.type` will pass to Paimon catalog properties.
 
+#### Identifier Case Behavior
+
+For `catalog-backend=hive`, schema, table, and view identifiers are case-insensitive; you can use any casing.
+
+For `catalog-backend=rest`, always use the same identifier casing that was used when the object was first registered. Loading the same object with different casing is rejected.
+
+:::caution
+After upgrading, if loading an existing mixed-case object reports a retained identifier conflict,
+Gravitino does not support metadata-only unregister of an individual external object. Use this
+catalog-wide recovery procedure:
+
+1. Have an administrator [force-drop the Gravitino catalog](./manage-catalogs-and-schemas.md#drop-a-catalog).
+   This deletes every Gravitino registration and its privileges, tags, and other relationships in
+   the catalog. It does not drop the Paimon databases, tables, views, or physical data.
+2. Recreate the Gravitino catalog and load the objects again. Keep the existing
+   `gravitino.identifier` properties; deleted registrations do not block new imports.
+3. Reapply any privileges, tags, or other governance relationships that the new registrations need.
+
+A source identifier can have only one active Gravitino registration. Coordinate with other
+Gravitino catalogs that share the external source before resetting a catalog.
+:::
+
 #### Hadoop S3A (optional)
 
 Paimon's native S3 filesystem uses an `s3://` warehouse and the `paimon-s3` dependency. As an
@@ -89,7 +111,9 @@ optional S3A dependencies by default. To enable it, add the following JARs to
 
 - `hadoop-aws-<hadoop-version>.jar`, with the same version as the Hadoop libraries packaged by
   Gravitino.
-- The `aws-java-sdk-bundle` version required by that `hadoop-aws` release.
+- The AWS SDK v2 `bundle` jar (`software.amazon.awssdk:bundle`) required by that `hadoop-aws`
+  release, for example `bundle-2.35.4.jar` for `hadoop-aws-3.4.3.jar`. The older AWS SDK v1
+  `aws-java-sdk-bundle` jar is only needed with Hadoop 3.3 and earlier.
 
 The following example configures static credentials and a custom HTTP S3 endpoint:
 
@@ -138,7 +162,7 @@ Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-
 :::note
 Sensitive catalog properties such as `jdbc-password` and DLF credential keys are hidden from the default load catalog response (`jdbc-user` is returned in plaintext). Recover JDBC / DLF credential fields via either path:
 
-- `getCredentials` / `JdbcCredential` / `DlfSecretKeyCredential` (no dedicated privilege beyond loading the catalog)
+- `getCredentials` / `JdbcCredential` / `DlfSecretKeyCredential` (requires catalog access plus both `USE_SECRETS` and `INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership)
 - `getSecrets` / `GET .../objects/{type}/{fullName}/secrets` with `USE_SECRETS` (DLF cloud access-key pairs also need `INCLUDE_CREDENTIAL_SECRETS`)
 
 Other non-credential secrets (secret-manager URNs, declared `hidden` properties, undeclared sensitive-named keys) use `getSecrets` only.
@@ -297,6 +321,43 @@ Rename cannot be combined with other changes in a single `alterView` call. Submi
 ### View Operations
 
 Refer to [Manage view metadata using Gravitino](./manage-view-metadata-using-gravitino.md) for more details.
+
+## Iceberg Compatibility
+
+Paimon can maintain Iceberg metadata for a table by setting the `metadata.iceberg.storage` table property
+(see [Paimon Iceberg metadata](https://paimon.apache.org/docs/master/iceberg/)). When it is set to
+`rest-catalog`, Paimon publishes the table's Iceberg metadata through the Iceberg REST service named by
+`metadata.iceberg.rest.uri`, and `metadata.iceberg.rest.warehouse` selects which Gravitino catalog stores
+that metadata (see
+[Client Catalog Selection](./iceberg-rest-service.md#client-catalog-selection)). An Iceberg client pointed
+at the same service can then read the Paimon table.
+
+:::info
+Gravitino's Iceberg REST service serves table metadata as the producing engine published it, so the
+visibility rules of that engine still apply.
+:::
+
+For **primary-key** tables, Paimon's publication rule decides what Iceberg readers can see. Iceberg readers
+cannot merge LSM files, so for incremental commits Paimon publishes only the data files that have been
+merged to the highest LSM level, while a plain `INSERT` writes its files below that level. Such writes are
+committed to the Paimon table, and are visible to Paimon readers, but they do not appear in the Iceberg
+metadata until a full compaction moves the merged result to the highest level. The first commit of a table
+is an exception, because it publishes a full snapshot, so the first write is visible immediately.
+
+Run a full compaction to establish the visibility boundary:
+
+```sql
+CALL paimon_catalog.sys.compact(`table` => 'db.tbl', compact_strategy => 'full');
+```
+
+Alternatively, let Paimon compact periodically with `compaction.optimization-interval` or
+`full-compaction.delta-commits`. Deletion-vector mode (`metadata.iceberg.format-version` = `3`,
+`deletion-vectors.enabled` = `true`, `deletion-vectors.bitmap64` = `true`, read by an Iceberg client with
+v3 support) publishes files above level 0 as well, which shortens the delay but still excludes the newest
+level-0 files.
+
+See [Primary Key Tables](https://paimon.apache.org/docs/master/iceberg/primary-key-table/) in the Paimon
+documentation for the full publication rules.
 
 ## HDFS Configuration
 

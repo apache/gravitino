@@ -39,6 +39,7 @@ import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_M
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_STORE;
 import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
+import static org.apache.gravitino.Configs.SEMANTIC_MODEL_VERSION_RETENTION_COUNT;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static org.apache.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
@@ -50,7 +51,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Arrays;
@@ -138,6 +138,7 @@ public class TestGenericCatalogOperations {
     f.deleteOnExit();
 
     when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
+    when(config.get(SEMANTIC_MODEL_VERSION_RETENTION_COUNT)).thenReturn(100L);
     when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     when(config.get(ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
@@ -208,10 +209,23 @@ public class TestGenericCatalogOperations {
   @CsvSource(
       value = {"NULL", "false", "true"},
       nullValues = "NULL")
-  void testRegisterPropertiesAreExternalBeforeProvisioning(String external) {
+  void testRegisterPropertiesAreExternalBeforeProvisioning(String external) throws Exception {
     NameIdentifier schemaIdent = createSchema();
     NameIdentifier ident =
         NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaIdent.name(), "registered");
+    String location = lanceDataDir.resolve("existing").toString();
+    // Arrow Schema and Gravitino Schema share a simple name in this test class.
+    try (Dataset ignored =
+        Dataset.write()
+            .schema(
+                new org.apache.arrow.vector.types.pojo.Schema(
+                    List.of(Field.nullable("id", new ArrowType.Int(32, true)))))
+            .uri(location)
+            .mode(WriteParams.WriteMode.CREATE)
+            .execute()) {
+      // Registration now requires an existing dataset at the provider-resolved location.
+    }
+    FakeTableLocationProvider.provisionLocation(location);
     Map<String, String> properties =
         Maps.newHashMap(
             Map.of(
@@ -220,7 +234,7 @@ public class TestGenericCatalogOperations {
                 "lance.register",
                 "true",
                 Table.PROPERTY_LOCATION,
-                lanceDataDir.resolve("existing").toString()));
+                location));
     properties.putAll(
         StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(idGenerator.nextId()), null));
     if (external != null) {
@@ -303,28 +317,18 @@ public class TestGenericCatalogOperations {
     store.put(entity, false);
 
     if ("purge".equals(operation)) {
-      Assertions.assertTrue(opsWithFakeProvider.purgeTable(ident));
+      Assertions.assertThrowsExactly(
+          UnsupportedOperationException.class, () -> opsWithFakeProvider.purgeTable(ident));
     } else if ("cascade".equals(operation)) {
       Assertions.assertTrue(opsWithFakeProvider.dropSchema(schemaIdent, true));
     } else {
       Assertions.assertTrue(opsWithFakeProvider.dropTable(ident));
     }
 
-    Assertions.assertFalse(opsWithFakeProvider.tableExists(ident));
-    if ("purge".equals(operation)) {
-      Assertions.assertFalse(Files.exists(lanceDataDir.resolve("legacy/_versions")));
-      Assertions.assertEquals(1, FakeTableLocationProvider.unprovisioned().size());
-      Assertions.assertEquals(
-          location,
-          FakeTableLocationProvider.unprovisioned()
-              .get(0)
-              .tableProperties()
-              .get(Table.PROPERTY_LOCATION));
-    } else {
-      Assertions.assertTrue(FakeTableLocationProvider.unprovisioned().isEmpty());
-      try (Dataset dataset = Dataset.open().uri(location).build()) {
-        Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
-      }
+    Assertions.assertEquals("purge".equals(operation), opsWithFakeProvider.tableExists(ident));
+    Assertions.assertTrue(FakeTableLocationProvider.unprovisioned().isEmpty());
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
     }
   }
 

@@ -18,7 +18,9 @@
  */
 package org.apache.gravitino.dto.tag;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import org.apache.gravitino.MetadataObject;
 
@@ -34,6 +36,14 @@ public class MetadataObjectDTO implements MetadataObject {
   private Type type;
 
   private MetadataObjectDTO() {}
+
+  @JsonCreator
+  private MetadataObjectDTO(
+      @JsonProperty("fullName") @Nullable String fullName, @JsonProperty("type") Type type) {
+    // Read the type first so the raw domain name reaches validation regardless of JSON field order.
+    this.type = type;
+    setFullName(fullName);
+  }
 
   @Override
   public String parent() {
@@ -61,11 +71,16 @@ public class MetadataObjectDTO implements MetadataObject {
   /**
    * Sets the full name of the metadata object. Only used by Jackson deserializer.
    *
-   * @param fullName The full name of the metadata object.
+   * @param fullName The full name of the metadata object, or null when absent.
    */
   @JsonProperty("fullName")
-  public void setFullName(String fullName) {
-    int index = fullName.lastIndexOf(".");
+  public void setFullName(@Nullable String fullName) {
+    if (fullName == null) {
+      parent = null;
+      name = null;
+      return;
+    }
+    int index = type == Type.DOMAIN ? -1 : fullName.lastIndexOf(".");
     if (index == -1) {
       parent = null;
       name = fullName;

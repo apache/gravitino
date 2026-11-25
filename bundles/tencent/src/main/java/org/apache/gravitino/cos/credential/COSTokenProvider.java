@@ -21,13 +21,15 @@ package org.apache.gravitino.cos.credential;
 
 import org.apache.gravitino.credential.COSTokenCredential;
 import org.apache.gravitino.credential.CredentialProviderDelegator;
+import org.apache.gravitino.credential.SupportsDynamicCredential;
 
 /**
  * A lightweight credential provider for Tencent Cloud COS. It delegates the actual credential
  * generation to {@link COSTokenGenerator}, which is loaded via reflection so that bundles without
  * the Tencent Cloud STS SDK on the classpath do not fail at class loading time.
  */
-public class COSTokenProvider extends CredentialProviderDelegator<COSTokenCredential> {
+public class COSTokenProvider extends CredentialProviderDelegator<COSTokenCredential>
+    implements SupportsDynamicCredential {
 
   @Override
   public boolean supportsScheme(String scheme) {

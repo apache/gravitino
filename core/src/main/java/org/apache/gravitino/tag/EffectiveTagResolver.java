@@ -29,16 +29,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.catalog.CapabilityHelpers;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.utils.MetadataObjectUtil;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,37 +95,8 @@ public class EffectiveTagResolver {
    */
   public ResolvedTag[] resolveWithSources(String metalake, MetadataObject metadataObject) {
     MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
-    List<MetadataObject> resolutionOrder = new ArrayList<>();
-    resolutionOrder.add(metadataObject);
-    resolutionOrder.addAll(MetadataObjectUtil.getParentMetadataObjects(metadataObject));
-
-    Map<String, ResolvedTag> effectiveTags = new LinkedHashMap<>();
-    for (int index = 0; index < resolutionOrder.size(); index++) {
-      MetadataObject object = resolutionOrder.get(index);
-      boolean inherited = index > 0;
-      NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
-      Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object);
-      try {
-        List<TagEntity> tags =
-            entityStore
-                .relationOperations()
-                .listEntitiesByRelation(
-                    SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
-                    identifier,
-                    entityType);
-        for (TagEntity tag : tags) {
-          effectiveTags.putIfAbsent(
-              tag.name(), new ResolvedTag(tag.copyWithInherited(inherited), object));
-        }
-      } catch (NoSuchEntityException e) {
-        throw new NoSuchMetadataObjectException(
-            e, "Failed to resolve effective tags for metadata object %s due to not found", object);
-      } catch (IOException e) {
-        LOG.error("Failed to resolve effective tags for metadata object {}", object, e);
-        throw new RuntimeException(e);
-      }
-    }
-    return effectiveTags.values().toArray(new ResolvedTag[0]);
+    return resolveWithSources(
+        metadataObject, object -> loadTags(metalake, normalizeForLookup(metalake, object), false));
   }
 
   /**
@@ -216,6 +193,7 @@ public class EffectiveTagResolver {
     }
     MetadataObjectUtil.checkMetadataObjects(metalake, metadataObjects);
     Map<MetadataObject, List<MetadataObject>> resolutionOrders = new LinkedHashMap<>();
+    Map<MetadataObject, MetadataObject> normalizedObjects = new LinkedHashMap<>();
     Map<Entity.EntityType, Set<MetadataObject>> objectsByType =
         new EnumMap<>(Entity.EntityType.class);
     for (MetadataObject requested : metadataObjects) {
@@ -224,10 +202,12 @@ public class EffectiveTagResolver {
       order.addAll(MetadataObjectUtil.getParentMetadataObjects(requested));
       resolutionOrders.put(requested, order);
       for (MetadataObject object : order) {
+        MetadataObject normalized =
+            normalizedObjects.computeIfAbsent(object, key -> normalizeForLookup(metalake, key));
         objectsByType
             .computeIfAbsent(
                 MetadataObjectUtil.toEntityType(object), ignored -> new LinkedHashSet<>())
-            .add(object);
+            .add(normalized);
       }
     }
 
@@ -270,7 +250,7 @@ public class EffectiveTagResolver {
             boolean inherited = index > 0;
             MetadataObject source = order.get(index);
             directTags
-                .getOrDefault(source, Collections.emptyList())
+                .getOrDefault(normalizedObjects.get(source), Collections.emptyList())
                 .forEach(
                     tag ->
                         effectiveTags.putIfAbsent(
@@ -279,5 +259,90 @@ public class EffectiveTagResolver {
           result.put(requested, effectiveTags.values().toArray(new ResolvedTag[0]));
         });
     return result;
+  }
+
+  /**
+   * Resolves effective tags for an already normalized authorization target. Missing objects have no
+   * direct assignments and can still inherit tags from their ancestors.
+   *
+   * @param metalake the containing metalake
+   * @param target the canonical target
+   * @param context the request cache shared by privilege checks
+   * @return the effective assignments and their sources
+   */
+  public ResolvedTag[] resolveWithSources(
+      String metalake, MetadataObject target, AuthorizationRequestContext context) {
+    return resolveWithSources(
+        target,
+        object ->
+            context.computeDirectTagsIfAbsent(
+                metalake, object, () -> loadTags(metalake, object, true)));
+  }
+
+  private static ResolvedTag[] resolveWithSources(
+      MetadataObject metadataObject, Function<MetadataObject, List<TagEntity>> reader) {
+    List<MetadataObject> resolutionOrder = new ArrayList<>();
+    resolutionOrder.add(metadataObject);
+    resolutionOrder.addAll(MetadataObjectUtil.getParentMetadataObjects(metadataObject));
+
+    Map<String, ResolvedTag> effectiveTags = new LinkedHashMap<>();
+    for (int index = 0; index < resolutionOrder.size(); index++) {
+      MetadataObject object = resolutionOrder.get(index);
+      boolean inherited = index > 0;
+      reader
+          .apply(object)
+          .forEach(
+              tag ->
+                  effectiveTags.putIfAbsent(
+                      tag.name(), new ResolvedTag(tag.copyWithInherited(inherited), object)));
+    }
+    return effectiveTags.values().toArray(new ResolvedTag[0]);
+  }
+
+  private List<TagEntity> loadTags(String metalake, MetadataObject object, boolean allowMissing) {
+    NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
+    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object);
+    try {
+      return entityStore
+          .relationOperations()
+          .listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL, identifier, entityType);
+    } catch (NoSuchEntityException e) {
+      if (allowMissing) {
+        return Collections.emptyList();
+      }
+      throw new NoSuchMetadataObjectException(
+          e, "Failed to resolve effective tags for metadata object %s due to not found", object);
+    } catch (IOException e) {
+      LOG.error("Failed to resolve effective tags for metadata object {}", object, e);
+      throw new RuntimeException(e);
+    }
+  }
+
+  private MetadataObject normalizeForLookup(String metalake, MetadataObject object) {
+    switch (object.type()) {
+      case SCHEMA:
+      case TABLE:
+      case COLUMN:
+      case VIEW:
+      case FUNCTION:
+      case FILESET:
+      case TOPIC:
+      case MODEL:
+      case SEMANTIC_MODEL:
+        // resolveWithSources checks the original requested objects before building the chain.
+        // Normalize each original chain node: normalizing an already unquoted name again can
+        // change its meaning.
+        NameIdentifier identifier =
+            CapabilityHelpers.normalizeMetadataIdentifier(
+                MetadataObjectUtil.toEntityIdent(metalake, object),
+                Capability.Scope.valueOf(object.type().name()),
+                GravitinoEnv.getInstance().catalogManager(),
+                () -> entityStore);
+        return NameIdentifierUtil.toMetadataObject(
+            identifier, MetadataObjectUtil.toEntityType(object));
+      default:
+        return object;
+    }
   }
 }

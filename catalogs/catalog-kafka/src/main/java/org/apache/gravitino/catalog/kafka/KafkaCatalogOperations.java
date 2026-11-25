@@ -86,7 +86,9 @@ import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.config.ConfigResource;
 import org.apache.kafka.common.errors.InvalidConfigurationException;
+import org.apache.kafka.common.errors.InvalidPartitionsException;
 import org.apache.kafka.common.errors.InvalidReplicationFactorException;
+import org.apache.kafka.common.errors.InvalidTopicException;
 import org.apache.kafka.common.errors.TopicExistsException;
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
 import org.slf4j.Logger;
@@ -97,6 +99,11 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   private static final Logger LOG = LoggerFactory.getLogger(KafkaCatalogOperations.class);
   private static final String DEFAULT_SCHEMA_NAME = "default";
   @VisibleForTesting static final String CLIENT_ID_TEMPLATE = "%s-%s.%s";
+
+  // Kafka resolves "${provider:path:key}" placeholders in client configs through the providers
+  // named by "config.providers". Those providers read the Gravitino server's own environment
+  // variables and files, so they must not be selectable through catalog properties.
+  @VisibleForTesting static final String CONFIG_PROVIDERS_KEY = "config.providers";
 
   private final EntityStore store;
   private final IdGenerator idGenerator;
@@ -141,6 +148,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
                 Collectors.toMap(
                     e -> e.getKey().substring(CATALOG_BYPASS_PREFIX.length()),
                     Map.Entry::getValue));
+    checkNoConfigProviders(config);
     adminClientConfig.putAll(bypassConfigs);
     adminClientConfig.put(
         AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG,
@@ -291,6 +299,12 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     } catch (ExecutionException e) {
       if (e.getCause() instanceof TopicExistsException) {
         throw new TopicAlreadyExistsException(e, "Topic %s already exists", ident);
+
+      } else if (e.getCause() instanceof InvalidPartitionsException) {
+        throw ExceptionMessages.illegalArgument("Invalid partition count for topic " + ident, e);
+
+      } else if (e.getCause() instanceof InvalidTopicException) {
+        throw ExceptionMessages.illegalArgument("Invalid topic name " + ident, e);
 
       } else if (e.getCause() instanceof InvalidReplicationFactorException) {
         throw ExceptionMessages.illegalArgument("Invalid replication factor for topic " + ident, e);
@@ -631,5 +645,29 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     } catch (IOException ioe) {
       throw ExceptionMessages.wrap("Failed to create default schema for Kafka catalog", ioe);
     }
+  }
+
+  /**
+   * Rejects Kafka config provider properties passed through the bypass prefix.
+   *
+   * @param config the catalog configuration
+   * @throws IllegalArgumentException if any {@code gravitino.bypass.config.providers} property is
+   *     set
+   */
+  static void checkNoConfigProviders(Map<String, String> config) {
+    String disallowedKeys =
+        config.keySet().stream()
+            .filter(KafkaCatalogOperations::isConfigProviderKey)
+            .sorted()
+            .collect(Collectors.joining(", "));
+    Preconditions.checkArgument(
+        disallowedKeys.isEmpty(),
+        "Kafka config providers are not supported, please remove the properties: %s",
+        disallowedKeys);
+  }
+
+  private static boolean isConfigProviderKey(String key) {
+    String providersKey = CATALOG_BYPASS_PREFIX + CONFIG_PROVIDERS_KEY;
+    return key.equals(providersKey) || key.startsWith(providersKey + ".");
   }
 }

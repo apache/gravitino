@@ -50,7 +50,7 @@ public class GravitinoHiveCatalog extends BaseCatalog {
     TableCatalog hiveCatalog = new HiveTableCatalog();
     Map<String, String> all =
         getPropertiesConverter().toSparkCatalogProperties(options, properties);
-    applyS3Credential(gravitinoCatalogClient, all);
+    applyS3Credential(gravitinoCatalog(), all);
     hiveCatalog.initialize(name, new CaseInsensitiveStringMap(all));
     return hiveCatalog;
   }
@@ -114,12 +114,19 @@ public class GravitinoHiveCatalog extends BaseCatalog {
   }
 
   @Override
+  protected boolean supportsSparkViews() {
+    return true;
+  }
+
+  @Override
   protected org.apache.spark.sql.connector.catalog.Table createSparkView(
       Identifier ident,
       View gravitinoView,
       org.apache.spark.sql.connector.catalog.Table sparkTable) {
     return new SparkHiveView(
         gravitinoView,
+        name(),
+        getDatabase(ident),
         (HiveTable) sparkTable,
         (HiveTableCatalog) sparkCatalog,
         getSparkTypeConverter());

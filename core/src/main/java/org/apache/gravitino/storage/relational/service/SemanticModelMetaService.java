@@ -19,6 +19,8 @@
 package org.apache.gravitino.storage.relational.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
+import static org.apache.gravitino.semantic.SemanticModelRevisionSelector.ACTIVE;
+import static org.apache.gravitino.semantic.SemanticModelRevisionSelector.LATEST;
 import static org.apache.gravitino.storage.relational.po.SemanticModelPO.buildSemanticModelPO;
 import static org.apache.gravitino.storage.relational.po.SemanticModelPO.fromSemanticModelPO;
 import static org.apache.gravitino.storage.relational.po.SemanticModelPO.initializeSemanticModelPO;
@@ -33,25 +35,29 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchSemanticModelRevisionException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.semantic.Metric;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
+import org.apache.gravitino.semantic.SemanticModelSource;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.EntityChangeLogWriter;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelSourceMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.gravitino.storage.relational.po.SemanticModelMetricPO;
 import org.apache.gravitino.storage.relational.po.SemanticModelPO;
@@ -69,18 +75,22 @@ public class SemanticModelMetaService {
 
   private static final Logger LOG = LoggerFactory.getLogger(SemanticModelMetaService.class);
   private static final int METRIC_INSERT_BATCH_SIZE = 1000;
+  private static final int SOURCE_INSERT_BATCH_SIZE = 1000;
   private static final SemanticModelMetaService INSTANCE = new SemanticModelMetaService();
 
-  private final BasePOStorageOps<SemanticModelPO, SemanticModelMetaMapper> ops;
+  private final BasePOStorageOps<SemanticModelPO, SemanticModelMetaMapper> activeOps =
+      opsFor(ACTIVE);
+  private final BasePOStorageOps<SemanticModelPO, SemanticModelMetaMapper> latestOps =
+      opsFor(LATEST);
+  private final BasePOStorageOps<SemanticModelPO, SemanticModelMetaMapper> identityOps =
+      opsFor(null);
 
   /** Returns the singleton Semantic Model metadata service. */
   public static SemanticModelMetaService getInstance() {
     return INSTANCE;
   }
 
-  private SemanticModelMetaService() {
-    this.ops = new HierarchicalConversionPOStorageOps<>(new SemanticModelPOStorageOps());
-  }
+  private SemanticModelMetaService() {}
 
   /**
    * Resolves a Semantic Model stable ID by schema ID and name.
@@ -94,17 +104,17 @@ public class SemanticModelMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getSemanticModelIdBySchemaIdAndName")
   public Long getSemanticModelIdBySchemaIdAndName(long schemaId, String semanticModelName) {
-    SemanticModelPO semanticModelPO =
+    Long id =
         SessionUtils.getWithoutCommit(
             SemanticModelMetaMapper.class,
-            mapper -> ops.getPO(mapper, schemaId, semanticModelName));
-    if (semanticModelPO == null) {
+            mapper -> mapper.selectSemanticModelIdBySchemaIdAndName(schemaId, semanticModelName));
+    if (id == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
           Entity.EntityType.SEMANTIC_MODEL.name().toLowerCase(Locale.ROOT),
           semanticModelName);
     }
-    return semanticModelPO.getSemanticModelId();
+    return id;
   }
 
   /**
@@ -118,8 +128,13 @@ public class SemanticModelMetaService {
       baseMetricName = "listSemanticModelsByNamespace")
   public List<SemanticModelEntity> listSemanticModelsByNamespace(Namespace namespace) {
     NamespaceUtil.checkSemanticModel(namespace);
-    return listSemanticModelPOs(namespace).stream()
-        .map(po -> fromSemanticModelPO(po, namespace))
+    return listSemanticModelPOs(namespace, activeOps).stream()
+        .filter(po -> po.getActiveVersion() > 0)
+        .map(
+            po -> {
+              requireSnapshot(po, po.getActiveVersion(), "active");
+              return fromSemanticModelPO(po, namespace);
+            })
         .collect(Collectors.toList());
   }
 
@@ -134,12 +149,50 @@ public class SemanticModelMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getSemanticModelByIdentifier")
   public SemanticModelEntity getSemanticModelByIdentifier(NameIdentifier identifier) {
-    SemanticModelPO semanticModelPO = getSemanticModelPOByIdentifier(identifier);
-    return fromSemanticModelPO(semanticModelPO, identifier.namespace());
+    return getSemanticModelByIdentifier(identifier, ACTIVE);
+  }
+
+  /** Loads the selected revision of an existing Semantic Model. */
+  public SemanticModelEntity getSemanticModelByIdentifier(
+      NameIdentifier identifier, SemanticModelRevisionSelector selector) {
+    SemanticModelPO po =
+        selectModel(
+            identifier,
+            selector == ACTIVE ? activeOps : selector == LATEST ? latestOps : opsFor(selector));
+    if (selector == ACTIVE) {
+      if (po.getActiveVersion() == 0) {
+        throw missingModel(identifier);
+      }
+      requireSnapshot(po, po.getActiveVersion(), "active");
+    } else if (selector == LATEST) {
+      requireSnapshot(po, po.getCurrentVersion(), "latest");
+    } else if (po.getSemanticModelVersionInfoPO() == null) {
+      throw missingRevision(identifier, selector.getNumber(), po.getCurrentVersion());
+    }
+    return fromSemanticModelPO(po, identifier.namespace());
+  }
+
+  /** Checks for a live identity, including a model with only drafts. */
+  public boolean semanticModelExists(NameIdentifier identifier) {
+    try {
+      selectModel(identifier, identityOps);
+      return true;
+    } catch (NoSuchEntityException e) {
+      return false;
+    }
+  }
+
+  /** Lists model identities under a schema for governance operations. */
+  public List<NameIdentifier> listSemanticModelIdentifiers(Namespace namespace) {
+    NamespaceUtil.checkSemanticModel(namespace);
+    return listSemanticModelPOs(namespace, identityOps).stream()
+        .map(po -> NameIdentifier.of(namespace, po.getSemanticModelName()))
+        .toList();
   }
 
   /**
-   * Inserts or overwrites a Semantic Model, its snapshot, and its metric identities atomically.
+   * Inserts or overwrites a Semantic Model, its snapshot, metric identities, and supplied source
+   * associations atomically.
    *
    * @param semanticModelEntity The Semantic Model entity.
    * @param overwrite Whether to overwrite rows for the same stable ID or natural key.
@@ -173,7 +226,7 @@ public class SemanticModelMetaService {
                         if (storedPO == null) {
                           // Keep missing-row imports strict. A losing concurrent insert must not
                           // overwrite a persisted identity with a different ID.
-                          ops.insertPO(mapper, po, false);
+                          mapper.insertSemanticModelMeta(po);
                           return;
                         }
 
@@ -185,7 +238,10 @@ public class SemanticModelMetaService {
                         }
                         persistedPO.set(replacementPO);
                       }),
-              () -> reconcileMetricIdentities(persistedPO.get(), semanticModelEntity.definition()),
+              () ->
+                  reconcileMetricIdentities(
+                      persistedPO.get(), metricNames(semanticModelEntity.definition())),
+              () -> replaceSources(persistedPO.get(), semanticModelEntity),
               () ->
                   SessionUtils.doWithoutCommit(
                       SemanticModelVersionInfoMapper.class,
@@ -215,105 +271,71 @@ public class SemanticModelMetaService {
       baseMetricName = "updateSemanticModel")
   public <E extends Entity & HasIdentifier> SemanticModelEntity updateSemanticModel(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
-    SemanticModelPO oldSemanticModelPO = getSemanticModelPOByIdentifier(identifier);
-    SemanticModelEntity oldSemanticModelEntity =
-        fromSemanticModelPO(oldSemanticModelPO, identifier.namespace());
-    SemanticModelEntity newEntity = (SemanticModelEntity) updater.apply((E) oldSemanticModelEntity);
+    SemanticModelPO observed = getSemanticModelPOByIdentifier(identifier);
+    SemanticModelEntity oldEntity = fromSemanticModelPO(observed, identifier.namespace());
+    SemanticModelEntity newEntity = (SemanticModelEntity) updater.apply((E) oldEntity);
     Preconditions.checkArgument(
-        Objects.equals(oldSemanticModelEntity.id(), newEntity.id()),
-        "The updated Semantic Model entity id: %s should be same with the entity id before: %s",
-        newEntity.id(),
-        oldSemanticModelEntity.id());
+        oldEntity.id().equals(newEntity.id()), "Semantic Model ID cannot change");
     Preconditions.checkArgument(
-        oldSemanticModelEntity.namespace().equals(newEntity.namespace()),
+        oldEntity.namespace().equals(newEntity.namespace()),
         "Semantic Model namespace cannot change from %s to %s",
-        oldSemanticModelEntity.namespace(),
+        oldEntity.namespace(),
         newEntity.namespace());
 
-    AtomicInteger updateResult = new AtomicInteger(-1);
     try {
-      SemanticModelPO newSemanticModelPO = updateSemanticModelPO(oldSemanticModelPO, newEntity);
-      String metalakeName = identifier.namespace().level(0);
-      String catalogName = identifier.namespace().level(1);
-      String schemaName = identifier.namespace().level(2);
-      NameIdentifier oldSemanticModelIdent =
-          NameIdentifierUtil.ofSemanticModel(
-              metalakeName, catalogName, schemaName, oldSemanticModelPO.getSemanticModelName());
-      boolean isRenamed =
-          !Objects.equals(
-              oldSemanticModelPO.getSemanticModelName(), newSemanticModelPO.getSemanticModelName());
-
-      SessionUtils.doMultipleWithCommit(
-          // The Semantic Model and its parent were read before this transaction started. Lock the
-          // observed parent again before either identity or version writes, so a schema cascade
-          // cannot finish its cleanup and then let this update recreate child state below it.
-          () ->
-              SchemaMetaService.getInstance()
-                  .lockSchemaForEntityWrite(
-                      identifier,
-                      oldSemanticModelPO.getSchemaId(),
-                      oldSemanticModelPO.getCatalogId(),
-                      oldSemanticModelPO.getMetalakeId()),
-          () -> {
-            updateResult.set(
-                SessionUtils.getWithoutCommit(
-                    SemanticModelMetaMapper.class,
-                    mapper -> ops.updatePO(mapper, newSemanticModelPO, oldSemanticModelPO)));
-            if (updateResult.get() == 0) {
-              throw semanticModelWriteFailure(identifier, oldSemanticModelPO);
+      return SessionUtils.doWithCommitAndFetchResult(
+          SemanticModelMetaMapper.class,
+          mapper -> {
+            lockParent(identifier, observed);
+            SemanticModelPO next = updateSemanticModelPO(observed, newEntity);
+            if (mapper.updateSemanticModelMeta(next, observed) != 1) {
+              throw semanticModelWriteFailure(identifier, observed);
             }
-          },
-          () -> {
             if (!Objects.equals(
-                    oldSemanticModelPO.getSemanticModelVersionInfoPO().metrics(),
-                    newSemanticModelPO.getSemanticModelVersionInfoPO().metrics())
-                && !metricNames(oldSemanticModelEntity.definition())
+                    observed.getSemanticModelVersionInfoPO().metrics(),
+                    next.getSemanticModelVersionInfoPO().metrics())
+                && !metricNames(oldEntity.definition())
                     .equals(metricNames(newEntity.definition()))) {
-              reconcileMetricIdentities(newSemanticModelPO, newEntity.definition());
+              reconcileMetricIdentities(next, metricNames(newEntity.definition()));
             }
-          },
-          () ->
-              SessionUtils.doWithoutCommit(
-                  SemanticModelVersionInfoMapper.class,
-                  mapper ->
-                      mapper.insertSemanticModelVersionInfo(
-                          newSemanticModelPO.getSemanticModelVersionInfoPO())),
-          () -> {
-            if (isRenamed && updateResult.get() > 0) {
+            replaceSources(next, newEntity);
+            SessionUtils.doWithoutCommit(
+                SemanticModelVersionInfoMapper.class,
+                versions ->
+                    versions.insertSemanticModelVersionInfo(next.getSemanticModelVersionInfoPO()));
+            if (!observed.getSemanticModelName().equals(next.getSemanticModelName())) {
               EntityChangeLogWriter.append(
-                  oldSemanticModelIdent, Entity.EntityType.SEMANTIC_MODEL, OperateType.ALTER);
+                  identifier, Entity.EntityType.SEMANTIC_MODEL, OperateType.ALTER);
             }
+            return fromSemanticModelPO(next, identifier.namespace());
           });
-      return newEntity;
-    } catch (OptimisticLockException optimisticLockException) {
-      throw optimisticLockException;
-    } catch (RuntimeException re) {
+    } catch (RuntimeException e) {
       ExceptionUtils.checkSQLException(
-          re, Entity.EntityType.SEMANTIC_MODEL, newEntity.nameIdentifier().toString());
-      throw re;
+          e, Entity.EntityType.SEMANTIC_MODEL, newEntity.nameIdentifier().toString());
+      throw e;
     }
   }
 
   /**
-   * Soft-deletes a Semantic Model, its metric identities, and all of its version snapshots.
+   * Soft-deletes a Semantic Model, its metric identities, source associations, and version
+   * snapshots.
    *
    * @param identifier The Semantic Model identifier.
    * @return {@code true} when an active identity was deleted.
    * @throws NoSuchEntityException If the Semantic Model is already deleted or renamed.
-   * @throws OptimisticLockException If the internal transaction loses a concurrent update race.
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteSemanticModel")
   public boolean deleteSemanticModel(NameIdentifier identifier) {
-    SemanticModelPO semanticModelPO = getSemanticModelPOByIdentifier(identifier);
-    deleteSemanticModelWithVersion(identifier, semanticModelPO);
+    SemanticModelPO semanticModelPO = selectModel(identifier, identityOps);
+    deleteObservedSemanticModel(identifier, semanticModelPO);
     return true;
   }
 
   /**
-   * Permanently deletes retired metric identities and deleted models and snapshots older than a
-   * timeline.
+   * Permanently deletes retired source associations, metric identities, and deleted models and
+   * snapshots older than a timeline.
    *
    * @param legacyTimeline The exclusive deletion timeline in epoch milliseconds.
    * @param limit The maximum rows to delete from each table.
@@ -323,6 +345,10 @@ public class SemanticModelMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteSemanticModelMetasByLegacyTimeline")
   public int deleteSemanticModelMetasByLegacyTimeline(Long legacyTimeline, int limit) {
+    int sourceDeletedCount =
+        SessionUtils.doWithCommitAndFetchResult(
+            SemanticModelSourceMapper.class,
+            mapper -> mapper.deleteByLegacyTimeline(legacyTimeline, limit));
     int metricDeletedCount =
         SessionUtils.doWithCommitAndFetchResult(
             SemanticModelMetricMapper.class,
@@ -335,7 +361,7 @@ public class SemanticModelMetaService {
         SessionUtils.doWithCommitAndFetchResult(
             SemanticModelMetaMapper.class,
             mapper -> mapper.deleteSemanticModelMetasByLegacyTimeline(legacyTimeline, limit));
-    return metricDeletedCount + versionDeletedCount + metaDeletedCount;
+    return sourceDeletedCount + metricDeletedCount + versionDeletedCount + metaDeletedCount;
   }
 
   /**
@@ -355,38 +381,52 @@ public class SemanticModelMetaService {
             mapper -> mapper.selectSemanticModelVersionsByRetentionCount(versionRetentionCount));
 
     int totalDeletedCount = 0;
-    for (SemanticModelVersionInfoPO currentVersion : currentVersions) {
-      long versionRetentionLine = currentVersion.version() - versionRetentionCount;
+    for (SemanticModelVersionInfoPO candidate : currentVersions) {
       int deletedCount =
           SessionUtils.doWithCommitAndFetchResult(
-              SemanticModelVersionInfoMapper.class,
-              mapper ->
-                  mapper.softDeleteSemanticModelVersionsByRetentionLine(
-                      currentVersion.semanticModelId(), versionRetentionLine, limit));
+              SemanticModelMetaMapper.class,
+              mapper -> {
+                SemanticModelPO model =
+                    mapper.selectSemanticModelMetaByIdForUpdate(candidate.semanticModelId());
+                if (model == null) {
+                  return 0;
+                }
+                long cutoff = model.getCurrentVersion() - versionRetentionCount;
+                int count =
+                    SessionUtils.getWithoutCommit(
+                        SemanticModelVersionInfoMapper.class,
+                        snapshots ->
+                            snapshots.softDeleteSemanticModelVersionsByRetentionLine(
+                                model.getSemanticModelId(),
+                                cutoff,
+                                model.getActiveVersion(),
+                                limit));
+                SessionUtils.doWithoutCommit(
+                    SemanticModelSourceMapper.class,
+                    sources -> sources.softDeleteUnreferencedRanges(model.getSemanticModelId()));
+                return count;
+              });
       totalDeletedCount += deletedCount;
-      LOG.info(
-          "Soft delete Semantic Model versions count: {} through retention line: {},"
-              + " current Semantic Model id and version: <{}, {}>.",
+      LOG.debug(
+          "Soft-deleted {} revisions for Semantic Model {}",
           deletedCount,
-          versionRetentionLine,
-          currentVersion.semanticModelId(),
-          currentVersion.version());
+          candidate.semanticModelId());
     }
     return totalDeletedCount;
   }
 
   /** Returns the persistent-object operations used by this service. */
   public BasePOStorageOps<SemanticModelPO, SemanticModelMetaMapper> ops() {
-    return ops;
+    return activeOps;
   }
 
   /**
    * Deletes the observed Semantic Model and its snapshots in one transaction.
    *
-   * <p>Package-private access lets concurrency tests submit a stale snapshot through the same
-   * compare-and-set path as public deletion.
+   * <p>Package-private access lets concurrency tests submit an observed identity through the same
+   * name guard as public deletion.
    */
-  void deleteSemanticModelWithVersion(
+  void deleteObservedSemanticModel(
       NameIdentifier identifier, SemanticModelPO observedSemanticModelPO) {
     Long semanticModelId = observedSemanticModelPO.getSemanticModelId();
     String metalakeName = identifier.namespace().level(0);
@@ -406,7 +446,7 @@ public class SemanticModelMetaService {
                         SemanticModelMetaMapper.class,
                         mapper ->
                             mapper.softDeleteSemanticModelMetasBySemanticModelId(
-                                semanticModelId, observedSemanticModelPO.getCurrentVersion())),
+                                semanticModelId, observedSemanticModelPO.getSemanticModelName())),
                 () -> semanticModelWriteFailure(identifier, observedSemanticModelPO)),
         () ->
             SessionUtils.doWithoutCommit(
@@ -417,14 +457,35 @@ public class SemanticModelMetaService {
                 SemanticModelMetricMapper.class,
                 mapper -> mapper.softDeleteSemanticModelMetricsBySemanticModelId(semanticModelId)),
         () ->
+            SessionUtils.doWithoutCommit(
+                SemanticModelSourceMapper.class,
+                mapper -> mapper.softDeleteByModelId(semanticModelId)),
+        () ->
             EntityChangeLogWriter.append(
                 semanticModelIdent, Entity.EntityType.SEMANTIC_MODEL, OperateType.DROP));
   }
 
-  private static void reconcileMetricIdentities(
-      SemanticModelPO model, SemanticModelDefinition definition) {
-    Set<String> names = metricNames(definition);
+  private void replaceSources(SemanticModelPO po, SemanticModelEntity entity) {
+    if (!entity.sourceUpdate().replacesSources()) {
+      return;
+    }
+    entity.sourceUpdate().validate(entity.definition());
+    SessionUtils.doWithoutCommit(
+        SemanticModelSourceMapper.class,
+        mapper -> {
+          mapper.closeSourceRanges(po.getSemanticModelId(), po.getCurrentVersion());
+          List<SemanticModelSource> sources = entity.sourceUpdate().sources();
+          for (int start = 0; start < sources.size(); start += SOURCE_INSERT_BATCH_SIZE) {
+            mapper.insertSources(
+                po.getMetalakeId(),
+                po.getSemanticModelId(),
+                po.getCurrentVersion(),
+                sources.subList(start, Math.min(start + SOURCE_INSERT_BATCH_SIZE, sources.size())));
+          }
+        });
+  }
 
+  private static void reconcileMetricIdentities(SemanticModelPO model, Set<String> names) {
     // The caller has already inserted or version-checked the model in this transaction. A locking
     // read also observes the latest identities on backends using repeatable-read isolation.
     SessionUtils.doWithoutCommit(
@@ -519,6 +580,7 @@ public class SemanticModelMetaService {
         .withSchemaId(persistedPO.getSchemaId())
         .withAuditInfo(source.getAuditInfo())
         .withCurrentVersion(nextVersion)
+        .withActiveVersion(nextVersion)
         .withLastVersion(nextVersion)
         .withDeletedAt(source.getDeletedAt())
         .withSemanticModelVersionInfoPO(
@@ -529,40 +591,71 @@ public class SemanticModelMetaService {
 
   private static SemanticModelVersionInfoPO versionInfoForOverwrite(
       SemanticModelVersionInfoPO source, SemanticModelPO persistedPO, int nextVersion) {
-    return SemanticModelVersionInfoPO.builder()
+    return source.toBuilder()
         .withMetalakeId(persistedPO.getMetalakeId())
         .withCatalogId(persistedPO.getCatalogId())
         .withSchemaId(persistedPO.getSchemaId())
         .withSemanticModelId(persistedPO.getSemanticModelId())
         .withVersion(nextVersion)
-        .withSemanticModelName(source.semanticModelName())
-        .withSemanticModelComment(source.semanticModelComment())
-        .withDatasets(source.datasets())
-        .withRelationships(source.relationships())
-        .withMetrics(source.metrics())
-        .withAiContext(source.aiContext())
-        .withCustomExtensions(source.customExtensions())
-        .withProperties(source.properties())
-        .withAuditInfo(source.auditInfo())
-        .withDeletedAt(source.deletedAt())
         .build();
   }
 
   SemanticModelPO getSemanticModelPOByIdentifier(NameIdentifier identifier) {
+    SemanticModelPO po = selectModel(identifier, latestOps);
+    requireSnapshot(po, po.getCurrentVersion(), "latest");
+    return po;
+  }
+
+  private static void lockParent(NameIdentifier identifier, SemanticModelPO observed) {
+    SchemaMetaService.getInstance()
+        .lockSchemaForEntityWrite(
+            identifier, observed.getSchemaId(), observed.getCatalogId(), observed.getMetalakeId());
+  }
+
+  private static void requireSnapshot(SemanticModelPO po, int revision, String pointer) {
+    Preconditions.checkState(
+        po.getSemanticModelVersionInfoPO() != null,
+        "Missing %s snapshot %s for Semantic Model %s",
+        pointer,
+        revision,
+        po.getSemanticModelId());
+  }
+
+  private static NoSuchEntityException missingModel(NameIdentifier identifier) {
+    return new NoSuchEntityException(
+        NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+        Entity.EntityType.SEMANTIC_MODEL.name().toLowerCase(Locale.ROOT),
+        identifier.name());
+  }
+
+  private static NoSuchSemanticModelRevisionException missingRevision(
+      NameIdentifier identifier, int revision, int latest) {
+    return revision <= latest
+        ? new NoSuchSemanticModelRevisionException(
+            "Revision %s of Semantic Model %s was removed by version retention",
+            revision, identifier)
+        : new NoSuchSemanticModelRevisionException(
+            "Revision %s of Semantic Model %s does not exist", revision, identifier);
+  }
+
+  private SemanticModelPO selectModel(
+      NameIdentifier identifier, BasePOStorageOps<SemanticModelPO, SemanticModelMetaMapper> ops) {
     NameIdentifierUtil.checkSemanticModel(identifier);
-    SemanticModelPO semanticModelPO =
+    SemanticModelPO po =
         SessionUtils.getWithoutCommit(
             SemanticModelMetaMapper.class,
             mapper ->
                 POStorageReadRouting.getPO(
                     mapper, identifier, ops, Entity.EntityType.SEMANTIC_MODEL));
-    if (semanticModelPO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.SEMANTIC_MODEL.name().toLowerCase(Locale.ROOT),
-          identifier.name());
+    if (po == null) {
+      throw missingModel(identifier);
     }
-    return semanticModelPO;
+    return po;
+  }
+
+  private static BasePOStorageOps<SemanticModelPO, SemanticModelMetaMapper> opsFor(
+      @Nullable SemanticModelRevisionSelector selector) {
+    return new HierarchicalConversionPOStorageOps<>(new SemanticModelPOStorageOps(selector));
   }
 
   private RuntimeException semanticModelWriteFailure(
@@ -586,7 +679,8 @@ public class SemanticModelMetaService {
                     current.getMetalakeId(), observedSemanticModelPO.getMetalakeId()));
   }
 
-  private List<SemanticModelPO> listSemanticModelPOs(Namespace namespace) {
+  private List<SemanticModelPO> listSemanticModelPOs(
+      Namespace namespace, BasePOStorageOps<SemanticModelPO, SemanticModelMetaMapper> ops) {
     return SessionUtils.getWithoutCommit(
         SemanticModelMetaMapper.class,
         mapper ->

@@ -18,12 +18,23 @@
  */
 package org.apache.gravitino.catalog.glue.integration.test;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.catalog.glue.GlueCatalogOperations;
 import org.apache.gravitino.catalog.glue.GlueConstants;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.integration.test.container.GravitinoMotoContainer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
 /**
@@ -57,6 +68,53 @@ class MotoGlueCatalogIT extends AbstractGlueCatalogIT {
   void stopContainer() {
     if (moto != null) {
       moto.close();
+    }
+  }
+
+  @Test
+  void testUnreachableEndpointIsConnectionFailure() throws IOException {
+    int closedPort;
+    try (ServerSocket socket = new ServerSocket(0)) {
+      closedPort = socket.getLocalPort();
+    }
+    String endpoint = "http://127.0.0.1:" + closedPort;
+
+    ConnectionFailedException e =
+        assertThrows(ConnectionFailedException.class, () -> listSchemasAt(endpoint, Map.of()));
+    assertTrue(e.getMessage().contains(endpoint), e.getMessage());
+  }
+
+  @Test
+  void testEndpointThatDoesNotAnswerTimesOut() throws IOException {
+    // The socket accepts connections but never answers, like a stalled endpoint.
+    try (ServerSocket silent = new ServerSocket(0)) {
+      String endpoint = "http://127.0.0.1:" + silent.getLocalPort();
+      Map<String, String> timeouts =
+          Map.of(
+              GlueConstants.AWS_GLUE_API_CALL_TIMEOUT_MS, "3000",
+              GlueConstants.AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS, "1000",
+              GlueConstants.AWS_GLUE_MAX_ATTEMPTS, "2");
+
+      long start = System.nanoTime();
+      ConnectionFailedException e =
+          assertThrows(ConnectionFailedException.class, () -> listSchemasAt(endpoint, timeouts));
+      long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+
+      assertTrue(e.getMessage().contains("timed out"), e.getMessage());
+      assertTrue(elapsedMs < 10_000, "took " + elapsedMs + " ms");
+    }
+  }
+
+  private void listSchemasAt(String endpoint, Map<String, String> extraConfig) throws IOException {
+    Map<String, String> config = new HashMap<>(catalogConfig());
+    config.put(GlueConstants.AWS_GLUE_ENDPOINT, endpoint);
+    config.putAll(extraConfig);
+    GlueCatalogOperations unreachableOps = new GlueCatalogOperations();
+    try {
+      unreachableOps.initialize(config, null, null);
+      unreachableOps.listSchemas(Namespace.of("ml", "cat"));
+    } finally {
+      unreachableOps.close();
     }
   }
 

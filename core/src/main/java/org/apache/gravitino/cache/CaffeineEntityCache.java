@@ -100,6 +100,9 @@ public class CaffeineEntityCache extends BaseEntityCache {
    */
   private static final String NAME_LEVEL_BOUNDARY = ".";
 
+  /** Escapes {@link #NAME_LEVEL_BOUNDARY} and itself inside a level of an index key. */
+  private static final char INDEX_ESCAPE = '\u0001';
+
   /** Segmented locking for better concurrency */
   private final SegmentedLock segmentedLock;
 
@@ -255,7 +258,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
             // notification removes its index entry. This is not a synchronous admission check.
             // The quiet lookup does not schedule maintenance or acquire Caffeine's eviction lock.
             if (cacheData.policy().getIfPresentQuietly(entityCacheKey) != null) {
-              cacheIndex.put(entityCacheKey.toString(), entityCacheKey);
+              cacheIndex.put(indexKey(entityCacheKey), entityCacheKey);
             }
           }
         });
@@ -305,7 +308,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   protected void invalidateExpiredItem(EntityCacheKey key) {
     synchronized (indexLock) {
       if (cacheData.policy().getIfPresentQuietly(key) == null) {
-        cacheIndex.remove(key.toString());
+        cacheIndex.remove(indexKey(key));
       }
     }
   }
@@ -338,10 +341,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
     cacheData.invalidate(key);
     removeIndexEntryIfAbsent(key);
 
-    String identifier = key.identifier().toString();
-    invalidateDescendants(identifier + NAME_LEVEL_BOUNDARY);
-    if (key.entityType() == Entity.EntityType.SCHEMA) {
-      invalidateDescendants(identifier + HierarchicalSchemaUtil.schemaSeparator());
+    for (String prefix : descendantPrefixes(key.identifier(), key.entityType())) {
+      invalidateDescendants(prefix);
     }
   }
 
@@ -357,6 +358,118 @@ public class CaffeineEntityCache extends BaseEntityCache {
       cacheData.invalidate(childKey);
       removeIndexEntryIfAbsent(childKey);
     }
+  }
+
+  /**
+   * Returns the prefix-index key of a cache key: the escaped identifier text, {@code ":"}, and the
+   * entity type.
+   */
+  private static String indexKey(EntityCacheKey key) {
+    return indexText(key.identifier()) + ":" + key.entityType();
+  }
+
+  /**
+   * Joins the levels of an identifier into prefix-index text.
+   *
+   * <p>{@link NameIdentifier#toString()} is not one-to-one when a level contains {@code "."}: table
+   * {@code a.b} in schema {@code sch} and table {@code b} in schema {@code sch.a} both render as
+   * {@code sch.a.b}. Escaping {@code "."} and the escape character inside each level makes the text
+   * unique, while every real level boundary stays a bare {@code "."}, so both prefix scans in
+   * {@link #invalidateHierarchy(EntityCacheKey)} still match exactly the descendants. The schema
+   * separator can be neither {@code "."} nor the escape character (see {@link
+   * Configs#SCHEMA_SEPARATOR}), so it is kept as is.
+   */
+  private static String indexText(NameIdentifier ident) {
+    StringBuilder text = new StringBuilder();
+    for (String level : ident.namespace().levels()) {
+      appendEscaped(text, level).append(NAME_LEVEL_BOUNDARY);
+    }
+    return appendEscaped(text, ident.name()).toString();
+  }
+
+  /**
+   * Returns the descendant index prefixes used when cascading from {@code ident}.
+   *
+   * <p>Same prefixes {@link #invalidateHierarchy} uses. Does not include {@code ident} itself.
+   *
+   * @param ident The ancestor identifier.
+   * @param type The ancestor entity type.
+   * @return One or two prefixes ending at a name-level or schema-separator boundary.
+   */
+  public static List<String> descendantPrefixes(NameIdentifier ident, Entity.EntityType type) {
+    String identifier = indexText(ident);
+    List<String> prefixes = Lists.newArrayListWithCapacity(2);
+    prefixes.add(identifier + NAME_LEVEL_BOUNDARY);
+    if (type == Entity.EntityType.SCHEMA) {
+      prefixes.add(identifier + HierarchicalSchemaUtil.schemaSeparator());
+    }
+    return prefixes;
+  }
+
+  /**
+   * Returns whether {@code ident} lies under a hierarchy prefix from {@link #descendantPrefixes}.
+   *
+   * @param ident The identifier to test.
+   * @param prefix A prefix from {@link #descendantPrefixes}.
+   * @return {@code true} if {@code ident} is matched by {@code prefix}.
+   */
+  public static boolean isUnderHierarchyPrefix(NameIdentifier ident, String prefix) {
+    return indexText(ident).startsWith(prefix);
+  }
+
+  /**
+   * Returns the hierarchy prefixes an ancestor may have registered that would match {@code ident}.
+   *
+   * <p>Each value is a boundary-terminated prefix of {@link #indexText(NameIdentifier)} (name-level
+   * {@code .} or the schema separator). Looking these up in a pending-prefix map is O(depth)
+   * instead of scanning every active write.
+   *
+   * @param ident The identifier to test.
+   * @return Candidate prefixes, nearest ancestors last; never includes {@code ident} itself.
+   */
+  public static List<String> ancestorHierarchyPrefixes(NameIdentifier ident) {
+    String text = indexText(ident);
+    String schemaSeparator = HierarchicalSchemaUtil.schemaSeparator();
+    List<String> prefixes = Lists.newArrayList();
+    for (int i = 0; i < text.length(); i++) {
+      char c = text.charAt(i);
+      if (c == INDEX_ESCAPE) {
+        // Skip the escaped character so a literal '.' inside a level is not a boundary.
+        i++;
+        continue;
+      }
+      if (c == NAME_LEVEL_BOUNDARY.charAt(0)) {
+        prefixes.add(text.substring(0, i + 1));
+        continue;
+      }
+      if (schemaSeparator.isEmpty()) {
+        continue;
+      }
+      if (schemaSeparator.length() == 1) {
+        if (c == schemaSeparator.charAt(0)) {
+          prefixes.add(text.substring(0, i + 1));
+        }
+      } else if (text.startsWith(schemaSeparator, i)) {
+        prefixes.add(text.substring(0, i + schemaSeparator.length()));
+        i += schemaSeparator.length() - 1;
+      }
+    }
+    return prefixes;
+  }
+
+  /**
+   * Appends a level to prefix-index text, prefixing {@code "."} and the escape character with the
+   * escape character.
+   */
+  private static StringBuilder appendEscaped(StringBuilder text, String level) {
+    for (int i = 0; i < level.length(); i++) {
+      char c = level.charAt(i);
+      if (c == INDEX_ESCAPE || c == NAME_LEVEL_BOUNDARY.charAt(0)) {
+        text.append(INDEX_ESCAPE);
+      }
+      text.append(c);
+    }
+    return text;
   }
 
   /**

@@ -23,9 +23,9 @@ import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
-import org.apache.commons.cli.PosixParser;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.logging.log4j.util.Strings;
 
@@ -36,62 +36,87 @@ public class TrinoQueryTestTool {
     boolean isFailed = false;
     try {
       options.addOption(
+          null,
           "auto",
           true,
           "Start the test containers and gravitino server automatically, the values are 'all','gravitation','none'."
               + "The default value is 'all'. If the value is 'gravitino', only the gravitino server will be started automatically.");
 
       options.addOption(
-          "ignore_failed", false, "Ignore the failed test cases, the default value is 'false'");
+          null,
+          "ignore_failed",
+          false,
+          "Ignore the failed test cases, the default value is 'false'");
       options.addOption(
+          null,
           "gen_output",
           false,
           "Generate the output file for the test set, the default value is 'false'");
 
       options.addOption(
+          null,
           "test_host",
           true,
           "Host address for all test services (include gravitino server, trino, hive, postgresql, mysql..., "
               + "if the services are not running on the same host. set the arguments like --gravitino_uri=xxx and --trino_uri=xxx), "
               + "all test services use 127.0.0.1 as default, if --auto is set to 'all', this option is ignored");
       options.addOption(
+          null,
           "gravitino_uri",
           true,
           "URL for Gravitino server, if --auto is set to 'all', this option is ignored");
       options.addOption(
-          "trino_uri", true, "URL for Trino, if --auto is set to 'all', this option is ignored");
+          null,
+          "trino_uri",
+          true,
+          "URL for Trino, if --auto is set to 'all', this option is ignored");
       options.addOption(
-          "hive_uri", true, "URL for Hive, if --auto is set to 'all', this option is ignored");
+          null,
+          "hive_uri",
+          true,
+          "URL for Hive, if --auto is set to 'all', this option is ignored");
       options.addOption(
-          "mysql_uri", true, "URL for MySQL, if --auto is set to 'all', this option is ignored");
+          null,
+          "mysql_uri",
+          true,
+          "URL for MySQL, if --auto is set to 'all', this option is ignored");
       options.addOption(
-          "hdfs_uri", true, "URL for HDFS, if --auto is set to 'all', this option is ignored");
+          null,
+          "hdfs_uri",
+          true,
+          "URL for HDFS, if --auto is set to 'all', this option is ignored");
       options.addOption(
+          null,
           "postgresql_uri",
           true,
           "URL for PostgreSQL, if --auto is set to 'all', this option is ignored");
       options.addOption(
+          null,
           "skip_testsets",
           true,
           "Comma-separated list of testsets to skip, default is 'glue'. "
               + "Pass an empty string to skip nothing.");
 
       options.addOption(
+          null,
           "test_sets_dir",
           true,
           "Specify the test sets' directory, "
               + "the default value is 'integration-test/src/test/resources/trino-queries'");
-      options.addOption("test_set", true, "Specify the test set name to test");
-      options.addOption("tester_id", true, "Specify the tester file name prefix to select to test");
-      options.addOption("catalog", true, "Specify the catalog name to test");
+      options.addOption(null, "test_set", true, "Specify the test set name to test");
+      options.addOption(
+          null, "tester_id", true, "Specify the tester file name prefix to select to test");
+      options.addOption(null, "catalog", true, "Specify the catalog name to test");
 
       options.addOption(
+          null,
           "params",
           true,
           "Additional parameters that can replace the value of ${key} in the testers contents, "
               + "example: --params=key1,v1;key2,v2");
 
       options.addOption(
+          null,
           "trino_worker_num",
           true,
           "Specify the number of Trino independent worker, the default value is 0."
@@ -99,31 +124,36 @@ public class TrinoQueryTestTool {
               + "otherwise fall back to a single-node setup with combined coordinator-worker roles.");
 
       options.addOption(
+          null,
           "trino_version",
           true,
           "Specify the Trino version to test. If not specified, the version pinned in the test "
               + "docker-compose file is used.");
 
       options.addOption(
+          null,
           "trino_connector_dir",
           true,
           "Specify the Gravitino connector JAR path. "
               + "The JAR file under ${trino_connector_dir} will be copied into the test image, "
-              + "the default value is ${project_root}/trino-connector/trino-connector/build/libs.");
+              + "the default value is the connector directory pinned in the test docker-compose "
+              + "file.");
 
       options.addOption(
+          null,
           "test_containers",
           true,
           "Specify the docker compose test containers to start, the default value is 'default'.");
 
       options.addOption(
+          null,
           "env_only",
           false,
           "Start the environment (Gravitino + Trino) and keep it running for manual testing. Press Ctrl+C to shutdown.");
 
-      options.addOption("help", false, "Print this help message");
+      options.addOption(null, "help", false, "Print this help message");
 
-      CommandLineParser parser = new PosixParser();
+      CommandLineParser parser = new DefaultParser();
       CommandLine commandLine = parser.parse(options, args);
 
       if (commandLine.hasOption("help")) {
@@ -136,7 +166,7 @@ public class TrinoQueryTestTool {
                 + "Run all the testers in the 'testsets' directory with a distributed cluster:\n"
                 + "TrinoTestTool --auto=all --trino_worker_num=3\n\n"
                 + "Run all the testers in the 'testsets' directory with specific trino version:\n"
-                + "TrinoTestTool --auto=all --trino_version=440\n\n"
+                + "TrinoTestTool --auto=all --trino_version=483\n\n"
                 + "Run all the testers in the 'testsets' directory with specific trino connector JAR files:\n"
                 + "TrinoTestTool --auto=all --trino_connector_dir=./trino-connector/libs\n\n"
                 + "Run all the tpch testset's testers in the 'testsets/tpch' directory:\n"

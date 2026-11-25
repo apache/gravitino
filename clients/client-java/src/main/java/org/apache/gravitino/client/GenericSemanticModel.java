@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.client;
 
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -28,6 +29,8 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.domain.SupportsDomains;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyList;
 import org.apache.gravitino.policy.SupportsPolicies;
@@ -39,12 +42,19 @@ import org.apache.gravitino.tag.TagList;
 import org.apache.gravitino.tag.TagValue;
 
 /** An immutable client-side Semantic Model returned by the Gravitino REST API. */
-class GenericSemanticModel implements SemanticModel, SupportsTags, SupportsPolicies {
+class GenericSemanticModel
+    implements SemanticModel, SupportsTags, SupportsDomains, SupportsPolicies {
 
   private final String name;
   private final SemanticModelDefinition definition;
   private final Map<String, String> properties;
   private final Audit audit;
+  private final int revision;
+  private final Status status;
+  @Nullable private final String publishedBy;
+  @Nullable private final Instant publishedAt;
+  private final MetadataObjectDomainOperations objectDomainOperations;
+
   private final MetadataObjectTagOperations objectTagOperations;
   private final MetadataObjectPolicyOperations objectPolicyOperations;
 
@@ -61,12 +71,19 @@ class GenericSemanticModel implements SemanticModel, SupportsTags, SupportsPolic
             ? Collections.emptyMap()
             : Collections.unmodifiableMap(new LinkedHashMap<>(sourceProperties));
     this.audit = semanticModel.auditInfo();
+    this.revision = semanticModel.revision();
+    this.status = semanticModel.status();
+    this.publishedBy = semanticModel.publishedBy();
+    this.publishedAt = semanticModel.publishedAt();
     MetadataObject metadataObject =
         MetadataObjects.of(
             Arrays.asList(semanticModelNamespace.level(1), semanticModelNamespace.level(2), name),
             MetadataObject.Type.SEMANTIC_MODEL);
     this.objectTagOperations =
         new MetadataObjectTagOperations(
+            semanticModelNamespace.level(0), metadataObject, restClient);
+    this.objectDomainOperations =
+        new MetadataObjectDomainOperations(
             semanticModelNamespace.level(0), metadataObject, restClient);
     this.objectPolicyOperations =
         new MetadataObjectPolicyOperations(
@@ -102,6 +119,46 @@ class GenericSemanticModel implements SemanticModel, SupportsTags, SupportsPolic
   @Override
   public Audit auditInfo() {
     return audit;
+  }
+
+  @Override
+  public int revision() {
+    return revision;
+  }
+
+  @Override
+  public Status status() {
+    return status;
+  }
+
+  @Override
+  @Nullable
+  public String publishedBy() {
+    return publishedBy;
+  }
+
+  @Override
+  @Nullable
+  public Instant publishedAt() {
+    return publishedAt;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public SupportsDomains supportsDomains() {
+    return this;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String[] listDomains() {
+    return objectDomainOperations.listDomains();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Domain[] listDomainsInfo() {
+    return objectDomainOperations.listDomainsInfo();
   }
 
   /** {@inheritDoc} */
@@ -196,13 +253,18 @@ class GenericSemanticModel implements SemanticModel, SupportsTags, SupportsPolic
         && Objects.equals(comment, that.comment)
         && definition.equals(that.definition)
         && properties.equals(that.properties)
-        && audit.equals(that.audit);
+        && audit.equals(that.audit)
+        && revision == that.revision
+        && status == that.status
+        && Objects.equals(publishedBy, that.publishedBy)
+        && Objects.equals(publishedAt, that.publishedAt);
   }
 
   /** {@inheritDoc} */
   @Override
   public int hashCode() {
-    return Objects.hash(name, comment, definition, properties, audit);
+    return Objects.hash(
+        name, comment, definition, properties, audit, revision, status, publishedBy, publishedAt);
   }
 
   /** {@inheritDoc} */

@@ -37,6 +37,7 @@ import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTablePartitionOperations;
+import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.catalog.starrocks.utils.StarRocksUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
@@ -77,7 +78,8 @@ public final class StarRocksTablePartitionOperations extends JdbcTablePartitionO
   @Override
   public String[] listPartitionNames() {
     try (Connection connection = getConnection(loadedTable.databaseName())) {
-      String showPartitionsSql = String.format("SHOW PARTITIONS FROM `%s`", loadedTable.name());
+      String showPartitionsSql =
+          String.format("SHOW PARTITIONS FROM %s", quote(loadedTable.name()));
       try (Statement statement = connection.createStatement();
           ResultSet result = statement.executeQuery(showPartitionsSql)) {
         ImmutableList.Builder<String> partitionNames = ImmutableList.builder();
@@ -96,7 +98,8 @@ public final class StarRocksTablePartitionOperations extends JdbcTablePartitionO
     try (Connection connection = getConnection(loadedTable.databaseName())) {
       Transform partitionInfo = loadedTable.partitioning()[0];
       Map<String, Type> columnTypes = getColumnType(connection);
-      String showPartitionsSql = String.format("SHOW PARTITIONS FROM `%s`", loadedTable.name());
+      String showPartitionsSql =
+          String.format("SHOW PARTITIONS FROM %s", quote(loadedTable.name()));
       try (Statement statement = connection.createStatement();
           ResultSet result = statement.executeQuery(showPartitionsSql)) {
         ImmutableList.Builder<Partition> partitions = ImmutableList.builder();
@@ -119,8 +122,8 @@ public final class StarRocksTablePartitionOperations extends JdbcTablePartitionO
       Map<String, Type> columnTypes = getColumnType(connection);
       String showPartitionsSql =
           String.format(
-              "SHOW PARTITIONS FROM `%s` WHERE PartitionName = \"%s\"",
-              loadedTable.name(), partitionName);
+              "SHOW PARTITIONS FROM %s WHERE PartitionName = \"%s\"",
+              quote(loadedTable.name()), JdbcConnectorUtils.escapeSqlLiteral(partitionName, '"'));
       try (Statement statement = connection.createStatement();
           ResultSet result = statement.executeQuery(showPartitionsSql)) {
         if (result.next()) {
@@ -139,7 +142,7 @@ public final class StarRocksTablePartitionOperations extends JdbcTablePartitionO
     try (Connection connection = getConnection(loadedTable.databaseName())) {
       Transform partitionInfo = loadedTable.partitioning()[0];
 
-      String addPartitionSqlFormat = "ALTER TABLE `%s` ADD %s";
+      String addPartitionSqlFormat = "ALTER TABLE %s ADD %s";
       String partitionSqlFragment;
       Partition added;
 
@@ -189,7 +192,7 @@ public final class StarRocksTablePartitionOperations extends JdbcTablePartitionO
       log.info("Generated add partition sql : {}", partitionSqlFragment);
       try (Statement statement = connection.createStatement()) {
         statement.executeUpdate(
-            String.format(addPartitionSqlFormat, loadedTable.name(), partitionSqlFragment));
+            String.format(addPartitionSqlFormat, quote(loadedTable.name()), partitionSqlFragment));
         return added;
       }
     } catch (SQLException e) {
@@ -201,7 +204,8 @@ public final class StarRocksTablePartitionOperations extends JdbcTablePartitionO
   public boolean dropPartition(String partitionName) {
     try (Connection connection = getConnection(loadedTable.databaseName())) {
       String dropPartitionsSql =
-          String.format("ALTER TABLE `%s` DROP PARTITION `%s`", loadedTable.name(), partitionName);
+          String.format(
+              "ALTER TABLE %s DROP PARTITION %s", quote(loadedTable.name()), quote(partitionName));
       try (Statement statement = connection.createStatement()) {
         statement.executeUpdate(dropPartitionsSql);
         return true;
@@ -234,5 +238,9 @@ public final class StarRocksTablePartitionOperations extends JdbcTablePartitionO
       }
       return columnTypes.build();
     }
+  }
+
+  private static String quote(String identifier) {
+    return StarRocksUtils.quoteIdentifier(identifier);
   }
 }

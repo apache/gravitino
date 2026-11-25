@@ -39,6 +39,12 @@ dependencies {
     implementation(libs.snappy.java)
     implementation(libs.commons.beanutils)
     implementation(libs.woodstox.core)
+    // Not a new dependency: hadoop-common, hadoop-auth, Curator and the Hive shims already bring
+    // ZooKeeper transitively, resolved to 3.6.3 (end of life). Gravitino does not use ZooKeeper; only
+    // Hadoop/Hive code paths that Gravitino does not call (HA failover, ZooKeeper token stores and
+    // discovery) reference it. This constraint only upgrades the version that is shipped.
+    implementation(libs.zookeeper)
+    implementation(libs.zookeeper.jute)
   }
 
   implementation(libs.hadoop3.common) {
@@ -54,19 +60,25 @@ dependencies {
     exclude(group = "net.java.dev.jets3t")
     exclude(group = "org.apache.avro")
     exclude(group = "org.apache.logging.log4j")
+    // hadoop-common 3.4 declares these, Hadoop 3.3 did not bring them. No Hadoop class on the
+    // metastore client path uses them.
+    exclude(group = "org.bouncycastle", module = "bcprov-jdk18on")
+    exclude(group = "org.codehaus.jettison", module = "jettison")
     exclude(group = "org.eclipse.jetty")
     exclude(group = "org.eclipse.jetty.aggregate", module = "jetty-all")
     exclude(group = "org.eclipse.jetty.orbit", module = "javax.servlet")
     exclude(group = "org.slf4j")
   }
   implementation(libs.hadoop3.mapreduce.client.core) {
+    exclude(group = "ch.qos.logback")
     exclude(group = "ch.qos.reload4j")
     exclude(group = "com.github.pjfanning", module = "jersey-json")
     exclude(group = "com.github.spotbugs")
     exclude(group = "com.google.code.findbugs")
     exclude(group = "com.google.guava")
     exclude(group = "com.sun.jersey")
-    exclude(group = "io.netty", module = "netty")
+    // hadoop-mapreduce-client-core 3.4 brings netty-all and the netty modules, which are not needed.
+    exclude(group = "io.netty")
     exclude(group = "log4j")
     exclude(group = "org.apache.avro")
     exclude(group = "org.apache.logging.log4j")

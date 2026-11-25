@@ -27,6 +27,16 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestCredentialProvider {
+  /** Checks that unmarked stored credential providers do not opt into metadata-only access. */
+  @Test
+  public void testStoredCredentialProvidersAreNotDynamic() {
+    Assertions.assertFalse(new JdbcCredentialProvider() instanceof SupportsDynamicCredential);
+    Assertions.assertFalse(
+        new AwsSecretKeyCredentialProvider() instanceof SupportsDynamicCredential);
+    Assertions.assertFalse(
+        new DlfSecretKeyCredentialProvider() instanceof SupportsDynamicCredential);
+  }
+
   @Test
   void testCredentialProvider() {
     Map<String, String> catalogProperties = ImmutableMap.of("a", "b");

@@ -5,29 +5,56 @@ keyword: "iceberg, manifests, policy, optimizer, Gravitino"
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Behavior
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+## Overview
 
 `system_iceberg_rewrite_manifests` evaluates manifest statistics for one resolved partition
-spec and submits `builtin-iceberg-rewrite-manifests`. Associate the policy with a tag and
-assign that tag to a catalog, schema, or table through the existing
-[policy API](./manage-policies-in-gravitino.md). Tables inherit tags from their ancestors.
-The strategy type is `iceberg-rewrite-manifests`; its handler and job adapter are built in.
+spec and submits `builtin-iceberg-rewrite-manifests`. The strategy type is
+`iceberg-rewrite-manifests`; its handler and job adapter are built in.
 
-| Content field | Default | Meaning |
-| --- | --- | --- |
-| `manifest_count_critical` | `500` | Trigger when count is at least this value, regardless of size. |
-| `manifest_count_warning` | `100` | Minimum count for the small-average-size trigger. Must be positive. |
-| `avg_manifest_size_threshold_bytes` | `8388608` | Trigger when average size is strictly below this value and the warning count is reached. Must be positive. |
-| `spec_id` | Iceberg's current default | Existing partition spec to evaluate. Omission resolves the current default from Iceberg metadata. |
-| `use_caching` | Omitted | Optional boolean forwarded to Iceberg; omission preserves the runtime default. |
+The optimizer treats `CATALOG`, `SCHEMA`, and `TABLE` as the applicable object types for this
+policy. That list is not an association reject list: associating a policy does not check
+`supportedObjectTypes`, and object policy lookup does not filter by it. Consumers decide whether
+the policy type applies to the object they are processing. See
+[Policies](./policies.md) and the OpenAPI description of `supportedObjectTypes`.
 
-The critical count must be at least the warning count. Spec IDs must be non-negative
-32-bit integers. Thresholds use integer counts and bytes. Recommendations are ranked by
-the selected spec's manifest count. The policy API accepts only JSON booleans for
-`use_caching`; numbers and strings are rejected.
+## Policy Content
 
-At the defaults, 99 manifests never trigger; 100 manifests averaging 8 MiB do not trigger;
-100 averaging less than 8 MiB trigger; and 500 trigger regardless of size.
+The typed content for `system_iceberg_rewrite_manifests` supports the following fields:
+
+| Field                      | Required | Default                   | Description                                                                                                                     |
+| -------------------------- | -------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `manifest_count_threshold` | No       | `100`                     | Trigger when manifest count is at least this value. Aligns with Iceberg `commit.manifest.min-count-to-merge`. Must be positive. |
+| `spec_id`                  | No       | Iceberg's current default | Existing partition spec to evaluate. Omission resolves the current default from Iceberg metadata.                               |
+| `use_caching`              | No       | Omitted                   | Optional boolean forwarded to Iceberg; omission preserves the runtime default. JSON booleans only.                              |
+
+Spec IDs must be non-negative 32-bit integers. Recommendations are ranked by the selected
+spec's manifest count. Average manifest size is collected for observability but does not
+affect the trigger. At the default threshold, 99 manifests never trigger and 100 or more
+trigger regardless of average manifest size.
+
+## Generated Rules and Properties
+
+Typed content fields on CREATE/GET are the REST payload. The optimizer (and other consumers)
+derive stable properties and evaluation rules from those fields. The derived keys below are
+**not** serialized as `strategy.type`, `trigger-expr`, or `job.options.*` entries on the policy
+REST `content` object.
+
+After a GET (or create) through the Java or Python client, inspect them with
+`policy.content().properties()` and `policy.content().rules()` (for example
+`metalake.getPolicy(name).content().rules()`).
+
+Derived properties:
+
+- `strategy.type=iceberg-rewrite-manifests`
+- `job.template-name=builtin-iceberg-rewrite-manifests`
+
+Derived rules:
+
+- `trigger-expr=custom-manifest-number >= manifest_count_threshold`
+- optional `spec_id` and `use_caching` job options when set
 
 ## Collect, evaluate, and submit
 
@@ -41,22 +68,34 @@ metadata supplied by the optimizer's table metadata provider. Missing, malformed
 mismatched snapshot IDs produce no recommendation; recollect before evaluating again.
 For a table without a snapshot, the collector publishes `-1` and Iceberg table metadata
 reports `none`. The provider must expose this metadata property to verify freshness.
-The recommender reads metadata after statistics to detect snapshot changes during collection
-of its inputs. This freshness check is not transactional with job submission; the table may
-still change after evaluation.
 
 The handler reads the chosen spec's count and average from the same statistics response.
 A missing map or key produces no recommendation. An empty spec has count and average zero.
 Invalid policy rules or malformed measurements are logged and skipped for that table without
 aborting recommendations for other tables. Counts from other specs are ignored.
 
-The recommender and CLI use the table's current default partition spec when `spec_id` is
-omitted. The following example uses default thresholds and assumes statistics have been collected:
+When `spec_id` is omitted, the recommender resolves Iceberg's current `default-spec-id` from
+table metadata and retains that value through job submission. The maintenance job leaves an
+omitted `spec_id` unset at schedule time and resolves the table's current default when the
+Spark job runs. Set `spec_id` explicitly to target another existing spec after partition
+evolution.
+
+Rewriting reorganizes manifests within the selected spec and does not migrate data files
+between specs. Recollect statistics after a successful rewrite before evaluating again.
+For runtime requirements and direct job submission, see the
+[rewrite-manifests job reference](./table-maintenance-service/optimizer-cli-reference.md).
+
+## Policy Examples
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
 
 ```shell
-curl -X POST -H 'Content-Type: application/json' \
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
   -d '{
     "name": "rewrite_manifests",
+    "comment": "Built-in iceberg rewrite manifests policy",
     "policyType": "system_iceberg_rewrite_manifests",
     "enabled": true,
     "content": {}
@@ -64,42 +103,29 @@ curl -X POST -H 'Content-Type: application/json' \
   http://localhost:8090/api/metalakes/test/policies
 ```
 
-Associate `rewrite_manifests` with a tag using the `ALL_VALUES` selector, then assign that tag
-to the table. Configure the optimizer's Gravitino providers and Spark submission settings as described in
-[Optimizer configuration](./table-maintenance-service/optimizer-configuration.md), then preview:
+</TabItem>
+<TabItem value="java" label="Java">
 
-```shell
-./bin/gravitino-optimizer.sh --type submit-strategy-jobs \
-  --identifiers rest_catalog.db.t1 --strategy-name rewrite_manifests --dry-run
+```java
+GravitinoClient client = ...;
+
+PolicyContent content = PolicyContents.icebergRewriteManifests();
+
+Policy policy =
+    client.createPolicy(
+        "rewrite_manifests",
+        "system_iceberg_rewrite_manifests",
+        "Built-in iceberg rewrite manifests policy",
+        true,
+        content);
 ```
 
-Remove `--dry-run` to submit the recommendations. The adapter supplies `catalog_name`,
-`table_identifier`, the exact evaluated `spec_id`, and optional `use_caching`.
-Its catalog, table, spec, and caching values override shared job-submitter configuration.
-When the policy omits `use_caching`, the adapter supplies an empty option to clear any shared
-caching setting and leave the Iceberg runtime default in effect.
-Recollect statistics after a successful rewrite before evaluating again.
+</TabItem>
+</Tabs>
 
-## Selecting a partition spec
+## Apply the Policy Through a Tag
 
-When `spec_id` is omitted, the recommender resolves Iceberg's current `default-spec-id`
-from the table metadata supplied by the metadata provider. Empty policy content therefore
-evaluates the current default spec with the default thresholds. Set `spec_id` explicitly to
-target another existing spec, such as an older spec after partition evolution.
-
-The Iceberg catalog projects `TableMetadata.defaultSpecId()` as the reserved, read-only table
-property `default-spec-id`. This is metadata, not an operator setting; it cannot be set or
-removed through Gravitino table-property changes. Custom metadata providers must expose the
-same value from Iceberg metadata. If an omitted target cannot be resolved because metadata is
-missing or invalid, the recommender warns and skips that table without aborting the batch.
-
-The resolved ID is used for both statistics lookup and job submission. Partition evolution
-after evaluation cannot retarget an already-created job context. A later evaluation with an
-omitted `spec_id` resolves the new default; an explicit policy target remains unchanged.
-The handler never infers a spec from statistics map keys. After a snapshot change, recollect
-statistics before evaluating again.
-
-Rewriting reorganizes manifests within the selected spec and does not migrate data files
-between specs. This policy introduces no scheduling, cooldown, or last-success statistic.
-For runtime requirements and direct job submission, see the
-[rewrite-manifests job reference](./table-maintenance-service/optimizer-cli-reference.md).
+After creating the policy, create or reuse a tag, associate the policy with that tag using the
+`ALL_VALUES` selector, and assign the tag to a table or one of its ancestors. See
+[Manage Policies](./manage-policies-in-gravitino.md#policy-to-tag-associations) and
+[Optimizer configuration](./table-maintenance-service/optimizer-configuration.md).

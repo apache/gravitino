@@ -65,6 +65,12 @@ public class ClassLoaderKey {
 
   @Override
   public String toString() {
-    return "ClassLoaderKey{" + "provider='" + provider + '\'' + ", properties=" + properties + '}';
+    return "ClassLoaderKey{"
+        + "provider='"
+        + provider
+        + '\''
+        + ", propertyNames="
+        + properties.keySet()
+        + '}';
   }
 }

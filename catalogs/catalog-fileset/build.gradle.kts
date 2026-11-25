@@ -145,6 +145,13 @@ tasks.test {
     dependsOn(tasks.jar)
   }
 
+  // hadoop-client-api also contains the AuthenticationFilter of hadoop-auth, built against the
+  // shaded servlet API. The MiniDFSCluster runs the unshaded hadoop-common, which needs the class of
+  // hadoop-auth, so put hadoop-auth first instead of relying on the resolution order.
+  val testClasspath = classpath
+  val isHadoopAuth = { file: File -> file.name.startsWith("hadoop-auth-") }
+  classpath = testClasspath.filter(isHadoopAuth) + testClasspath.filter { !isHadoopAuth(it) }
+
   // this task depends on :bundles:aws-bundle:jar
   dependsOn(":bundles:aws-bundle:jar")
   dependsOn(":bundles:aliyun-bundle:jar")
