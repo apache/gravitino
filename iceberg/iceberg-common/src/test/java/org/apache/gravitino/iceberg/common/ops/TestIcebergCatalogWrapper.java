@@ -369,11 +369,6 @@ public class TestIcebergCatalogWrapper {
             .setProperties(ImmutableMap.of("format-version", "3"))
             .build();
     Assertions.assertDoesNotThrow(() -> IcebergCatalogWrapper.validateTableDefinition(v3));
-
-    // Without an explicit version the catalog defaults decide; nothing is rejected up front.
-    CreateTableRequest unspecified =
-        CreateTableRequest.builder().withName("t").withSchema(nanos).build();
-    Assertions.assertDoesNotThrow(() -> IcebergCatalogWrapper.validateTableDefinition(unspecified));
   }
 
   @Test
@@ -426,6 +421,17 @@ public class TestIcebergCatalogWrapper {
       Assertions.assertTrue(
           failure.getMessage().contains("variant is not supported until v3"), failure.getMessage());
     }
+  }
+
+  @Test
+  public void testValidateTableDefinitionRejectsTypesWhenFormatVersionUsesCatalogDefault() {
+    Schema nanos =
+        new Schema(Types.NestedField.required(1, "ts", Types.TimestampNanoType.withZone()));
+    CreateTableRequest unspecified =
+        CreateTableRequest.builder().withName("t").withSchema(nanos).build();
+    Assertions.assertThrows(
+        BadRequestException.class,
+        () -> IcebergCatalogWrapper.validateTableDefinition(unspecified));
   }
 
   @Test
