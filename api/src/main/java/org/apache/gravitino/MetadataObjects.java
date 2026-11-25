@@ -37,10 +37,10 @@ public class MetadataObjects {
   public static final String METADATA_OBJECT_RESERVED_NAME = "*";
 
   /**
-   * The {@link MetadataObject.Type}s that support being associated with tags and policies, either
-   * individually or through the bulk lookup APIs.
+   * The {@link MetadataObject.Type}s that can be associated with tags, either individually or
+   * through the bulk lookup API.
    */
-  public static final Set<MetadataObject.Type> TAG_AND_POLICY_SUPPORTED_TYPES =
+  public static final Set<MetadataObject.Type> TAGGABLE_METADATA_OBJECT_TYPES =
       Sets.immutableEnumSet(
           MetadataObject.Type.CATALOG,
           MetadataObject.Type.SCHEMA,

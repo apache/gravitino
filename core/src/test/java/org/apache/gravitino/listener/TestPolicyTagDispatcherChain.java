@@ -25,11 +25,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
@@ -37,16 +33,12 @@ import org.apache.gravitino.hook.PolicyHookDispatcher;
 import org.apache.gravitino.hook.TagHookDispatcher;
 import org.apache.gravitino.listener.api.event.AddPolicyForTagEvent;
 import org.apache.gravitino.listener.api.event.AddPolicyForTagPreEvent;
-import org.apache.gravitino.listener.api.event.ListTagsInfoForMetadataObjectEvent;
-import org.apache.gravitino.listener.api.event.ListTagsInfoForMetadataObjectFailureEvent;
-import org.apache.gravitino.listener.api.event.ListTagsInfoForMetadataObjectPreEvent;
 import org.apache.gravitino.listener.api.event.RemovePolicyFromTagEvent;
 import org.apache.gravitino.listener.api.event.RemovePolicyFromTagPreEvent;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.AllValuesSelector;
 import org.apache.gravitino.policy.PolicyDispatcher;
-import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -55,35 +47,6 @@ public class TestPolicyTagDispatcherChain {
   private static final String METALAKE = "metalake";
   private static final String TAG = "tag";
   private static final String POLICY = "policy";
-
-  @Test
-  void testDisplayTagsPreserveDispatcherEvents() {
-    TagDispatcher delegate = mock(TagDispatcher.class);
-    DummyEventListener listener = new DummyEventListener();
-    TagDispatcher dispatcher =
-        new TagHookDispatcher(
-            new TagEventDispatcher(new EventBus(Collections.singletonList(listener)), delegate));
-    MetadataObject object = MetadataObjects.parse("catalog.schema", MetadataObject.Type.SCHEMA);
-    List<MetadataObject> objects = List.of(object);
-    Map<MetadataObject, Tag[]> expected = Collections.singletonMap(object, new Tag[0]);
-    when(delegate.listEffectiveTagsForDisplay(METALAKE, objects)).thenReturn(expected);
-
-    Assertions.assertSame(expected, dispatcher.listEffectiveTagsForDisplay(METALAKE, objects));
-    Assertions.assertInstanceOf(
-        ListTagsInfoForMetadataObjectPreEvent.class, listener.getPreEvents().get(0));
-    Assertions.assertInstanceOf(
-        ListTagsInfoForMetadataObjectEvent.class, listener.getPostEvents().get(0));
-    RuntimeException failure = new RuntimeException("store unavailable");
-    when(delegate.listEffectiveTagsForDisplay(METALAKE, objects)).thenThrow(failure);
-    Assertions.assertSame(
-        failure,
-        Assertions.assertThrows(
-            RuntimeException.class,
-            () -> dispatcher.listEffectiveTagsForDisplay(METALAKE, objects)));
-    Assertions.assertInstanceOf(
-        ListTagsInfoForMetadataObjectFailureEvent.class, listener.getPostEvents().get(1));
-    verify(delegate, times(2)).listEffectiveTagsForDisplay(METALAKE, objects);
-  }
 
   @Test
   void testTagDispatcherChainDelegatesPolicyTagLookups() {

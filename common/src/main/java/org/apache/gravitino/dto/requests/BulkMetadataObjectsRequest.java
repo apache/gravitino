@@ -57,7 +57,7 @@ public class BulkMetadataObjectsRequest implements RESTRequest {
     Set<MetadataObject> seen = new HashSet<>();
     for (MetadataObjectDTO object : metadataObjects) {
       Preconditions.checkArgument(
-          object != null && MetadataObjects.TAG_AND_POLICY_SUPPORTED_TYPES.contains(object.type()),
+          object != null && MetadataObjects.TAGGABLE_METADATA_OBJECT_TYPES.contains(object.type()),
           "metadataObject must have a supported type");
       Preconditions.checkArgument(
           StringUtils.isNotBlank(object.name()), "metadataObject fullName must not be empty");

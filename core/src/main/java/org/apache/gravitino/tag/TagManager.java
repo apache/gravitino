@@ -76,7 +76,7 @@ public class TagManager implements TagDispatcher {
 
   /** Metadata object types that support tag assignments. */
   public static final Set<MetadataObject.Type> SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS =
-      MetadataObjects.TAG_AND_POLICY_SUPPORTED_TYPES;
+      MetadataObjects.TAGGABLE_METADATA_OBJECT_TYPES;
 
   private final IdGenerator idGenerator;
 
