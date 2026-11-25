@@ -22,18 +22,27 @@ package org.apache.gravitino.kb;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
-import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.domain.DefinitionMember;
+import org.apache.gravitino.domain.DefinitionMemberPage;
+import org.apache.gravitino.domain.Domain;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 public class TestKnowledgeBaseArticleContract {
 
@@ -337,35 +346,79 @@ public class TestKnowledgeBaseArticleContract {
     AssetBindingPage bindings = new AssetBindingPage(ImmutableList.of(asset), true);
     assertEquals(ImmutableList.of(asset), bindings.objects());
     assertTrue(bindings.hasMore());
-    ArticleSummary summary =
-        new ArticleSummary() {
-          public String name() {
-            return "guide";
-          }
-
-          public String title() {
-            return "Guide";
-          }
-
-          public ArticleStatus status() {
-            return ArticleStatus.PUBLISHED;
-          }
-
-          public String[] domains() {
-            return new String[0];
-          }
-
-          public Owner owner() {
-            return null;
-          }
-
-          public Audit auditInfo() {
-            return null;
-          }
-        };
+    ArticleSummary summary = mock(ArticleSummary.class);
     assertTrue(ArticlePage.of(ImmutableList.of(summary), true).hasMore());
     assertFalse(ArticlePage.of(ImmutableList.of(summary), false).hasMore());
     assertFalse(ArticlePage.of(ImmutableList.of(), false).hasMore());
+  }
+
+  @Test
+  public void testReverseLookupsUseArticleListFilters() {
+    KnowledgeBaseArticleOperations operations =
+        mock(KnowledgeBaseArticleOperations.class, CALLS_REAL_METHODS);
+    ArticleObjectIdentifier target =
+        ArticleObjectIdentifier.of(
+            MetadataObject.Type.COLUMN, ImmutableList.of("c", "s", "t"), "a.b");
+    operations.listArticlesForObject(target, true, 5, 10);
+    operations.listArticlesForTerm("Revenue");
+    ArgumentCaptor<ArticleListFilter> capture = ArgumentCaptor.forClass(ArticleListFilter.class);
+    verify(operations, times(2)).listArticles(capture.capture());
+    ArticleListFilter asset = capture.getAllValues().get(0);
+    assertEquals(target, asset.object());
+    assertNull(asset.term());
+    assertTrue(asset.includeDeprecated());
+    assertEquals(5, asset.limit());
+    assertEquals(10, asset.offset());
+    ArticleListFilter term = capture.getAllValues().get(1);
+    assertEquals("Revenue", term.term());
+    assertNull(term.object());
+    assertFalse(term.includeDeprecated());
+    assertEquals(20, term.limit());
+    assertEquals(0, term.offset());
+    ArticleListFilter combined =
+        ArticleListFilter.builder()
+            .withDomain("Finance")
+            .withTerm("Revenue")
+            .withObject(target)
+            .build();
+    assertEquals("Finance", combined.domain());
+    assertEquals("Revenue", combined.term());
+    assertEquals(target, combined.object());
+    assertThrows(IllegalArgumentException.class, () -> operations.listArticlesForTerm(" "));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> operations.listArticlesForObject(target, false, 1001, 0));
+  }
+
+  @Test
+  public void testOrdinaryAlterOmitsRevision() {
+    KnowledgeBaseArticleOperations operations =
+        mock(KnowledgeBaseArticleOperations.class, CALLS_REAL_METHODS);
+    KnowledgeBaseArticleChange[] changes = {
+      KnowledgeBaseArticleChange.updateTitle("Shared title"),
+      KnowledgeBaseArticleChange.addTerms("Revenue")
+    };
+    operations.alterArticle("guide", changes);
+    verify(operations).alterArticle("guide", changes, null);
+  }
+
+  @Test
+  public void testBindingAndDefinitionMemberPages() {
+    KnowledgeBaseArticleOperations operations =
+        mock(KnowledgeBaseArticleOperations.class, CALLS_REAL_METHODS);
+    operations.listTermBindings("guide");
+    verify(operations).listTermBindings("guide", 20, 0);
+    ArticleTermBinding term = mock(ArticleTermBinding.class);
+    TermBindingPage terms = new TermBindingPage(ImmutableList.of(term), true);
+    assertEquals(ImmutableList.of(term), terms.terms());
+    assertTrue(terms.hasMore());
+
+    Domain domain = mock(Domain.class, CALLS_REAL_METHODS);
+    DefinitionMember member = mock(DefinitionMember.class);
+    DefinitionMemberPage members = new DefinitionMemberPage(ImmutableList.of(member), false);
+    doReturn(members).when(domain).listDefinitionMembers(20, 0);
+    assertEquals(ImmutableList.of(member), domain.listDefinitionMembers().members());
+    assertFalse(members.hasMore());
   }
 
   @Test
@@ -496,5 +549,127 @@ public class TestKnowledgeBaseArticleContract {
         ArticleObjectIdentifier.of(
                 MetadataObject.Type.COLUMN, new String[] {"c", "s", "t"}, "total.amount")
             .hashCode());
+  }
+
+  @Test
+  public void testPropertyChangesRejectInvalidInput() {
+    assertThrows(
+        IllegalArgumentException.class, () -> KnowledgeBaseArticleChange.setProperty(null, "v"));
+    assertThrows(
+        IllegalArgumentException.class, () -> KnowledgeBaseArticleChange.setProperty(" ", "v"));
+    assertThrows(
+        IllegalArgumentException.class, () -> KnowledgeBaseArticleChange.setProperty("k", null));
+    assertThrows(
+        IllegalArgumentException.class, () -> KnowledgeBaseArticleChange.removeProperty(null));
+    assertThrows(
+        IllegalArgumentException.class, () -> KnowledgeBaseArticleChange.removeProperty(" "));
+  }
+
+  @Test
+  public void testNullClearsCommentAndSourceReference() {
+    KnowledgeBaseArticleChange.UpdateComment clearComment =
+        (KnowledgeBaseArticleChange.UpdateComment) KnowledgeBaseArticleChange.updateComment(null);
+    assertNull(clearComment.getNewComment());
+    assertEquals(clearComment, KnowledgeBaseArticleChange.updateComment(null));
+    assertEquals(
+        clearComment.hashCode(), KnowledgeBaseArticleChange.updateComment(null).hashCode());
+    assertFalse(clearComment.equals(KnowledgeBaseArticleChange.updateComment("comment")));
+
+    KnowledgeBaseArticleChange.UpdateSourceReference clearSource =
+        (KnowledgeBaseArticleChange.UpdateSourceReference)
+            KnowledgeBaseArticleChange.updateSourceReference(null);
+    assertNull(clearSource.getNewSourceReference());
+    assertEquals(clearSource, KnowledgeBaseArticleChange.updateSourceReference(null));
+    assertEquals(
+        clearSource.hashCode(), KnowledgeBaseArticleChange.updateSourceReference(null).hashCode());
+    assertFalse(clearSource.equals(KnowledgeBaseArticleChange.updateSourceReference("source")));
+  }
+
+  @Test
+  public void testArrayChangeValueEqualityAndDefensiveCopy() {
+    KnowledgeBaseArticleChange.UpdateDomains domains =
+        (KnowledgeBaseArticleChange.UpdateDomains)
+            KnowledgeBaseArticleChange.updateDomains(new String[] {"Finance", "Tax"});
+    assertEquals(
+        domains, KnowledgeBaseArticleChange.updateDomains(new String[] {"Finance", "Tax"}));
+    assertEquals(
+        domains.hashCode(),
+        KnowledgeBaseArticleChange.updateDomains(new String[] {"Finance", "Tax"}).hashCode());
+    assertFalse(
+        domains.equals(KnowledgeBaseArticleChange.updateDomains(new String[] {"Tax", "Finance"})));
+    assertFalse(
+        domains.equals(KnowledgeBaseArticleChange.updateSynonyms(new String[] {"Finance", "Tax"})));
+
+    String[] input = {"Finance", "Tax"};
+    KnowledgeBaseArticleChange.UpdateDomains defensive =
+        (KnowledgeBaseArticleChange.UpdateDomains) KnowledgeBaseArticleChange.updateDomains(input);
+    input[0] = "Mutated";
+    assertArrayEquals(new String[] {"Finance", "Tax"}, defensive.getNewDomains());
+    String[] out = defensive.getNewDomains();
+    out[0] = "Mutated";
+    assertArrayEquals(new String[] {"Finance", "Tax"}, defensive.getNewDomains());
+
+    KnowledgeBaseArticleChange.UpdateSynonyms synonyms =
+        (KnowledgeBaseArticleChange.UpdateSynonyms)
+            KnowledgeBaseArticleChange.updateSynonyms(new String[] {"a", "b"});
+    assertEquals(synonyms, KnowledgeBaseArticleChange.updateSynonyms(new String[] {"a", "b"}));
+    assertEquals(
+        synonyms.hashCode(),
+        KnowledgeBaseArticleChange.updateSynonyms(new String[] {"a", "b"}).hashCode());
+    assertFalse(
+        synonyms.equals(KnowledgeBaseArticleChange.updateSynonyms(new String[] {"b", "a"})));
+
+    KnowledgeBaseArticleChange.UpdateStatus status =
+        (KnowledgeBaseArticleChange.UpdateStatus)
+            KnowledgeBaseArticleChange.updateStatus(ArticleStatus.DRAFT);
+    assertEquals(status, KnowledgeBaseArticleChange.updateStatus(ArticleStatus.DRAFT));
+    assertFalse(status.equals(KnowledgeBaseArticleChange.updateStatus(ArticleStatus.PUBLISHED)));
+    assertFalse(status.equals(KnowledgeBaseArticleChange.updateTitle("DRAFT")));
+
+    KnowledgeBaseArticleChange.SetProperty setProperty =
+        (KnowledgeBaseArticleChange.SetProperty) KnowledgeBaseArticleChange.setProperty("k", "v");
+    assertEquals(setProperty, KnowledgeBaseArticleChange.setProperty("k", "v"));
+    assertFalse(setProperty.equals(KnowledgeBaseArticleChange.setProperty("k", "w")));
+    assertFalse(setProperty.equals(KnowledgeBaseArticleChange.removeProperty("k")));
+
+    KnowledgeBaseArticleChange.UpdateBody body =
+        (KnowledgeBaseArticleChange.UpdateBody)
+            KnowledgeBaseArticleChange.updateBody(ArticleBody.of(ArticleBody.Format.HTML, "x"));
+    assertEquals(
+        body, KnowledgeBaseArticleChange.updateBody(ArticleBody.of(ArticleBody.Format.HTML, "x")));
+    assertFalse(
+        body.equals(
+            KnowledgeBaseArticleChange.updateBody(
+                ArticleBody.of(ArticleBody.Format.MARKDOWN, "x"))));
+  }
+
+  @Test
+  public void testNfcMetadataObjectEquality() {
+    MetadataObject.Type type = MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE;
+    MetadataObject composed = MetadataObjects.of(null, "café", type);
+    MetadataObject decomposed = MetadataObjects.of(null, "café", type);
+    assertEquals(composed, decomposed);
+    assertEquals(composed.hashCode(), decomposed.hashCode());
+    assertEquals(1, new HashSet<>(Arrays.asList(composed, decomposed)).size());
+  }
+
+  @Test
+  public void testCatalogAndSchemaDepthValidation() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ArticleObjectIdentifier.of(
+                MetadataObject.Type.CATALOG, ImmutableList.of("catalog"), "catalog"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ArticleObjectIdentifier.of(MetadataObject.Type.SCHEMA, ImmutableList.of(), "schema"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ArticleObjectIdentifier.of(
+                MetadataObject.Type.SCHEMA, ImmutableList.of("c", "s"), "schema"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ArticleObjectIdentifier.of(MetadataObject.Type.TABLE, (List<String>) null, "table"));
   }
 }

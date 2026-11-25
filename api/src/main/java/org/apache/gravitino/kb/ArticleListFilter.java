@@ -41,6 +41,9 @@ public class ArticleListFilter {
   private final String domain;
   private final ArticleStatus status;
   private final Owner owner;
+  private final String term;
+  private final ArticleObjectIdentifier object;
+  private final boolean includeDeprecated;
   private final int limit;
   private final int offset;
 
@@ -56,12 +59,16 @@ public class ArticleListFilter {
     this.domain = builder.domain;
     this.status = builder.status;
     this.owner = builder.owner;
+    this.term = builder.term;
+    this.object = builder.object;
+    this.includeDeprecated = builder.includeDeprecated;
     this.limit = builder.limit;
     this.offset = builder.offset;
   }
 
   /**
-   * @return the substring matched against the title, the synonyms and the body, or {@code null}
+   * @return the case-insensitive substring matched against the title, the synonyms and the body, or
+   *     {@code null}
    */
   @Nullable
   public String query() {
@@ -107,19 +114,84 @@ public class ArticleListFilter {
     return offset;
   }
 
+  /**
+   * @return the exact bound Term name, or null
+   */
+  @Nullable
+  public String term() {
+    return term;
+  }
+
+  /**
+   * @return the bound asset with its exact namespace components, or null
+   */
+  @Nullable
+  public ArticleObjectIdentifier object() {
+    return object;
+  }
+
+  /**
+   * @return whether target-filtered lists can include deprecated Articles alongside published ones
+   */
+  public boolean includeDeprecated() {
+    return includeDeprecated;
+  }
+
   /** Builder for {@link ArticleListFilter}. */
   public static class Builder {
     private String query;
     private String domain;
     private ArticleStatus status;
     private Owner owner;
+    private String term;
+    private ArticleObjectIdentifier object;
+    private boolean includeDeprecated;
     private int limit = DEFAULT_LIMIT;
     private int offset = 0;
 
     private Builder() {}
 
     /**
-     * Sets the substring matched against the title, the synonyms and the body.
+     * Filters by a live direct Term binding. The list operation resolves the Term first and
+     * requires read access to it; a missing or hidden Term fails the request as not found instead
+     * of matching an empty page.
+     *
+     * @param term exact Term name
+     * @return this builder
+     */
+    public Builder withTerm(String term) {
+      Preconditions.checkArgument(term != null && !term.trim().isEmpty(), "Term must not be blank");
+      this.term = term;
+      return this;
+    }
+
+    /**
+     * Filters by a live direct asset binding. All supplied filters apply together. The list
+     * operation resolves the asset first and requires read access to it; a missing or hidden target
+     * fails the request as not found instead of matching an empty page.
+     *
+     * @param object the target asset
+     * @return this builder
+     */
+    public Builder withObject(ArticleObjectIdentifier object) {
+      this.object = Preconditions.checkNotNull(object, "object");
+      return this;
+    }
+
+    /**
+     * Controls deprecated Articles for target-filtered lists. Drafts are always excluded from these
+     * lists. This flag has no effect without a target filter.
+     *
+     * @param includeDeprecated whether to include deprecated matches
+     * @return this builder
+     */
+    public Builder withIncludeDeprecated(boolean includeDeprecated) {
+      this.includeDeprecated = includeDeprecated;
+      return this;
+    }
+
+    /**
+     * Sets the case-insensitive substring matched against the title, the synonyms and the body.
      *
      * @param query the search text
      * @return this builder

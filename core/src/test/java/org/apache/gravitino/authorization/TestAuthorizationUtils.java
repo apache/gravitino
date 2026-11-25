@@ -198,6 +198,42 @@ class TestAuthorizationUtils {
   }
 
   @Test
+  void testArticleOwnerDoesNotNotifyCatalogs() {
+    CatalogManager catalogs = Mockito.mock(CatalogManager.class);
+    GravitinoEnv env = Mockito.mock(GravitinoEnv.class);
+    Mockito.when(env.catalogManager()).thenReturn(catalogs);
+    try (MockedStatic<GravitinoEnv> mocked = Mockito.mockStatic(GravitinoEnv.class)) {
+      mocked.when(GravitinoEnv::getInstance).thenReturn(env);
+      AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+          "lake",
+          MetadataObjects.of(null, "guide", MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE),
+          plugin -> Assertions.fail("Unexpected catalog plugin callback"));
+    }
+    Mockito.verifyNoInteractions(catalogs);
+  }
+
+  @Test
+  void testFilterDefinitionPrivilegesFromCatalogRole() {
+    SecurableObject metalake =
+        SecurableObjects.ofMetalake(
+            "lake",
+            List.of(
+                Privileges.UseCatalog.allow(), Privileges.ViewDefinition.allow(),
+                Privileges.CreateDefinition.deny(), Privileges.ManageDefinitions.allow()));
+    RoleEntity role =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName("role")
+            .withSecurableObjects(List.of(metalake))
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+    Role filtered = AuthorizationUtils.filterSecurableObjects(role, "lake", "catalog");
+    Assertions.assertEquals(
+        List.of(SecurableObjects.ofMetalake("lake", List.of(Privileges.UseCatalog.allow()))),
+        filtered.securableObjects());
+  }
+
+  @Test
   void testFilteredSecurableObjects() {
 
     List<SecurableObject> securableObjects = Lists.newArrayList();

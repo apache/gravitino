@@ -60,4 +60,14 @@ public interface ArticleSummary {
    * @return the audit information
    */
   Audit auditInfo();
+
+  /**
+   * @return the readable Terms in the preview of up to 20 readable Terms
+   */
+  ArticleTermBinding[] terms();
+
+  /**
+   * @return whether more readable Terms follow this preview
+   */
+  boolean termsHasMore();
 }

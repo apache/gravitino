@@ -24,6 +24,8 @@ import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
@@ -56,7 +58,9 @@ public interface KnowledgeBaseArticleChange {
   }
 
   /**
-   * Creates a change to replace the whole Domain list.
+   * Creates a change to replace the Domain list. The server computes the delta from the complete
+   * stored set and preserves memberships that are not visible to the caller; submitting a filtered
+   * read response must not remove hidden memberships.
    *
    * @param newDomains the new Domain names
    * @return the change
@@ -81,7 +85,7 @@ public interface KnowledgeBaseArticleChange {
    * @param newComment the new comment, or {@code null} to clear it
    * @return the change
    */
-  static KnowledgeBaseArticleChange updateComment(String newComment) {
+  static KnowledgeBaseArticleChange updateComment(@Nullable String newComment) {
     return new UpdateComment(newComment);
   }
 
@@ -101,7 +105,7 @@ public interface KnowledgeBaseArticleChange {
    * @param newSourceReference the new source reference, or {@code null} to clear it
    * @return the change
    */
-  static KnowledgeBaseArticleChange updateSourceReference(String newSourceReference) {
+  static KnowledgeBaseArticleChange updateSourceReference(@Nullable String newSourceReference) {
     return new UpdateSourceReference(newSourceReference);
   }
 
@@ -346,7 +350,7 @@ public interface KnowledgeBaseArticleChange {
     }
   }
 
-  /** A change to replace the whole Domain list. */
+  /** A change to replace the caller-visible Domain set while preserving hidden memberships. */
   final class UpdateDomains implements KnowledgeBaseArticleChange {
     private final String[] newDomains;
 
@@ -426,16 +430,17 @@ public interface KnowledgeBaseArticleChange {
 
   /** A change to replace the comment. */
   final class UpdateComment implements KnowledgeBaseArticleChange {
-    private final String newComment;
+    @Nullable private final String newComment;
 
-    private UpdateComment(String newComment) {
+    private UpdateComment(@Nullable String newComment) {
       this.newComment =
           ArticleValidation.length(newComment, KnowledgeBaseArticle.COMMENT_MAX_LENGTH, "Comment");
     }
 
     /**
-     * @return the new comment
+     * @return the new comment, or {@code null} to clear the field
      */
+    @Nullable
     public String getNewComment() {
       return newComment;
     }
@@ -505,9 +510,9 @@ public interface KnowledgeBaseArticleChange {
 
   /** A change to replace the source reference. */
   final class UpdateSourceReference implements KnowledgeBaseArticleChange {
-    private final String newSourceReference;
+    @Nullable private final String newSourceReference;
 
-    private UpdateSourceReference(String newSourceReference) {
+    private UpdateSourceReference(@Nullable String newSourceReference) {
       this.newSourceReference =
           ArticleValidation.length(
               newSourceReference,
@@ -516,8 +521,9 @@ public interface KnowledgeBaseArticleChange {
     }
 
     /**
-     * @return the new source reference
+     * @return the new source reference, or {@code null} to clear the field
      */
+    @Nullable
     public String getNewSourceReference() {
       return newSourceReference;
     }
@@ -551,6 +557,9 @@ public interface KnowledgeBaseArticleChange {
     private final String value;
 
     private SetProperty(String property, String value) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(property), "Property name must not be null or blank");
+      Preconditions.checkArgument(value != null, "Property value must not be null");
       this.property = property;
       this.value = value;
     }
@@ -597,6 +606,8 @@ public interface KnowledgeBaseArticleChange {
     private final String property;
 
     private RemoveProperty(String property) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(property), "Property name must not be null or blank");
       this.property = property;
     }
 

@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.authorization.Owner;
 
 /** A metalake-scoped article with current rich-text content, Domain membership and bindings. */
 @Evolving
@@ -76,8 +77,7 @@ public interface KnowledgeBaseArticle extends Auditable {
   String name();
 
   /**
-   * @return the display title, unique among active articles in each directly assigned Domain, or in
-   *     the metalake scope for unassigned articles
+   * @return the display title, which may be shared by multiple articles
    */
   String title();
 
@@ -85,6 +85,17 @@ public interface KnowledgeBaseArticle extends Auditable {
    * @return the rich-text body of the article
    */
   ArticleBody body();
+
+  /**
+   * @return the opaque editing token for this metalake, article identity and revision
+   */
+  String revisionToken();
+
+  /**
+   * @return the direct owner, or null when no owner relation exists
+   */
+  @Nullable
+  Owner owner();
 
   /**
    * @return the article status
@@ -133,4 +144,14 @@ public interface KnowledgeBaseArticle extends Auditable {
    */
   @Override
   Audit auditInfo();
+
+  /**
+   * @return the readable Terms in the requested binding window
+   */
+  ArticleTermBinding[] terms();
+
+  /**
+   * @return whether more readable Terms follow this preview
+   */
+  boolean termsHasMore();
 }

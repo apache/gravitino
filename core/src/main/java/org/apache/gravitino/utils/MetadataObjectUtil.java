@@ -147,7 +147,7 @@ public class MetadataObjectUtil {
         return NameIdentifierUtil.ofGlossaryTerm(metalakeName, metadataObject.name());
       case KNOWLEDGE_BASE_ARTICLE:
         return NameIdentifier.of(
-            metalakeName, KnowledgeBaseArticle.normalizeName(metadataObject.name()));
+            metalakeName, KnowledgeBaseArticle.normalizeName(metadataObject.fullName()));
       case DOMAIN:
         String domainName = metadataObject.fullName();
         NameValidationUtils.validateName("domain", domainName);
