@@ -68,7 +68,6 @@ public class TestMysqlTableOperations extends TestMysql {
   private static final String DEFAULT_CHARSET = "utf8mb4";
   private static final String DEFAULT_COLLATION = "utf8mb4_0900_ai_ci";
   private static final Type VARCHAR = varchar(255);
-  private static final Type VARCHAR_LITERAL = Types.VarCharType.of(255);
   private static final Type INT = Types.IntegerType.get();
 
   @Test
@@ -232,7 +231,7 @@ public class TestMysqlTableOperations extends TestMysql {
         JdbcColumn.builder()
             .withName("col_4")
             .withType(VARCHAR)
-            .withDefaultValue(Literals.of("hello world", VARCHAR_LITERAL))
+            .withDefaultValue(Literals.of("hello world", VARCHAR))
             .withNullable(false)
             .build());
     Map<String, String> properties = new HashMap<>();
@@ -272,7 +271,7 @@ public class TestMysqlTableOperations extends TestMysql {
             .withType(VARCHAR)
             .withComment("new_add")
             .withNullable(true)
-            .withDefaultValue(Literals.of("hello test", VARCHAR_LITERAL))
+            .withDefaultValue(Literals.of("hello test", VARCHAR))
             .build();
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME.toString(),
@@ -349,7 +348,7 @@ public class TestMysqlTableOperations extends TestMysql {
         JdbcColumn.builder()
             .withName("col_2")
             .withType(varchar(16))
-            .withDefaultValue(Literals.of("new", Types.VarCharType.of(16)))
+            .withDefaultValue(Literals.of("new", varchar(16)))
             .withNullable(false)
             .build();
     TABLE_OPERATIONS.create(
@@ -370,7 +369,7 @@ public class TestMysqlTableOperations extends TestMysql {
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
     Column updated = load.columns()[1];
     Assertions.assertEquals(varchar(32), updated.dataType());
-    Assertions.assertEquals(Literals.of("new", Types.VarCharType.of(32)), updated.defaultValue());
+    Assertions.assertEquals(Literals.of("new", varchar(32)), updated.defaultValue());
   }
 
   @Test
@@ -432,7 +431,7 @@ public class TestMysqlTableOperations extends TestMysql {
             .withName("col_2")
             .withType(VARCHAR)
             .withComment("name")
-            .withDefaultValue(Literals.of("hello world", VARCHAR_LITERAL))
+            .withDefaultValue(Literals.of("hello world", VARCHAR))
             .withNullable(false)
             .build();
     columns.add(col_2);
@@ -587,7 +586,7 @@ public class TestMysqlTableOperations extends TestMysql {
         TableChange.addColumn(new String[] {"col_4"}, VARCHAR, "txt4", false),
         TableChange.updateColumnComment(new String[] {newColName_2}, newCol2Comment),
         TableChange.addColumn(
-            new String[] {"col_5"}, VARCHAR, "txt5", Literals.of("hello world", VARCHAR_LITERAL)));
+            new String[] {"col_5"}, VARCHAR, "txt5", Literals.of("hello world", VARCHAR)));
     load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
 
     columns.clear();
@@ -616,7 +615,7 @@ public class TestMysqlTableOperations extends TestMysql {
             .withName("col_5")
             .withType(VARCHAR)
             .withComment("txt5")
-            .withDefaultValue(Literals.of("hello world", VARCHAR_LITERAL))
+            .withDefaultValue(Literals.of("hello world", VARCHAR))
             .withNullable(true)
             .build());
     assertionsTableInfo(
@@ -647,7 +646,7 @@ public class TestMysqlTableOperations extends TestMysql {
             .withType(VARCHAR)
             .withNullable(false)
             .withComment("xxx")
-            .withDefaultValue(Literals.of("hello world", VARCHAR_LITERAL))
+            .withDefaultValue(Literals.of("hello world", VARCHAR))
             .build());
     columns.add(col3);
     columns.add(
@@ -716,7 +715,7 @@ public class TestMysqlTableOperations extends TestMysql {
             .withType(VARCHAR)
             .withNullable(false)
             .withComment("varchar")
-            .withDefaultValue(Literals.of("hello", VARCHAR_LITERAL))
+            .withDefaultValue(Literals.of("hello", VARCHAR))
             .build());
     Map<String, String> properties = new HashMap<>();
 
@@ -752,7 +751,7 @@ public class TestMysqlTableOperations extends TestMysql {
             new String[] {columns.get(2).name()},
             Literals.timestampLiteral(LocalDateTime.parse("2024-04-01T00:00:00"))),
         TableChange.updateColumnDefaultValue(
-            new String[] {columns.get(3).name()}, Literals.of("world", VARCHAR_LITERAL)));
+            new String[] {columns.get(3).name()}, Literals.of("world", VARCHAR)));
 
     loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
     Assertions.assertEquals(
@@ -761,8 +760,7 @@ public class TestMysqlTableOperations extends TestMysql {
     Assertions.assertEquals(
         Literals.timestampLiteral(LocalDateTime.parse("2024-04-01T00:00:00")),
         loaded.columns()[2].defaultValue());
-    Assertions.assertEquals(
-        Literals.of("world", VARCHAR_LITERAL), loaded.columns()[3].defaultValue());
+    Assertions.assertEquals(Literals.of("world", VARCHAR), loaded.columns()[3].defaultValue());
   }
 
   @Test
@@ -1604,7 +1602,7 @@ public class TestMysqlTableOperations extends TestMysql {
     try {
       JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
       Assertions.assertEquals(
-          Literals.varcharLiteral(255, defaultValue), table.columns()[0].defaultValue());
+          Literals.of(defaultValue, VARCHAR), table.columns()[0].defaultValue());
 
       TABLE_OPERATIONS.alterTable(
           TEST_DB_NAME.toString(),
@@ -1619,7 +1617,7 @@ public class TestMysqlTableOperations extends TestMysql {
               Literals.varcharLiteral(255, defaultValue)));
       table = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
       Assertions.assertEquals(
-          Literals.varcharLiteral(255, defaultValue), table.columns()[1].defaultValue());
+          Literals.of(defaultValue, VARCHAR), table.columns()[1].defaultValue());
 
       String updated = defaultValue + " updated";
       TABLE_OPERATIONS.alterTable(
@@ -1628,8 +1626,7 @@ public class TestMysqlTableOperations extends TestMysql {
           TableChange.updateColumnDefaultValue(
               new String[] {"col1"}, Literals.varcharLiteral(255, updated)));
       table = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
-      Assertions.assertEquals(
-          Literals.varcharLiteral(255, updated), table.columns()[0].defaultValue());
+      Assertions.assertEquals(Literals.of(updated, VARCHAR), table.columns()[0].defaultValue());
     } finally {
       TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), tableName);
     }

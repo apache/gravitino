@@ -141,6 +141,17 @@ public class TestJsonUtils {
     Assertions.assertEquals(objectMapper.readTree(expected), objectMapper.readTree(jsonValue));
     Assertions.assertEquals(type, JsonUtils.objectMapper().readValue(jsonValue, Type.class));
 
+    Assertions.assertEquals(
+        Types.StringType.get(),
+        JsonUtils.objectMapper()
+            .readValue("{\"type\":\"string\",\"charset\":null,\"collation\":null}", Type.class));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            JsonUtils.objectMapper()
+                .readValue(
+                    "{\"type\":\"varchar\",\"length\":-1,\"charset\":\"utf8mb4\"}", Type.class));
+
     type = Types.DecimalType.of(10, 2);
     jsonValue = JsonUtils.objectMapper().writeValueAsString(type);
     expected = "\"decimal(10,2)\"";

@@ -58,6 +58,8 @@ import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.literals.Literal;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
@@ -327,8 +329,17 @@ public class MysqlTableOperations extends JdbcTableOperations {
         .withComment(column.comment())
         .withNullable(column.nullable())
         .withAutoIncrement(column.autoIncrement())
-        .withDefaultValue(column.defaultValue())
+        .withDefaultValue(defaultValueWithType(column.defaultValue(), type))
         .build();
+  }
+
+  private static Expression defaultValueWithType(Expression defaultValue, Type type) {
+    if (type instanceof Type.CharacterType
+        && defaultValue instanceof Literal
+        && ((Literal<?>) defaultValue).dataType() instanceof Type.CharacterType) {
+      return Literals.of(((Literal<?>) defaultValue).value(), type);
+    }
+    return defaultValue;
   }
 
   private static Map<String, MysqlColumnTypeMetadata> fetchColumnTypeMetadata(

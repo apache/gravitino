@@ -124,7 +124,13 @@ public interface Type {
   /** The base type of all primitive types. */
   abstract class PrimitiveType implements Type {}
 
-  /** The base type of all character types. */
+  /**
+   * The base type of all character types.
+   *
+   * <p>Character set and collation are provider-defined strings and are compared using exact,
+   * case-sensitive equality. {@link #simpleString()} intentionally omits this metadata, so two
+   * unequal character types can have the same simple string representation.
+   */
   abstract class CharacterType extends PrimitiveType {
     @Nullable private final String charset;
     @Nullable private final String collation;

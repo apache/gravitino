@@ -25,6 +25,12 @@ export const formatColumnType = type => {
     return type ?? ''
   }
   switch (type.type) {
+    case 'string':
+      return 'string'
+    case 'char':
+      return `char(${type.length})`
+    case 'varchar':
+      return `varchar(${type.length})`
     case 'list':
       return `list<${withNotNull(formatColumnType(type.elementType), type.containsNull)}>`
     case 'map':

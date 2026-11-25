@@ -175,8 +175,11 @@ class CharacterType(PrimitiveType, ABC):
 
     @staticmethod
     def _validate_metadata(value: Optional[str], name: str) -> None:
-        if value is not None and not value.strip():
-            raise ValueError(f"{name} cannot be empty or blank")
+        if value is not None:
+            if not isinstance(value, str):
+                raise ValueError(f"{name} must be a string")
+            if not value.strip():
+                raise ValueError(f"{name} cannot be empty or blank")
 
 
 class NumericType(PrimitiveType, ABC):

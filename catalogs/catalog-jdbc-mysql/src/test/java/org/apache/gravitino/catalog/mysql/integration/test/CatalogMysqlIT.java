@@ -925,25 +925,50 @@ public class CatalogMysqlIT extends BaseIT {
                 + "text_col TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci)",
             schemaName, tableName));
 
-    Table loadedTable =
-        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+    TableCatalog tables = catalog.asTableCatalog();
+    NameIdentifier tableIdent = NameIdentifier.of(schemaName, tableName);
+    Table loadedTable = tables.loadTable(tableIdent);
+    assertCharacterMetadata(loadedTable);
+
+    tables.alterTable(
+        tableIdent, TableChange.updateColumnComment(new String[] {"utf8_col"}, "updated"));
+    assertCharacterMetadata(tables.loadTable(tableIdent));
+
+    tables.alterTable(
+        tableIdent, TableChange.renameColumn(new String[] {"latin1_col"}, "latin1_renamed"));
+    assertCharacterMetadata(tables.loadTable(tableIdent));
+
+    tables.alterTable(
+        tableIdent, TableChange.updateColumnNullability(new String[] {"text_col"}, false));
+    assertCharacterMetadata(tables.loadTable(tableIdent));
+
+    Type varcharType = loadedTable.columns()[0].dataType();
+    tables.alterTable(
+        tableIdent,
+        TableChange.updateColumnDefaultValue(
+            new String[] {"utf8_col"}, Literals.of("default value", varcharType)));
+    loadedTable = tables.loadTable(tableIdent);
+    assertCharacterMetadata(loadedTable);
     Assertions.assertEquals(
-        Types.VarCharType.of(100, "utf8mb4", "utf8mb4_bin"), loadedTable.columns()[0].dataType());
-    Assertions.assertEquals(
-        Types.FixedCharType.of(20, "latin1", "latin1_bin"), loadedTable.columns()[1].dataType());
-    Assertions.assertEquals(
-        Types.StringType.of("utf8mb4", "utf8mb4_unicode_ci"), loadedTable.columns()[2].dataType());
+        Literals.of("default value", varcharType), loadedTable.columns()[0].defaultValue());
 
     String copiedTableName = GravitinoITUtils.genRandomName("character_metadata_copy");
     NameIdentifier copiedTableIdent = NameIdentifier.of(schemaName, copiedTableName);
-    catalog
-        .asTableCatalog()
-        .createTable(copiedTableIdent, loadedTable.columns(), null, ImmutableMap.of());
-    Table copiedTable = catalog.asTableCatalog().loadTable(copiedTableIdent);
+    tables.createTable(copiedTableIdent, loadedTable.columns(), null, ImmutableMap.of());
+    Table copiedTable = tables.loadTable(copiedTableIdent);
 
     Assertions.assertArrayEquals(
         Arrays.stream(loadedTable.columns()).map(Column::dataType).toArray(Type[]::new),
         Arrays.stream(copiedTable.columns()).map(Column::dataType).toArray(Type[]::new));
+  }
+
+  private static void assertCharacterMetadata(Table table) {
+    Assertions.assertEquals(
+        Types.VarCharType.of(100, "utf8mb4", "utf8mb4_bin"), table.columns()[0].dataType());
+    Assertions.assertEquals(
+        Types.FixedCharType.of(20, "latin1", "latin1_bin"), table.columns()[1].dataType());
+    Assertions.assertEquals(
+        Types.StringType.of("utf8mb4", "utf8mb4_unicode_ci"), table.columns()[2].dataType());
   }
 
   @Test

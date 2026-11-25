@@ -103,6 +103,30 @@ class TestTypeSerdes(unittest.TestCase):
             self.assertEqual(serialized, expected)
             self.assertEqual(TypeSerdes.deserialize(serialized), character_type)
 
+        self.assertEqual(
+            TypeSerdes.deserialize(
+                {"type": "string", "charset": None, "collation": None}
+            ),
+            Types.StringType.get(),
+        )
+
+    def test_invalid_character_type_metadata(self):
+        for metadata in (
+            {"type": "string", "charset": 123},
+            {"type": "string", "collation": False},
+        ):
+            with self.subTest(metadata=metadata), self.assertRaises(ValueError):
+                TypeSerdes.deserialize(metadata)
+
+    def test_invalid_character_type_length(self):
+        for length in (-1, "20", True):
+            with self.subTest(length=length), self.assertRaises(
+                IllegalArgumentException
+            ):
+                TypeSerdes.deserialize(
+                    {"type": "varchar", "length": length, "charset": "utf8mb4"}
+                )
+
     def test_serialize_struct_type_of_primitive_and_none_types(self):
         types = self._primitive_and_none_types.values()
         fields = [

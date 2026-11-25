@@ -214,10 +214,15 @@ class SerdesUtils(SerdesUtilsBase):
             cls.LENGTH in type_data,
             f"Cannot parse {type_str} type from missing length: {type_data}",
         )
+        length = type_data[cls.LENGTH]
+        Precondition.check_argument(
+            isinstance(length, int) and not isinstance(length, bool) and length >= 0,
+            f"Cannot parse {type_str} type from invalid length: {length}",
+        )
         if type_str == "char":
-            return Types.FixedCharType.of(type_data[cls.LENGTH], charset, collation)
+            return Types.FixedCharType.of(length, charset, collation)
         if type_str == "varchar":
-            return Types.VarCharType.of(type_data[cls.LENGTH], charset, collation)
+            return Types.VarCharType.of(length, charset, collation)
         raise ValueError(f"Unsupported character type: {type_str}")
 
     @classmethod

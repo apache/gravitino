@@ -27,7 +27,7 @@ import org.apache.gravitino.rel.types.Types;
 /** Type converter for MySQL. */
 public class MysqlTypeConverter extends JdbcTypeConverter {
 
-  private static final Pattern CHARACTER_METADATA_PATTERN = Pattern.compile("[A-Za-z0-9_]+$");
+  private static final Pattern CHARACTER_METADATA_PATTERN = Pattern.compile("[A-Za-z0-9_]+");
 
   // Keep this limit in sync with Types.DecimalType.checkPrecisionScale.
   static final int MAX_DECIMAL_PRECISION = 38;

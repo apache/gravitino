@@ -825,19 +825,25 @@ public class JsonUtils {
 
   private static Type.CharacterType readCharacterType(JsonNode node) {
     String type = getString(TYPE, node);
-    String charset = node.has(CHARSET) ? getString(CHARSET, node) : null;
-    String collation = node.has(COLLATION) ? getString(COLLATION, node) : null;
+    String charset = getStringOrNull(CHARSET, node);
+    String collation = getStringOrNull(COLLATION, node);
     switch (type) {
       case "string":
         return Types.StringType.of(charset, collation);
       case "char":
         Preconditions.checkArgument(
             node.has(LENGTH), "Cannot parse char type from missing length: %s", node);
-        return Types.FixedCharType.of(getInt(LENGTH, node), charset, collation);
+        int charLength = getInt(LENGTH, node);
+        Preconditions.checkArgument(
+            charLength >= 0, "Cannot parse char type with negative length: %s", node);
+        return Types.FixedCharType.of(charLength, charset, collation);
       case "varchar":
         Preconditions.checkArgument(
             node.has(LENGTH), "Cannot parse varchar type from missing length: %s", node);
-        return Types.VarCharType.of(getInt(LENGTH, node), charset, collation);
+        int varcharLength = getInt(LENGTH, node);
+        Preconditions.checkArgument(
+            varcharLength >= 0, "Cannot parse varchar type with negative length: %s", node);
+        return Types.VarCharType.of(varcharLength, charset, collation);
       default:
         throw new IllegalArgumentException(String.format("Unsupported character type: %s", type));
     }

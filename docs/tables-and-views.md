@@ -91,13 +91,13 @@ provider's page for its type mapping.
 | Variant                   | `Types.VariantType.get()`                                               | `"variant"`                                                                                                                        |
 | Null                      | `Types.NullType.get()`                                                  | `"null"`                                                                                                                           |
 | Geometry                  | `Types.GeometryType.crs84()`                                            | `"geometry"`                                                                                                                       |
+| Geography                 | `Types.GeographyType.crs84()`                                           | `"geography"`                                                                                                                      |
 
 Character set and collation are optional, provider-defined metadata. Gravitino compares them
 exactly and preserves them in REST and client serialization. The original string JSON forms remain
 unchanged when both attributes are absent. Connectors for engines that do not expose character set
 or collation still map the character type and length, but cannot carry those two attributes into the
 engine's native type system.
-| Geography                 | `Types.GeographyType.crs84()`                                           | `"geography"`                                                                                                                      |
 
 Decimal precision is in the range 1-38, and scale is in the range 0-precision. The optional
 precision for time and timestamp types is in the range 0-12.
