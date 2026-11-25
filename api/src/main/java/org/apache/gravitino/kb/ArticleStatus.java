@@ -24,7 +24,11 @@ import org.apache.gravitino.annotation.Evolving;
 /** Publication status of a Knowledge Base Article. */
 @Evolving
 public enum ArticleStatus {
-  /** A draft article. Visible only to its owner with CREATE or to a MANAGE holder. */
+  /**
+   * A draft article. With authorization enabled, it is visible only to its owner with CREATE or to
+   * a MANAGE holder. With authorization disabled, ordinary direct reads and lists without a target
+   * filter may include it.
+   */
   DRAFT,
 
   /** A published article. Visible to every caller who passes the read check. */

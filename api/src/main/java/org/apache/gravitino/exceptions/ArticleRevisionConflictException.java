@@ -22,8 +22,8 @@ package org.apache.gravitino.exceptions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
-/** Exception thrown when an article write loses a concurrent update to the same article. */
-public class KnowledgeBaseArticleVersionConflictException extends OptimisticLockException {
+/** Exception thrown when an edit token does not match the current Article identity and revision. */
+public class ArticleRevisionConflictException extends OptimisticLockException {
 
   /**
    * Constructs a new exception with the specified detail message.
@@ -32,8 +32,7 @@ public class KnowledgeBaseArticleVersionConflictException extends OptimisticLock
    * @param args the arguments to the message
    */
   @FormatMethod
-  public KnowledgeBaseArticleVersionConflictException(
-      @FormatString String message, Object... args) {
+  public ArticleRevisionConflictException(@FormatString String message, Object... args) {
     super(message, args);
   }
 
@@ -45,7 +44,7 @@ public class KnowledgeBaseArticleVersionConflictException extends OptimisticLock
    * @param args the arguments to the message
    */
   @FormatMethod
-  public KnowledgeBaseArticleVersionConflictException(
+  public ArticleRevisionConflictException(
       Throwable cause, @FormatString String message, Object... args) {
     super(cause, message, args);
   }

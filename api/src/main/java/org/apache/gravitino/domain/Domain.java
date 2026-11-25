@@ -290,4 +290,27 @@ public interface Domain extends Auditable {
    * @throws NoSuchDomainException If this domain does not exist or is not visible to the caller.
    */
   DomainMember[] listMembers(DomainMemberFilter filter) throws NoSuchDomainException;
+
+  /**
+   * Lists directly assigned definitions for a caller with MANAGE_DOMAIN on this Domain. Includes
+   * the identities of hidden drafts. Content reads require separate authorization.
+   *
+   * @param limit maximum page size, from 1 through 1,000
+   * @param offset number of direct members to skip
+   * @return a page of member types and names, ordered by type and stable ID
+   * @throws NoSuchDomainException If this domain does not exist or is not visible to the caller.
+   * @throws UnsupportedOperationException if the implementation does not support definition
+   *     membership
+   */
+  default DefinitionMemberPage listDefinitionMembers(int limit, int offset) {
+    throw new UnsupportedOperationException("Domain definition membership is unsupported");
+  }
+
+  /**
+   * @return the first page of up to 20 directly assigned definitions
+   * @throws NoSuchDomainException If this domain does not exist or is not visible to the caller.
+   */
+  default DefinitionMemberPage listDefinitionMembers() {
+    return listDefinitionMembers(20, 0);
+  }
 }

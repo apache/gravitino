@@ -45,6 +45,7 @@ import org.apache.gravitino.catalog.SemanticModelDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
+import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.job.JobOperationDispatcher;
@@ -132,6 +133,28 @@ public class TestMetadataObjectUtil {
         Entity.EntityType.DOMAIN, MetadataObjectUtil.toEntityType(MetadataObject.Type.DOMAIN));
     Assertions.assertThrows(
         UnsupportedOperationException.class, () -> entityTypes.add(Entity.EntityType.USER));
+  }
+
+  @Test
+  public void testArticleIdentifierRoundTrip() {
+    MetadataObject.Type type = MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE;
+    MetadataObjectDTO dto = MetadataObjectDTO.builder().withType(type).build();
+    dto.setFullName("café");
+    NameIdentifier ident = MetadataObjectUtil.toEntityIdent("lake", dto);
+    Assertions.assertEquals(NameIdentifier.of("lake", "café"), ident);
+    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(dto);
+    Assertions.assertEquals(
+        MetadataObjects.of(null, "café", type),
+        NameIdentifierUtil.toMetadataObjectForRead(ident, entityType));
+    for (NameIdentifier invalid :
+        List.of(NameIdentifier.of("guide"), NameIdentifier.of("lake", "prefix", "guide"))) {
+      Assertions.assertThrows(
+          IllegalNamespaceException.class,
+          () -> NameIdentifierUtil.toMetadataObjectForRead(invalid, entityType));
+    }
+    dto.setFullName("prefix.guide");
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> MetadataObjectUtil.toEntityIdent("lake", dto));
   }
 
   @Test

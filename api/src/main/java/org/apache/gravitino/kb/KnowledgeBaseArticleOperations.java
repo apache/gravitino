@@ -19,14 +19,15 @@
 
 package org.apache.gravitino.kb;
 
+import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
 import org.apache.gravitino.exceptions.KnowledgeBaseArticleAlreadyExistsException;
-import org.apache.gravitino.exceptions.KnowledgeBaseArticleVersionConflictException;
 import org.apache.gravitino.exceptions.NoSuchKnowledgeBaseArticleException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
 /**
- * Metalake-scoped operations on Knowledge Base Articles and their asset bindings.
+ * Metalake-scoped operations on Knowledge Base Articles and their Term and asset bindings.
  *
  * <p>Page visible results before returning them. Page sizes range from 1 through {@value
  * ArticleListFilter#MAX_LIMIT}; offsets are zero-based and nonnegative.
@@ -68,12 +69,13 @@ public interface KnowledgeBaseArticleOperations {
       throws NoSuchKnowledgeBaseArticleException;
 
   /**
-   * Creates an article with current content, Domains and initial bindings.
+   * Creates an article with current content and initial bindings. Each added Domain requires
+   * MANAGE_DOMAIN in addition to Article create authority. The creator becomes Owner when
+   * authorization is enabled.
    *
    * @param articleCreate the create request
    * @return the created article
-   * @throws KnowledgeBaseArticleAlreadyExistsException if the explicit name is already used, or the
-   *     title is already claimed in the same title-uniqueness scope
+   * @throws KnowledgeBaseArticleAlreadyExistsException if the explicit article name is already used
    */
   KnowledgeBaseArticle createArticle(ArticleCreate articleCreate)
       throws KnowledgeBaseArticleAlreadyExistsException;
@@ -85,30 +87,55 @@ public interface KnowledgeBaseArticleOperations {
    * @param name the article name
    * @param changes the changes to apply
    * @return the altered article
-   * @throws NoSuchKnowledgeBaseArticleException if the article does not exist
-   * @throws KnowledgeBaseArticleAlreadyExistsException if the title is already claimed in a
-   *     requested Domain or the default scope
-   * @throws KnowledgeBaseArticleVersionConflictException if a concurrent update to the same article
-   *     was detected
+   * @throws NoSuchKnowledgeBaseArticleException if the article does not exist or is invisible to
+   *     the caller
    */
-  KnowledgeBaseArticle alterArticle(String name, KnowledgeBaseArticleChange... changes)
-      throws NoSuchKnowledgeBaseArticleException, KnowledgeBaseArticleAlreadyExistsException,
-          KnowledgeBaseArticleVersionConflictException;
+  default KnowledgeBaseArticle alterArticle(String name, KnowledgeBaseArticleChange... changes) {
+    return alterArticle(name, changes, null);
+  }
+
+  /**
+   * Applies all changes atomically. Domain replacement requires Article edit authority and
+   * MANAGE_DOMAIN on each added or removed Domain. After authorization, compare a supplied token
+   * against the locked Article before detecting a no-op. A matching no-op retains the token.
+   *
+   * @param name the article name
+   * @param changes the changes, including any binding deltas
+   * @param expectedRevision opaque token from a full Article response, or null for an ordinary edit
+   * @return the updated article with its editing token
+   * @throws ArticleRevisionConflictException if the token refers to another identity or a stale
+   *     revision
+   * @throws IllegalArgumentException if the token is malformed
+   * @throws NoSuchKnowledgeBaseArticleException if the article is missing or hidden
+   */
+  KnowledgeBaseArticle alterArticle(
+      String name, KnowledgeBaseArticleChange[] changes, @Nullable String expectedRevision)
+      throws ArticleRevisionConflictException, NoSuchKnowledgeBaseArticleException;
 
   /**
    * Deletes an article.
    *
    * @param name the article name
-   * @return true if the article was deleted, false if it did not exist
+   * @return true if the article was deleted, false if absent, previously deleted or hidden
    */
-  boolean deleteArticle(String name) throws KnowledgeBaseArticleVersionConflictException;
+  boolean deleteArticle(String name);
+
+  /**
+   * Detaches one Article from a Domain. With authorization enabled, this requires MANAGE_DOMAIN on
+   * the Domain, independent of Article edit permission. An absent Article or membership is a no-op.
+   *
+   * @param name the Article name
+   * @param domain the Domain name
+   */
+  void detachDomain(String name, String domain);
 
   /**
    * Lists the metadata objects bound to the article.
    *
    * @param name the article name
    * @return the bound objects visible to the caller
-   * @throws NoSuchKnowledgeBaseArticleException if the article does not exist
+   * @throws NoSuchKnowledgeBaseArticleException if the article does not exist or is invisible to
+   *     the caller
    */
   default AssetBindingPage listAssetBindings(String name)
       throws NoSuchKnowledgeBaseArticleException {
@@ -122,34 +149,81 @@ public interface KnowledgeBaseArticleOperations {
    * @param limit maximum page size
    * @param offset number of visible bindings to skip
    * @return the requested binding page
+   * @throws NoSuchKnowledgeBaseArticleException if the article does not exist or is invisible to
+   *     the caller
    */
   AssetBindingPage listAssetBindings(String name, int limit, int offset)
       throws NoSuchKnowledgeBaseArticleException;
 
   /**
-   * Adds and removes asset bindings in one transaction. A request is atomic: if any target is
-   * missing or invisible, no binding changes.
-   *
    * @param name the article name
-   * @param objectsToAdd the objects to bind
-   * @param objectsToRemove the objects to unbind
-   * @return the first page of visible bindings after the change
-   * @throws NoSuchKnowledgeBaseArticleException if the article does not exist
-   * @throws KnowledgeBaseArticleVersionConflictException on an optimistic-lock conflict
+   * @return the first page of readable bound Terms
+   * @throws NoSuchKnowledgeBaseArticleException if the article does not exist or is invisible to
+   *     the caller
    */
-  AssetBindingPage alterAssetBindings(
-      String name,
-      ArticleObjectIdentifier[] objectsToAdd,
-      ArticleObjectIdentifier[] objectsToRemove)
-      throws NoSuchKnowledgeBaseArticleException, KnowledgeBaseArticleVersionConflictException;
+  default TermBindingPage listTermBindings(String name) {
+    return listTermBindings(name, ArticleListFilter.DEFAULT_LIMIT, 0);
+  }
 
   /**
-   * Reverse lookup: lists the articles bound to a metadata object.
+   * Lists readable Terms bound to the Article.
    *
-   * @param object the target object
-   * @param includeDeprecated whether to include deprecated articles; draft articles are never
-   *     returned
-   * @return the matching published articles
+   * @param name the article name
+   * @param limit maximum page size
+   * @param offset readable bindings to skip
+   * @return the requested page
+   * @throws NoSuchKnowledgeBaseArticleException if the article does not exist or is invisible to
+   *     the caller
+   */
+  TermBindingPage listTermBindings(String name, int limit, int offset);
+
+  /**
+   * @param term direct binding target
+   * @return the first page of published articles bound to the target
+   */
+  default ArticlePage listArticlesForTerm(String term) {
+    return listArticlesForTerm(term, false);
+  }
+
+  /**
+   * @param term direct binding target
+   * @param includeDeprecated whether to include deprecated articles
+   * @return the first page of matching articles
+   */
+  default ArticlePage listArticlesForTerm(String term, boolean includeDeprecated) {
+    return listArticlesForTerm(term, includeDeprecated, ArticleListFilter.DEFAULT_LIMIT, 0);
+  }
+
+  /**
+   * @param term direct binding target
+   * @param includeDeprecated whether to include deprecated articles
+   * @param limit maximum page size
+   * @param offset matching articles to skip
+   * @return the requested page of visible matches
+   */
+  default ArticlePage listArticlesForTerm(
+      String term, boolean includeDeprecated, int limit, int offset) {
+    return listArticles(
+        ArticleListFilter.builder()
+            .withTerm(term)
+            .withIncludeDeprecated(includeDeprecated)
+            .withLimit(limit)
+            .withOffset(offset)
+            .build());
+  }
+
+  /**
+   * @param object direct binding target
+   * @return the first page of published articles bound to the target
+   */
+  default ArticlePage listArticlesForObject(ArticleObjectIdentifier object) {
+    return listArticlesForObject(object, false);
+  }
+
+  /**
+   * @param object direct binding target
+   * @param includeDeprecated whether to include deprecated articles
+   * @return the first page of matching articles
    */
   default ArticlePage listArticlesForObject(
       ArticleObjectIdentifier object, boolean includeDeprecated) {
@@ -157,14 +231,20 @@ public interface KnowledgeBaseArticleOperations {
   }
 
   /**
-   * Lists a page of visible published articles bound to an asset.
-   *
-   * @param object target asset
+   * @param object direct binding target
    * @param includeDeprecated whether to include deprecated articles
    * @param limit maximum page size
-   * @param offset number of visible matches to skip
-   * @return a page of visible matches with its continuation flag
+   * @param offset matching articles to skip
+   * @return the requested page of visible matches
    */
-  ArticlePage listArticlesForObject(
-      ArticleObjectIdentifier object, boolean includeDeprecated, int limit, int offset);
+  default ArticlePage listArticlesForObject(
+      ArticleObjectIdentifier object, boolean includeDeprecated, int limit, int offset) {
+    return listArticles(
+        ArticleListFilter.builder()
+            .withObject(object)
+            .withIncludeDeprecated(includeDeprecated)
+            .withLimit(limit)
+            .withOffset(offset)
+            .build());
+  }
 }
