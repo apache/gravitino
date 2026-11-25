@@ -205,7 +205,7 @@ public class GlossaryTermMetaBaseSQLProvider {
   }
 
   /** Reads a bounded batch of live terms by ID. */
-  public String snapshotByIds(
+  public String selectTermSnapshotsByIds(
       @Param("metalakeId") long metalakeId,
       @Param("metalakeName") String metalakeName,
       @Param("ids") List<Long> ids) {

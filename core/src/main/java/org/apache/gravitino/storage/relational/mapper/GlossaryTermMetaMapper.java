@@ -133,8 +133,10 @@ public interface GlossaryTermMetaMapper {
       @Param("key") @Nullable String key);
 
   /** Reads definition snapshots for one bounded batch of live endpoints. */
-  @SelectProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "snapshotByIds")
-  List<GlossaryTermSnapshotPO> snapshotByIds(
+  @SelectProvider(
+      type = GlossaryTermMetaSQLProviderFactory.class,
+      method = "selectTermSnapshotsByIds")
+  List<GlossaryTermSnapshotPO> selectTermSnapshotsByIds(
       @Param("metalakeId") long metalakeId,
       @Param("metalakeName") String metalakeName,
       @Param("ids") List<Long> ids);

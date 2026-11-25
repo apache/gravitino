@@ -75,7 +75,7 @@ public final class GlossaryTermVersions {
       names.keySet().retainAll(ids);
       for (GlossaryTermEntity endpoint :
           GlossaryTermMetaService.getInstance()
-              .getByIds(term.namespace(), definition.getMetalakeId(), ids)) {
+              .listTermsByIds(term.namespace(), definition.getMetalakeId(), ids)) {
         names.put(endpoint.id(), endpoint.name());
       }
       for (Set<Long> members : List.of(broader, related)) {

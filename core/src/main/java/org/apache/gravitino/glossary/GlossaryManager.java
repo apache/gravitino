@@ -150,6 +150,19 @@ public final class GlossaryManager {
         ids, authorizationEnabled, handler, readable.and(visibility), depthLimit, policy);
   }
 
+  record SnapshotTerms(long metalakeId, GlossaryAccess access, List<GlossaryTermEntity> terms) {}
+
+  boolean isTermVisible(
+      GlossaryTermEntity term, GlossaryAccess access, @Nullable GlossaryTerm.Status status) {
+    return (status == null || status == term.status())
+        && access.canRead(term)
+        && readable.test(term);
+  }
+
+  GlossaryAccess accessForMetalake(String metalake) {
+    return GlossaryAccess.forRequest(metalake, authorizationEnabled);
+  }
+
   /** Selects the direction of a hierarchy walk or the symmetric direct related terms. */
   public enum Direction {
     /** Follow child-to-parent edges. */
@@ -178,51 +191,56 @@ public final class GlossaryManager {
     Preconditions.checkArgument(
         direction != Direction.RELATED || !transitive, "RELATED is not transitive");
     return SqlSessions.readSnapshot(
-        () -> {
-          NameIdentifier ident = NameIdentifierUtil.ofGlossaryTerm(metalake, name);
-          long lake = termReadMetalakeId(ident);
-          GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
-          GlossaryTermEntity root = loadRootForView(ident, lake, access);
-          Predicate<GlossaryTermEntity> visible =
-              term ->
-                  (status == null || status == term.status())
-                      && access.canRead(term)
-                      && readable.test(term);
-          if (!visible.test(root)) {
-            throw missingRelationRoot(ident);
-          }
-          List<GlossaryTermEntity> result = new ArrayList<>();
-          Set<Long> seen = new HashSet<>(Set.of(root.id()));
-          Set<Long> frontier = Set.of(root.id());
-          do {
-            Set<Long> next = new LinkedHashSet<>();
-            List<GlossaryTermRelPO> links =
-                switch (direction) {
-                  case BROADER -> edges.listBroaderEdges(lake, frontier);
-                  case NARROWER -> edges.listNarrowerEdges(lake, frontier);
-                  case RELATED -> edges.listRelatedEdges(lake, frontier);
-                };
-            for (GlossaryTermRelPO link : links) {
-              long id =
-                  direction == Direction.NARROWER
-                          || (direction == Direction.RELATED
-                              && link.getToTermId().equals(root.id()))
-                      ? link.getFromTermId()
-                      : link.getToTermId();
-              if (seen.add(id)) {
-                next.add(id);
-              }
-            }
-            frontier = new LinkedHashSet<>();
-            for (GlossaryTermEntity term : terms.getByIds(root.namespace(), lake, next)) {
-              if (visible.test(term)) {
-                result.add(term);
-                frontier.add(term.id());
-              }
-            }
-          } while (transitive && !frontier.isEmpty());
-          return visibleDomains(result, access);
-        });
+        () -> listRelationsInSnapshot(metalake, name, direction, transitive, status).terms());
+  }
+
+  SnapshotTerms listRelationsInSnapshot(
+      String metalake,
+      String name,
+      Direction direction,
+      boolean transitive,
+      @Nullable GlossaryTerm.Status status) {
+    NameIdentifier ident = NameIdentifierUtil.ofGlossaryTerm(metalake, name);
+    long lake = termReadMetalakeId(ident);
+    GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
+    GlossaryTermEntity root = loadRootForView(ident, lake, access);
+    Predicate<GlossaryTermEntity> visible = term -> isTermVisible(term, access, status);
+    if (!visible.test(root)) {
+      throw missingRelationRoot(ident);
+    }
+    List<GlossaryTermEntity> result = new ArrayList<>();
+    Set<Long> seen = new HashSet<>(Set.of(root.id()));
+    Set<Long> frontier = Set.of(root.id());
+    for (; ; ) {
+      Set<Long> next = new LinkedHashSet<>();
+      List<GlossaryTermRelPO> links =
+          switch (direction) {
+            case BROADER -> edges.listBroaderEdges(lake, frontier);
+            case NARROWER -> edges.listNarrowerEdges(lake, frontier);
+            case RELATED -> edges.listRelatedEdges(lake, frontier);
+          };
+      for (GlossaryTermRelPO link : links) {
+        long id =
+            direction == Direction.NARROWER
+                    || (direction == Direction.RELATED && link.getToTermId().equals(root.id()))
+                ? link.getFromTermId()
+                : link.getToTermId();
+        if (seen.add(id)) {
+          next.add(id);
+        }
+      }
+      frontier = new LinkedHashSet<>();
+      for (GlossaryTermEntity term : terms.listTermsByIds(root.namespace(), lake, next)) {
+        if (visible.test(term)) {
+          result.add(term);
+          frontier.add(term.id());
+        }
+      }
+      if (!transitive || frontier.isEmpty()) {
+        break;
+      }
+    }
+    return new SnapshotTerms(lake, access, visibleDomains(result, access));
   }
 
   /**
@@ -254,28 +272,45 @@ public final class GlossaryManager {
       return all;
     }
     return SqlSessions.readSnapshot(
-        () -> {
-          long metalakeId;
-          try {
-            metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
-          } catch (NoSuchEntityException missing) {
-            throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", metalake);
-          }
-          GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
-          if (!access.canView()) {
-            return new ArrayList<>();
-          }
-          Namespace ns = NamespaceUtil.ofGlossaryTerm(metalake);
-          List<GlossaryTermEntity> result;
-          if (domain == null) {
-            result = terms.list(ns, metalakeId);
-          } else {
-            Set<Long> scope = domainScope(metalake, metalakeId, domain, access);
-            result = terms.getByIds(ns, metalakeId, DOMAINS.termIds(metalakeId, scope));
-          }
-          result.removeIf(term -> !access.canRead(term) || !readable.test(term));
-          return visibleDomains(result, access);
-        });
+        () -> listTermsInSnapshot(metalake, domain, ignored -> true, null).terms());
+  }
+
+  SnapshotTerms listTermsInSnapshot(
+      String metalake,
+      @Nullable String domain,
+      Predicate<GlossaryTermEntity> matchesName,
+      @Nullable GlossaryTerm.Status status) {
+    long metalakeId = resolveMetalakeId(metalake);
+    GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
+    return new SnapshotTerms(
+        metalakeId,
+        access,
+        listVisibleTermsInSnapshot(
+            metalake,
+            metalakeId,
+            access,
+            domain,
+            matchesName,
+            status,
+            GlossaryManager::visibleDomains));
+  }
+
+  String[] listTermNamesInSnapshot(
+      String metalake,
+      @Nullable String domain,
+      Predicate<GlossaryTermEntity> matchesName,
+      @Nullable GlossaryTerm.Status status) {
+    long metalakeId = resolveMetalakeId(metalake);
+    GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
+    return listVisibleTermsInSnapshot(
+            metalake,
+            metalakeId,
+            access,
+            domain,
+            matchesName,
+            status,
+            (term, ignored) -> term.name())
+        .toArray(String[]::new);
   }
 
   /**
@@ -290,16 +325,19 @@ public final class GlossaryManager {
     if (!authorizationEnabled) {
       return requireVisible(ident, relationRoot(ident).term());
     }
-    return SqlSessions.readSnapshot(
-        () -> {
-          long lake = termReadMetalakeId(ident);
-          GlossaryAccess access = GlossaryAccess.forRequest(metalake, true);
-          GlossaryTermEntity term = loadRootForView(ident, lake, access);
-          if (!access.canRead(term)) {
-            throw missingRelationRoot(ident);
-          }
-          return visibleDomains(requireVisible(ident, term), access);
-        });
+    return SqlSessions.readSnapshot(() -> getTermInSnapshot(metalake, name, null).terms().get(0));
+  }
+
+  SnapshotTerms getTermInSnapshot(
+      String metalake, String name, @Nullable GlossaryTerm.Status status) {
+    NameIdentifier ident = NameIdentifierUtil.ofGlossaryTerm(metalake, name);
+    long lake = termReadMetalakeId(ident);
+    GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
+    GlossaryTermEntity term = loadRootForView(ident, lake, access);
+    if (!isTermVisible(term, access, status)) {
+      throw missingRelationRoot(ident);
+    }
+    return new SnapshotTerms(lake, access, List.of(visibleDomains(term, access)));
   }
 
   /**
@@ -464,7 +502,7 @@ public final class GlossaryManager {
                     null,
                     () -> {
                       for (GlossaryTermEntity survivor :
-                          terms.getByIds(ident.namespace(), lake, affected)) {
+                          terms.listTermsByIds(ident.namespace(), lake, affected)) {
                         GlossaryTermEntity after =
                             TermEdits.apply(survivor, new TermChange[0], true);
                         handler.handleRelationLoss(
@@ -611,7 +649,7 @@ public final class GlossaryManager {
           if (head.getPublishedVersion() != null) {
             long lake = draft.definition().getMetalakeId();
             List<GlossaryTermEntity> live =
-                terms.getByIds(NamespaceUtil.ofGlossaryTerm(metalake), lake, Set.of(termId));
+                terms.listTermsByIds(NamespaceUtil.ofGlossaryTerm(metalake), lake, Set.of(termId));
             if (live.isEmpty()
                 || live.get(0).version() != row.getBaseRevision()
                 || !edges.listRelated(lake, termId).equals(draft.baseRelated())) {
@@ -637,6 +675,42 @@ public final class GlossaryManager {
   /** Rejects exactly the submitted candidate and leaves the published snapshot in place. */
   public TermPublication rejectCandidate(String metalake, long termId, long candidateVersionId) {
     return recordCandidateDecision(metalake, termId, candidateVersionId, State.REJECTED);
+  }
+
+  private static long resolveMetalakeId(String metalake) {
+    try {
+      return MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+    } catch (NoSuchEntityException missing) {
+      throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", metalake);
+    }
+  }
+
+  private <T> List<T> listVisibleTermsInSnapshot(
+      String metalake,
+      long metalakeId,
+      GlossaryAccess access,
+      @Nullable String domain,
+      Predicate<GlossaryTermEntity> matchesName,
+      @Nullable GlossaryTerm.Status status,
+      BiFunction<GlossaryTermEntity, GlossaryAccess, T> project) {
+    if (!access.canView()) {
+      return new ArrayList<>();
+    }
+    Namespace ns = NamespaceUtil.ofGlossaryTerm(metalake);
+    List<GlossaryTermEntity> result;
+    if (domain == null) {
+      result = terms.list(ns, metalakeId);
+    } else {
+      Set<Long> scope = domainScope(metalake, metalakeId, domain, access);
+      result = terms.listTermsByIds(ns, metalakeId, DOMAINS.termIds(metalakeId, scope));
+    }
+    List<T> visible = new ArrayList<>();
+    for (GlossaryTermEntity term : result) {
+      if (matchesName.test(term) && isTermVisible(term, access, status)) {
+        visible.add(project.apply(term, access));
+      }
+    }
+    return visible;
   }
 
   private GlossaryTermEntity alter(
@@ -754,7 +828,7 @@ public final class GlossaryManager {
         }
         if (!edge.add() && removedId != null) {
           for (GlossaryTermEntity target :
-              terms.getByIds(term.namespace(), lake, Set.of(removedId))) {
+              terms.listTermsByIds(term.namespace(), lake, Set.of(removedId))) {
             if (!access.canRead(target) || !readable.test(target))
               throw new NoSuchTermException("Referenced term does not exist");
           }
@@ -1058,7 +1132,7 @@ public final class GlossaryManager {
   private Set<Long> visibleEndpoints(
       long lake, GlossaryTermEntity term, Set<Long> ids, GlossaryAccess access) {
     Set<Long> result = new HashSet<>();
-    for (GlossaryTermEntity endpoint : terms.getByIds(term.namespace(), lake, ids)) {
+    for (GlossaryTermEntity endpoint : terms.listTermsByIds(term.namespace(), lake, ids)) {
       if (access.canRead(endpoint) && readable.test(endpoint)) result.add(endpoint.id());
     }
     return Set.copyOf(result);
@@ -1091,7 +1165,8 @@ public final class GlossaryManager {
     return terms.withHierarchyLock(
         ns,
         lake -> {
-          Set<Long> locks = terms.getByIds(ns, lake, Set.of(id)).isEmpty() ? Set.of() : Set.of(id);
+          Set<Long> locks =
+              terms.listTermsByIds(ns, lake, Set.of(id)).isEmpty() ? Set.of() : Set.of(id);
           return edges.withHierarchyLock(
               lake,
               locks,
@@ -1113,7 +1188,7 @@ public final class GlossaryManager {
       boolean mayInitialize,
       boolean requireEditor) {
     List<GlossaryTermEntity> live =
-        terms.getByIds(NamespaceUtil.ofGlossaryTerm(metalake), lake, Set.of(id));
+        terms.listTermsByIds(NamespaceUtil.ofGlossaryTerm(metalake), lake, Set.of(id));
     Head head = mapper.getVersionHeadByMetalakeAndTermId(lake, id);
     if (live.isEmpty()) {
       if (head == null
@@ -1233,7 +1308,7 @@ public final class GlossaryManager {
                     locks.addAll(snapshot.broader());
                   }
                   if (head.getPublishedVersion() != null) {
-                    if (terms.getByIds(ns, lake, Set.of(termId)).isEmpty()) {
+                    if (terms.listTermsByIds(ns, lake, Set.of(termId)).isEmpty()) {
                       throw new NoSuchTermException("Glossary term %s does not exist", termId);
                     }
                     locks.add(termId);
@@ -1288,7 +1363,9 @@ public final class GlossaryManager {
     long id = head.getTermId();
     Namespace ns = after.namespace();
     GlossaryTermEntity before =
-        head.getPublishedVersion() == null ? null : terms.getByIds(ns, lake, Set.of(id)).get(0);
+        head.getPublishedVersion() == null
+            ? null
+            : terms.listTermsByIds(ns, lake, Set.of(id)).get(0);
     if (before != null && !readable.test(before))
       throw new NoSuchTermException("Glossary term does not exist");
     if (before != null
@@ -1643,7 +1720,8 @@ public final class GlossaryManager {
           GlossaryTermEntity locked = creating ? root : terms.get(root.nameIdentifier());
           checkRoot.accept(locked);
           Set<Long> visibleIds = new HashSet<>();
-          for (GlossaryTermEntity endpoint : terms.getByIds(root.namespace(), lake, endpoints)) {
+          for (GlossaryTermEntity endpoint :
+              terms.listTermsByIds(root.namespace(), lake, endpoints)) {
             if (access.canRead(endpoint) && readable.test(endpoint)) {
               visibleIds.add(endpoint.id());
             }

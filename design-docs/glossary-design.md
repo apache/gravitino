@@ -1711,6 +1711,11 @@ The users for these cases:
   expansion and the optional binding fields are absent. Then retrieve bindings using T12.9's
   bounded pages. Separately exhaust the overall budget with term/relation projection alone:
   disabling bindings still returns the typed work-limit error, never a false complete result.
+- T13.15 List terms without a domain in a metalake with many unrelated terms and a draft hidden
+  from the caller. Exercise both an unfiltered names-only list and a selective `nameContains`
+  and `status` query. Assert the visible results and inspect storage reads. The names-only path
+  reads only the fields needed for names and visibility. The details path applies the filters
+  before loading full definitions for the matching roots. [#15119](https://github.com/apache/gravitino/issues/15119)
 
 **T14 and T15. Clients**
 

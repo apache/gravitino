@@ -136,12 +136,12 @@ public class GlossaryTermMetaSQLProviderFactory {
     return getProvider().snapshot(metalakeId, metalakeName, key);
   }
 
-  /** Delegates {@link GlossaryTermMetaBaseSQLProvider#snapshotByIds}. */
-  public static String snapshotByIds(
+  /** Delegates {@link GlossaryTermMetaBaseSQLProvider#selectTermSnapshotsByIds}. */
+  public static String selectTermSnapshotsByIds(
       @Param("metalakeId") long metalakeId,
       @Param("metalakeName") String metalakeName,
       @Param("ids") List<Long> ids) {
-    return getProvider().snapshotByIds(metalakeId, metalakeName, ids);
+    return getProvider().selectTermSnapshotsByIds(metalakeId, metalakeName, ids);
   }
 
   /** Delegates {@link GlossaryTermMetaBaseSQLProvider#conflictingName}. */
