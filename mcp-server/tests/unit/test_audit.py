@@ -21,8 +21,9 @@ import hashlib
 import json
 import logging
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+import httpx
 from fastmcp import Client
 
 from mcp_server.client.factory import RESTClientFactory
@@ -314,30 +315,360 @@ class TestAuditMiddlewareIntegration(unittest.TestCase):
         self.assertEqual(record["principal"], "oauth:0d315e3c73d7840c")
 
     def test_failed_tool_call_emits_deny_record(self):
-        """A tool call that raises an exception produces an audit record with outcome=deny."""
+        """An authorization denial produces outcome=deny with the original error_type."""
 
         class FailingOperation(MockOperation):
             def as_catalog_operation(self):
-                return _FailingCatalogOperation()
+                return _FailingCatalogOperation(
+                    GravitinoException(
+                        "Error code: 1008, Error type: ForbiddenException, "
+                        "Error message: Not allowed",
+                        status_code=403,
+                        error_code=1008,
+                        error_type="ForbiddenException",
+                    )
+                )
 
         RESTClientFactory.set_rest_client(FailingOperation)
         server = GravitinoMCPServer(Setting("mock_metalake"))
 
         async def _run():
             async with Client(server.mcp) as client:
-                try:
-                    await client.call_tool("get_list_of_catalogs")
-                except Exception:  # pylint: disable=broad-exception-caught
-                    pass
+                await client.call_tool(
+                    "get_list_of_catalogs", raise_on_error=False
+                )
 
         asyncio.run(_run())
 
-        deny_records = [
-            json.loads(r) for r in self.log_records if '"deny"' in r
+        self.assertEqual(len(self.log_records), 1)
+        record = json.loads(self.log_records[0])
+        self.assertEqual(record["tool"], "get_list_of_catalogs")
+        self.assertEqual(record["outcome"], "deny")
+        self.assertEqual(record["error_type"], "ForbiddenException")
+        self.assertEqual(record["error_category"], "permission_denied")
+        self.assertNotEqual(record["error_type"], "McpError")
+
+    def test_non_authz_failures_emit_error_outcome_and_original_classification(
+        self,
+    ):
+        """Non-authz failures emit outcome=error with their original error type and category."""
+        request = httpx.Request("GET", "http://gravitino/api/metalakes")
+        cases = [
+            (
+                GravitinoException(
+                    "Bad request",
+                    status_code=400,
+                    error_code=1001,
+                    error_type="IllegalArgumentException",
+                ),
+                "error",
+                "IllegalArgumentException",
+                "invalid_params",
+            ),
+            (
+                GravitinoException(
+                    "Not found",
+                    status_code=404,
+                    error_code=1003,
+                    error_type="NoSuchTableException",
+                ),
+                "error",
+                "NoSuchTableException",
+                "not_found",
+            ),
+            (
+                GravitinoException(
+                    "In use",
+                    status_code=409,
+                    error_code=1010,
+                    error_type="CatalogInUseException",
+                ),
+                "error",
+                "CatalogInUseException",
+                "conflict",
+            ),
+            (
+                httpx.ConnectError("Connection refused", request=request),
+                "error",
+                "ConnectError",
+                "unavailable",
+            ),
+            (
+                GravitinoException(
+                    "Unauthenticated",
+                    status_code=401,
+                    error_code=1011,
+                    error_type="UnauthorizedException",
+                ),
+                "deny",
+                "UnauthorizedException",
+                "unauthorized",
+            ),
         ]
-        self.assertTrue(len(deny_records) >= 1)
-        self.assertEqual(deny_records[0]["tool"], "get_list_of_catalogs")
-        self.assertEqual(deny_records[0]["outcome"], "deny")
+
+        for (
+            exc_to_raise,
+            expected_outcome,
+            expected_type,
+            expected_category,
+        ) in cases:
+            with self.subTest(expected_type=expected_type):
+                self.log_records.clear()
+
+                class FailingOperation(MockOperation):
+                    def as_catalog_operation(self, err=exc_to_raise):
+                        return _FailingCatalogOperation(err)
+
+                RESTClientFactory.set_rest_client(FailingOperation)
+                server = GravitinoMCPServer(Setting("mock_metalake"))
+
+                async def _run(mcp=server.mcp):
+                    async with Client(mcp) as client:
+                        await client.call_tool(
+                            "get_list_of_catalogs", raise_on_error=False
+                        )
+
+                asyncio.run(_run())
+
+                self.assertEqual(len(self.log_records), 1)
+                record = json.loads(self.log_records[0])
+                self.assertEqual(record["outcome"], expected_outcome)
+                self.assertEqual(record["error_type"], expected_type)
+                self.assertEqual(record["error_category"], expected_category)
+
+    def test_fallback_disabled_emits_deny_record(self):
+        """--no-service-identity-fallback rejection is audited as outcome=deny."""
+        server = GravitinoMCPServer(
+            Setting(
+                "mock_metalake",
+                transport="http",
+                token="service-token",
+                no_service_identity_fallback=True,
+            )
+        )
+        mock_request = MagicMock()
+        mock_request.headers.get.return_value = ""
+
+        async def _run():
+            with patch(
+                "fastmcp.server.dependencies.get_http_request",
+                return_value=mock_request,
+            ):
+                async with Client(server.mcp) as client:
+                    await client.call_tool(
+                        "get_list_of_catalogs", raise_on_error=False
+                    )
+
+        asyncio.run(_run())
+
+        self.assertEqual(len(self.log_records), 1)
+        record = json.loads(self.log_records[0])
+        self.assertEqual(record["outcome"], "deny")
+        self.assertEqual(
+            record["error_type"], "ServiceIdentityFallbackDisabled"
+        )
+        self.assertEqual(record["error_category"], "unauthorized")
+
+    def test_write_and_delete_tools_record_target_object_on_allow_and_deny(
+        self,
+    ):
+        """Write/delete audit records include target_type and target_name."""
+
+        async def _run_allow():
+            async with Client(self.mcp) as client:
+                await client.call_tool(
+                    "drop_schema",
+                    {
+                        "catalog_name": "mcpcat",
+                        "schema_name": "alice_s",
+                        "metalake": "authz",
+                    },
+                )
+                await client.call_tool(
+                    "drop_catalog",
+                    {"catalog_name": "mcpcat"},
+                )
+
+        asyncio.run(_run_allow())
+
+        schema_record = json.loads(self.log_records[0])
+        self.assertEqual(schema_record["outcome"], "allow")
+        self.assertEqual(schema_record["metalake"], "authz")
+        self.assertEqual(schema_record["target_type"], "schema")
+        self.assertEqual(schema_record["target_name"], "authz.mcpcat.alice_s")
+
+        catalog_record = json.loads(self.log_records[1])
+        self.assertEqual(catalog_record["outcome"], "allow")
+        self.assertEqual(catalog_record["target_type"], "catalog")
+        self.assertEqual(catalog_record["target_name"], "mock_metalake.mcpcat")
+
+        # Denied drop_table must still carry its target object.
+        self.log_records.clear()
+
+        class _DeniedTableOp:
+            async def drop_table(self, *_args, **_kwargs):
+                raise GravitinoException(
+                    "Forbidden",
+                    status_code=403,
+                    error_code=1008,
+                    error_type="ForbiddenException",
+                )
+
+        class DeniedOperation(MockOperation):
+            def as_table_operation(self):
+                return _DeniedTableOp()
+
+        RESTClientFactory.set_rest_client(DeniedOperation)
+        denied_server = GravitinoMCPServer(Setting("authz"))
+
+        async def _run_deny():
+            async with Client(denied_server.mcp) as client:
+                await client.call_tool(
+                    "drop_table",
+                    {
+                        "catalog_name": "mcpcat",
+                        "schema_name": "alice_s",
+                        "table_name": "orders",
+                    },
+                    raise_on_error=False,
+                )
+
+        asyncio.run(_run_deny())
+
+        denied_record = json.loads(self.log_records[0])
+        self.assertEqual(denied_record["outcome"], "deny")
+        self.assertEqual(denied_record["error_type"], "ForbiddenException")
+        self.assertEqual(denied_record["target_type"], "table")
+        self.assertEqual(
+            denied_record["target_name"], "authz.mcpcat.alice_s.orders"
+        )
+
+    def test_readonly_tool_omits_target_fields(self):
+        """Read-only calls do not emit target_type or target_name."""
+
+        async def _run():
+            async with Client(self.mcp) as client:
+                await client.call_tool("get_list_of_catalogs")
+
+        asyncio.run(_run())
+
+        record = json.loads(self.log_records[0])
+        self.assertNotIn("target_type", record)
+        self.assertNotIn("target_name", record)
+
+
+class TestExtractWriteTarget(unittest.TestCase):
+    """Unit tests for audit.extract_write_target() and write-tool coverage."""
+
+    def test_extracts_hierarchical_and_special_targets(self):
+        self.assertEqual(
+            audit.extract_write_target(
+                "create_table",
+                {"catalog_name": "c", "schema_name": "s", "name": "t"},
+                "ml",
+            ),
+            ("table", "ml.c.s.t"),
+        )
+        self.assertEqual(
+            audit.extract_write_target(
+                "alter_model_version",
+                {
+                    "catalog_name": "c",
+                    "schema_name": "s",
+                    "model_name": "m",
+                    "version": 0,
+                },
+                "ml",
+            ),
+            ("model_version", "ml.c.s.m.0"),
+        )
+        self.assertEqual(
+            audit.extract_write_target(
+                "associate_tag_with_metadata",
+                {
+                    "metadata_type": "TABLE",
+                    "metadata_full_name": "c.s.t",
+                    "tags_to_associate": ["pii"],
+                },
+                "ml",
+            ),
+            ("table", "ml.c.s.t"),
+        )
+        self.assertEqual(
+            audit.extract_write_target(
+                "associate_tag_with_metadata",
+                {
+                    "metadata_type": "metalake",
+                    "metadata_full_name": "ml",
+                    "tags_to_associate": ["pii"],
+                },
+                "ml",
+            ),
+            ("metalake", "ml"),
+        )
+        self.assertEqual(
+            audit.extract_write_target(
+                "cancel_job", {"job_id": "job-42"}, "ml"
+            ),
+            ("job", "job-42"),
+        )
+        self.assertEqual(
+            audit.extract_write_target(
+                "drop_schema", {"catalog_name": "c", "schema_name": "s"}, ""
+            ),
+            ("schema", "c.s"),
+        )
+
+    def test_missing_or_invalid_arguments_return_empty_target(self):
+        self.assertEqual(
+            audit.extract_write_target(
+                "drop_table", {"catalog_name": "c"}, "ml"
+            ),
+            ("", ""),
+        )
+        self.assertEqual(
+            audit.extract_write_target(
+                "alter_model_version",
+                {
+                    "catalog_name": "c",
+                    "schema_name": "s",
+                    "model_name": "m",
+                    "version": True,
+                },
+                "ml",
+            ),
+            ("", ""),
+        )
+        self.assertEqual(
+            audit.extract_write_target("drop_catalog", None, "ml"), ("", "")
+        )
+        self.assertEqual(
+            audit.extract_write_target("get_list_of_catalogs", {}, "ml"),
+            ("", ""),
+        )
+
+    def test_every_mutating_registered_tool_has_a_write_target_spec(self):
+        """Keep WRITE_TARGET_SPECS synchronized with the registered MCP tools."""
+        RESTClientFactory.set_rest_client(MockOperation)
+        try:
+            server = GravitinoMCPServer(Setting("ml"))
+            tools = asyncio.run(server.mcp.list_tools())
+        finally:
+            RESTClientFactory.set_rest_client(PlainRESTClientOperation)
+
+        registered_names = {tool.name for tool in tools}
+        # Every configured spec must name an actual registered tool.
+        self.assertLessEqual(
+            set(audit.WRITE_TARGET_SPECS.keys()), registered_names
+        )
+
+        readonly_prefixes = ("get_", "list_", "load_", "metadata_type_")
+        mutating_tools = {
+            name
+            for name in registered_names
+            if not name.startswith(readonly_prefixes)
+        }
+        self.assertEqual(mutating_tools, set(audit.WRITE_TARGET_SPECS.keys()))
 
 
 # ---------------------------------------------------------------------------
@@ -357,8 +688,11 @@ class _CapturingHandler(logging.Handler):
 
 
 class _FailingCatalogOperation:
+    def __init__(self, exc: Exception):
+        self._exc = exc
+
     async def get_list_of_catalogs(self) -> str:
-        raise GravitinoException("Error code: 1003, Error type: FORBIDDEN")
+        raise self._exc
 
 
 def _jwt_for(subject: str, signature: bytes = b"signature") -> str:

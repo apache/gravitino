@@ -17,6 +17,7 @@
 
 import logging
 from decimal import Decimal
+from typing import Optional
 from urllib.parse import quote
 
 import simplejson
@@ -52,7 +53,7 @@ def extract_list_from_response(response, field: str) -> str:
             "Invalid Gravitino response: invalid JSON"
         ) from exc
     if isinstance(payload, dict):
-        _handle_gravitino_exception(payload)
+        _handle_gravitino_exception(payload, status_code=response.status_code)
     response.raise_for_status()
     if not isinstance(payload, dict) or "code" not in payload:
         raise GravitinoException("Invalid Gravitino response: missing code")
@@ -76,17 +77,24 @@ def _response_content(response):
         raise
 
     if isinstance(content, dict):
-        _handle_gravitino_exception(content)
+        _handle_gravitino_exception(content, status_code=response.status_code)
     if not response.is_success:
         response.raise_for_status()
     return content
 
 
-def _handle_gravitino_exception(response: dict):
+def _handle_gravitino_exception(
+    response: dict, status_code: Optional[int] = None
+):
     error_code = response.get("code", 0)
     if error_code != 0:
         t = response.get("type", "")
         message = response.get("message", "")
         error_message = f"Error code: {error_code}, Error type: {t}, Error message: {message}"
         logging.warning(error_message)
-        raise GravitinoException(error_message)
+        raise GravitinoException(
+            error_message,
+            status_code=status_code,
+            error_code=error_code if isinstance(error_code, int) else None,
+            error_type=str(t) if t is not None else "",
+        )
