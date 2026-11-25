@@ -692,6 +692,7 @@ components:
               - USE_MODEL
               - EXECUTE_FUNCTION
               - USE_SEMANTIC_MODEL
+              - USE_ONTOLOGY
         applicableRoles:
           type: array
           minItems: 1
@@ -784,7 +785,7 @@ components:
           minItems: 1
           items:
             type: string
-            enum: [ "CATALOG", "SCHEMA", "TABLE", "FILESET", "TOPIC", "MODEL", "SEMANTIC_MODEL", "VIEW", "FUNCTION" ]
+            enum: [ "CATALOG", "SCHEMA", "TABLE", "FILESET", "TOPIC", "MODEL", "SEMANTIC_MODEL", "ONTOLOGY", "VIEW", "FUNCTION" ]
         properties:
           type: object
           description: A map of string-to-string properties for the policy content.

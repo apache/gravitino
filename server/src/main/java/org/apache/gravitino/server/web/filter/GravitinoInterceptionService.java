@@ -80,6 +80,7 @@ import org.apache.gravitino.server.web.rest.MetadataObjectSemanticModelOperation
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
 import org.apache.gravitino.server.web.rest.MetalakeOperations;
 import org.apache.gravitino.server.web.rest.ModelOperations;
+import org.apache.gravitino.server.web.rest.OntologyOperations;
 import org.apache.gravitino.server.web.rest.OperationType;
 import org.apache.gravitino.server.web.rest.OwnerOperations;
 import org.apache.gravitino.server.web.rest.PartitionOperations;
@@ -124,6 +125,7 @@ public class GravitinoInterceptionService implements InterceptionService {
             ModelOperations.class.getName(),
             FunctionOperations.class.getName(),
             SemanticModelOperations.class.getName(),
+            OntologyOperations.class.getName(),
             SemanticModelMetricOperations.class.getName(),
             MetadataObjectSemanticModelOperations.class.getName(),
             TopicOperations.class.getName(),
