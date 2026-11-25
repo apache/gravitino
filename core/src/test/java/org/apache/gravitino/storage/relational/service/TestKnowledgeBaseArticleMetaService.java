@@ -36,7 +36,7 @@ import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.exceptions.KnowledgeBaseArticleVersionConflictException;
+import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
 import org.apache.gravitino.kb.ArticleBody;
 import org.apache.gravitino.kb.KnowledgeBaseArticleEntity;
 import org.apache.gravitino.kb.KnowledgeBaseArticleEntity.Binding;
@@ -108,14 +108,14 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
             });
     assertEquals(edited, STORE.get(ident));
     assertThrows(
-        KnowledgeBaseArticleVersionConflictException.class,
+        ArticleRevisionConflictException.class,
         () -> STORE.update(ident, token, a -> a, (old, next) -> {}));
     assertTrue(STORE.delete(ident));
     assertFalse(STORE.delete(ident));
     STORE.insert(initial.toBuilder().withId(12L).withBindings(Set.of()).build(), false);
     assertTrue(STORE.get(ident).bindings().isEmpty());
     assertThrows(
-        KnowledgeBaseArticleVersionConflictException.class,
+        ArticleRevisionConflictException.class,
         () -> STORE.update(ident, token, a -> a, (old, next) -> {}));
     assertEquals(3, backend.hardDeleteLegacyData(TYPE, Long.MAX_VALUE));
     assertEquals(0, STORE.collect(Long.MAX_VALUE, 10));

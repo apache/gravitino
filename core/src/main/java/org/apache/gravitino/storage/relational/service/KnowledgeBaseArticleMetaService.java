@@ -42,7 +42,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.exceptions.KnowledgeBaseArticleVersionConflictException;
+import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.json.JsonUtils;
@@ -193,7 +193,7 @@ public final class KnowledgeBaseArticleMetaService {
               && (expected.metalakeId() != metalakeId
                   || expected.articleId() != before.id()
                   || expected.revision() != before.revision())) {
-            throw new KnowledgeBaseArticleVersionConflictException("Article %s has changed", ident);
+            throw new ArticleRevisionConflictException("Article %s has changed", ident);
           }
           KnowledgeBaseArticleEntity proposed = updater.apply(before);
           KnowledgeBaseArticlePO row =
@@ -409,7 +409,7 @@ public final class KnowledgeBaseArticleMetaService {
     Long missingDomain = lockLiveDomains(metalakeId, affected);
     KnowledgeBaseArticlePO locked = mapper.lock(metalakeId, observed.name());
     if (locked == null || locked.getArticleId() != observed.id()) {
-      throw new KnowledgeBaseArticleVersionConflictException(
+      throw new ArticleRevisionConflictException(
           "Article %s was removed or replaced", observed.nameIdentifier());
     }
     if (locked.getRevision() != observed.revision()) {
