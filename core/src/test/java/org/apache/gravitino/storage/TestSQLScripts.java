@@ -40,6 +40,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.storage.relational.DatabaseFixture;
 import org.apache.gravitino.storage.relational.ResetStrategy;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -117,6 +118,7 @@ public class TestSQLScripts extends TestJDBCBackend {
           Assertions.assertTrue(rows.next());
           Assertions.assertEquals(2, rows.getInt(1));
         }
+        assertBindingComments(statement);
         String binding =
             "INSERT INTO glossary_term_binding (metalake_id,term_id,target_type,target_id,deleted_at) VALUES (100,101,'TABLE',301,0)";
         statement.executeUpdate(binding);
@@ -810,6 +812,47 @@ public class TestSQLScripts extends TestJDBCBackend {
               .anyMatch(index -> index.contains("uk_table_id_version_deleted_at")),
           "Failed conversion must preserve the existing indexes");
     }
+  }
+
+  private void assertBindingComments(Statement statement) throws SQLException {
+    String tableComment;
+    String columnComments;
+    switch (backendType.toLowerCase(Locale.ROOT)) {
+      case "mysql" -> {
+        tableComment =
+            "SELECT table_comment FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='glossary_term_binding'";
+        columnComments =
+            "SELECT column_name, column_comment FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='glossary_term_binding'";
+      }
+      case "postgresql" -> {
+        tableComment = "SELECT obj_description('glossary_term_binding'::regclass, 'pg_class')";
+        columnComments =
+            "SELECT attname, col_description(attrelid, attnum) FROM pg_attribute WHERE attrelid='glossary_term_binding'::regclass AND attnum>0 AND NOT attisdropped";
+      }
+      case "h2" -> {
+        tableComment =
+            "SELECT remarks FROM information_schema.tables WHERE table_schema=CURRENT_SCHEMA AND LOWER(table_name)='glossary_term_binding'";
+        columnComments =
+            "SELECT column_name, remarks FROM information_schema.columns WHERE table_schema=CURRENT_SCHEMA AND LOWER(table_name)='glossary_term_binding'";
+      }
+      default -> throw new AssertionError("Unknown backend " + backendType);
+    }
+    try (ResultSet rows = statement.executeQuery(tableComment)) {
+      Assertions.assertTrue(rows.next());
+      Assertions.assertTrue(
+          StringUtils.isNotBlank(rows.getString(1)), "Missing glossary_term_binding table comment");
+    }
+    Set<String> columns = new TreeSet<>();
+    try (ResultSet rows = statement.executeQuery(columnComments)) {
+      while (rows.next()) {
+        String name = rows.getString(1).toLowerCase(Locale.ROOT);
+        Assertions.assertTrue(
+            StringUtils.isNotBlank(rows.getString(2)), "Missing column comment for " + name);
+        columns.add(name);
+      }
+    }
+    Assertions.assertEquals(
+        Set.of("metalake_id", "term_id", "target_type", "target_id", "deleted_at"), columns);
   }
 
   private void seedExternalGovernance(int generation) throws SQLException {

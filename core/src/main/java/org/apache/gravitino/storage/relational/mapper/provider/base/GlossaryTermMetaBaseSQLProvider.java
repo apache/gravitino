@@ -84,10 +84,11 @@ public class GlossaryTermMetaBaseSQLProvider {
   public String incrementVersion(
       @Param("metalakeId") long metalakeId,
       @Param("termId") long termId,
-      @Param("version") long version) {
+      @Param("version") long version,
+      @Param("auditInfo") String auditInfo) {
     return "UPDATE "
         + GlossaryTermMetaMapper.TABLE_NAME
-        + " SET current_version = current_version + 1"
+        + " SET current_version = current_version + 1, audit_info=#{auditInfo}"
         + " WHERE term_id=#{termId} AND metalake_id=#{metalakeId}"
         + " AND current_version=#{version} AND deleted_at=0";
   }

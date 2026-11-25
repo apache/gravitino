@@ -533,7 +533,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       Principal principal,
       String metalake,
       AuthorizationRequestContext requestContext) {
-    Optional<Long> metadataId = lookups.resolveMetadataId(metadataObject, metalake, requestContext);
+    Optional<Long> metadataId =
+        lookups.resolveTargetId(metadataObject, metalake, requestContext).metadataId();
     if (!metadataId.isPresent()) {
       return false;
     }
@@ -1099,7 +1100,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         String privilege,
         AuthorizationRequestContext requestContext) {
       JcasbinAuthorizationLookups.MetadataIdResolution resolution =
-          lookups.resolveMetadataIdResult(metadataObject, metalake, requestContext);
+          lookups.resolveTargetId(metadataObject, metalake, requestContext);
       if (resolution.normalizationFailed()) {
         // Failure to resolve a DENY scope must not let a parent ALLOW grant access, even when
         // the role's policies are already loaded. Missing entities retain their existing semantics.

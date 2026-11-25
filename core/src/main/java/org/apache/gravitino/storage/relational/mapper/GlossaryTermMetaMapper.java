@@ -72,7 +72,8 @@ public interface GlossaryTermMetaMapper {
   int incrementVersion(
       @Param("metalakeId") long metalakeId,
       @Param("termId") long termId,
-      @Param("version") long version);
+      @Param("version") long version,
+      @Param("auditInfo") String auditInfo);
 
   /** Returns only term/metalake IDs, or null if the term or requested parent name is absent. */
   @Nullable

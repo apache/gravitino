@@ -20,6 +20,9 @@
 package org.apache.gravitino.glossary;
 
 import java.security.Principal;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -27,6 +30,9 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege.Name;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.NamespacedEntityId;
+import org.apache.gravitino.storage.relational.RelationalEntityStoreIdResolver;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -64,6 +70,28 @@ final class GlossaryBindingAccess {
         PrincipalUtils.getCurrentPrincipal(),
         metalake,
         new AuthorizationRequestContext());
+  }
+
+  static GlossaryBindingAccess forResolvedTarget(
+      String metalake, boolean enabled, MetadataObject target, NamespacedEntityId ids) {
+    if (!enabled) {
+      return UNRESTRICTED;
+    }
+    Map<MetadataObject, Optional<Long>> scopes = new HashMap<>();
+    long[] chain = ids.fullIds();
+    MetadataObject scope = target;
+    for (int i = chain.length - 1; i > 0; i--) {
+      scopes.put(scope, Optional.of(chain[i]));
+      scope = MetadataObjects.parent(scope);
+    }
+    scopes.put(
+        MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE), Optional.of(chain[0]));
+    return forSnapshot(metalake, scopes);
+  }
+
+  /** Uses the page's relational snapshot for canonical target and ancestor IDs. */
+  static GlossaryBindingAccess forBindingPage(String metalake, boolean enabled) {
+    return enabled ? forSnapshot(metalake, new HashMap<>()) : UNRESTRICTED;
   }
 
   /** Returns whether the caller has ordinary metadata read access to the binding target. */
@@ -189,5 +217,33 @@ final class GlossaryBindingAccess {
       }
     }
     return allowed;
+  }
+
+  private static GlossaryBindingAccess forSnapshot(
+      String metalake, Map<MetadataObject, Optional<Long>> scopes) {
+    RelationalEntityStoreIdResolver resolver = new RelationalEntityStoreIdResolver();
+    AuthorizationRequestContext context =
+        new AuthorizationRequestContext(
+            metalake,
+            scope ->
+                scopes.computeIfAbsent(
+                    scope,
+                    obj -> {
+                      try {
+                        return Optional.of(
+                            resolver
+                                .getEntityIds(
+                                    MetadataObjectUtil.toEntityIdent(metalake, obj),
+                                    MetadataObjectUtil.toEntityType(obj))
+                                .entityId());
+                      } catch (NoSuchEntityException missing) {
+                        return Optional.empty();
+                      }
+                    }));
+    return new GlossaryBindingAccess(
+        GravitinoEnv.getInstance().gravitinoAuthorizer(),
+        PrincipalUtils.getCurrentPrincipal(),
+        metalake,
+        context);
   }
 }

@@ -85,12 +85,13 @@ public class SemanticModelMetricBaseSQLProvider {
   /** Returns SQL for resolving a live metric identity by model ID and exact metric name. */
   public String selectSemanticModelMetricByModelIdAndName(
       @Param("semanticModelId") Long semanticModelId, @Param("metricName") String metricName) {
+    // MySQL utf8mb4_bin pads trailing spaces for equality. Metric identity retains them.
     return "SELECT metric_id as metricId, metalake_id as metalakeId, catalog_id as catalogId,"
         + " schema_id as schemaId, semantic_model_id as semanticModelId, metric_name as metricName,"
         + " deleted_at as deletedAt FROM "
         + TABLE_NAME
         + " WHERE semantic_model_id = #{semanticModelId} AND metric_name = #{metricName}"
-        + " AND deleted_at = 0";
+        + " AND CHAR_LENGTH(metric_name) = CHAR_LENGTH(#{metricName}) AND deleted_at = 0";
   }
 
   /** Returns SQL for resolving a batch of live metric identities by metric ID. */

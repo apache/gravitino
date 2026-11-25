@@ -52,8 +52,9 @@ public class GlossaryTermMetaSQLProviderFactory {
   public static String incrementVersion(
       @Param("metalakeId") long metalakeId,
       @Param("termId") long termId,
-      @Param("version") long version) {
-    return getProvider().incrementVersion(metalakeId, termId, version);
+      @Param("version") long version,
+      @Param("auditInfo") String auditInfo) {
+    return getProvider().incrementVersion(metalakeId, termId, version, auditInfo);
   }
 
   /** Delegates {@link GlossaryTermMetaBaseSQLProvider#getIds}. */

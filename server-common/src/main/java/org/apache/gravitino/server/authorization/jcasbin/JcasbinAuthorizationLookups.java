@@ -104,6 +104,15 @@ public class JcasbinAuthorizationLookups {
         id -> ownerRelCache.get(id, k -> loadOwner(k, metadataType)));
   }
 
+  /** Resolves the object being authorized against the identity observed by the operation. */
+  MetadataIdResolution resolveTargetId(
+      MetadataObject object, String metalake, AuthorizationRequestContext context) {
+    Function<MetadataObject, Optional<Long>> resolver = context.targetIdResolver(metalake);
+    return resolver == null
+        ? resolveMetadataIdResult(object, metalake, context)
+        : new MetadataIdResolution(resolver.apply(object), false);
+  }
+
   // Preserve normalization failures as distinct from missing objects for DENY-policy consumers.
   MetadataIdResolution resolveMetadataIdResult(
       MetadataObject metadataObject, String metalake, AuthorizationRequestContext requestContext) {

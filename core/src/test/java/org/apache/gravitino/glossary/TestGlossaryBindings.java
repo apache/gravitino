@@ -22,14 +22,19 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.StringWriter;
 import java.security.PrivilegedExceptionAction;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -41,7 +46,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.IntStream;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -56,20 +63,31 @@ import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.catalog.CapabilityHelpers;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.SchemaOperationDispatcher;
+import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.catalog.TableOperationDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
+import org.apache.gravitino.exceptions.TermVersionConflictException;
+import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.semantic.Dataset;
 import org.apache.gravitino.semantic.DialectExpression;
 import org.apache.gravitino.semantic.Expression;
@@ -88,21 +106,29 @@ import org.apache.gravitino.storage.relational.service.GlossaryTermBindingServic
 import org.apache.gravitino.storage.relational.service.GlossaryTermBindingService.CleanupAuditListener;
 import org.apache.gravitino.storage.relational.service.GlossaryTermBindingService.LostBinding;
 import org.apache.gravitino.storage.relational.service.GlossaryTermBindingService.TargetType;
+import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
 import org.apache.gravitino.storage.relational.service.SemanticModelMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.storage.relational.service.ViewMetaService;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.ThrowableFunction;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.appender.WriterAppender;
+import org.apache.logging.log4j.core.layout.PatternLayout;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 import org.mockito.AdditionalAnswers;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 /** Exercises glossary term bindings, authorization, cleanup, and concurrency in core (T11). */
@@ -127,6 +153,7 @@ class TestGlossaryBindings extends TestJDBCBackend {
   private GravitinoAuthorizer previousAuthorizer;
   private EntityStore previousStore;
   private CatalogManager previousCatalogs;
+  private TableDispatcher previousTableDispatcher;
   private IdGenerator previousIdGenerator;
   private JcasbinAuthorizer authorizer;
   private Namespace schNs;
@@ -139,6 +166,10 @@ class TestGlossaryBindings extends TestJDBCBackend {
     previousStore = (EntityStore) FieldUtils.readField(env, "entityStore", true);
     previousCatalogs = (CatalogManager) FieldUtils.readField(env, "catalogManager", true);
     previousIdGenerator = env.idGenerator();
+    previousTableDispatcher =
+        (TableDispatcher) FieldUtils.readField(env, "internalTableDispatcher", true);
+    FieldUtils.writeField(
+        env, "internalTableDispatcher", Mockito.mock(TableDispatcher.class), true);
     CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
     BaseCatalog<?> mockCatalog = Mockito.mock(BaseCatalog.class);
     Mockito.when(mockCatalog.capability()).thenReturn(Capability.DEFAULT);
@@ -254,6 +285,7 @@ class TestGlossaryBindings extends TestJDBCBackend {
         authorizer.close();
       }
       env.setGravitinoAuthorizer(previousAuthorizer);
+      FieldUtils.writeField(env, "internalTableDispatcher", previousTableDispatcher, true);
       FieldUtils.writeField(env, "entityStore", previousStore, true);
       FieldUtils.writeField(env, "catalogManager", previousCatalogs, true);
       FieldUtils.writeField(env, "idGenerator", previousIdGenerator, true);
@@ -316,23 +348,28 @@ class TestGlossaryBindings extends TestJDBCBackend {
         expectedVersion, as("lakeOwner", () -> manager.getTerm(LAKE, "Customer")).version());
 
     List<TermBinding> allBindings =
-        as("lakeOwner", () -> manager.listTermBindings(LAKE, "Customer", null, null, null));
+        as(
+            "lakeOwner",
+            () -> manager.listTermBindings(LAKE, "Customer", null, null, null).bindings());
     assertEquals(9, allBindings.size());
     assertEquals(
         8,
         as(
                 "lakeOwner",
                 () ->
-                    manager.listTermBindings(
-                        LAKE, "Customer", TermBinding.Kind.IMPLEMENTED_BY, null, null))
+                    manager
+                        .listTermBindings(
+                            LAKE, "Customer", TermBinding.Kind.IMPLEMENTED_BY, null, null)
+                        .bindings())
             .size());
     assertEquals(
         1,
         as(
                 "lakeOwner",
                 () ->
-                    manager.listTermBindings(
-                        LAKE, "Customer", TermBinding.Kind.USED_BY, null, null))
+                    manager
+                        .listTermBindings(LAKE, "Customer", TermBinding.Kind.USED_BY, null, null)
+                        .bindings())
             .size());
 
     // Unbind all targets and the metric.
@@ -355,7 +392,9 @@ class TestGlossaryBindings extends TestJDBCBackend {
     assertEquals(
         expectedVersion, as("lakeOwner", () -> manager.getTerm(LAKE, "Customer")).version());
     assertTrue(
-        as("lakeOwner", () -> manager.listTermBindings(LAKE, "Customer", null, null, null))
+        as(
+                "lakeOwner",
+                () -> manager.listTermBindings(LAKE, "Customer", null, null, null).bindings())
             .isEmpty());
 
     // T11.2: unsupported object types fail with IllegalArgumentException (400).
@@ -602,7 +641,9 @@ class TestGlossaryBindings extends TestJDBCBackend {
                     .build());
 
     assertTrue(
-        as("lakeOwner", () -> manager.listTermBindings(LAKE, "ActiveFlag", null, null, null))
+        as(
+                "lakeOwner",
+                () -> manager.listTermBindings(LAKE, "ActiveFlag", null, null, null).bindings())
             .isEmpty());
     assertEquals(
         activeVersionBefore + 1,
@@ -615,7 +656,9 @@ class TestGlossaryBindings extends TestJDBCBackend {
         as("lakeOwner", () -> manager.getTerm(LAKE, "Untouched")).version());
     assertEquals(
         2,
-        as("lakeOwner", () -> manager.listTermBindings(LAKE, "CustomerId", null, null, null))
+        as(
+                "lakeOwner",
+                () -> manager.listTermBindings(LAKE, "CustomerId", null, null, null).bindings())
             .size());
 
     // T11.9: rename table and rename column preserving IDs -> bindings stay and resolve to new
@@ -648,7 +691,9 @@ class TestGlossaryBindings extends TestJDBCBackend {
                     .build());
 
     List<TermBinding> afterRename =
-        as("lakeOwner", () -> manager.listTermBindings(LAKE, "CustomerId", null, null, null));
+        as(
+            "lakeOwner",
+            () -> manager.listTermBindings(LAKE, "CustomerId", null, null, null).bindings());
     assertEquals(2, afterRename.size());
     assertTrue(
         afterRename.contains(
@@ -707,7 +752,10 @@ class TestGlossaryBindings extends TestJDBCBackend {
     List<TermBinding> revBindings =
         as(
             "lakeOwner",
-            () -> manager.listTermBindings(LAKE, "Revenue", TermBinding.Kind.USED_BY, null, null));
+            () ->
+                manager
+                    .listTermBindings(LAKE, "Revenue", TermBinding.Kind.USED_BY, null, null)
+                    .bindings());
     assertEquals(3, revBindings.size());
     assertTrue(revBindings.contains(TermBinding.usedBy(smObj, longMetricA)));
     assertTrue(revBindings.contains(TermBinding.usedBy(smObj, longMetricB)));
@@ -733,7 +781,9 @@ class TestGlossaryBindings extends TestJDBCBackend {
         as(
                 "lakeOwner",
                 () ->
-                    manager.listTermBindings(LAKE, "Revenue", TermBinding.Kind.USED_BY, null, null))
+                    manager
+                        .listTermBindings(LAKE, "Revenue", TermBinding.Kind.USED_BY, null, null)
+                        .bindings())
             .size());
 
     // T11.17: semantic-model rename preserves bindings and resolves to the new model name.
@@ -751,7 +801,10 @@ class TestGlossaryBindings extends TestJDBCBackend {
     List<TermBinding> afterModelRename =
         as(
             "lakeOwner",
-            () -> manager.listTermBindings(LAKE, "Revenue", TermBinding.Kind.USED_BY, null, null));
+            () ->
+                manager
+                    .listTermBindings(LAKE, "Revenue", TermBinding.Kind.USED_BY, null, null)
+                    .bindings());
     assertEquals(3, afterModelRename.size());
     assertTrue(afterModelRename.contains(TermBinding.usedBy(renamedSmObj, longMetricA)));
 
@@ -865,7 +918,10 @@ class TestGlossaryBindings extends TestJDBCBackend {
         versionBeforeFail, as("lakeOwner", () -> manager.getTerm(LAKE, "CoreTerm")).version());
     assertEquals(
         3,
-        as("lakeOwner", () -> manager.listTermBindings(LAKE, "CoreTerm", null, null, null)).size());
+        as(
+                "lakeOwner",
+                () -> manager.listTermBindings(LAKE, "CoreTerm", null, null, null).bindings())
+            .size());
     assertTrue(auditRecords.isEmpty(), "Rolled-back cleanup must emit no audit record");
 
     // Actual table drop -> CoreTerm gets +1 revision and 1 audit record listing all 3 lost
@@ -914,7 +970,9 @@ class TestGlossaryBindings extends TestJDBCBackend {
     assertEquals(1, auditRecords.size());
     assertEquals(5, auditRecords.get(0).lostBindings().size());
     assertTrue(
-        as("lakeOwner", () -> manager.listTermBindings(LAKE, "CoreTerm", null, null, null))
+        as(
+                "lakeOwner",
+                () -> manager.listTermBindings(LAKE, "CoreTerm", null, null, null).bindings())
             .isEmpty());
 
     // Catalog cascade drop cleans up catalog + child schema/table bindings with +1 revision.
@@ -991,7 +1049,8 @@ class TestGlossaryBindings extends TestJDBCBackend {
     } finally {
       pool.shutdownNow();
     }
-    assertTrue(openManager.listTermBindings(LAKE, "RaceTerm", null, null, null).isEmpty());
+    assertTrue(
+        openManager.listTermBindings(LAKE, "RaceTerm", null, null, null).bindings().isEmpty());
   }
 
   /**
@@ -1084,9 +1143,15 @@ class TestGlossaryBindings extends TestJDBCBackend {
                   bindSucceeded.get() ? v2Before + 2 : v2Before,
                   openManager.getTerm(LAKE, "ContendedTerm2").version());
               assertTrue(
-                  openManager.listTermBindings(LAKE, "ContendedTerm", null, null, null).isEmpty());
+                  openManager
+                      .listTermBindings(LAKE, "ContendedTerm", null, null, null)
+                      .bindings()
+                      .isEmpty());
               assertTrue(
-                  openManager.listTermBindings(LAKE, "ContendedTerm2", null, null, null).isEmpty());
+                  openManager
+                      .listTermBindings(LAKE, "ContendedTerm2", null, null, null)
+                      .bindings()
+                      .isEmpty());
               GlossaryInvariants.assertBindings();
             }
           });
@@ -1185,10 +1250,12 @@ class TestGlossaryBindings extends TestJDBCBackend {
               assertTrue(
                   openManager
                       .listTermBindings(LAKE, "MetricRaceTerm1", null, null, null)
+                      .bindings()
                       .isEmpty());
               assertTrue(
                   openManager
                       .listTermBindings(LAKE, "MetricRaceTerm2", null, null, null)
+                      .bindings()
                       .isEmpty());
               GlossaryInvariants.assertBindings();
             }
@@ -1271,6 +1338,7 @@ class TestGlossaryBindings extends TestJDBCBackend {
               assertTrue(
                   openManager
                       .listTermBindings(LAKE, "CascadeRaceTerm", null, null, null)
+                      .bindings()
                       .isEmpty());
               GlossaryInvariants.assertBindings();
             }
@@ -1287,112 +1355,135 @@ class TestGlossaryBindings extends TestJDBCBackend {
    */
   @TestTemplate
   void testExternalDdlFailureRollbackAndLoadColumnReconciliation() throws Exception {
-    AtomicInteger handlerCalls = new AtomicInteger();
-    GlossaryManager hooked =
-        new GlossaryManager(
-            ids::incrementAndGet,
-            false,
-            (before, after, persist) -> {
-              handlerCalls.incrementAndGet();
-              persist.run();
-            });
-    hooked.createTerm(LAKE, TermSpec.builder("ReconcileTerm").build());
-    MetadataObject colActive =
-        MetadataObjects.of(List.of(CAT, SCH, TBL, "is_active"), MetadataObject.Type.COLUMN);
-    hooked.associateTerms(LAKE, colActive, new String[] {"ReconcileTerm"}, null);
-    assertEquals(2, handlerCalls.get()); // create + bind both went through TermChangeHandler.
-
-    long versionBefore = hooked.getTerm(LAKE, "ReconcileTerm").version();
-    NameIdentifier tableIdent = NameIdentifier.of(schNs, TBL);
-    TableEntity storedTable = TableMetaService.getInstance().getTableByIdentifier(tableIdent);
-
-    // Simulate external column drop followed by failed local store cleanup.
-    auditRecords.clear();
-    assertThrows(
-        RuntimeException.class,
-        () ->
-            SessionUtils.doMultipleWithCommit(
-                () -> {
-                  try {
-                    TableMetaService.getInstance()
-                        .updateTable(
-                            tableIdent,
-                            (TableEntity old) ->
-                                TableEntity.builder()
-                                    .withId(old.id())
-                                    .withName(old.name())
-                                    .withNamespace(old.namespace())
-                                    .withColumns(
-                                        old.columns().stream()
-                                            .filter(c -> !c.name().equals("is_active"))
-                                            .toList())
-                                    .withAuditInfo(AUDIT_INFO)
-                                    .build());
-                  } catch (Exception e) {
-                    throw new RuntimeException(e);
-                  }
-                },
-                () -> {
-                  throw new IllegalStateException(
-                      "Simulated local store failure after external DDL");
-                }));
-    // Local column, binding, and revision rolled back; no cleanup-success audit emitted.
-    assertEquals(versionBefore, hooked.getTerm(LAKE, "ReconcileTerm").version());
-    assertEquals(1, hooked.listTermBindings(LAKE, "ReconcileTerm", null, null, null).size());
-    assertTrue(auditRecords.isEmpty());
-
-    // Subsequent load/overwrite reconciliation (insertTable with overwrite=true,
-    // reuseStoredColumnIds)
-    // drops the removed column and cleans up its binding atomically.
-    TableEntity reloadedWithoutIsActive =
-        TableEntity.builder()
-            .withId(storedTable.id())
-            .withName(storedTable.name())
-            .withNamespace(storedTable.namespace())
-            .withColumns(
-                List.of(
-                    ColumnEntity.builder()
-                        .withId(ids.incrementAndGet())
-                        .withName("customer_id")
-                        .withPosition(0)
-                        .withDataType(Types.StringType.get())
-                        .withNullable(true)
-                        .withAutoIncrement(false)
-                        .withAuditInfo(AUDIT_INFO)
-                        .build(),
-                    ColumnEntity.builder()
-                        .withId(ids.incrementAndGet())
-                        .withName("email")
-                        .withPosition(1)
-                        .withDataType(Types.StringType.get())
-                        .withNullable(true)
-                        .withAutoIncrement(false)
-                        .withAuditInfo(AUDIT_INFO)
-                        .build()))
-            .withAuditInfo(AUDIT_INFO)
+    Config config = new Config(false) {};
+    config.set(Configs.CATALOG_LOAD_ISOLATED, false);
+    Object previousLocks = FieldUtils.readField(env, "lockManager", true);
+    CatalogManager oldCatalogs = env.catalogManager();
+    LoggerContext context =
+        (LoggerContext)
+            LogManager.getContext(GlossaryTermBindingService.class.getClassLoader(), false);
+    var logger = context.getLogger(GlossaryTermBindingService.class.getName());
+    Level previousLevel = logger.getLevel();
+    StringWriter logs = new StringWriter();
+    WriterAppender appender =
+        WriterAppender.newBuilder()
+            .setName("bindingCleanup")
+            .setTarget(logs)
+            .setLayout(PatternLayout.newBuilder().withPattern("%m%n%throwable").build())
             .build();
-    TableMetaService.getInstance().insertTable(reloadedWithoutIsActive, true);
-    assertEquals(versionBefore + 1, hooked.getTerm(LAKE, "ReconcileTerm").version());
-    assertTrue(hooked.listTermBindings(LAKE, "ReconcileTerm", null, null, null).isEmpty());
-    assertEquals(1, auditRecords.size());
-    assertEquals("RECONCILE_TABLE_COLUMNS", auditRecords.get(0).triggeringOperation());
+    appender.start();
+    logger.addAppender(appender);
+    logger.setLevel(Level.INFO);
+    try (SecretManager secrets = new SecretManager(config);
+        CatalogManager catalogs =
+            new CatalogManager(config, env.entityStore(), ids::incrementAndGet, secrets)) {
+      if (previousLocks == null) {
+        FieldUtils.writeField(env, "lockManager", new LockManager(config), true);
+      }
+      FieldUtils.writeField(env, "catalogManager", catalogs, true);
+      NameIdentifier catalog = NameIdentifier.of(LAKE, "external");
+      catalogs.createCatalog(
+          catalog,
+          Catalog.Type.RELATIONAL,
+          "test",
+          "",
+          Map.of("key1", "v1", "key2", "v2", "key5-1", "v3"));
+      SchemaOperationDispatcher schemas =
+          new SchemaOperationDispatcher(catalogs, env.entityStore(), ids::incrementAndGet, secrets);
+      TableOperationDispatcher tables =
+          new TableOperationDispatcher(
+              catalogs, env.entityStore(), ids::incrementAndGet, () -> schemas, secrets);
+      schemas.createSchema(
+          NameIdentifier.of(LAKE, "external", SCH), "", Map.of("k1", "v1", "k2", "v2"));
+      NameIdentifier table = NameIdentifier.of(LAKE, "external", SCH, TBL);
+      tables.createTable(
+          table,
+          new Column[] {
+            Column.of("keep", Types.StringType.get()), Column.of("removed", Types.StringType.get())
+          },
+          "",
+          Map.of("k1", "v1", "k2", "v2"));
+      TableEntity stored = TableMetaService.getInstance().getTableByIdentifier(table);
+      MetadataObject column =
+          MetadataObjects.of(List.of("external", SCH, TBL, "removed"), MetadataObject.Type.COLUMN);
+      MetadataObject target = MetadataObjects.parent(column);
+      openManager.createTerm(LAKE, TermSpec.builder("ReconcileTerm").build());
+      openManager.associateTerms(LAKE, column, new String[] {"ReconcileTerm"}, null);
+      long before = openManager.getTerm(LAKE, "ReconcileTerm").version();
+      GlossaryTermMetaService termService = Mockito.spy(GlossaryTermMetaService.getInstance());
+      AtomicBoolean fail = new AtomicBoolean(true);
+      Mockito.doAnswer(
+              inv -> {
+                if (fail.get()) {
+                  throw new IllegalStateException("injected revision failure");
+                }
+                return inv.callRealMethod();
+              })
+          .when(termService)
+          .advanceBindingRevision(
+              Mockito.anyLong(), Mockito.anyLong(), Mockito.anyLong(), Mockito.any());
+      try (MockedStatic<GlossaryTermMetaService> services =
+          Mockito.mockStatic(GlossaryTermMetaService.class, Mockito.CALLS_REAL_METHODS)) {
+        services.when(GlossaryTermMetaService::getInstance).thenReturn(termService);
+        tables.alterTable(table, TableChange.deleteColumn(new String[] {"removed"}, false));
+        List<String> externalColumns =
+            catalogs.doWithCatalog(
+                catalog,
+                c ->
+                    Arrays.stream(((TableCatalog) c.ops()).loadTable(table).columns())
+                        .map(Column::name)
+                        .toList());
+        assertEquals(List.of("keep"), externalColumns);
+        assertEquals(
+            2, TableMetaService.getInstance().getTableByIdentifier(table).columns().size());
+        assertEquals(before, openManager.getTerm(LAKE, "ReconcileTerm").version());
+        assertEquals(1, openManager.listObjectTerms(LAKE, column, null).size());
+        assertTrue(auditRecords.isEmpty());
+        assertTrue(logs.toString().contains("ALTER_TABLE"));
+        assertTrue(logs.toString().contains("TABLE:" + stored.id()));
+        assertTrue(logs.toString().contains("injected revision failure"));
+        assertFalse(logs.toString().contains("cleanup committed"));
 
-    // Failed local table drop leaves stale registration and its binding intact (not repaired).
-    MetadataObject tableObj = MetadataObjects.of(List.of(CAT, SCH, TBL), MetadataObject.Type.TABLE);
-    hooked.associateTerms(LAKE, tableObj, new String[] {"ReconcileTerm"}, null);
-    long beforeDropFail = hooked.getTerm(LAKE, "ReconcileTerm").version();
-    auditRecords.clear();
-    assertThrows(
-        IllegalStateException.class,
-        () ->
-            SessionUtils.doMultipleWithCommit(
-                () -> TableMetaService.getInstance().deleteTable(tableIdent),
-                () -> {
-                  throw new IllegalStateException("Local table drop failed after external drop");
-                }));
-    assertEquals(beforeDropFail, hooked.getTerm(LAKE, "ReconcileTerm").version());
-    assertEquals(1, hooked.listTermBindings(LAKE, "ReconcileTerm", null, null, null).size());
-    assertTrue(auditRecords.isEmpty());
+        fail.set(false);
+        tables.loadTable(table);
+        assertEquals(
+            1, TableMetaService.getInstance().getTableByIdentifier(table).columns().size());
+        assertEquals(before + 1, openManager.getTerm(LAKE, "ReconcileTerm").version());
+        assertTrue(
+            openManager
+                .listTermBindings(LAKE, "ReconcileTerm", null, null, null)
+                .bindings()
+                .isEmpty());
+        assertEquals(1, auditRecords.size());
+        assertTrue(logs.toString().contains("cleanup committed"));
+        assertTrue(logs.toString().contains("removed"));
+
+        openManager.associateTerms(LAKE, target, new String[] {"ReconcileTerm"}, null);
+        long beforeDrop = openManager.getTerm(LAKE, "ReconcileTerm").version();
+        fail.set(true);
+        logs.getBuffer().setLength(0);
+        auditRecords.clear();
+        assertThrows(RuntimeException.class, () -> tables.dropTable(table));
+        boolean stillExists =
+            catalogs.doWithCatalog(catalog, c -> ((TableCatalog) c.ops()).tableExists(table));
+        assertFalse(stillExists);
+        assertFalse(tables.dropTable(table));
+        assertEquals(stored.id(), TableMetaService.getInstance().getTableByIdentifier(table).id());
+        assertEquals(beforeDrop, openManager.getTerm(LAKE, "ReconcileTerm").version());
+        assertEquals(1, openManager.listObjectTerms(LAKE, target, null).size());
+        assertTrue(auditRecords.isEmpty());
+        assertTrue(logs.toString().contains("DROP_TABLE"));
+        assertTrue(logs.toString().contains("TABLE:" + stored.id()));
+        assertTrue(logs.toString().contains("injected revision failure"));
+        assertFalse(logs.toString().contains("cleanup committed"));
+      }
+    } finally {
+      logger.removeAppender(appender);
+      logger.setLevel(previousLevel);
+      appender.stop();
+      FieldUtils.writeField(env, "catalogManager", oldCatalogs, true);
+      FieldUtils.writeField(env, "lockManager", previousLocks, true);
+    }
   }
 
   /**
@@ -1483,7 +1574,10 @@ class TestGlossaryBindings extends TestJDBCBackend {
     backend.insert(overwritten, true);
 
     assertTrue(
-        openManager.listTermBindings(LAKE, "OverwriteNullColTerm", null, null, null).isEmpty());
+        openManager
+            .listTermBindings(LAKE, "OverwriteNullColTerm", null, null, null)
+            .bindings()
+            .isEmpty());
     assertEquals(revBefore + 1, openManager.getTerm(LAKE, "OverwriteNullColTerm").version());
     assertEquals(1, auditRecords.size());
     assertEquals("RECONCILE_TABLE_COLUMNS", auditRecords.get(0).triggeringOperation());
@@ -1777,7 +1871,7 @@ class TestGlossaryBindings extends TestJDBCBackend {
     List<TermBinding> filteredBindings =
         as(
             "viewerWithTableRead",
-            () -> manager.listTermBindings(LAKE, "AuthApproved", null, null, null));
+            () -> manager.listTermBindings(LAKE, "AuthApproved", null, null, null).bindings());
     assertTrue(filteredBindings.stream().anyMatch(b -> b.object().equals(tblObj)));
     assertTrue(filteredBindings.stream().anyMatch(b -> b.object().equals(colObj)));
     assertFalse(filteredBindings.stream().anyMatch(b -> b.object().equals(viewObj)));
@@ -1788,12 +1882,15 @@ class TestGlossaryBindings extends TestJDBCBackend {
         () -> {
           assertThrows(
               NoSuchTermException.class,
-              () -> manager.listTermBindings(LAKE, "AuthPrivateDraft", null, null, null));
+              () ->
+                  manager.listTermBindings(LAKE, "AuthPrivateDraft", null, null, null).bindings());
           assertThrows(
               IllegalArgumentException.class,
               () ->
-                  manager.listTermBindings(
-                      LAKE, "AuthApproved", null, Set.of(MetadataObject.Type.METALAKE), null));
+                  manager
+                      .listTermBindings(
+                          LAKE, "AuthApproved", null, Set.of(MetadataObject.Type.METALAKE), null)
+                      .bindings());
           return null;
         });
   }
@@ -1867,7 +1964,9 @@ class TestGlossaryBindings extends TestJDBCBackend {
     assertEquals(rev + 1, openManager.getTerm(LAKE, "LeafCleanupTerm").version());
     assertEquals(1, auditRecords.size());
     assertEquals("OVERWRITE_SEMANTIC_MODEL", auditRecords.get(0).triggeringOperation());
-    assertEquals(1, openManager.listTermBindings(LAKE, "LeafCleanupTerm", null, null, null).size());
+    assertEquals(
+        1,
+        openManager.listTermBindings(LAKE, "LeafCleanupTerm", null, null, null).bindings().size());
 
     // Rolled-back metric alter leaves m_keep binding intact and emits no audit record.
     rev = openManager.getTerm(LAKE, "LeafCleanupTerm").version();
@@ -1891,7 +1990,9 @@ class TestGlossaryBindings extends TestJDBCBackend {
                   throw new IllegalStateException("simulated metric alter failure");
                 }));
     assertEquals(rev, openManager.getTerm(LAKE, "LeafCleanupTerm").version());
-    assertEquals(1, openManager.listTermBindings(LAKE, "LeafCleanupTerm", null, null, null).size());
+    assertEquals(
+        1,
+        openManager.listTermBindings(LAKE, "LeafCleanupTerm", null, null, null).bindings().size());
     assertTrue(auditRecords.isEmpty());
 
     // Dropping the semantic model cleans up remaining m_keep binding.
@@ -1925,7 +2026,11 @@ class TestGlossaryBindings extends TestJDBCBackend {
         CatalogMetaService.getInstance().deleteCatalog(NameIdentifier.of(LAKE, ncCat), false));
     assertEquals(rev + 2, openManager.getTerm(LAKE, "LeafCleanupTerm").version());
     assertEquals(2, auditRecords.size());
-    assertTrue(openManager.listTermBindings(LAKE, "LeafCleanupTerm", null, null, null).isEmpty());
+    assertTrue(
+        openManager
+            .listTermBindings(LAKE, "LeafCleanupTerm", null, null, null)
+            .bindings()
+            .isEmpty());
   }
 
   /**
@@ -2088,11 +2193,202 @@ class TestGlossaryBindings extends TestJDBCBackend {
             .build();
     backend.insert(replacement, true);
 
-    assertTrue(openManager.listTermBindings(LAKE, "StaleTblTerm", null, null, null).isEmpty());
+    assertTrue(
+        openManager.listTermBindings(LAKE, "StaleTblTerm", null, null, null).bindings().isEmpty());
     assertEquals(revBefore + 1, openManager.getTerm(LAKE, "StaleTblTerm").version());
     assertEquals(1, auditRecords.size());
     assertEquals("DROP_TABLE", auditRecords.get(0).triggeringOperation());
     assertEquals(2, auditRecords.get(0).lostBindings().size());
+  }
+
+  @TestTemplate
+  void testColdTableImportBeforeOpeningBindingTransaction() throws Exception {
+    NameIdentifier ident = NameIdentifier.of(schNs, "external");
+    MetadataObject table =
+        MetadataObjects.of(List.of(CAT, SCH, "external"), MetadataObject.Type.TABLE);
+    Mockito.when(env.internalTableDispatcher().tableExists(ident))
+        .thenAnswer(
+            inv -> {
+              assertFalse(SqlSessions.hasActiveSession());
+              insertTable("external", List.of(col("id", 0)));
+              return true;
+            });
+    openManager.createTerm(LAKE, TermSpec.builder("Imported").build());
+    openManager.associateTerms(LAKE, table, new String[] {"Imported"}, null);
+    assertEquals(
+        List.of("Imported"),
+        openManager.listObjectTerms(LAKE, table, null).stream()
+            .map(GlossaryTermEntity::name)
+            .toList());
+    Mockito.verify(env.internalTableDispatcher()).tableExists(ident);
+  }
+
+  @TestTemplate
+  void testBindingPageResumesAfterHiddenCandidatesAndRechecksRevision() throws Exception {
+    user("metricReader", "viewDef", "readModel");
+    GlossaryTermEntity term =
+        openManager.createTerm(
+            LAKE, TermSpec.builder("Paged").withStatus(GlossaryTerm.Status.APPROVED).build());
+    List<ColumnEntity> columns =
+        IntStream.range(0, 1000).mapToObj(i -> col("col_" + i, i)).toList();
+    insertTable("wide", columns);
+    long lake = MetalakeMetaService.getInstance().getMetalakeIdByName(LAKE);
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            columns.forEach(
+                column ->
+                    GlossaryTermBindingService.getInstance()
+                        .add(lake, term.id(), TargetType.COLUMN, column.id())));
+    MetadataObject model =
+        MetadataObjects.of(List.of(CAT, SCH, SMODEL), MetadataObject.Type.SEMANTIC_MODEL);
+    openManager.associateMetricTerms(LAKE, model, "net_revenue", new String[] {"Paged"}, null);
+    GlossaryManager.BindingPage first =
+        as(
+            "metricReader",
+            () -> manager.listTermBindings(LAKE, "Paged", null, null, null, 1, null));
+    assertTrue(first.bindings().isEmpty());
+    assertNotNull(first.next());
+    GlossaryManager.BindingPage last =
+        as(
+            "metricReader",
+            () -> manager.listTermBindings(LAKE, "Paged", null, null, null, 1, first.next()));
+    assertEquals(List.of(TermBinding.usedBy(model, "net_revenue")), last.bindings());
+    assertNull(last.next());
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            openManager.listTermBindings(
+                LAKE, "Paged", TermBinding.Kind.USED_BY, null, null, 1, first.next()));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> openManager.listTermBindings(LAKE, "Paged", null, null, null, 101, null));
+    openManager.associateMetricTerms(LAKE, model, "active_users", new String[] {"Paged"}, null);
+    assertThrows(
+        TermVersionConflictException.class,
+        () -> openManager.listTermBindings(LAKE, "Paged", null, null, null, 1, first.next()));
+    GlossaryManager.BindingPage one =
+        openManager.listTermBindings(LAKE, "Paged", TermBinding.Kind.USED_BY, null, null, 1, null);
+    GlossaryManager.BindingPage two =
+        openManager.listTermBindings(
+            LAKE, "Paged", TermBinding.Kind.USED_BY, null, null, 1, one.next());
+    assertEquals(
+        Set.of(TermBinding.usedBy(model, "net_revenue"), TermBinding.usedBy(model, "active_users")),
+        Set.of(one.bindings().get(0), two.bindings().get(0)));
+    assertNull(two.next());
+  }
+
+  @TestTemplate
+  void testExactMetricIdentity() throws Exception {
+    SemanticModelMetaService.getInstance()
+        .insertSemanticModel(
+            semanticModel(ids.incrementAndGet(), "exact_names", List.of("units", "units ")), false);
+    MetadataObject target =
+        MetadataObjects.of(List.of(CAT, SCH, "exact_names"), MetadataObject.Type.SEMANTIC_MODEL);
+    openManager.createTerm(LAKE, TermSpec.builder("UnitsTerm").build());
+    openManager.associateMetricTerms(LAKE, target, "units", new String[] {"UnitsTerm"}, null);
+    assertEquals(List.of(), openManager.listMetricTerms(LAKE, target, "units ", null));
+  }
+
+  @TestTemplate
+  void testBindingFailureRollsBackAndRejectsNestedWrites() throws Exception {
+    openManager.createTerm(LAKE, TermSpec.builder("FirstTerm").build());
+    openManager.createTerm(LAKE, TermSpec.builder("SecondTerm").build());
+    long before = openManager.getTerm(LAKE, "FirstTerm").version();
+    AtomicInteger calls = new AtomicInteger();
+    GlossaryManager failing =
+        new GlossaryManager(
+            ids::incrementAndGet,
+            false,
+            (a, b, persist) -> {
+              if (calls.incrementAndGet() == 2)
+                throw new IllegalStateException("second write failed");
+              persist.run();
+            });
+    MetadataObject target = MetadataObjects.of(List.of(CAT, SCH, TBL), MetadataObject.Type.TABLE);
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            assertThrows(
+                IllegalStateException.class,
+                () ->
+                    failing.associateTerms(
+                        LAKE, target, new String[] {"FirstTerm", "SecondTerm"}, null)));
+    assertEquals(0, calls.get());
+    assertThrows(
+        IllegalStateException.class,
+        () -> failing.associateTerms(LAKE, target, new String[] {"FirstTerm", "SecondTerm"}, null));
+    assertEquals(2, calls.get());
+    assertEquals(
+        List.of(),
+        openManager.listObjectTerms(LAKE, target, null).stream()
+            .map(GlossaryTermEntity::name)
+            .toList());
+    assertEquals(before, openManager.getTerm(LAKE, "FirstTerm").version());
+  }
+
+  @TestTemplate
+  void testTargetDropRecordsModifier() throws Exception {
+    MetadataObject target = MetadataObjects.of(List.of(CAT, SCH, TBL), MetadataObject.Type.TABLE);
+    as(
+        "writer",
+        () ->
+            openManager.createTerm(
+                LAKE, TermSpec.builder("AuditTerm").withSynonyms("first", "second").build()));
+    as("writer", () -> openManager.associateTerms(LAKE, target, new String[] {"AuditTerm"}, null));
+    GlossaryTermEntity before = openManager.getTerm(LAKE, "AuditTerm");
+    as("dropper", () -> TableMetaService.getInstance().deleteTable(NameIdentifier.of(schNs, TBL)));
+    GlossaryTermEntity after = openManager.getTerm(LAKE, "AuditTerm");
+    assertEquals(before.version() + 1, after.version());
+    assertArrayEquals(before.synonyms(), after.synonyms());
+    assertEquals("writer", after.auditInfo().creator());
+    assertEquals(before.auditInfo().createTime(), after.auditInfo().createTime());
+    assertFalse(
+        after.auditInfo().lastModifiedTime().isBefore(before.auditInfo().lastModifiedTime()));
+    assertEquals("dropper", after.auditInfo().lastModifier());
+  }
+
+  @TestTemplate
+  void testBindAndReadCaseInsensitiveTarget() throws Exception {
+    openManager.createTerm(LAKE, TermSpec.builder("RevenueTerm").build());
+    Capability insensitive =
+        new Capability() {
+          @Override
+          public CapabilityResult caseSensitiveOnName(Scope scope) {
+            return CapabilityResult.unsupported("case insensitive");
+          }
+        };
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability()).thenReturn(insensitive);
+    Mockito.reset(env.catalogManager());
+    Mockito.when(env.catalogManager().doWithCatalog(Mockito.any(), Mockito.any()))
+        .thenAnswer(
+            inv -> {
+              ThrowableFunction<BaseCatalog<?>, Object> action = inv.getArgument(1);
+              return action.apply(catalog);
+            });
+    MetadataObject target =
+        MetadataObjects.of(
+            List.of(CAT, SCH, TBL.toUpperCase(Locale.ROOT)), MetadataObject.Type.TABLE);
+    NameIdentifier canonical =
+        CapabilityHelpers.normalizeMetadataIdentifier(
+            NameIdentifier.of(schNs, TBL.toUpperCase(Locale.ROOT)),
+            Capability.Scope.TABLE,
+            env.catalogManager(),
+            () -> env.entityStore());
+    assertEquals(NameIdentifier.of(schNs, TBL), canonical);
+    openManager.associateTerms(LAKE, target, new String[] {"RevenueTerm"}, null);
+    assertEquals(1, openManager.listObjectTerms(LAKE, target, null).size());
+  }
+
+  @TestTemplate
+  void testMetricWithUnmatchedTrailingSpace() throws Exception {
+    MetadataObject target =
+        MetadataObjects.of(List.of(CAT, SCH, SMODEL), MetadataObject.Type.SEMANTIC_MODEL);
+    openManager.createTerm(LAKE, TermSpec.builder("MissingMetric").build());
+    assertThrows(
+        NoSuchMetadataObjectException.class,
+        () ->
+            openManager.associateMetricTerms(
+                LAKE, target, "net_revenue ", new String[] {"MissingMetric"}, null));
   }
 
   private TableEntity insertTable(String name, List<ColumnEntity> columns) throws Exception {

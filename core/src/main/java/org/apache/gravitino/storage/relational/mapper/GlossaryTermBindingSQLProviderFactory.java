@@ -97,8 +97,11 @@ public class GlossaryTermBindingSQLProviderFactory {
   public static String listByTerm(
       @Param("metalakeId") long metalakeId,
       @Param("termId") long termId,
-      @Param("targetTypes") @Nullable Collection<String> targetTypes) {
-    return getProvider().listByTerm(metalakeId, termId, targetTypes);
+      @Param("targetTypes") @Nullable Collection<String> targetTypes,
+      @Param("afterType") @Nullable String afterType,
+      @Param("afterId") long afterId,
+      @Param("limit") int limit) {
+    return getProvider().listByTerm(metalakeId, termId, targetTypes, afterType, afterId, limit);
   }
 
   /** Delegates {@link GlossaryTermBindingBaseSQLProvider#listByTable}. */

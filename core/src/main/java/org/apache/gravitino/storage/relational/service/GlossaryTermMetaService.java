@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -36,6 +37,7 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
@@ -57,6 +59,7 @@ import org.apache.gravitino.storage.relational.po.GlossaryTermSnapshotPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
  * Transactional persistence of glossary definitions and their synonyms.
@@ -617,6 +620,29 @@ public final class GlossaryTermMetaService {
           .build();
     } catch (IOException e) {
       throw new UncheckedIOException("Cannot decode glossary term " + row.getTermId(), e);
+    }
+  }
+
+  /** Advances a locked term after a binding change, preserving its definition and synonyms. */
+  public void advanceBindingRevision(long metalakeId, long termId, long version, Audit audit) {
+    int updated =
+        SessionUtils.getWithoutCommit(
+            GlossaryTermMetaMapper.class,
+            mapper -> mapper.incrementVersion(metalakeId, termId, version, json(audit)));
+    Preconditions.checkState(updated == 1, "Failed to advance revision for locked term %s", termId);
+  }
+
+  static AuditInfo auditAfterBindingLoss(GlossaryTermPO row) {
+    try {
+      AuditInfo old = JsonUtils.anyFieldMapper().readValue(row.getAuditInfo(), AuditInfo.class);
+      return AuditInfo.builder()
+          .withCreator(old.creator())
+          .withCreateTime(old.createTime())
+          .withLastModifier(PrincipalUtils.getCurrentUserName())
+          .withLastModifiedTime(Instant.now())
+          .build();
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
     }
   }
 

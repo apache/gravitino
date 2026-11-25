@@ -94,7 +94,10 @@ public interface GlossaryTermBindingMapper {
   List<GlossaryTermBindingPO> listByTerm(
       @Param("metalakeId") long metalakeId,
       @Param("termId") long termId,
-      @Param("targetTypes") @Nullable Collection<String> targetTypes);
+      @Param("targetTypes") @Nullable Collection<String> targetTypes,
+      @Param("afterType") @Nullable String afterType,
+      @Param("afterId") long afterId,
+      @Param("limit") int limit);
 
   /** Lists live bindings belonging to a table and all its live columns. */
   @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)

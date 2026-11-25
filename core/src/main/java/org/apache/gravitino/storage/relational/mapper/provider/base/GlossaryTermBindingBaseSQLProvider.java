@@ -120,7 +120,10 @@ public class GlossaryTermBindingBaseSQLProvider {
   public String listByTerm(
       @Param("metalakeId") long metalakeId,
       @Param("termId") long termId,
-      @Param("targetTypes") @Nullable Collection<String> targetTypes) {
+      @Param("targetTypes") @Nullable Collection<String> targetTypes,
+      @Param("afterType") @Nullable String afterType,
+      @Param("afterId") long afterId,
+      @Param("limit") int limit) {
     StringBuilder sql =
         new StringBuilder("<script>SELECT ")
             .append(SELECT_COLUMNS)
@@ -133,7 +136,11 @@ public class GlossaryTermBindingBaseSQLProvider {
           .append(
               "<foreach collection='targetTypes' item='t' open='(' separator=',' close=')'>#{t}</foreach>");
     }
-    sql.append(" ORDER BY b.target_type, b.target_id</script>");
+    if (afterType != null) {
+      sql.append(
+          " AND (b.target_type > #{afterType} OR (b.target_type=#{afterType} AND b.target_id > #{afterId}))");
+    }
+    sql.append(" ORDER BY b.target_type, b.target_id LIMIT #{limit}</script>");
     return sql.toString();
   }
 

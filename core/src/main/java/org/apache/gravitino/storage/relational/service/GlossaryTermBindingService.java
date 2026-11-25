@@ -200,14 +200,19 @@ public final class GlossaryTermBindingService {
 
   /** Lists live bindings of a term in keyset order on (target_type, target_id). */
   public List<GlossaryTermBindingPO> listByTerm(
-      long metalakeId, long termId, @Nullable Set<TargetType> targetTypes) {
+      long metalakeId,
+      long termId,
+      @Nullable Set<TargetType> targetTypes,
+      @Nullable String afterType,
+      long afterId,
+      int limit) {
     List<String> typeNames =
         targetTypes == null || targetTypes.isEmpty()
             ? null
             : targetTypes.stream().map(TargetType::name).toList();
     return SessionUtils.getWithoutCommit(
         GlossaryTermBindingMapper.class,
-        mapper -> mapper.listByTerm(metalakeId, termId, typeNames));
+        mapper -> mapper.listByTerm(metalakeId, termId, typeNames, afterType, afterId, limit));
   }
 
   /** Retires every binding row of a deleted term inside its deletion transaction. */
@@ -515,7 +520,15 @@ public final class GlossaryTermBindingService {
     try {
       cleanupBindings(metalakeId, bindings, metadataByKey, triggeringOperation);
     } catch (RuntimeException e) {
-      logCleanupFailure(triggeringOperation, metalakeId, "COLLECTED:" + bindings.size(), e);
+      GlossaryTermBindingPO first = bindings.get(0);
+      logCleanupFailure(
+          triggeringOperation,
+          metalakeId,
+          bindingKey(first.getTargetType(), first.getTargetId())
+              + " (first of "
+              + bindings.size()
+              + " bindings)",
+          e);
       throw e;
     }
   }
@@ -586,54 +599,42 @@ public final class GlossaryTermBindingService {
     // Increment each affected surviving term's revision once and stage its post-commit audit
     // entry.
     List<BindingLossAuditRecord> records = new ArrayList<>(actuallyRemovedByTerm.size());
-    SessionUtils.doWithoutCommit(
-        GlossaryTermMetaMapper.class,
-        termMapper -> {
-          for (Map.Entry<Long, List<GlossaryTermBindingPO>> entry :
-              actuallyRemovedByTerm.entrySet()) {
-            long termId = entry.getKey();
-            GlossaryTermPO term = lockedTerms.get(termId);
-            int updated = termMapper.incrementVersion(metalakeId, termId, term.getCurrentVersion());
-            Preconditions.checkState(
-                updated == 1, "Failed to increment version for locked glossary term %s", termId);
-            long newRevision = Math.addExact(term.getCurrentVersion(), 1L);
-            List<LostBinding> lost = new ArrayList<>(entry.getValue().size());
-            for (GlossaryTermBindingPO row : entry.getValue()) {
-              String key = bindingKey(row.getTargetType(), row.getTargetId());
-              LostBinding detail = metadataByKey.get(key);
-              if (detail == null) {
-                detail =
-                    new LostBinding(
-                        TargetType.valueOf(row.getTargetType()),
-                        row.getTargetId(),
-                        null,
-                        null,
-                        null);
-              }
-              lost.add(detail);
-            }
-            records.add(
-                new BindingLossAuditRecord(
-                    metalakeId,
-                    termId,
-                    term.getName(),
-                    newRevision,
-                    triggeringOperation,
-                    List.copyOf(lost)));
-          }
-        });
+    for (Map.Entry<Long, List<GlossaryTermBindingPO>> entry : actuallyRemovedByTerm.entrySet()) {
+      long termId = entry.getKey();
+      GlossaryTermPO term = lockedTerms.get(termId);
+      GlossaryTermMetaService.getInstance()
+          .advanceBindingRevision(
+              metalakeId,
+              termId,
+              term.getCurrentVersion(),
+              GlossaryTermMetaService.auditAfterBindingLoss(term));
+      long newRevision = Math.addExact(term.getCurrentVersion(), 1L);
+      List<LostBinding> lost = new ArrayList<>(entry.getValue().size());
+      for (GlossaryTermBindingPO row : entry.getValue()) {
+        String key = bindingKey(row.getTargetType(), row.getTargetId());
+        LostBinding detail = metadataByKey.get(key);
+        if (detail == null) {
+          detail =
+              new LostBinding(
+                  TargetType.valueOf(row.getTargetType()), row.getTargetId(), null, null, null);
+        }
+        lost.add(detail);
+      }
+      records.add(
+          new BindingLossAuditRecord(
+              metalakeId,
+              termId,
+              term.getName(),
+              newRevision,
+              triggeringOperation,
+              List.copyOf(lost)));
+    }
 
     if (!records.isEmpty()) {
       SqlSessions.afterCommit(
           () -> {
             for (BindingLossAuditRecord record : records) {
-              LOG.info(
-                  "Cleaned up {} glossary binding(s) for term {} (id={}) on {}: new revision={}",
-                  record.lostBindings().size(),
-                  record.termName(),
-                  record.termId(),
-                  record.triggeringOperation(),
-                  record.resultingRevision());
+              LOG.info("Glossary binding cleanup committed: {}", record);
               for (CleanupAuditListener listener : listeners) {
                 try {
                   listener.onBindingsCleaned(record);
