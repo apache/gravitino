@@ -21,8 +21,10 @@ package org.apache.gravitino.connector.capability;
 import com.google.common.collect.ImmutableSet;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Pattern;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.utils.NameValidationUtils;
 
 /**
  * The Catalog interface to provide the capabilities of the catalog. If the implemented catalog has
@@ -158,17 +160,7 @@ public interface Capability {
     private static final Set<String> RESERVED_WORDS =
         ImmutableSet.of(MetadataObjects.METADATA_OBJECT_RESERVED_NAME);
 
-    /**
-     * Regular expression explanation:
-     *
-     * <p>^\w - Starts with a letter, digit, or underscore
-     *
-     * <p>[\w/=-]{0,63} - Followed by 0 to 63 characters (making the total length at most 64) of
-     * letters (both cases), digits, underscores, slashes, hyphens, or equals signs
-     *
-     * <p>$ - End of the string
-     */
-    private static final String DEFAULT_NAME_PATTERN = "^\\w[\\w/=-]{0,63}$";
+    private static final Pattern DEFAULT_NAME_PATTERN = Pattern.compile("\\w[\\w/=-]*");
 
     @Override
     public CapabilityResult columnNotNull() {
@@ -192,11 +184,10 @@ public interface Capability {
             String.format("The %s name '%s' is reserved.", scope, name));
       }
 
-      if (!name.matches(DEFAULT_NAME_PATTERN)) {
-        return CapabilityResult.unsupported(
-            String.format("The %s name '%s' is illegal.", scope, name));
-      }
-      return CapabilityResult.SUPPORTED;
+      String error =
+          NameValidationUtils.nameValidationError(
+              String.valueOf(scope), name, DEFAULT_NAME_PATTERN);
+      return error == null ? CapabilityResult.SUPPORTED : CapabilityResult.unsupported(error);
     }
 
     @Override

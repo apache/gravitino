@@ -28,6 +28,7 @@ import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.MetalakeChange;
@@ -36,20 +37,11 @@ import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.utils.NameValidationUtils;
 
 public class MetalakeNormalizeDispatcher implements MetalakeDispatcher {
   private static final Set<String> RESERVED_WORDS = ImmutableSet.of(SYSTEM_METALAKE_RESERVED_NAME);
-  /**
-   * Regular expression explanation:
-   *
-   * <p>^[\w] - Starts with a letter, digit, or underscore
-   *
-   * <p>[\w]{0,63} - Followed by 0 to 63 characters (making the total length at most 64) of letters
-   * (both cases), digits, underscores
-   *
-   * <p>$ - End of the string
-   */
-  private static final String METALAKE_NAME_PATTERN = "^\\w[\\w]{0,63}$";
+  private static final Pattern METALAKE_NAME_PATTERN = Pattern.compile("\\w+");
 
   private final MetalakeDispatcher dispatcher;
 
@@ -125,8 +117,9 @@ public class MetalakeNormalizeDispatcher implements MetalakeDispatcher {
     if (RESERVED_WORDS.contains(name)) {
       throw new IllegalArgumentException("The metalake name '" + name + "' is reserved.");
     }
-    if (!name.matches(METALAKE_NAME_PATTERN)) {
-      throw new IllegalArgumentException("The metalake name '" + name + "' is illegal.");
+    String error = NameValidationUtils.nameValidationError("metalake", name, METALAKE_NAME_PATTERN);
+    if (error != null) {
+      throw new IllegalArgumentException(error);
     }
   }
 
