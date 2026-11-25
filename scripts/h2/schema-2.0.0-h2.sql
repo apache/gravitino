@@ -918,6 +918,7 @@ CREATE TABLE IF NOT EXISTS kb_article_meta (
     live_key INT GENERATED ALWAYS AS (CASE WHEN deleted_at = 0 THEN 1 ELSE NULL END) COMMENT 'Only live rows reserve the unique key',
     CONSTRAINT uk_kba_name UNIQUE (metalake_id, article_name, live_key)
 ) COMMENT='Current Knowledge Base Article';
+CREATE INDEX IF NOT EXISTS idx_kba_deleted ON kb_article_meta (deleted_at, article_id);
 
 CREATE TABLE IF NOT EXISTS kb_article_relation_meta (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT 'Binding row ID',
@@ -934,3 +935,4 @@ CREATE TABLE IF NOT EXISTS kb_article_relation_meta (
 ) COMMENT='Current Article bindings';
 CREATE INDEX IF NOT EXISTS idx_kba_target ON kb_article_relation_meta (target_id, target_type, deleted_at);
 CREATE INDEX IF NOT EXISTS idx_kba_relation_metalake ON kb_article_relation_meta (metalake_id, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_kba_relation_deleted ON kb_article_relation_meta (deleted_at, id);

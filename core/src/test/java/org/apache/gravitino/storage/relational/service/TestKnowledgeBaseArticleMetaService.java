@@ -22,7 +22,9 @@ package org.apache.gravitino.storage.relational.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -30,8 +32,12 @@ import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -39,24 +45,31 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.kb.ArticleBody;
 import org.apache.gravitino.kb.KnowledgeBaseArticleEntity;
 import org.apache.gravitino.kb.KnowledgeBaseArticleEntity.Binding;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.KnowledgeBaseArticleMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.po.KnowledgeBaseArticlePO;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.ExpectedRevision;
+import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.NameConflictException;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.ibatis.exceptions.PersistenceException;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.TestTemplate;
 import org.junit.jupiter.api.function.Executable;
@@ -208,6 +221,51 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
     assertEquals(3, backend.hardDeleteLegacyData(TYPE, Long.MAX_VALUE));
     assertEquals(0, STORE.collect(Long.MAX_VALUE, 10));
     assertEquals(12, STORE.getIds(ident).entityId());
+  }
+
+  @TestTemplate
+  void testCreateDistinguishesNameAndIdConflicts() throws IOException {
+    createAndInsertMakeLake("lake");
+    STORE.insert(article(31, "guide"), false);
+    assertThrows(NameConflictException.class, () -> STORE.insert(article(32, "guide"), false));
+    var idConflict =
+        assertThrowsExactly(
+            EntityAlreadyExistsException.class, () -> STORE.insert(article(31, "another"), false));
+    assertTrue(idConflict.getMessage().contains("Article ID 31"));
+    assertFalse(backend.exists(NameIdentifier.of("lake", "another"), TYPE));
+  }
+
+  @TestTemplate
+  void testDuplicateBindingInHookPreservesFailureAndRollsBack() throws IOException {
+    long lake = createAndInsertMakeLake("lake").id();
+    var initial = article(31, "guide");
+    var fromHook = new AtomicReference<PersistenceException>();
+    var failure =
+        assertThrows(
+            PersistenceException.class,
+            () ->
+                STORE.insert(
+                    initial,
+                    false,
+                    (before, after) -> {
+                      // The initial bindings already include TABLE when the hook runs.
+                      var duplicate =
+                          assertThrows(
+                              PersistenceException.class,
+                              () ->
+                                  SessionUtils.doWithoutCommit(
+                                      KnowledgeBaseArticleMapper.class,
+                                      m -> m.bind(m.get(lake, after.name()), TABLE, "{}")));
+                      fromHook.set(duplicate);
+                      throw duplicate;
+                    }));
+    assertSame(fromHook.get(), failure);
+    assertTrue(ExceptionUtils.isDuplicateKey(failure));
+    assertFalse(backend.exists(initial.nameIdentifier(), TYPE));
+    assertEquals(
+        List.of(),
+        SessionUtils.getWithoutCommit(
+            KnowledgeBaseArticleMapper.class, m -> m.bindings(initial.id())));
   }
 
   @TestTemplate
@@ -532,6 +590,66 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
     assertEquals("Earlier edit", STORE.get(earlier.nameIdentifier()).title());
   }
 
+  @TestTemplate
+  void testPurgeSelectsOldestRetirementFirst() throws IOException {
+    createAndInsertMakeLake("lake");
+    var newer = article(31, "newer").toBuilder().withBindings(Set.of(TABLE)).build();
+    var older = article(32, "older").toBuilder().withBindings(Set.of(TABLE)).build();
+    STORE.insert(newer, false);
+    STORE.insert(older, false);
+    SessionUtils.doWithCommit(
+        KnowledgeBaseArticleMapper.class,
+        mapper -> {
+          mapper.deleteBindings(newer.id(), 20);
+          mapper.delete(newer.id(), 20);
+          mapper.deleteBindings(older.id(), 10);
+          mapper.delete(older.id(), 10);
+
+          assertEquals(1, mapper.purgeBindings(21, 1));
+          assertEquals(0, mapper.purgeBindings(20, 1));
+          assertEquals(1, mapper.purge(21, 1));
+          assertEquals(0, mapper.purge(20, 1));
+        });
+  }
+
+  @TestTemplate
+  void testBindingAuditRecordsEachActorAndInsertionTime() throws Exception {
+    createAndInsertMakeLake("lake");
+    AuditInfo articleAudit =
+        AuditInfo.builder().withCreator("alice").withCreateTime(Instant.EPOCH).build();
+    var entity =
+        article(31, "guide").toBuilder()
+            .withAuditInfo(articleAudit)
+            .withBindings(Set.of(TABLE))
+            .build();
+    long insertStart = System.currentTimeMillis();
+    PrincipalUtils.doAs(
+        new UserPrincipal("alice"),
+        () -> {
+          STORE.insert(entity, false);
+          return null;
+        });
+    AuditInfo initial = bindingAudit(entity.id(), TABLE);
+    assertEquals("alice", initial.creator());
+    assertTrue(initial.createTime().toEpochMilli() >= insertStart);
+    assertTrue(initial.createTime().toEpochMilli() <= System.currentTimeMillis());
+
+    long editStart = System.currentTimeMillis();
+    PrincipalUtils.doAs(
+        new UserPrincipal("bob"),
+        () ->
+            STORE.update(
+                entity.nameIdentifier(),
+                (KnowledgeBaseArticleEntity a) ->
+                    a.toBuilder().withBindings(Set.of(TABLE, TERM)).build()));
+    AuditInfo added = bindingAudit(entity.id(), TERM);
+    assertEquals("bob", added.creator());
+    assertTrue(added.createTime().toEpochMilli() >= editStart);
+    assertTrue(added.createTime().toEpochMilli() <= System.currentTimeMillis());
+    assertEquals(initial, bindingAudit(entity.id(), TABLE));
+    assertEquals(articleAudit, STORE.get(entity.nameIdentifier()).auditInfo());
+  }
+
   // The peer uses its own transaction; both the observation and the later lock still hit the DB.
   private static MockedStatic<SessionUtils> interleaveArticleReads(
       Executable before, Executable after) {
@@ -547,6 +665,25 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
           }
           return invocation.callRealMethod();
         });
+  }
+
+  private static AuditInfo bindingAudit(long articleId, Binding binding)
+      throws SQLException, IOException {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession();
+        PreparedStatement query =
+            session
+                .getConnection()
+                .prepareStatement(
+                    "SELECT audit_info FROM kb_article_relation_meta WHERE article_id=? AND target_type=? AND target_id=? AND deleted_at=0")) {
+      query.setLong(1, articleId);
+      query.setString(2, binding.targetType());
+      query.setLong(3, binding.targetId());
+      try (ResultSet rows = query.executeQuery()) {
+        assertTrue(rows.next());
+        return JsonUtils.anyFieldMapper().readValue(rows.getString(1), AuditInfo.class);
+      }
+    }
   }
 
   private static KnowledgeBaseArticleEntity article(long id, String name) {

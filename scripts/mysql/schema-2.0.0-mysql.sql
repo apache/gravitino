@@ -896,7 +896,8 @@ CREATE TABLE IF NOT EXISTS kb_article_meta (
     audit_info MEDIUMTEXT NOT NULL COMMENT 'Audit information',
     deleted_at BIGINT NOT NULL DEFAULT 0 COMMENT 'Soft deletion time in milliseconds, zero for live rows',
     live_key INT GENERATED ALWAYS AS (CASE WHEN deleted_at = 0 THEN 1 ELSE NULL END) STORED COMMENT 'Only live rows reserve the unique key',
-    CONSTRAINT uk_kba_name UNIQUE (metalake_id, article_name, live_key)
+    CONSTRAINT uk_kba_name UNIQUE (metalake_id, article_name, live_key),
+    INDEX idx_kba_deleted (deleted_at, article_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Current Knowledge Base Article';
 
 CREATE TABLE IF NOT EXISTS kb_article_relation_meta (
@@ -912,5 +913,6 @@ CREATE TABLE IF NOT EXISTS kb_article_relation_meta (
     live_key INT GENERATED ALWAYS AS (CASE WHEN deleted_at = 0 THEN 1 ELSE NULL END) STORED COMMENT 'Only live rows reserve the unique key',
     CONSTRAINT uk_kba_binding UNIQUE (article_id, target_id, target_type, live_key),
     INDEX idx_kba_target (target_id, target_type, deleted_at),
-    INDEX idx_kba_relation_metalake (metalake_id, deleted_at)
+    INDEX idx_kba_relation_metalake (metalake_id, deleted_at),
+    INDEX idx_kba_relation_deleted (deleted_at, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Current Article bindings';
