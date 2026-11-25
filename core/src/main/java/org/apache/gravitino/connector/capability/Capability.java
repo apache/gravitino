@@ -162,6 +162,16 @@ public interface Capability {
 
     private static final Pattern DEFAULT_NAME_PATTERN = Pattern.compile("\\w[\\w/=-]*");
 
+    /**
+     * Checks the default catalog object name syntax, excluding reserved names and length limits.
+     *
+     * @param name the proposed name
+     * @return whether the characters and their positions are valid
+     */
+    public static boolean matchesNameSyntax(String name) {
+      return DEFAULT_NAME_PATTERN.matcher(name).matches();
+    }
+
     @Override
     public CapabilityResult columnNotNull() {
       return CapabilityResult.SUPPORTED;
