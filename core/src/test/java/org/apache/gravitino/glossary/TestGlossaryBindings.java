@@ -2225,6 +2225,32 @@ class TestGlossaryBindings extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testAuthorizerWithoutResolvedTargetSupportRejectsBindingBeforeImport() throws Exception {
+    GravitinoAuthorizer legacy =
+        Mockito.mock(GravitinoAuthorizer.class, AdditionalAnswers.delegatesTo(authorizer));
+    Mockito.doCallRealMethod().when(legacy).supportsResolvedTargetAuthorization();
+    env.setGravitinoAuthorizer(legacy);
+    as("lakeOwner", () -> manager.createTerm(LAKE, TermSpec.builder("Restricted").build()));
+    MetadataObject cold = MetadataObjects.of(List.of(CAT, SCH, "cold"), MetadataObject.Type.TABLE);
+    MetadataObject live = MetadataObjects.of(List.of(CAT, SCH, TBL), MetadataObject.Type.TABLE);
+    assertThrows(
+        ForbiddenException.class,
+        () ->
+            as(
+                "lakeOwner",
+                () -> manager.associateTerms(LAKE, cold, new String[] {"Restricted"}, null)));
+    assertThrows(
+        ForbiddenException.class,
+        () -> as("lakeOwner", () -> manager.listObjectTerms(LAKE, live, null)));
+    assertThrows(
+        ForbiddenException.class,
+        () ->
+            as("lakeOwner", () -> manager.listTermBindings(LAKE, "Restricted", null, null, null)));
+    Mockito.verifyNoInteractions(env.internalTableDispatcher());
+    assertTrue(openManager.listObjectTerms(LAKE, live, null).isEmpty());
+  }
+
+  @TestTemplate
   void testOwnerReadFromOldSnapshotDoesNotChangeLaterAuthorization() throws Exception {
     NameIdentifier table = NameIdentifier.of(schNs, TBL);
     MetadataObject target = MetadataObjects.of(List.of(CAT, SCH, TBL), MetadataObject.Type.TABLE);

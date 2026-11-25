@@ -30,6 +30,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege.Name;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.storage.relational.RelationalEntityStoreIdResolver;
@@ -66,7 +67,7 @@ final class GlossaryBindingAccess {
       return UNRESTRICTED;
     }
     return new GlossaryBindingAccess(
-        GravitinoEnv.getInstance().gravitinoAuthorizer(),
+        bindingAuthorizer(),
         PrincipalUtils.getCurrentPrincipal(),
         metalake,
         new AuthorizationRequestContext());
@@ -219,6 +220,15 @@ final class GlossaryBindingAccess {
     return allowed;
   }
 
+  private static GravitinoAuthorizer bindingAuthorizer() {
+    GravitinoAuthorizer authorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    if (!authorizer.supportsResolvedTargetAuthorization()) {
+      throw new ForbiddenException(
+          "The configured authorizer does not support glossary binding checks by target ID");
+    }
+    return authorizer;
+  }
+
   private static GlossaryBindingAccess forSnapshot(
       String metalake, Map<MetadataObject, Optional<Long>> scopes) {
     RelationalEntityStoreIdResolver resolver = new RelationalEntityStoreIdResolver();
@@ -241,9 +251,6 @@ final class GlossaryBindingAccess {
                       }
                     }));
     return new GlossaryBindingAccess(
-        GravitinoEnv.getInstance().gravitinoAuthorizer(),
-        PrincipalUtils.getCurrentPrincipal(),
-        metalake,
-        context);
+        bindingAuthorizer(), PrincipalUtils.getCurrentPrincipal(), metalake, context);
   }
 }

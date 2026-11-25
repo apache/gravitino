@@ -310,6 +310,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   /** Background HA invalidator for {@link #metadataIdCache} and {@link #ownerRelCache}. */
   private JcasbinChangeListener changePoller;
 
+  /** {@inheritDoc} */
+  @Override
+  public boolean supportsResolvedTargetAuthorization() {
+    return true;
+  }
+
   @Override
   public void initialize() {
     long cacheExpirationSecs =

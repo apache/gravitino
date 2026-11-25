@@ -773,12 +773,12 @@ public final class GlossaryManager {
               if (term == null || !termAccess.canRead(term) || !readable.test(term)) {
                 throw missingRelationRoot(termIdent);
               }
-              boolean termEditorPath = termAccess.canEdit(term) && canReadObject;
-              boolean objectAdminPath = canAdminObject && termAccess.canRead(term);
-              if (termEditorPath) {
+              // Visibility of a draft already required an edit check on this locked term.
+              if (canReadObject
+                  && (term.status() == GlossaryTerm.Status.DRAFT || termAccess.canEdit(term))) {
                 continue;
               }
-              if (objectAdminPath) {
+              if (canAdminObject) {
                 if (term.status() != GlossaryTerm.Status.APPROVED) {
                   throw new IllegalArgumentException(
                       "Object administrators can bind or unbind only APPROVED glossary terms");

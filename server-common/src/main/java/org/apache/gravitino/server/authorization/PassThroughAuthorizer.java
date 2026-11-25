@@ -36,6 +36,12 @@ import org.apache.gravitino.utils.PrincipalUtils;
  */
 public class PassThroughAuthorizer implements GravitinoAuthorizer {
 
+  /** {@inheritDoc} */
+  @Override
+  public boolean supportsResolvedTargetAuthorization() {
+    return true;
+  }
+
   @Override
   public void initialize() {}
 
