@@ -27,7 +27,7 @@ import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.Owner;
 
-/** A metalake-scoped article with current rich-text content, Domain membership and bindings. */
+/** A metalake-scoped article with metadata, Domain membership and visible bindings. */
 @Evolving
 public interface KnowledgeBaseArticle extends Auditable {
 
@@ -80,11 +80,6 @@ public interface KnowledgeBaseArticle extends Auditable {
    * @return the display title, which may be shared by multiple articles
    */
   String title();
-
-  /**
-   * @return the rich-text body of the article
-   */
-  ArticleBody body();
 
   /**
    * @return the opaque editing token for this metalake, article identity and revision

@@ -64,7 +64,7 @@ public interface KnowledgeBaseArticleOperations {
   }
 
   /**
-   * Loads current content and a visible binding preview from the same revision.
+   * Loads current metadata and a visible binding preview from the same revision.
    *
    * @param name the article name
    * @param limit maximum preview size
@@ -75,6 +75,15 @@ public interface KnowledgeBaseArticleOperations {
    */
   KnowledgeBaseArticle loadArticle(String name, int limit, int offset)
       throws NoSuchKnowledgeBaseArticleException;
+
+  /**
+   * Loads the stored body and editing token from the same revision.
+   *
+   * @param name the article name
+   * @return the content visible to the caller
+   * @throws NoSuchKnowledgeBaseArticleException if the article does not exist or is invisible
+   */
+  ArticleContent getArticleContent(String name) throws NoSuchKnowledgeBaseArticleException;
 
   /**
    * Creates an article with current content and initial bindings. Each added Domain requires
@@ -114,7 +123,8 @@ public interface KnowledgeBaseArticleOperations {
    *
    * @param name the article name
    * @param changes the changes, including any binding deltas
-   * @param expectedRevision opaque token from a full Article response, or null for an ordinary edit
+   * @param expectedRevision opaque token from Article metadata or content, or null for an ordinary
+   *     edit
    * @return the updated article with its editing token
    * @throws ArticleRevisionConflictException if the token refers to another identity or a stale
    *     revision
