@@ -293,7 +293,9 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public LoadTableResponse createTable(Namespace namespace, CreateTableRequest request) {
     request.validate();
-    validateCreateTableDefinition(request);
+    Map<String, String> properties = Maps.newHashMap(tableDefaultProperties());
+    properties.putAll(request.properties());
+    validateTableDefinition(request.schema(), properties);
     validateTableLocation(request.location());
     validateStorageProperties(request.properties());
     validateInheritedLocation(namespace, request.location());
@@ -507,7 +509,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     validateStorageUpdates(updateTableRequest);
     getMetadataCache().invalidate(tableIdentifier);
     validateDefaultSpecAndSortOrder(tableIdentifier, updateTableRequest);
-    validateUpdateTableSchemaCompatibility(tableIdentifier, updateTableRequest);
+    validateSchemaUpdates(tableIdentifier, updateTableRequest);
     LoadTableResponse loadTableResponse;
     try {
       loadTableResponse =
@@ -516,7 +518,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       // As in createTable: an invalid update, not an unsupported operation. updateTable has no 406.
       throw new BadRequestException("Invalid table update: %s", e.getMessage());
     } catch (IllegalStateException e) {
-      rethrowSchemaFormatCompatibilityAsBadRequest(e);
+      throwIfSchemaIncompatible(e);
       throw e;
     }
     if (loadTableResponse != null) {
@@ -539,11 +541,11 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   public LoadTableResponse updateTable(IcebergTableChange icebergTableChange) {
     Transaction transaction = icebergTableChange.getTransaction();
     try {
-      validateTransactionTableSchema(transaction);
+      validateSchema(transaction);
       try {
         transaction.commitTransaction();
       } catch (IllegalStateException e) {
-        rethrowSchemaFormatCompatibilityAsBadRequest(e);
+        throwIfSchemaIncompatible(e);
         throw e;
       }
     } finally {
@@ -574,10 +576,10 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     try {
       change = builder.apply(getCatalog());
     } catch (IllegalStateException e) {
-      rethrowSchemaFormatCompatibilityAsBadRequest(e);
+      // UpdateSchema.commit can fail Schema.checkCompatibility before a change is returned.
+      throwIfSchemaIncompatible(e);
       throw e;
     }
-    validateTransactionTableSchema(change.getTransaction());
     return updateTable(change);
   }
 
@@ -751,38 +753,18 @@ public class IcebergCatalogWrapper implements AutoCloseable {
    * Rejects a table definition Iceberg would otherwise accept or fail on with a server error: a
    * format version that is not a number or not a defined version, and column types the format
    * version does not support.
-   *
-   * @param request create-table request
-   * @param defaultFormatVersion format version when the request omits {@code format-version}
-   */
-  @VisibleForTesting
-  static void validateTableDefinition(CreateTableRequest request, int defaultFormatVersion) {
-    int formatVersion = resolveFormatVersion(request.properties(), defaultFormatVersion);
-    if (request.schema() != null) {
-      ensureSchemaCompatibleWithFormatVersion(request.schema(), formatVersion);
-    }
-  }
-
-  /**
-   * Rejects a table definition Iceberg would otherwise accept or fail on with a server error: a
-   * format version that is not a number or not a defined version, and column types the format
-   * version does not support.
    */
   @VisibleForTesting
   static void validateTableDefinition(CreateTableRequest request) {
-    validateTableDefinition(request, DEFAULT_TABLE_FORMAT_VERSION);
+    validateTableDefinition(request.schema(), request.properties());
   }
 
-  /**
-   * Validates create-table schema against the resolved format version, including catalog table
-   * defaults merged with request properties.
-   */
-  private void validateCreateTableDefinition(CreateTableRequest request) {
-    Map<String, String> properties = Maps.newHashMap(tableDefaultProperties());
-    properties.putAll(request.properties());
-    int formatVersion = resolveFormatVersion(properties, DEFAULT_TABLE_FORMAT_VERSION);
-    if (request.schema() != null) {
-      ensureSchemaCompatibleWithFormatVersion(request.schema(), formatVersion);
+  @VisibleForTesting
+  static void validateTableDefinition(
+      @Nullable Schema schema, @Nullable Map<String, String> properties) {
+    int formatVersion = formatVersion(properties);
+    if (schema != null) {
+      validateSchema(schema, formatVersion);
     }
   }
 
@@ -791,14 +773,13 @@ public class IcebergCatalogWrapper implements AutoCloseable {
         icebergConfig.getIcebergCatalogProperties(), CatalogProperties.TABLE_DEFAULT_PREFIX);
   }
 
-  private static int resolveFormatVersion(
-      @Nullable Map<String, String> properties, int defaultFormatVersion) {
+  private static int formatVersion(@Nullable Map<String, String> properties) {
     if (properties == null) {
-      return defaultFormatVersion;
+      return DEFAULT_TABLE_FORMAT_VERSION;
     }
     String value = properties.get(TableProperties.FORMAT_VERSION);
     if (value == null) {
-      return defaultFormatVersion;
+      return DEFAULT_TABLE_FORMAT_VERSION;
     }
     int formatVersion;
     try {
@@ -815,7 +796,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     return formatVersion;
   }
 
-  private static void ensureSchemaCompatibleWithFormatVersion(Schema schema, int formatVersion) {
+  private static void validateSchema(Schema schema, int formatVersion) {
     try {
       Schema.checkCompatibility(schema, formatVersion);
     } catch (IllegalStateException | IllegalArgumentException e) {
@@ -823,8 +804,16 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     }
   }
 
-  private void validateUpdateTableSchemaCompatibility(
-      TableIdentifier tableIdentifier, UpdateTableRequest request) {
+  private static void validateSchema(Transaction transaction) {
+    Table table = transaction.table();
+    if (!(table instanceof HasTableOperations)) {
+      return;
+    }
+    TableMetadata metadata = ((HasTableOperations) table).operations().current();
+    validateSchema(metadata.schema(), metadata.formatVersion());
+  }
+
+  private void validateSchemaUpdates(TableIdentifier tableIdentifier, UpdateTableRequest request) {
     if (request == null || request.updates() == null) {
       return;
     }
@@ -845,47 +834,30 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       if (update instanceof MetadataUpdate.UpgradeFormatVersion) {
         formatVersion = ((MetadataUpdate.UpgradeFormatVersion) update).formatVersion();
       } else if (update instanceof MetadataUpdate.AddSchema) {
-        ensureSchemaCompatibleWithFormatVersion(
-            ((MetadataUpdate.AddSchema) update).schema(), formatVersion);
+        validateSchema(((MetadataUpdate.AddSchema) update).schema(), formatVersion);
       }
     }
     if (hasFormatUpgrade && !hasSchemaUpdate) {
-      ensureSchemaCompatibleWithFormatVersion(base.schema(), formatVersion);
+      validateSchema(base.schema(), formatVersion);
     }
-  }
-
-  private static void validateTransactionTableSchema(Transaction transaction) {
-    Table table = transaction.table();
-    if (!(table instanceof HasTableOperations)) {
-      return;
-    }
-    TableMetadata metadata = ((HasTableOperations) table).operations().current();
-    ensureSchemaCompatibleWithFormatVersion(metadata.schema(), metadata.formatVersion());
   }
 
   /**
-   * Iceberg reports schema / format-version mismatches as {@link IllegalStateException} from {@link
-   * Schema#checkCompatibility(Schema, int)}. Map only that case to {@link BadRequestException}.
+   * Maps {@link Schema#checkCompatibility} failures that escape as {@link IllegalStateException} to
+   * {@link BadRequestException}. Other illegal states are left alone.
    */
-  private static void rethrowSchemaFormatCompatibilityAsBadRequest(IllegalStateException e) {
-    if (isThrownFromSchemaCheckCompatibility(e)) {
-      throw new BadRequestException("%s", e.getMessage());
-    }
-  }
-
-  private static boolean isThrownFromSchemaCheckCompatibility(IllegalStateException exception) {
-    for (Throwable current = exception; current != null; current = current.getCause()) {
+  private static void throwIfSchemaIncompatible(IllegalStateException e) {
+    for (Throwable current = e; current != null; current = current.getCause()) {
       if (!(current instanceof IllegalStateException)) {
         continue;
       }
       for (StackTraceElement frame : current.getStackTrace()) {
         if ("org.apache.iceberg.Schema".equals(frame.getClassName())
             && "checkCompatibility".equals(frame.getMethodName())) {
-          return true;
+          throw new BadRequestException("%s", e.getMessage());
         }
       }
     }
-    return false;
   }
 
   private void validateTableLocation(@Nullable String location) {
