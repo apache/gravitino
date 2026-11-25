@@ -22,6 +22,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.exceptions.OntologyInUseException;
 import org.apache.gravitino.semantic.OssieDocument;
 import org.apache.gravitino.semantic.OssieFormat;
 
@@ -79,6 +80,8 @@ public interface SupportsOntologies {
    * @param name The ontology name.
    * @param changes The ordered changes.
    * @return The updated ontology.
+   * @throws OntologyInUseException If the replacement definition would invalidate a live mapping
+   *     that references the ontology. None of the changes are applied in this case.
    */
   Ontology alterOntology(String name, OntologyChange... changes);
 
@@ -86,7 +89,8 @@ public interface SupportsOntologies {
    * Drops an ontology.
    *
    * @param name The ontology name.
-   * @return Whether it existed and was dropped.
+   * @return {@code true} if the ontology was dropped, or {@code false} if it did not exist.
+   * @throws OntologyInUseException If any live mapping references the ontology.
    */
   boolean dropOntology(String name);
 

@@ -21,7 +21,7 @@ package org.apache.gravitino.exceptions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
-/** Exception thrown when a resource is in use and cannot be deleted. */
+/** Thrown when a live mapping prevents replacing an ontology's definition or dropping it. */
 public class OntologyInUseException extends InUseException {
   /**
    * Constructs a new exception with the specified detail message.
