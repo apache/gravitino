@@ -99,6 +99,12 @@ Pull request tests run with GitHub Actions in your fork, not in `apache/gravitin
 3. Open the pull request. Its **Fork CI** check verifies the suite jobs and the exact tested head, base branch and base SHA. A pre-PR run is accepted only if its inferred base matches the PR. After retargeting a PR, push again or ask a committer for a trusted run. The separate **ASF Allowlist Check** scans the PR's workflow YAML using reviewed upstream code.
 4. Keep your branch up to date before merging. Strict branch protection requires an up-to-date branch. If the base changes, update your branch and run CI again. The **Fork CI** check can stay green after the base branch moves on; strict branch protection, not the check, blocks the merge until the branch is updated.
 
+### Warming the Gradle cache in your fork
+
+If Fork CI hits Maven Central's HTTP 429 rate limit, **Warm Gradle cache** can populate your fork's default-branch cache for PR branches that use the same Gradle build files as upstream `main`.
+
+Sync your fork's default branch to get the workflow. In your fork, open **Actions → Warm Gradle cache** and select **Enable workflow** if prompted. It checks daily and compiles the core test classes only on a cache miss. To warm the cache immediately, select **Run workflow** on your fork's default branch. [GitHub's workflow enablement guide](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/disable-and-enable-workflows)
+
 ### Running Fork CI again
 
 `apache/gravitino` cannot start or cancel runs in your fork, so you control Fork CI from your fork. To run CI again without changing code, use any of these:
