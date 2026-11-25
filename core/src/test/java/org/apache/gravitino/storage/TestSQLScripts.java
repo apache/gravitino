@@ -1271,6 +1271,23 @@ public class TestSQLScripts extends TestJDBCBackend {
         Assertions.assertTrue(rows.next());
         Assertions.assertEquals(3, rows.getInt(1));
       }
+      // Multiple published/rejected rows with NULL reserved_name may coexist in the same metalake,
+      // while two unpublished candidates cannot reserve the same normalized name.
+      statement.executeUpdate(
+          "INSERT INTO glossary_term_version_head (term_id, metalake_id, last_version, reserved_name) VALUES (101, 100, 1, NULL)");
+      statement.executeUpdate(
+          "INSERT INTO glossary_term_version_head (term_id, metalake_id, last_version, reserved_name) VALUES (102, 100, 1, NULL)");
+      statement.executeUpdate(
+          "INSERT INTO glossary_term_version_head (term_id, metalake_id, last_version, reserved_name) VALUES (103, 100, 1, 'pending')");
+      Assertions.assertThrows(
+          SQLException.class,
+          () ->
+              statement.executeUpdate(
+                  "INSERT INTO glossary_term_version_head (term_id, metalake_id, last_version, reserved_name) VALUES (104, 100, 1, 'pending')"));
+      statement.executeUpdate(
+          "INSERT INTO glossary_term_version_head (term_id, metalake_id, last_version, reserved_name) VALUES (105, 101, 1, 'pending')");
+      statement.executeUpdate(
+          "DELETE FROM glossary_term_version_head WHERE term_id BETWEEN 101 AND 105");
     }
   }
 
@@ -1279,6 +1296,8 @@ public class TestSQLScripts extends TestJDBCBackend {
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession();
         Connection connection = session.getConnection();
         Statement statement = connection.createStatement()) {
+      assertTableAndColumnComments(connection, "glossary_term_version_head");
+      assertTableAndColumnComments(connection, "glossary_term_version_info");
       try (ResultSet rows =
           statement.executeQuery(
               "SELECT term_id, metalake_id, name, name_key, definition, status, links, source_ref, properties, audit_info, current_version, deleted_at FROM glossary_term_meta WHERE 1=0")) {
@@ -1289,13 +1308,38 @@ public class TestSQLScripts extends TestJDBCBackend {
               "SELECT term_id, metalake_id, synonym, synonym_key, deleted_at FROM glossary_term_synonym WHERE 1=0")) {
         Assertions.assertEquals(5, rows.getMetaData().getColumnCount());
       }
-      try (ResultSet tables =
-          connection.getMetaData().getTables(null, null, "%", new String[] {"TABLE"})) {
-        while (tables.next())
-          Assertions.assertNotEquals(
-              "glossary_term_version_info",
-              tables.getString("TABLE_NAME").toLowerCase(Locale.ROOT));
+      try (ResultSet rows =
+          statement.executeQuery(
+              "SELECT term_id, version_id, base_revision, lifecycle, snapshot FROM glossary_term_version_info WHERE 1=0")) {
+        Assertions.assertEquals(5, rows.getMetaData().getColumnCount());
+      }
+      try (ResultSet rows =
+          statement.executeQuery(
+              "SELECT term_id, metalake_id, published_version, candidate_version, last_version, reserved_name FROM glossary_term_version_head WHERE 1=0")) {
+        Assertions.assertEquals(6, rows.getMetaData().getColumnCount());
       }
     }
+  }
+
+  private void assertTableAndColumnComments(Connection connection, String table)
+      throws SQLException {
+    DatabaseMetaData metadata = connection.getMetaData();
+    String name = metadata.storesUpperCaseIdentifiers() ? table.toUpperCase(Locale.ROOT) : table;
+    try (ResultSet tables = metadata.getTables(connection.getCatalog(), null, name, null)) {
+      Assertions.assertTrue(tables.next(), table);
+      Assertions.assertFalse(isMissingComment(tables), table + " needs a table comment");
+    }
+    try (ResultSet columns = metadata.getColumns(connection.getCatalog(), null, name, "%")) {
+      while (columns.next()) {
+        Assertions.assertFalse(
+            isMissingComment(columns),
+            table + "." + columns.getString("COLUMN_NAME") + " needs a column comment");
+      }
+    }
+  }
+
+  private boolean isMissingComment(ResultSet metadata) throws SQLException {
+    String comment = metadata.getString("REMARKS");
+    return comment == null || comment.isBlank();
   }
 }

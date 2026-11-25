@@ -434,6 +434,44 @@ class TestGlossaryBindings extends TestJDBCBackend {
         expectedVersion, as("lakeOwner", () -> manager.getTerm(LAKE, "Customer")).version());
   }
 
+  @TestTemplate
+  void testBindingsFollowTermIdentityAcrossDefinitionVersionsAndRespectApproval() {
+    AtomicBoolean approval = new AtomicBoolean();
+    GlossaryManager glossary =
+        new GlossaryManager(ids::incrementAndGet, false, lake -> approval.get());
+    GlossaryTermEntity term = glossary.createTerm(LAKE, TermSpec.builder("Customer").build());
+    MetadataObject table = MetadataObjects.of(List.of(CAT, SCH, TBL), MetadataObject.Type.TABLE);
+    MetadataObject model =
+        MetadataObjects.of(List.of(CAT, SCH, SMODEL), MetadataObject.Type.SEMANTIC_MODEL);
+    String[] names = {"Customer"};
+    glossary.associateTerms(LAKE, table, names, null);
+    assertEquals(term.version() + 1, glossary.getTerm(LAKE, "Customer").version());
+    assertEquals(List.of(1L), glossary.listTermVersions(LAKE, term.id()));
+    glossary.alterTerm(LAKE, "Customer", TermChange.updateDefinition("published"));
+    assertEquals(List.of(2L, 1L), glossary.listTermVersions(LAKE, term.id()));
+    assertEquals(term.id(), glossary.listObjectTerms(LAKE, table, null).get(0).id());
+
+    approval.set(true);
+    GlossaryTermEntity candidate =
+        glossary.alterTerm(LAKE, "Customer", TermChange.updateDefinition("proposed"));
+    long revision = glossary.getTerm(LAKE, "Customer").version();
+    assertThrows(ForbiddenException.class, () -> glossary.associateTerms(LAKE, table, null, names));
+    assertThrows(
+        ForbiddenException.class,
+        () -> glossary.associateMetricTerms(LAKE, model, "net_revenue", names, null));
+    assertArrayEquals(names, glossary.associateTerms(LAKE, table, names, null));
+    assertTrue(glossary.listMetricTerms(LAKE, model, "net_revenue", null).isEmpty());
+    assertEquals(revision, glossary.getTerm(LAKE, "Customer").version());
+    assertEquals("published", glossary.getTerm(LAKE, "Customer").definition());
+    assertEquals(
+        TermPublication.State.SUBMITTED,
+        glossary
+            .getTermVersion(LAKE, term.id(), candidate.publication().versionId())
+            .term()
+            .publication()
+            .state());
+  }
+
   /**
    * Covers T11.3 (guard), T11.4, T11.5 (guard): two-path authorization, status check order, and
    * all-or-nothing atomicity across multiple terms in one request.

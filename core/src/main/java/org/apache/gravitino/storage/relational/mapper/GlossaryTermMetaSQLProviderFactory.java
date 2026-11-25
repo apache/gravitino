@@ -36,6 +36,14 @@ public class GlossaryTermMetaSQLProviderFactory {
           JDBCBackendType.H2, new GlossaryTermMetaBaseSQLProvider(),
           JDBCBackendType.POSTGRESQL, new GlossaryTermMetaBaseSQLProvider());
 
+  /** Delegates the exact source reference lookup to the configured backend. */
+  public static String findOtherTermIdBySourceRef(
+      @Param("metalakeId") long metalakeId,
+      @Param("excludedTermId") long excludedTermId,
+      @Param("sourceRef") String sourceRef) {
+    return getProvider().findOtherTermIdBySourceRef();
+  }
+
   /** Delegates {@link GlossaryTermMetaBaseSQLProvider#getForUpdate}. */
   public static String getForUpdate(
       @Param("metalakeId") long metalakeId, @Param("key") String key) {
@@ -183,6 +191,11 @@ public class GlossaryTermMetaSQLProviderFactory {
   }
 
   static class GlossaryTermMetaMySQLProvider extends GlossaryTermMetaBaseSQLProvider {
+    @Override
+    protected String sourceRefPredicate() {
+      return "source_ref_key=CAST(#{sourceRef} AS BINARY)";
+    }
+
     @Override
     public String getForUpdate(@Param("metalakeId") long metalakeId, @Param("key") String key) {
       // Relation writers lock the primary key before updating the name index. Resolve the ID
