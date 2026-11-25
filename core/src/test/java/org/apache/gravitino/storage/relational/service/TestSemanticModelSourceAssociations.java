@@ -106,7 +106,7 @@ public class TestSemanticModelSourceAssociations extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testReplaceEntireSetAndRetirePreviousRows() throws Exception {
+  void testReplaceEntireSetAndClosePreviousRanges() throws Exception {
     SemanticModelEntity original = model("staff", source.id(), "employee", "manager");
     backend.insert(original, false);
     Set<Long> initialIds = liveIds(original.id());
@@ -117,9 +117,10 @@ public class TestSemanticModelSourceAssociations extends TestJDBCBackend {
         old -> copy(original, "staff", changed.definition(), changed.sourceUpdate()));
     assertEquals(Set.of("manager", "renamed", "added"), datasetNames(original.id()));
     assertTrue(liveIds(original.id()).stream().noneMatch(initialIds::contains));
-    List<Association> retired =
-        rows(original.id()).stream().filter(row -> row.deletedAt() > 0).toList();
-    assertEquals(2, retired.size());
+    List<Association> closed =
+        rows(original.id()).stream().filter(row -> row.toVersion() == 2).toList();
+    assertEquals(2, closed.size());
+    assertTrue(closed.stream().allMatch(row -> row.fromVersion() == 1 && row.deletedAt() == 0));
 
     SemanticModelEntity reordered = model("staff", source.id(), "added", "renamed", "manager");
     backend.update(
@@ -127,7 +128,7 @@ public class TestSemanticModelSourceAssociations extends TestJDBCBackend {
         original.type(),
         old -> copy(original, "staff", reordered.definition(), reordered.sourceUpdate()));
     assertEquals(Set.of("manager", "renamed", "added"), datasetNames(original.id()));
-    assertTrue(rows(original.id()).containsAll(retired));
+    assertTrue(rows(original.id()).containsAll(closed));
     assertEquals(8, rows(original.id()).size());
     assertEquals(
         3, service().getSemanticModelPOByIdentifier(original.nameIdentifier()).getCurrentVersion());
@@ -141,11 +142,17 @@ public class TestSemanticModelSourceAssociations extends TestJDBCBackend {
     assertTrue(backend.delete(source.nameIdentifier(), source.type(), false));
     TableEntity replacement = createAndInsertTableEntity(sourceNamespace, source.name());
     assertNotEquals(source.id(), replacement.id());
+    SemanticModelEntity updated =
+        copy(
+            original, original.name(), original.definition(), SemanticModelSourceUpdate.preserve());
+    backend.update(original.nameIdentifier(), original.type(), old -> updated);
     SemanticModelEntity renamed =
-        copy(original, "renamed", original.definition(), SemanticModelSourceUpdate.preserve());
-    backend.update(original.nameIdentifier(), original.type(), old -> renamed);
+        copy(updated, "renamed", updated.definition(), SemanticModelSourceUpdate.preserve());
+    backend.update(updated.nameIdentifier(), updated.type(), old -> renamed);
     assertEquals(initial, rows(original.id()));
-    assertEquals(renamed, service().getSemanticModelByIdentifier(renamed.nameIdentifier()));
+    SemanticModelEntity loaded = service().getSemanticModelByIdentifier(renamed.nameIdentifier());
+    assertEquals(renamed.fields(), loaded.fields());
+    assertEquals(3, loaded.revision());
 
     SemanticModelSourceUpdate rebound =
         SemanticModelSourceUpdate.replace(
@@ -156,7 +163,8 @@ public class TestSemanticModelSourceAssociations extends TestJDBCBackend {
         old -> copy(renamed, renamed.name(), renamed.definition(), rebound));
     assertEquals(Set.copyOf(rebound.sources()), sourceSet(original.id()));
     assertEquals(2, rows(original.id()).size());
-    assertTrue(rows(original.id()).get(0).deletedAt() > 0);
+    assertEquals(4, rows(original.id()).get(0).toVersion());
+    assertEquals(0, rows(original.id()).get(0).deletedAt());
   }
 
   @TestTemplate
@@ -171,7 +179,9 @@ public class TestSemanticModelSourceAssociations extends TestJDBCBackend {
         copy(original, original.name(), changedDefinition, SemanticModelSourceUpdate.preserve());
     backend.update(original.nameIdentifier(), original.type(), old -> changed);
 
-    assertEquals(changed, service().getSemanticModelByIdentifier(original.nameIdentifier()));
+    SemanticModelEntity loaded = service().getSemanticModelByIdentifier(original.nameIdentifier());
+    assertEquals(changed.fields(), loaded.fields());
+    assertEquals(2, loaded.revision());
     assertEquals(initial, rows(original.id()));
     assertEquals(2, snapshotCount(original.id()));
   }
@@ -252,7 +262,7 @@ public class TestSemanticModelSourceAssociations extends TestJDBCBackend {
                       old ->
                           copy(
                               original,
-                              "renamed",
+                              original.name(),
                               original.definition(),
                               SemanticModelSourceUpdate.replace(sources))));
       assertTrue(
@@ -399,12 +409,13 @@ public class TestSemanticModelSourceAssociations extends TestJDBCBackend {
         old ->
             copy(original, original.name(), replacement.definition(), replacement.sourceUpdate()));
     List<Association> current = live(original.id());
+    assertEquals(0, service().deleteSemanticModelMetasByLegacyTimeline(Long.MAX_VALUE, 100));
+    assertEquals(1, service().deleteSemanticModelVersionsByRetentionCount(1L, 100));
     execute("UPDATE semantic_model_source_rel SET deleted_at = 10 WHERE deleted_at > 0");
     assertEquals(0, service().deleteSemanticModelMetasByLegacyTimeline(10L, 1));
     assertEquals(1, service().deleteSemanticModelMetasByLegacyTimeline(11L, 1));
     assertEquals(2, rows(original.id()).size());
     assertEquals(1, service().deleteSemanticModelMetasByLegacyTimeline(11L, 1));
-    assertEquals(1, service().deleteSemanticModelVersionsByRetentionCount(1L, 100));
     service().deleteSemanticModelMetasByLegacyTimeline(Long.MAX_VALUE, 100);
     assertEquals(current, rows(original.id()));
     assertEquals(1, snapshotCount(original.id()));
@@ -474,7 +485,7 @@ public class TestSemanticModelSourceAssociations extends TestJDBCBackend {
             session
                 .getConnection()
                 .prepareStatement(
-                    "SELECT id, metalake_id, dataset_name, source_type, source_id, deleted_at"
+                    "SELECT id, metalake_id, dataset_name, source_type, source_id, deleted_at, from_version, to_version"
                         + " FROM semantic_model_source_rel WHERE semantic_model_id = ? ORDER BY id")) {
       statement.setLong(1, modelId);
       try (ResultSet result = statement.executeQuery()) {
@@ -487,7 +498,9 @@ public class TestSemanticModelSourceAssociations extends TestJDBCBackend {
                   result.getString(3),
                   result.getString(4),
                   result.getLong(5),
-                  result.getLong(6)));
+                  result.getLong(6),
+                  result.getInt(7),
+                  result.getInt(8)));
         }
         return rows;
       }
@@ -495,7 +508,9 @@ public class TestSemanticModelSourceAssociations extends TestJDBCBackend {
   }
 
   private List<Association> live(long modelId) throws Exception {
-    return rows(modelId).stream().filter(row -> row.deletedAt() == 0).toList();
+    return rows(modelId).stream()
+        .filter(row -> row.deletedAt() == 0 && row.toVersion() == 0)
+        .toList();
   }
 
   private Set<Long> liveIds(long modelId) throws Exception {
@@ -585,5 +600,7 @@ public class TestSemanticModelSourceAssociations extends TestJDBCBackend {
       String datasetName,
       String sourceType,
       long sourceId,
-      long deletedAt) {}
+      long deletedAt,
+      int fromVersion,
+      int toVersion) {}
 }

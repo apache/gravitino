@@ -105,6 +105,26 @@ public class TestGenericSemanticModel {
       SemanticModelDefinition definition, Map<String, String> properties, Audit audit) {
     return new SemanticModel() {
       @Override
+      public int revision() {
+        return 1;
+      }
+
+      @Override
+      public Status status() {
+        return Status.PUBLISHED;
+      }
+
+      @Override
+      public String publishedBy() {
+        return "user";
+      }
+
+      @Override
+      public Instant publishedAt() {
+        return Instant.EPOCH;
+      }
+
+      @Override
       public String name() {
         return "sales_model";
       }

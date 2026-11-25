@@ -37,6 +37,7 @@ import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.SupportsTableIdLookup;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.semantic.SemanticModelMetric;
 
 /** Interface defining the operations for a Relation Backend. */
@@ -54,6 +55,15 @@ public interface RelationalBackend
   @Override
   default long getTableId(NameIdentifier identifier) throws IOException {
     return get(identifier, Entity.EntityType.TABLE).id();
+  }
+
+  /** Lists model identities for governance, irrespective of publication state. */
+  default List<NameIdentifier> listSemanticModelIdentifiers(Namespace namespace)
+      throws IOException {
+    return this.<SemanticModelEntity>list(namespace, Entity.EntityType.SEMANTIC_MODEL, false)
+        .stream()
+        .map(SemanticModelEntity::nameIdentifier)
+        .toList();
   }
 
   /**

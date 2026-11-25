@@ -58,7 +58,6 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.SchemaEntity;
-import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
@@ -611,8 +610,12 @@ final class DomainMembershipResolver {
             break;
           case SEMANTIC_MODEL:
             leaves =
-                listMetadataObjects(
-                    namespace, SemanticModelEntity.class, Entity.EntityType.SEMANTIC_MODEL);
+                store.listSemanticModelIdentifiers(namespace).stream()
+                    .map(
+                        ident ->
+                            NameIdentifierUtil.toMetadataObject(
+                                ident, Entity.EntityType.SEMANTIC_MODEL))
+                    .toList();
             break;
           default:
             throw new IllegalArgumentException("Unsupported domain member type " + type);

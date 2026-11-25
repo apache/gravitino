@@ -21,6 +21,7 @@ package org.apache.gravitino.meta;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
@@ -78,6 +79,10 @@ public class SemanticModelEntity implements Entity, Auditable, HasIdentifier, Se
   private SemanticModelDefinition definition;
   private Map<String, String> properties = Collections.emptyMap();
   private AuditInfo auditInfo;
+  private int revision = 1;
+  private Status status = Status.PUBLISHED;
+  @Nullable private String publishedBy;
+  @Nullable private Instant publishedAt;
 
   @JsonIgnore @ToString.Exclude
   private transient SemanticModelSourceUpdate sourceUpdate = SemanticModelSourceUpdate.preserve();
@@ -186,6 +191,28 @@ public class SemanticModelEntity implements Entity, Auditable, HasIdentifier, Se
     return auditInfo;
   }
 
+  @Override
+  public int revision() {
+    return revision;
+  }
+
+  @Override
+  public Status status() {
+    return status;
+  }
+
+  @Override
+  @Nullable
+  public String publishedBy() {
+    return publishedBy;
+  }
+
+  @Override
+  @Nullable
+  public Instant publishedAt() {
+    return publishedAt;
+  }
+
   /**
    * Returns the Semantic Model entity type.
    *
@@ -227,7 +254,11 @@ public class SemanticModelEntity implements Entity, Auditable, HasIdentifier, Se
         && Objects.equals(comment, that.comment)
         && Objects.equals(definition, that.definition)
         && Objects.equals(properties, that.properties)
-        && Objects.equals(auditInfo, that.auditInfo);
+        && Objects.equals(auditInfo, that.auditInfo)
+        && revision == that.revision
+        && status == that.status
+        && Objects.equals(publishedBy, that.publishedBy)
+        && Objects.equals(publishedAt, that.publishedAt);
   }
 
   /**
@@ -237,7 +268,18 @@ public class SemanticModelEntity implements Entity, Auditable, HasIdentifier, Se
    */
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, namespace, comment, definition, properties, auditInfo);
+    return Objects.hash(
+        id,
+        name,
+        namespace,
+        comment,
+        definition,
+        properties,
+        auditInfo,
+        revision,
+        status,
+        publishedBy,
+        publishedAt);
   }
 
   /**
@@ -347,6 +389,16 @@ public class SemanticModelEntity implements Entity, Auditable, HasIdentifier, Se
       return this;
     }
 
+    /** Sets the snapshot number and its publication metadata. */
+    public Builder withRevision(
+        int revision, Status status, @Nullable String publishedBy, @Nullable Instant publishedAt) {
+      semanticModel.revision = revision;
+      semanticModel.status = status;
+      semanticModel.publishedBy = publishedBy;
+      semanticModel.publishedAt = publishedAt;
+      return this;
+    }
+
     /**
      * Builds and validates the Semantic Model entity.
      *
@@ -354,6 +406,17 @@ public class SemanticModelEntity implements Entity, Auditable, HasIdentifier, Se
      * @throws IllegalArgumentException If a required field is missing or has the wrong type.
      */
     public SemanticModelEntity build() {
+      if (semanticModel.status == Status.PUBLISHED
+          && semanticModel.publishedBy == null
+          && semanticModel.auditInfo != null) {
+        AuditInfo audit = semanticModel.auditInfo;
+        semanticModel.publishedBy =
+            audit.lastModifier() == null ? audit.creator() : audit.lastModifier();
+        Instant writtenAt =
+            audit.lastModifiedTime() == null ? audit.createTime() : audit.lastModifiedTime();
+        semanticModel.publishedAt =
+            writtenAt == null ? null : Instant.ofEpochMilli(writtenAt.toEpochMilli());
+      }
       semanticModel.validate();
       return semanticModel;
     }

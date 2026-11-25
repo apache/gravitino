@@ -34,7 +34,9 @@ import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -59,7 +61,10 @@ import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper;
+import org.apache.gravitino.storage.relational.po.SemanticModelMetricPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterEach;
@@ -75,6 +80,7 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
   private Config previousConfig;
   private NameIdentifier modelIdent;
   private ManagedSemanticModelOperations operations;
+  private RelationalEntityStore store;
 
   @BeforeAll
   public void captureEnvironmentConfig() {
@@ -97,7 +103,7 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
 
     Config config = new Config(false) {};
     config.set(Configs.CACHE_ENABLED, false);
-    RelationalEntityStore store = new RelationalEntityStore();
+    store = new RelationalEntityStore();
     FieldUtils.writeField(store, "backend", backend, true);
     FieldUtils.writeField(store, "cache", new NoOpsCache(config), true);
     operations =
@@ -130,6 +136,10 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
 
     assertNotSame(created, loaded);
     assertEquals(created, loaded);
+    assertEquals(1, loaded.revision());
+    assertEquals(SemanticModel.Status.PUBLISHED, loaded.status());
+    assertEquals(loaded.auditInfo().creator(), loaded.publishedBy());
+    assertEquals(loaded.auditInfo().createTime(), loaded.publishedAt());
     assertEquals(definition, loaded.definition());
     assertEquals(1, writeValidationCount.get());
     assertTrue(backend.exists(modelIdent, Entity.EntityType.SEMANTIC_MODEL));
@@ -163,6 +173,8 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
             SemanticModelChange.setProperty("tier", "gold"),
             SemanticModelChange.replaceDefinition(replacement));
 
+    assertEquals(2, altered.revision());
+    assertEquals(SemanticModel.Status.PUBLISHED, altered.status());
     assertEquals(renamedIdent.name(), altered.name());
     assertEquals("Updated", altered.comment());
     assertEquals(replacement, altered.definition());
@@ -347,6 +359,36 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
     assertEquals(2, writeValidationCount.get());
   }
 
+  private static Set<String> metricIdentities(long modelId) {
+    return SessionUtils.getWithoutCommit(
+            SemanticModelMetricMapper.class,
+            mapper -> mapper.selectSemanticModelMetricsByModelIdForUpdate(modelId))
+        .stream()
+        .map(SemanticModelMetricPO::metricName)
+        .collect(Collectors.toSet());
+  }
+
+  private static SemanticModelSourceUpdate associations(TableEntity source) {
+    return SemanticModelSourceUpdate.replace(
+        List.of(new SemanticModelSource(source.name(), source.type(), source.id())));
+  }
+
+  private static int retainedSourceRangeCount(long modelId) throws Exception {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession();
+        PreparedStatement statement =
+            session
+                .getConnection()
+                .prepareStatement(
+                    "SELECT COUNT(*) FROM semantic_model_source_rel WHERE semantic_model_id = ? AND deleted_at = 0")) {
+      statement.setLong(1, modelId);
+      try (ResultSet result = statement.executeQuery()) {
+        assertTrue(result.next());
+        return result.getInt(1);
+      }
+    }
+  }
+
   private List<Association> liveAssociations(long modelId) throws Exception {
     try (SqlSession session =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession();
@@ -355,7 +397,7 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
                 .getConnection()
                 .prepareStatement(
                     "SELECT id, dataset_name, source_type, source_id FROM semantic_model_source_rel"
-                        + " WHERE semantic_model_id = ? AND deleted_at = 0 ORDER BY id")) {
+                        + " WHERE semantic_model_id = ? AND deleted_at = 0 AND to_version = 0 ORDER BY id")) {
       statement.setLong(1, modelId);
       try (ResultSet result = statement.executeQuery()) {
         List<Association> rows = new ArrayList<>();
