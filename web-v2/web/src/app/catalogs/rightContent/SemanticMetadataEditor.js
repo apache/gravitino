@@ -18,10 +18,10 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { Alert, Button, Form, Input, Modal, Select, Space, Tabs, theme } from 'antd'
+import { Alert, Button, Form, Input, Modal, Select, Space, Spin, Tabs, theme } from 'antd'
 import { isEqual } from 'lodash-es'
 import { useAppDispatch } from '@/lib/hooks/useStore'
-import { updateSemanticModel } from '@/lib/store/metalakes'
+import { getSemanticModelDetails, updateSemanticModel } from '@/lib/store/metalakes'
 import { semanticDataTypes, validateSemanticModelDefinition } from '@/lib/utils/semanticModel'
 import {
   getSemanticMetadataEntity,
@@ -30,25 +30,46 @@ import {
 } from '@/lib/utils/semanticMetadata'
 
 export default function SemanticMetadataEditor(props) {
-  try {
-    getSemanticMetadataEntity(props.definition, props.target)
-  } catch (error) {
+  const { metalake, catalog, schema, semanticModel, onClose, target } = props
+  const dispatch = useAppDispatch()
+  const [snapshot, setSnapshot] = useState(null)
+  const [loadError, setLoadError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    dispatch(getSemanticModelDetails({ metalake, catalog, schema, semanticModel, revision: 'latest' }))
+      .unwrap()
+      .then(({ semanticModel: latest }) => {
+        if (!latest?.revision) throw new Error('The latest Semantic Model revision is unavailable.')
+        getSemanticMetadataEntity(latest.definition, target)
+        if (!cancelled) setSnapshot(latest)
+      })
+      .catch(error => {
+        if (!cancelled) setLoadError(error.message || 'Unable to load the latest Semantic Model revision.')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [dispatch, metalake, catalog, schema, semanticModel, target])
+
+  if (!snapshot) {
     return (
       <Modal
         open
-        title='Metadata unavailable'
-        onCancel={props.onClose}
-        footer={<Button onClick={props.onClose}>Close</Button>}
+        title={loadError ? 'Metadata unavailable' : 'Loading latest revision'}
+        onCancel={onClose}
+        footer={<Button onClick={onClose}>Close</Button>}
       >
-        <Alert type='error' showIcon message={error.message} />
+        {loadError ? <Alert type='error' showIcon message={loadError} /> : <Spin />}
       </Modal>
     )
   }
 
-  return <SemanticMetadataForm {...props} />
+  return <SemanticMetadataForm {...props} snapshot={snapshot} />
 }
 
-function SemanticMetadataForm({ definition, target, metalake, catalog, schema, semanticModel, onClose, onSaved }) {
+function SemanticMetadataForm({ snapshot, target, metalake, catalog, schema, semanticModel, onClose, onSaved }) {
   const { token } = theme.useToken()
   const dispatch = useAppDispatch()
   const [form] = Form.useForm()
@@ -80,7 +101,7 @@ function SemanticMetadataForm({ definition, target, metalake, catalog, schema, s
   }, [errors])
 
   // Keep the editing snapshot stable through list/detail refreshes while the dialog is open.
-  const [original] = useState(definition)
+  const [{ definition: original, revision }] = useState(snapshot)
   const entity = getSemanticMetadataEntity(original, target)
   const [initial] = useState(() => semanticMetadataFormValues(entity))
   const structuredContextInitialized = useRef(initial.contextFormat === 'structured')
@@ -129,8 +150,7 @@ function SemanticMetadataForm({ definition, target, metalake, catalog, schema, s
           catalog,
           schema,
           semanticModel,
-          expectedDefinition: original,
-          data: { updates: [{ '@type': 'replaceDefinition', definition: updated }] }
+          data: { expectedRevision: revision, updates: [{ '@type': 'replaceDefinition', definition: updated }] }
         })
       )
       if (result.error || result.payload?.err || !result.payload) {

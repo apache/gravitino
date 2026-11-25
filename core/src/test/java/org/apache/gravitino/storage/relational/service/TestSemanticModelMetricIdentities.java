@@ -113,10 +113,10 @@ public class TestSemanticModelMetricIdentities extends TestJDBCBackend {
     }
     SemanticModelEntity loaded = backend.get(renamed.nameIdentifier(), renamed.type());
     assertEquals(renamed.fields(), loaded.fields());
-    assertEquals(3, loaded.revision());
+    assertEquals(2, loaded.revision());
     assertEquals(
-        3, service().getSemanticModelPOByIdentifier(renamed.nameIdentifier()).getCurrentVersion());
-    assertEquals(3, count("semantic_model_version_info", original.id()));
+        2, service().getSemanticModelPOByIdentifier(renamed.nameIdentifier()).getCurrentVersion());
+    assertEquals(2, count("semantic_model_version_info", original.id()));
     assertEquals(initial, liveIds(original.id()));
     assertEquals(4, count("semantic_model_metric_meta", original.id()));
 

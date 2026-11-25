@@ -46,7 +46,6 @@ import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 import org.apache.gravitino.meta.SemanticModelDatasetListing;
 import org.apache.gravitino.secret.SecretManager;
-import org.apache.gravitino.semantic.OssieDocument;
 import org.apache.gravitino.semantic.OssieDocumentConverter;
 import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
@@ -54,6 +53,8 @@ import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.semantic.SemanticModelPropertiesMetadata;
+import org.apache.gravitino.semantic.SemanticModelRevision;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -173,6 +174,19 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
   }
 
   @Override
+  public SemanticModel loadSemanticModelRevision(
+      NameIdentifier ident, SemanticModelRevisionSelector selector) {
+    checkModelParent(ident);
+    return managedOperations.loadSemanticModelRevision(ident, selector);
+  }
+
+  @Override
+  public SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident) {
+    checkModelParent(ident);
+    return managedOperations.listSemanticModelRevisions(ident);
+  }
+
+  @Override
   public SemanticModel createSemanticModel(
       NameIdentifier ident,
       @Nullable String comment,
@@ -207,13 +221,24 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
 
   /** {@inheritDoc} */
   @Override
-  public OssieDocument exportOssieDocument(NameIdentifier ident, OssieFormat format) {
-    return OssieDocumentConverter.exportDocument(loadSemanticModel(ident), format);
+  public SemanticModelExport exportSemanticModel(
+      NameIdentifier ident, SemanticModelRevisionSelector selector, OssieFormat format) {
+    SemanticModel model;
+    if (selector == SemanticModelRevisionSelector.ACTIVE) {
+      model = loadSemanticModel(ident);
+    } else {
+      model = loadSemanticModelRevision(ident, selector);
+    }
+    return new SemanticModelExport(
+        OssieDocumentConverter.exportDocument(model, format), model.revision());
   }
 
   @Override
   public SemanticModel alterSemanticModel(
-      NameIdentifier ident, SemanticModelSourceUpdate sourceUpdate, SemanticModelChange... changes)
+      NameIdentifier ident,
+      @Nullable Integer expectedRevision,
+      SemanticModelSourceUpdate sourceUpdate,
+      SemanticModelChange... changes)
       throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
     if (changes == null || changes.length == 0) {
@@ -225,7 +250,7 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
     if (!schemaDispatcher.schemaExists(schemaIdent)) {
       throw new NoSuchSemanticModelException("Semantic Model %s does not exist", ident);
     }
-    return managedOperations.alterSemanticModel(ident, sourceUpdate, changes);
+    return managedOperations.alterSemanticModel(ident, sourceUpdate, expectedRevision, changes);
   }
 
   @Override

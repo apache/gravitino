@@ -32,6 +32,7 @@ import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
+import org.apache.ibatis.annotations.Update;
 import org.apache.ibatis.annotations.UpdateProvider;
 
 /** A MyBatis mapper for Semantic Model identity metadata operations. */
@@ -193,6 +194,22 @@ public interface SemanticModelMetaMapper {
   Integer updateSemanticModelMeta(
       @Param("newSemanticModelMeta") SemanticModelPO newSemanticModelPO,
       @Param("oldSemanticModelMeta") SemanticModelPO oldSemanticModelPO);
+
+  /** Renames an identity that still has the observed name and optional expected revision. */
+  @Update(
+      """
+      <script>
+      UPDATE semantic_model_meta SET semantic_model_name = #{newName}, audit_info = #{auditInfo}
+      WHERE semantic_model_id = #{observed.semanticModelId}
+        AND semantic_model_name = #{observed.semanticModelName} AND deleted_at = 0
+      <if test="expectedRevision != null">AND current_version = #{expectedRevision}</if>
+      </script>
+      """)
+  int renameSemanticModel(
+      @Param("observed") SemanticModelPO observed,
+      @Param("newName") String newName,
+      @Param("auditInfo") String auditInfo,
+      @Param("expectedRevision") @Nullable Integer expectedRevision);
 
   /** Soft-deletes a Semantic Model identity by stable ID and observed name. */
   @UpdateProvider(

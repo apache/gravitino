@@ -299,6 +299,10 @@ class NoSuchSemanticModelException(NotFoundException):
     """An exception thrown when a Semantic Model with specified name is not found."""
 
 
+class NoSuchSemanticModelRevisionException(NotFoundException):
+    """The requested Semantic Model revision could not be found."""
+
+
 class SemanticModelAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a Semantic Model already exists."""
 
