@@ -51,6 +51,9 @@ public class TestKnowledgeBaseArticleContract {
     ArticleBody body = ArticleBody.of(ArticleBody.Format.MARKDOWN, "# Revenue");
     assertEquals(ArticleBody.Format.MARKDOWN, body.format());
     assertEquals("# Revenue", body.content());
+    ArticleContent content = new ArticleContent(body, "revision-1");
+    assertEquals(body, content.body());
+    assertEquals("revision-1", content.revisionToken());
     assertEquals(body, ArticleBody.of(ArticleBody.Format.MARKDOWN, "# Revenue"));
     assertFalse(body.equals(ArticleBody.of(ArticleBody.Format.HTML, "# Revenue")));
     assertThrows(IllegalArgumentException.class, () -> ArticleBody.of(null, "x"));
