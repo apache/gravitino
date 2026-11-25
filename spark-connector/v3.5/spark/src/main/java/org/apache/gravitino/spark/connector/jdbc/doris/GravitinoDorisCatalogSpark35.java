@@ -20,11 +20,15 @@
 package org.apache.gravitino.spark.connector.jdbc.doris;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
@@ -95,6 +99,14 @@ public class GravitinoDorisCatalogSpark35 extends GravitinoJdbcCatalogSpark35 {
                 sparkTransformConverter,
                 sparkTypeConverter);
     return new DorisReadOnlyTable35(jdbcTable);
+  }
+
+  @Override
+  protected Set<String> predicateResidualColumns(org.apache.gravitino.rel.Table table) {
+    return Arrays.stream(table.columns())
+        .filter(column -> column.dataType() instanceof Types.FloatType)
+        .map(Column::name)
+        .collect(Collectors.toSet());
   }
 
   @Override

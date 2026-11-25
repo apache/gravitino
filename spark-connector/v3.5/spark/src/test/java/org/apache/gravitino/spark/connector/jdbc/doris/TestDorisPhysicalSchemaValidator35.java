@@ -327,16 +327,68 @@ public class TestDorisPhysicalSchemaValidator35 {
   }
 
   @Test
+  void testJsonRequiresMatchingLogicalAndPhysicalTypes() {
+    assertDoesNotThrow(
+        () ->
+            validateSingleColumn(
+                Types.ExternalType.of("json"), DataTypes.StringType, "JSON", "json", true));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            validateSingleColumn(
+                Types.StringType.get(), DataTypes.StringType, "JSON", "JSON", true));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            validateSingleColumn(
+                Types.ExternalType.of("json"),
+                DataTypes.StringType,
+                "VARCHAR(20)",
+                "VARCHAR(20)",
+                true));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            validateSingleColumn(
+                Types.ExternalType.of("json"), DataTypes.IntegerType, "JSON", "JSON", true));
+  }
+
+  @Test
+  void testFloatCompatibilityRequiresMatchingMetadata() {
+    assertDoesNotThrow(
+        () ->
+            validateSingleColumn(
+                Types.FloatType.get(), DataTypes.FloatType, "FLOAT", "float", true));
+    assertDoesNotThrow(
+        () ->
+            validateSingleColumn(
+                Types.FloatType.get(), DataTypes.DoubleType, "FLOAT", "float", true));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            validateSingleColumn(
+                Types.FloatType.get(), DataTypes.DoubleType, "DOUBLE", "FLOAT", true));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            validateSingleColumn(
+                Types.IntegerType.get(), DataTypes.DoubleType, "FLOAT", "FLOAT", true));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            validateSingleColumn(
+                Types.DoubleType.get(), DataTypes.DoubleType, "FLOAT", "FLOAT", true));
+  }
+
+  @Test
   void testUnsupportedDorisTypeFailsClosed() {
-    for (String typeName : Arrays.asList("JSON", "CHAR(4)", "FLOAT")) {
-      IllegalArgumentException failure =
-          assertThrows(
-              IllegalArgumentException.class,
-              () ->
-                  validateSingleColumn(
-                      Types.StringType.get(), DataTypes.StringType, typeName, typeName, true));
-      assertTrue(failure.getMessage().contains("unsupported Doris type"));
-    }
+    IllegalArgumentException failure =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                validateSingleColumn(
+                    Types.StringType.get(), DataTypes.StringType, "CHAR(4)", "CHAR(4)", true));
+    assertTrue(failure.getMessage().contains("unsupported Doris type"));
   }
 
   @Test

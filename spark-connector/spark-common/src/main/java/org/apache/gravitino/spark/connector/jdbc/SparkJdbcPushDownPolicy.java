@@ -21,6 +21,7 @@ package org.apache.gravitino.spark.connector.jdbc;
 
 import com.google.common.collect.ImmutableSet;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
@@ -76,6 +77,7 @@ class SparkJdbcPushDownPolicy {
   private final Set<String> sensitiveColumns;
   private final Set<String> nullPreservingColumns;
   private final Set<String> stringColumns;
+  private final Set<String> predicateResidualColumns;
   private final boolean stringPrefilterSupported;
   private final Set<String> readerTypeMismatchColumns;
   private final Set<String> zonedTimestampColumns;
@@ -87,9 +89,21 @@ class SparkJdbcPushDownPolicy {
       StructType sparkSchema,
       JdbcDialect dialect,
       String jdbcUrl) {
+    this(columns, readerSchema, sparkSchema, dialect, jdbcUrl, Collections.emptySet());
+  }
+
+  SparkJdbcPushDownPolicy(
+      Column[] columns,
+      StructType readerSchema,
+      StructType sparkSchema,
+      JdbcDialect dialect,
+      String jdbcUrl,
+      Set<String> predicateResidualColumns) {
     this.sensitiveColumns = new HashSet<>();
     this.nullPreservingColumns = new HashSet<>();
     this.stringColumns = new HashSet<>();
+    this.predicateResidualColumns = new HashSet<>();
+    predicateResidualColumns.forEach(name -> this.predicateResidualColumns.add(normalize(name)));
     String url = jdbcUrl.toLowerCase(Locale.ROOT);
     // These sources can return extra collation matches, which Spark removes with a residual.
     // Other JDBC sources retain their existing conservative policy until validated separately.
@@ -143,12 +157,18 @@ class SparkJdbcPushDownPolicy {
         dialect.compileValue(LocalDateTime.of(2000, 1, 1, 0, 0)) instanceof String;
   }
 
-  /**
-   * Returns whether a predicate, sort, or group-by expression may be evaluated by the source.
-   *
-   * @param expression the expression to check
-   * @return true if pushing it keeps Spark results
-   */
+  /** Returns whether a predicate may be evaluated by the source. */
+  boolean canPushPredicate(Predicate predicate) {
+    Expression[] children = predicate.children();
+    if (("IS_NULL".equals(predicate.name()) || "IS_NOT_NULL".equals(predicate.name()))
+        && children.length == 1
+        && isColumn(children[0], nullPreservingColumns)) {
+      return true;
+    }
+    return !referencesPredicateResidualColumn(predicate) && canPush(predicate);
+  }
+
+  /** Returns whether an expression may be evaluated by the source. */
   boolean canPush(Expression expression) {
     if (expression instanceof Predicate) {
       Predicate predicate = (Predicate) expression;
@@ -230,7 +250,7 @@ class SparkJdbcPushDownPolicy {
    * that Spark would accept. This is a prefilter, never proof that the source result is exact.
    */
   boolean canPrefilter(Predicate predicate) {
-    if (!stringPrefilterSupported) {
+    if (!stringPrefilterSupported || referencesPredicateResidualColumn(predicate)) {
       return false;
     }
     Expression[] children = predicate.children();
@@ -263,6 +283,21 @@ class SparkJdbcPushDownPolicy {
     }
     NamedReference reference = (NamedReference) expression;
     return reference.fieldNames().length == 1 && names.contains(columnName(reference));
+  }
+
+  private boolean referencesPredicateResidualColumn(Expression expression) {
+    if (predicateResidualColumns.isEmpty()) {
+      return false;
+    }
+    if (expression instanceof NamedReference) {
+      return predicateResidualColumns.contains(columnName((NamedReference) expression));
+    }
+    for (Expression child : expression.children()) {
+      if (referencesPredicateResidualColumn(child)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private boolean referencesZonedTimestamp(Expression expression) {

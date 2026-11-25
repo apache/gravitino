@@ -28,10 +28,13 @@ import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -76,7 +79,8 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
   private static final String ORDINARY_TYPES_TABLE_NAME = "read_ordinary_types";
   private static final String PATTERN_MATCH_TABLE_NAME = "readxbaseline";
   private static final String OTHER_DATABASE_NAME = "doris_spark_baseline_other_it";
-  private static final String UNSUPPORTED_TABLE_NAME = "unsupported_json";
+  private static final String JSON_TABLE_NAME = "read_json";
+  private static final String UNSUPPORTED_TABLE_NAME = "unsupported_char";
   private static final String JDBC_DRIVER = "com.mysql.cj.jdbc.Driver";
   private static final DorisImageName DORIS_IMAGE = DorisImageName.VERSION_3_0;
 
@@ -128,10 +132,14 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
         "CREATE TABLE "
             + dorisTable(TABLE_NAME)
             + " (id INT NOT NULL, name VARCHAR(64)) DISTRIBUTED BY HASH(id) BUCKETS 1",
+        "DROP TABLE IF EXISTS " + dorisTable(JSON_TABLE_NAME),
+        "CREATE TABLE "
+            + dorisTable(JSON_TABLE_NAME)
+            + " (id INT NOT NULL, payload JSON) DISTRIBUTED BY HASH(id) BUCKETS 1",
         "DROP TABLE IF EXISTS " + dorisTable(UNSUPPORTED_TABLE_NAME),
         "CREATE TABLE "
             + dorisTable(UNSUPPORTED_TABLE_NAME)
-            + " (id INT NOT NULL, payload JSON) DISTRIBUTED BY HASH(id) BUCKETS 1",
+            + " (id INT NOT NULL, value CHAR(4)) DISTRIBUTED BY HASH(id) BUCKETS 1",
         "INSERT INTO " + dorisTable(TABLE_NAME) + " VALUES (1, 'one'), (2, 'two')");
   }
 
@@ -163,6 +171,135 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
   }
 
   @Test
+  void testReadJsonColumn() throws Exception {
+    executeJdbcSql(
+        "INSERT INTO "
+            + dorisTable(JSON_TABLE_NAME)
+            + " VALUES (1, '{\"key\":\"value\",\"nested\":{\"n\":1}}'),"
+            + " (2, '[1,2]'), (3, '42'), (4, '\"text\"'), (5, 'null'), (6, NULL)");
+    try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUser, jdbcPassword);
+        PreparedStatement statement =
+            connection.prepareStatement(
+                "INSERT INTO " + dorisTable(JSON_TABLE_NAME) + " VALUES (?, ?)")) {
+      statement.setInt(1, 7);
+      statement.setString(2, "{\"quote\":\"a\\\"b\",\"unicode\":\"\\u4e2d\"}");
+      statement.executeUpdate();
+    }
+    List<Row> expected = new ArrayList<>();
+    try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUser, jdbcPassword);
+        Statement statement = connection.createStatement();
+        ResultSet result =
+            statement.executeQuery(
+                "SELECT id, payload FROM " + dorisTable(JSON_TABLE_NAME) + " ORDER BY id")) {
+      while (result.next()) {
+        expected.add(RowFactory.create(result.getInt(1), result.getString(2)));
+      }
+    }
+    Dataset<Row> result =
+        getSparkSession()
+            .sql("SELECT id, payload FROM " + sparkTable(JSON_TABLE_NAME) + " ORDER BY id");
+    Assertions.assertEquals(DataTypes.StringType, result.schema().fields()[1].dataType());
+    Assertions.assertEquals(7, expected.size());
+    Assertions.assertEquals(expected, result.collectAsList());
+    Assertions.assertTrue(expected.get(5).isNullAt(1));
+
+    SparkSession pushdownSession = getSparkSession().newSession();
+    pushdownSession.conf().set("spark.sql.catalog." + CATALOG_NAME + ".pushDownPredicate", "true");
+    Dataset<Row> filtered =
+        pushdownSession.sql(
+            "SELECT id FROM "
+                + sparkTable(JSON_TABLE_NAME)
+                + " WHERE payload = '"
+                + expected.get(1).getString(1)
+                + "' ORDER BY id LIMIT 1");
+    Assertions.assertEquals(List.of(RowFactory.create(2)), filtered.collectAsList());
+    JDBCScan scan = jdbcScan(filtered);
+    Assertions.assertTrue(scan.relation().jdbcOptions().pushDownPredicate());
+    Assertions.assertEquals(0, scan.pushedPredicates().length);
+    Assertions.assertTrue(filtered.queryExecution().optimizedPlan().toString().contains("Filter"));
+  }
+
+  @Test
+  void testReadFloatRangeAndNull() throws Exception {
+    String tableName = "read_float_range";
+    try {
+      executeJdbcSql(
+          "CREATE TABLE "
+              + dorisTable(tableName)
+              + " (id INT NOT NULL, value FLOAT) DISTRIBUTED BY HASH(id) BUCKETS 1",
+          "INSERT INTO "
+              + dorisTable(tableName)
+              + " VALUES (1, -1e30), (2, 1e-30), (3, 0), (4, 1e30), (5, NULL),"
+              + " (6, 0.1), (7, 0.10000001)");
+      Dataset<Row> result =
+          getSparkSession().sql("SELECT id, value FROM " + sparkTable(tableName) + " ORDER BY id");
+      Assertions.assertEquals(DataTypes.FloatType, result.schema().fields()[1].dataType());
+      Assertions.assertEquals(
+          DataTypes.FloatType, jdbcScan(result).readSchema().fields()[1].dataType());
+      Assertions.assertEquals(
+          List.of(
+              RowFactory.create(1, -1e30f),
+              RowFactory.create(2, 1e-30f),
+              RowFactory.create(3, 0.0f),
+              RowFactory.create(4, 1e30f),
+              RowFactory.create(5, null),
+              RowFactory.create(6, 0.1f),
+              RowFactory.create(7, 0.10000001f)),
+          result.collectAsList());
+      Assertions.assertEquals(
+          List.of(RowFactory.create(1)),
+          getSparkSession()
+              .sql("SELECT id FROM " + sparkTable(tableName) + " WHERE value < 0")
+              .collectAsList());
+      Dataset<Row> aggregate =
+          getSparkSession().sql("SELECT MIN(value), MAX(value) FROM " + sparkTable(tableName));
+      Assertions.assertEquals(List.of(RowFactory.create(-1e30f, 1e30f)), aggregate.collectAsList());
+
+      SparkSession pushed = getSparkSession().newSession();
+      SparkSession local = getSparkSession().newSession();
+      pushed.conf().set("spark.sql.catalog." + CATALOG_NAME + ".pushDownPredicate", "true");
+      local.conf().set("spark.sql.catalog." + CATALOG_NAME + ".pushDownPredicate", "false");
+      for (String operator : List.of("=", "<>")) {
+        String query =
+            "SELECT id FROM "
+                + sparkTable(tableName)
+                + " WHERE value "
+                + operator
+                + " CAST(0.1 AS FLOAT) AND id >= 1 ORDER BY id";
+        Dataset<Row> pushedResult = pushed.sql(query);
+        List<Row> rows = pushedResult.collectAsList();
+        Assertions.assertEquals(local.sql(query).collectAsList(), rows, operator);
+        Assertions.assertEquals(
+            operator.equals("=")
+                ? List.of(RowFactory.create(6))
+                : List.of(
+                    RowFactory.create(1),
+                    RowFactory.create(2),
+                    RowFactory.create(3),
+                    RowFactory.create(4),
+                    RowFactory.create(7)),
+            rows,
+            operator);
+        JDBCScan scan = jdbcScan(pushedResult);
+        Assertions.assertTrue(scan.relation().jdbcOptions().pushDownPredicate());
+        Assertions.assertTrue(
+            Arrays.stream(scan.pushedPredicates())
+                .anyMatch(
+                    predicate -> predicate.toString().toLowerCase(Locale.ROOT).contains("id")));
+        Assertions.assertFalse(
+            Arrays.stream(scan.pushedPredicates())
+                .anyMatch(
+                    predicate ->
+                        predicate.toString().toLowerCase(Locale.ROOT).contains("value")
+                            && !predicate.name().equals("IS_NULL")
+                            && !predicate.name().equals("IS_NOT_NULL")));
+      }
+    } finally {
+      executeJdbcSql("DROP TABLE IF EXISTS " + dorisTable(tableName));
+    }
+  }
+
+  @Test
   void testCatalogBypassReadOptionControlsPredicatePushdown() {
     Dataset<Row> result =
         getSparkSession().sql("SELECT id, name FROM " + sparkTable(TABLE_NAME) + " WHERE id = 1");
@@ -171,21 +308,7 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
     Assertions.assertEquals(1, rows.size());
     Assertions.assertEquals(1, rows.get(0).getInt(0));
     Assertions.assertEquals("one", rows.get(0).getString(1));
-    JDBCScan jdbcScan = null;
-    Iterator<LogicalPlan> leaves =
-        result.queryExecution().optimizedPlan().collectLeaves().iterator();
-    while (leaves.hasNext()) {
-      LogicalPlan leaf = leaves.next();
-      if (leaf instanceof DataSourceV2ScanRelation) {
-        Scan scan = ((DataSourceV2ScanRelation) leaf).scan();
-        if (scan instanceof V1ScanWrapper) {
-          scan = ((V1ScanWrapper) scan).v1Scan();
-        }
-        Assertions.assertTrue(scan instanceof JDBCScan, scan.getClass().getName());
-        jdbcScan = (JDBCScan) scan;
-      }
-    }
-    Assertions.assertNotNull(jdbcScan);
+    JDBCScan jdbcScan = jdbcScan(result);
     Assertions.assertEquals(0, jdbcScan.pushedPredicates().length);
     Assertions.assertTrue(result.queryExecution().optimizedPlan().toString().contains("Filter"));
   }
@@ -375,6 +498,25 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
     }
   }
 
+  private static JDBCScan jdbcScan(Dataset<Row> result) {
+    JDBCScan jdbcScan = null;
+    Iterator<LogicalPlan> leaves =
+        result.queryExecution().optimizedPlan().collectLeaves().iterator();
+    while (leaves.hasNext()) {
+      LogicalPlan leaf = leaves.next();
+      if (leaf instanceof DataSourceV2ScanRelation) {
+        Scan scan = ((DataSourceV2ScanRelation) leaf).scan();
+        if (scan instanceof V1ScanWrapper) {
+          scan = ((V1ScanWrapper) scan).v1Scan();
+        }
+        Assertions.assertTrue(scan instanceof JDBCScan, scan.getClass().getName());
+        jdbcScan = (JDBCScan) scan;
+      }
+    }
+    Assertions.assertNotNull(jdbcScan);
+    return jdbcScan;
+  }
+
   private void executeJdbcSql(String... statements) throws SQLException {
     try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUser, jdbcPassword);
         Statement statement = connection.createStatement()) {
@@ -405,6 +547,7 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
         Arguments.of(
             "DECIMALV3(20,4)", "1234567890123456.1234", new BigDecimal("1234567890123456.1234")),
         Arguments.of("DOUBLE", "2.25", 2.25d),
+        Arguments.of("FLOAT", "-123.125", -123.125f),
         Arguments.of("INT", "2147483647", Integer.MAX_VALUE),
         Arguments.of("INTEGER", "-2147483648", Integer.MIN_VALUE),
         Arguments.of("STRING", "'string-value'", "string-value"),

@@ -55,7 +55,7 @@ public class SparkJdbcScanBuilder extends SparkJdbcScanBuilderBase {
     Set<Predicate> kept = new LinkedHashSet<>();
     List<Predicate> candidates = new ArrayList<>();
     for (Predicate predicate : predicates) {
-      if (policy.canPush(predicate)) {
+      if (policy.canPushPredicate(predicate)) {
         candidates.add(predicate);
       } else {
         kept.add(predicate);

@@ -59,6 +59,7 @@ final class DorisPhysicalSchemaValidator35 {
           "decimal",
           "decimalv3",
           "double",
+          "float",
           "int",
           "integer",
           "smallint",
@@ -183,8 +184,19 @@ final class DorisPhysicalSchemaValidator35 {
       if (!sameTypeSignature) {
         throw mismatch(identifier, "FE and JDBC type signatures differ for " + logical.name());
       }
-      if (!ORDINARY_TYPES.contains(baseType(fe.typeName()))) {
+      Type logicalType = logical.dataType();
+      boolean logicalJson =
+          logicalType instanceof Types.ExternalType
+              && "json".equalsIgnoreCase(((Types.ExternalType) logicalType).catalogString());
+      boolean physicalJson = "json".equals(fe.signature());
+      if (logicalJson != physicalJson) {
+        throw mismatch(identifier, "logical and physical JSON types differ for " + logical.name());
+      }
+      if (!physicalJson && !ORDINARY_TYPES.contains(baseType(fe.typeName()))) {
         throw mismatch(identifier, "unsupported Doris type for " + logical.name());
+      }
+      if ("float".equals(baseType(fe.typeName())) && !(logicalType instanceof Types.FloatType)) {
+        throw mismatch(identifier, "logical and physical FLOAT types differ for " + logical.name());
       }
       DataType expected = typeConverter.toSparkType(logical.dataType());
       // Spark 3.5.3 JdbcUtils.getCatalystType maps SMALLINT to IntegerType:
@@ -196,7 +208,15 @@ final class DorisPhysicalSchemaValidator35 {
               && "smallint".equals(baseType(fe.typeName()))
               && DataTypes.ShortType.equals(expected)
               && DataTypes.IntegerType.equals(spark.dataType());
-      if (!expected.equals(spark.dataType()) && !compatibleSmallInt) {
+      // Connector/J can report Doris FLOAT as JDBC REAL, which Spark 3.5 maps to DoubleType.
+      // The logical FloatType schema reads these values through JDBC getFloat().
+      boolean compatibleFloat =
+          "float".equals(baseType(jdbc.typeName()))
+              && "float".equals(baseType(fe.typeName()))
+              && logicalType instanceof Types.FloatType
+              && DataTypes.FloatType.equals(expected)
+              && DataTypes.DoubleType.equals(spark.dataType());
+      if (!expected.equals(spark.dataType()) && !compatibleSmallInt && !compatibleFloat) {
         throw mismatch(identifier, "logical and Spark physical types differ for " + logical.name());
       }
       validateLogicalTypeSignature(identifier, logical, fe.signature());

@@ -19,9 +19,11 @@
 
 package org.apache.gravitino.spark.connector.jdbc;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.types.Types;
@@ -69,7 +71,8 @@ public class SparkJdbcTable extends SparkJdbcTableBase {
         propertiesConverter,
         sparkTransformConverter,
         sparkTypeConverter,
-        () -> {});
+        () -> {},
+        Collections.emptySet());
   }
 
   SparkJdbcTable(
@@ -79,7 +82,8 @@ public class SparkJdbcTable extends SparkJdbcTableBase {
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter,
       SparkTypeConverter sparkTypeConverter,
-      Runnable validateConnection) {
+      Runnable validateConnection,
+      Set<String> predicateResidualColumns) {
     super(identifier, jdbcTable);
     this.validateConnection = validateConnection;
     this.gravitinoTable = gravitinoTable;
@@ -98,7 +102,8 @@ public class SparkJdbcTable extends SparkJdbcTableBase {
             jdbcTable.schema(),
             sparkSchema,
             JdbcDialects.get(jdbcTable.jdbcOptions().url()),
-            jdbcTable.jdbcOptions().url());
+            jdbcTable.jdbcOptions().url(),
+            predicateResidualColumns);
   }
 
   /**
