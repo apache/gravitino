@@ -290,9 +290,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public LoadTableResponse createTable(Namespace namespace, CreateTableRequest request) {
     request.validate();
-    Map<String, String> properties = Maps.newHashMap(tableDefaultProperties());
-    properties.putAll(request.properties());
-    validateTableDefinition(request.schema(), properties);
+    validateCreateRequest(request);
     validateTableLocation(request.location());
     validateStorageProperties(request.properties());
     validateInheritedLocation(namespace, request.location());
@@ -757,18 +755,48 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     }
   }
 
+  /**
+   * Validates create-table schema against the resolved format version, including catalog table
+   * defaults merged with request properties.
+   */
+  protected final void validateCreateRequest(CreateTableRequest request) {
+    Map<String, String> properties = Maps.newHashMap(tableDefaultProperties());
+    properties.putAll(request.properties());
+    validateTableDefinition(request.schema(), properties);
+  }
+
+  /**
+   * Validates schema / format-version compatibility for a staged-create {@link UpdateTableRequest}
+   * (AssertTableDoesNotExist), where the table does not exist yet so {@link #validateSchemaUpdates}
+   * cannot load a base.
+   */
+  protected static void validateStagedCreateUpdates(UpdateTableRequest request) {
+    if (request == null || request.updates() == null) {
+      return;
+    }
+    // Default matches Iceberg TableMetadata when no UpgradeFormatVersion is present.
+    int formatVersion = 2;
+    for (MetadataUpdate update : request.updates()) {
+      if (update instanceof MetadataUpdate.UpgradeFormatVersion) {
+        formatVersion = ((MetadataUpdate.UpgradeFormatVersion) update).formatVersion();
+      } else if (update instanceof MetadataUpdate.AddSchema) {
+        validateSchema(((MetadataUpdate.AddSchema) update).schema(), formatVersion);
+      }
+    }
+  }
+
   private Map<String, String> tableDefaultProperties() {
     return PropertyUtil.propertiesWithPrefix(
         icebergConfig.getIcebergCatalogProperties(), CatalogProperties.TABLE_DEFAULT_PREFIX);
   }
 
   private static int formatVersion(@Nullable Map<String, String> properties) {
-    // Iceberg TableMetadata defaults to format version 2 when the property is unset.
+    // Iceberg TableMetadata defaults to format version 2 when the property is unset or blank.
     if (properties == null) {
       return 2;
     }
     String value = properties.get(TableProperties.FORMAT_VERSION);
-    if (value == null) {
+    if (StringUtils.isBlank(value)) {
       return 2;
     }
     int formatVersion;
@@ -786,7 +814,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     return formatVersion;
   }
 
-  private static void validateSchema(Schema schema, int formatVersion) {
+  protected static void validateSchema(Schema schema, int formatVersion) {
     try {
       Schema.checkCompatibility(schema, formatVersion);
     } catch (IllegalStateException | IllegalArgumentException e) {
@@ -803,7 +831,8 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     validateSchema(metadata.schema(), metadata.formatVersion());
   }
 
-  private void validateSchemaUpdates(TableIdentifier tableIdentifier, UpdateTableRequest request) {
+  protected void validateSchemaUpdates(
+      TableIdentifier tableIdentifier, UpdateTableRequest request) {
     if (request == null || request.updates() == null) {
       return;
     }

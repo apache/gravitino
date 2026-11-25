@@ -465,6 +465,16 @@ public class TestIcebergCatalogWrapper {
     Assertions.assertThrows(
         BadRequestException.class,
         () -> IcebergCatalogWrapper.validateTableDefinition(unspecified));
+
+    // Blank matches catalog decodeFormatVersion: treat as unset and default to v2.
+    CreateTableRequest blank =
+        CreateTableRequest.builder()
+            .withName("t")
+            .withSchema(nanos)
+            .setProperties(ImmutableMap.of("format-version", ""))
+            .build();
+    Assertions.assertThrows(
+        BadRequestException.class, () -> IcebergCatalogWrapper.validateTableDefinition(blank));
   }
 
   @Test
