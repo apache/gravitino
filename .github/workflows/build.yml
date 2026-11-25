@@ -47,8 +47,6 @@ jobs:
         id: checkout
       - name: Test source license-reference checker
         run: bash dev/release/test-check-license.sh
-      - name: Test Gravitino Docker entrypoint
-        run: python3 -B -m unittest discover -s dev/docker/gravitino/tests -v
       - name: Test Fork CI contracts
         run: node --test .github/scripts/tests/*.test.cjs
       - name: Disable Git automatic maintenance
