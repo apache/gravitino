@@ -28,7 +28,9 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.ConcurrentModificationException;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -153,6 +155,183 @@ public class RoleMetaService {
               }
             })
         .collect(Collectors.toList());
+  }
+
+  /**
+   * Lists roles with direct privileges on the requested resource only.
+   *
+   * @param identifier the resource identifier
+   * @param entityType the storage entity type
+   * @return roles containing only the requested resource's privilege entry
+   */
+  public List<RoleEntity> listRolesWithResourcePrivileges(
+      NameIdentifier identifier, Entity.EntityType entityType) {
+    MetadataObject object = NameIdentifierUtil.toMetadataObjectForRead(identifier, entityType);
+    long objectId = EntityIdService.getEntityId(identifier, entityType);
+    List<RolePO> roles =
+        SessionUtils.getWithoutCommitFresh(
+            RoleMetaMapper.class,
+            mapper -> mapper.listRolesWithResourcePrivileges(objectId, object.type().name()));
+    Namespace namespace =
+        AuthorizationUtils.ofRoleNamespace(NameIdentifierUtil.getMetalake(identifier));
+    return roles.stream()
+        .map(
+            role ->
+                POConverters.fromRolePO(
+                    role,
+                    role.requireSecurableObjectPOs().stream()
+                        .map(
+                            po ->
+                                POConverters.fromSecurableObjectPO(
+                                    object.fullName(), po, object.type()))
+                        .collect(Collectors.toList()),
+                    namespace))
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Applies resource-scoped privilege transformations and commits all changed relations together.
+   *
+   * @param resource the affected resource
+   * @param type the resource type
+   * @param changes per-role transformations
+   * @return errors keyed by role name
+   */
+  public Map<String, Exception> updateResourcePrivileges(
+      NameIdentifier resource,
+      Entity.EntityType type,
+      Map<String, Function<RoleEntity, RoleEntity>> changes) {
+    Map<String, Exception> failures = new LinkedHashMap<>();
+    if (changes.isEmpty()) {
+      return failures;
+    }
+    String metalake = NameIdentifierUtil.getMetalake(resource);
+    NamespacedEntityId identity = EntityIdService.getEntityIds(resource, type);
+    long metalakeId =
+        EntityIdService.getEntityId(NameIdentifier.of(metalake), Entity.EntityType.METALAKE);
+    MetadataObject object = NameIdentifierUtil.toMetadataObjectForRead(resource, type);
+    List<String> names = Lists.newArrayList(changes.keySet());
+    List<RolePO> snapshots =
+        SessionUtils.getWithoutCommitFresh(
+            RoleMetaMapper.class, mapper -> mapper.listRolePrivilegeSnapshots(metalakeId, names));
+    Map<String, RolePO> byName =
+        snapshots.stream().collect(Collectors.toMap(RolePO::getRoleName, role -> role));
+    List<RolePO> updated = Lists.newArrayList();
+    List<SecurableObjectPO> added = Lists.newArrayList();
+    List<SecurableObjectPO> removed = Lists.newArrayList();
+    for (String name : names) {
+      try {
+        RolePO snapshot = byName.get(name);
+        if (snapshot == null) {
+          throw new NoSuchRoleException("Role %s does not exist in metalake %s", name, metalake);
+        }
+        RoleEntity before =
+            POConverters.fromRolePO(
+                snapshot,
+                listSecurableObjects(snapshot),
+                AuthorizationUtils.ofRoleNamespace(metalake));
+        RoleEntity after = changes.get(name).apply(before);
+        if (after.equals(before)) {
+          continue;
+        }
+        RolePO write = POConverters.updateRolePOWithVersion(snapshot, after);
+        after.securableObjects().stream()
+            .filter(
+                grant ->
+                    grant.type() == object.type() && grant.fullName().equals(object.fullName()))
+            .findFirst()
+            .ifPresent(
+                grant ->
+                    added.add(
+                        POConverters.initializeSecurablePOBuilderWithVersion(
+                                before.id(), grant, getType(grant))
+                            .withMetadataObjectId(identity.entityId())
+                            .build()));
+        snapshot.requireSecurableObjectPOs().stream()
+            .filter(
+                grant ->
+                    Objects.equals(grant.getMetadataObjectId(), identity.entityId())
+                        && grant.getType().equals(object.type().name()))
+            .forEach(removed::add);
+        updated.add(
+            RolePO.builder()
+                .withRoleId(snapshot.getRoleId())
+                .withCurrentVersion(snapshot.getCurrentVersion())
+                .withAuditInfo(write.getAuditInfo())
+                .withRoleName(name)
+                .withMetalakeId(metalakeId)
+                .withLastVersion(snapshot.getLastVersion())
+                .withDeletedAt(snapshot.getDeletedAt())
+                .build());
+      } catch (Exception e) {
+        failures.put(name, e);
+      }
+    }
+    try {
+      writeResourcePrivilegeBatch(resource, type, identity, updated, removed, added);
+    } catch (ConcurrentModificationException conflict) {
+      for (RolePO role : updated) {
+        failures.put(
+            role.getRoleName(),
+            new ConcurrentModificationException(
+                "Privilege batch rolled back because a role version changed; reread and retry",
+                conflict));
+      }
+    }
+    return failures;
+  }
+
+  /**
+   * Writes prepared privilege changes for a single resource in one transaction. The supplied role
+   * snapshots carry the observed versions and updated audit information.
+   *
+   * @param resource the affected resource
+   * @param resourceType the storage type of the resource
+   * @param observedResource the resource identity observed when preparing the changes
+   * @param roles the changed roles, excluding no-op items
+   * @param removed the obsolete privilege relations
+   * @param added the replacement or new privilege relations
+   */
+  void writeResourcePrivilegeBatch(
+      NameIdentifier resource,
+      Entity.EntityType resourceType,
+      NamespacedEntityId observedResource,
+      List<RolePO> roles,
+      List<SecurableObjectPO> removed,
+      List<SecurableObjectPO> added) {
+    if (roles.isEmpty()) {
+      return;
+    }
+    String metalake = NameIdentifierUtil.getMetalake(resource);
+    long metalakeId =
+        EntityIdService.getEntityId(NameIdentifier.of(metalake), Entity.EntityType.METALAKE);
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            LiveEndpointService.lockLiveEndpoint(
+                NameIdentifier.of(metalake),
+                Entity.EntityType.METALAKE,
+                new NamespacedEntityId(metalakeId)),
+        () -> {
+          int updated =
+              SessionUtils.getWithoutCommit(
+                  RoleMetaMapper.class, mapper -> mapper.batchCompareAndSetPrivileges(roles));
+          if (updated != roles.size()) {
+            throw new ConcurrentModificationException(
+                "A role changed while preparing the resource privilege batch");
+          }
+        },
+        new EndpointLock(resource, resourceType, observedResource),
+        () -> {
+          if (!removed.isEmpty()) {
+            SessionUtils.doWithoutCommit(
+                SecurableObjectMapper.class,
+                mapper -> mapper.batchSoftDeleteSecurableObjects(removed));
+          }
+          if (!added.isEmpty()) {
+            SessionUtils.doWithoutCommit(
+                SecurableObjectMapper.class, mapper -> mapper.batchInsertSecurableObjects(added));
+          }
+        });
   }
 
   @Monitored(

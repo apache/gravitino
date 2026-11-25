@@ -28,6 +28,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,6 +38,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.exceptions.IllegalRoleException;
@@ -50,6 +52,8 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.storage.relational.RelationalEntityStore;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -404,6 +408,92 @@ class PermissionManager {
           ioe);
       throw new RuntimeException(ioe);
     }
+  }
+
+  /**
+   * Applies explicit per-role privilege changes on one resource using a relational batch.
+   *
+   * @param metalake the metalake name
+   * @param object the affected resource
+   * @param privileges the privileges keyed by role name
+   * @param grant whether to grant or revoke
+   * @return item-level failures keyed by role
+   */
+  static PrivilegeBatchResult batchChangePrivileges(
+      String metalake,
+      MetadataObject object,
+      Map<String, Set<Privilege>> privileges,
+      boolean grant) {
+    Map<String, Role> committed = new LinkedHashMap<>();
+    Map<String, AuthorizationPluginCallbackWrapper> callbacks = new LinkedHashMap<>();
+    Map<String, Function<RoleEntity, RoleEntity>> changes = new LinkedHashMap<>();
+    privileges.forEach(
+        (name, requested) ->
+            changes.put(
+                name,
+                role -> {
+                  AuthorizationPluginCallbackWrapper callback =
+                      new AuthorizationPluginCallbackWrapper();
+                  List<SecurableObject> next =
+                      generateNewSecurableObjects(
+                          role.securableObjects(),
+                          object,
+                          current -> {
+                            if (grant) {
+                              return current == null
+                                  ? createNewSecurableObject(
+                                      metalake, object, requested, role, callback)
+                                  : updateGrantedSecurableObject(
+                                      metalake, requested, role, current, callback);
+                            }
+                            return current == null
+                                ? null
+                                : updateRevokedSecurableObject(
+                                    metalake, requested, role, current, callback);
+                          });
+                  if (Sets.newHashSet(next).equals(Sets.newHashSet(role.securableObjects()))) {
+                    committed.put(name, role);
+                    return role;
+                  }
+                  AuditInfo audit =
+                      AuditInfo.builder()
+                          .withCreator(role.auditInfo().creator())
+                          .withCreateTime(role.auditInfo().createTime())
+                          .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                          .withLastModifiedTime(Instant.now())
+                          .build();
+                  callbacks.put(name, callback);
+                  RoleEntity updated =
+                      RoleEntity.builder()
+                          .withId(role.id())
+                          .withName(role.name())
+                          .withNamespace(role.namespace())
+                          .withProperties(role.properties())
+                          .withAuditInfo(audit)
+                          .withSecurableObjects(next)
+                          .build();
+                  committed.put(name, updated);
+                  return updated;
+                }));
+    Map<String, Exception> failures =
+        ((RelationalEntityStore) GravitinoEnv.getInstance().entityStore())
+            .updateResourcePrivileges(
+                metalake,
+                MetadataObjectUtil.toEntityIdent(metalake, object),
+                MetadataObjectUtil.toEntityType(object),
+                changes);
+    failures.keySet().forEach(committed::remove);
+    callbacks.forEach(
+        (name, callback) -> {
+          if (!failures.containsKey(name)) {
+            try {
+              callback.execute();
+            } catch (Exception error) {
+              failures.put(name, new PrivilegeNotificationException(error));
+            }
+          }
+        });
+    return new PrivilegeBatchResult(committed, failures);
   }
 
   Role grantPrivilegesToRole(
@@ -773,7 +863,7 @@ class PermissionManager {
   }
 
   // This method will generate all the securable objects after granting or revoking privileges
-  private List<SecurableObject> generateNewSecurableObjects(
+  private static List<SecurableObject> generateNewSecurableObjects(
       List<SecurableObject> securableObjects,
       MetadataObject targetObject,
       Function<SecurableObject, SecurableObject> objectUpdater) {

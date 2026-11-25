@@ -152,4 +152,31 @@ public class RoleMetaSQLProviderFactory {
     return getProvider()
         .listRolesWithPrivilegesByMetadataObjectIdAndType(metadataObjectId, metadataObjectType);
   }
+  /**
+   * Returns SQL for role snapshots scoped to a resource.
+   *
+   * @param metadataObjectId the resource ID
+   * @param metadataObjectType the resource type
+   * @return the scoped snapshot query
+   */
+  public static String listRolesWithResourcePrivileges(
+      @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return getProvider().listRolesWithResourcePrivileges(metadataObjectId, metadataObjectType);
+  }
+  /**
+   * Returns the version-checked batch update for changed role privileges.
+   *
+   * @param roles the observed role snapshots
+   * @return the update statement
+   */
+  public static String batchCompareAndSetPrivileges(@Param("roles") List<RolePO> roles) {
+    return getProvider().batchCompareAndSetPrivileges(roles);
+  }
+
+  /** Returns SQL for reading complete snapshots by role name. */
+  public static String listRolePrivilegeSnapshots(
+      @Param("metalakeId") long metalakeId, @Param("names") List<String> names) {
+    return getProvider().listRolePrivilegeSnapshots(metalakeId, names);
+  }
 }

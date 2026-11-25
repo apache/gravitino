@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.bulk;
 
+import java.util.ConcurrentModificationException;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.dto.responses.BulkError;
@@ -60,7 +61,9 @@ public class BulkManager {
   }
 
   private int errorCode(Exception e) {
-    if (e instanceof IllegalArgumentException) {
+    if (e instanceof ConcurrentModificationException) {
+      return ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE;
+    } else if (e instanceof IllegalArgumentException) {
       return ErrorConstants.ILLEGAL_ARGUMENTS_CODE;
     } else if (e instanceof NotFoundException) {
       return ErrorConstants.NOT_FOUND_CODE;

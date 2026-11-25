@@ -18,13 +18,19 @@
  */
 package org.apache.gravitino.server.web.rest;
 
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConverter.CAN_OPERATE_METADATA_PRIVILEGE;
+
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -45,6 +51,7 @@ import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.PrivilegeBatchResult;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
@@ -60,6 +67,7 @@ import org.apache.gravitino.dto.authorization.RoleDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.authorization.UserDTO;
 import org.apache.gravitino.dto.requests.BulkGroupAddRequest;
+import org.apache.gravitino.dto.requests.BulkPrivilegeRequest;
 import org.apache.gravitino.dto.requests.BulkRemoveRequest;
 import org.apache.gravitino.dto.requests.BulkRoleAddRequest;
 import org.apache.gravitino.dto.requests.BulkUserAddRequest;
@@ -79,7 +87,9 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -475,6 +485,126 @@ public class BulkOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleRoleException(OperationType.DELETE, "", metalake, e);
+    }
+  }
+
+  /** Grant privileges for multiple existing roles on a single metadata object. */
+  @POST
+  @Path("permissions/{type}/{fullName}/grant")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "bulk-grant-privileges." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "bulk-grant-privileges", absolute = true)
+  @AuthorizationExpression(expression = CAN_OPERATE_METADATA_PRIVILEGE)
+  public Response grantPrivileges(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("type") @AuthorizationObjectType String type,
+      @PathParam("fullName") @AuthorizationFullName String fullName,
+      BulkPrivilegeRequest request) {
+    return changePrivileges(metalake, type, fullName, request, OperationType.GRANT);
+  }
+
+  /** Revoke privileges for multiple existing roles on a single metadata object. */
+  @POST
+  @Path("permissions/{type}/{fullName}/revoke")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "bulk-revoke-privileges." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "bulk-revoke-privileges", absolute = true)
+  @AuthorizationExpression(expression = CAN_OPERATE_METADATA_PRIVILEGE)
+  public Response revokePrivileges(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("type") @AuthorizationObjectType String type,
+      @PathParam("fullName") @AuthorizationFullName String fullName,
+      BulkPrivilegeRequest request) {
+    return changePrivileges(metalake, type, fullName, request, OperationType.REVOKE);
+  }
+
+  private Response changePrivileges(
+      String metalake,
+      String type,
+      String fullName,
+      BulkPrivilegeRequest request,
+      OperationType operation) {
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            if (request == null || request.getRoles() == null || request.getRoles().isEmpty()) {
+              throw new IllegalArgumentException("roles must not be empty");
+            }
+            bulkManager.checkBulkSize(ROLES_FIELD_NAME, request.getRoles().size());
+            Set<String> roleNames = new HashSet<>();
+            for (BulkPrivilegeRequest.Item item : request.getRoles()) {
+              if (item == null
+                  || item.getName() == null
+                  || item.getName().isBlank()
+                  || !roleNames.add(item.getName())) {
+                throw new IllegalArgumentException("Role names must be nonblank and unique");
+              }
+            }
+
+            MetalakeManager.checkMetalakeInUse(metalake);
+            MetadataObject object =
+                MetadataObjects.parse(
+                    fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+            TagOperations.checkVisibleTag(metalake, object);
+            MetadataObjectUtil.checkMetadataObject(metalake, object);
+            List<String> successes = new ArrayList<>();
+            Map<String, Set<Privilege>> changes = new LinkedHashMap<>();
+            Map<String, Integer> indexes = new LinkedHashMap<>();
+            List<BulkError> errors = new ArrayList<>();
+            for (int index = 0; index < request.getRoles().size(); index++) {
+              BulkPrivilegeRequest.Item item = request.getRoles().get(index);
+              try {
+                if (item.getPrivileges() == null
+                    || item.getPrivileges().isEmpty()
+                    || item.getPrivileges().contains(null)) {
+                  throw new IllegalArgumentException(
+                      "privileges must contain at least one non-null privilege");
+                }
+                for (PrivilegeDTO privilege : item.getPrivileges()) {
+                  AuthorizationUtils.checkPrivilege(privilege, object, metalake);
+                }
+                AuthorizationUtils.checkDuplicatedNamePrivilege(
+                    new ArrayList<>(item.getPrivileges()));
+                Set<Privilege> privileges =
+                    item.getPrivileges().stream()
+                        .map(DTOConverters::fromPrivilegeDTO)
+                        .collect(Collectors.toSet());
+                changes.put(item.getName(), privileges);
+                indexes.put(item.getName(), index);
+              } catch (Exception e) {
+                errors.add(
+                    bulkManager.toBulkError(BulkItemResult.failure(index, item.getName(), e)));
+              }
+            }
+            PrivilegeBatchResult result =
+                accessControlDispatcher.batchChangePrivileges(
+                    metalake, object, changes, operation == OperationType.GRANT);
+            Map<String, Exception> failures = result.failures();
+            changes
+                .keySet()
+                .forEach(
+                    name -> {
+                      if (failures.containsKey(name)) {
+                        errors.add(
+                            bulkManager.toBulkError(
+                                BulkItemResult.failure(
+                                    indexes.get(name), name, failures.get(name))));
+                      } else {
+                        successes.add(name);
+                      }
+                    });
+            errors.sort(Comparator.comparingInt(BulkError::getIndex));
+            return Utils.ok(
+                new BulkRemoveResponse(
+                    successes.toArray(new String[0]),
+                    errors.toArray(new BulkError[0]),
+                    new BulkSummary(request.getRoles().size(), successes.size(), errors.size())));
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleRolePermissionOperationException(operation, fullName, "", e);
     }
   }
 

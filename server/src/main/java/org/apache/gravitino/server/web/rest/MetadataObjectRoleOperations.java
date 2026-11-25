@@ -18,8 +18,11 @@
  */
 package org.apache.gravitino.server.web.rest;
 
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConverter.CAN_OPERATE_METADATA_PRIVILEGE;
+
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.List;
 import java.util.Locale;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
@@ -33,12 +36,21 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.dto.authorization.RoleDTO;
 import org.apache.gravitino.dto.responses.NameListResponse;
+import org.apache.gravitino.dto.responses.ResourceRolePrivilegesResponse;
+import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.NameBindings;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
@@ -88,6 +100,49 @@ public class MetadataObjectRoleOperations {
                     names,
                     (roleName) -> NameIdentifierUtil.ofRole(metalake, roleName));
             return Utils.ok(new NameListResponse(names));
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleRoleException(OperationType.LIST, "", metalake, e);
+    }
+  }
+  /**
+   * Lists the visible role grants attached directly to the requested resource.
+   *
+   * @param metalake the metalake name
+   * @param type the metadata object type
+   * @param fullName the metadata object name
+   * @return role grants scoped to the requested object
+   */
+  @GET
+  @Path("privileges")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(
+      name = "list-role-privileges-by-object." + MetricNames.HTTP_PROCESS_DURATION,
+      absolute = true)
+  @ResponseMetered(name = "list-role-privileges-by-object", absolute = true)
+  @AuthorizationExpression(expression = CAN_OPERATE_METADATA_PRIVILEGE)
+  public Response listRolePrivileges(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("type") @AuthorizationObjectType String type,
+      @PathParam("fullName") @AuthorizationFullName String fullName) {
+    try {
+      MetadataObject object =
+          MetadataObjects.parse(
+              fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            MetalakeManager.checkMetalakeInUse(metalake);
+            TagOperations.checkVisibleTag(metalake, object);
+            MetadataObjectUtil.checkMetadataObject(metalake, object);
+            List<RoleEntity> roles =
+                RoleMetaService.getInstance()
+                    .listRolesWithResourcePrivileges(
+                        MetadataObjectUtil.toEntityIdent(metalake, object),
+                        MetadataObjectUtil.toEntityType(object));
+            RoleDTO[] grants = roles.stream().map(DTOConverters::toDTO).toArray(RoleDTO[]::new);
+            return Utils.ok(new ResourceRolePrivilegesResponse(grants));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleRoleException(OperationType.LIST, "", metalake, e);

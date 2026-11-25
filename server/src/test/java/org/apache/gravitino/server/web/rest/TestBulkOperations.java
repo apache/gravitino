@@ -33,6 +33,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
@@ -45,9 +46,11 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.PrivilegeBatchResult;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.bulk.BulkItemResult;
@@ -78,12 +81,18 @@ import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
+import org.apache.gravitino.hook.AccessControlHookDispatcher;
+import org.apache.gravitino.listener.AccessControlEventDispatcher;
+import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.event.RevokePrivilegesEvent;
+import org.apache.gravitino.listener.api.event.RevokePrivilegesPreEvent;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -205,6 +214,69 @@ public class TestBulkOperations extends BaseOperationsTest {
           ErrorConstants.ILLEGAL_ARGUMENTS_CODE, result.getErrors()[0].getCode());
     }
     Mockito.verify(manager).createRoles(eq("metalake1"), eq(Collections.emptyList()));
+  }
+
+  /** Verifies the REST request reaches the cache hook before emitting the committed event. */
+  @Test
+  public void testBulkRevokeNotifiesAuthorizerAndEmitsEvents() throws Exception {
+    GravitinoEnv env = GravitinoEnv.getInstance();
+    Object originalDispatcher =
+        FieldUtils.readField(bulkOperations, "accessControlDispatcher", true);
+    Object originalMetalake = FieldUtils.readField(env, "internalMetalakeDispatcher", true);
+    Object originalAuthorizer = FieldUtils.readField(env, "gravitinoAuthorizer", true);
+    MetalakeDispatcher metalakes = mock(MetalakeDispatcher.class);
+    when(metalakes.metalakeExists(any())).thenReturn(true);
+    EventBus events = mock(EventBus.class);
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    RoleEntity role =
+        RoleEntity.builder()
+            .withId(42L)
+            .withName("role1")
+            .withSecurableObjects(List.of())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    when(manager.batchChangePrivileges(any(), any(), any(), Mockito.eq(false)))
+        .thenReturn(new PrivilegeBatchResult(Map.of("role1", role), Map.of()));
+    FieldUtils.writeField(env, "internalMetalakeDispatcher", metalakes, true);
+    FieldUtils.writeField(env, "gravitinoAuthorizer", authorizer, true);
+    FieldUtils.writeField(
+        bulkOperations,
+        "accessControlDispatcher",
+        new AccessControlEventDispatcher(events, new AccessControlHookDispatcher(manager)),
+        true);
+    try (Response response =
+        target("/bulk/metalakes/metalake1/permissions/METALAKE/metalake1/revoke")
+            .request()
+            .post(
+                Entity.json(
+                    "{\"roles\":[{\"name\":\"role1\",\"privileges\":[{\"name\":\"CREATE_CATALOG\",\"condition\":\"ALLOW\"}]}]}"))) {
+      Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+      Assertions.assertArrayEquals(
+          new String[] {"role1"}, response.readEntity(BulkRemoveResponse.class).getNames());
+      var calls = Mockito.inOrder(events, manager, authorizer);
+      calls.verify(events).dispatchEvent(any(RevokePrivilegesPreEvent.class));
+      calls.verify(manager).batchChangePrivileges(any(), any(), any(), Mockito.eq(false));
+      calls.verify(authorizer).handleRolePrivilegeChange("metalake1", "role1");
+      calls.verify(events).dispatchEvent(any(RevokePrivilegesEvent.class));
+    } finally {
+      FieldUtils.writeField(bulkOperations, "accessControlDispatcher", originalDispatcher, true);
+      FieldUtils.writeField(env, "internalMetalakeDispatcher", originalMetalake, true);
+      FieldUtils.writeField(env, "gravitinoAuthorizer", originalAuthorizer, true);
+    }
+  }
+
+  @Test
+  public void testBulkPrivilegesRejectDuplicateRolesBeforeAnyUpdate() {
+    for (String operation : new String[] {"grant", "revoke"}) {
+      try (Response response =
+          target("/bulk/metalakes/metalake1/permissions/TABLE/catalog.schema.table/" + operation)
+              .request()
+              .post(
+                  Entity.json("{\"roles\":[{\"name\":\"duplicate\"},{\"name\":\"duplicate\"}]}"))) {
+        Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      }
+    }
   }
 
   @Test

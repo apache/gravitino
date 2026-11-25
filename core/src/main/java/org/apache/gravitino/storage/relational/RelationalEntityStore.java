@@ -56,6 +56,7 @@ import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsDomainOperations;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.SupportsTableIdLookup;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.cache.BaseEntityCache;
 import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
@@ -70,6 +71,7 @@ import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
@@ -77,6 +79,7 @@ import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
+import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.Executable;
@@ -370,6 +373,61 @@ public class RelationalEntityStore
         }
       } finally {
         endPendingWrite(ident, entityType);
+      }
+    }
+  }
+
+  /**
+   * Updates multiple roles for one resource while respecting entity-cache write barriers.
+   *
+   * @param metalake the metalake name
+   * @param resource the resource identifier
+   * @param resourceType the resource type
+   * @param changes per-role privilege transformations
+   * @return failures keyed by role name
+   */
+  public Map<String, Exception> updateResourcePrivileges(
+      String metalake,
+      NameIdentifier resource,
+      Entity.EntityType resourceType,
+      Map<String, Function<RoleEntity, RoleEntity>> changes) {
+    List<NameIdentifier> pending = new ArrayList<>();
+    Throwable writeFailure = null;
+    try {
+      for (String name : changes.keySet()) {
+        NameIdentifier role = AuthorizationUtils.ofRole(metalake, name);
+        beginPendingWrite(role, Entity.EntityType.ROLE);
+        pending.add(role);
+      }
+      return RoleMetaService.getInstance()
+          .updateResourcePrivileges(resource, resourceType, changes);
+    } catch (RuntimeException | Error error) {
+      writeFailure = error;
+      throw error;
+    } finally {
+      endPendingRoleWrites(pending, writeFailure);
+    }
+  }
+
+  private void endPendingRoleWrites(List<NameIdentifier> pending, Throwable writeFailure) {
+    Throwable failure = writeFailure;
+    for (NameIdentifier role : pending) {
+      try {
+        endPendingWrite(role, Entity.EntityType.ROLE);
+      } catch (RuntimeException | Error error) {
+        if (failure == null) {
+          failure = error;
+        } else if (failure != error) {
+          failure.addSuppressed(error);
+        }
+      }
+    }
+    if (writeFailure == null) {
+      if (failure instanceof RuntimeException) {
+        throw (RuntimeException) failure;
+      }
+      if (failure instanceof Error) {
+        throw (Error) failure;
       }
     }
   }

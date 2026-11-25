@@ -418,6 +418,24 @@ public class AccessControlManager implements AccessControlDispatcher {
         identifier, LockType.READ, () -> roleManager.listRoleNamesByObject(metalake, object));
   }
 
+  /**
+   * Applies a resource privilege batch via relational storage.
+   *
+   * @param metalake the metalake
+   * @param object the affected resource
+   * @param privileges requested privileges by role
+   * @param grant whether to grant rather than revoke
+   * @return failures by role name
+   */
+  @Override
+  public PrivilegeBatchResult batchChangePrivileges(
+      String metalake,
+      MetadataObject object,
+      Map<String, Set<Privilege>> privileges,
+      boolean grant) {
+    return PermissionManager.batchChangePrivileges(metalake, object, privileges, grant);
+  }
+
   @Override
   public Role grantPrivilegeToRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
