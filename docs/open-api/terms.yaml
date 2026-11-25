@@ -59,10 +59,7 @@ paths:
             application/vnd.gravitino.v1+json:
               schema:
                 oneOf:
-                  - allOf:
-                      - $ref: ./openapi.yaml#/components/schemas/NameListResponse
-                      - type: object
-                        required: [code, names]
+                  - $ref: "#/components/schemas/TermNamesResponse"
                   - $ref: "#/components/schemas/TermListResponse"
         "400":
           $ref: "#/components/responses/InvalidRequest"
@@ -364,7 +361,7 @@ paths:
             application/vnd.gravitino.v1+json:
               schema:
                 oneOf:
-                  - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+                  - $ref: "#/components/schemas/TermNamesResponse"
                   - $ref: "#/components/schemas/ObjectTermsResponse"
         "400":
           $ref: "#/components/responses/InvalidRequest"
@@ -392,7 +389,7 @@ paths:
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+                $ref: "#/components/schemas/TermNamesResponse"
         "400":
           $ref: "#/components/responses/InvalidRequest"
         "403":
@@ -443,7 +440,7 @@ paths:
             application/vnd.gravitino.v1+json:
               schema:
                 oneOf:
-                  - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+                  - $ref: "#/components/schemas/TermNamesResponse"
                   - $ref: "#/components/schemas/TermListResponse"
         "400":
           $ref: "#/components/responses/InvalidRequest"
@@ -471,7 +468,7 @@ paths:
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+                $ref: "#/components/schemas/TermNamesResponse"
         "400":
           $ref: "#/components/responses/InvalidRequest"
         "403":
@@ -486,6 +483,11 @@ paths:
           $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
 components:
   schemas:
+    TermNamesResponse:
+      allOf:
+        - $ref: ./openapi.yaml#/components/schemas/NameListResponse
+        - type: object
+          required: [code, names]
     TermsAssociateRequest:
       type: object
       anyOf:

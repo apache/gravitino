@@ -2370,6 +2370,8 @@ class TestGlossaryBindings extends TestJDBCBackend {
             () -> manager.listTermBindings(LAKE, "Paged", null, null, null, 1, null));
     assertTrue(first.bindings().isEmpty());
     assertNotNull(first.next());
+    assertEquals(TargetType.COLUMN.name(), first.next().afterType());
+    assertEquals(columns.get(999).id(), first.next().afterId());
     GlossaryManager.BindingPage last =
         as(
             "metricReader",
@@ -2397,6 +2399,19 @@ class TestGlossaryBindings extends TestJDBCBackend {
         Set.of(TermBinding.usedBy(model, "net_revenue"), TermBinding.usedBy(model, "active_users")),
         Set.of(one.bindings().get(0), two.bindings().get(0)));
     assertNull(two.next());
+
+    MetadataObject lastColumn =
+        MetadataObjects.of(
+            List.of(CAT, SCH, "wide", columns.get(1000).name()), MetadataObject.Type.COLUMN);
+    openManager.associateTerms(LAKE, lastColumn, null, new String[] {"Paged"});
+    GlossaryManager.BindingPage exact =
+        as(
+            "metricReader",
+            () ->
+                manager.listTermBindings(
+                    LAKE, "Paged", null, Set.of(MetadataObject.Type.COLUMN), null, 1, null));
+    assertTrue(exact.bindings().isEmpty());
+    assertNull(exact.next());
   }
 
   @TestTemplate
