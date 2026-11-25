@@ -155,6 +155,65 @@ public class TestCredentialOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertSame(validCredential, credentials.get(0));
   }
 
+  @Test
+  public void testGetCredentialsDynamicProvidersOnlySkipsStaticProvider() throws Exception {
+    String staticType = "static-type";
+    String dynamicType = "dynamic-type";
+
+    CredentialProvider staticProvider = mockCredentialProvider(staticType);
+    CredentialProvider dynamicProvider =
+        Mockito.mock(
+            CredentialProvider.class,
+            Mockito.withSettings().extraInterfaces(SupportsDynamicCredential.class));
+    Mockito.when(dynamicProvider.credentialType()).thenReturn(dynamicType);
+    Mockito.when(dynamicProvider.supportsScheme(Mockito.anyString())).thenReturn(true);
+
+    Credential dynamicCredential = Mockito.mock(Credential.class);
+    Credential staticCredential = Mockito.mock(Credential.class);
+
+    CatalogCredentialManager credentialManager = Mockito.mock(CatalogCredentialManager.class);
+    Mockito.when(credentialManager.getCredentialProvider(staticType))
+        .thenReturn(Optional.of(staticProvider));
+    Mockito.when(credentialManager.getCredentialProvider(dynamicType))
+        .thenReturn(Optional.of(dynamicProvider));
+    Mockito.when(
+            credentialManager.getCredential(
+                Mockito.eq(staticType), Mockito.any(CredentialContext.class)))
+        .thenReturn(Optional.of(staticCredential));
+    Mockito.when(
+            credentialManager.getCredential(
+                Mockito.eq(dynamicType), Mockito.any(CredentialContext.class)))
+        .thenReturn(Optional.of(dynamicCredential));
+
+    CatalogOperations ops =
+        Mockito.mock(
+            CatalogOperations.class,
+            Mockito.withSettings().extraInterfaces(SupportsPathBasedCredentials.class));
+    Mockito.when(
+            ((SupportsPathBasedCredentials) ops).getPathContext(Mockito.any(NameIdentifier.class)))
+        .thenReturn(
+            Arrays.asList(
+                new PathContext("s3://bucket/a", staticType),
+                new PathContext("s3://bucket/b", dynamicType)));
+
+    BaseCatalog<?> baseCatalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(baseCatalog.catalogCredentialManager()).thenReturn(credentialManager);
+    Mockito.when(baseCatalog.ops()).thenReturn(ops);
+
+    CredentialOperationDispatcher dispatcher =
+        new CredentialOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
+
+    NameIdentifier fileset = NameIdentifier.of(metalake, catalog, "schema", "fileset");
+    List<Credential> dynamicOnly =
+        dispatcher.getCredentials(baseCatalog, fileset, CredentialPrivilege.READ, true);
+    Assertions.assertEquals(1, dynamicOnly.size());
+    Assertions.assertSame(dynamicCredential, dynamicOnly.get(0));
+
+    List<Credential> allProviders =
+        dispatcher.getCredentials(baseCatalog, fileset, CredentialPrivilege.READ, false);
+    Assertions.assertEquals(2, allProviders.size());
+  }
+
   private static CredentialProvider mockCredentialProvider(String credentialType) {
     CredentialProvider provider = Mockito.mock(CredentialProvider.class);
     Mockito.when(provider.credentialType()).thenReturn(credentialType);
