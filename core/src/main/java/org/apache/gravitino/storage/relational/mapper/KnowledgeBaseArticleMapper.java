@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.kb.KnowledgeBaseArticleEntity.Binding;
 import org.apache.gravitino.storage.relational.po.KnowledgeBaseArticlePO;
@@ -136,6 +137,17 @@ public interface KnowledgeBaseArticleMapper {
       """)
   List<KnowledgeBaseArticlePO> joinedBatch(
       @Param("metalake") String metalake, @Param("names") List<String> names);
+
+  /** Returns the occupied candidates without loading Article content. */
+  @Select(
+      """
+      <script>
+      SELECT a.article_name FROM kb_article_meta a JOIN metalake_meta m ON m.metalake_id=a.metalake_id
+      WHERE m.metalake_name=#{metalake} AND m.deleted_at=0 AND a.deleted_at=0 AND a.article_name IN
+      <foreach item="name" collection="names" open="(" separator="," close=")">#{name}</foreach>
+      </script>
+      """)
+  Set<String> occupiedNames(@Param("metalake") String metalake, @Param("names") List<String> names);
 
   /** Loads the stored fields used for an Article summary, without fetching content. */
   @Select(

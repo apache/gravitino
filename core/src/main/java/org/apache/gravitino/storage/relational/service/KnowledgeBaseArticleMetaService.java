@@ -38,8 +38,10 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -72,6 +74,33 @@ public final class KnowledgeBaseArticleMetaService {
       new KnowledgeBaseArticleMetaService();
   private static final MemberType ARTICLE = MemberType.KNOWLEDGE_BASE_ARTICLE;
   private static final TransactionHook NO_HOOK = (before, after) -> {};
+  // Match the constraint identifier in the backend diagnostic, not the conflicting value.
+  private static final Pattern NAME_CONSTRAINT =
+      Pattern.compile(
+          "(?i)(?:for key '(?:kb_article_meta\\.)?uk_kba_name'$"
+              + "|violates unique constraint \"uk_kba_name\""
+              + "|violation: \"(?:[\\w]+\\.)?uk_kba_name_index_[0-9a-f]+ on )");
+
+  /** A conflict on the live Article name key during the Article row insert. */
+  public static final class NameConflictException extends EntityAlreadyExistsException {
+    private NameConflictException(Throwable cause, String name) {
+      super(cause, "Article name %s already exists", name);
+    }
+  }
+
+  /** Current Article and its metalake identity observed in the same transaction. */
+  public record ScopedArticle(long metalakeId, KnowledgeBaseArticleEntity article) {}
+
+  /** The addressed Article or its parent is missing, independently of any extension failure. */
+  public static final class MissingArticleScopeException extends NoSuchEntityException {
+    private MissingArticleScopeException(NameIdentifier ident) {
+      super("Knowledge Base Article %s does not exist", ident);
+    }
+
+    private MissingArticleScopeException(NoSuchEntityException parent) {
+      super(parent, "%s", parent.getMessage());
+    }
+  }
 
   /** Storage extension invoked before commit, with the complete old and new binding sets. */
   @FunctionalInterface
@@ -96,17 +125,48 @@ public final class KnowledgeBaseArticleMetaService {
 
   /** Returns Article metadata and binding identities from one snapshot. */
   public KnowledgeBaseArticleEntity get(NameIdentifier ident) {
-    String name = KnowledgeBaseArticle.normalizeName(ident.name());
-    List<KnowledgeBaseArticleEntity> result = read(ident.namespace(), name);
-    if (result.isEmpty()) {
-      throw missing(ident);
-    }
-    return result.get(0);
+    return getScoped(ident).article();
   }
 
   /** Lists stored metadata and binding identities. */
   public List<KnowledgeBaseArticleEntity> list(Namespace namespace) {
-    return read(namespace, null);
+    return readAll(namespace);
+  }
+
+  /** Reads the Article and the identity used for its editing token from one snapshot. */
+  public ScopedArticle getScoped(NameIdentifier ident) {
+    String name = KnowledgeBaseArticle.normalizeName(ident.name());
+    if (SqlSessions.hasActiveSession()) {
+      ScopedArticle result = joinedArticle(ident.namespace(), name);
+      if (result == null) {
+        throw missing(ident);
+      }
+      return result;
+    }
+    return SqlSessions.readSnapshot(
+        () -> {
+          long lake =
+              MetalakeMetaService.getInstance()
+                  .getMetalakeIdByName(metalakeName(ident.namespace()));
+          return SessionUtils.getWithoutCommit(
+              KnowledgeBaseArticleMapper.class,
+              mapper -> {
+                KnowledgeBaseArticlePO row = mapper.get(lake, name);
+                if (row == null) {
+                  throw missing(ident);
+                }
+                return new ScopedArticle(lake, materialize(ident.namespace(), row, mapper));
+              });
+        });
+  }
+
+  /** Returns the live names among the proposed allocation candidates. */
+  public Set<String> occupiedNames(String metalake, List<String> candidates) {
+    if (candidates.isEmpty()) {
+      return Set.of();
+    }
+    return SessionUtils.getWithoutCommit(
+        KnowledgeBaseArticleMapper.class, mapper -> mapper.occupiedNames(metalake, candidates));
   }
 
   /** Reads only the current content and its editing identity. */
@@ -168,16 +228,22 @@ public final class KnowledgeBaseArticleMetaService {
   /** Commits the initial Owner or extension data along with the Article and initial bindings. */
   public void insert(KnowledgeBaseArticleEntity entity, boolean overwrite, TransactionHook hook)
       throws IOException {
+    insertScoped(entity, overwrite, hook);
+  }
+
+  /** Returns the stored state with the metalake ID fenced by the write. */
+  public ScopedArticle insertScoped(
+      KnowledgeBaseArticleEntity entity, boolean overwrite, TransactionHook hook)
+      throws IOException {
     try {
-      write(
+      return write(
           entity.namespace(),
           (mapper, metalakeId) -> {
             KnowledgeBaseArticleEntity before = overwrite ? observe(entity.nameIdentifier()) : null;
             if (before != null) {
               KnowledgeBaseArticlePO row =
                   lockForChange(mapper, metalakeId, before, entity.domainIds());
-              replace(mapper, row, before, entity, hook);
-              return null;
+              return new ScopedArticle(metalakeId, replace(mapper, row, before, entity, hook));
             }
             requireDomainsLive(lockLiveDomains(metalakeId, entity.domainIds()));
             KnowledgeBaseArticleEntity initial =
@@ -188,12 +254,26 @@ public final class KnowledgeBaseArticleMetaService {
                     entity.bodyUpdate(), "An initial Article body is required");
             row.setBodyFormat(body.format().name());
             row.setBodyContent(body.content());
-            mapper.insert(row);
+            try {
+              mapper.insert(row);
+            } catch (RuntimeException failure) {
+              for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+                if (cause instanceof SQLException sql
+                    && ExceptionUtils.isDuplicateKey(sql)
+                    && sql.getMessage() != null
+                    && NAME_CONSTRAINT.matcher(sql.getMessage()).find()) {
+                  throw new NameConflictException(failure, initial.name());
+                }
+              }
+              throw failure;
+            }
             initial.bindings().forEach(binding -> mapper.bind(row, binding));
             changeMemberships(row, Set.of(), initial.domainIds());
             hook.onChange(null, initial);
-            return null;
+            return new ScopedArticle(metalakeId, initial);
           });
+    } catch (NameConflictException e) {
+      throw e;
     } catch (RuntimeException e) {
       ExceptionUtils.checkSQLException(e, entity.type(), entity.nameIdentifier().toString());
       throw e;
@@ -218,6 +298,15 @@ public final class KnowledgeBaseArticleMetaService {
       @Nullable ExpectedRevision expected,
       Function<KnowledgeBaseArticleEntity, KnowledgeBaseArticleEntity> updater,
       TransactionHook hook) {
+    return updateScoped(ident, expected, updater, hook).article();
+  }
+
+  /** Returns the effective state and its token identity while the write locks are held. */
+  public ScopedArticle updateScoped(
+      NameIdentifier ident,
+      @Nullable ExpectedRevision expected,
+      Function<KnowledgeBaseArticleEntity, KnowledgeBaseArticleEntity> updater,
+      TransactionHook hook) {
     return write(
         ident.namespace(),
         (mapper, metalakeId) -> {
@@ -229,12 +318,15 @@ public final class KnowledgeBaseArticleMetaService {
               && (expected.metalakeId() != metalakeId
                   || expected.articleId() != before.id()
                   || expected.revision() != before.revision())) {
+            // Confirm the observed state under lock before reporting a stale token. If the row
+            // changed during planning, write() retries with the original token.
+            lockForChange(mapper, metalakeId, before, before.domainIds());
             throw new ArticleRevisionConflictException("Article %s has changed", ident);
           }
           KnowledgeBaseArticleEntity proposed = updater.apply(before);
           KnowledgeBaseArticlePO row =
               lockForChange(mapper, metalakeId, before, proposed.domainIds());
-          return replace(mapper, row, before, proposed, hook);
+          return new ScopedArticle(metalakeId, replace(mapper, row, before, proposed, hook));
         });
   }
 
@@ -290,7 +382,7 @@ public final class KnowledgeBaseArticleMetaService {
   }
 
   private static NoSuchEntityException missing(NameIdentifier ident) {
-    return new NoSuchEntityException("Knowledge Base Article %s does not exist", ident);
+    return new MissingArticleScopeException(ident);
   }
 
   private static final class StaleArticlePlan extends OptimisticLockException {
@@ -320,8 +412,13 @@ public final class KnowledgeBaseArticleMetaService {
         KnowledgeBaseArticleMapper.class,
         mapper -> {
           MetalakeMetaService parents = MetalakeMetaService.getInstance();
-          long id = parents.requireMetalakeByName(name).getMetalakeId();
-          parents.lockMetalakeForChildWrite(name, id);
+          long id;
+          try {
+            id = parents.requireMetalakeByName(name).getMetalakeId();
+            parents.lockMetalakeForChildWrite(name, id);
+          } catch (NoSuchEntityException missing) {
+            throw new MissingArticleScopeException(missing);
+          }
           SessionUtils.clearSessionCache();
           if (!nested) {
             return operation.apply(mapper, id);
@@ -352,13 +449,13 @@ public final class KnowledgeBaseArticleMetaService {
         });
   }
 
-  private List<KnowledgeBaseArticleEntity> read(Namespace ns, @Nullable String name) {
+  private List<KnowledgeBaseArticleEntity> readAll(Namespace ns) {
     String metalake = metalakeName(ns);
     if (SqlSessions.hasActiveSession()) {
       // A caller's READ_COMMITTED transaction may contain uncommitted writes. A single
       // statement observes them without splitting the row and its bindings across snapshots.
       return SessionUtils.getWithoutCommitFresh(
-          KnowledgeBaseArticleMapper.class, m -> aggregate(ns, m.joined(metalake, name)));
+          KnowledgeBaseArticleMapper.class, m -> aggregate(ns, m.joined(metalake, null)));
     }
     return SqlSessions.readSnapshot(
         () ->
@@ -369,10 +466,6 @@ public final class KnowledgeBaseArticleMetaService {
                       MetalakeMetaService.getInstance()
                           .requireMetalakeByName(metalake)
                           .getMetalakeId();
-                  if (name != null) {
-                    KnowledgeBaseArticlePO row = m.get(metalakeId, name);
-                    return row == null ? List.of() : List.of(materialize(ns, row, m));
-                  }
                   Map<Long, Set<Binding>> bindings = new HashMap<>();
                   for (KnowledgeBaseArticlePO target : m.listBindings(metalakeId)) {
                     bindings
@@ -447,9 +540,20 @@ public final class KnowledgeBaseArticleMetaService {
 
   @Nullable
   private KnowledgeBaseArticleEntity observe(NameIdentifier ident) {
-    List<KnowledgeBaseArticleEntity> articles =
-        read(ident.namespace(), KnowledgeBaseArticle.normalizeName(ident.name()));
-    return articles.isEmpty() ? null : articles.get(0);
+    ScopedArticle current =
+        joinedArticle(ident.namespace(), KnowledgeBaseArticle.normalizeName(ident.name()));
+    return current == null ? null : current.article();
+  }
+
+  @Nullable
+  private ScopedArticle joinedArticle(Namespace namespace, String name) {
+    List<KnowledgeBaseArticlePO> rows =
+        SessionUtils.getWithoutCommitFresh(
+            KnowledgeBaseArticleMapper.class,
+            mapper -> mapper.joined(metalakeName(namespace), name));
+    return rows.isEmpty()
+        ? null
+        : new ScopedArticle(rows.get(0).getMetalakeId(), aggregate(namespace, rows).get(0));
   }
 
   private KnowledgeBaseArticlePO lockForChange(
