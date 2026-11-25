@@ -32,6 +32,7 @@ import org.apache.gravitino.storage.relational.mapper.FunctionVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermDomainRelMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermRelMapper;
+import org.apache.gravitino.storage.relational.mapper.GlossaryTermVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
@@ -108,6 +109,7 @@ public class DefaultMapperPackageProvider implements MapperPackageProvider {
         TagMetadataObjectRelMapper.class,
         TagMetaMapper.class,
         GlossaryTermMetaMapper.class,
+        GlossaryTermVersionMapper.class,
         GlossaryTermRelMapper.class,
         GlossaryTermDomainRelMapper.class,
         KnowledgeBaseArticleMapper.class,

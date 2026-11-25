@@ -53,6 +53,7 @@ dependencies {
   testAnnotationProcessor(libs.lombok)
   testCompileOnly(libs.lombok)
 
+  testImplementation(libs.awaitility)
   testImplementation(libs.commons.io)
   testImplementation(project(":server-common", "testArtifacts"))
   testImplementation(libs.jersey.test.framework.core) {

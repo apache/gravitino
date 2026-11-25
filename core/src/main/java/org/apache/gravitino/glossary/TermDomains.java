@@ -21,6 +21,7 @@ package org.apache.gravitino.glossary;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.service.GlossaryTermDomainService;
@@ -60,6 +61,15 @@ final class TermDomains {
     } else {
       after.remove(domainId);
     }
+  }
+
+  Set<Long> ids() {
+    return Set.copyOf(after.keySet());
+  }
+
+  void replace(Map<Long, String> members) {
+    after.clear();
+    after.putAll(members);
   }
 
   boolean changed() {

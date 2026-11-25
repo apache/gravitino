@@ -205,7 +205,7 @@ public class GlossaryTermMetaBaseSQLProvider {
   }
 
   /** Reads a bounded batch of live terms by ID. */
-  public String snapshotByIds(
+  public String selectTermSnapshotsByIds(
       @Param("metalakeId") long metalakeId,
       @Param("metalakeName") String metalakeName,
       @Param("ids") List<Long> ids) {
@@ -225,6 +225,19 @@ public class GlossaryTermMetaBaseSQLProvider {
         + "AND term_id != #{excludedTermId} AND deleted_at=0 AND name_key IN "
         + "<foreach collection='keys' item='key' open='(' separator=',' close=')'>#{key}</foreach> "
         + "LIMIT 1</script>";
+  }
+
+  /** Finds another live term using the same source reference. */
+  public String findOtherTermIdBySourceRef() {
+    return "SELECT term_id FROM "
+        + GlossaryTermMetaMapper.TABLE_NAME
+        + " WHERE metalake_id=#{metalakeId} AND deleted_at=0 AND term_id != #{excludedTermId} AND "
+        + sourceRefPredicate();
+  }
+
+  /** Compares source references with the same semantics as the unique index. */
+  protected String sourceRefPredicate() {
+    return "source_ref=#{sourceRef}";
   }
 
   /** Finds a different live term whose synonym matches the proposed term name. */

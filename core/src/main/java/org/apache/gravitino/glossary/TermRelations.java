@@ -78,6 +78,21 @@ final class TermRelations {
     }
   }
 
+  Set<Long> broader() {
+    return Set.copyOf(parents);
+  }
+
+  Set<Long> related() {
+    return Set.copyOf(related);
+  }
+
+  void replace(Set<Long> broader, Set<Long> relatedIds) {
+    parents.clear();
+    parents.addAll(broader);
+    related.clear();
+    related.addAll(relatedIds);
+  }
+
   boolean changed() {
     return !parents.equals(oldParents) || !related.equals(oldRelated);
   }
