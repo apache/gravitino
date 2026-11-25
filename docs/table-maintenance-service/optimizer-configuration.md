@@ -182,6 +182,23 @@ gravitino.maintenance.ircAuth.oauth2-server-uri = https://idp.example.com/realms
 gravitino.maintenance.ircAuth.scope = catalog
 ```
 
+**Object-store data access (manual)** — `rest.auth.*` only authenticates to Iceberg REST. It does
+not grant access to object-store table files. When IRC uses credential providers such as
+`s3-token` (or otherwise withholds static `s3-access-key-id` / `s3-secret-access-key` from
+`/v1/config`), set vended credentials yourself under `ircAuth` (or the same key in policy
+`jobOptions` / `spark_conf`). TMS does not inject this header automatically:
+
+```properties
+gravitino.maintenance.ircAuth.header.X-Iceberg-Access-Delegation = vended-credentials
+```
+
+That suffix becomes
+`spark.sql.catalog.<catalog>.header.X-Iceberg-Access-Delegation=vended-credentials` when the
+job writes `spark_conf`. Alternatively supply static object-store keys in `spark_conf` when your
+deployment allows them. Cron / expand maintenance jobs use the same `ircAuth` overlay as other
+built-in Iceberg jobs. See
+[Secured Gravitino and Iceberg REST](./optimizer.md#secured-gravitino-and-iceberg-rest-object-storage).
+
 **4. `sigv4`** — **not supported yet** for Gravitino IRC.
 
 **5. `google`** — **not supported yet** for Gravitino IRC.

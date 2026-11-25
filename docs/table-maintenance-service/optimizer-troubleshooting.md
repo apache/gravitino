@@ -83,9 +83,13 @@ default provides the Iceberg runtime, list it in `spark_conf` as well.
 **`The provided credentials did not support` or Iceberg `Not authorized`** — a secured Gravitino
 endpoint needs the optimizer Gravitino client auth (`none` / `simple` / `basic` / `oauth`) in CLI
 conf and/or short names in `updater_options`. A secured Iceberg REST catalog needs `rest.auth.*` in
-`spark-conf` for any built-in job that reads the table. Object-store writes also need
-`spark.sql.catalog.<cat>.header.X-Iceberg-Access-Delegation=vended-credentials`. See
-[Gravitino client auth](./optimizer-configuration.md#gravitino-client-auth-cli-and-update-stats) and
+`spark-conf` for any built-in job that reads the table. Object-store reads and writes also need
+`spark.sql.catalog.<cat>.header.X-Iceberg-Access-Delegation=vended-credentials` (or static
+object-store keys) when IRC does not return static AK/SK — set that under
+`gravitino.maintenance.ircAuth.*` for in-process / cron jobs; TMS does not add it automatically.
+See
+[Iceberg REST / Spark auth](./optimizer-configuration.md#iceberg-rest-spark-auth-gravitinomaintenanceircauth-arbitrary-passthrough),
+[Gravitino client auth](./optimizer-configuration.md#gravitino-client-auth-cli-and-update-stats), and
 [Secured Gravitino and Iceberg REST](./optimizer.md#secured-gravitino-and-iceberg-rest-object-storage).
 
 **`NoSuchWarehouse` on Iceberg REST** — `warehouse_location` was set to an `s3://` (or similar)
