@@ -304,6 +304,9 @@ paths:
         "200":
           description: Successful glossary binding operation.
           content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TermBindingListResponse"
             application/vnd.gravitino.v1+json:
               schema:
                 $ref: "#/components/schemas/TermBindingListResponse"
@@ -358,11 +361,12 @@ paths:
         "200":
           description: Successful glossary binding operation.
           content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ObjectTermsReadResponse"
             application/vnd.gravitino.v1+json:
               schema:
-                oneOf:
-                  - $ref: "#/components/schemas/TermNamesResponse"
-                  - $ref: "#/components/schemas/ObjectTermsResponse"
+                $ref: "#/components/schemas/ObjectTermsReadResponse"
         "400":
           $ref: "#/components/responses/InvalidRequest"
         "403":
@@ -387,6 +391,9 @@ paths:
         "200":
           description: Successful glossary binding operation.
           content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TermNamesResponse"
             application/vnd.gravitino.v1+json:
               schema:
                 $ref: "#/components/schemas/TermNamesResponse"
@@ -437,11 +444,12 @@ paths:
         "200":
           description: Successful glossary binding operation.
           content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetricTermsReadResponse"
             application/vnd.gravitino.v1+json:
               schema:
-                oneOf:
-                  - $ref: "#/components/schemas/TermNamesResponse"
-                  - $ref: "#/components/schemas/TermListResponse"
+                $ref: "#/components/schemas/MetricTermsReadResponse"
         "400":
           $ref: "#/components/responses/InvalidRequest"
         "403":
@@ -466,6 +474,9 @@ paths:
         "200":
           description: Successful glossary binding operation.
           content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TermNamesResponse"
             application/vnd.gravitino.v1+json:
               schema:
                 $ref: "#/components/schemas/TermNamesResponse"
@@ -483,6 +494,14 @@ paths:
           $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
 components:
   schemas:
+    ObjectTermsReadResponse:
+      oneOf:
+        - $ref: "#/components/schemas/TermNamesResponse"
+        - $ref: "#/components/schemas/ObjectTermsResponse"
+    MetricTermsReadResponse:
+      oneOf:
+        - $ref: "#/components/schemas/TermNamesResponse"
+        - $ref: "#/components/schemas/TermListResponse"
     TermNamesResponse:
       allOf:
         - $ref: ./openapi.yaml#/components/schemas/NameListResponse

@@ -47,13 +47,12 @@ import org.apache.gravitino.glossary.GlossaryTermViews;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
-import org.apache.gravitino.server.web.Utils;
 
 /**
  * Reverse glossary binding reads and writes. Target authorization runs before child enumeration.
  */
 @Path("/metalakes/{metalake}/objects/{type}/{fullName}")
-@Produces("application/vnd.gravitino.v1+json")
+@Produces({"application/json", "application/vnd.gravitino.v1+json"})
 public class MetadataObjectTermOperations {
   private final GlossaryTermViews views;
   @Context private HttpServletRequest httpRequest;
@@ -155,14 +154,15 @@ public class MetadataObjectTermOperations {
               "children requires a table or semantic model");
           GlossaryTerm.Status filter = TermOperations.parseStatus(status);
           if (!detailed && !expand) {
-            return Utils.ok(
-                new NameListResponse(views.listTargetTermNames(metalake, object, metric, filter)));
+            return Response.ok(
+                    new NameListResponse(
+                        views.listTargetTermNames(metalake, object, metric, filter)))
+                .build();
           }
           ObjectTermsResponse terms =
               views.listTargetTerms(metalake, object, metric, expand, filter);
-          return metric == null
-              ? Utils.ok(terms)
-              : Utils.ok(new TermListResponse(terms.getTerms()));
+          return Response.ok(metric == null ? terms : new TermListResponse(terms.getTerms()))
+              .build();
         });
   }
 
@@ -180,14 +180,15 @@ public class MetadataObjectTermOperations {
         () -> {
           Preconditions.checkArgument(request != null, "A terms association request is required");
           request.validate();
-          return Utils.ok(
-              new NameListResponse(
-                  views.associateTerms(
-                      metalake,
-                      target(type, fullName, metric),
-                      metric,
-                      request.getTermsToAdd(),
-                      request.getTermsToRemove())));
+          return Response.ok(
+                  new NameListResponse(
+                      views.associateTerms(
+                          metalake,
+                          target(type, fullName, metric),
+                          metric,
+                          request.getTermsToAdd(),
+                          request.getTermsToRemove())))
+              .build();
         });
   }
 

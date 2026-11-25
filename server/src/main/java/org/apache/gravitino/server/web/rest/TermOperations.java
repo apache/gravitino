@@ -273,6 +273,7 @@ public class TermOperations {
   /** Lists one bounded page of visible objects or metrics bound to the requested term. */
   @GET
   @Path("{term}/objects")
+  @Produces({"application/json", "application/vnd.gravitino.v1+json"})
   @Timed(name = "list-term-bindings." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-term-bindings", absolute = true)
   @AuthorizationExpression(expression = "")
@@ -311,9 +312,10 @@ public class TermOperations {
                           new TermBindingDTO(
                               b.kind(), DTOConverters.toDTO(b.object()), b.metric().orElse(null)))
                   .toArray(TermBindingDTO[]::new);
-          return Utils.ok(
-              new TermBindingListResponse(
-                  bindings, page.next() == null ? null : tokens.encode(page.next())));
+          return Response.ok(
+                  new TermBindingListResponse(
+                      bindings, page.next() == null ? null : tokens.encode(page.next())))
+              .build();
         });
   }
 

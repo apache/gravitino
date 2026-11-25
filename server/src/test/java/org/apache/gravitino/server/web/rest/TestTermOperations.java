@@ -550,14 +550,18 @@ public class TestTermOperations extends BaseOperationsTest {
     when(dispatcher.associateTerms("test", table, null, names, null)).thenReturn(names);
     when(dispatcher.associateTerms("test", model, "revenue net", names, null)).thenReturn(names);
     for (String path : List.of(TABLE_TERMS, METRIC_TERMS)) {
-      try (Response r = target(path).request(ACCEPT_V1).get()) {
-        assertEquals(200, r.getStatus());
-        assertArrayEquals(names, r.readEntity(NameListResponse.class).getNames());
-      }
-      try (Response r =
-          target(path).request().post(Entity.json("{\"termsToAdd\":[\"Revenue\"]}"))) {
-        assertEquals(200, r.getStatus());
-        assertArrayEquals(names, r.readEntity(NameListResponse.class).getNames());
+      for (String accept : List.of(MediaType.APPLICATION_JSON, ACCEPT_V1)) {
+        try (Response r = target(path).request(accept).get()) {
+          assertEquals(200, r.getStatus());
+          assertTrue(MediaType.valueOf(accept).isCompatible(r.getMediaType()));
+          assertArrayEquals(names, r.readEntity(NameListResponse.class).getNames());
+        }
+        try (Response r =
+            target(path).request(accept).post(Entity.json("{\"termsToAdd\":[\"Revenue\"]}"))) {
+          assertEquals(200, r.getStatus());
+          assertTrue(MediaType.valueOf(accept).isCompatible(r.getMediaType()));
+          assertArrayEquals(names, r.readEntity(NameListResponse.class).getNames());
+        }
       }
     }
     try (Response r =
@@ -597,21 +601,25 @@ public class TestTermOperations extends BaseOperationsTest {
             .queryParam("types", "table,semantic_model")
             .queryParam("pageSize", 1);
     String token;
-    try (Response r = endpoint.request().get()) {
+    try (Response r = endpoint.request(ACCEPT_V1).get()) {
       assertEquals(200, r.getStatus());
+      assertTrue(MediaType.valueOf(ACCEPT_V1).isCompatible(r.getMediaType()));
       TermBindingListResponse first = r.readEntity(TermBindingListResponse.class);
       assertEquals(0, first.getBindings().length);
       token = first.getNextPageToken();
     }
-    try (Response r = endpoint.queryParam("pageToken", token).request().get()) {
+    try (Response r =
+        endpoint.queryParam("pageToken", token).request(MediaType.APPLICATION_JSON).get()) {
       assertEquals(200, r.getStatus());
+      assertTrue(MediaType.APPLICATION_JSON_TYPE.isCompatible(r.getMediaType()));
       TermBindingListResponse last = r.readEntity(TermBindingListResponse.class);
       assertEquals("revenue", last.getBindings()[0].getMetric());
       assertEquals(model.fullName(), last.getBindings()[0].getObject().getFullName());
       assertEquals(TermBinding.Kind.USED_BY, last.getBindings()[0].getKind());
       assertNull(last.getNextPageToken());
     }
-    try (Response r = endpoint.queryParam("pageToken", token).request().get()) {
+    try (Response r =
+        endpoint.queryParam("pageToken", token).request(MediaType.APPLICATION_JSON).get()) {
       assertError(r, 409, "TermVersionConflictException");
     }
   }
