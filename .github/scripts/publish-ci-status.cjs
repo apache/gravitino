@@ -61,9 +61,13 @@ async function publishStatus({ github, repo, sha, context, state, description, t
 
 // Waiting for a committer is not a failure of the contributor's change.
 const NEEDS_ATTENTION = 'Fork CI needs attention';
-const LEGACY_TRUSTED_REQUIRED = 'Fork CI passed; trusted verification required';
-const TRUSTED_REQUIRED = 'Fork CI passed; CI files differ from target branch. ' +
-  'Committer: run Fork CI in apache/gravitino on that branch with this PR number.';
+const WRONG_BASE = 'Wrong base. Re-run all jobs in fork.';
+const TRUSTED_REQUIRED = 'Committer: run Fork CI upstream.';
+const LEGACY_TRUST_HINTS = [
+  'Fork CI passed; trusted verification required',
+  'Fork CI passed; CI files differ from target branch. ' +
+    'Committer: run Fork CI in apache/gravitino on that branch with this PR number.',
+];
 
 function statusState(result) {
   if (result.status !== 'completed') return 'pending';
@@ -74,7 +78,7 @@ function statusState(result) {
 
 // Whether a published status reports a finished execution, including pending trusted verification.
 function statusCompleted(status) {
-  return status.state !== 'pending' || [TRUSTED_REQUIRED, LEGACY_TRUSTED_REQUIRED].includes(status.description);
+  return status.state !== 'pending' || status.description === TRUSTED_REQUIRED || LEGACY_TRUST_HINTS.includes(status.description);
 }
 
-module.exports = { NEEDS_ATTENTION, TRUSTED_REQUIRED, LEGACY_TRUSTED_REQUIRED, latestStatus, parseRunUrl, publishStatus, runUrl, statusCompleted, statusState };
+module.exports = { NEEDS_ATTENTION, WRONG_BASE, TRUSTED_REQUIRED, LEGACY_TRUST_HINTS, latestStatus, parseRunUrl, publishStatus, runUrl, statusCompleted, statusState };
