@@ -59,6 +59,7 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -2221,6 +2222,54 @@ class TestGlossaryBindings extends TestJDBCBackend {
             .map(GlossaryTermEntity::name)
             .toList());
     Mockito.verify(env.internalTableDispatcher()).tableExists(ident);
+  }
+
+  @TestTemplate
+  void testOwnerReadFromOldSnapshotDoesNotChangeLaterAuthorization() throws Exception {
+    NameIdentifier table = NameIdentifier.of(schNs, TBL);
+    MetadataObject target = MetadataObjects.of(List.of(CAT, SCH, TBL), MetadataObject.Type.TABLE);
+    OwnerMetaService owners = OwnerMetaService.getInstance();
+    owners.setOwner(
+        table,
+        Entity.EntityType.TABLE,
+        NameIdentifierUtil.ofUser(LAKE, "writer"),
+        Entity.EntityType.USER);
+    ExecutorService changes = Executors.newSingleThreadExecutor();
+    try {
+      SqlSessions.readSnapshot(
+          () -> {
+            // Establish the binding reader's snapshot before another connection changes the owner.
+            assertEquals(TBL, TableMetaService.getInstance().getTableByIdentifier(table).name());
+            Future<?> updated =
+                changes.submit(
+                    () -> {
+                      owners.setOwner(
+                          table,
+                          Entity.EntityType.TABLE,
+                          NameIdentifierUtil.ofUser(LAKE, "tableAdmin"),
+                          Entity.EntityType.USER);
+                      authorizer.handleMetadataOwnerChange(
+                          LAKE, null, table, Entity.EntityType.TABLE);
+                    });
+            try {
+              updated.get(10, TimeUnit.SECONDS);
+            } catch (Exception e) {
+              throw new AssertionError(e);
+            }
+            assertTrue(
+                authorizer.isOwner(
+                    new UserPrincipal("writer"), LAKE, target, new AuthorizationRequestContext()));
+            return null;
+          });
+      assertFalse(
+          authorizer.isOwner(
+              new UserPrincipal("writer"), LAKE, target, new AuthorizationRequestContext()));
+      assertTrue(
+          authorizer.isOwner(
+              new UserPrincipal("tableAdmin"), LAKE, target, new AuthorizationRequestContext()));
+    } finally {
+      changes.shutdownNow();
+    }
   }
 
   @TestTemplate

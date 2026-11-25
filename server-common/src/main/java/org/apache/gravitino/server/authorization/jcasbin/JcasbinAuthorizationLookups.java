@@ -30,6 +30,7 @@ import org.apache.gravitino.meta.GlossaryTermNames;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -90,8 +91,8 @@ public class JcasbinAuthorizationLookups {
 
   /**
    * Two-tier owner lookup: request-level dedup first, then the shared {@code ownerRelCache}, and
-   * finally a single {@code owner_meta} query. Both positive and negative DB results populate both
-   * tiers so subsequent calls — within this request and from later requests — avoid a repeat query.
+   * finally a single {@code owner_meta} query. An active transaction uses only its request cache,
+   * so an older snapshot cannot repopulate the shared cache after another request invalidated it.
    */
   public Optional<OwnerInfo> resolveOwnerId(
       Long metadataId,
@@ -101,7 +102,10 @@ public class JcasbinAuthorizationLookups {
         metadataId,
         // Use the cache's atomic loader so concurrent misses on the same id collapse to one DB
         // query. Both present and absent results are cached so later requests skip the DB entirely.
-        id -> ownerRelCache.get(id, k -> loadOwner(k, metadataType)));
+        id ->
+            SqlSessions.hasActiveSession()
+                ? loadOwner(id, metadataType)
+                : ownerRelCache.get(id, k -> loadOwner(k, metadataType)));
   }
 
   /** Resolves the object being authorized against the identity observed by the operation. */
@@ -165,7 +169,11 @@ public class JcasbinAuthorizationLookups {
           Optional.of(
               requestContext.computeMetadataIdIfAbsent(
                   cacheKey,
-                  k -> metadataIdCache.get(k, ignored -> loadMetadataId(cacheObject, metalake)))),
+                  k ->
+                      SqlSessions.hasActiveSession()
+                          ? loadMetadataId(cacheObject, metalake)
+                          : metadataIdCache.get(
+                              k, ignored -> loadMetadataId(cacheObject, metalake)))),
           false);
     } catch (NotFoundException e) {
       return new MetadataIdResolution(Optional.empty(), false);

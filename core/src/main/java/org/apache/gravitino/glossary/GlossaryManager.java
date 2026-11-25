@@ -655,8 +655,9 @@ public final class GlossaryManager {
           String afterType = cursor == null ? null : cursor.afterType();
           long afterId = cursor == null ? 0 : cursor.afterId();
           List<TermBinding> visible = new ArrayList<>(pageSize);
+          int fetchSize = pageSize;
           for (int examined = 0; examined < MAX_BINDING_CANDIDATES; ) {
-            int batchSize = Math.min(MAX_BINDING_PAGE_SIZE, MAX_BINDING_CANDIDATES - examined);
+            int batchSize = Math.min(fetchSize, MAX_BINDING_CANDIDATES - examined);
             List<GlossaryTermBindingPO> rows =
                 BINDINGS.listByTerm(
                     lake, root.id(), targetTypes, afterType, afterId, batchSize + 1);
@@ -691,6 +692,8 @@ public final class GlossaryManager {
             if (rows.size() <= batchSize) {
               break;
             }
+            // Grow only when missing or unauthorized targets leave the page short.
+            fetchSize = Math.min(MAX_BINDING_PAGE_SIZE, fetchSize * 2);
           }
           return new BindingPage(visible, null);
         });

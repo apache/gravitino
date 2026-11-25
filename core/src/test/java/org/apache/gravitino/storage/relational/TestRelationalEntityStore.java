@@ -48,13 +48,16 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestRelationalEntityStore {
@@ -75,6 +78,26 @@ public class TestRelationalEntityStore {
 
     FieldUtils.writeField(store, "backend", backend, true);
     FieldUtils.writeField(store, "cache", Mockito.spy(new NoOpsCache(config)), true);
+  }
+
+  @Test
+  void testTransactionalReadsUseOnlyTheirDatabaseSession() throws Exception {
+    EntityCache cache = Mockito.mock(EntityCache.class);
+    FieldUtils.writeField(store, "cache", cache, true);
+    NameIdentifier ident = NameIdentifier.of("lake", "catalog", "schema", "table");
+    Entity.EntityType type = Entity.EntityType.TABLE;
+    TableEntity table = Mockito.mock(TableEntity.class);
+    Mockito.when(backend.get(ident, type)).thenReturn(table);
+    Mockito.when(backend.batchGet(List.of(ident), type)).thenReturn(List.of(table));
+    Mockito.when(backend.exists(ident, type)).thenReturn(true);
+    try (MockedStatic<SqlSessions> sessions = Mockito.mockStatic(SqlSessions.class)) {
+      sessions.when(SqlSessions::hasActiveSession).thenReturn(true);
+      Assertions.assertSame(table, store.get(ident, type, TableEntity.class));
+      Assertions.assertEquals(
+          List.of(table), store.batchGet(List.of(ident), type, TableEntity.class));
+      Assertions.assertTrue(store.exists(ident, type));
+    }
+    Mockito.verifyNoInteractions(cache);
   }
 
   @Test
