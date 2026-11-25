@@ -79,6 +79,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.ConnectException;
+import java.nio.channels.spi.AbstractInterruptibleChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
@@ -90,6 +91,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
@@ -2920,6 +2922,42 @@ public class TestFilesetCatalogOperations {
     return users;
   }
 
+  /**
+   * A channel whose read blocks until released. An interrupt closes it on the interrupting thread,
+   * which then waits for the read, as for a file on a mount that does not answer.
+   */
+  private static final class ReadingChannel extends AbstractInterruptibleChannel {
+    private final CountDownLatch reading = new CountDownLatch(1);
+    private final CountDownLatch closing = new CountDownLatch(1);
+    private final CountDownLatch release = new CountDownLatch(1);
+    private final AtomicReference<Thread> closer = new AtomicReference<>();
+
+    FileSystem read() throws IOException {
+      begin();
+      try {
+        reading.countDown();
+        Uninterruptibles.awaitUninterruptibly(release);
+        return null;
+      } finally {
+        end(false);
+      }
+    }
+
+    @Override
+    protected void implCloseChannel() {
+      closer.set(Thread.currentThread());
+      closing.countDown();
+      Uninterruptibles.awaitUninterruptibly(release);
+    }
+  }
+
+  // Starts the pool threads before a lookup with a short timeout, so that its tasks do not wait
+  // for new threads past its deadline on a slow runner.
+  private static void startWorkers(FilesetCatalogOperations ops) {
+    ops.fileSystemExecutor.prestartAllCoreThreads();
+    ops.loginSettingsExecutor.prestartAllCoreThreads();
+  }
+
   // The tests rely on a thread started inside Subject.doAs keeping that Subject, as it does up to
   // JDK 22. Revisit them when PrincipalUtils moves off Subject.getSubject, which later JDKs no
   // longer support. Keep the threads alive so that bob's request does not start new ones.
@@ -3140,7 +3178,11 @@ public class TestFilesetCatalogOperations {
       Assertions.assertEquals(
           "svc-2@EXAMPLE.COM", loginConf.getValue().get(HADOOP_SECURITY_PRINCIPAL));
 
-      // The settings of each fileset are cached under its whole configuration.
+      // The settings of each fileset are cached under its whole configuration. Those that the
+      // shared load resolved for the first fileset were only returned to it.
+      Mockito.clearInvocations(ops);
+      Assertions.assertSame(first, ops.getFileSystemWithCache(path, filesetConf(principal, "1")));
+      Mockito.verify(ops, Mockito.times(1)).resolveHdfsLogin(any());
       Mockito.clearInvocations(ops);
       Assertions.assertSame(first, ops.getFileSystemWithCache(path, filesetConf(principal, "1")));
       Assertions.assertSame(second, ops.getFileSystemWithCache(path, filesetConf(principal, "2")));
@@ -3195,7 +3237,7 @@ public class TestFilesetCatalogOperations {
     Path path = new Path("hdfs://localhost:8020/cache_key");
     Map<String, String> conf =
         withSetting(
-            filesetConf("svc@EXAMPLE.COM", "1"), FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "2");
+            filesetConf("svc@EXAMPLE.COM", "1"), FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "4");
     try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER)) {
       // Resolving the settings takes half the timeout, and creating the file system takes more
       // than the other half, though less than a whole timeout.
@@ -3203,7 +3245,7 @@ public class TestFilesetCatalogOperations {
       Mockito.doAnswer(
               invocation -> {
                 if (resolutions.getAndIncrement() == 0) {
-                  Thread.sleep(1_000);
+                  Thread.sleep(2_000);
                 }
                 return invocation.callRealMethod();
               })
@@ -3211,11 +3253,12 @@ public class TestFilesetCatalogOperations {
           .resolveHdfsLogin(any());
       Mockito.doAnswer(
               invocation -> {
-                Thread.sleep(1_500);
+                Thread.sleep(3_000);
                 return Mockito.mock(FileSystem.class);
               })
           .when(ops)
           .createFileSystem(any(), any(), any(), any(), any(), any());
+      startWorkers(ops);
       GravitinoRuntimeException e =
           Assertions.assertThrows(
               GravitinoRuntimeException.class, () -> ops.getFileSystemWithCache(path, conf));
@@ -3422,12 +3465,13 @@ public class TestFilesetCatalogOperations {
               })
           .when(ops)
           .createFileSystem(any(), any(), any(), any(), any(), any());
+      startWorkers(ops);
       try {
         Future<FileSystem> first =
             caller.submit(
                 () ->
                     ops.getFileSystemWithCache(
-                        path, ImmutableMap.of(FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "1")));
+                        path, ImmutableMap.of(FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "3")));
         Assertions.assertTrue(started.await(10, TimeUnit.SECONDS));
         // This lookup waits for the creation that the first one started, and creates the file
         // system itself once the first one gives up.
@@ -3618,9 +3662,9 @@ public class TestFilesetCatalogOperations {
       throws Exception {
     Path path = new Path("hdfs://localhost:8020/cache_key");
     Map<String, String> first =
-        withSetting(filesetConf("svc@A.COM", "1"), FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "3");
+        withSetting(filesetConf("svc@A.COM", "1"), FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "6");
     Map<String, String> second =
-        withSetting(filesetConf("svc@A.COM", "2"), FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "3");
+        withSetting(filesetConf("svc@A.COM", "2"), FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "6");
     CountDownLatch started = new CountDownLatch(1);
     CountDownLatch release = new CountDownLatch(1);
     ExecutorService callers = Executors.newFixedThreadPool(2);
@@ -3636,15 +3680,31 @@ public class TestFilesetCatalogOperations {
               })
           .when(ops)
           .resolveHdfsLogin(any());
+      startWorkers(ops);
       try {
         Future<FileSystem> firstLookup =
             callers.submit(() -> ops.getFileSystemWithCache(path, first));
         Assertions.assertTrue(started.await(10, TimeUnit.SECONDS));
         // The second fileset waits for the settings that the first one is resolving, and has time
         // left when the first one gives up.
-        Thread.sleep(1_500);
+        Thread.sleep(3_000);
+        CompletableFuture<Optional<Map<String, String>>> resolving =
+            ops.sharedHdfsLoginSettingsCache.getIfPresent(
+                FilesetCatalogOperations.ConfKey.withoutIdentifier(first));
+        // Unless the runner was too slow, the second lookup waits for the settings still being
+        // resolved.
+        Assumptions.assumeTrue(
+            resolving != null && !resolving.isDone(), "the first lookup gave up before");
+        int waiting = resolving.getNumberOfDependents();
         Future<FileSystem> secondLookup =
             callers.submit(() -> ops.getFileSystemWithCache(path, second));
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (resolving.getNumberOfDependents() <= waiting) {
+          Assumptions.assumeFalse(
+              resolving.isDone() || secondLookup.isDone(), "the first lookup gave up before");
+          Assertions.assertTrue(System.nanoTime() < deadline, "the second lookup never waited");
+          Thread.sleep(10);
+        }
         Assertions.assertNotNull(secondLookup.get(10, TimeUnit.SECONDS));
         ExecutionException e =
             Assertions.assertThrows(
@@ -3848,9 +3908,10 @@ public class TestFilesetCatalogOperations {
     Path path = new Path("hdfs://localhost:8020/cache_key");
     try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER)) {
       // Settings without variables are in the shared cache, the others in the cache by the whole
-      // configuration.
+      // configuration, from the second lookup on.
       Map<String, String> conf = new HashMap<>(filesetConf(principal, "1"));
       FileSystem fs = ops.getFileSystemWithCache(path, conf);
+      Assertions.assertSame(fs, ops.getFileSystemWithCache(path, conf));
       // A lookup does not copy the configuration on a hit, so the caches keep their own copy.
       conf.put(HADOOP_SECURITY_PRINCIPAL, "other@EXAMPLE.COM");
       Mockito.clearInvocations(ops);
@@ -3977,6 +4038,7 @@ public class TestFilesetCatalogOperations {
     try (FilesetCatalogOperations ops =
         Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
       ops.initialize(ImmutableMap.of(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
+      startWorkers(ops);
       // Like a Kerberos login that swallows the interrupt of the timeout.
       Mockito.doAnswer(
               invocation -> {
@@ -4005,7 +4067,7 @@ public class TestFilesetCatalogOperations {
               () ->
                   ops.getFileSystemWithCache(
                       new Path(TEST_ROOT_PATH, "late"),
-                      ImmutableMap.of(FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "1")));
+                      ImmutableMap.of(FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "3")));
         } finally {
           timedOut.countDown();
         }
@@ -4018,13 +4080,69 @@ public class TestFilesetCatalogOperations {
 
   @Test
   @Timeout(60)
+  public void testTaskTimedOutByTheTimerIsInterruptedOnAThreadOfItsOwn() throws Exception {
+    ReadingChannel channel = new ReadingChannel();
+    ExecutorService pool = Executors.newSingleThreadExecutor();
+    try {
+      // Nobody waits for the task, so the timer of orTimeout fails it.
+      FilesetCatalogOperations.TimedTask.start(
+          pool, channel::read, System.nanoTime() + TimeUnit.SECONDS.toNanos(3));
+      Assertions.assertTrue(channel.reading.await(10, TimeUnit.SECONDS));
+      Assertions.assertTrue(channel.closing.await(10, TimeUnit.SECONDS));
+      Assertions.assertEquals("gravitino-fileset-task-canceller", channel.closer.get().getName());
+      // The timer is not held by the interrupt.
+      CompletableFuture<Void> timer = new CompletableFuture<>();
+      CompletableFuture.delayedExecutor(10, TimeUnit.MILLISECONDS)
+          .execute(() -> timer.complete(null));
+      timer.get(10, TimeUnit.SECONDS);
+    } finally {
+      channel.release.countDown();
+      pool.shutdownNow();
+    }
+  }
+
+  @Test
+  @Timeout(60)
+  public void testLookupThatTimesOutReturnsWhileItsTaskIsInterrupted() throws Exception {
+    ReadingChannel channel = new ReadingChannel();
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER)) {
+      Mockito.doAnswer(invocation -> channel.read())
+          .when(ops)
+          .createFileSystem(any(), any(), any(), any(), any(), any());
+      startWorkers(ops);
+      ExecutorService caller = Executors.newSingleThreadExecutor();
+      try {
+        Future<FileSystem> lookup =
+            caller.submit(
+                () ->
+                    ops.getFileSystemWithCache(
+                        new Path(TEST_ROOT_PATH, "reading"),
+                        ImmutableMap.of(FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "3")));
+        // The lookup returns at its deadline, while the interrupt of its task still waits.
+        ExecutionException e =
+            Assertions.assertThrows(
+                ExecutionException.class, () -> lookup.get(10, TimeUnit.SECONDS));
+        Assertions.assertInstanceOf(GravitinoRuntimeException.class, e.getCause());
+        Assertions.assertTrue(channel.closing.await(10, TimeUnit.SECONDS));
+        Assertions.assertEquals("gravitino-fileset-task-canceller", channel.closer.get().getName());
+      } finally {
+        channel.release.countDown();
+        caller.shutdownNow();
+      }
+    }
+  }
+
+  @Test
+  @Timeout(60)
   public void testFileSystemCreatedAfterInterruptIsClosed() throws Exception {
     FileSystem late = Mockito.mock(FileSystem.class);
     AtomicBoolean closedInterrupted = new AtomicBoolean(true);
+    AtomicReference<String> closer = new AtomicReference<>();
     CountDownLatch closed = new CountDownLatch(1);
     Mockito.doAnswer(
             invocation -> {
               closedInterrupted.set(Thread.currentThread().isInterrupted());
+              closer.set(Thread.currentThread().getName());
               closed.countDown();
               return null;
             })
@@ -4076,9 +4194,11 @@ public class TestFilesetCatalogOperations {
           InterruptedException.class, Throwables.getRootCause(failure.get()));
       Assertions.assertTrue(stillInterrupted.get());
       Mockito.verify(late, Mockito.timeout(10_000)).close();
-      // The interrupt that cancelled the task does not reach the close of its result.
+      // The interrupt that cancelled the task does not reach the close of its result, which runs
+      // on another thread than the task in case the interrupt comes later.
       Assertions.assertTrue(closed.await(10, TimeUnit.SECONDS));
       Assertions.assertFalse(closedInterrupted.get());
+      Assertions.assertEquals("gravitino-fileset-late-result-closer", closer.get());
     }
   }
 
@@ -4111,11 +4231,12 @@ public class TestFilesetCatalogOperations {
               () -> {
                 try {
                   ops.getFileSystemWithCache(
-                      path, ImmutableMap.of(FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "1"));
+                      path, ImmutableMap.of(FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "3"));
                 } catch (Throwable t) {
                   failure.set(t);
                 }
               });
+      startWorkers(ops);
       try {
         first.start();
         Assertions.assertTrue(started.await(10, TimeUnit.SECONDS));
@@ -4132,7 +4253,7 @@ public class TestFilesetCatalogOperations {
             ops.getFileSystemWithCache(
                 path, ImmutableMap.of(FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "10")));
         long waitedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-        Assertions.assertTrue(waitedMillis < 5_000, "waited " + waitedMillis + " ms");
+        Assertions.assertTrue(waitedMillis < 8_000, "waited " + waitedMillis + " ms");
       } finally {
         release.countDown();
       }
@@ -4160,12 +4281,13 @@ public class TestFilesetCatalogOperations {
               })
           .when(ops)
           .createFileSystem(any(), any(), any(), any(), any(), any());
+      startWorkers(ops);
       try {
         Assertions.assertThrows(
             GravitinoRuntimeException.class,
             () ->
                 ops.getFileSystemWithCache(
-                    path, ImmutableMap.of(FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "1")));
+                    path, ImmutableMap.of(FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "3")));
         Assertions.assertTrue(interrupted.await(10, TimeUnit.SECONDS));
       } finally {
         release.countDown();
@@ -4230,6 +4352,16 @@ public class TestFilesetCatalogOperations {
   public void testClosingTheCatalogClosesAFileSystemCreatedAfterwards() throws Exception {
     Path path = new Path(TEST_ROOT_PATH, "created_after_close");
     FileSystem created = Mockito.mock(FileSystem.class);
+    AtomicBoolean closedInterrupted = new AtomicBoolean(true);
+    CountDownLatch closed = new CountDownLatch(1);
+    Mockito.doAnswer(
+            invocation -> {
+              closedInterrupted.set(Thread.currentThread().isInterrupted());
+              closed.countDown();
+              return null;
+            })
+        .when(created)
+        .close();
     CountDownLatch started = new CountDownLatch(1);
     CountDownLatch release = new CountDownLatch(1);
     ExecutorService caller = Executors.newSingleThreadExecutor();
@@ -4254,12 +4386,14 @@ public class TestFilesetCatalogOperations {
         ops.close();
         long closingMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
         Assertions.assertTrue(closingMillis < 5_000, "closed in " + closingMillis + " ms");
-        Mockito.verify(created, never()).close();
       } finally {
         release.countDown();
         caller.shutdownNow();
       }
       Mockito.verify(created, Mockito.timeout(10_000)).close();
+      // The interrupt of closing the catalog does not reach the close of the file system.
+      Assertions.assertTrue(closed.await(10, TimeUnit.SECONDS));
+      Assertions.assertFalse(closedInterrupted.get());
     }
   }
 

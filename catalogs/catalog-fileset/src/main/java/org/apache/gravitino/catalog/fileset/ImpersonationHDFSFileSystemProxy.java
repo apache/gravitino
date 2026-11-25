@@ -45,11 +45,7 @@ public class ImpersonationHDFSFileSystemProxy extends HDFSFileSystemProxy {
    */
   public ImpersonationHDFSFileSystemProxy(
       Path path, Map<String, String> config, ProxyUserHandler handler) {
-    super();
-
-    Preconditions.checkArgument(handler != null, "ProxyUserHandler cannot be null");
-    this.proxyUserHandler = handler;
-    initFileSystem(path, config);
+    this(path, config, null, handler);
   }
 
   /**

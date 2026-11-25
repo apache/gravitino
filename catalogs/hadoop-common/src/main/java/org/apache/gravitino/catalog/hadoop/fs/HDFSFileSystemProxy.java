@@ -69,6 +69,7 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
 
   private static final Logger LOG = LoggerFactory.getLogger(HDFSFileSystemProxy.class);
 
+  // The keytab files are named like this, in the directory of KeytabNames.
   public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s";
   private static final String GRAVITINO_ID_KEY = "gravitino.identifier";
   // The Hadoop properties the login settings may come from.
@@ -99,8 +100,6 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
   @Nullable private File keytabFile;
   @Nullable private String keytabSlotPrefix;
   private int keytabSlot;
-  // The modification time of the keytab when it was named after its content.
-  @Nullable private FileTime keytabModified;
   protected UserGroupInformation initUgi;
   private FileSystem fs;
   private Configuration configuration;
@@ -345,16 +344,10 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     }
     if (keytabFile != null) {
       try {
-        boolean unchanged = keytabUnchanged();
+        // Deletes a link itself, without reading the local keytab it links to.
         Files.deleteIfExists(keytabFile.toPath());
         LIVE_KEYTAB_FILES.remove(keytabFile);
-        if (unchanged) {
-          releaseKeytabSlot();
-        } else {
-          // A local keytab changed while renewals read it through the link, so the JDK may keep
-          // other keys for this name. It is not reused.
-          keytabSlotPrefix = null;
-        }
+        releaseKeytabSlot();
       } catch (IOException | RuntimeException e) {
         LOG.warn("Failed to delete the keytab file {}", keytabFile, e);
         // Deleted at exit instead. The shutdown hook would hand it over too, but a catalog class
@@ -398,12 +391,10 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     }
   }
 
-  // Takes the lowest free name for the identifier, the keytab URI and its content, and moves the
-  // fetched file there. See KeytabNames for when a name is reused, and close() for when it is not.
+  // Takes the lowest free name for the identifier, the keytab URI, its content and, for a link, its
+  // modification time, and moves the fetched file there. See KeytabNames for when a name is reused.
   private synchronized File moveToKeytabName(String identifier, String keytabUri, File fetched)
       throws IOException {
-    // Read first, so that a change while the content is read is seen on close too.
-    keytabModified = Files.getLastModifiedTime(fetched.toPath());
     String prefix = keytabNamePrefix(identifier, keytabUri, fetched);
     int slot = KeytabNames.reserve(prefix);
     keytabSlotPrefix = prefix;
@@ -421,27 +412,21 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
   private static String keytabNamePrefix(String identifier, String keytabUri, File fetched)
       throws IOException {
     if (Files.isRegularFile(fetched.toPath())) {
+      // A link to a local keytab is named after its modification time too, read first: renewals
+      // read the file through the link, and the JDK returns the keys it kept for a name while the
+      // file keeps its modification time. Only a name that saw the same time is reused.
+      FileTime modified =
+          Files.isSymbolicLink(fetched.toPath())
+              ? Files.getLastModifiedTime(fetched.toPath())
+              : null;
       try (InputStream in = Files.newInputStream(fetched.toPath())) {
         byte[] content = ByteStreams.toByteArray(ByteStreams.limit(in, MAX_KEYTAB_NAME_BYTES + 1));
         if (content.length <= MAX_KEYTAB_NAME_BYTES) {
-          return KeytabNames.prefix(identifier, keytabUri, content);
+          return KeytabNames.prefix(identifier, keytabUri, content, modified);
         }
       }
     }
-    return identifier + "-" + KeytabNames.token() + "-" + UUID.randomUUID();
-  }
-
-  // Whether the keytab, which may be a link to a local file, has kept its modification time since
-  // it was named. Otherwise the JDK may have read other keys through the name.
-  private synchronized boolean keytabUnchanged() {
-    if (keytabModified == null) {
-      return true;
-    }
-    try {
-      return keytabModified.equals(Files.getLastModifiedTime(keytabFile.toPath()));
-    } catch (IOException e) {
-      return false;
-    }
+    return identifier + "-" + UUID.randomUUID();
   }
 
   private synchronized void releaseKeytabSlot() {
@@ -487,9 +472,11 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
       // before the fetch, so that close() also deletes what a failed fetch leaves behind.
       File destination =
           new File(
-              String.format(
-                  GRAVITINO_KEYTAB_FORMAT,
-                  identifier + "-" + KeytabNames.token() + "-fetch-" + UUID.randomUUID()));
+              KeytabNames.directory(),
+              new File(
+                      String.format(
+                          GRAVITINO_KEYTAB_FORMAT, identifier + "-fetch-" + UUID.randomUUID()))
+                  .getName());
       recordKeytabFile(destination);
       String keytabUri = kerberosConfig.getKeytab();
       File fetched =

@@ -194,7 +194,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   @VisibleForTesting AsyncCache<FileSystemCacheKey, FileSystem> fileSystemCache;
 
   // Resolving the HDFS login settings parses XML, so the settings are cached.
-  // Expiring after write lets edits to the config.resources files reach the key within an hour.
+  // Expiring after write lets edits to the config.resources files reach the key within about an
+  // hour.
   // Settings that expand no Hadoop variable are the same for configurations that differ only in
   // their identifier, so they are cached by the configuration without it. Otherwise that entry is
   // empty, and the settings are cached by the whole configuration.
@@ -419,8 +420,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       this.deadlineNanos = deadlineNanos;
     }
 
-    // When the deadline passes first, the task is cancelled, and a result that it returns later is
-    // closed. A login can ignore interrupts.
+    // When the deadline passes first, the task leaves the queue or is interrupted, and a result
+    // that it returns later is closed. A login can ignore interrupts.
     static <T> TimedTask<T> start(ExecutorService executor, Callable<T> task, long deadlineNanos) {
       TimedTask<T> timed = new TimedTask<>(deadlineNanos);
       long timeoutNanos = deadlineNanos - System.nanoTime();
@@ -440,29 +441,52 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                   timed.complete(null);
                   return;
                 }
-                if (!timed.complete(result)) {
-                  // cancel(true) or close() may have interrupted this thread, and may still
-                  // interrupt the close of the result.
-                  Thread.interrupted();
-                  closeQuietly(result);
+                // close() may have interrupted this thread, and completing runs the stages that
+                // close the result after close().
+                Thread.interrupted();
+                if (!timed.complete(result) && result instanceof Closeable) {
+                  // The interrupt that cancels this task may still come, so the result is closed
+                  // on another thread.
+                  Runnable close = () -> closeQuietly(result);
+                  if (!startThread("gravitino-fileset-late-result-closer", close)) {
+                    close.run();
+                  }
                 }
               });
       timed.orTimeout(timeoutNanos, TimeUnit.NANOSECONDS);
       timed.whenComplete(
           (result, e) -> {
-            if (e != null) {
-              running.cancel(true);
-              // A task that has not started leaves the queue, so that it takes no room from others.
-              if (executor instanceof ThreadPoolExecutor && running instanceof Runnable) {
-                ((ThreadPoolExecutor) executor).remove((Runnable) running);
-              }
+            if (e == null) {
+              return;
             }
+            // A task that has not started leaves the queue, so that it takes no room from others.
+            if (executor instanceof ThreadPoolExecutor
+                && ((ThreadPoolExecutor) executor).getQueue().remove(running)) {
+              return;
+            }
+            // Interrupting a thread that reads a file through a channel waits until the read
+            // returns, so neither the caller nor the timer of orTimeout does it. Without a thread,
+            // the task is not interrupted, and its result is closed once it returns.
+            startThread("gravitino-fileset-task-canceller", () -> running.cancel(true));
           });
       return timed;
     }
 
+    private static boolean startThread(String name, Runnable action) {
+      try {
+        Thread thread = new Thread(action, name);
+        thread.setDaemon(true);
+        thread.start();
+        return true;
+      } catch (Throwable t) {
+        LOG.warn("Failed to start the thread {}", name, t);
+        return false;
+      }
+    }
+
     // Waits for the result until the deadline. A task that failed at the deadline of the caller
     // that started it fails with a timeout here too.
+    @Nullable
     static <T> T await(CompletableFuture<T> future, long deadlineNanos)
         throws InterruptedException, ExecutionException, TimeoutException {
       T result;
@@ -495,7 +519,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     // fails at the earlier deadline of the caller that started it is loaded again with the time
     // this caller has left. A caller whose wait ends with the failure of a load another caller
     // started, with that caller's configuration, loads again until it gets a result or its own
-    // failure, as each caller does with a synchronous cache.
+    // failure, as each caller does with a synchronous cache. A load that returns null is not loaded
+    // again: the caller gets null, which only a file system creation returns.
+    @Nullable
     static <K, V> V awaitEntry(
         AsyncCache<K, V> cache,
         K key,
@@ -507,6 +533,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
     // As above, but a miss inserts the key that storedKey returns, which equals the given key, and
     // passes it to load.
+    @Nullable
     static <K, V> V awaitEntry(
         AsyncCache<K, V> cache,
         K key,
@@ -617,10 +644,14 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                         cacheKey == null ? null : cacheKey.authority,
                         cacheKey == null ? null : cacheKey.currentUser,
                         cause);
+                    if (value == null) {
+                      return;
+                    }
+                    // Runs in a stage that nothing reads, so a failure is only logged here.
                     try {
                       ((FileSystem) value).close();
-                    } catch (IOException e) {
-                      LOG.warn("Failed to close FileSystem instance in cache", e);
+                    } catch (Throwable t) {
+                      LOG.warn("Failed to close FileSystem instance in cache", t);
                     }
                   })
               .scheduler(Scheduler.forScheduledExecutorService(scheduler));
@@ -1356,11 +1387,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                         if (fs == null) {
                           return;
                         }
+                        // Runs in a stage that nothing reads, so a failure is only logged here.
                         try {
                           fs.close();
-                        } catch (IOException | RuntimeException e) {
-                          // Keep closing the other file systems.
-                          LOG.warn("Failed to close FileSystem instance in cache", e);
+                        } catch (Throwable t) {
+                          LOG.warn("Failed to close FileSystem instance in cache", t);
                         }
                       }));
       fileSystemCache.synchronous().cleanUp();
@@ -1871,8 +1902,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   private Map<String, String> hdfsLoginSettings(
       Path path, Map<String, String> conf, long deadlineNanos) {
-    // Settings resolved for the shared entry that expand variables, cached for this configuration
-    // after the shared entry is loaded.
+    // Settings resolved for the shared entry that expand variables, returned to this caller only:
+    // they may be older than what another caller has cached for this configuration since.
     AtomicReference<Map<String, String>> resolved = new AtomicReference<>();
     Optional<Map<String, String>> shared =
         awaitLoginSettings(
@@ -1893,8 +1924,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       return shared.get();
     }
     if (resolved.get() != null) {
-      hdfsLoginSettingsCache.put(
-          ConfKey.of(conf).copy(), CompletableFuture.completedFuture(resolved.get()));
       return resolved.get();
     }
     return awaitLoginSettings(
@@ -2096,6 +2125,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 conf, FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
   }
 
+  @Nullable
   private <T> T executeFileSystemTask(ExecutorService executor, Callable<T> task, long timeoutNanos)
       throws InterruptedException, ExecutionException, TimeoutException {
     long deadlineNanos = System.nanoTime() + timeoutNanos;
@@ -2113,10 +2143,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   private static void closeQuietly(@Nullable Object result) {
     if (result instanceof Closeable) {
+      // May run on a thread of its own, where nobody sees what it throws.
       try {
         ((Closeable) result).close();
-      } catch (IOException | RuntimeException e) {
-        LOG.warn("Failed to close a file system that its caller stopped waiting for", e);
+      } catch (Throwable t) {
+        LOG.warn("Failed to close a file system that its caller stopped waiting for", t);
       }
     }
   }
