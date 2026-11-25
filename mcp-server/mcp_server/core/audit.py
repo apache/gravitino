@@ -24,7 +24,10 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
+from pydantic import TypeAdapter
+
 _audit_logger = logging.getLogger("gravitino.mcp.audit")
+_VERSION = TypeAdapter(int)
 
 
 @dataclass(frozen=True)
@@ -89,8 +92,9 @@ WRITE_TARGET_SPECS: dict[str, _WriteTargetSpec] = {
     "delete_model": _WriteTargetSpec(
         "model", ("catalog_name", "schema_name", "model_name")
     ),
+    # The server assigns the version number after the call. The request names its parent.
     "link_model_version": _WriteTargetSpec(
-        "model_version", ("catalog_name", "schema_name", "model_name")
+        "model", ("catalog_name", "schema_name", "model_name")
     ),
     "alter_model_version": _WriteTargetSpec(
         "model_version",
@@ -139,15 +143,14 @@ WRITE_TARGET_SPECS: dict[str, _WriteTargetSpec] = {
 }
 
 
-def _format_target_part(value: Any) -> str:
-    """Convert a single target identifier component to a non-empty string."""
-    if isinstance(value, bool) or value is None:
-        return ""
-    if isinstance(value, int):
-        return str(value)
-    if isinstance(value, str):
-        return value.strip()
-    return ""
+def _format_target_part(field: str, value: Any) -> str:
+    if field == "version":
+        # FastMCP validates this argument as an int before constructing the REST path.
+        try:
+            return str(_VERSION.validate_python(value))
+        except ValueError:
+            return ""
+    return value if isinstance(value, str) else ""
 
 
 def extract_write_target(
@@ -174,16 +177,14 @@ def extract_write_target(
 
     parts: list[str] = []
     for field in spec.name_fields:
-        part = _format_target_part(arguments.get(field))
+        part = _format_target_part(field, arguments.get(field))
         if not part:
             return "", ""
         parts.append(part)
 
-    clean_metalake = metalake.strip() if isinstance(metalake, str) else ""
-    if spec.include_metalake and clean_metalake and target_type != "metalake":
-        target_name = ".".join([clean_metalake, *parts])
-    else:
-        target_name = ".".join(parts)
+    if spec.include_metalake and metalake and target_type != "metalake":
+        parts.insert(0, metalake)
+    target_name = ".".join(parts)
 
     return target_type, target_name
 
@@ -248,7 +249,7 @@ def emit(
                     "error"; empty on "allow".
         error_category: Normalized failure category ("unauthorized",
                         "permission_denied", "invalid_params", "not_found",
-                        "conflict", "timeout", "unavailable", "internal_error")
+                        "conflict", "timeout", "rate_limited", "unavailable", "internal_error")
                         when outcome is "deny" or "error"; empty on "allow".
         metalake:  Metalake the call operated on, resolved - so a call that
                    relied on the server default records that default. Empty

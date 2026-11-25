@@ -35,11 +35,12 @@ from mcp.types import ErrorData
 
 from mcp_server.client.plain.exception import GravitinoException
 from mcp_server.core.context import ServiceIdentityFallbackDisabled
+from mcp_server.core.oauth import OAuthTokenResponseError
 
 # Standard JSON-RPC error codes and server-defined codes (-32000..-32099).
 JSONRPC_INVALID_PARAMS = -32602
 JSONRPC_INTERNAL_ERROR = -32603
-JSONRPC_PERMISSION_OR_TIMEOUT = -32000
+JSONRPC_SERVER_ERROR = -32000
 JSONRPC_NOT_FOUND = -32001
 JSONRPC_RESOURCE_NOT_FOUND = -32002
 JSONRPC_CONFLICT = -32009
@@ -61,14 +62,14 @@ _GRAVITINO_SERVICE_UNAVAILABLE_CODE = 1013
 _Rule = tuple[int, str, str, str, str]
 
 _UNAUTHORIZED_RULE: _Rule = (
-    JSONRPC_PERMISSION_OR_TIMEOUT,
+    JSONRPC_SERVER_ERROR,
     "Unauthorized",
     "deny",
     "unauthorized",
     "UnauthorizedException",
 )
 _PERMISSION_DENIED_RULE: _Rule = (
-    JSONRPC_PERMISSION_OR_TIMEOUT,
+    JSONRPC_SERVER_ERROR,
     "Permission denied",
     "deny",
     "permission_denied",
@@ -96,10 +97,17 @@ _CONFLICT_RULE: _Rule = (
     "",
 )
 _TIMEOUT_RULE: _Rule = (
-    JSONRPC_PERMISSION_OR_TIMEOUT,
+    JSONRPC_SERVER_ERROR,
     "Request timeout",
     "error",
     "timeout",
+    "",
+)
+_RATE_LIMIT_RULE: _Rule = (
+    JSONRPC_SERVER_ERROR,
+    "Rate limited",
+    "error",
+    "rate_limited",
     "",
 )
 _UNAVAILABLE_RULE: _Rule = (
@@ -125,6 +133,7 @@ _HTTP_STATUS_RULES: dict[int, _Rule] = {
     408: _TIMEOUT_RULE,
     409: _CONFLICT_RULE,
     422: _INVALID_PARAMS_RULE,
+    429: _RATE_LIMIT_RULE,
     502: _UNAVAILABLE_RULE,
     503: _UNAVAILABLE_RULE,
 }
@@ -266,12 +275,14 @@ def _classify_bare_mcp_error(exc: McpError) -> ErrorClassification:
     """Classify an McpError raised directly without an inner Python cause."""
     code = exc.error.code
     rule = _MCP_CODE_RULES.get(code)
-    if rule is None and code == JSONRPC_PERMISSION_OR_TIMEOUT:
+    if rule is None and code == JSONRPC_SERVER_ERROR:
         message = (exc.error.message or "").lower()
         if "unauthorized" in message:
             rule = _UNAUTHORIZED_RULE
         elif "permission" in message or "forbidden" in message:
             rule = _PERMISSION_DENIED_RULE
+        elif message.startswith("rate limited"):
+            rule = _RATE_LIMIT_RULE
         elif "timeout" in message:
             rule = _TIMEOUT_RULE
     resolved = rule or _INTERNAL_ERROR_RULE
@@ -310,6 +321,8 @@ def classify_error(exc: BaseException, method: str = "") -> ErrorClassification:
         rule = _UNAUTHORIZED_RULE
     elif isinstance(root, (PermissionError, AuthorizationError)):
         rule = _PERMISSION_DENIED_RULE
+    elif isinstance(root, OAuthTokenResponseError):
+        rule = _INTERNAL_ERROR_RULE
     elif isinstance(root, (ValueError, TypeError, FastMCPValidationError)):
         rule = _INVALID_PARAMS_RULE
     elif isinstance(
@@ -334,12 +347,12 @@ class GravitinoErrorHandlingMiddleware(ErrorHandlingMiddleware):
     async def on_message(self, context: MiddlewareContext, call_next: CallNext):
         try:
             return await call_next(context)
-        except UrlElicitationRequiredError:
-            # The SDK handles this protocol challenge separately from tool failures.
-            raise
         except Exception as error:
             self._log_error(error, context)
-            if not self.transform_errors:
+            # The SDK handles URL elicitation as a protocol challenge.
+            if not self.transform_errors or isinstance(
+                error, UrlElicitationRequiredError
+            ):
                 raise
 
             classification = classify_error(error, method=context.method or "")

@@ -563,6 +563,14 @@ class TestExtractWriteTarget(unittest.TestCase):
     def test_extracts_hierarchical_and_special_targets(self):
         self.assertEqual(
             audit.extract_write_target(
+                "link_model_version",
+                {"catalog_name": "c", "schema_name": "s", "model_name": "m"},
+                "ml",
+            ),
+            ("model", "ml.c.s.m"),
+        )
+        self.assertEqual(
+            audit.extract_write_target(
                 "create_table",
                 {"catalog_name": "c", "schema_name": "s", "name": "t"},
                 "ml",
@@ -633,7 +641,7 @@ class TestExtractWriteTarget(unittest.TestCase):
                     "catalog_name": "c",
                     "schema_name": "s",
                     "model_name": "m",
-                    "version": True,
+                    "version": 1.5,
                 },
                 "ml",
             ),

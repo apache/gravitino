@@ -462,16 +462,19 @@ uv run mcp_server --transport http --mcp-url http://0.0.0.0:8000/mcp
 
 ## Tool errors
 
-A failed tool execution returns a `CallToolResult` with `isError: true`. Its text
+A tool execution failure handled by the Gravitino middleware returns a `CallToolResult` with `isError: true`. Its text
 includes the error prefix and message. Clients can read the numeric classification
 code and category from `_meta["org.apache.gravitino/error"]`. For example, a
 Gravitino HTTP 409 returns `{"code": -32009, "category": "conflict"}` there.
 HTTP 401 and 403 both use code `-32000` and have the respective categories `unauthorized` and
-`permission_denied`. MCP protocol errors use the usual JSON-RPC error envelope.
+`permission_denied`. An upstream HTTP 429 has the category `rate_limited`.
+MCP protocol errors use the usual JSON-RPC error envelope. If strict SDK input
+validation rejects a request before middleware runs, the SDK supplies the error
+text and the call has no Gravitino classification metadata or tool audit record.
 
 ## Audit Logging
 
-Every tool invocation is recorded as one structured JSON line in `gravitino-mcp-audit.log` (written to the server's working directory). Each record is attributed to the incoming HTTP `Authorization` header when present; otherwise to the configured service identity (`--token` or OAuth client id).
+Every tool invocation that reaches the audit middleware is recorded as one structured JSON line in `gravitino-mcp-audit.log` (written to the server's working directory). Each record is attributed to the incoming HTTP `Authorization` header when present; otherwise to the configured service identity (`--token` or OAuth client id).
 
 | Field            | Description                                                                                                                                                                                                                                                                                                                                                                      |
 |------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -483,7 +486,7 @@ Every tool invocation is recorded as one structured JSON line in `gravitino-mcp-
 | `target_type`    | Metadata object type for write and delete tools (for example `catalog`, `schema`, `table`, `tag`, `semantic_model`); omitted for read-only calls or when required target arguments are missing.                                                                                                                                                                                  |
 | `target_name`    | Target object full name for write and delete tools (for example `authz.mcpcat.alice_s`); omitted when `target_type` is omitted.                                                                                                                                                                                                                                                  |
 | `error_type`     | Original Gravitino error type (for example `ForbiddenException`, `NoSuchTableException`, `CatalogInUseException`) or exception class name (for example `ConnectError`, `ValueError`, `ReadTimeout`); present only when `outcome` is `deny` or `error`.                                                                                                                           |
-| `error_category` | Normalized failure category (`unauthorized`, `permission_denied`, `invalid_params`, `not_found`, `conflict`, `timeout`, `unavailable`, `internal_error`); present only when `outcome` is `deny` or `error`.                                                                                                                                                                      |
+| `error_category` | Normalized failure category (`unauthorized`, `permission_denied`, `invalid_params`, `not_found`, `conflict`, `timeout`, `rate_limited`, `unavailable`, `internal_error`); present only when `outcome` is `deny` or `error`.                                                                                                                                                      |
 
 For every scheme other than `Basic`, `principal` is a fingerprint of one credential, not a stable user identity. The hash has no key, so the fingerprint suits high-entropy tokens only: a short static credential can be recovered from the log by guessing. To trace what one user did, use the Gravitino server's [audit log](./gravitino-server-config.md#audit-logging).
 

@@ -45,8 +45,8 @@ from mcp_server.core.errors import (
     JSONRPC_INTERNAL_ERROR,
     JSONRPC_INVALID_PARAMS,
     JSONRPC_NOT_FOUND,
-    JSONRPC_PERMISSION_OR_TIMEOUT,
     JSONRPC_RESOURCE_NOT_FOUND,
+    JSONRPC_SERVER_ERROR,
     GravitinoErrorHandlingMiddleware,
     classify_error,
 )
@@ -145,7 +145,7 @@ class TestClassifyError(unittest.TestCase):
                 401,
                 1011,
                 "UnauthorizedException",
-                JSONRPC_PERMISSION_OR_TIMEOUT,
+                JSONRPC_SERVER_ERROR,
                 "Unauthorized",
                 "deny",
                 "unauthorized",
@@ -154,7 +154,7 @@ class TestClassifyError(unittest.TestCase):
                 403,
                 1008,
                 "ForbiddenException",
-                JSONRPC_PERMISSION_OR_TIMEOUT,
+                JSONRPC_SERVER_ERROR,
                 "Permission denied",
                 "deny",
                 "permission_denied",
@@ -251,10 +251,10 @@ class TestClassifyError(unittest.TestCase):
             (
                 1011,
                 "UnauthorizedException",
-                JSONRPC_PERMISSION_OR_TIMEOUT,
+                JSONRPC_SERVER_ERROR,
                 "deny",
             ),
-            (1008, "ForbiddenException", JSONRPC_PERMISSION_OR_TIMEOUT, "deny"),
+            (1008, "ForbiddenException", JSONRPC_SERVER_ERROR, "deny"),
             (1001, "IllegalArgumentException", JSONRPC_INVALID_PARAMS, "error"),
             (1003, "NoSuchTableException", JSONRPC_NOT_FOUND, "error"),
             (1004, "AlreadyExistsException", JSONRPC_CONFLICT, "error"),
@@ -295,9 +295,7 @@ class TestClassifyError(unittest.TestCase):
         tool_err = ToolError("Error calling tool 'drop_table': denied")
         tool_err.__cause__ = root
         mcp_err = McpError(
-            ErrorData(
-                code=JSONRPC_PERMISSION_OR_TIMEOUT, message="Permission denied"
-            )
+            ErrorData(code=JSONRPC_SERVER_ERROR, message="Permission denied")
         )
         mcp_err.__cause__ = tool_err
 
@@ -309,8 +307,8 @@ class TestClassifyError(unittest.TestCase):
     def test_non_json_http_status_error_and_connection_errors(self):
         request = httpx.Request("GET", "http://gravitino/api/metalakes")
         for status, expected_code, expected_outcome, expected_cat in [
-            (401, JSONRPC_PERMISSION_OR_TIMEOUT, "deny", "unauthorized"),
-            (403, JSONRPC_PERMISSION_OR_TIMEOUT, "deny", "permission_denied"),
+            (401, JSONRPC_SERVER_ERROR, "deny", "unauthorized"),
+            (403, JSONRPC_SERVER_ERROR, "deny", "permission_denied"),
             (400, JSONRPC_INVALID_PARAMS, "error", "invalid_params"),
             (404, JSONRPC_NOT_FOUND, "error", "not_found"),
             (409, JSONRPC_CONFLICT, "error", "conflict"),
@@ -335,7 +333,7 @@ class TestClassifyError(unittest.TestCase):
 
     def test_python_and_fastmcp_exceptions(self):
         res = classify_error(ServiceIdentityFallbackDisabled("no header"))
-        self.assertEqual(res.mcp_code, JSONRPC_PERMISSION_OR_TIMEOUT)
+        self.assertEqual(res.mcp_code, JSONRPC_SERVER_ERROR)
         self.assertEqual(res.outcome, "deny")
         self.assertEqual(res.category, "unauthorized")
 
@@ -418,7 +416,7 @@ class TestEndToEndMcpErrorMapping(unittest.TestCase):
                 1008,
                 "ForbiddenException",
                 "User 'alice' is not authorized to drop table",
-                JSONRPC_PERMISSION_OR_TIMEOUT,
+                JSONRPC_SERVER_ERROR,
                 "Permission denied:",
             ),
             (
@@ -426,7 +424,7 @@ class TestEndToEndMcpErrorMapping(unittest.TestCase):
                 1011,
                 "UnauthorizedException",
                 "Authentication required",
-                JSONRPC_PERMISSION_OR_TIMEOUT,
+                JSONRPC_SERVER_ERROR,
                 "Unauthorized:",
             ),
             (
@@ -540,7 +538,7 @@ class TestEndToEndMcpErrorMapping(unittest.TestCase):
                 self.assertEqual(
                     result.meta["org.apache.gravitino/error"],
                     {
-                        "code": JSONRPC_PERMISSION_OR_TIMEOUT,
+                        "code": JSONRPC_SERVER_ERROR,
                         "category": category,
                     },
                 )
@@ -553,6 +551,37 @@ class TestEndToEndMcpErrorMapping(unittest.TestCase):
                     metalake="authz",
                     target_type="job",
                     target_name="job-42",
+                )
+
+    def test_model_version_audit_matches_the_rest_target(self):
+        for version in (1.0, "01", True):
+            with self.subTest(version=version):
+                handler = MagicMock(
+                    return_value=httpx.Response(
+                        200, json={"code": 0, "dropped": True}
+                    )
+                )
+                with patch("mcp_server.server.audit.emit") as emit:
+                    result = self._call_with_transport(
+                        handler,
+                        "delete_model_version",
+                        {
+                            "catalog_name": "c",
+                            "schema_name": "s",
+                            "model_name": " m ",
+                            "version": version,
+                        },
+                    )
+                self.assertFalse(result.isError)
+                self.assertEqual(
+                    handler.call_args.args[0].url.path,
+                    "/api/metalakes/authz/catalogs/c/schemas/s/models/ m /versions/1",
+                )
+                self.assertEqual(
+                    emit.call_args.kwargs["target_name"], "authz.c.s. m .1"
+                )
+                self.assertEqual(
+                    emit.call_args.kwargs["target_type"], "model_version"
                 )
 
     def test_connection_failure_and_5xx_remain_internal_error(self):
@@ -594,6 +623,81 @@ class TestEndToEndMcpErrorMapping(unittest.TestCase):
             JSONRPC_INTERNAL_ERROR,
         )
 
+    def test_upstream_rate_limit_is_reported_to_client_and_audit(self):
+        for response in (
+            httpx.Response(429, text="Too many requests"),
+            httpx.Response(
+                429,
+                json={
+                    "code": 429,
+                    "type": "RateLimit",
+                    "message": "Too many requests",
+                },
+            ),
+        ):
+            with self.subTest(response=response), patch(
+                "mcp_server.server.audit.emit"
+            ) as emit:
+                result = self._call_with_transport(
+                    MagicMock(return_value=response), "get_list_of_catalogs", {}
+                )
+                self.assertTrue(result.isError)
+                self.assertTrue(
+                    result.content[0].text.startswith("Rate limited:")
+                )
+                self.assertEqual(
+                    result.meta["org.apache.gravitino/error"],
+                    {"code": -32000, "category": "rate_limited"},
+                )
+                self.assertEqual(emit.call_args.kwargs["outcome"], "error")
+                self.assertEqual(
+                    emit.call_args.kwargs["error_category"], "rate_limited"
+                )
+
+    def test_malformed_oauth_responses_are_upstream_errors(self):
+        setting = Setting(
+            metalake="m",
+            oauth_token_endpoint="https://idp.example/token",
+            oauth_client_id="client",
+            oauth_client_secret="secret",
+        )
+        for body in (
+            b"{}",
+            b"bad JSON",
+            b"[]",
+            b'{"access_token":"opaque","expires_in":"invalid"}',
+        ):
+            with self.subTest(body=body):
+                idp = MagicMock(return_value=httpx.Response(200, content=body))
+                rest = MagicMock(
+                    side_effect=AssertionError(
+                        "Must obtain a token before calling Gravitino"
+                    )
+                )
+                async_client = httpx.AsyncClient
+                with patch(
+                    "mcp_server.core.oauth.httpx.AsyncClient",
+                    return_value=async_client(
+                        transport=httpx.MockTransport(idp)
+                    ),
+                ), patch("mcp_server.server.audit.emit") as emit:
+                    result = self._call_with_transport(
+                        rest, "get_list_of_catalogs", {}, setting=setting
+                    )
+                idp.assert_called_once()
+                rest.assert_not_called()
+                self.assertTrue(result.isError)
+                self.assertEqual(
+                    result.meta["org.apache.gravitino/error"],
+                    {"code": -32603, "category": "internal_error"},
+                )
+                self.assertIn("OAuth token response", result.content[0].text)
+                self.assertEqual(
+                    emit.call_args.kwargs["error_type"],
+                    "OAuthTokenResponseError",
+                )
+                self.assertEqual(emit.call_args.kwargs["outcome"], "error")
+
     def test_read_timeout_maps_to_request_timeout_with_actionable_text(self):
         def timeout_handler(request):
             raise httpx.ReadTimeout("slow", request=request)
@@ -611,7 +715,7 @@ class TestEndToEndMcpErrorMapping(unittest.TestCase):
         self.assertIn("may still complete", text)
         self.assertEqual(
             result.meta["org.apache.gravitino/error"]["code"],
-            JSONRPC_PERMISSION_OR_TIMEOUT,
+            JSONRPC_SERVER_ERROR,
         )
 
     def test_missing_required_tool_argument_maps_to_invalid_params(self):
@@ -653,5 +757,5 @@ class TestEndToEndMcpErrorMapping(unittest.TestCase):
         self.assertTrue(text.startswith("Unauthorized:"), text)
         self.assertEqual(
             result.meta["org.apache.gravitino/error"]["code"],
-            JSONRPC_PERMISSION_OR_TIMEOUT,
+            JSONRPC_SERVER_ERROR,
         )
