@@ -75,14 +75,6 @@ final class TermEdits {
         publication != null && publication.state() != TermPublication.State.PUBLISHED
             ? GlossaryTerm.Status.DRAFT
             : term.status();
-    return copyWithStatus(term, domains, publication, status);
-  }
-
-  static GlossaryTermEntity copyWithStatus(
-      GlossaryTermEntity term,
-      String[] domains,
-      @Nullable TermPublication publication,
-      GlossaryTerm.Status status) {
     return GlossaryTermEntity.builder()
         .withPublication(publication)
         .withId(term.id())
@@ -111,7 +103,7 @@ final class TermEdits {
 
   static GlossaryTermEntity apply(
       GlossaryTermEntity current, TermChange[] changes, boolean relationsChanged) {
-    return apply(current, changes, relationsChanged, null);
+    return apply(current, changes, relationsChanged, null, false);
   }
 
   /**
@@ -122,7 +114,8 @@ final class TermEdits {
       GlossaryTermEntity current,
       TermChange[] changes,
       boolean relationsChanged,
-      @Nullable String[] domains) {
+      @Nullable String[] domains,
+      boolean requiresApproval) {
     String name = current.name();
     String definition = current.definition();
     GlossaryTerm.Status status = current.status();
@@ -137,8 +130,11 @@ final class TermEdits {
       } else if (change instanceof TermChange.UpdateDefinition) {
         definition = ((TermChange.UpdateDefinition) change).getNewDefinition();
         GlossaryTermEntity.validateDefinition(definition);
-      } else if (change instanceof TermChange.SetStatus) {
-        status = ((TermChange.SetStatus) change).getNewStatus();
+      } else if (change instanceof TermChange.SetStatus setStatus) {
+        // Under approval, DRAFT requests a private save and carries no definition status change.
+        if (!requiresApproval || setStatus.getNewStatus() != GlossaryTerm.Status.DRAFT) {
+          status = setStatus.getNewStatus();
+        }
       } else if (change instanceof TermChange.UpdateLinks) {
         links = validateLinks(((TermChange.UpdateLinks) change).getLinks());
       } else if (change instanceof TermChange.SetSourceRef) {

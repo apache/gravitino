@@ -54,6 +54,7 @@ import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermRelService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermRelService.RelationType;
+import org.apache.gravitino.storage.relational.service.GlossaryTermVersions;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -207,6 +208,101 @@ class TestGlossaryManager extends TestJDBCBackend {
     gated.publishCandidate(LAKE, draft.id(), 3);
     Assertions.assertEquals("saved", manager.getTerm(LAKE, "draft").definition());
     Assertions.assertEquals(GlossaryTerm.Status.APPROVED, manager.getTerm(LAKE, "draft").status());
+  }
+
+  @TestTemplate
+  void testSubmittingDraftPreservesDeprecatedStatus() throws IOException {
+    createAndInsertMakeLake(LAKE);
+    GlossaryTermEntity live =
+        manager.createTerm(
+            LAKE,
+            TermSpec.builder("retired")
+                .withStatus(GlossaryTerm.Status.DEPRECATED)
+                .withDefinition("original")
+                .build());
+    GlossaryManager gated = approvalManager();
+    GlossaryTermEntity draft =
+        gated.alterTerm(
+            LAKE,
+            live.name(),
+            TermChange.updateDefinition("revised"),
+            TermChange.setStatus(GlossaryTerm.Status.DRAFT));
+    Assertions.assertEquals(GlossaryTerm.Status.DRAFT, draft.status());
+    TermPublication submitted = gated.submitDraft(LAKE, live.id(), draft.publication().versionId());
+    Assertions.assertEquals(TermPublication.State.SUBMITTED, submitted.state());
+    Assertions.assertEquals("original", manager.getTerm(LAKE, live.name()).definition());
+    gated.publishCandidate(LAKE, live.id(), submitted.versionId());
+    GlossaryTermEntity published = manager.getTerm(LAKE, live.name());
+    Assertions.assertEquals(GlossaryTerm.Status.DEPRECATED, published.status());
+    Assertions.assertEquals("revised", published.definition());
+    Assertions.assertEquals(
+        GlossaryTerm.Status.DEPRECATED,
+        gated.getTermVersion(LAKE, live.id(), submitted.versionId()).term().status());
+  }
+
+  @TestTemplate
+  void testContinuingDraftPreservesProposedDeprecation() throws IOException {
+    createAndInsertMakeLake(LAKE);
+    GlossaryManager gated = approvalManager();
+    for (GlossaryTerm.Status status :
+        List.of(GlossaryTerm.Status.DEPRECATED, GlossaryTerm.Status.APPROVED)) {
+      GlossaryTermEntity live =
+          manager.createTerm(LAKE, TermSpec.builder(status.name()).withStatus(status).build());
+      GlossaryTermEntity draft =
+          gated.alterTerm(
+              LAKE,
+              live.name(),
+              TermChange.setStatus(GlossaryTerm.Status.DEPRECATED),
+              TermChange.setStatus(GlossaryTerm.Status.DRAFT));
+      GlossaryTermEntity submitted =
+          gated.alterTerm(
+              LAKE, live.name(), draft.revisionToken(), TermChange.updateDefinition("revised"));
+      Assertions.assertEquals(TermPublication.State.SUBMITTED, submitted.publication().state());
+      Assertions.assertEquals(status, manager.getTerm(LAKE, live.name()).status());
+      gated.publishCandidate(LAKE, live.id(), submitted.publication().versionId());
+      GlossaryTermEntity published = manager.getTerm(LAKE, live.name());
+      Assertions.assertEquals(GlossaryTerm.Status.DEPRECATED, published.status());
+      Assertions.assertEquals("revised", published.definition());
+    }
+  }
+
+  @TestTemplate
+  void testSubmittingOlderDraftSnapshotsUsesLiveStatus() throws IOException {
+    long lakeId = createAndInsertMakeLake(LAKE).id();
+    GlossaryManager gated = approvalManager();
+    for (String name : List.of("submit", "continue")) {
+      GlossaryTermEntity live =
+          manager.createTerm(
+              LAKE, TermSpec.builder(name).withStatus(GlossaryTerm.Status.DEPRECATED).build());
+      // Older snapshots persisted the private DRAFT status over the proposed definition status.
+      GlossaryTermEntity oldDraft =
+          TermEdits.apply(
+              live, new TermChange[] {TermChange.setStatus(GlossaryTerm.Status.DRAFT)}, false);
+      TermPublication draft =
+          GlossaryTermMetaService.getInstance()
+              .withLockedTerm(
+                  live.nameIdentifier(),
+                  false,
+                  ignored ->
+                      GlossaryTermVersions.recordTermVersion(
+                          lakeId,
+                          GlossaryTermVersions.captureSnapshot(
+                              lakeId, oldDraft, Set.of(), Set.of(), Set.of()),
+                          live.version(),
+                          TermPublication.State.DRAFT,
+                          null));
+      TermPublication submitted;
+      if (name.equals("submit")) {
+        submitted = gated.submitDraft(LAKE, live.id(), draft.versionId());
+      } else {
+        String token =
+            gated.getTermVersion(LAKE, live.id(), draft.versionId()).term().revisionToken();
+        submitted =
+            gated.alterTerm(LAKE, name, token, TermChange.updateDefinition("edited")).publication();
+      }
+      gated.publishCandidate(LAKE, live.id(), submitted.versionId());
+      Assertions.assertEquals(GlossaryTerm.Status.DEPRECATED, manager.getTerm(LAKE, name).status());
+    }
   }
 
   @TestTemplate

@@ -607,6 +607,7 @@ public final class GlossaryManager {
           if (!canReadTermVersion(metalake, head, row))
             throw new NoSuchTermException("Glossary draft does not exist");
           Snapshot draft = GlossaryTermVersions.decodeSnapshot(row);
+          GlossaryTermEntity base = null;
           if (head.getPublishedVersion() != null) {
             long lake = draft.definition().getMetalakeId();
             List<GlossaryTermEntity> live =
@@ -616,8 +617,9 @@ public final class GlossaryManager {
                 || !edges.listRelated(lake, termId).equals(draft.baseRelated())) {
               throw staleCandidateConflict();
             }
+            base = live.get(0);
           }
-          draft.definition().setStatus(GlossaryTerm.Status.APPROVED.name());
+          restoreDraftDefinitionStatus(draft, base);
           return GlossaryTermVersions.recordTermVersion(
               draft.definition().getMetalakeId(),
               draft,
@@ -660,7 +662,8 @@ public final class GlossaryManager {
                     Version row =
                         mapper.getVersionByTermIdAndVersionId(id, head.getCandidateVersion());
                     if (!canReadTermVersion(metalake, head, row)) throw missingRelationRoot(ident);
-                    return editTermCandidate(ident, lake, head, row, conditional, token, changes);
+                    return editTermCandidate(
+                        ident, lake, head, row, null, conditional, token, changes);
                   });
             }
             if (conditional) {
@@ -706,7 +709,7 @@ public final class GlossaryManager {
                         .listRelated(lake, live.id())
                         .equals(GlossaryTermVersions.decodeSnapshot(row).baseRelated()))
                   throw staleCandidateConflict();
-                return editTermCandidate(ident, lake, head, row, true, token, changes);
+                return editTermCandidate(ident, lake, head, row, live, true, token, changes);
               });
         });
   }
@@ -716,11 +719,13 @@ public final class GlossaryManager {
       long lake,
       Head head,
       Version row,
+      @Nullable GlossaryTermEntity live,
       boolean conditional,
       @Nullable String token,
       TermChange[] changes) {
     String metalake = ident.namespace().level(0);
     Snapshot previous = GlossaryTermVersions.decodeSnapshot(row);
+    restoreDraftDefinitionStatus(previous, live);
     GlossaryTermEntity term = previous.term(ident.namespace());
     TermPublication publication = GlossaryTermVersions.toPublicationResult(head, row);
     checkRevision(
@@ -785,11 +790,8 @@ public final class GlossaryManager {
             content.toArray(new TermChange[0]),
             !previous.related().equals(relations.related())
                 || !previous.broader().equals(relations.broader()),
-            domainsChanged ? domains.names() : null);
-    if (state == State.SUBMITTED && edited.status() == GlossaryTerm.Status.DRAFT) {
-      edited =
-          TermEdits.copyWithStatus(edited, domains.names(), null, GlossaryTerm.Status.APPROVED);
-    }
+            domainsChanged ? domains.names() : null,
+            true);
     Preconditions.checkArgument(
         head.getPublishedVersion() != null || edited.status() != GlossaryTerm.Status.DEPRECATED,
         "Omit status to submit a new term or specify DRAFT to save it.");
@@ -935,7 +937,11 @@ public final class GlossaryManager {
     }
     GlossaryTermEntity after =
         TermEdits.apply(
-            before, request, plan != null && plan.changed(), membership ? domains.names() : null);
+            before,
+            request,
+            plan != null && plan.changed(),
+            membership ? domains.names() : null,
+            approval);
 
     State state = approval ? State.SUBMITTED : State.PUBLISHED;
     for (TermChange change : request) {
@@ -952,16 +958,15 @@ public final class GlossaryManager {
       return TermEdits.toPublicationView(
           after, after.domains(), GlossaryTermVersions.toPublicationResult(head, row));
     }
-    GlossaryTermEntity target =
-        state == State.SUBMITTED && after.status() == GlossaryTerm.Status.DRAFT
-            ? TermEdits.copyWithStatus(after, after.domains(), null, GlossaryTerm.Status.APPROVED)
-            : after;
     if (approval || TermEdits.needsHierarchyLock(request)) {
-      terms.validateTermNameSynonymsAndSourceRef(target);
-      checkTermNameReservation(lake, target);
+      terms.validateTermNameSynonymsAndSourceRef(after);
+      checkTermNameReservation(lake, after);
     }
     loadOrCreateVersionHead(lake, before);
-    Snapshot frozen = captureTermWithRelationships(lake, target, plan, domains);
+    Snapshot frozen = captureTermWithRelationships(lake, after, plan, domains);
+    if (approval) {
+      restoreDraftDefinitionStatus(frozen, before);
+    }
     if (before == after && state == State.DRAFT) {
       frozen.definition().setCurrentVersion(Math.incrementExact(before.version()));
     }
@@ -969,13 +974,13 @@ public final class GlossaryManager {
         state == State.PUBLISHED
             ? frozen
             : frozen.withCandidateReferences(
-                target, Map.of(), edges.listRelated(lake, target.id()), null);
+                after, Map.of(), edges.listRelated(lake, after.id()), null);
     if (state == State.PUBLISHED)
       handler.handle(
           before,
-          target,
+          after,
           () -> {
-            persistDefinition(ident, target);
+            persistDefinition(ident, after);
             if (plan != null) {
               plan.persist();
             }
@@ -985,7 +990,19 @@ public final class GlossaryManager {
           });
     TermPublication result =
         GlossaryTermVersions.recordTermVersion(lake, snapshot, before.version(), state, null);
-    return TermEdits.toPublicationView(snapshot.term(ident.namespace()), target.domains(), result);
+    return TermEdits.toPublicationView(snapshot.term(ident.namespace()), after.domains(), result);
+  }
+
+  private static void restoreDraftDefinitionStatus(
+      Snapshot snapshot, @Nullable GlossaryTermEntity live) {
+    // New terms and older saved drafts can carry DRAFT in the definition itself.
+    if (GlossaryTerm.Status.DRAFT.name().equals(snapshot.definition().getStatus())) {
+      GlossaryTerm.Status status =
+          live == null || live.status() == GlossaryTerm.Status.DRAFT
+              ? GlossaryTerm.Status.APPROVED
+              : live.status();
+      snapshot.definition().setStatus(status.name());
+    }
   }
 
   private static State resolvePublicationState(

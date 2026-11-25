@@ -60,7 +60,8 @@ public interface TermChange {
 
   /**
    * Requests a term status change. The default policy applies it immediately. Under an approval
-   * policy DRAFT saves a private draft, DEPRECATED proposes deprecation and APPROVED is rejected.
+   * policy DRAFT saves a private draft and preserves the status that would take effect on
+   * publication. DEPRECATED proposes deprecation and APPROVED is rejected.
    *
    * @param newStatus The new status.
    * @return The term change.
