@@ -107,9 +107,9 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
         FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
         try (MockedStatic<MetadataAuthzHelper> auth = mockStatic(MetadataAuthzHelper.class)) {
           stubSecretPrivilegeChecks(auth, useSecrets, includeCredentials);
-          try (Response response = operations.getCredentials("test", "catalog", "catalog")) {
+          try (Response response = operations.getCredentials(metalake, "catalog", "catalog")) {
             Assertions.assertEquals(200, response.getStatus());
-            CredentialResponse body = response.readEntity(CredentialResponse.class);
+            CredentialResponse body = (CredentialResponse) response.getEntity();
             if (useSecrets && includeCredentials) {
               Assertions.assertEquals(1, body.getCredentials().length);
             } else {
@@ -117,7 +117,7 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
             }
           }
           try (Response response =
-              operations.getCredentials("test", "fileset", "catalog.schema.fileset")) {
+              operations.getCredentials(metalake, "fileset", "catalog.schema.fileset")) {
             Assertions.assertEquals(200, response.getStatus());
           }
         }
@@ -137,9 +137,9 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
     FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
     try (MockedStatic<MetadataAuthzHelper> auth = mockStatic(MetadataAuthzHelper.class)) {
       stubSecretPrivilegeChecks(auth, false, false);
-      try (Response response = operations.getCredentials("test", "catalog", "catalog")) {
+      try (Response response = operations.getCredentials(metalake, "catalog", "catalog")) {
         Assertions.assertEquals(200, response.getStatus());
-        CredentialResponse body = response.readEntity(CredentialResponse.class);
+        CredentialResponse body = (CredentialResponse) response.getEntity();
         Assertions.assertEquals(1, body.getCredentials().length);
         Assertions.assertEquals(
             S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE, body.getCredentials()[0].credentialType());
@@ -161,9 +161,9 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
     FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
     try (MockedStatic<MetadataAuthzHelper> auth = mockStatic(MetadataAuthzHelper.class)) {
       stubSecretPrivilegeChecks(auth, true, false);
-      try (Response response = operations.getCredentials("test", "catalog", "catalog")) {
+      try (Response response = operations.getCredentials(metalake, "catalog", "catalog")) {
         Assertions.assertEquals(200, response.getStatus());
-        CredentialResponse body = response.readEntity(CredentialResponse.class);
+        CredentialResponse body = (CredentialResponse) response.getEntity();
         Assertions.assertEquals(1, body.getCredentials().length);
         Assertions.assertEquals(
             S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE, body.getCredentials()[0].credentialType());
@@ -185,9 +185,9 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
     FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
     try (MockedStatic<MetadataAuthzHelper> auth = mockStatic(MetadataAuthzHelper.class)) {
       stubSecretPrivilegeChecks(auth, true, true);
-      try (Response response = operations.getCredentials("test", "catalog", "catalog")) {
+      try (Response response = operations.getCredentials(metalake, "catalog", "catalog")) {
         Assertions.assertEquals(200, response.getStatus());
-        CredentialResponse body = response.readEntity(CredentialResponse.class);
+        CredentialResponse body = (CredentialResponse) response.getEntity();
         Assertions.assertEquals(2, body.getCredentials().length);
         Assertions.assertEquals(
             S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE,
