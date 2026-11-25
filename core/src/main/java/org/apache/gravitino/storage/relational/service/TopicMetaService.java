@@ -368,13 +368,6 @@ public class TopicMetaService {
     Long topicId = topicPO.getTopicId();
     // The topic row has passed its version check. Every cleanup below uses the same transaction,
     // so a later failure also restores the root row and all earlier relationship changes.
-    GlossaryTermBindingService.getInstance()
-        .cleanupObjectBindings(
-            topicPO.getMetalakeId(),
-            GlossaryTermBindingService.TargetType.TOPIC,
-            topicId,
-            topicPO.getTopicName(),
-            "DROP_TOPIC");
     SessionUtils.doWithoutCommit(
         OwnerMetaMapper.class,
         mapper ->
@@ -391,6 +384,13 @@ public class TopicMetaService {
                 topicId, MetadataObject.Type.TOPIC.name()));
     SessionUtils.doWithoutCommit(
         StatisticMetaMapper.class, mapper -> mapper.softDeleteStatisticsByEntityId(topicId));
+    GlossaryTermBindingService.getInstance()
+        .cleanupObjectBindings(
+            topicPO.getMetalakeId(),
+            GlossaryTermBindingService.TargetType.TOPIC,
+            topicId,
+            topicPO.getTopicName(),
+            "DROP_TOPIC");
   }
 
   private RuntimeException topicWriteFailure(NameIdentifier identifier, TopicPO observedTopicPO) {

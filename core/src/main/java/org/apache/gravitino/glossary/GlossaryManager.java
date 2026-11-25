@@ -48,6 +48,7 @@ import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CapabilityHelpers;
@@ -680,9 +681,15 @@ public final class GlossaryManager {
       @Nullable GlossaryTerm.Status status,
       String afterType,
       long afterId) {
-    /** Captures the filters used to produce this position. */
+    /** Captures and validates the filters and keyset position used to resume a binding scan. */
     public BindingCursor {
+      Preconditions.checkArgument(types != null, "Binding cursor types cannot be null");
+      for (MetadataObject.Type type : types) {
+        Preconditions.checkArgument(type != null, "Binding cursor type cannot be null");
+      }
       types = Set.copyOf(types);
+      Preconditions.checkArgument(afterType != null, "Binding cursor afterType cannot be null");
+      TargetType.valueOf(afterType);
     }
   }
 
@@ -701,6 +708,7 @@ public final class GlossaryManager {
    * exhaust the scan budget. Every call rechecks visibility in its own snapshot.
    *
    * @throws IllegalArgumentException if the page size, filters or cursor filters are invalid
+   * @throws ForbiddenException if the configured authorizer cannot evaluate resolved target IDs
    * @throws NoSuchTermException if the term is missing, hidden, or excluded by the status filter
    * @throws TermVersionConflictException if the root identity or revision changed between pages
    * @throws IllegalStateException if an SQL session is already active on the calling thread
@@ -740,11 +748,11 @@ public final class GlossaryManager {
               throw new TermVersionConflictException("Term %s has changed", ident);
             }
           }
+          GlossaryBindingAccess objectAccess =
+              GlossaryBindingAccess.forBindingPage(metalake, authorizationEnabled, lake);
           if (targetTypes != null && targetTypes.isEmpty()) {
             return new BindingPage(List.of(), null);
           }
-          GlossaryBindingAccess objectAccess =
-              GlossaryBindingAccess.forBindingPage(metalake, authorizationEnabled);
           String afterType = cursor == null ? null : cursor.afterType();
           long afterId = cursor == null ? 0 : cursor.afterId();
           List<TermBinding> visible = new ArrayList<>(pageSize);
@@ -756,7 +764,7 @@ public final class GlossaryManager {
                     lake, root.id(), targetTypes, afterType, afterId, batchSize + 1);
             int batchEnd = Math.min(rows.size(), batchSize);
             Map<GlossaryTermBindingPO, TermBinding> resolved =
-                resolveBindings(rows.subList(0, batchEnd));
+                resolveBindings(rows.subList(0, batchEnd), objectAccess);
             for (int i = 0; i < batchEnd; i++) {
               GlossaryTermBindingPO row = rows.get(i);
               examined++;
@@ -1030,7 +1038,7 @@ public final class GlossaryManager {
   }
 
   private static Map<GlossaryTermBindingPO, TermBinding> resolveBindings(
-      List<GlossaryTermBindingPO> rows) {
+      List<GlossaryTermBindingPO> rows, GlossaryBindingAccess objectAccess) {
     Map<TargetType, List<Long>> idsByType = new EnumMap<>(TargetType.class);
     for (GlossaryTermBindingPO row : rows) {
       idsByType
@@ -1077,11 +1085,23 @@ public final class GlossaryManager {
         }
         MetadataObject modelObj = semanticModelsById.get(metricPO.semanticModelId());
         if (modelObj != null) {
+          objectAccess.registerTarget(modelObj, metricPO.semanticModelId());
+          MetadataObject schemaObj = MetadataObjects.parent(modelObj);
+          if (schemaObj != null) {
+            objectAccess.registerTarget(schemaObj, metricPO.schemaId());
+            MetadataObject catalogObj = MetadataObjects.parent(schemaObj);
+            if (catalogObj != null) {
+              objectAccess.registerTarget(catalogObj, metricPO.catalogId());
+            }
+          }
           result.put(row, TermBinding.usedBy(modelObj, metricPO.metricName()));
         }
       } else {
         MetadataObject obj = objectsByType.getOrDefault(type, Map.of()).get(row.getTargetId());
         if (obj != null) {
+          if (type != TargetType.COLUMN) {
+            objectAccess.registerTarget(obj, row.getTargetId());
+          }
           result.put(row, TermBinding.implementedBy(obj));
         }
       }

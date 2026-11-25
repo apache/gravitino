@@ -23,6 +23,7 @@ import java.security.Principal;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -44,22 +45,25 @@ import org.apache.gravitino.utils.PrincipalUtils;
  */
 final class GlossaryBindingAccess {
   private static final GlossaryBindingAccess UNRESTRICTED =
-      new GlossaryBindingAccess(null, null, null, null);
+      new GlossaryBindingAccess(null, null, null, null, null);
 
   private final GravitinoAuthorizer authorizer;
   private final Principal principal;
   private final String metalake;
   private final AuthorizationRequestContext context;
+  @Nullable private final Map<MetadataObject, Optional<Long>> resolvedScopes;
 
   private GlossaryBindingAccess(
       GravitinoAuthorizer authorizer,
       Principal principal,
       String metalake,
-      AuthorizationRequestContext context) {
+      AuthorizationRequestContext context,
+      @Nullable Map<MetadataObject, Optional<Long>> resolvedScopes) {
     this.authorizer = authorizer;
     this.principal = principal;
     this.metalake = metalake;
     this.context = context;
+    this.resolvedScopes = resolvedScopes;
   }
 
   static GlossaryBindingAccess forRequest(String metalake, boolean enabled) {
@@ -70,7 +74,8 @@ final class GlossaryBindingAccess {
         bindingAuthorizer(),
         PrincipalUtils.getCurrentPrincipal(),
         metalake,
-        new AuthorizationRequestContext());
+        new AuthorizationRequestContext(),
+        null);
   }
 
   static GlossaryBindingAccess forResolvedTarget(
@@ -79,20 +84,26 @@ final class GlossaryBindingAccess {
       return UNRESTRICTED;
     }
     Map<MetadataObject, Optional<Long>> scopes = new HashMap<>();
-    long[] chain = ids.fullIds();
-    MetadataObject scope = target;
-    for (int i = chain.length - 1; i > 0; i--) {
-      scopes.put(scope, Optional.of(chain[i]));
-      scope = MetadataObjects.parent(scope);
-    }
-    scopes.put(
-        MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE), Optional.of(chain[0]));
+    cacheChain(scopes, metalake, target, ids);
     return forSnapshot(metalake, scopes);
   }
 
   /** Uses the page's relational snapshot for canonical target and ancestor IDs. */
-  static GlossaryBindingAccess forBindingPage(String metalake, boolean enabled) {
-    return enabled ? forSnapshot(metalake, new HashMap<>()) : UNRESTRICTED;
+  static GlossaryBindingAccess forBindingPage(String metalake, boolean enabled, long metalakeId) {
+    if (!enabled) {
+      return UNRESTRICTED;
+    }
+    Map<MetadataObject, Optional<Long>> scopes = new HashMap<>();
+    scopes.put(
+        MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE), Optional.of(metalakeId));
+    return forSnapshot(metalake, scopes);
+  }
+
+  /** Seeds a known live identity from the current snapshot so target checks skip name lookups. */
+  void registerTarget(MetadataObject target, long entityId) {
+    if (resolvedScopes != null) {
+      resolvedScopes.putIfAbsent(target, Optional.of(entityId));
+    }
   }
 
   /** Returns whether the caller has ordinary metadata read access to the binding target. */
@@ -229,28 +240,45 @@ final class GlossaryBindingAccess {
     return authorizer;
   }
 
+  private static void cacheChain(
+      Map<MetadataObject, Optional<Long>> scopes,
+      String metalake,
+      MetadataObject target,
+      NamespacedEntityId ids) {
+    long[] chain = ids.fullIds();
+    MetadataObject scope = target;
+    for (int i = chain.length - 1; i > 0; i--) {
+      scopes.put(scope, Optional.of(chain[i]));
+      scope = MetadataObjects.parent(scope);
+    }
+    scopes.put(
+        MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE), Optional.of(chain[0]));
+  }
+
   private static GlossaryBindingAccess forSnapshot(
       String metalake, Map<MetadataObject, Optional<Long>> scopes) {
     RelationalEntityStoreIdResolver resolver = new RelationalEntityStoreIdResolver();
     AuthorizationRequestContext context =
         new AuthorizationRequestContext(
             metalake,
-            scope ->
-                scopes.computeIfAbsent(
-                    scope,
-                    obj -> {
-                      try {
-                        return Optional.of(
-                            resolver
-                                .getEntityIds(
-                                    MetadataObjectUtil.toEntityIdent(metalake, obj),
-                                    MetadataObjectUtil.toEntityType(obj))
-                                .entityId());
-                      } catch (NoSuchEntityException missing) {
-                        return Optional.empty();
-                      }
-                    }));
+            scope -> {
+              Optional<Long> existing = scopes.get(scope);
+              if (existing != null) {
+                return existing;
+              }
+              try {
+                NamespacedEntityId ids =
+                    resolver.getEntityIds(
+                        MetadataObjectUtil.toEntityIdent(metalake, scope),
+                        MetadataObjectUtil.toEntityType(scope));
+                cacheChain(scopes, metalake, scope, ids);
+                return Optional.of(ids.entityId());
+              } catch (NoSuchEntityException missing) {
+                scopes.put(scope, Optional.empty());
+                return Optional.empty();
+              }
+            });
     return new GlossaryBindingAccess(
-        bindingAuthorizer(), PrincipalUtils.getCurrentPrincipal(), metalake, context);
+        bindingAuthorizer(), PrincipalUtils.getCurrentPrincipal(), metalake, context, scopes);
   }
 }

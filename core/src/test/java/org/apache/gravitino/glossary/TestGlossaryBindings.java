@@ -33,6 +33,7 @@ import java.security.PrivilegedExceptionAction;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -2284,6 +2285,18 @@ class TestGlossaryBindings extends TestJDBCBackend {
         ForbiddenException.class,
         () ->
             as("lakeOwner", () -> manager.listTermBindings(LAKE, "Restricted", null, null, null)));
+    assertThrows(
+        ForbiddenException.class,
+        () ->
+            as(
+                "lakeOwner",
+                () ->
+                    manager.listTermBindings(
+                        LAKE,
+                        "Restricted",
+                        TermBinding.Kind.IMPLEMENTED_BY,
+                        Set.of(MetadataObject.Type.SEMANTIC_MODEL),
+                        null)));
     Mockito.verifyNoInteractions(env.internalTableDispatcher());
     assertTrue(openManager.listObjectTerms(LAKE, live, null).isEmpty());
   }
@@ -2502,6 +2515,49 @@ class TestGlossaryBindings extends TestJDBCBackend {
         () ->
             openManager.associateMetricTerms(
                 LAKE, target, "net_revenue ", new String[] {"MissingMetric"}, null));
+  }
+
+  @TestTemplate
+  void testBindingCursorRejectsNullTypesAndInvalidPosition() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new GlossaryManager.BindingCursor(1L, 2L, 1L, null, null, null, "TABLE", 10L));
+    Set<MetadataObject.Type> withNull = new HashSet<>();
+    withNull.add(null);
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new GlossaryManager.BindingCursor(1L, 2L, 1L, null, withNull, null, "TABLE", 10L));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new GlossaryManager.BindingCursor(1L, 2L, 1L, null, Set.of(), null, null, 10L));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new GlossaryManager.BindingCursor(1L, 2L, 1L, null, Set.of(), null, "INVALID", 10L));
+  }
+
+  @TestTemplate
+  void testBindingPageAuthorizationSkipsPerTargetTableNameLookups() throws Exception {
+    as("lakeOwner", () -> manager.createTerm(LAKE, TermSpec.builder("BatchPageTerm").build()));
+    for (int i = 0; i < 5; i++) {
+      String tbl = "page_tbl_" + i;
+      insertTable(tbl, List.of(col("c1", 0)));
+      MetadataObject tblObj = MetadataObjects.of(List.of(CAT, SCH, tbl), MetadataObject.Type.TABLE);
+      as(
+          "lakeOwner",
+          () -> manager.associateTerms(LAKE, tblObj, new String[] {"BatchPageTerm"}, null));
+    }
+    TableMetaService tableService = Mockito.spy(TableMetaService.getInstance());
+    try (MockedStatic<TableMetaService> services =
+        Mockito.mockStatic(TableMetaService.class, Mockito.CALLS_REAL_METHODS)) {
+      services.when(TableMetaService::getInstance).thenReturn(tableService);
+      List<TermBinding> bindings =
+          as(
+              "viewerWithTableRead",
+              () -> manager.listTermBindings(LAKE, "BatchPageTerm", null, null, null).bindings());
+      assertEquals(5, bindings.size());
+      Mockito.verify(tableService, Mockito.never())
+          .getTableIdBySchemaIdAndName(Mockito.anyLong(), Mockito.anyString());
+    }
   }
 
   private TableEntity insertTable(String name, List<ColumnEntity> columns) throws Exception {

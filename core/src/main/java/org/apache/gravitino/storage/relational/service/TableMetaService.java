@@ -567,12 +567,22 @@ public class TableMetaService {
   }
 
   private void deleteTableDependents(TablePO tablePO) {
-    // The table row has already passed its version check. All cleanup below uses the same database
-    // transaction, so either the table and every related row are deleted together, or none are.
-    GlossaryTermBindingService.getInstance()
-        .cleanupTableBindings(
-            tablePO.getMetalakeId(), tablePO.getTableId(), tablePO.getTableName(), "DROP_TABLE");
+    // The table row has already passed its version check. Collect bindings before soft-deleting
+    // columns, delete all non-glossary dependents, then lock and retire glossary term bindings last
+    // to preserve the global endpoint -> term lock order.
+    GlossaryTermBindingService bindingService = GlossaryTermBindingService.getInstance();
+    List<GlossaryTermBindingPO> liveBindings =
+        bindingService.collectTableBindings(
+            tablePO.getMetalakeId(), tablePO.getTableId(), "DROP_TABLE");
     deleteTableNonGlossaryDependents(tablePO);
+    if (!liveBindings.isEmpty()) {
+      bindingService.retireCollectedBindings(
+          tablePO.getMetalakeId(),
+          liveBindings,
+          bindingService.tableBindingMetadata(
+              tablePO.getTableId(), tablePO.getTableName(), liveBindings),
+          "DROP_TABLE");
+    }
   }
 
   private void deleteTableNonGlossaryDependents(TablePO tablePO) {

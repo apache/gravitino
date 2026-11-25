@@ -38,6 +38,7 @@ import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.BaseEntityCache;
+import org.apache.gravitino.cache.CachedEntityIdResolver;
 import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.NoOpsCache;
@@ -46,8 +47,10 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
+import org.apache.gravitino.meta.EntityIdResolver;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
@@ -96,6 +99,14 @@ public class TestRelationalEntityStore {
       Assertions.assertEquals(
           List.of(table), store.batchGet(List.of(ident), type, TableEntity.class));
       Assertions.assertTrue(store.exists(ident, type));
+
+      EntityIdResolver underlying = Mockito.mock(EntityIdResolver.class);
+      NamespacedEntityId ids = new NamespacedEntityId(42L, 1L, 2L, 3L);
+      Mockito.when(underlying.getEntityIds(ident, type)).thenReturn(ids);
+      Mockito.when(underlying.getEntityId(ident, type)).thenReturn(42L);
+      CachedEntityIdResolver idResolver = new CachedEntityIdResolver(cache, underlying);
+      Assertions.assertSame(ids, idResolver.getEntityIds(ident, type));
+      Assertions.assertEquals(42L, idResolver.getEntityId(ident, type));
     }
     Mockito.verifyNoInteractions(cache);
   }
