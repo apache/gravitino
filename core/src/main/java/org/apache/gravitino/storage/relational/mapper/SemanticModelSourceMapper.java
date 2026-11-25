@@ -25,6 +25,7 @@ import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 import org.apache.ibatis.annotations.UpdateProvider;
 
 /** Reads and persists dataset-to-source associations and their retirement state. */
@@ -36,15 +37,30 @@ public interface SemanticModelSourceMapper {
   @Insert(
       """
       <script>INSERT INTO semantic_model_source_rel
-      (metalake_id, semantic_model_id, dataset_name, source_type, source_id, deleted_at) VALUES
+      (metalake_id, semantic_model_id, dataset_name, source_type, source_id, from_version, deleted_at) VALUES
       <foreach collection='sources' item='source' separator=','>
-      (#{metalakeId}, #{modelId}, #{source.datasetName}, #{source.sourceType}, #{source.sourceId}, 0)
+      (#{metalakeId}, #{modelId}, #{source.datasetName}, #{source.sourceType}, #{source.sourceId}, #{revision}, 0)
       </foreach></script>
       """)
   void insertSources(
       @Param("metalakeId") long metalakeId,
       @Param("modelId") long modelId,
+      @Param("revision") int revision,
       @Param("sources") List<SemanticModelSource> sources);
+
+  /** Closes the open ranges when a new snapshot replaces their associations. */
+  @Update(
+      """
+      UPDATE semantic_model_source_rel SET to_version = #{revision}
+      WHERE semantic_model_id = #{modelId} AND to_version = 0 AND deleted_at = 0
+      """)
+  int closeSourceRanges(@Param("modelId") long modelId, @Param("revision") int revision);
+
+  /** Retires ranges that no longer cover a retained revision. */
+  @UpdateProvider(
+      type = SemanticModelSourceSQLProviderFactory.class,
+      method = "softDeleteUnreferencedRanges")
+  int softDeleteUnreferencedRanges(@Param("modelId") long modelId);
 
   /** Retires all live associations of a model. */
   @UpdateProvider(
@@ -88,7 +104,9 @@ public interface SemanticModelSourceMapper {
       JOIN schema_meta ON schema_meta.schema_id = model.schema_id AND schema_meta.deleted_at = 0
       JOIN catalog_meta catalog ON catalog.catalog_id = model.catalog_id AND catalog.deleted_at = 0
       JOIN metalake_meta metalake ON metalake.metalake_id = rel.metalake_id AND metalake.deleted_at = 0
-      WHERE rel.deleted_at = 0 AND rel.metalake_id = #{metalakeId} AND rel.source_type = #{sourceType} AND rel.source_id = #{sourceId}
+      WHERE rel.from_version <= model.active_version
+        AND (rel.to_version = 0 OR rel.to_version > model.active_version)
+        AND rel.deleted_at = 0 AND rel.metalake_id = #{metalakeId} AND rel.source_type = #{sourceType} AND rel.source_id = #{sourceId}
       """)
   List<SemanticModelSourceListingPO> listForSource(
       @Param("metalakeId") long metalakeId,

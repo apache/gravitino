@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -41,6 +42,7 @@ import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.semantic.SemanticModel;
+import org.apache.gravitino.semantic.SemanticModel.Status;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
@@ -158,6 +160,15 @@ public class ManagedSemanticModelOperations {
     }
   }
 
+  /** Returns whether the identity exists, even when the model has no active revision. */
+  public boolean semanticModelExists(NameIdentifier ident) {
+    try {
+      return store.exists(ident, Entity.EntityType.SEMANTIC_MODEL);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to check Semantic Model " + ident, e);
+    }
+  }
+
   /**
    * Creates a model with its validated source associations.
    *
@@ -186,7 +197,8 @@ public class ManagedSemanticModelOperations {
     writeValidator.accept(ident, definition);
     sourceUpdate.validate(definition);
 
-    Instant now = Instant.now();
+    Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+    String writer = PrincipalUtils.getCurrentUserName();
     SemanticModelEntity entity =
         SemanticModelEntity.builder()
             .withId(idGenerator.nextId())
@@ -196,11 +208,8 @@ public class ManagedSemanticModelOperations {
             .withDefinition(definition)
             .withSourceUpdate(sourceUpdate)
             .withProperties(properties)
-            .withAuditInfo(
-                AuditInfo.builder()
-                    .withCreator(PrincipalUtils.getCurrentUserName())
-                    .withCreateTime(now)
-                    .build())
+            .withRevision(1, Status.PUBLISHED, writer, now)
+            .withAuditInfo(AuditInfo.builder().withCreator(writer).withCreateTime(now).build())
             .build();
 
     try {
@@ -335,6 +344,8 @@ public class ManagedSemanticModelOperations {
     }
 
     AuditInfo oldAudit = oldEntity.auditInfo();
+    Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+    String writer = PrincipalUtils.getCurrentUserName();
     return SemanticModelEntity.builder()
         .withId(oldEntity.id())
         .withName(newName)
@@ -343,12 +354,13 @@ public class ManagedSemanticModelOperations {
         .withDefinition(newDefinition)
         .withSourceUpdate(sourceUpdate)
         .withProperties(newProperties)
+        .withRevision(Math.incrementExact(oldEntity.revision()), Status.PUBLISHED, writer, now)
         .withAuditInfo(
             AuditInfo.builder()
                 .withCreator(oldAudit.creator())
                 .withCreateTime(oldAudit.createTime())
-                .withLastModifier(PrincipalUtils.getCurrentUserName())
-                .withLastModifiedTime(Instant.now())
+                .withLastModifier(writer)
+                .withLastModifiedTime(now)
                 .build())
         .build();
   }

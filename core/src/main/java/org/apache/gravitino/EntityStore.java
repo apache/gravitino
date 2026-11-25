@@ -30,10 +30,19 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.utils.Executable;
 
 public interface EntityStore extends Closeable {
+
+  /** Lists model identities for governance, irrespective of publication state. */
+  default List<NameIdentifier> listSemanticModelIdentifiers(Namespace namespace)
+      throws IOException {
+    return list(namespace, SemanticModelEntity.class, EntityType.SEMANTIC_MODEL).stream()
+        .map(SemanticModelEntity::nameIdentifier)
+        .toList();
+  }
 
   /**
    * Reads metric identifiers in a schema without loading complete Semantic Models.

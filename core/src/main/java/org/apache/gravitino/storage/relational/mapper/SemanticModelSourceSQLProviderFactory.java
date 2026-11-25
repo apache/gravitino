@@ -50,6 +50,11 @@ public class SemanticModelSourceSQLProviderFactory {
     return getProvider().softDeleteByModelId(modelId);
   }
 
+  /** Provides SQL for retiring closed ranges without a retained snapshot. */
+  public static String softDeleteUnreferencedRanges(@Param("modelId") long modelId) {
+    return getProvider().softDeleteUnreferencedRanges(modelId);
+  }
+
   /** Retires live associations owned by models in the given schemas. */
   public static String softDeleteBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
     return getProvider().softDeleteBySchemaIds(schemaIds);
