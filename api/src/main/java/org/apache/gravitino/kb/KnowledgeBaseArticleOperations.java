@@ -23,6 +23,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
 import org.apache.gravitino.exceptions.KnowledgeBaseArticleAlreadyExistsException;
+import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchKnowledgeBaseArticleException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
@@ -39,9 +40,14 @@ public interface KnowledgeBaseArticleOperations {
    * Lists visible summaries matching the filter. Set {@link ArticlePage#hasMore()} when an
    * additional readable match follows the requested page.
    *
+   * <p>A Term or asset filter resolves its target first and requires read access to it; a missing
+   * or hidden target fails the request as not found instead of returning an empty page.
+   *
    * @param filter the list filter
    * @return one page of matching articles
    * @throws NoSuchMetalakeException if the metalake does not exist
+   * @throws org.apache.gravitino.exceptions.NoSuchTermException if a Term filter target does not
+   *     exist or is invisible to the caller
    */
   ArticlePage listArticles(ArticleListFilter filter) throws NoSuchMetalakeException;
 
@@ -64,6 +70,8 @@ public interface KnowledgeBaseArticleOperations {
    * @param limit maximum preview size
    * @param offset number of visible bindings to skip
    * @return the article with the requested preview
+   * @throws NoSuchKnowledgeBaseArticleException if the article does not exist or is invisible to
+   *     the caller
    */
   KnowledgeBaseArticle loadArticle(String name, int limit, int offset)
       throws NoSuchKnowledgeBaseArticleException;
@@ -71,11 +79,16 @@ public interface KnowledgeBaseArticleOperations {
   /**
    * Creates an article with current content and initial bindings. Each added Domain requires
    * MANAGE_DOMAIN in addition to Article create authority. The creator becomes Owner when
-   * authorization is enabled.
+   * authorization is enabled. Newly bound Terms must be approved, and each bound object must be
+   * readable by the caller; otherwise the request fails without creating anything. A derived name
+   * that keeps colliding after the implementation's bounded retries also fails the request.
    *
    * @param articleCreate the create request
    * @return the created article
-   * @throws KnowledgeBaseArticleAlreadyExistsException if the explicit article name is already used
+   * @throws KnowledgeBaseArticleAlreadyExistsException if the explicit article name is already
+   *     used, or every derived-name candidate conflicts during the bounded allocation retries
+   * @throws org.apache.gravitino.exceptions.NoSuchTermException if a Term to bind does not exist or
+   *     is invisible to the caller
    */
   KnowledgeBaseArticle createArticle(ArticleCreate articleCreate)
       throws KnowledgeBaseArticleAlreadyExistsException;
@@ -106,7 +119,8 @@ public interface KnowledgeBaseArticleOperations {
    * @throws ArticleRevisionConflictException if the token refers to another identity or a stale
    *     revision
    * @throws IllegalArgumentException if the token is malformed
-   * @throws NoSuchKnowledgeBaseArticleException if the article is missing or hidden
+   * @throws NoSuchKnowledgeBaseArticleException if the article does not exist or is invisible to
+   *     the caller
    */
   KnowledgeBaseArticle alterArticle(
       String name, KnowledgeBaseArticleChange[] changes, @Nullable String expectedRevision)
@@ -123,11 +137,14 @@ public interface KnowledgeBaseArticleOperations {
   /**
    * Detaches one Article from a Domain. With authorization enabled, this requires MANAGE_DOMAIN on
    * the Domain, independent of Article edit permission. An absent Article or membership is a no-op.
+   * An effective detach advances the Article revision once, which can invalidate a client's
+   * conditional-edit token read before the detach.
    *
    * @param name the Article name
    * @param domain the Domain name
+   * @throws NoSuchDomainException if the Domain does not exist or is invisible to the caller
    */
-  void detachDomain(String name, String domain);
+  void detachDomain(String name, String domain) throws NoSuchDomainException;
 
   /**
    * Lists the metadata objects bound to the article.
@@ -161,7 +178,7 @@ public interface KnowledgeBaseArticleOperations {
    * @throws NoSuchKnowledgeBaseArticleException if the article does not exist or is invisible to
    *     the caller
    */
-  default TermBindingPage listTermBindings(String name) {
+  default TermBindingPage listTermBindings(String name) throws NoSuchKnowledgeBaseArticleException {
     return listTermBindings(name, ArticleListFilter.DEFAULT_LIMIT, 0);
   }
 
@@ -175,7 +192,8 @@ public interface KnowledgeBaseArticleOperations {
    * @throws NoSuchKnowledgeBaseArticleException if the article does not exist or is invisible to
    *     the caller
    */
-  TermBindingPage listTermBindings(String name, int limit, int offset);
+  TermBindingPage listTermBindings(String name, int limit, int offset)
+      throws NoSuchKnowledgeBaseArticleException;
 
   /**
    * @param term direct binding target

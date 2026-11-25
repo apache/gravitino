@@ -299,6 +299,7 @@ public interface Domain extends Auditable {
    * @param offset number of direct members to skip
    * @return a page of member types and names, ordered by type and stable ID
    * @throws NoSuchDomainException If this domain does not exist or is not visible to the caller.
+   * @throws IllegalArgumentException If the limit or offset is outside its documented range.
    * @throws UnsupportedOperationException if the implementation does not support definition
    *     membership
    */

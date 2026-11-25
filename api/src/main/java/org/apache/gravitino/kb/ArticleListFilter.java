@@ -152,7 +152,9 @@ public class ArticleListFilter {
     private Builder() {}
 
     /**
-     * Filters by a live direct Term binding.
+     * Filters by a live direct Term binding. The list operation resolves the Term first and
+     * requires read access to it; a missing or hidden Term fails the request as not found instead
+     * of matching an empty page.
      *
      * @param term exact Term name
      * @return this builder
@@ -164,7 +166,9 @@ public class ArticleListFilter {
     }
 
     /**
-     * Filters by a live direct asset binding. All supplied filters apply together.
+     * Filters by a live direct asset binding. All supplied filters apply together. The list
+     * operation resolves the asset first and requires read access to it; a missing or hidden target
+     * fails the request as not found instead of matching an empty page.
      *
      * @param object the target asset
      * @return this builder
