@@ -50,6 +50,7 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.Transaction;
+import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -469,6 +470,73 @@ public class TestIcebergCatalogWrapper {
                 new MetadataUpdate.AddSchema(variantSchema),
                 new MetadataUpdate.UpgradeFormatVersion(3)));
     Assertions.assertDoesNotThrow(() -> IcebergCatalogWrapper.validateStagedCreateUpdates(request));
+  }
+
+  @Test
+  public void testStagedCreateCommitDoesNotLoadMissingTable(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Namespace namespace = Namespace.of("db");
+      TableIdentifier identifier = TableIdentifier.of(namespace, "staged_t");
+      wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+
+      // Trino CREATE TABLE: stage-create then commit with AssertTableDoesNotExist. Must not call
+      // validateSchemaUpdates (loadTable) or NoSuchTableException leaks as a failed create.
+      LoadTableResponse staged =
+          wrapper.createTable(
+              namespace,
+              CreateTableRequest.builder()
+                  .withName("staged_t")
+                  .withSchema(new Schema(Types.NestedField.required(1, "id", Types.LongType.get())))
+                  .setProperties(ImmutableMap.of("format-version", "2"))
+                  .stageCreate()
+                  .build());
+      UpdateTableRequest commit =
+          new UpdateTableRequest(
+              Collections.singletonList(new UpdateRequirement.AssertTableDoesNotExist()),
+              staged.tableMetadata().changes());
+      Assertions.assertDoesNotThrow(() -> wrapper.updateTable(identifier, commit));
+      Assertions.assertTrue(wrapper.tableExists(identifier));
+    }
+  }
+
+  @Test
+  public void testStagedCreateCommitRejectsV3TypeWithoutFormatVersion3(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Namespace namespace = Namespace.of("db");
+      TableIdentifier identifier = TableIdentifier.of(namespace, "staged_variant");
+      wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+
+      Schema variantSchema =
+          new Schema(Types.NestedField.optional(1, "payload", Types.VariantType.get()));
+      LoadTableResponse staged =
+          wrapper.createTable(
+              namespace,
+              CreateTableRequest.builder()
+                  .withName("staged_variant")
+                  .withSchema(variantSchema)
+                  .setProperties(ImmutableMap.of("format-version", "3"))
+                  .stageCreate()
+                  .build());
+      // Drop format upgrade from the staged changes so commit would default to v2 — should 400.
+      java.util.List<MetadataUpdate> updatesWithoutUpgrade =
+          staged.tableMetadata().changes().stream()
+              .filter(update -> !(update instanceof MetadataUpdate.UpgradeFormatVersion))
+              .collect(java.util.stream.Collectors.toList());
+      UpdateTableRequest commit =
+          new UpdateTableRequest(
+              Collections.singletonList(new UpdateRequirement.AssertTableDoesNotExist()),
+              updatesWithoutUpgrade);
+      BadRequestException failure =
+          Assertions.assertThrows(
+              BadRequestException.class, () -> wrapper.updateTable(identifier, commit));
+      Assertions.assertTrue(
+          failure.getMessage().contains("variant is not supported until v3"), failure.getMessage());
+      Assertions.assertFalse(wrapper.tableExists(identifier));
+    }
   }
 
   @Test

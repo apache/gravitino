@@ -56,6 +56,7 @@ import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.Transaction;
+import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.aws.s3.S3FileIO;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
@@ -504,7 +505,13 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     validateStorageUpdates(updateTableRequest);
     getMetadataCache().invalidate(tableIdentifier);
     validateDefaultSpecAndSortOrder(tableIdentifier, updateTableRequest);
-    validateSchemaUpdates(tableIdentifier, updateTableRequest);
+    // Staged create (AssertTableDoesNotExist) has no table to load yet; use the create-path
+    // validator. Existing-table updates keep validateSchemaUpdates (loads the base).
+    if (isStagedCreate(updateTableRequest)) {
+      validateStagedCreateUpdates(updateTableRequest);
+    } else {
+      validateSchemaUpdates(tableIdentifier, updateTableRequest);
+    }
     LoadTableResponse loadTableResponse;
     try {
       loadTableResponse =
@@ -761,6 +768,13 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     Map<String, String> properties = Maps.newHashMap(tableDefaultProperties());
     properties.putAll(request.properties());
     validateTableDefinition(request.schema(), properties);
+  }
+
+  private static boolean isStagedCreate(UpdateTableRequest request) {
+    return request != null
+        && request.requirements() != null
+        && request.requirements().stream()
+            .anyMatch(UpdateRequirement.AssertTableDoesNotExist.class::isInstance);
   }
 
   /**
