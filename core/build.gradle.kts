@@ -55,6 +55,7 @@ dependencies {
   implementation(libs.h2db)
   implementation(libs.jackson.databind)
   implementation(libs.jackson.dataformat.yaml)
+  implementation(libs.json.schema.validator)
   implementation(libs.jackson.jaxrs.json.provider) // This is required by lance
   implementation(libs.lance) {
     exclude(group = "com.fasterxml.jackson.core", module = "*") // provided by gravitino
