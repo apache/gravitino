@@ -92,5 +92,6 @@ public interface SemanticModelVersionInfoMapper {
   Integer softDeleteSemanticModelVersionsByRetentionLine(
       @Param("semanticModelId") Long semanticModelId,
       @Param("versionRetentionLine") long versionRetentionLine,
+      @Param("activeVersion") int activeVersion,
       @Param("limit") int limit);
 }
