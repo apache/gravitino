@@ -28,18 +28,27 @@ public final class ArticleContent {
   private final ArticleBody body;
   private final String revisionToken;
 
-  /** Creates a content response for the supplied body and revision token. */
+  /**
+   * Creates a content response for one Article revision.
+   *
+   * @param body the stored text and its markup format
+   * @param revisionToken the opaque token for conditional edits based on this revision
+   */
   public ArticleContent(ArticleBody body, String revisionToken) {
     this.body = Preconditions.checkNotNull(body, "body");
     this.revisionToken = Preconditions.checkNotNull(revisionToken, "revisionToken");
   }
 
-  /** Returns the stored text and its markup format. */
+  /**
+   * @return the stored text and its markup format
+   */
   public ArticleBody body() {
     return body;
   }
 
-  /** Returns the token for conditional edits based on this content. */
+  /**
+   * @return the token for conditional edits based on this content
+   */
   public String revisionToken() {
     return revisionToken;
   }
