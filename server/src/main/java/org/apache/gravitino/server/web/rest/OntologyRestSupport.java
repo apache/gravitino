@@ -39,6 +39,7 @@ import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -102,13 +103,29 @@ final class OntologyRestSupport {
         .build();
   }
 
-  static boolean canLoadMapping(NameIdentifier mapping, boolean modelHasPublishedRevision) {
-    NameIdentifier model = NameIdentifier.of(mapping.namespace().levels());
+  static void requireOntologyLoad(String metalake, String name) {
+    if (!MetadataAuthzHelper.checkAccess(
+        NameIdentifierUtil.ofOntology(metalake, name),
+        Entity.EntityType.ONTOLOGY,
+        AuthorizationExpressionConstants.LOAD_ONTOLOGY_AUTHORIZATION_EXPRESSION)) {
+      throw new ForbiddenException("Cannot load ontology '%s'", name);
+    }
+  }
+
+  static boolean canModifyModel(NameIdentifier model) {
     return MetadataAuthzHelper.checkAccess(
         model,
         Entity.EntityType.SEMANTIC_MODEL,
-        modelHasPublishedRevision
-            ? AuthorizationExpressionConstants.LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION
-            : AuthorizationExpressionConstants.MODIFY_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION);
+        AuthorizationExpressionConstants.MODIFY_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION);
+  }
+
+  static boolean canLoadMapping(NameIdentifier mapping, boolean modelHasPublishedRevision) {
+    NameIdentifier model = NameIdentifier.of(mapping.namespace().levels());
+    return modelHasPublishedRevision
+        ? MetadataAuthzHelper.checkAccess(
+            model,
+            Entity.EntityType.SEMANTIC_MODEL,
+            AuthorizationExpressionConstants.LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION)
+        : canModifyModel(model);
   }
 }

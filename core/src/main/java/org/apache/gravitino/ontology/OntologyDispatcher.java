@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
@@ -207,28 +208,32 @@ public final class OntologyDispatcher {
    *
    * @param metalake The containing metalake.
    * @param name The ontology name.
-   * @return Mapping identifiers before authorization filtering.
+   * @param visible Checks access to each mapping given its model's publication state.
+   * @return The visible mapping identifiers.
    */
-  public List<NameIdentifier> listOntologyMappings(String metalake, String name) {
+  public List<NameIdentifier> listOntologyMappings(
+      String metalake, String name, BiPredicate<NameIdentifier, Boolean> visible) {
     return operate(
         OperationType.LIST_MAPPINGS_BY_ONTOLOGY,
         NameIdentifierUtil.ofOntology(metalake, name),
-        () -> storage.listOntologyMappings(metalake, name));
+        () -> storage.listOntologyMappings(metalake, name, visible));
   }
 
   /**
    * Lists mappings under a model.
    *
    * @param model The parent model.
+   * @param canModify Checks whether the caller can read a never-published model.
    * @return The mapping identifiers.
    */
-  public List<NameIdentifier> listModelMappings(NameIdentifier model) {
+  public List<NameIdentifier> listModelMappings(
+      NameIdentifier model, Predicate<NameIdentifier> canModify) {
     return operate(
         OperationType.LIST_ONTOLOGY_MAPPING,
         model,
         () -> {
           NameIdentifier parent = normalizeModel(model);
-          return storage.listModelMappings(parent).stream()
+          return storage.listModelMappings(parent, canModify).stream()
               .map(name -> mappingIdent(parent, name))
               .toList();
         });
@@ -239,13 +244,15 @@ public final class OntologyDispatcher {
    *
    * @param model The parent model.
    * @param name The mapping name.
+   * @param canModify Checks whether the caller can read a never-published model.
    * @return The current mapping.
    */
-  public OntologyMapping loadMapping(NameIdentifier model, String name) {
+  public OntologyMapping loadMapping(
+      NameIdentifier model, String name, Predicate<NameIdentifier> canModify) {
     return operate(
         OperationType.LOAD_ONTOLOGY_MAPPING,
         mappingIdent(model, name),
-        () -> storage.loadMapping(normalizeModel(model), name));
+        () -> storage.loadMapping(normalizeModel(model), name, canModify));
   }
 
   /**
@@ -321,16 +328,18 @@ public final class OntologyDispatcher {
    * @param model The parent model.
    * @param name The mapping name.
    * @param format The output format.
+   * @param canModify Checks whether the caller can read a never-published model.
    * @return The Ossie document.
    */
-  public OssieDocument exportMapping(NameIdentifier model, String name, OssieFormat format) {
+  public OssieDocument exportMapping(
+      NameIdentifier model, String name, OssieFormat format, Predicate<NameIdentifier> canModify) {
     return operate(
         OperationType.EXPORT_ONTOLOGY_MAPPING,
         mappingIdent(model, name),
         () -> {
           NameIdentifier parent = normalizeModel(model);
           return OssieOntologyDocuments.exportMapping(
-              storage.loadMapping(parent, name), parent.name(), format);
+              storage.loadMapping(parent, name, canModify), parent.name(), format);
         });
   }
 

@@ -100,7 +100,9 @@ class TestOntologyDispatcher {
         .when(catalog)
         .checkMetalakeAndCatalogInUse();
 
-    assertThrows(CatalogNotInUseException.class, () -> dispatcher.loadMapping(MODEL, "customers"));
+    assertThrows(
+        CatalogNotInUseException.class,
+        () -> dispatcher.loadMapping(MODEL, "customers", ignored -> true));
     assertThrows(CatalogNotInUseException.class, () -> dispatcher.dropMapping(MODEL, "customers"));
     verifyNoInteractions(storage);
   }
@@ -113,7 +115,9 @@ class TestOntologyDispatcher {
     assertThrows(
         MetalakeNotInUseException.class,
         () -> dispatcher.dropOntology(METALAKE.name(), "Sales", (mapping, published) -> true));
-    assertThrows(MetalakeNotInUseException.class, () -> dispatcher.listModelMappings(MODEL));
+    assertThrows(
+        MetalakeNotInUseException.class,
+        () -> dispatcher.listModelMappings(MODEL, ignored -> true));
     verifyNoInteractions(storage);
   }
 

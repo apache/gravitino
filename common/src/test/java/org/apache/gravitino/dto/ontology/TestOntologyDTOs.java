@@ -19,6 +19,7 @@
 package org.apache.gravitino.dto.ontology;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
@@ -67,5 +68,13 @@ class TestOntologyDTOs {
     response.validate();
     assertEquals(request.definition(), response.ontology().definition());
     assertEquals("steward", response.ontology().auditInfo().creator());
+  }
+
+  @Test
+  void testMappingCannotAlterItsOntology() throws Exception {
+    OntologyUpdatesRequest request =
+        JSON.readValue(
+            "{\"updates\":[{\"@type\":\"replaceOntology\"}]}", OntologyUpdatesRequest.class);
+    assertThrows(IllegalArgumentException.class, request::mappingChanges);
   }
 }
