@@ -460,3 +460,32 @@ CREATE INDEX IF NOT EXISTS `idx_tag_relation_meta_live` ON `tag_relation_meta` (
 CREATE INDEX IF NOT EXISTS `idx_role_meta_securable_object_live` ON `role_meta_securable_object` (`metadata_object_id`, `type`, `deleted_at`);
 CREATE INDEX IF NOT EXISTS `idx_user_role_rel_live` ON `user_role_rel` (`role_id`, `deleted_at`);
 CREATE INDEX IF NOT EXISTS `idx_policy_tag_relation_meta_live` ON `policy_tag_relation_meta` (`tag_id`, `deleted_at`);
+
+CREATE TABLE IF NOT EXISTS `ontology_meta` (
+    `ontology_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'ontology id',
+    `ontology_name` VARCHAR(128) NOT NULL COMMENT 'ontology name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'ontology identity audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'last allocated version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'ontology deleted at',
+    PRIMARY KEY (`ontology_id`),
+    UNIQUE KEY `uk_onm_mid_name_del` (`metalake_id`, `ontology_name`, `deleted_at`),
+    KEY `idx_onm_deleted` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'ontology identity';
+
+CREATE TABLE IF NOT EXISTS `ontology_version_info` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `ontology_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'ontology id',
+    `version` INT UNSIGNED NOT NULL COMMENT 'version',
+    `ontology_comment` TEXT DEFAULT NULL COMMENT 'comment snapshot',
+    `definition` MEDIUMTEXT NOT NULL COMMENT 'normalized OntologyDefinition (JSON)',
+    `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'properties snapshot (JSON)',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'version audit info',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'version deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_onvi_oid_ver_del` (`ontology_id`, `version`, `deleted_at`),
+    KEY `idx_onvi_mid` (`metalake_id`, `deleted_at`),
+    KEY `idx_onvi_deleted` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'ontology versions';
