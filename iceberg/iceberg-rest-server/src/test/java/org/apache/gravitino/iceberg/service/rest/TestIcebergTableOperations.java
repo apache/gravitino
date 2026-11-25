@@ -761,6 +761,23 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   @ParameterizedTest
   @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testCreateWithV3TypeAndDefaultFormatVersionReturnsBadRequest(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    Schema variantSchema = new Schema(NestedField.optional(1, "payload", Types.VariantType.get()));
+    CreateTableRequest request =
+        CreateTableRequest.builder()
+            .withName("create_variant_default_v2")
+            .withSchema(variantSchema)
+            .build();
+    assertBadRequest(
+        getTableClientBuilder(namespace, Optional.empty())
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE)),
+        "variant is not supported until v3");
+    verifyLoadTableFail(namespace, "create_variant_default_v2", 404);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
   void testCreateWithInvalidTruncateReturnsBadRequest(Namespace namespace) {
     verifyCreateNamespaceSucc(namespace);
     for (boolean staged : new boolean[] {false, true}) {

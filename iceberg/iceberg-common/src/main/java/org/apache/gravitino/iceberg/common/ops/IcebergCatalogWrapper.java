@@ -559,15 +559,13 @@ public class IcebergCatalogWrapper implements AutoCloseable {
    * @return the response after committing the table change
    */
   public LoadTableResponse buildAndUpdateTable(Function<Catalog, IcebergTableChange> builder) {
-    IcebergTableChange change;
     try {
-      change = builder.apply(getCatalog());
+      return updateTable(builder.apply(getCatalog()));
     } catch (IllegalStateException e) {
-      // UpdateSchema.commit runs Schema.checkCompatibility before returning a change; map that
-      // client error like UnsupportedOperationException on create/update.
+      // Safety net: UpdateSchema.commit runs Schema.checkCompatibility. Prefer validating apply()
+      // with validateSchema before commit (IcebergCatalogWrapperHelper); map stragglers to 400.
       throw new BadRequestException("%s", e.getMessage());
     }
-    return updateTable(change);
   }
 
   public LoadViewResponse createView(Namespace namespace, CreateViewRequest request) {
@@ -774,12 +772,16 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     if (request == null || request.updates() == null) {
       return;
     }
-    // Default matches Iceberg TableMetadata when no UpgradeFormatVersion is present.
-    int formatVersion = 2;
+    // Match CatalogHandlers.create / FederatedCatalogWrapper: resolve UpgradeFormatVersion first
+    // so AddSchema order relative to the upgrade does not change the effective format version.
+    int formatVersion =
+        request.updates().stream()
+            .filter(MetadataUpdate.UpgradeFormatVersion.class::isInstance)
+            .map(update -> ((MetadataUpdate.UpgradeFormatVersion) update).formatVersion())
+            .findFirst()
+            .orElse(2);
     for (MetadataUpdate update : request.updates()) {
-      if (update instanceof MetadataUpdate.UpgradeFormatVersion) {
-        formatVersion = ((MetadataUpdate.UpgradeFormatVersion) update).formatVersion();
-      } else if (update instanceof MetadataUpdate.AddSchema) {
+      if (update instanceof MetadataUpdate.AddSchema) {
         validateSchema(((MetadataUpdate.AddSchema) update).schema(), formatVersion);
       }
     }
@@ -814,7 +816,12 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     return formatVersion;
   }
 
-  protected static void validateSchema(Schema schema, int formatVersion) {
+  /**
+   * Runs {@link Schema#checkCompatibility} and maps failures to {@link BadRequestException}. Call
+   * this on {@link org.apache.iceberg.UpdateSchema#apply()} results before {@code commit()} so
+   * builders do not rely on catching {@link IllegalStateException}.
+   */
+  public static void validateSchema(Schema schema, int formatVersion) {
     try {
       Schema.checkCompatibility(schema, formatVersion);
     } catch (IllegalStateException | IllegalArgumentException e) {
@@ -848,16 +855,23 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       return;
     }
     TableMetadata base = ((HasTableOperations) table).operations().current();
-    int formatVersion = base.formatVersion();
-    for (MetadataUpdate update : request.updates()) {
-      if (update instanceof MetadataUpdate.UpgradeFormatVersion) {
-        formatVersion = ((MetadataUpdate.UpgradeFormatVersion) update).formatVersion();
-      } else if (update instanceof MetadataUpdate.AddSchema) {
-        validateSchema(((MetadataUpdate.AddSchema) update).schema(), formatVersion);
+    // Replay format/schema updates on a builder so checkCompatibility uses the same format version
+    // Iceberg would see at each step (upgrade-before-add succeeds; reverse order fails like
+    // commit).
+    TableMetadata.Builder builder = TableMetadata.buildFrom(base);
+    try {
+      for (MetadataUpdate update : request.updates()) {
+        if (update instanceof MetadataUpdate.UpgradeFormatVersion
+            || update instanceof MetadataUpdate.AddSchema) {
+          update.applyTo(builder);
+        }
       }
-    }
-    if (hasFormatUpgrade && !hasSchemaUpdate) {
-      validateSchema(base.schema(), formatVersion);
+      if (hasFormatUpgrade && !hasSchemaUpdate) {
+        TableMetadata pending = builder.build();
+        validateSchema(pending.schema(), pending.formatVersion());
+      }
+    } catch (IllegalStateException | IllegalArgumentException e) {
+      throw new BadRequestException("%s", e.getMessage());
     }
   }
 

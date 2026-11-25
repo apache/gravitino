@@ -405,6 +405,7 @@ public class TestIcebergCatalogWrapper {
               .setProperties(ImmutableMap.of("format-version", "2"))
               .build());
 
+      // Commit without pre-validate: buildAndUpdateTable safety net maps ISE → BadRequestException.
       BadRequestException failure =
           Assertions.assertThrows(
               BadRequestException.class,
@@ -448,6 +449,93 @@ public class TestIcebergCatalogWrapper {
               Collections.emptyList(),
               Arrays.asList(
                   new MetadataUpdate.AddSchema(evolved), new MetadataUpdate.SetCurrentSchema(-1)));
+      BadRequestException failure =
+          Assertions.assertThrows(
+              BadRequestException.class, () -> wrapper.updateTable(identifier, request));
+      Assertions.assertTrue(
+          failure.getMessage().contains("variant is not supported until v3"), failure.getMessage());
+    }
+  }
+
+  @Test
+  public void testValidateStagedCreateAllowsAddSchemaBeforeUpgradeFormatVersion() {
+    Schema variantSchema =
+        new Schema(Types.NestedField.optional(1, "payload", Types.VariantType.get()));
+    // AddSchema before UpgradeFormatVersion: still validates against v3 (CatalogHandlers.create).
+    UpdateTableRequest request =
+        new UpdateTableRequest(
+            Collections.emptyList(),
+            Arrays.asList(
+                new MetadataUpdate.AddSchema(variantSchema),
+                new MetadataUpdate.UpgradeFormatVersion(3)));
+    Assertions.assertDoesNotThrow(() -> IcebergCatalogWrapper.validateStagedCreateUpdates(request));
+  }
+
+  @Test
+  public void testUpdateTableUpgradeThenAddV3SchemaSucceeds(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Namespace namespace = Namespace.of("db");
+      TableIdentifier identifier = TableIdentifier.of(namespace, "t_v2_upgrade_add");
+      wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+      wrapper.createTable(
+          namespace,
+          CreateTableRequest.builder()
+              .withName("t_v2_upgrade_add")
+              .withSchema(new Schema(Types.NestedField.required(1, "id", Types.LongType.get())))
+              .setProperties(ImmutableMap.of("format-version", "2"))
+              .build());
+
+      Schema evolved =
+          new Schema(
+              Types.NestedField.required(1, "id", Types.LongType.get()),
+              Types.NestedField.optional(2, "payload", Types.VariantType.get()));
+      UpdateTableRequest request =
+          new UpdateTableRequest(
+              Collections.emptyList(),
+              Arrays.asList(
+                  new MetadataUpdate.UpgradeFormatVersion(3),
+                  new MetadataUpdate.AddSchema(evolved),
+                  new MetadataUpdate.SetCurrentSchema(-1)));
+      Assertions.assertDoesNotThrow(() -> wrapper.updateTable(identifier, request));
+      Assertions.assertEquals(
+          3,
+          ((HasTableOperations) wrapper.getCatalog().loadTable(identifier))
+              .operations()
+              .current()
+              .formatVersion());
+    }
+  }
+
+  @Test
+  public void testUpdateTableAddV3SchemaBeforeUpgradeIsBadRequest(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Namespace namespace = Namespace.of("db");
+      TableIdentifier identifier = TableIdentifier.of(namespace, "t_v2_add_before_upgrade");
+      wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+      wrapper.createTable(
+          namespace,
+          CreateTableRequest.builder()
+              .withName("t_v2_add_before_upgrade")
+              .withSchema(new Schema(Types.NestedField.required(1, "id", Types.LongType.get())))
+              .setProperties(ImmutableMap.of("format-version", "2"))
+              .build());
+
+      Schema evolved =
+          new Schema(
+              Types.NestedField.required(1, "id", Types.LongType.get()),
+              Types.NestedField.optional(2, "payload", Types.VariantType.get()));
+      // Same order Iceberg commit would reject: AddSchema still sees format-version 2.
+      UpdateTableRequest request =
+          new UpdateTableRequest(
+              Collections.emptyList(),
+              Arrays.asList(
+                  new MetadataUpdate.AddSchema(evolved),
+                  new MetadataUpdate.UpgradeFormatVersion(3),
+                  new MetadataUpdate.SetCurrentSchema(-1)));
       BadRequestException failure =
           Assertions.assertThrows(
               BadRequestException.class, () -> wrapper.updateTable(identifier, request));
