@@ -48,10 +48,7 @@ public interface KnowledgeBaseArticleMapper {
   String LIVE = " FROM kb_article_meta WHERE metalake_id=#{metalakeId} AND deleted_at=0";
 
   /** Loads the live row under an exclusive lock. */
-  @Select(
-      "SELECT article_id AS articleId, metalake_id AS metalakeId, revision"
-          + LIVE
-          + " AND article_name=#{name} FOR UPDATE")
+  @Select("SELECT " + COLUMNS + LIVE + " AND article_name=#{name} FOR UPDATE")
   @Nullable
   KnowledgeBaseArticlePO lock(@Param("metalakeId") long metalakeId, @Param("name") String name);
 
@@ -67,7 +64,7 @@ public interface KnowledgeBaseArticleMapper {
   /** Reads the stored body and its revision in one statement. */
   @Select(
       """
-      SELECT a.metalake_id AS metalakeId, a.article_id AS articleId, a.revision,
+      SELECT a.metalake_id AS metalakeId, a.article_id AS articleId, a.revision, a.status,
           a.body_format AS bodyFormat, a.body_content AS bodyContent
       FROM kb_article_meta a JOIN metalake_meta m ON a.metalake_id=m.metalake_id
       WHERE m.metalake_name=#{metalake} AND m.deleted_at=0 AND a.article_name=#{name} AND a.deleted_at=0

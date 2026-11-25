@@ -983,7 +983,10 @@ public class GravitinoEnv {
     this.glossaryManager =
         new GlossaryManager(idGenerator, config.get(Configs.ENABLE_AUTHORIZATION));
     this.articleManager =
-        new ArticleManager(idGenerator, config.get(Configs.KB_ARTICLE_MAX_BODY_BYTES));
+        new ArticleManager(
+            idGenerator,
+            config.get(Configs.KB_ARTICLE_MAX_BODY_BYTES),
+            config.get(Configs.ENABLE_AUTHORIZATION));
     this.domainManager = new DomainManager(idGenerator, entityStore);
     this.internalDomainDispatcher = new DomainNormalizeDispatcher(domainManager);
 

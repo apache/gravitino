@@ -197,6 +197,7 @@ components:
           - "METALAKE"
           - "DOMAIN"
           - "GLOSSARY_TERM"
+          - "KNOWLEDGE_BASE_ARTICLE"
           - "CATALOG"
           - "SCHEMA"
           - "TABLE"

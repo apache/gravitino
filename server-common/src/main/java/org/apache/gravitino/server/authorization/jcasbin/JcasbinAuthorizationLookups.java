@@ -170,13 +170,11 @@ public class JcasbinAuthorizationLookups {
             mapper -> mapper.selectGlossaryTermOwner(metalake, GlossaryTermNames.key(name))));
   }
 
-  Optional<OwnerInfo> currentGlossaryTermOwner(long termId) {
+  Optional<OwnerInfo> currentDefinitionOwner(long id, MetadataObject.Type type) {
     return Optional.ofNullable(
         SessionUtils.getWithoutCommitFresh(
             OwnerMetaMapper.class,
-            mapper ->
-                mapper.selectOwnerByMetadataObjectIdAndType(
-                    termId, MetadataObject.Type.GLOSSARY_TERM.name())));
+            mapper -> mapper.selectOwnerByMetadataObjectIdAndType(id, type.name())));
   }
 
   private static Long loadMetadataId(MetadataObject metadataObject, String metalake) {

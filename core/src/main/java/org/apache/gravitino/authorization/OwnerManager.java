@@ -41,6 +41,7 @@ import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
+import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -89,7 +90,17 @@ public class OwnerManager implements OwnerDispatcher {
                         throw new NoSuchMetadataObjectException(
                             "Glossary term %s does not exist", objectIdent);
                       }
-                      checkTermOwnerTransfer(metalake, current.get().id());
+                      checkDefinitionOwnerTransfer(
+                          metalake, metadataObject.type(), current.get().id());
+                      return replaceOwner(metalake, metadataObject, objectIdent, newOwner);
+                    });
+      } else if (metadataObject.type() == MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE) {
+        originOwner =
+            KnowledgeBaseArticleMetaService.getInstance()
+                .withLockedArticleId(
+                    objectIdent,
+                    id -> {
+                      checkDefinitionOwnerTransfer(metalake, metadataObject.type(), id);
                       return replaceOwner(metalake, metadataObject, objectIdent, newOwner);
                     });
       } else {
@@ -134,8 +145,9 @@ public class OwnerManager implements OwnerDispatcher {
           MetadataObjectUtil.toEntityType(metadataObjects.get(i)) == objectType,
           "All metadata objects in setOwners must share the same type");
     }
-    if (objectType == Entity.EntityType.GLOSSARY_TERM) {
-      // Each transfer must check the current owner while holding that term's row lock.
+    if (objectType == Entity.EntityType.GLOSSARY_TERM
+        || objectType == Entity.EntityType.KNOWLEDGE_BASE_ARTICLE) {
+      // Check each transfer while holding the corresponding definition's row lock.
       OwnerDispatcher.super.setOwners(metalake, metadataObjects, ownerName, ownerType);
       return;
     }
@@ -233,15 +245,19 @@ public class OwnerManager implements OwnerDispatcher {
   @Override
   public Optional<Owner> getOwner(String metalake, MetadataObject metadataObject) {
     GravitinoAuthorizer authorizer = authorizer();
-    if (metadataObject.type() == MetadataObject.Type.GLOSSARY_TERM && authorizer != null) {
+    if ((metadataObject.type() == MetadataObject.Type.GLOSSARY_TERM
+            || metadataObject.type() == MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE)
+        && authorizer != null) {
       // Visibility and the returned owner must refer to the same generation of this name.
       return SqlSessions.readSnapshot(
           () -> {
-            if (!authorizer.canAccessGlossaryTerm(
-                PrincipalUtils.getCurrentPrincipal(),
-                metalake,
-                metadataObject,
-                new AuthorizationRequestContext())) {
+            Principal principal = PrincipalUtils.getCurrentPrincipal();
+            AuthorizationRequestContext context = new AuthorizationRequestContext();
+            boolean visible =
+                metadataObject.type() == MetadataObject.Type.GLOSSARY_TERM
+                    ? authorizer.canAccessGlossaryTerm(principal, metalake, metadataObject, context)
+                    : authorizer.canAccessArticle(principal, metalake, metadataObject, context);
+            if (!visible) {
               throw new ForbiddenException("Current user cannot get this object's owner");
             }
             return Optional.ofNullable(readOwner(metalake, metadataObject));
@@ -298,7 +314,7 @@ public class OwnerManager implements OwnerDispatcher {
     }
   }
 
-  private void checkTermOwnerTransfer(String metalake, long termId) {
+  private void checkDefinitionOwnerTransfer(String metalake, MetadataObject.Type type, long id) {
     GravitinoAuthorizer authorizer = authorizer();
     if (authorizer == null) {
       return;
@@ -306,8 +322,14 @@ public class OwnerManager implements OwnerDispatcher {
     Principal principal = PrincipalUtils.getCurrentPrincipal();
     AuthorizationRequestContext context = new AuthorizationRequestContext();
     MetadataObject lake = MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE);
-    if (!authorizer.isOwner(principal, metalake, lake, context)
-        && !authorizer.isGlossaryTermOwner(principal, metalake, termId, context)) {
+    if (authorizer.isOwner(principal, metalake, lake, context)) {
+      return;
+    }
+    boolean owns =
+        type == MetadataObject.Type.GLOSSARY_TERM
+            ? authorizer.isGlossaryTermOwner(principal, metalake, id, context)
+            : authorizer.isArticleOwner(principal, metalake, id, context);
+    if (!owns) {
       throw new ForbiddenException("Current user cannot set this object's owner");
     }
   }

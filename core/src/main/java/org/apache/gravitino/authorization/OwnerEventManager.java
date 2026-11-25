@@ -80,8 +80,10 @@ public class OwnerEventManager implements OwnerDispatcher {
     if (metadataObjects.isEmpty()) {
       return;
     }
-    if (metadataObjects.stream()
-        .allMatch(object -> object.type() == MetadataObject.Type.GLOSSARY_TERM)) {
+    MetadataObject.Type firstType = metadataObjects.get(0).type();
+    if ((firstType == MetadataObject.Type.GLOSSARY_TERM
+            || firstType == MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE)
+        && metadataObjects.stream().allMatch(object -> object.type() == firstType)) {
       // A later failure must not emit failure events for transfers that already committed.
       OwnerDispatcher.super.setOwners(metalake, metadataObjects, ownerName, ownerType);
       return;

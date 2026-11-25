@@ -777,6 +777,7 @@ class PermissionManager {
       List<SecurableObject> securableObjects,
       MetadataObject targetObject,
       Function<SecurableObject, SecurableObject> objectUpdater) {
+    SecurableObjects.checkGrantScope(targetObject.type());
 
     // Find a matched securable object to update privileges
     List<SecurableObject> updateSecurableObjects = Lists.newArrayList(securableObjects);

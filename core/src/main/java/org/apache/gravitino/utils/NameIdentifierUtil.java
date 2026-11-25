@@ -1053,6 +1053,7 @@ public class NameIdentifierUtil {
       case JOB:
       case JOB_TEMPLATE:
       case GLOSSARY_TERM:
+      case KNOWLEDGE_BASE_ARTICLE:
       case DOMAIN:
         return Entity.EntityType.METALAKE;
 

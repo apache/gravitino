@@ -89,6 +89,23 @@ public interface GravitinoAuthorizer extends Closeable {
     return false;
   }
 
+  /** Returns whether the caller may read the Article identified by the metadata object. */
+  default boolean canAccessArticle(
+      Principal principal,
+      String metalake,
+      MetadataObject object,
+      AuthorizationRequestContext context) {
+    return false;
+  }
+
+  /**
+   * Checks the current user or group owner of the stable Article ID in the caller's transaction.
+   */
+  default boolean isArticleOwner(
+      Principal principal, String metalake, long articleId, AuthorizationRequestContext context) {
+    return false;
+  }
+
   boolean deny(
       Principal principal,
       String metalake,

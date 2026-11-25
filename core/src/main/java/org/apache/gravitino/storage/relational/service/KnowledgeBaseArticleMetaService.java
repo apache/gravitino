@@ -41,6 +41,8 @@ import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.LongFunction;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
@@ -123,7 +125,7 @@ public final class KnowledgeBaseArticleMetaService {
   }
 
   /** Body and stable revision identity read from the same live row. */
-  public record StoredContent(ArticleBody body, ExpectedRevision revision) {}
+  public record StoredContent(ArticleBody body, ExpectedRevision revision, ArticleStatus status) {}
 
   private KnowledgeBaseArticleMetaService() {}
 
@@ -190,7 +192,8 @@ public final class KnowledgeBaseArticleMetaService {
     }
     return new StoredContent(
         ArticleBody.of(ArticleBody.Format.valueOf(row.getBodyFormat()), row.getBodyContent()),
-        new ExpectedRevision(row.getMetalakeId(), row.getArticleId(), row.getRevision()));
+        new ExpectedRevision(row.getMetalakeId(), row.getArticleId(), row.getRevision()),
+        ArticleStatus.valueOf(row.getStatus()));
   }
 
   /** Resolves the stable ID without fetching the Article body. */
@@ -245,11 +248,24 @@ public final class KnowledgeBaseArticleMetaService {
   public ScopedArticle insertScoped(
       KnowledgeBaseArticleEntity entity, boolean overwrite, TransactionHook hook)
       throws IOException {
+    return insertScoped(entity.nameIdentifier(), () -> entity, overwrite, hook);
+  }
+
+  /** Prepares the Article under its metalake fence before checking conflicts or writing rows. */
+  public ScopedArticle insertScoped(
+      NameIdentifier ident,
+      Supplier<KnowledgeBaseArticleEntity> prepare,
+      boolean overwrite,
+      TransactionHook hook)
+      throws IOException {
     try {
       return write(
-          entity.namespace(),
+          ident.namespace(),
           (mapper, metalakeId) -> {
-            KnowledgeBaseArticleEntity before = overwrite ? observe(entity.nameIdentifier()) : null;
+            KnowledgeBaseArticleEntity entity = prepare.get();
+            Preconditions.checkArgument(
+                ident.equals(entity.nameIdentifier()), "Expected Article %s", ident);
+            KnowledgeBaseArticleEntity before = overwrite ? observe(ident) : null;
             if (before != null) {
               KnowledgeBaseArticlePO row =
                   lockForChange(mapper, metalakeId, before, entity.domainIds(), null);
@@ -285,7 +301,8 @@ public final class KnowledgeBaseArticleMetaService {
     } catch (NameConflictException e) {
       throw e;
     } catch (RuntimeException e) {
-      ExceptionUtils.checkSQLException(e, entity.type(), entity.nameIdentifier().toString());
+      ExceptionUtils.checkSQLException(
+          e, Entity.EntityType.KNOWLEDGE_BASE_ARTICLE, ident.toString());
       throw e;
     }
   }
@@ -335,6 +352,30 @@ public final class KnowledgeBaseArticleMetaService {
         });
   }
 
+  /** Checks and applies a content or metadata edit to the locked Article. */
+  public ScopedArticle editMetadata(
+      NameIdentifier ident,
+      Function<ScopedArticle, KnowledgeBaseArticleEntity> edit,
+      TransactionHook hook) {
+    return withLockedRow(
+        ident,
+        (mapper, row) -> {
+          long lake = row.getMetalakeId();
+          KnowledgeBaseArticleEntity before = materialize(ident.namespace(), row, mapper);
+          KnowledgeBaseArticleEntity after = edit.apply(new ScopedArticle(lake, before));
+          Preconditions.checkArgument(
+              before.domainIds().equals(after.domainIds())
+                  && before.bindings().equals(after.bindings()),
+              "Relation changes require endpoint lock planning");
+          return new ScopedArticle(lake, replace(mapper, row, before, after, hook));
+        });
+  }
+
+  /** Runs an owner transfer under the parent fence and the current Article's row lock. */
+  public <T> T withLockedArticleId(NameIdentifier ident, LongFunction<T> operation) {
+    return withLockedRow(ident, (mapper, row) -> operation.apply(row.getArticleId()));
+  }
+
   /** Retires a live Article and its bindings atomically. */
   public boolean delete(NameIdentifier ident) {
     return delete(ident, NO_HOOK);
@@ -342,6 +383,12 @@ public final class KnowledgeBaseArticleMetaService {
 
   /** Retires an Article and invokes its storage extension with the former state. */
   public boolean delete(NameIdentifier ident, TransactionHook hook) {
+    return delete(ident, article -> true, hook);
+  }
+
+  /** Checks deletion authority against the locked Article; a hidden Article is reported absent. */
+  public boolean delete(
+      NameIdentifier ident, Predicate<KnowledgeBaseArticleEntity> canDelete, TransactionHook hook) {
     // A revision change can retry the plan. Keep the first identity across those attempts.
     AtomicReference<Long> targetId = new AtomicReference<>();
     return write(
@@ -356,7 +403,7 @@ public final class KnowledgeBaseArticleMetaService {
             return false;
           }
           KnowledgeBaseArticlePO row = lockObservedArticle(mapper, metalakeId, old, Set.of(), null);
-          if (row == null) {
+          if (row == null || !canDelete.test(old)) {
             return false;
           }
           long now = System.currentTimeMillis();
@@ -386,6 +433,21 @@ public final class KnowledgeBaseArticleMetaService {
         m -> {
           int bindings = m.purgeBindings(cutoff, limit);
           return bindings == limit ? bindings : bindings + m.purge(cutoff, limit - bindings);
+        });
+  }
+
+  private <T> T withLockedRow(
+      NameIdentifier ident,
+      BiFunction<KnowledgeBaseArticleMapper, KnowledgeBaseArticlePO, T> operation) {
+    String name = KnowledgeBaseArticle.normalizeName(ident.name());
+    return write(
+        ident.namespace(),
+        (mapper, lake) -> {
+          KnowledgeBaseArticlePO row = mapper.lock(lake, name);
+          if (row == null) {
+            throw missing(ident);
+          }
+          return operation.apply(mapper, row);
         });
   }
 
