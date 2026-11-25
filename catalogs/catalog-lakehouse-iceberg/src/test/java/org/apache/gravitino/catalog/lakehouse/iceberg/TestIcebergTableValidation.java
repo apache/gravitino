@@ -257,6 +257,20 @@ class TestIcebergTableValidation {
 
   @ParameterizedTest
   @MethodSource("versionThreeTypes")
+  void testAddVersionThreeTypeToVersionTwoTableIsBadRequest(Type type) {
+    createOrdinaryTable("add_v3_type");
+    Exception failure =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                operations.alterTable(
+                    table("add_v3_type"), TableChange.addColumn(new String[] {"value"}, type)));
+    assertEquals(400, tableError(OperationType.ALTER, failure));
+    assertOrdinaryColumns("add_v3_type");
+  }
+
+  @ParameterizedTest
+  @MethodSource("versionThreeTypes")
   void testVersionThreeTypeRoundTrip(Type type) {
     operations.createTable(
         table("version_three"),
