@@ -91,6 +91,7 @@ import org.apache.gravitino.server.web.rest.SemanticModelOperations;
 import org.apache.gravitino.server.web.rest.StatisticOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
 import org.apache.gravitino.server.web.rest.TagOperations;
+import org.apache.gravitino.server.web.rest.TermOperations;
 import org.apache.gravitino.server.web.rest.TopicOperations;
 import org.apache.gravitino.server.web.rest.UserOperations;
 import org.apache.gravitino.server.web.rest.ViewOperations;
@@ -137,6 +138,7 @@ public class GravitinoInterceptionService implements InterceptionService {
             MetadataObjectTagOperations.class.getName(),
             TagOperations.class.getName(),
             DomainOperations.class.getName(),
+            TermOperations.class.getName(),
             DomainMembershipOperations.class.getName(),
             MetadataObjectDomainOperations.class.getName(),
             PolicyOperations.class.getName(),

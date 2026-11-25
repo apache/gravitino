@@ -34,6 +34,7 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -41,6 +42,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -64,11 +66,13 @@ import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.domain.DomainChange;
 import org.apache.gravitino.domain.DomainDispatcher;
 import org.apache.gravitino.domain.DomainManager;
+import org.apache.gravitino.dto.glossary.TermDTO;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.apache.gravitino.exceptions.NonEmptyDomainException;
 import org.apache.gravitino.exceptions.TermAlreadyExistsException;
+import org.apache.gravitino.exceptions.TermVersionConflictException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
@@ -80,6 +84,7 @@ import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermRelMapper;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.GlossaryTermPO;
 import org.apache.gravitino.storage.relational.service.GlossaryDomainFixtures;
@@ -99,6 +104,7 @@ import org.junit.jupiter.api.TestTemplate;
 import org.mockito.AdditionalAnswers;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
+import org.mockito.invocation.InvocationOnMock;
 
 /** Runs glossary domain membership against real grant, domain and term rows (T7). */
 class TestGlossaryDomains extends TestJDBCBackend {
@@ -197,6 +203,223 @@ class TestGlossaryDomains extends TestJDBCBackend {
     GlossaryTermEntity term = as("lakeOwner", () -> manager.getTerm(LAKE, "Churn"));
     assertArrayEquals(new String[] {"Retail", "Sales"}, term.domains());
     assertEquals(1, term.version());
+  }
+
+  @TestTemplate
+  void testNameListSkipsMemberDomainProjection() throws Exception {
+    GlossaryTermViews views = new GlossaryTermViews(manager);
+    create("Needle", "Sales");
+    create("Other", "Finance");
+    as("viewer", () -> views.listTermNames(LAKE, null, null, null));
+    List<String> lookups = new ArrayList<>();
+    try (MockedStatic<SqlSessions> ignored =
+        observeMapper(
+            DomainMetaMapper.class,
+            call -> {
+              if (call.getMethod().getName().equals("selectDomainMetaByMetalakeAndName")) {
+                lookups.add(call.getArgument(1));
+              }
+            })) {
+      assertArrayEquals(
+          new String[] {"Needle"},
+          as("viewer", () -> views.listTermNames(LAKE, null, "EEd", null)));
+      assertEquals(List.of(), lookups);
+      TermDTO[] details = as("viewer", () -> views.listTerms(LAKE, null, "EEd", null));
+      assertEquals(1, details.length);
+      assertArrayEquals(new String[] {"Sales"}, details[0].getDomains());
+      assertEquals(List.of("Sales"), lookups);
+    }
+  }
+
+  @TestTemplate
+  void testStatusFilterSkipsOwnershipChecksForExcludedDrafts() throws Exception {
+    GlossaryTermViews views = new GlossaryTermViews(manager);
+    GlossaryTerm.Status approved = GlossaryTerm.Status.APPROVED;
+    as("writer", () -> views.createTerm(LAKE, TermSpec.builder("Root").build()));
+    as(
+        "writer",
+        () ->
+            views.createTerm(
+                LAKE,
+                TermSpec.builder("Draft")
+                    .withStatus(GlossaryTerm.Status.DRAFT)
+                    .withBroader("Root")
+                    .build()));
+    GravitinoAuthorizer observed =
+        Mockito.mock(GravitinoAuthorizer.class, AdditionalAnswers.delegatesTo(authorizer));
+    env.setGravitinoAuthorizer(observed);
+    as(
+        "writer",
+        () -> {
+          assertArrayEquals(new String[] {"Root"}, views.listTermNames(LAKE, null, null, approved));
+          assertEquals("Root", views.listTerms(LAKE, null, null, approved)[0].getName());
+          assertThrows(NoSuchTermException.class, () -> views.getTerm(LAKE, "Draft", approved));
+          assertEquals(0, views.getTerm(LAKE, "Root", approved).getNarrower().length);
+          assertEquals(
+              0,
+              views.getTermHierarchy(LAKE, "Root", GlossaryManager.Direction.NARROWER, approved)
+                  .length);
+          return null;
+        });
+    Mockito.verify(observed, Mockito.never())
+        .isGlossaryTermOwner(Mockito.any(), Mockito.eq(LAKE), Mockito.anyLong(), Mockito.any());
+    assertEquals("Draft", as("writer", () -> views.getTerm(LAKE, "Draft", null)).getName());
+    Mockito.verify(observed)
+        .isGlossaryTermOwner(Mockito.any(), Mockito.eq(LAKE), Mockito.anyLong(), Mockito.any());
+  }
+
+  @TestTemplate
+  void testDetailedListReusesVisibleRelationEndpoints() throws Exception {
+    GlossaryTermViews views = new GlossaryTermViews(manager);
+    GlossaryTermEntity parent = create("Parent");
+    as(
+        "lakeOwner",
+        () -> views.createTerm(LAKE, TermSpec.builder("Child").withBroader("Parent").build()));
+    List<Long> loaded = new ArrayList<>();
+    try (MockedStatic<SqlSessions> ignored =
+        observeMapper(
+            GlossaryTermMetaMapper.class,
+            call -> {
+              if (call.getMethod().getName().equals("selectTermSnapshotsByIds")) {
+                loaded.addAll(call.<List<Long>>getArgument(2));
+              }
+            })) {
+      TermDTO[] all = as("lakeOwner", () -> views.listTerms(LAKE, null, null, null));
+      TermDTO child =
+          Arrays.stream(all).filter(t -> t.getName().equals("Child")).findFirst().orElseThrow();
+      assertArrayEquals(new String[] {"Parent"}, child.getBroader());
+      assertEquals(List.of(), loaded);
+      TermDTO[] onlyChild = as("lakeOwner", () -> views.listTerms(LAKE, null, "Child", null));
+      assertArrayEquals(new String[] {"Parent"}, onlyChild[0].getBroader());
+      assertEquals(List.of(parent.id()), loaded);
+    }
+  }
+
+  @TestTemplate
+  void testProjectionFailureRollsBackCreate() throws Exception {
+    GlossaryTermViews views = new GlossaryTermViews(manager);
+    RuntimeException failure = new IllegalStateException("Owner projection failed");
+    try (MockedStatic<SqlSessions> ignored =
+        observeMapper(
+            OwnerMetaMapper.class,
+            call -> {
+              if (call.getMethod()
+                  .getName()
+                  .equals("batchSelectUserOwnerMetaByMetadataObjectIdAndType")) {
+                throw failure;
+              }
+            })) {
+      assertEquals(
+          failure,
+          as(
+              "writer",
+              () ->
+                  assertThrows(
+                      IllegalStateException.class,
+                      () ->
+                          views.createTerm(
+                              LAKE, TermSpec.builder("Retry").withDomains("Sales").build()))));
+    }
+    as(
+        "lakeOwner",
+        () -> assertThrows(NoSuchTermException.class, () -> views.getTerm(LAKE, "Retry", null)));
+    assertTrue(as("lakeOwner", () -> manager.listTerms(LAKE, "Sales")).isEmpty());
+    assertEquals(
+        1L,
+        as("writer", () -> views.createTerm(LAKE, TermSpec.builder("Retry").build())).getVersion());
+  }
+
+  @TestTemplate
+  void testTermResponseSnapshot() throws Exception {
+    GlossaryTermViews views = new GlossaryTermViews(manager);
+    GlossaryTerm.Status approved = GlossaryTerm.Status.APPROVED;
+    GlossaryTermEntity leaf = create("Leaf", "Sales", "Finance");
+    as("lakeOwner", () -> transfer(leaf, "writer"));
+    as(
+        "lakeOwner",
+        () -> {
+          views.createTerm(LAKE, TermSpec.builder("Root").build());
+          views.createTerm(
+              LAKE, TermSpec.builder("Peer").withStatus(GlossaryTerm.Status.DEPRECATED).build());
+          views.createTerm(
+              LAKE,
+              TermSpec.builder("Middle")
+                  .withStatus(GlossaryTerm.Status.DRAFT)
+                  .withBroader("Root")
+                  .build());
+          TermDTO result =
+              views.alterTerm(
+                  LAKE,
+                  "Leaf",
+                  leaf.revisionToken(),
+                  new TermChange[] {
+                    TermChange.addBroader("Middle"), TermChange.addRelated("Peer")
+                  });
+          assertArrayEquals(new String[] {"Middle"}, result.getBroader());
+          assertEquals("writer", result.getOwner().name());
+          assertThrows(
+              TermVersionConflictException.class,
+              () ->
+                  views.alterTerm(
+                      LAKE,
+                      "Leaf",
+                      leaf.revisionToken(),
+                      new TermChange[] {TermChange.rename("Gone")}));
+          assertEquals(
+              2,
+              views.getTermHierarchy(LAKE, "Root", GlossaryManager.Direction.NARROWER, null)
+                  .length);
+          assertEquals(
+              0,
+              views.getTermHierarchy(LAKE, "Root", GlossaryManager.Direction.NARROWER, approved)
+                  .length);
+          assertThrows(NoSuchTermException.class, () -> views.getTerm(LAKE, "Middle", approved));
+          assertThrows(
+              NoSuchTermException.class,
+              () ->
+                  views.getTermHierarchy(
+                      LAKE, "Middle", GlossaryManager.Direction.BROADER, approved));
+          assertEquals(0, views.getTerm(LAKE, "Leaf", approved).getBroader().length);
+          assertArrayEquals(new String[] {"Peer"}, result.getRelated());
+          assertEquals(0, views.getTerm(LAKE, "Leaf", approved).getRelated().length);
+          assertEquals(0, views.getTerm(LAKE, "Root", approved).getNarrower().length);
+          assertFalse(
+              Arrays.asList(views.listTermNames(LAKE, null, null, approved)).contains("Middle"));
+          return null;
+        });
+    as(
+        "writer",
+        () -> {
+          String[] visible = {"Sales"};
+          assertArrayEquals(
+              visible,
+              views
+                  .createTerm(
+                      LAKE,
+                      TermSpec.builder("Child").withDomains("Sales").withBroader("Leaf").build())
+                  .getDomains());
+          assertArrayEquals(visible, views.getTerm(LAKE, "Leaf", null).getDomains());
+          assertArrayEquals(visible, views.listTerms(LAKE, "Sales", "eAF", null)[0].getDomains());
+          assertArrayEquals(
+              visible,
+              views.getTermHierarchy(LAKE, "Child", GlossaryManager.Direction.BROADER, null)[0]
+                  .getDomains());
+          assertArrayEquals(
+              visible,
+              views
+                  .alterTerm(
+                      LAKE, "Leaf", null, new TermChange[] {TermChange.updateDefinition("changed")})
+                  .getDomains());
+          return null;
+        });
+    assertArrayEquals(
+        new String[] {"Finance", "Sales"},
+        as("lakeOwner", () -> views.getTerm(LAKE, "Leaf", null)).getDomains());
+
+    GlossaryTermViews unauthzViews =
+        new GlossaryTermViews(new GlossaryManager(ids::incrementAndGet, false));
+    TermDTO unowned = unauthzViews.createTerm(LAKE, TermSpec.builder("Unowned").build());
+    assertEquals(null, unowned.getOwner());
   }
 
   @TestTemplate
@@ -927,6 +1150,24 @@ class TestGlossaryDomains extends TestJDBCBackend {
 
   private static List<String> names(List<GlossaryTermEntity> terms) {
     return terms.stream().map(GlossaryTermEntity::name).sorted().toList();
+  }
+
+  private static <T> MockedStatic<SqlSessions> observeMapper(
+      Class<T> type, Consumer<InvocationOnMock> onCall) {
+    return Mockito.mockStatic(
+        SqlSessions.class,
+        lookup -> {
+          Object mapper = lookup.callRealMethod();
+          if (lookup.getMethod().getName().equals("getMapper") && lookup.getArgument(0) == type) {
+            return Mockito.mock(
+                type,
+                call -> {
+                  onCall.accept(call);
+                  return AdditionalAnswers.delegatesTo(mapper).answer(call);
+                });
+          }
+          return mapper;
+        });
   }
 
   private static <T> T observeLock(

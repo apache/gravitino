@@ -458,14 +458,15 @@ public final class GlossaryTermMetaService {
   }
 
   /** Loads live terms in bounded batches from the named metalake and its observed identity. */
-  public List<GlossaryTermEntity> getByIds(Namespace ns, long lake, Set<Long> ids) {
+  public List<GlossaryTermEntity> listTermsByIds(Namespace ns, long lake, Set<Long> ids) {
     validateNamespace(ns);
     List<GlossaryTermEntity> result = new ArrayList<>();
     for (List<Long> batch : Lists.partition(List.copyOf(ids), LOOKUP_BATCH_SIZE)) {
       result.addAll(
           SessionUtils.getWithoutCommit(
               GlossaryTermMetaMapper.class,
-              mapper -> definitions(ns, mapper.snapshotByIds(lake, ns.level(0), batch))));
+              mapper ->
+                  definitions(ns, mapper.selectTermSnapshotsByIds(lake, ns.level(0), batch))));
     }
     return result;
   }
