@@ -81,10 +81,10 @@ export const getPoliciesForTagApi = ({ metalake, tag }) => {
   })
 }
 
-export const addPolicyForTagApi = ({ metalake, tag, policy }) => {
+export const addPolicyForTagApi = ({ metalake, tag, policy, selector }) => {
   return defHttp.post({
     url: Apis.TAG_POLICY({ metalake, tag, policy }),
-    data: { selector: { type: 'ALL_VALUES' } }
+    data: { selector }
   })
 }
 

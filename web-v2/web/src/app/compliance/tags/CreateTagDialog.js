@@ -20,6 +20,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { ColorPicker, Form, Input, Modal, Radio, Select, Space, Tag, Typography } from 'antd'
 import Icons from '@/components/Icons'
+import PolicyTag from '@/components/PolicyTag'
 import RenderPropertiesFormItem from '@/components/EntityPropertiesFormItem'
 import { validateMessages, mismatchName } from '@/config'
 import { nameRegex } from '@/lib/utils/regex'
@@ -41,7 +42,7 @@ const defaultValues = {
 }
 
 export default function CreateTagDialog({ ...props }) {
-  const { open, setOpen, metalake, editTag } = props
+  const { open, setOpen, metalake, editTag, onPolicyBindingsChange } = props
   const [confirmLoading, setConfirmLoading] = useState(false)
   const [cacheData, setCacheData] = useState()
   const loadedRef = useRef(false)
@@ -79,6 +80,7 @@ export default function CreateTagDialog({ ...props }) {
     // Reset loadedRef when dialog closes
     if (!open) {
       loadedRef.current = false
+      setCacheData(undefined)
     }
   }, [open, editTag, metalake])
 
@@ -226,6 +228,16 @@ export default function CreateTagDialog({ ...props }) {
                 </Form.Item>
               )}
             </>
+          )}
+          {open && editTag && cacheData?.name === editTag && (
+            <Form.Item label='Policies' extra='Policy mapping changes save immediately.'>
+              <PolicyTag
+                metadataObjectType='tag'
+                metadataObjectFullName={editTag}
+                allowedValues={cacheData.allowedValues}
+                onBindingsChange={onPolicyBindingsChange}
+              />
+            </Form.Item>
           )}
           <Form.Item name='color' label='Color'>
             <Space>
