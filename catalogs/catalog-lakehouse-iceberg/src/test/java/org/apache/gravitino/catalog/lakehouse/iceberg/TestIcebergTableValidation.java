@@ -105,6 +105,80 @@ class TestIcebergTableValidation {
     assertFalse(operations.tableExists(table("duplicates")));
   }
 
+  @ParameterizedTest
+  @MethodSource("unparsedTypes")
+  void testUnparsedTypeOnCreateIsBadRequest(Type type) {
+    IllegalArgumentException error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> create("unparsed_type", new Column[] {Column.of("id", type)}));
+    assertTrue(error.getMessage().contains("bigintz"));
+    assertTrue(error.getMessage().contains("column 'id"));
+    assertEquals(400, tableError(OperationType.CREATE, error));
+    assertFalse(operations.tableExists(table("unparsed_type")));
+  }
+
+  @Test
+  void testUnparsedNestedTypeReportsFullColumnPath() {
+    Type type =
+        Types.StructType.of(
+            Types.StructType.Field.nullableField(
+                "items",
+                Types.ListType.nullable(
+                    Types.MapType.valueNullable(
+                        Types.StringType.get(),
+                        Types.StructType.of(
+                            Types.StructType.Field.nullableField(
+                                "value", Types.UnparsedType.of("bigintz")))))));
+    IllegalArgumentException error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> create("unparsed_nested", new Column[] {Column.of("payload", type)}));
+    assertEquals(
+        "Unsupported type 'bigintz' for column 'payload.items.value' in an Iceberg table",
+        error.getMessage());
+    assertEquals(400, tableError(OperationType.CREATE, error));
+    assertFalse(operations.tableExists(table("unparsed_nested")));
+  }
+
+  @ParameterizedTest
+  @MethodSource("unparsedTypes")
+  void testUnparsedTypeOnAddLeavesSchemaUnchanged(Type type) {
+    createOrdinaryTable("unparsed_add");
+    for (boolean nullable : new boolean[] {true, false}) {
+      IllegalArgumentException error =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  operations.alterTable(
+                      table("unparsed_add"),
+                      TableChange.addColumn(new String[] {"valid"}, Types.StringType.get()),
+                      TableChange.addColumn(new String[] {"bad"}, type, nullable)));
+      assertTrue(error.getMessage().contains("bigintz"));
+      assertEquals(400, tableError(OperationType.ALTER, error));
+      assertOrdinaryColumns("unparsed_add");
+    }
+  }
+
+  @Test
+  void testUnparsedTypeOnUpdateLeavesSchemaUnchanged() {
+    createOrdinaryTable("unparsed_update");
+    IllegalArgumentException error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                operations.alterTable(
+                    table("unparsed_update"),
+                    TableChange.updateColumnType(
+                        new String[] {"id"}, Types.UnparsedType.of("bigintz"))));
+    assertTrue(error.getMessage().contains("bigintz"));
+    assertEquals(400, tableError(OperationType.ALTER, error));
+    assertOrdinaryColumns("unparsed_update");
+    assertEquals(
+        Types.LongType.get(),
+        operations.loadTable(table("unparsed_update")).columns()[0].dataType());
+  }
+
   @Test
   void testRenameColumnConflictLeavesSchemaUnchanged() {
     createOrdinaryTable("rename_column");
@@ -204,7 +278,46 @@ class TestIcebergTableValidation {
                     new Index[0]));
     assertTrue(failure.getMessage().contains("format-version"));
     assertEquals(400, tableError(OperationType.CREATE, failure));
+<<<<<<< HEAD
     assertFalse(operations.tableExists(table("invalid_version")));
+=======
+    assertFalse(operations.tableExists(table("unsupported_type")));
+  }
+
+  @ParameterizedTest
+  @MethodSource("versionThreeTypes")
+  void testVersionThreeTypeRoundTrip(Type type) {
+    operations.createTable(
+        table("version_three"),
+        new Column[] {Column.of("value", type)},
+        "",
+        Map.of("format-version", "3"),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[0]);
+    assertEquals(type, operations.loadTable(table("version_three")).columns()[0].dataType());
+  }
+
+  private static Stream<Type> unparsedTypes() {
+    Type unparsed = Types.UnparsedType.of("bigintz");
+    return Stream.of(
+        unparsed,
+        Types.ListType.nullable(unparsed),
+        Types.MapType.valueNullable(unparsed, Types.StringType.get()),
+        Types.MapType.valueNullable(Types.StringType.get(), unparsed),
+        Types.StructType.of(Types.StructType.Field.nullableField("nested", unparsed)),
+        Types.ListType.nullable(
+            Types.StructType.of(Types.StructType.Field.nullableField("nested", unparsed))));
+  }
+
+  private static Stream<Type> versionThreeTypes() {
+    return Stream.of(
+        Types.NullType.get(),
+        Types.VariantType.get(),
+        Types.GeometryType.of("OGC:CRS84"),
+        Types.GeographyType.of("OGC:CRS84", "spherical"));
+>>>>>>> ec348efae ([#15257] fix(iceberg): Return 400 for unrecognized column types (#15258))
   }
 
   private static Stream<Arguments> incompatiblePartitionTransforms() {
