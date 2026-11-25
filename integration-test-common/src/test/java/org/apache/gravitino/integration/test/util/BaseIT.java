@@ -36,7 +36,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -348,11 +347,19 @@ public class BaseIT {
   }
 
   /**
-   * Provisions and configures the entity-store database for the selected JDBC backend.
-   *
-   * @throws SQLException if the PostgreSQL JDBC driver cannot be resolved
+   * Starts the Gravitino server (embedded or external) and initialises the admin client. Extracted
+   * from {@link #startIntegrationTest()} so that subclasses can call it directly without triggering
+   * virtual-dispatch through overriding {@code @BeforeAll} overrides (e.g. {@code
+   * SparkEnvIT.startIntegrationTest()} which is intentionally empty).
    */
-  protected void configureJdbcBackend() throws SQLException {
+  protected void startServer() throws Exception {
+    testMode =
+        System.getProperty(ITUtils.TEST_MODE) == null
+            ? ITUtils.EMBEDDED_TEST_MODE
+            : System.getProperty(ITUtils.TEST_MODE);
+
+    LOG.info("Running Gravitino Server in {} mode", testMode);
+
     if ("MySQL".equalsIgnoreCase(getJDBCBackend())) {
       // Start MySQL docker instance.
       String jdbcURL = startAndInitMySQLBackend();
@@ -377,23 +384,6 @@ public class BaseIT {
       customConfigs.put(
           Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY, POSTGRESQL_CONTAINER.getPassword());
     }
-  }
-
-  /**
-   * Starts the Gravitino server (embedded or external) and initialises the admin client. Extracted
-   * from {@link #startIntegrationTest()} so that subclasses can call it directly without triggering
-   * virtual-dispatch through overriding {@code @BeforeAll} overrides (e.g. {@code
-   * SparkEnvIT.startIntegrationTest()} which is intentionally empty).
-   */
-  protected void startServer() throws Exception {
-    testMode =
-        System.getProperty(ITUtils.TEST_MODE) == null
-            ? ITUtils.EMBEDDED_TEST_MODE
-            : System.getProperty(ITUtils.TEST_MODE);
-
-    LOG.info("Running Gravitino Server in {} mode", testMode);
-
-    configureJdbcBackend();
 
     File baseDir = new File(System.getProperty("java.io.tmpdir"));
     File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
