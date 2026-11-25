@@ -671,6 +671,7 @@ CREATE TABLE IF NOT EXISTS kb_article_meta (
     deleted_at BIGINT NOT NULL DEFAULT 0
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uk_kba_name ON kb_article_meta (metalake_id, article_name) WHERE deleted_at = 0;
+CREATE INDEX IF NOT EXISTS idx_kba_deleted ON kb_article_meta (deleted_at, article_id);
 COMMENT ON TABLE kb_article_meta IS 'Current Knowledge Base Article';
 COMMENT ON COLUMN kb_article_meta.article_id IS 'Stable Article ID';
 COMMENT ON COLUMN kb_article_meta.metalake_id IS 'Owning metalake ID';
@@ -711,3 +712,4 @@ COMMENT ON COLUMN kb_article_relation_meta.audit_info IS 'Audit information';
 COMMENT ON COLUMN kb_article_relation_meta.deleted_at IS 'Soft deletion time in milliseconds, zero for live rows';
 CREATE INDEX IF NOT EXISTS idx_kba_target ON kb_article_relation_meta (target_id, target_type, deleted_at);
 CREATE INDEX IF NOT EXISTS idx_kba_relation_metalake ON kb_article_relation_meta (metalake_id, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_kba_relation_deleted ON kb_article_relation_meta (deleted_at, id);

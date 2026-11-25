@@ -227,9 +227,12 @@ public interface KnowledgeBaseArticleMapper {
       """
       INSERT INTO kb_article_relation_meta (metalake_id, article_id, target_type, target_id,
           audit_info)
-      VALUES (#{p.metalakeId}, #{p.articleId}, #{b.targetType}, #{b.targetId}, #{p.auditInfo})
+      VALUES (#{p.metalakeId}, #{p.articleId}, #{b.targetType}, #{b.targetId}, #{audit})
       """)
-  void bind(@Param("p") KnowledgeBaseArticlePO row, @Param("b") Binding binding);
+  void bind(
+      @Param("p") KnowledgeBaseArticlePO row,
+      @Param("b") Binding binding,
+      @Param("audit") String audit);
 
   /** Retires a removed binding. */
   @Update(
@@ -268,7 +271,7 @@ public interface KnowledgeBaseArticleMapper {
       FROM (SELECT article_id
       FROM kb_article_meta
       WHERE deleted_at>0 AND deleted_at<#{cutoff}
-      ORDER BY article_id
+      ORDER BY deleted_at, article_id
       LIMIT #{limit}) expired)
       """)
   int purge(@Param("cutoff") long cutoff, @Param("limit") int limit);
@@ -282,7 +285,7 @@ public interface KnowledgeBaseArticleMapper {
       FROM (SELECT id
       FROM kb_article_relation_meta
       WHERE deleted_at>0 AND deleted_at<#{cutoff}
-      ORDER BY id
+      ORDER BY deleted_at, id
       LIMIT #{limit}) expired)
       """)
   int purgeBindings(@Param("cutoff") long cutoff, @Param("limit") int limit);
