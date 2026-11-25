@@ -54,16 +54,39 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
   }
 
   public List<Credential> getCredentials(NameIdentifier identifier, CredentialPrivilege privilege) {
+    return getCredentials(identifier, privilege, false /* dynamicProvidersOnly */);
+  }
+
+  /**
+   * Returns credentials for {@code identifier}.
+   *
+   * @param identifier the metadata object
+   * @param privilege read or write privilege for path-based contexts
+   * @param dynamicProvidersOnly when {@code true}, only providers that implement {@link
+   *     SupportsDynamicCredential} are invoked
+   * @return generated credentials; may be empty
+   */
+  public List<Credential> getCredentials(
+      NameIdentifier identifier, CredentialPrivilege privilege, boolean dynamicProvidersOnly) {
     return doWithCatalog(
         NameIdentifierUtil.getCatalogIdentifier(identifier),
         catalogWrapper ->
             catalogWrapper.doWithCredentialOps(
-                baseCatalog -> getCredentials(baseCatalog, identifier, privilege)),
+                baseCatalog ->
+                    getCredentials(baseCatalog, identifier, privilege, dynamicProvidersOnly)),
         NoSuchCatalogException.class);
   }
 
   List<Credential> getCredentials(
       BaseCatalog baseCatalog, NameIdentifier nameIdentifier, CredentialPrivilege privilege) {
+    return getCredentials(baseCatalog, nameIdentifier, privilege, false);
+  }
+
+  List<Credential> getCredentials(
+      BaseCatalog baseCatalog,
+      NameIdentifier nameIdentifier,
+      CredentialPrivilege privilege,
+      boolean dynamicProvidersOnly) {
     Map<String, CredentialContext> contexts =
         getCredentialContexts(baseCatalog, nameIdentifier, privilege);
     List<Credential> credentials = new ArrayList<>();
@@ -73,9 +96,13 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
       if (!providerOptional.isPresent()) {
         continue;
       }
+      CredentialProvider provider = providerOptional.get();
+      if (dynamicProvidersOnly && !(provider instanceof SupportsDynamicCredential)) {
+        continue;
+      }
 
       Optional<CredentialContext> contextOptional =
-          filterContextByProvider(providerOptional.get(), entry.getValue());
+          filterContextByProvider(provider, entry.getValue());
       if (!contextOptional.isPresent()) {
         continue;
       }

@@ -394,7 +394,9 @@ public class TestGravitinoLanceNamespaceWrapper {
         new SecretPropertyOperationDispatcher(null, null, null, null) {
           @Override
           public Map<String, String> getSecrets(
-              NameIdentifier identifier, Entity.EntityType entityType) {
+              NameIdentifier identifier,
+              Entity.EntityType entityType,
+              boolean includeStaticCredentials) {
             if (catalogIdent.equals(identifier) && entityType == Entity.EntityType.CATALOG) {
               return Map.of("jdbc-password", "from-dispatcher");
             }

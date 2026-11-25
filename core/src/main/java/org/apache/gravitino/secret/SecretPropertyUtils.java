@@ -22,16 +22,17 @@ import static org.apache.gravitino.secret.SecretConstants.URN_PREFIX;
 
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
-import org.apache.gravitino.storage.CloudStorageCredentialPropertyKeys;
 
 /**
  * Helpers for secret-related entity property handling and request validation.
@@ -415,16 +416,49 @@ public final class SecretPropertyUtils {
   }
 
   /**
-   * Omits cloud access-key pair properties from a plaintext secrets map for {@code USE_SECRETS}
-   * callers. Delegates to {@link
-   * CloudStorageCredentialPropertyKeys#omitCloudAccessKeyPairProperties}.
+   * Omits static credential properties that apply to this metadata object for {@code USE_SECRETS}
+   * callers that lack {@code INCLUDE_CREDENTIAL_SECRETS}.
+   *
+   * <p>A key is omitted when it is in the static-credential key set and any of: declared in {@code
+   * metadata}; used by a static {@code credential-providers} entry on {@code
+   * propertiesWithProviders}; or present as a key on {@code propertiesWithProviders} (covers
+   * leftover static pairs when providers list only tokens). When {@code metadata} is {@code null},
+   * omits the full static-credential key set.
+   *
+   * <p>For catalogs, pass the effective property map (including inferred {@code
+   * credential-providers} from {@code BaseCatalog#propertiesWithCredentialProviders}), not only the
+   * raw entity map, so keys for inferred static providers are omitted even when undeclared in
+   * {@code metadata}.
    *
    * @param secrets plaintext secrets
-   * @return secrets without cloud AK/SK pairs
+   * @param metadata properties metadata for the object, or null when unavailable
+   * @param propertiesWithProviders properties that carry {@code credential-providers} (explicit or
+   *     inferred) and/or stored static credential keys, or null
+   * @return secrets without object-scoped static credential properties
    */
-  public static Map<String, String> omitCloudAccessKeyPairSecrets(
-      @Nullable Map<String, String> secrets) {
-    return CloudStorageCredentialPropertyKeys.omitCloudAccessKeyPairProperties(secrets);
+  public static Map<String, String> omitStaticCredentialSecrets(
+      @Nullable Map<String, String> secrets,
+      @Nullable PropertiesMetadata metadata,
+      @Nullable Map<String, String> propertiesWithProviders) {
+    return StaticCredentialSecretKeys.omit(
+        secrets, resolveStaticCredentialKeysToOmit(metadata, propertiesWithProviders));
+  }
+
+  private static Set<String> resolveStaticCredentialKeysToOmit(
+      @Nullable PropertiesMetadata metadata,
+      @Nullable Map<String, String> propertiesWithProviders) {
+    if (metadata == null) {
+      return StaticCredentialSecretKeys.allKeys();
+    }
+    Set<String> keys = new HashSet<>();
+    for (String key : StaticCredentialSecretKeys.allKeys()) {
+      if (metadata.containsProperty(key)) {
+        keys.add(key);
+      }
+    }
+    keys.addAll(StaticCredentialSecretKeys.keysForCredentialProviders(propertiesWithProviders));
+    keys.addAll(StaticCredentialSecretKeys.keysPresentInProperties(propertiesWithProviders));
+    return keys;
   }
 
   /**
