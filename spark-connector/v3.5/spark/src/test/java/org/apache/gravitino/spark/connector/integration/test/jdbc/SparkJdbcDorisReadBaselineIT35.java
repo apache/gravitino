@@ -34,7 +34,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -217,86 +216,6 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
     Assertions.assertTrue(scan.relation().jdbcOptions().pushDownPredicate());
     Assertions.assertEquals(0, scan.pushedPredicates().length);
     Assertions.assertTrue(filtered.queryExecution().optimizedPlan().toString().contains("Filter"));
-  }
-
-  @Test
-  void testReadFloatRangeAndNull() throws Exception {
-    String tableName = "read_float_range";
-    try {
-      executeJdbcSql(
-          "CREATE TABLE "
-              + dorisTable(tableName)
-              + " (id INT NOT NULL, value FLOAT) DISTRIBUTED BY HASH(id) BUCKETS 1",
-          "INSERT INTO "
-              + dorisTable(tableName)
-              + " VALUES (1, -1e30), (2, 1e-30), (3, 0), (4, 1e30), (5, NULL),"
-              + " (6, 0.1), (7, 0.10000001)");
-      Dataset<Row> result =
-          getSparkSession().sql("SELECT id, value FROM " + sparkTable(tableName) + " ORDER BY id");
-      Assertions.assertEquals(DataTypes.FloatType, result.schema().fields()[1].dataType());
-      Assertions.assertEquals(
-          DataTypes.FloatType, jdbcScan(result).readSchema().fields()[1].dataType());
-      Assertions.assertEquals(
-          List.of(
-              RowFactory.create(1, -1e30f),
-              RowFactory.create(2, 1e-30f),
-              RowFactory.create(3, 0.0f),
-              RowFactory.create(4, 1e30f),
-              RowFactory.create(5, null),
-              RowFactory.create(6, 0.1f),
-              RowFactory.create(7, 0.10000001f)),
-          result.collectAsList());
-      Assertions.assertEquals(
-          List.of(RowFactory.create(1)),
-          getSparkSession()
-              .sql("SELECT id FROM " + sparkTable(tableName) + " WHERE value < 0")
-              .collectAsList());
-      Dataset<Row> aggregate =
-          getSparkSession().sql("SELECT MIN(value), MAX(value) FROM " + sparkTable(tableName));
-      Assertions.assertEquals(List.of(RowFactory.create(-1e30f, 1e30f)), aggregate.collectAsList());
-
-      SparkSession pushed = getSparkSession().newSession();
-      SparkSession local = getSparkSession().newSession();
-      pushed.conf().set("spark.sql.catalog." + CATALOG_NAME + ".pushDownPredicate", "true");
-      local.conf().set("spark.sql.catalog." + CATALOG_NAME + ".pushDownPredicate", "false");
-      for (String operator : List.of("=", "<>")) {
-        String query =
-            "SELECT id FROM "
-                + sparkTable(tableName)
-                + " WHERE value "
-                + operator
-                + " CAST(0.1 AS FLOAT) AND id >= 1 ORDER BY id";
-        Dataset<Row> pushedResult = pushed.sql(query);
-        List<Row> rows = pushedResult.collectAsList();
-        Assertions.assertEquals(local.sql(query).collectAsList(), rows, operator);
-        Assertions.assertEquals(
-            operator.equals("=")
-                ? List.of(RowFactory.create(6))
-                : List.of(
-                    RowFactory.create(1),
-                    RowFactory.create(2),
-                    RowFactory.create(3),
-                    RowFactory.create(4),
-                    RowFactory.create(7)),
-            rows,
-            operator);
-        JDBCScan scan = jdbcScan(pushedResult);
-        Assertions.assertTrue(scan.relation().jdbcOptions().pushDownPredicate());
-        Assertions.assertTrue(
-            Arrays.stream(scan.pushedPredicates())
-                .anyMatch(
-                    predicate -> predicate.toString().toLowerCase(Locale.ROOT).contains("id")));
-        Assertions.assertFalse(
-            Arrays.stream(scan.pushedPredicates())
-                .anyMatch(
-                    predicate ->
-                        predicate.toString().toLowerCase(Locale.ROOT).contains("value")
-                            && !predicate.name().equals("IS_NULL")
-                            && !predicate.name().equals("IS_NOT_NULL")));
-      }
-    } finally {
-      executeJdbcSql("DROP TABLE IF EXISTS " + dorisTable(tableName));
-    }
   }
 
   @Test
@@ -547,7 +466,6 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
         Arguments.of(
             "DECIMALV3(20,4)", "1234567890123456.1234", new BigDecimal("1234567890123456.1234")),
         Arguments.of("DOUBLE", "2.25", 2.25d),
-        Arguments.of("FLOAT", "-123.125", -123.125f),
         Arguments.of("INT", "2147483647", Integer.MAX_VALUE),
         Arguments.of("INTEGER", "-2147483648", Integer.MIN_VALUE),
         Arguments.of("STRING", "'string-value'", "string-value"),

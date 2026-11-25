@@ -59,7 +59,6 @@ final class DorisPhysicalSchemaValidator35 {
           "decimal",
           "decimalv3",
           "double",
-          "float",
           "int",
           "integer",
           "smallint",
@@ -195,9 +194,6 @@ final class DorisPhysicalSchemaValidator35 {
       if (!physicalJson && !ORDINARY_TYPES.contains(baseType(fe.typeName()))) {
         throw mismatch(identifier, "unsupported Doris type for " + logical.name());
       }
-      if ("float".equals(baseType(fe.typeName())) && !(logicalType instanceof Types.FloatType)) {
-        throw mismatch(identifier, "logical and physical FLOAT types differ for " + logical.name());
-      }
       DataType expected = typeConverter.toSparkType(logical.dataType());
       // Spark 3.5.3 JdbcUtils.getCatalystType maps SMALLINT to IntegerType:
       // https://github.com/apache/spark/blob/v3.5.3/sql/core/src/main/scala/org/apache/spark/sql/execution/datasources/jdbc/JdbcUtils.scala
@@ -208,15 +204,7 @@ final class DorisPhysicalSchemaValidator35 {
               && "smallint".equals(baseType(fe.typeName()))
               && DataTypes.ShortType.equals(expected)
               && DataTypes.IntegerType.equals(spark.dataType());
-      // Connector/J can report Doris FLOAT as JDBC REAL, which Spark 3.5 maps to DoubleType.
-      // The logical FloatType schema reads these values through JDBC getFloat().
-      boolean compatibleFloat =
-          "float".equals(baseType(jdbc.typeName()))
-              && "float".equals(baseType(fe.typeName()))
-              && logicalType instanceof Types.FloatType
-              && DataTypes.FloatType.equals(expected)
-              && DataTypes.DoubleType.equals(spark.dataType());
-      if (!expected.equals(spark.dataType()) && !compatibleSmallInt && !compatibleFloat) {
+      if (!expected.equals(spark.dataType()) && !compatibleSmallInt) {
         throw mismatch(identifier, "logical and Spark physical types differ for " + logical.name());
       }
       validateLogicalTypeSignature(identifier, logical, fe.signature());

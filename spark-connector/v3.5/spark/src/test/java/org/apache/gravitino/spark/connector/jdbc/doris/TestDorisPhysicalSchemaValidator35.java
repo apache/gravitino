@@ -354,41 +354,16 @@ public class TestDorisPhysicalSchemaValidator35 {
   }
 
   @Test
-  void testFloatCompatibilityRequiresMatchingMetadata() {
-    assertDoesNotThrow(
-        () ->
-            validateSingleColumn(
-                Types.FloatType.get(), DataTypes.FloatType, "FLOAT", "float", true));
-    assertDoesNotThrow(
-        () ->
-            validateSingleColumn(
-                Types.FloatType.get(), DataTypes.DoubleType, "FLOAT", "float", true));
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            validateSingleColumn(
-                Types.FloatType.get(), DataTypes.DoubleType, "DOUBLE", "FLOAT", true));
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            validateSingleColumn(
-                Types.IntegerType.get(), DataTypes.DoubleType, "FLOAT", "FLOAT", true));
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            validateSingleColumn(
-                Types.DoubleType.get(), DataTypes.DoubleType, "FLOAT", "FLOAT", true));
-  }
-
-  @Test
   void testUnsupportedDorisTypeFailsClosed() {
-    IllegalArgumentException failure =
-        assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                validateSingleColumn(
-                    Types.StringType.get(), DataTypes.StringType, "CHAR(4)", "CHAR(4)", true));
-    assertTrue(failure.getMessage().contains("unsupported Doris type"));
+    for (String typeName : Arrays.asList("CHAR(4)", "FLOAT")) {
+      IllegalArgumentException failure =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  validateSingleColumn(
+                      Types.StringType.get(), DataTypes.StringType, typeName, typeName, true));
+      assertTrue(failure.getMessage().contains("unsupported Doris type"));
+    }
   }
 
   @Test

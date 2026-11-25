@@ -26,7 +26,6 @@ import static org.mockito.Mockito.when;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -122,44 +121,6 @@ public class TestSparkJdbcPushDownPolicy {
     for (String field : new String[] {"QUARTER", "MONTH", "DAY"}) {
       Assertions.assertTrue(policy.canPush(new Extract(field, col("d"))), field);
     }
-  }
-
-  @Test
-  void testCatalogSpecificResidualColumnsKeepFloatPredicatesInSpark() {
-    String url = "jdbc:mysql://localhost/test";
-    Column[] columns = {
-      column("id", Types.IntegerType.get()), column("value", Types.FloatType.get())
-    };
-    StructType schema =
-        new StructType().add("id", DataTypes.IntegerType).add("value", DataTypes.FloatType);
-    SparkJdbcPushDownPolicy defaults =
-        new SparkJdbcPushDownPolicy(columns, schema, schema, JdbcDialects.get(url), url);
-    SparkJdbcPushDownPolicy restricted =
-        new SparkJdbcPushDownPolicy(
-            columns, schema, schema, JdbcDialects.get(url), url, Set.of("VALUE"));
-    Predicate floatPredicate = eq(col("value"), lit(0.1f, DataTypes.FloatType));
-    Predicate idPredicate = eq(col("id"), lit(1, DataTypes.IntegerType));
-    Assertions.assertTrue(defaults.canPushPredicate(floatPredicate));
-    Assertions.assertFalse(restricted.canPushPredicate(floatPredicate));
-    Assertions.assertFalse(restricted.canPushPredicate(new And(floatPredicate, idPredicate)));
-    Assertions.assertTrue(restricted.canPushPredicate(idPredicate));
-    Assertions.assertTrue(restricted.canPushPredicate(predicate("IS_NULL", col("value"))));
-    Assertions.assertTrue(restricted.canPushAggregate(new Max(col("value"))));
-
-    JDBCOptions options =
-        new JDBCOptions(
-            new HashMap<String, String>()
-                .updated("url", url)
-                .updated("dbtable", "t")
-                .updated("driver", "com.mysql.cj.jdbc.Driver")
-                .updated("pushDownPredicate", "true"));
-    JDBCScanBuilder delegate = jdbcScanBuilder(options);
-    when(delegate.schema()).thenReturn(schema);
-    SparkJdbcScanBuilder builder = new SparkJdbcScanBuilder(delegate, restricted);
-    Assertions.assertEquals(
-        List.of(floatPredicate),
-        Arrays.asList(builder.pushPredicates(new Predicate[] {floatPredicate, idPredicate})));
-    Assertions.assertEquals(List.of(idPredicate), Arrays.asList(builder.pushedPredicates()));
   }
 
   @Test

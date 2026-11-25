@@ -327,18 +327,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
         propertiesConverter,
         sparkTransformConverter,
         sparkTypeConverter,
-        this::verifyJdbcConnectionUnchanged,
-        predicateResidualColumns(gravitinoTable));
-  }
-
-  /**
-   * Returns columns whose predicates must remain in Spark for this catalog.
-   *
-   * @param table the Gravitino table metadata
-   * @return column names whose predicates must not be pushed
-   */
-  protected Set<String> predicateResidualColumns(org.apache.gravitino.rel.Table table) {
-    return Collections.emptySet();
+        this::verifyJdbcConnectionUnchanged);
   }
 
   @Override
