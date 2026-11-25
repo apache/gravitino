@@ -20,13 +20,12 @@
 import asyncio
 import json
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 from fastmcp import Client
 from fastmcp.exceptions import NotFoundError, ToolError
-from fastmcp.server.middleware.middleware import Middleware
-from mcp.shared.exceptions import McpError
+from mcp.shared.exceptions import McpError, UrlElicitationRequiredError
 from mcp.types import ErrorData
 
 from mcp_server.client.factory import RESTClientFactory
@@ -48,6 +47,7 @@ from mcp_server.core.errors import (
     JSONRPC_NOT_FOUND,
     JSONRPC_PERMISSION_OR_TIMEOUT,
     JSONRPC_RESOURCE_NOT_FOUND,
+    GravitinoErrorHandlingMiddleware,
     classify_error,
 )
 from mcp_server.core.setting import Setting
@@ -120,13 +120,20 @@ class TestRestResponseExceptionMetadata(unittest.TestCase):
             request=httpx.Request("GET", "http://gravitino/api/test"),
             content=b"not json",
         )
-        with self.assertRaises(GravitinoException) as raised:
-            extract_list_from_response(response, "identifiers")
-
-        classification = classify_error(raised.exception)
-        self.assertEqual(classification.mcp_code, JSONRPC_INTERNAL_ERROR)
-        self.assertEqual(classification.outcome, "error")
-        self.assertEqual(classification.category, "internal_error")
+        for extract, args in (
+            (extract_response, ()),
+            (extract_content_from_response, ("table",)),
+            (extract_list_from_response, ("identifiers",)),
+        ):
+            with self.subTest(extract=extract.__name__):
+                with self.assertRaises(GravitinoException) as raised:
+                    extract(response, *args)
+                self.assertIsInstance(raised.exception.__cause__, ValueError)
+                classification = classify_error(raised.exception)
+                self.assertEqual(
+                    classification.mcp_code, JSONRPC_INTERNAL_ERROR
+                )
+                self.assertEqual(classification.category, "internal_error")
 
 
 class TestClassifyError(unittest.TestCase):
@@ -350,19 +357,27 @@ class TestClassifyError(unittest.TestCase):
         self.assertEqual(res.error_type, "RuntimeError")
 
 
-class _CaptureMcpErrorMiddleware(Middleware):
-    """Middleware placed outside ErrorHandlingMiddleware to inspect McpError codes."""
-
-    def __init__(self, captured: list):
-        super().__init__()
-        self._captured = captured
-
-    async def on_call_tool(self, context, call_next):
-        try:
-            return await call_next(context)
-        except Exception as exc:
-            self._captured.append(exc)
-            raise
+class TestProtocolErrors(unittest.IsolatedAsyncioTestCase):
+    async def test_protocol_errors_keep_their_code_and_data(self):
+        middleware = GravitinoErrorHandlingMiddleware()
+        challenge = UrlElicitationRequiredError([])
+        native = McpError(
+            ErrorData(
+                code=-32602,
+                message="Invalid resource URI",
+                data={"field": "uri"},
+            )
+        )
+        for method, error in (
+            ("tools/call", challenge),
+            ("resources/read", native),
+        ):
+            with self.subTest(method=method):
+                with self.assertRaises(McpError) as raised:
+                    await middleware.on_message(
+                        MagicMock(method=method), AsyncMock(side_effect=error)
+                    )
+                self.assertIs(raised.exception, error)
 
 
 class TestEndToEndMcpErrorMapping(unittest.TestCase):
@@ -379,7 +394,6 @@ class TestEndToEndMcpErrorMapping(unittest.TestCase):
         setting: Setting | None = None,
     ):
         original_init = _GravitinoAsyncClient.__init__
-        captured_errors: list = []
 
         def init_with_transport(client, *args, **kwargs):
             kwargs["transport"] = httpx.MockTransport(handler)
@@ -392,16 +406,10 @@ class TestEndToEndMcpErrorMapping(unittest.TestCase):
                 server = GravitinoMCPServer(
                     setting or Setting(metalake="authz")
                 )
-                server.mcp.middleware.insert(
-                    0, _CaptureMcpErrorMiddleware(captured_errors)
-                )
                 async with Client(server.mcp) as client:
-                    return await client.call_tool(
-                        tool_name, arguments, raise_on_error=False
-                    )
+                    return await client.call_tool_mcp(tool_name, arguments)
 
-        result = asyncio.run(_run())
-        return result, captured_errors
+        return asyncio.run(_run())
 
     def test_gravitino_rest_errors_are_not_reported_as_internal_error(self):
         cases = [
@@ -467,7 +475,7 @@ class TestEndToEndMcpErrorMapping(unittest.TestCase):
                         st, json={"code": ec, "type": et, "message": msg}
                     )
 
-                result, captured = self._call_with_transport(
+                result = self._call_with_transport(
                     handler,
                     "drop_table",
                     {
@@ -476,14 +484,76 @@ class TestEndToEndMcpErrorMapping(unittest.TestCase):
                         "table_name": "tbl",
                     },
                 )
-                self.assertTrue(result.is_error)
+                self.assertTrue(result.isError)
                 text = " ".join(item.text for item in result.content)
                 self.assertTrue(text.startswith(expected_prefix), text)
                 self.assertNotIn("Internal error:", text)
                 self.assertIn(detail, text)
-                self.assertEqual(len(captured), 1)
-                self.assertIsInstance(captured[0], McpError)
-                self.assertEqual(captured[0].error.code, expected_mcp_code)
+                self.assertEqual(
+                    result.meta["org.apache.gravitino/error"]["code"],
+                    expected_mcp_code,
+                )
+
+    def test_cancel_job_denials_reach_client_and_audit(self):
+        for status, rest_code, error_type, category, prefix in (
+            (
+                401,
+                1011,
+                "UnauthorizedException",
+                "unauthorized",
+                "Unauthorized:",
+            ),
+            (
+                403,
+                1008,
+                "ForbiddenException",
+                "permission_denied",
+                "Permission denied:",
+            ),
+        ):
+            with self.subTest(status=status):
+
+                handler = MagicMock(
+                    return_value=httpx.Response(
+                        status,
+                        json={
+                            "code": rest_code,
+                            "type": error_type,
+                            "message": "Cannot cancel this job",
+                        },
+                    )
+                )
+
+                with patch("mcp_server.server.audit.emit") as emit:
+                    result = self._call_with_transport(
+                        handler, "cancel_job", {"job_id": "job-42"}
+                    )
+                handler.assert_called_once()
+                request = handler.call_args.args[0]
+                self.assertEqual(request.method, "POST")
+                self.assertEqual(
+                    request.url.path, "/api/metalakes/authz/jobs/runs/job-42"
+                )
+                self.assertTrue(result.isError)
+                self.assertTrue(result.content[0].text.startswith(prefix))
+                self.assertIn("Cannot cancel this job", result.content[0].text)
+                self.assertEqual(
+                    result.meta["org.apache.gravitino/error"],
+                    {
+                        "code": JSONRPC_PERMISSION_OR_TIMEOUT,
+                        "category": category,
+                    },
+                )
+                emit.assert_called_once_with(
+                    principal="anonymous",
+                    tool="cancel_job",
+                    outcome="deny",
+                    error_type=error_type,
+                    error_category=category,
+                    metalake="authz",
+                    target_type="job",
+                    target_name="job-42",
+                )
 
     def test_connection_failure_and_5xx_remain_internal_error(self):
         def connect_handler(request):
@@ -491,13 +561,16 @@ class TestEndToEndMcpErrorMapping(unittest.TestCase):
                 "All connection attempts failed", request=request
             )
 
-        result, captured = self._call_with_transport(
+        result = self._call_with_transport(
             connect_handler, "get_list_of_catalogs", {}
         )
-        self.assertTrue(result.is_error)
+        self.assertTrue(result.isError)
         text = " ".join(item.text for item in result.content)
         self.assertTrue(text.startswith("Internal error:"), text)
-        self.assertEqual(captured[0].error.code, JSONRPC_INTERNAL_ERROR)
+        self.assertEqual(
+            result.meta["org.apache.gravitino/error"]["code"],
+            JSONRPC_INTERNAL_ERROR,
+        )
 
         def server_err_handler(_request):
             return httpx.Response(
@@ -509,43 +582,50 @@ class TestEndToEndMcpErrorMapping(unittest.TestCase):
                 },
             )
 
-        result, captured = self._call_with_transport(
+        result = self._call_with_transport(
             server_err_handler, "get_list_of_catalogs", {}
         )
-        self.assertTrue(result.is_error)
+        self.assertTrue(result.isError)
         text = " ".join(item.text for item in result.content)
         self.assertTrue(text.startswith("Internal error:"), text)
         self.assertIn("Server boom", text)
-        self.assertEqual(captured[0].error.code, JSONRPC_INTERNAL_ERROR)
+        self.assertEqual(
+            result.meta["org.apache.gravitino/error"]["code"],
+            JSONRPC_INTERNAL_ERROR,
+        )
 
     def test_read_timeout_maps_to_request_timeout_with_actionable_text(self):
         def timeout_handler(request):
             raise httpx.ReadTimeout("slow", request=request)
 
-        result, captured = self._call_with_transport(
+        result = self._call_with_transport(
             timeout_handler,
             "get_table_metadata_details",
             {"catalog_name": "c", "schema_name": "s", "table_name": "t"},
             setting=Setting(metalake="m", gravitino_read_timeout=30),
         )
-        self.assertTrue(result.is_error)
+        self.assertTrue(result.isError)
         text = " ".join(item.text for item in result.content)
         self.assertTrue(text.startswith("Request timeout:"), text)
         self.assertIn("30 seconds", text)
         self.assertIn("may still complete", text)
-        self.assertEqual(captured[0].error.code, JSONRPC_PERMISSION_OR_TIMEOUT)
+        self.assertEqual(
+            result.meta["org.apache.gravitino/error"]["code"],
+            JSONRPC_PERMISSION_OR_TIMEOUT,
+        )
 
     def test_missing_required_tool_argument_maps_to_invalid_params(self):
         def unused_handler(_request):
             raise AssertionError("HTTP call should not be reached")
 
-        result, captured = self._call_with_transport(
-            unused_handler, "drop_table", {}
-        )
-        self.assertTrue(result.is_error)
+        result = self._call_with_transport(unused_handler, "drop_table", {})
+        self.assertTrue(result.isError)
         text = " ".join(item.text for item in result.content)
         self.assertTrue(text.startswith("Invalid params:"), text)
-        self.assertEqual(captured[0].error.code, JSONRPC_INVALID_PARAMS)
+        self.assertEqual(
+            result.meta["org.apache.gravitino/error"]["code"],
+            JSONRPC_INVALID_PARAMS,
+        )
 
     def test_service_identity_fallback_disabled_maps_to_unauthorized(self):
         def unused_handler(_request):
@@ -557,7 +637,7 @@ class TestEndToEndMcpErrorMapping(unittest.TestCase):
             "fastmcp.server.dependencies.get_http_request",
             return_value=mock_request,
         ):
-            result, captured = self._call_with_transport(
+            result = self._call_with_transport(
                 unused_handler,
                 "get_list_of_catalogs",
                 {},
@@ -568,7 +648,10 @@ class TestEndToEndMcpErrorMapping(unittest.TestCase):
                     no_service_identity_fallback=True,
                 ),
             )
-        self.assertTrue(result.is_error)
+        self.assertTrue(result.isError)
         text = " ".join(item.text for item in result.content)
         self.assertTrue(text.startswith("Unauthorized:"), text)
-        self.assertEqual(captured[0].error.code, JSONRPC_PERMISSION_OR_TIMEOUT)
+        self.assertEqual(
+            result.meta["org.apache.gravitino/error"]["code"],
+            JSONRPC_PERMISSION_OR_TIMEOUT,
+        )

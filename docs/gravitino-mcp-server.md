@@ -460,6 +460,15 @@ No default at all, every call chooses:
 uv run mcp_server --transport http --mcp-url http://0.0.0.0:8000/mcp
 ```
 
+## Tool errors
+
+A failed tool execution returns a `CallToolResult` with `isError: true`. Its text
+includes the error prefix and message. Clients can read the numeric classification
+code and category from `_meta["org.apache.gravitino/error"]`. For example, a
+Gravitino HTTP 409 returns `{"code": -32009, "category": "conflict"}` there.
+HTTP 401 and 403 both use code `-32000` and have the respective categories `unauthorized` and
+`permission_denied`. MCP protocol errors use the usual JSON-RPC error envelope.
+
 ## Audit Logging
 
 Every tool invocation is recorded as one structured JSON line in `gravitino-mcp-audit.log` (written to the server's working directory). Each record is attributed to the incoming HTTP `Authorization` header when present; otherwise to the configured service identity (`--token` or OAuth client id).

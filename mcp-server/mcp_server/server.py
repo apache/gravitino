@@ -151,6 +151,13 @@ def _create_gravitino_mcp(setting: Setting) -> FastMCP:
     # Added first so it wraps the others: it must publish the call's metalake
     # before AuditMiddleware records it.
     mcp.add_middleware(MetalakeArgumentMiddleware())
+    # Audit the original exception before the error handler returns a tool result.
+    mcp.add_middleware(
+        GravitinoErrorHandlingMiddleware(
+            include_traceback=True,
+            transform_errors=True,
+        )
+    )
     mcp.add_middleware(
         AuditMiddleware(
             service_fallback_authorization(setting), setting.metalake
@@ -160,12 +167,6 @@ def _create_gravitino_mcp(setting: Setting) -> FastMCP:
         LoggingMiddleware(include_payloads=True, max_payload_length=1000)
     )
     mcp.add_middleware(TimingMiddleware())
-    mcp.add_middleware(
-        GravitinoErrorHandlingMiddleware(
-            include_traceback=True,
-            transform_errors=True,
-        )
-    )
     return mcp
 
 

@@ -72,9 +72,11 @@ def extract_response(response) -> str:
 def _response_content(response):
     try:
         content = response.json(parse_float=Decimal)
-    except ValueError:
+    except ValueError as exc:
         response.raise_for_status()
-        raise
+        raise GravitinoException(
+            "Invalid Gravitino response: invalid JSON"
+        ) from exc
 
     if isinstance(content, dict):
         _handle_gravitino_exception(content, status_code=response.status_code)

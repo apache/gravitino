@@ -28,8 +28,9 @@ from fastmcp.exceptions import (
 )
 from fastmcp.exceptions import ValidationError as FastMCPValidationError
 from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware
-from fastmcp.server.middleware.middleware import MiddlewareContext
-from mcp.shared.exceptions import McpError
+from fastmcp.server.middleware.middleware import CallNext, MiddlewareContext
+from fastmcp.tools.base import ToolResult
+from mcp.shared.exceptions import McpError, UrlElicitationRequiredError
 from mcp.types import ErrorData
 
 from mcp_server.client.plain.exception import GravitinoException
@@ -328,29 +329,39 @@ def classify_error(exc: BaseException, method: str = "") -> ErrorClassification:
 
 
 class GravitinoErrorHandlingMiddleware(ErrorHandlingMiddleware):
-    """ErrorHandlingMiddleware that maps Gravitino REST and HTTP errors cleanly.
+    """Return classified tool execution failures and preserve MCP protocol errors."""
 
-    FastMCP's stock ErrorHandlingMiddleware only recognizes a handful of Python
-    built-ins (by exact type match) and maps every other exception — including
-    Gravitino 401/403 authorization denials, 400 invalid requests, 404 not-found
-    responses, 409 conflicts, and pydantic ValidationError — to JSON-RPC -32603
-    ("Internal error"). This subclass uses ``classify_error`` so clients receive
-    accurate error codes and prefixes while keeping Gravitino's actionable text.
-    """
+    async def on_message(self, context: MiddlewareContext, call_next: CallNext):
+        try:
+            return await call_next(context)
+        except UrlElicitationRequiredError:
+            # The SDK handles this protocol challenge separately from tool failures.
+            raise
+        except Exception as error:
+            self._log_error(error, context)
+            if not self.transform_errors:
+                raise
 
-    def _transform_error(
-        self, error: Exception, context: MiddlewareContext
-    ) -> Exception:
-        if isinstance(error, McpError):
-            return error
-
-        if not self.transform_errors:
-            return error
-
-        classification = classify_error(error, method=context.method or "")
-        return McpError(
-            ErrorData(
-                code=classification.mcp_code,
-                message=f"{classification.prefix}: {error!s}",
-            )
-        )
+            classification = classify_error(error, method=context.method or "")
+            if isinstance(error, McpError):
+                if context.method != "tools/call":
+                    raise
+                data = error.error
+            else:
+                data = ErrorData(
+                    code=classification.mcp_code,
+                    message=f"{classification.prefix}: {error}",
+                )
+            if context.method == "tools/call":
+                # Raising here would make the SDK discard the code and keep only text.
+                return ToolResult(
+                    content=data.message,
+                    is_error=True,
+                    meta={
+                        "org.apache.gravitino/error": {
+                            "code": data.code,
+                            "category": classification.category,
+                        }
+                    },
+                )
+            raise McpError(data) from error
