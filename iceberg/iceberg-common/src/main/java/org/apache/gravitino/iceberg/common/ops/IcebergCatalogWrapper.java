@@ -515,7 +515,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       // As in createTable: an invalid update, not an unsupported operation. updateTable has no 406.
       throw new BadRequestException("Invalid table update: %s", e.getMessage());
     } catch (IllegalStateException e) {
-      convertToBadRequest(e);
+      convertSchemaCheckException(e);
       throw e;
     }
     if (loadTableResponse != null) {
@@ -542,7 +542,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       try {
         transaction.commitTransaction();
       } catch (IllegalStateException e) {
-        convertToBadRequest(e);
+        convertSchemaCheckException(e);
         throw e;
       }
     } finally {
@@ -574,7 +574,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       change = builder.apply(getCatalog());
     } catch (IllegalStateException e) {
       // UpdateSchema.commit can fail Schema.checkCompatibility before a change is returned.
-      convertToBadRequest(e);
+      convertSchemaCheckException(e);
       throw e;
     }
     return updateTable(change);
@@ -844,7 +844,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
    * Converts {@link Schema#checkCompatibility} failures to {@link BadRequestException}; other
    * illegal states are left for the caller to rethrow.
    */
-  private static void convertToBadRequest(IllegalStateException e) {
+  private static void convertSchemaCheckException(IllegalStateException e) {
     for (Throwable current = e; current != null; current = current.getCause()) {
       if (!(current instanceof IllegalStateException)) {
         continue;
