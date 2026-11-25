@@ -514,9 +514,6 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     } catch (UnsupportedOperationException e) {
       // As in createTable: an invalid update, not an unsupported operation. updateTable has no 406.
       throw new BadRequestException("Invalid table update: %s", e.getMessage());
-    } catch (IllegalStateException e) {
-      convertSchemaCheckException(e);
-      throw e;
     }
     if (loadTableResponse != null) {
       getMetadataCache().updateTableMetadata(tableIdentifier, loadTableResponse.tableMetadata());
@@ -539,12 +536,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     Transaction transaction = icebergTableChange.getTransaction();
     try {
       validateSchema(transaction);
-      try {
-        transaction.commitTransaction();
-      } catch (IllegalStateException e) {
-        convertSchemaCheckException(e);
-        throw e;
-      }
+      transaction.commitTransaction();
     } finally {
       // A load during the commit can cache old metadata, even if the commit ultimately fails.
       getMetadataCache().invalidate(icebergTableChange.getTableIdentifier());
@@ -573,9 +565,9 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     try {
       change = builder.apply(getCatalog());
     } catch (IllegalStateException e) {
-      // UpdateSchema.commit can fail Schema.checkCompatibility before a change is returned.
-      convertSchemaCheckException(e);
-      throw e;
+      // UpdateSchema.commit runs Schema.checkCompatibility before returning a change; map that
+      // client error like UnsupportedOperationException on create/update.
+      throw new BadRequestException("%s", e.getMessage());
     }
     return updateTable(change);
   }
@@ -837,24 +829,6 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     }
     if (hasFormatUpgrade && !hasSchemaUpdate) {
       validateSchema(base.schema(), formatVersion);
-    }
-  }
-
-  /**
-   * Converts {@link Schema#checkCompatibility} failures to {@link BadRequestException}; other
-   * illegal states are left for the caller to rethrow.
-   */
-  private static void convertSchemaCheckException(IllegalStateException e) {
-    for (Throwable current = e; current != null; current = current.getCause()) {
-      if (!(current instanceof IllegalStateException)) {
-        continue;
-      }
-      for (StackTraceElement frame : current.getStackTrace()) {
-        if ("org.apache.iceberg.Schema".equals(frame.getClassName())
-            && "checkCompatibility".equals(frame.getMethodName())) {
-          throw new BadRequestException("%s", e.getMessage());
-        }
-      }
     }
   }
 
