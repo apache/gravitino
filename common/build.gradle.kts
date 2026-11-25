@@ -41,13 +41,19 @@ dependencies {
   annotationProcessor(libs.lombok)
   compileOnly(libs.commons.dbcp2)
   compileOnly(libs.jackson.dataformat.yaml)
-  compileOnly(libs.json.schema.validator)
+  compileOnly(libs.json.schema.validator) {
+    exclude(group = "com.fasterxml.jackson.core", module = "jackson-databind")
+    exclude(group = "com.fasterxml.jackson.dataformat", module = "jackson-dataformat-yaml")
+  }
   compileOnly(libs.lombok)
   testAnnotationProcessor(libs.lombok)
   testCompileOnly(libs.lombok)
 
   testImplementation(libs.jackson.dataformat.yaml)
-  testImplementation(libs.json.schema.validator)
+  testImplementation(libs.json.schema.validator) {
+    exclude(group = "com.fasterxml.jackson.core", module = "jackson-databind")
+    exclude(group = "com.fasterxml.jackson.dataformat", module = "jackson-dataformat-yaml")
+  }
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
 
