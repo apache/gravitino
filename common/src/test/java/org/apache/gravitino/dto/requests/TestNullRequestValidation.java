@@ -134,6 +134,51 @@ class TestNullRequestValidation {
   }
 
   @Test
+  void testNullPropertyValuesInOtherRequests() throws Exception {
+    Map<Class<? extends RESTRequest>, String> requests =
+        Map.of(
+            TagCreateRequest.class,
+            "{\"name\":\"t\",\"properties\":null}",
+            RoleCreateRequest.class,
+            "{\"name\":\"r\",\"securableObjects\":[],\"properties\":null}",
+            SemanticModelCreateRequest.class,
+            "{\"name\":\"m\",\"definition\":{\"datasets\":[{\"name\":\"orders\","
+                + "\"source\":{\"namespace\":[\"sales\",\"mart\"],\"name\":\"orders\"}}]},"
+                + "\"properties\":null}",
+            ModelRegisterRequest.class,
+            "{\"name\":\"m\",\"properties\":null}",
+            ModelVersionLinkRequest.class,
+            "{\"uri\":\"file:///tmp/m\",\"properties\":null}");
+    for (Map.Entry<Class<? extends RESTRequest>, String> entry : requests.entrySet()) {
+      Class<? extends RESTRequest> type = entry.getKey();
+      String valid = entry.getValue();
+      RESTRequest baseline = JsonUtils.objectMapper().readValue(valid, type);
+      assertDoesNotThrow(baseline::validate, type.getSimpleName());
+      RESTRequest populated =
+          JsonUtils.objectMapper()
+              .readValue(
+                  valid.replace("\"properties\":null", "\"properties\":{\"k\":\"v\"}"), type);
+      assertDoesNotThrow(populated::validate, type.getSimpleName());
+      RESTRequest request =
+          JsonUtils.objectMapper()
+              .readValue(valid.replace("\"properties\":null", "\"properties\":{\"k\":null}"), type);
+      IllegalArgumentException error =
+          assertThrows(IllegalArgumentException.class, request::validate, type.getSimpleName());
+      assertEquals("properties[k] must not be null", error.getMessage());
+    }
+  }
+
+  @Test
+  void testNullPropertyKeyInTagCreateRequest() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(null, "value");
+    TagCreateRequest request = new TagCreateRequest("tag", null, properties);
+    IllegalArgumentException error =
+        assertThrows(IllegalArgumentException.class, request::validate);
+    assertEquals("properties must not contain null keys", error.getMessage());
+  }
+
+  @Test
   void testNullPropertyKey() {
     Map<String, String> properties = new HashMap<>();
     properties.put(null, "value");

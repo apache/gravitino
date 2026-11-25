@@ -88,5 +88,6 @@ public class RoleCreateRequest implements RESTRequest {
           objectDTO.privileges() != null && !objectDTO.privileges().isEmpty(),
           "\"securable object privileges\" can't be null or empty");
     }
+    RequestValidation.properties(properties);
   }
 }

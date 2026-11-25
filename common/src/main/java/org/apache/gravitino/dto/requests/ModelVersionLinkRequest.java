@@ -104,5 +104,6 @@ public class ModelVersionLinkRequest implements RESTRequest {
             Preconditions.checkArgument(StringUtils.isNotBlank(u), "URI must not be blank");
           });
     }
+    RequestValidation.properties(properties);
   }
 }
