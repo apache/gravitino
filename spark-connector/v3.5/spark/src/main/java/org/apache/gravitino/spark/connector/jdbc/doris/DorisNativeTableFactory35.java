@@ -47,13 +47,6 @@ final class DorisNativeTableFactory35 {
       StructType schema,
       Map<String, String> nativeOptions,
       JdbcCredential credential) {
-    if (identifier.namespace().length != 1
-        || identifier.namespace()[0].contains(".")
-        || identifier.name().contains(".")
-        || identifier.namespace()[0].contains("`")
-        || identifier.name().contains("`")) {
-      throw new IllegalArgumentException("Unsupported identifier for a Doris native scan");
-    }
     Map<String, String> options = new HashMap<>(nativeOptions);
     options.put("doris.table.identifier", identifier.namespace()[0] + "." + identifier.name());
     options.put("doris.user", credential.jdbcUser());

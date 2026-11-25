@@ -133,42 +133,28 @@ public class SparkDorisNativeReadIT35 extends DorisNativeReadFixture35 {
 
       String nativeTable = nativeCatalog + "." + databaseName + "." + table;
       String jdbcTable = jdbcCatalog + "." + databaseName + "." + table;
-      Dataset<Row> nativeTimestamp =
-          getSparkSession().sql("SELECT event_time FROM " + nativeTable + " WHERE id = 1");
-      Dataset<Row> jdbcTimestamp =
-          getSparkSession().sql("SELECT event_time FROM " + jdbcTable + " WHERE id = 1");
       Instant expected = Instant.parse("2026-01-01T00:00:00Z");
-      Assertions.assertEquals(
-          expected, nativeTimestamp.collectAsList().get(0).getTimestamp(0).toInstant());
-      Assertions.assertEquals(
-          expected, jdbcTimestamp.collectAsList().get(0).getTimestamp(0).toInstant());
-      Assertions.assertInstanceOf(JDBCScan.class, getScan(nativeTimestamp));
+      for (String source : List.of(nativeTable, jdbcTable)) {
+        Dataset<Row> timestamp =
+            getSparkSession().sql("SELECT event_time FROM " + source + " WHERE id = 1");
+        Assertions.assertEquals(
+            expected, timestamp.collectAsList().get(0).getTimestamp(0).toInstant());
+        Assertions.assertInstanceOf(JDBCScan.class, getScan(timestamp));
 
-      Dataset<Row> filtered =
-          getSparkSession()
-              .sql(
-                  "SELECT id FROM "
-                      + nativeTable
-                      + " WHERE event_time > TIMESTAMP '2026-01-01 12:00:00'");
-      Dataset<Row> jdbcFiltered =
-          getSparkSession()
-              .sql(
-                  "SELECT id FROM "
-                      + jdbcTable
-                      + " WHERE event_time > TIMESTAMP '2026-01-01 12:00:00'");
-      Assertions.assertEquals(
-          List.of(2, 3),
-          filtered.collectAsList().stream()
-              .map(row -> row.getInt(0))
-              .sorted()
-              .collect(Collectors.toList()));
-      Assertions.assertEquals(
-          List.of(2, 3),
-          jdbcFiltered.collectAsList().stream()
-              .map(row -> row.getInt(0))
-              .sorted()
-              .collect(Collectors.toList()));
-      Assertions.assertInstanceOf(JDBCScan.class, getScan(filtered));
+        Dataset<Row> filtered =
+            getSparkSession()
+                .sql(
+                    "SELECT id FROM "
+                        + source
+                        + " WHERE event_time > TIMESTAMP '2026-01-01 12:00:00'");
+        Assertions.assertEquals(
+            List.of(2, 3),
+            filtered.collectAsList().stream()
+                .map(row -> row.getInt(0))
+                .sorted()
+                .collect(Collectors.toList()));
+        Assertions.assertInstanceOf(JDBCScan.class, getScan(filtered));
+      }
 
       Dataset<Row> ordinary =
           getSparkSession().sql("SELECT id FROM " + nativeTable + " WHERE id = 1");

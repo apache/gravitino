@@ -136,18 +136,17 @@ public class TestDorisPropertiesConverter35 {
             "spark.bypass.doris.batch.size", "1024",
             "spark.bypass.doris.read.arrow-flight-sql.port", "8070");
     Map<String, String> options = DorisPropertiesConverter35.nativeOptions(properties);
-    assertEquals("fe:8030", options.get("doris.fenodes"));
-    assertEquals("thrift", options.get("doris.read.mode"));
-    assertEquals("2", options.get("doris.request.tablet.size"));
-    assertEquals("1024", options.get("doris.batch.size"));
-    assertEquals("8070", options.get("doris.read.arrow-flight-sql.port"));
+    assertEquals(
+        Map.of(
+            "doris.fenodes", "fe:8030",
+            "doris.read.mode", "thrift",
+            "doris.request.tablet.size", "2",
+            "doris.batch.size", "1024",
+            "doris.read.arrow-flight-sql.port", "8070"),
+        options);
     Map<String, String> jdbc =
         DorisPropertiesConverter35.getInstance().toSparkCatalogProperties(properties);
-    assertFalse(jdbc.containsKey("doris.fenodes"));
-    assertFalse(jdbc.containsKey("doris.read.mode"));
-    assertFalse(jdbc.containsKey("doris.request.tablet.size"));
-    assertFalse(jdbc.containsKey("doris.batch.size"));
-    assertFalse(jdbc.containsKey("doris.read.arrow-flight-sql.port"));
+    assertTrue(options.keySet().stream().noneMatch(jdbc::containsKey));
   }
 
   @Test

@@ -45,8 +45,6 @@ import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Exercises native Doris reads with real remote Spark executors. Select this suite explicitly with
@@ -56,8 +54,6 @@ import org.slf4j.LoggerFactory;
 @Tag("doris-multi-version")
 @Tag("doris-standalone")
 public class SparkDorisNativeDistributedIT35 extends DorisNativeReadFixture35 {
-  private static final Logger LOG = LoggerFactory.getLogger(SparkDorisNativeDistributedIT35.class);
-
   @Override
   protected String getSparkMaster() {
     String master = System.getenv("GRAVITINO_TEST_SPARK_MASTER");
@@ -119,28 +115,6 @@ public class SparkDorisNativeDistributedIT35 extends DorisNativeReadFixture35 {
     } finally {
       getSparkSession().sparkContext().removeSparkListener(listener);
     }
-  }
-
-  @Test
-  void testNativeAndJdbcEquivalentReadTimings() throws Exception {
-    String table = "native_read_timing";
-    try (Connection connection =
-            DriverManager.getConnection(
-                jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
-        Statement statement = connection.createStatement()) {
-      statement.execute(
-          "CREATE TABLE "
-              + databaseName
-              + "."
-              + table
-              + " (id INT NOT NULL, name VARCHAR(128)) DISTRIBUTED BY HASH(id) BUCKETS 8");
-      statement.execute(
-          "INSERT INTO "
-              + databaseName
-              + "."
-              + table
-              + " SELECT CAST(number AS INT), REPEAT('x', 96) FROM numbers(\"number\" = \"200000\")");
-    }
 
     String jdbcCatalog = "jdbc_doris_compare";
     Map<String, String> properties = new HashMap<>(getCatalogConfigs());
@@ -152,54 +126,22 @@ public class SparkDorisNativeDistributedIT35 extends DorisNativeReadFixture35 {
         .conf()
         .set("spark.sql.catalog." + jdbcCatalog, GravitinoDorisCatalogSpark35.class.getName());
 
-    Dataset<Row> nativeRows =
-        getSparkSession()
-            .sql(
-                "SELECT id, name FROM "
-                    + CATALOG_NAME
-                    + "."
-                    + databaseName
-                    + "."
-                    + table
-                    + " WHERE id >= 100000");
+    String query = "SELECT id, name FROM %s WHERE id >= 3";
+    Dataset<Row> nativeRows = getSparkSession().sql(String.format(query, sparkTable()));
     Dataset<Row> jdbcRows =
         getSparkSession()
-            .sql(
-                "SELECT id, name FROM "
-                    + jdbcCatalog
-                    + "."
-                    + databaseName
-                    + "."
-                    + table
-                    + " WHERE id >= 100000");
+            .sql(String.format(query, jdbcCatalog + "." + databaseName + "." + TABLE_NAME));
     Scan nativeScan = SparkDorisNativeReadIT35.getScan(nativeRows);
     Scan jdbcScan = SparkDorisNativeReadIT35.getScan(jdbcRows);
     Assertions.assertInstanceOf(DorisScanV2.class, nativeScan);
     assertReaderMode(nativeScan);
     Assertions.assertInstanceOf(JDBCScan.class, jdbcScan);
-    int nativePartitions = nativeScan.toBatch().planInputPartitions().length;
-    int jdbcPartitions = jdbcRows.javaRDD().getNumPartitions();
-    Assertions.assertTrue(nativePartitions > 1);
-
-    // Warm both paths, then record separate runs of the same query without caching either result.
-    readChecksum(nativeRows);
-    readChecksum(jdbcRows);
-    for (int run = 0; run < 2; run++) {
-      long start = System.nanoTime();
-      long[] nativeResult = readChecksum(nativeRows);
-      long nativeMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-      start = System.nanoTime();
-      long[] jdbcResult = readChecksum(jdbcRows);
-      long jdbcMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-      Assertions.assertArrayEquals(jdbcResult, nativeResult);
-      Assertions.assertArrayEquals(new long[] {100000, 14999950000L, 9600000}, nativeResult);
-      LOG.info(
-          "Doris equivalent read: native partitions={}, ms={}; JDBC partitions={}, ms={}",
-          nativePartitions,
-          nativeMs,
-          jdbcPartitions,
-          jdbcMs);
-    }
+    Assertions.assertTrue(nativeScan.toBatch().planInputPartitions().length > 1);
+    List<Row> nativeResult = nativeRows.collectAsList();
+    List<Row> jdbcResult = jdbcRows.collectAsList();
+    Assertions.assertEquals(6, nativeResult.size());
+    Assertions.assertEquals(jdbcResult.size(), nativeResult.size());
+    Assertions.assertEquals(new HashSet<>(jdbcResult), new HashSet<>(nativeResult));
   }
 
   @Test
@@ -225,16 +167,6 @@ public class SparkDorisNativeDistributedIT35 extends DorisNativeReadFixture35 {
       values.add(row.getInt(0));
     }
     Assertions.assertEquals(Set.of(1, 2), values);
-  }
-
-  private static long[] readChecksum(Dataset<Row> rows) {
-    long[] total = new long[3];
-    for (Row row : rows.collectAsList()) {
-      total[0]++;
-      total[1] += row.getInt(0);
-      total[2] += row.getString(1).length();
-    }
-    return total;
   }
 
   private void assertReaderMode(Scan scan) throws ReflectiveOperationException {

@@ -75,8 +75,8 @@ final class DorisReadOnlyTable35 implements Table, SupportsRead {
 
   @Override
   public ScanBuilder newScanBuilder(CaseInsensitiveStringMap options) {
-    DorisPropertiesConverter35.validateReadOptions(options);
     if (nativeTable == null) {
+      DorisPropertiesConverter35.validateReadOptions(options);
       return jdbcTable.newScanBuilder(options);
     }
     DorisPropertiesConverter35.validateNativeReadOptions(options);

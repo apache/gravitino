@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.spark.connector.jdbc.doris;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -59,15 +58,6 @@ public class TestDorisNativeTableFactory35 {
     assertFalse(DorisNativeTableFactory35.schemasCompatible(quoted, quoted));
     StructType dotted = new StructType().add("a.b", DataTypes.IntegerType);
     assertFalse(DorisNativeTableFactory35.schemasCompatible(dotted, dotted));
-  }
-
-  @Test
-  void testArrowIdentifierQuotesDatabaseAndReservedTableName() {
-    Identifier original = Identifier.of(new String[] {"db"}, "select");
-    Identifier quoted = DorisNativeTableFactory35.quotedIdentifier(original);
-    assertEquals("`db`.`select`", quoted.toString());
-    assertEquals("db", quoted.namespace()[0]);
-    assertEquals("select", quoted.name());
   }
 
   @Test

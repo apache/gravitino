@@ -131,9 +131,7 @@ final class DorisPropertiesConverter35 implements PropertiesConverter {
       throw new IllegalArgumentException(
           "Unsupported Doris native option: " + otherDorisOptions.get(0));
     }
-    if (!nativeOptions.isEmpty()
-        && (!nativeOptions.containsKey("doris.fenodes")
-            || nativeOptions.get("doris.fenodes").trim().isEmpty())) {
+    if (!nativeOptions.isEmpty() && !nativeOptions.containsKey("doris.fenodes")) {
       throw new IllegalArgumentException(
           "Doris native reads require catalog-managed doris.fenodes");
     }

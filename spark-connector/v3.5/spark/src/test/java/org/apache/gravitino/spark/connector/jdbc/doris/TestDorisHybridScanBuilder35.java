@@ -43,13 +43,16 @@ import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 /** Tests the coordination of native and JDBC scan delegates. */
+@TestInstance(TestInstance.Lifecycle.PER_METHOD)
 public class TestDorisHybridScanBuilder35 {
+  private final RecordingBuilder nativeBuilder = new RecordingBuilder();
+  private final RecordingBuilder jdbcBuilder = new RecordingBuilder();
+
   @Test
   void testDetailReadDelegatesColumnsAndSelectsNative() {
-    RecordingBuilder nativeBuilder = new RecordingBuilder();
-    RecordingBuilder jdbcBuilder = new RecordingBuilder();
     StructType schema =
         new StructType()
             .add("id", DataTypes.IntegerType)
@@ -84,8 +87,6 @@ public class TestDorisHybridScanBuilder35 {
 
   @Test
   void testPredicatesRejectedByEitherDelegateRemainResidual() {
-    RecordingBuilder nativeBuilder = new RecordingBuilder();
-    RecordingBuilder jdbcBuilder = new RecordingBuilder();
     DorisHybridScanBuilder35 builder =
         new DorisHybridScanBuilder35(nativeBuilder, jdbcBuilder, new StructType());
     Predicate supported =
@@ -103,8 +104,6 @@ public class TestDorisHybridScanBuilder35 {
 
   @Test
   void testJdbcResidualIsNotPushedToNative() {
-    RecordingBuilder nativeBuilder = new RecordingBuilder();
-    RecordingBuilder jdbcBuilder = new RecordingBuilder();
     DorisHybridScanBuilder35 builder =
         new DorisHybridScanBuilder35(nativeBuilder, jdbcBuilder, new StructType());
     Predicate predicate =
@@ -120,8 +119,6 @@ public class TestDorisHybridScanBuilder35 {
 
   @Test
   void testLimitRoutesToJdbcAndOffsetDoesNotMakeLimitNonpositive() {
-    RecordingBuilder nativeBuilder = new RecordingBuilder();
-    RecordingBuilder jdbcBuilder = new RecordingBuilder();
     DorisHybridScanBuilder35 builder =
         new DorisHybridScanBuilder35(nativeBuilder, jdbcBuilder, new StructType());
 
@@ -132,8 +129,6 @@ public class TestDorisHybridScanBuilder35 {
 
   @Test
   void testJdbcAggregateColumnsAreNotPrunedAgainstNativeSchema() {
-    RecordingBuilder nativeBuilder = new RecordingBuilder();
-    RecordingBuilder jdbcBuilder = new RecordingBuilder();
     DorisHybridScanBuilder35 builder =
         new DorisHybridScanBuilder35(nativeBuilder, jdbcBuilder, new StructType());
     StructType aggregateOutput = new StructType().add("count(*)", DataTypes.LongType);
@@ -148,9 +143,10 @@ public class TestDorisHybridScanBuilder35 {
 
   @Test
   void testTimestampPredicateRemainsResidualBeforeScanSelection() {
-    RecordingBuilder nativeBuilder = new RecordingBuilder();
-    RecordingBuilder jdbcBuilder = new RecordingBuilder();
-    StructType schema = new StructType().add("event_time", DataTypes.TimestampType);
+    StructType schema =
+        new StructType()
+            .add("id", DataTypes.IntegerType)
+            .add("event_time", DataTypes.TimestampType);
     DorisHybridScanBuilder35 builder =
         new DorisHybridScanBuilder35(nativeBuilder, jdbcBuilder, schema);
     Predicate predicate =
@@ -160,17 +156,18 @@ public class TestDorisHybridScanBuilder35 {
               Expressions.column("event_time"),
               Expressions.literal(Timestamp.valueOf("2026-01-01 00:00:00"))
             });
+    Predicate ordinary =
+        new Predicate("=", new Expression[] {Expressions.column("id"), Expressions.literal(1)});
 
     assertArrayEquals(
-        new Predicate[] {predicate}, builder.pushPredicates(new Predicate[] {predicate}));
-    assertArrayEquals(new Predicate[0], nativeBuilder.received);
-    assertArrayEquals(new Predicate[0], jdbcBuilder.received);
+        new Predicate[] {predicate}, builder.pushPredicates(new Predicate[] {predicate, ordinary}));
+    assertArrayEquals(new Predicate[] {ordinary}, nativeBuilder.received);
+    assertArrayEquals(new Predicate[] {ordinary}, jdbcBuilder.received);
+    assertArrayEquals(new Predicate[] {ordinary}, builder.pushedPredicates());
   }
 
   @Test
   void testTimestampNullCheckCanBePushed() {
-    RecordingBuilder nativeBuilder = new RecordingBuilder();
-    RecordingBuilder jdbcBuilder = new RecordingBuilder();
     DorisHybridScanBuilder35 builder =
         new DorisHybridScanBuilder35(
             nativeBuilder,

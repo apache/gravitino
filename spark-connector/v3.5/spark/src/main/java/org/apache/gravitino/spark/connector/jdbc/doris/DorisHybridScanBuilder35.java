@@ -104,36 +104,19 @@ final class DorisHybridScanBuilder35
 
   @Override
   public Predicate[] pushPredicates(Predicate[] predicates) {
-    List<Predicate> jdbcCandidates = new ArrayList<>();
-    for (Predicate predicate : predicates) {
-      if (!referencesTimestamp(predicate)) {
-        jdbcCandidates.add(predicate);
-      }
-    }
+    List<Predicate> jdbcCandidates = new ArrayList<>(Arrays.asList(predicates));
+    jdbcCandidates.removeIf(this::referencesTimestamp);
     Predicate[] jdbcResidual =
         ((SupportsPushDownV2Filters) jdbcBuilder)
             .pushPredicates(jdbcCandidates.toArray(new Predicate[0]));
-    List<Predicate> candidates = new ArrayList<>();
-    for (Predicate predicate : predicates) {
-      if (!Arrays.asList(jdbcResidual).contains(predicate) && !referencesTimestamp(predicate)) {
-        candidates.add(predicate);
-      }
-    }
+    jdbcCandidates.removeAll(Arrays.asList(jdbcResidual));
     Predicate[] nativeResidual =
         ((SupportsPushDownV2Filters) nativeBuilder)
-            .pushPredicates(candidates.toArray(new Predicate[0]));
-    List<Predicate> residual = new ArrayList<>();
-    List<Predicate> pushed = new ArrayList<>();
-    for (Predicate predicate : predicates) {
-      if (referencesTimestamp(predicate)
-          || Arrays.asList(nativeResidual).contains(predicate)
-          || Arrays.asList(jdbcResidual).contains(predicate)) {
-        residual.add(predicate);
-      } else {
-        pushed.add(predicate);
-      }
-    }
-    pushedPredicates = pushed.toArray(new Predicate[0]);
+            .pushPredicates(jdbcCandidates.toArray(new Predicate[0]));
+    jdbcCandidates.removeAll(Arrays.asList(nativeResidual));
+    pushedPredicates = jdbcCandidates.toArray(new Predicate[0]);
+    List<Predicate> residual = new ArrayList<>(Arrays.asList(predicates));
+    residual.removeAll(jdbcCandidates);
     return residual.toArray(new Predicate[0]);
   }
 
