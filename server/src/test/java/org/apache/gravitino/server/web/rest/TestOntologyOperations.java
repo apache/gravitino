@@ -143,9 +143,9 @@ public class TestOntologyOperations extends BaseOperationsTest {
     when(dispatcher.createOntology(
             eq(METALAKE), eq("Sales"), eq("orders"), any(OntologyDefinition.class), anyMap()))
         .thenReturn(ontology());
-    when(dispatcher.alterOntology(eq(METALAKE), eq("Sales"), any(OntologyChange[].class)))
+    when(dispatcher.alterOntology(eq(METALAKE), eq("Sales"), any(), any(OntologyChange[].class)))
         .thenReturn(ontology());
-    when(dispatcher.dropOntology(eq(METALAKE), eq("Sales"))).thenReturn(true);
+    when(dispatcher.dropOntology(eq(METALAKE), eq("Sales"), any())).thenReturn(true);
 
     OntologyCreateRequest create =
         new OntologyCreateRequest("Sales", "orders", DEFINITION, Map.of("k", "v"));
@@ -163,7 +163,7 @@ public class TestOntologyOperations extends BaseOperationsTest {
       assertEquals(200, response.getStatus());
     }
     ArgumentCaptor<OntologyChange[]> changes = ArgumentCaptor.forClass(OntologyChange[].class);
-    verify(dispatcher).alterOntology(eq(METALAKE), eq("Sales"), changes.capture());
+    verify(dispatcher).alterOntology(eq(METALAKE), eq("Sales"), any(), changes.capture());
     assertEquals(
         List.of(OntologyChange.updateComment("new"), OntologyChange.setProperty("k", "v2")),
         List.of(changes.getValue()));
@@ -221,7 +221,7 @@ public class TestOntologyOperations extends BaseOperationsTest {
         ErrorConstants.NOT_FOUND_CODE,
         NoSuchOntologyException.class);
 
-    when(dispatcher.dropOntology(eq(METALAKE), eq("Sales")))
+    when(dispatcher.dropOntology(eq(METALAKE), eq("Sales"), any()))
         .thenThrow(new OntologyInUseException("Ontology Sales is used by cat.sch.model.customers"));
     try (Response response = target(ITEM).request(GRAVITINO_JSON).delete()) {
       ErrorResponse error = response.readEntity(ErrorResponse.class);
@@ -260,7 +260,7 @@ public class TestOntologyOperations extends BaseOperationsTest {
 
   @Test
   public void testLockConflictsAreRetryable() {
-    when(dispatcher.alterOntology(eq(METALAKE), eq("Sales"), any(OntologyChange[].class)))
+    when(dispatcher.alterOntology(eq(METALAKE), eq("Sales"), any(), any(OntologyChange[].class)))
         .thenThrow(new OptimisticLockException("The ontology Sales could not be changed"));
     OntologyUpdatesRequest updates =
         OntologyUpdatesRequest.fromOntologyChanges(OntologyChange.updateComment("new"));
@@ -275,9 +275,9 @@ public class TestOntologyOperations extends BaseOperationsTest {
   @Test
   public void testOntologyNamedOssieIsRoutable() {
     when(dispatcher.loadOntology(METALAKE, "ossie")).thenReturn(ontology());
-    when(dispatcher.alterOntology(eq(METALAKE), eq("ossie"), any(OntologyChange[].class)))
+    when(dispatcher.alterOntology(eq(METALAKE), eq("ossie"), any(), any(OntologyChange[].class)))
         .thenReturn(ontology());
-    when(dispatcher.dropOntology(eq(METALAKE), eq("ossie"))).thenReturn(true);
+    when(dispatcher.dropOntology(eq(METALAKE), eq("ossie"), any())).thenReturn(true);
     OntologyUpdatesRequest updates =
         OntologyUpdatesRequest.fromOntologyChanges(OntologyChange.updateComment("new"));
     try (Response response = target(BASE + "/ossie").request(GRAVITINO_JSON).get()) {

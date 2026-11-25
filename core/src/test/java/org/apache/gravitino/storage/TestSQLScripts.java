@@ -233,6 +233,7 @@ public class TestSQLScripts extends TestJDBCBackend {
       if ("2.0.0".equals(versionScripts.getKey())) {
         assertCleanupIndexes("schema " + versionScripts.getKey());
         assertLiveRowIndexes("schema " + versionScripts.getKey());
+        assertOntologyMappingUniqueness("schema " + versionScripts.getKey());
         assertNameColumnWidths("schema " + versionScripts.getKey());
         assertIdempotencySchema("schema " + versionScripts.getKey());
       }
@@ -277,6 +278,7 @@ public class TestSQLScripts extends TestJDBCBackend {
       if ("2.0.0".equals(upgradeMatcher.group(2))) {
         assertCleanupIndexes(upgradeScript.getName());
         assertLiveRowIndexes(upgradeScript.getName());
+        assertOntologyMappingUniqueness(upgradeScript.getName());
         assertNameColumnWidths(upgradeScript.getName());
         assertIdempotencySchema(upgradeScript.getName());
       }
@@ -974,6 +976,23 @@ public class TestSQLScripts extends TestJDBCBackend {
         Assertions.assertEquals(expectedKeys, keys, index + " after " + source);
       }
     }
+  }
+
+  private void assertOntologyMappingUniqueness(String source) throws SQLException {
+    String table = "ontology_mapping_meta";
+    String databaseTable = "h2".equals(backendType) ? table.toUpperCase(Locale.ROOT) : table;
+    List<String> indexes =
+        readSchemaIndexes(Set.of(databaseTable)).stream()
+            .map(index -> index.toLowerCase(Locale.ROOT))
+            .toList();
+    String key = table + ":uk_onmm_smid_oid_del:";
+    Assertions.assertTrue(
+        indexes.containsAll(
+            List.of(
+                key + "1:semantic_model_id:false",
+                key + "2:ontology_id:false",
+                key + "3:deleted_at:false")),
+        "Missing unique model and ontology mapping key after " + source);
   }
 
   private void assertSchemaMatchesFreshInstall(

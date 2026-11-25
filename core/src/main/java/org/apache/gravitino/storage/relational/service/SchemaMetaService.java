@@ -420,6 +420,7 @@ public class SchemaMetaService {
               SessionUtils.doWithoutCommit(
                   SemanticModelVersionInfoMapper.class,
                   mapper -> mapper.softDeleteSemanticModelVersionsBySchemaIds(schemaIds.get())),
+          () -> OntologyMetaService.getInstance().cascadeSchemas(schemaIds.get()),
           () ->
               SessionUtils.doWithoutCommit(
                   SemanticModelMetricMapper.class,

@@ -92,7 +92,8 @@ public interface Entity extends Serializable {
     AUDIT,
     FUNCTION,
     DOMAIN,
-    ONTOLOGY;
+    ONTOLOGY,
+    ONTOLOGY_MAPPING;
   }
 
   /**
