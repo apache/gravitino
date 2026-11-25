@@ -27,7 +27,7 @@ public final class SemanticModelRevisionSelector {
   public static final SemanticModelRevisionSelector ACTIVE = new SemanticModelRevisionSelector(0);
 
   /** Selects the latest saved revision. */
-  public static final SemanticModelRevisionSelector LATEST = new SemanticModelRevisionSelector(0);
+  public static final SemanticModelRevisionSelector LATEST = new SemanticModelRevisionSelector(-1);
 
   private final int number;
 
@@ -41,7 +41,12 @@ public final class SemanticModelRevisionSelector {
     return new SemanticModelRevisionSelector(number);
   }
 
-  /** Returns the number for a numbered selector, or zero for a pointer selector. */
+  /**
+   * Returns the revision number or the reserved value for a pointer selector.
+   *
+   * @return {@code 0} for {@link #ACTIVE}, {@code -1} for {@link #LATEST}, or the positive revision
+   *     number for a numbered selector.
+   */
   public int getNumber() {
     return number;
   }
