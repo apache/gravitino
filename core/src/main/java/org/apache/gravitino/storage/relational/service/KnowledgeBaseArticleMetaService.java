@@ -42,8 +42,10 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -77,6 +79,25 @@ public final class KnowledgeBaseArticleMetaService {
   private static final int LOOKUP_BATCH_SIZE = 500;
   private static final MemberType ARTICLE = MemberType.KNOWLEDGE_BASE_ARTICLE;
   private static final TransactionHook NO_HOOK = (before, after) -> {};
+
+  // MySQL, PostgreSQL and H2 report the violated constraint in different diagnostic formats.
+  private static final Pattern NAME_CONSTRAINT =
+      Pattern.compile(
+          "(?i)(?:for key '(?:kb_article_meta\\.)?uk_kba_name'$"
+              + "|^ERROR: +duplicate key value violates unique constraint \"uk_kba_name\""
+              + "|^Unique index or primary key violation: \"(?:[\\w]+\\.)?uk_kba_name_index_[0-9a-f]+ on )");
+  private static final Pattern ID_CONSTRAINT =
+      Pattern.compile(
+          "(?i)(?:for key '(?:kb_article_meta\\.)?PRIMARY'$"
+              + "|^ERROR: +duplicate key value violates unique constraint \"kb_article_meta_pkey\""
+              + "|^Unique index or primary key violation: \"PRIMARY KEY ON (?:[\\w]+\\.)?kb_article_meta\\(article_id\\))");
+
+  /** A conflict on the live Article name key during the Article row insert. */
+  public static final class NameConflictException extends EntityAlreadyExistsException {
+    private NameConflictException(Throwable cause, String name) {
+      super(cause, "Article name %s already exists", name);
+    }
+  }
 
   /** Storage extension invoked before commit, with the complete old and new binding sets. */
   @FunctionalInterface
@@ -146,7 +167,12 @@ public final class KnowledgeBaseArticleMetaService {
     return new NamespacedEntityId(ids.getArticleId(), ids.getMetalakeId());
   }
 
-  /** Returns the requested live entities in input order, omitting missing entries. */
+  /**
+   * Returns the requested live entities in input order, omitting missing entries.
+   *
+   * <p>Without an active session, all batches for one metalake share a read snapshot. With an
+   * active session, visibility across batches follows the caller's transaction isolation level.
+   */
   public List<KnowledgeBaseArticleEntity> batchGet(List<NameIdentifier> idents) {
     Map<Namespace, Set<String>> groups = new LinkedHashMap<>();
     for (NameIdentifier ident : idents) {
@@ -198,14 +224,17 @@ public final class KnowledgeBaseArticleMetaService {
                     entity.bodyUpdate(), "An initial Article body is required");
             row.setBodyFormat(body.format().name());
             row.setBodyContent(body.content());
-            mapper.insert(row);
-            initial.bindings().forEach(binding -> mapper.bind(row, binding));
+            insertArticleRow(mapper, row);
+            addBindings(mapper, row, initial.bindings());
             changeMemberships(row, Set.of(), initial.domainIds());
             hook.onChange(null, initial);
             return null;
           });
     } catch (RuntimeException e) {
-      ExceptionUtils.checkSQLException(e, entity.type(), entity.nameIdentifier().toString());
+      // A duplicate from a binding or extension belongs to that write.
+      if (!ExceptionUtils.isDuplicateKey(e)) {
+        ExceptionUtils.checkSQLException(e, entity.type(), entity.nameIdentifier().toString());
+      }
       throw e;
     }
   }
@@ -298,6 +327,28 @@ public final class KnowledgeBaseArticleMetaService {
           int bindings = m.purgeBindings(cutoff, limit);
           return bindings == limit ? bindings : bindings + m.purge(cutoff, limit - bindings);
         });
+  }
+
+  private static void insertArticleRow(
+      KnowledgeBaseArticleMapper mapper, KnowledgeBaseArticlePO row) {
+    try {
+      mapper.insert(row);
+    } catch (RuntimeException failure) {
+      for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+        if (cause instanceof SQLException sql
+            && sql.getMessage() != null
+            && ExceptionUtils.isDuplicateKey(sql)) {
+          if (NAME_CONSTRAINT.matcher(sql.getMessage()).find()) {
+            throw new NameConflictException(failure, row.getArticleName());
+          }
+          if (ID_CONSTRAINT.matcher(sql.getMessage()).find()) {
+            throw new EntityAlreadyExistsException(
+                failure, "Article ID %s already exists", row.getArticleId());
+          }
+        }
+      }
+      throw failure;
+    }
   }
 
   private static String metalakeName(Namespace ns) {
@@ -549,6 +600,29 @@ public final class KnowledgeBaseArticleMetaService {
     }
   }
 
+  private void addBindings(
+      KnowledgeBaseArticleMapper mapper, KnowledgeBaseArticlePO row, Set<Binding> added) {
+    if (!added.isEmpty()) {
+      String audit = newRelationAudit();
+      for (Binding binding : added) {
+        mapper.bind(row, binding, audit);
+      }
+    }
+  }
+
+  private String newRelationAudit() {
+    AuditInfo audit =
+        AuditInfo.builder()
+            .withCreator(PrincipalUtils.getCurrentUserName())
+            .withCreateTime(Instant.now())
+            .build();
+    try {
+      return JsonUtils.anyFieldMapper().writeValueAsString(audit);
+    } catch (IOException e) {
+      throw new UncheckedIOException("Cannot encode Article relation audit", e);
+    }
+  }
+
   private void changeMemberships(KnowledgeBaseArticlePO row, Set<Long> before, Set<Long> after) {
     SessionUtils.doWithoutCommit(
         DomainMemberMapper.class,
@@ -563,18 +637,9 @@ public final class KnowledgeBaseArticleMetaService {
           }
           Set<Long> added = Sets.difference(after, before);
           if (!added.isEmpty()) {
-            AuditInfo audit =
-                AuditInfo.builder()
-                    .withCreator(PrincipalUtils.getCurrentUserName())
-                    .withCreateTime(Instant.now())
-                    .build();
-            try {
-              String auditJson = JsonUtils.anyFieldMapper().writeValueAsString(audit);
-              for (long id : added) {
-                members.add(row.getMetalakeId(), ARTICLE, row.getArticleId(), id, auditJson);
-              }
-            } catch (IOException e) {
-              throw new UncheckedIOException("Cannot encode Article membership audit", e);
+            String audit = newRelationAudit();
+            for (long id : added) {
+              members.add(row.getMetalakeId(), ARTICLE, row.getArticleId(), id, audit);
             }
           }
         });
@@ -617,9 +682,7 @@ public final class KnowledgeBaseArticleMetaService {
     for (Binding removed : Sets.difference(before.bindings(), after.bindings())) {
       mapper.unbind(before.id(), removed, now);
     }
-    for (Binding added : Sets.difference(after.bindings(), before.bindings())) {
-      mapper.bind(next, added);
-    }
+    addBindings(mapper, next, Sets.difference(after.bindings(), before.bindings()));
     changeMemberships(next, before.domainIds(), after.domainIds());
     hook.onChange(before, after);
     return after;
