@@ -475,7 +475,7 @@ public class IcebergCatalogOperations
                   catalog -> helper.buildIcebergTableChanges(catalog, schemaTableIdent, changes));
       loadTableResponse.validate();
       return IcebergTable.fromIcebergTable(loadTableResponse.tableMetadata(), tableIdent.name());
-    } catch (ValidationException e) {
+    } catch (ValidationException | BadRequestException e) {
       throw new IllegalArgumentException(e.getMessage(), e);
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(e, ICEBERG_TABLE_DOES_NOT_EXIST_MSG, tableIdent.name());

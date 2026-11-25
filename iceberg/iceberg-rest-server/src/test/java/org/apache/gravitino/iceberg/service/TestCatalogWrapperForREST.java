@@ -2350,6 +2350,142 @@ public class TestCatalogWrapperForREST {
             expectedFormatVersionStringAfterStagedUpdates(schema, noExplicitUpgrade));
   }
 
+  @Test
+  void testFederatedStagedCreateRejectsV3TypeWithoutFormatVersion3() {
+    RESTCatalog catalog = mock(RESTCatalog.class);
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "/tmp/warehouse"));
+    CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("test", config, catalog);
+
+    Schema variantSchema =
+        new Schema(Types.NestedField.optional(1, "payload", Types.VariantType.get()));
+    UpdateTableRequest request =
+        new UpdateTableRequest(
+            List.of(new UpdateRequirement.AssertTableDoesNotExist()),
+            stagedCreateMetadataUpdates(variantSchema, Optional.empty()));
+
+    BadRequestException failure =
+        Assertions.assertThrows(
+            BadRequestException.class,
+            () -> wrapper.updateTable(TableIdentifier.of("db", "tbl"), request));
+    Assertions.assertTrue(
+        failure.getMessage().contains("variant is not supported until v3"), failure.getMessage());
+    verify(catalog, never()).buildTable(any(TableIdentifier.class), any(Schema.class));
+  }
+
+  @Test
+  void testFederatedStagedCreateAllowsAddSchemaBeforeUpgradeFormatVersion() {
+    RESTCatalog catalog = mock(RESTCatalog.class);
+    Catalog.TableBuilder tableBuilder = mock(Catalog.TableBuilder.class);
+    BaseTransaction baseTransaction = mock(BaseTransaction.class);
+    TableOperations ops = mock(TableOperations.class);
+    when(catalog.buildTable(any(TableIdentifier.class), any(Schema.class)))
+        .thenReturn(tableBuilder);
+    when(tableBuilder.withPartitionSpec(any())).thenReturn(tableBuilder);
+    when(tableBuilder.withSortOrder(any())).thenReturn(tableBuilder);
+    when(tableBuilder.withLocation(any())).thenReturn(tableBuilder);
+    when(tableBuilder.withProperty(anyString(), anyString())).thenReturn(tableBuilder);
+    when(tableBuilder.withProperties(any())).thenReturn(tableBuilder);
+    when(tableBuilder.createOrReplaceTransaction()).thenReturn(baseTransaction);
+    when(baseTransaction.underlyingOps()).thenReturn(ops);
+    when(baseTransaction.currentMetadata()).thenReturn(minimalTableMetadataForStagedCreateTest());
+
+    AtomicReference<TableMetadata> opsCurrent = new AtomicReference<>();
+    when(ops.current()).thenAnswer(invocation -> opsCurrent.get());
+    doAnswer(
+            invocation -> {
+              opsCurrent.set(invocation.getArgument(1));
+              return null;
+            })
+        .when(ops)
+        .commit(any(), any());
+
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "/tmp/warehouse"));
+    CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("test", config, catalog);
+
+    Schema variantSchema =
+        new Schema(Types.NestedField.optional(1, "payload", Types.VariantType.get()));
+    List<MetadataUpdate> updates = stagedCreateMetadataUpdates(variantSchema, Optional.of(3));
+    // Put AddSchema before UpgradeFormatVersion to assert format resolution is order-independent.
+    int upgradeIndex = -1;
+    int addSchemaIndex = -1;
+    for (int i = 0; i < updates.size(); i++) {
+      if (updates.get(i) instanceof MetadataUpdate.UpgradeFormatVersion) {
+        upgradeIndex = i;
+      } else if (updates.get(i) instanceof MetadataUpdate.AddSchema) {
+        addSchemaIndex = i;
+      }
+    }
+    Assertions.assertTrue(upgradeIndex >= 0 && addSchemaIndex >= 0);
+    Collections.swap(updates, upgradeIndex, addSchemaIndex);
+
+    UpdateTableRequest request =
+        new UpdateTableRequest(List.of(new UpdateRequirement.AssertTableDoesNotExist()), updates);
+
+    Assertions.assertDoesNotThrow(
+        () -> wrapper.updateTable(TableIdentifier.of("db", "tbl"), request));
+    verify(catalog).buildTable(any(TableIdentifier.class), any(Schema.class));
+  }
+
+  @Test
+  void testFederatedStagedCreateAllowsV3TypeWithFormatVersion3() {
+    RESTCatalog catalog = mock(RESTCatalog.class);
+    Catalog.TableBuilder tableBuilder = mock(Catalog.TableBuilder.class);
+    BaseTransaction baseTransaction = mock(BaseTransaction.class);
+    TableOperations ops = mock(TableOperations.class);
+    when(catalog.buildTable(any(TableIdentifier.class), any(Schema.class)))
+        .thenReturn(tableBuilder);
+    when(tableBuilder.withPartitionSpec(any())).thenReturn(tableBuilder);
+    when(tableBuilder.withSortOrder(any())).thenReturn(tableBuilder);
+    when(tableBuilder.withLocation(any())).thenReturn(tableBuilder);
+    when(tableBuilder.withProperty(anyString(), anyString())).thenReturn(tableBuilder);
+    when(tableBuilder.withProperties(any())).thenReturn(tableBuilder);
+    when(tableBuilder.createOrReplaceTransaction()).thenReturn(baseTransaction);
+    when(baseTransaction.underlyingOps()).thenReturn(ops);
+    when(baseTransaction.currentMetadata()).thenReturn(minimalTableMetadataForStagedCreateTest());
+
+    AtomicReference<TableMetadata> opsCurrent = new AtomicReference<>();
+    when(ops.current()).thenAnswer(invocation -> opsCurrent.get());
+    doAnswer(
+            invocation -> {
+              opsCurrent.set(invocation.getArgument(1));
+              return null;
+            })
+        .when(ops)
+        .commit(any(), any());
+
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "/tmp/warehouse"));
+    CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("test", config, catalog);
+
+    Schema variantSchema =
+        new Schema(Types.NestedField.optional(1, "payload", Types.VariantType.get()));
+    UpdateTableRequest request =
+        new UpdateTableRequest(
+            List.of(new UpdateRequirement.AssertTableDoesNotExist()),
+            stagedCreateMetadataUpdates(variantSchema, Optional.of(3)));
+
+    Assertions.assertDoesNotThrow(
+        () -> wrapper.updateTable(TableIdentifier.of("db", "tbl"), request));
+    verify(catalog).buildTable(any(TableIdentifier.class), any(Schema.class));
+  }
+
   /**
    * Same derivation as {@link FederatedCatalogWrapper#tableUpdateInternal} for staged create:
    * replay metadata updates and read {@link TableMetadata#formatVersion()}.

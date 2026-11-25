@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.iceberg.converter.IcebergDataTypeConverter;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.rel.TableChange;
@@ -48,6 +49,7 @@ import org.apache.gravitino.rel.TableChange.UpdateColumnPosition;
 import org.apache.gravitino.rel.TableChange.UpdateColumnType;
 import org.apache.gravitino.rel.TableChange.UpdateComment;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
+import org.apache.iceberg.HasTableOperations;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.Transaction;
@@ -201,7 +203,8 @@ public class IcebergCatalogWrapperHelper {
   private void alterTableColumn(
       UpdateSchema icebergUpdateSchema,
       List<ColumnChange> columnChanges,
-      Schema icebergTableSchema) {
+      Schema icebergTableSchema,
+      int formatVersion) {
     for (ColumnChange change : columnChanges) {
       if (change instanceof AddColumn) {
         doAddColumn(icebergUpdateSchema, (AddColumn) change);
@@ -225,6 +228,9 @@ public class IcebergCatalogWrapperHelper {
             "Iceberg doesn't support " + change.getClass().getSimpleName() + " for now");
       }
     }
+    // Validate before commit so Schema.checkCompatibility fails as BadRequestException, not ISE
+    // from UpdateSchema.commit.
+    IcebergCatalogWrapper.validateSchema(icebergUpdateSchema.apply(), formatVersion);
     icebergUpdateSchema.commit();
   }
 
@@ -277,8 +283,13 @@ public class IcebergCatalogWrapperHelper {
     IcebergTableChange icebergTableChange =
         new IcebergTableChange(icebergTableIdentifier, transaction);
     if (!gravitinoColumnChanges.isEmpty()) {
+      int formatVersion =
+          ((HasTableOperations) icebergBaseTable).operations().current().formatVersion();
       alterTableColumn(
-          transaction.updateSchema(), gravitinoColumnChanges, icebergBaseTable.schema());
+          transaction.updateSchema(),
+          gravitinoColumnChanges,
+          icebergBaseTable.schema(),
+          formatVersion);
     }
 
     if (!gravitinoPropertyChanges.isEmpty()) {
