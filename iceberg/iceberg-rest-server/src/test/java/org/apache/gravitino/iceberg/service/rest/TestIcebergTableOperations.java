@@ -111,6 +111,7 @@ import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.types.Types;
 import org.apache.iceberg.types.Types.BooleanType;
 import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.types.Types.StringType;
@@ -721,6 +722,41 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Assertions.assertEquals(
         Status.OK.getStatusCode(),
         getTableClientBuilder(namespace, Optional.of("bad_default_tbl")).get().getStatus());
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testAddV3ColumnToV2TableReturnsBadRequest(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    String tableName = "v2_add_v3_col";
+    CreateTableRequest create =
+        CreateTableRequest.builder()
+            .withName(tableName)
+            .withSchema(tableSchema)
+            .setProperties(ImmutableMap.of("format-version", "2"))
+            .build();
+    try (Response createResponse =
+        getTableClientBuilder(namespace, Optional.empty())
+            .post(Entity.entity(create, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Status.OK.getStatusCode(), createResponse.getStatus());
+    }
+
+    Schema evolved =
+        new Schema(
+            NestedField.of(1, false, "foo_string", StringType.get()),
+            NestedField.optional(2, "payload", Types.VariantType.get()));
+    UpdateTableRequest request =
+        new UpdateTableRequest(
+            ImmutableList.of(),
+            ImmutableList.of(
+                new MetadataUpdate.AddSchema(evolved), new MetadataUpdate.SetCurrentSchema(-1)));
+    assertBadRequest(
+        getTableClientBuilder(namespace, Optional.of(tableName))
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE)),
+        "variant is not supported until v3");
+    Assertions.assertEquals(
+        Status.OK.getStatusCode(),
+        getTableClientBuilder(namespace, Optional.of(tableName)).get().getStatus());
   }
 
   @ParameterizedTest

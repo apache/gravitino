@@ -424,6 +424,39 @@ public class TestIcebergCatalogWrapper {
   }
 
   @Test
+  public void testUpdateTableAddV3SchemaToV2IsBadRequest(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Namespace namespace = Namespace.of("db");
+      TableIdentifier identifier = TableIdentifier.of(namespace, "t_v2_rest");
+      wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+      wrapper.createTable(
+          namespace,
+          CreateTableRequest.builder()
+              .withName("t_v2_rest")
+              .withSchema(new Schema(Types.NestedField.required(1, "id", Types.LongType.get())))
+              .setProperties(ImmutableMap.of("format-version", "2"))
+              .build());
+
+      Schema evolved =
+          new Schema(
+              Types.NestedField.required(1, "id", Types.LongType.get()),
+              Types.NestedField.optional(2, "payload", Types.VariantType.get()));
+      UpdateTableRequest request =
+          new UpdateTableRequest(
+              Collections.emptyList(),
+              Arrays.asList(
+                  new MetadataUpdate.AddSchema(evolved), new MetadataUpdate.SetCurrentSchema(-1)));
+      BadRequestException failure =
+          Assertions.assertThrows(
+              BadRequestException.class, () -> wrapper.updateTable(identifier, request));
+      Assertions.assertTrue(
+          failure.getMessage().contains("variant is not supported until v3"), failure.getMessage());
+    }
+  }
+
+  @Test
   public void testValidateTableDefinitionRejectsTypesWhenFormatVersionUsesCatalogDefault() {
     Schema nanos =
         new Schema(Types.NestedField.required(1, "ts", Types.TimestampNanoType.withZone()));
