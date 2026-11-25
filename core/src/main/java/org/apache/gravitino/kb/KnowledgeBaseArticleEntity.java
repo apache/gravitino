@@ -42,7 +42,7 @@ import org.apache.gravitino.meta.AuditInfo;
  */
 @Getter
 @Accessors(fluent = true)
-@EqualsAndHashCode(exclude = {"auditInfo", "bodyUpdate"})
+@EqualsAndHashCode(exclude = {"auditInfo", "bodyUpdate", "domains"})
 public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, Auditable {
   /** Stable identity of a bound Term or asset. */
   public record Binding(String targetType, long targetId) {
@@ -99,6 +99,9 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
   private final Map<String, String> properties;
   private final long revision;
   private final Set<Long> domainIds;
+  /** Current Domain names visible to the caller in manager results. */
+  private final List<String> domains;
+
   private final Set<Binding> bindings;
   private final AuditInfo auditInfo;
 
@@ -116,6 +119,7 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
       Map<String, String> properties,
       long revision,
       Set<Long> domainIds,
+      List<String> domains,
       Set<Binding> bindings,
       AuditInfo auditInfo) {
     Preconditions.checkArgument(
@@ -138,6 +142,7 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
     Preconditions.checkArgument(revision >= 0, "Negative revision");
     this.revision = revision == 0 ? 1 : revision;
     this.domainIds = domainIds == null ? Set.of() : Set.copyOf(domainIds);
+    this.domains = domains == null ? List.of() : List.copyOf(domains);
     this.bindings = bindings == null ? Set.of() : Set.copyOf(bindings);
     this.auditInfo = Preconditions.checkNotNull(auditInfo, "auditInfo");
   }

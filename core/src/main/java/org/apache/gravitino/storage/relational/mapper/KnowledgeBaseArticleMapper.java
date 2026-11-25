@@ -103,11 +103,19 @@ public interface KnowledgeBaseArticleMapper {
       ) b ON b.article_id=a.article_id
       WHERE m.metalake_name=#{metalake} AND m.deleted_at=0
       <if test='name != null'>AND a.article_name=#{name}</if>
+      <if test='domains != null'>
+        AND EXISTS (SELECT 1 FROM domain_member_rel d WHERE d.metalake_id=m.metalake_id
+          AND d.member_type='KNOWLEDGE_BASE_ARTICLE' AND d.member_id=a.article_id AND d.deleted_at=0
+          AND d.domain_id IN
+          <foreach item="domain" collection="domains" open="(" separator="," close=")">#{domain}</foreach>)
+      </if>
       ORDER BY a.article_id
       </script>
       """)
   List<KnowledgeBaseArticlePO> joined(
-      @Param("metalake") String metalake, @Param("name") @Nullable String name);
+      @Param("metalake") String metalake,
+      @Param("name") @Nullable String name,
+      @Param("domains") @Nullable List<Long> domains);
 
   /** Reads metadata and relations for a batch of Articles from the same snapshot. */
   @Select(

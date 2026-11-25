@@ -20,21 +20,25 @@
 package org.apache.gravitino.kb;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Suppliers;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
 import org.apache.gravitino.exceptions.KnowledgeBaseArticleAlreadyExistsException;
+import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchKnowledgeBaseArticleException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -98,6 +102,9 @@ public final class ArticleManager {
   public Result createArticle(String metalake, ArticleCreate request) {
     boolean generated = request.name() == null;
     String name = generated ? ArticleEdits.generatedName(request.title(), 0) : request.name();
+    ArticleDomains domains = new ArticleDomains(metalake, authorizationEnabled);
+    Supplier<ArticleDomains.Replacement> plan =
+        Suppliers.memoize(() -> domains.resolve(List.of(request.domains())));
     for (int attempt = 0; ; attempt++) {
       NameIdentifier ident = ident(metalake, name);
       long articleId = ids.nextId();
@@ -109,7 +116,8 @@ public final class ArticleManager {
                   if (authorizationEnabled) {
                     ArticleAccess.forRequest(metalake).requireCreate();
                   }
-                  return edits.create(metalake, articleId, ident.name(), request);
+                  Set<Long> initial = domains.check(plan.get(), Set.of(), true);
+                  return edits.create(metalake, articleId, ident.name(), request, initial);
                 },
                 false,
                 (before, created) -> {
@@ -122,7 +130,8 @@ public final class ArticleManager {
                             EntityType.USER);
                   }
                   policy.onChange(before, created);
-                }));
+                },
+                domains::visible));
       } catch (NameConflictException conflict) {
         if (!generated || attempt == MAX_NAME_RETRIES || SqlSessions.hasActiveSession()) {
           throw new KnowledgeBaseArticleAlreadyExistsException(
@@ -145,7 +154,11 @@ public final class ArticleManager {
             ident,
             () -> articles.getScoped(ident),
             (access, current) ->
-                access.requireRead(ident, current.article().id(), current.article().status()));
+                access.requireRead(ident, current.article().id(), current.article().status()),
+            current ->
+                new ScopedArticle(
+                    current.metalakeId(),
+                    new ArticleDomains(metalake, authorizationEnabled).visible(current.article())));
     return Result.from(state);
   }
 
@@ -157,7 +170,8 @@ public final class ArticleManager {
             ident,
             () -> articles.getContent(ident),
             (access, current) ->
-                access.requireRead(ident, current.revision().articleId(), current.status()));
+                access.requireRead(ident, current.revision().articleId(), current.status()),
+            UnaryOperator.identity());
     var revision = content.revision();
     return new ArticleContent(
         content.body(), encode(revision.metalakeId(), revision.articleId(), revision.revision()));
@@ -165,27 +179,31 @@ public final class ArticleManager {
 
   /** Lists the current stored Articles in stable ID order. */
   public List<KnowledgeBaseArticleEntity> listArticles(String metalake) {
+    return listArticles(metalake, null);
+  }
+
+  /** Lists readable Articles in the requested Domain and its readable direct subdomains. */
+  public List<KnowledgeBaseArticleEntity> listArticles(String metalake, @Nullable String domain) {
     Namespace namespace = Namespace.of(metalake);
-    if (!authorizationEnabled) {
-      try {
-        return articles.list(namespace);
-      } catch (NoSuchEntityException missing) {
-        throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", metalake);
-      }
-    }
-    return SqlSessions.readSnapshot(
+    return readSnapshot(
         () -> {
           try {
             MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
           } catch (NoSuchEntityException missing) {
             throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", metalake);
           }
-          ArticleAccess access = ArticleAccess.forRequest(metalake);
-          if (!access.canView()) {
+          ArticleAccess access = authorizationEnabled ? ArticleAccess.forRequest(metalake) : null;
+          if (access != null && !access.canView()) {
             return List.of();
           }
-          return articles.list(namespace).stream()
-              .filter(article -> access.canRead(article.id(), article.status()))
+          ArticleDomains domains = new ArticleDomains(metalake, authorizationEnabled);
+          List<KnowledgeBaseArticleEntity> candidates =
+              domain == null
+                  ? articles.list(namespace)
+                  : articles.listByDomains(namespace, domains.scope(domain));
+          return candidates.stream()
+              .filter(article -> access == null || access.canRead(article.id(), article.status()))
+              .map(domains::visible)
               .toList();
         });
   }
@@ -200,14 +218,39 @@ public final class ArticleManager {
 
     Preconditions.checkNotNull(changes, "changes");
     try {
+      ArticleDomains domains = new ArticleDomains(metalake, authorizationEnabled);
+      var replacements =
+          Arrays.stream(changes)
+              .filter(KnowledgeBaseArticleChange.UpdateDomains.class::isInstance)
+              .map(KnowledgeBaseArticleChange.UpdateDomains.class::cast)
+              .map(change -> List.of(change.getNewDomains()))
+              .toList();
+      ArticleDomains.Replacement plan;
+      Long originalId;
+      if (replacements.isEmpty()) {
+        plan = null;
+        originalId = null;
+      } else {
+        KnowledgeBaseArticleEntity observed = loadStored(ident, () -> articles.get(ident));
+        requireEdit(metalake, observed);
+        originalId = observed.id();
+        plan = domains.resolve(replacements);
+        domains.check(plan, observed.domainIds(), false);
+      }
       return Result.from(
-          articles.editMetadata(
+          articles.editScoped(
               ident,
+              plan == null ? null : plan.named().keySet(),
               state -> {
                 KnowledgeBaseArticleEntity before = state.article();
-                if (authorizationEnabled) {
-                  ArticleAccess.forRequest(metalake).requireEdit(before);
+                requireEdit(metalake, before);
+                if (originalId != null && !originalId.equals(before.id())) {
+                  throw new ArticleRevisionConflictException("Article %s was replaced", ident);
                 }
+                Set<Long> desired =
+                    plan == null
+                        ? before.domainIds()
+                        : domains.check(plan, before.domainIds(), false);
                 if (expectedRevision != null
                     && !decode(expectedRevision)
                         .equals(
@@ -215,11 +258,28 @@ public final class ArticleManager {
                                 state.metalakeId(), before.id(), before.revision()))) {
                   throw new ArticleRevisionConflictException("Article %s has changed", ident);
                 }
-                return edits.apply(before, changes);
+                return edits.apply(before, desired, changes);
               },
-              policy));
+              policy,
+              domains::visible));
     } catch (MissingArticleScopeException missing) {
       throw new NoSuchKnowledgeBaseArticleException(missing, "Article %s does not exist", ident);
+    }
+  }
+
+  /** Detaches a member using Domain management authority, including when the Article is hidden. */
+  public void detachDomain(String metalake, String name, String domain) {
+    ArticleDomains domains = new ArticleDomains(metalake, authorizationEnabled);
+    long id = domains.manage(domain);
+    try {
+      articles.detachDomain(
+          ident(metalake, name),
+          id,
+          lake -> domains.lockManaged(lake, id, domain),
+          ArticleEdits::modifiedAudit,
+          policy);
+    } catch (MissingArticleScopeException missing) {
+      throw new NoSuchDomainException(missing, "Domain %s does not exist", domain);
     }
   }
 
@@ -237,20 +297,35 @@ public final class ArticleManager {
     }
   }
 
-  private <T> T readArticle(
-      NameIdentifier ident, Supplier<T> fetch, BiConsumer<ArticleAccess, T> checkVisibility) {
-    if (!authorizationEnabled) {
-      return loadStored(ident, fetch);
+  private void requireEdit(String metalake, KnowledgeBaseArticleEntity article) {
+    if (authorizationEnabled) {
+      ArticleAccess.forRequest(metalake).requireEdit(article);
     }
-    return SqlSessions.readSnapshot(
+  }
+
+  private <T> T readSnapshot(Supplier<T> read) {
+    return !authorizationEnabled && SqlSessions.hasActiveSession()
+        ? read.get()
+        : SqlSessions.readSnapshot(read);
+  }
+
+  private <T> T readArticle(
+      NameIdentifier ident,
+      Supplier<T> fetch,
+      BiConsumer<ArticleAccess, T> checkVisibility,
+      UnaryOperator<T> project) {
+    return readSnapshot(
         () -> {
+          if (!authorizationEnabled) {
+            return project.apply(loadStored(ident, fetch));
+          }
           ArticleAccess access = ArticleAccess.forRequest(NameIdentifierUtil.getMetalake(ident));
           if (!access.canView()) {
             throw new NoSuchKnowledgeBaseArticleException("Article %s does not exist", ident);
           }
           T result = loadStored(ident, fetch);
           checkVisibility.accept(access, result);
-          return result;
+          return project.apply(result);
         });
   }
 
