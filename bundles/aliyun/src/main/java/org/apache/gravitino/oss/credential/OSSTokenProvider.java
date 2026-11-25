@@ -21,12 +21,14 @@ package org.apache.gravitino.oss.credential;
 
 import org.apache.gravitino.credential.CredentialProviderDelegator;
 import org.apache.gravitino.credential.OSSTokenCredential;
+import org.apache.gravitino.credential.SupportsDynamicCredential;
 
 /**
  * A lightweight credential provider for OSS. It delegates the actual credential generation to
  * {@link OSSTokenGenerator} which is loaded via reflection to avoid classpath issues.
  */
-public class OSSTokenProvider extends CredentialProviderDelegator<OSSTokenCredential> {
+public class OSSTokenProvider extends CredentialProviderDelegator<OSSTokenCredential>
+    implements SupportsDynamicCredential {
 
   @Override
   public boolean supportsScheme(String scheme) {

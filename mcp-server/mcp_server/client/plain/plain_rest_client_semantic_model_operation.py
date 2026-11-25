@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Optional
+from typing import Literal, Optional
 
 from httpx import AsyncClient
 
@@ -83,12 +83,32 @@ class PlainRESTClientSemanticModelOperation(SemanticModelOperation):
         return extract_list_from_response(response, "metrics")
 
     async def load_semantic_model(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        semantic_model_name: str,
+        revision: Optional[int | Literal["latest"]] = None,
+    ) -> str:
+        path = self._model_path(catalog_name, schema_name, semantic_model_name)
+        if revision is not None:
+            if revision != "latest" and (
+                not isinstance(revision, int)
+                or isinstance(revision, bool)
+                or revision <= 0
+            ):
+                raise ValueError(
+                    "Revision must be a positive integer or 'latest'"
+                )
+            path += f"/revisions/{revision}"
+        response = await self.rest_client.get(path)
+        return extract_content_from_response(response, "semanticModel", {})
+
+    async def list_semantic_model_revisions(
         self, catalog_name: str, schema_name: str, semantic_model_name: str
     ) -> str:
-        response = await self.rest_client.get(
-            self._model_path(catalog_name, schema_name, semantic_model_name)
-        )
-        return extract_content_from_response(response, "semanticModel", {})
+        path = self._model_path(catalog_name, schema_name, semantic_model_name)
+        response = await self.rest_client.get(f"{path}/revisions")
+        return extract_list_from_response(response, "revisions")
 
     # pylint: disable=too-many-positional-arguments
     async def create_semantic_model(
@@ -116,10 +136,15 @@ class PlainRESTClientSemanticModelOperation(SemanticModelOperation):
         schema_name: str,
         semantic_model_name: str,
         updates: list[dict],
+        *,
+        expected_revision: Optional[int] = None,
     ) -> str:
+        body = {"updates": updates}
+        if expected_revision is not None:
+            body["expectedRevision"] = expected_revision
         response = await self.rest_client.put(
             self._model_path(catalog_name, schema_name, semantic_model_name),
-            json={"updates": updates},
+            json=body,
         )
         return extract_content_from_response(response, "semanticModel", {})
 

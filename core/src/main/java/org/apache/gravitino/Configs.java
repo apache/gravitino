@@ -364,6 +364,17 @@ public class Configs {
                   MAX_VERSION_RETENTION_COUNT))
           .createWithDefault(DEFAULT_VERSION_RETENTION_COUNT);
 
+  /** Number of newest revisions retained per Semantic Model. */
+  public static final ConfigEntry<Long> SEMANTIC_MODEL_VERSION_RETENTION_COUNT =
+      new ConfigBuilder("gravitino.entity.store.semanticModel.versionRetentionCount")
+          .doc(
+              "Number of newest Semantic Model revisions to retain (1–1000). The active "
+                  + "revision is retained independently of this count.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .longConf()
+          .checkValue(v -> v >= 1L && v <= 1000L, "Semantic Model retention count must be 1–1000")
+          .createWithDefault(100L);
+
   // The followings are configurations for tree lock
 
   public static final ConfigEntry<Long> TREE_LOCK_MAX_NODE_IN_MEMORY =

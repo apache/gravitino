@@ -63,7 +63,7 @@ public class GravitinoIcebergCatalogSpark41 extends GravitinoIcebergCatalog
     // A denied table throws here rather than returning AuthorizationTable.deny: when Spark loads
     // the relation again, it would report the placeholder only as a changed table id.
     Table gravitinoTable = loadGravitinoTable(tableIdent);
-    SparkTable sparkTable = (SparkTable) loadSparkTable(tableIdent);
+    SparkTable sparkTable = (SparkTable) loadSparkTable(tableIdent, gravitinoTable);
     return createSparkTable(
         tableIdent,
         gravitinoTable,

@@ -512,6 +512,32 @@ class TestDomainMembershipResolver {
   }
 
   @Test
+  void testSemanticModelMembershipUsesIdentityForDirectAndInheritedMembers() throws Exception {
+    DomainEntity finance = domain(1, "Finance", null, 10L, null);
+    DomainEntity[] domains = {finance};
+    MetadataObject directModel = object("cat.db.direct_draft", MetadataObject.Type.SEMANTIC_MODEL);
+    MetadataObject inheritedModel =
+        object("cat.db.inherited_draft", MetadataObject.Type.SEMANTIC_MODEL);
+    candidate(10, SCHEMA, directModel);
+    assign(SCHEMA, tag(10, "department"));
+    assign(directModel, tag(10, "department"));
+    when(store.listSemanticModelIdentifiers(Namespace.of(METALAKE, "cat", "db")))
+        .thenReturn(
+            List.of(
+                NameIdentifier.of(METALAKE, "cat", "db", directModel.name()),
+                NameIdentifier.of(METALAKE, "cat", "db", inheritedModel.name())));
+
+    assertArrayEquals(
+        new MetadataObject[] {SCHEMA, directModel},
+        objects(resolver.listMembers(METALAKE, finance, domains, direct().build())));
+    DomainMember[] expanded = resolver.listMembers(METALAKE, finance, domains, all());
+    assertArrayEquals(new MetadataObject[] {directModel, inheritedModel}, objects(expanded));
+    assertArrayEquals(
+        new DomainRelation[] {DomainRelation.inherited(SCHEMA)}, expanded[1].relations());
+    verify(store).listSemanticModelIdentifiers(Namespace.of(METALAKE, "cat", "db"));
+  }
+
+  @Test
   void testDirectMembersStorageFailureAndUnknownScopes() throws Exception {
     DomainEntity finance = domain(1, "Finance", null, 10L, null);
     DomainEntity unbound = domain(2, "Unbound", null, null, null);
@@ -603,6 +629,23 @@ class TestDomainMembershipResolver {
     assign(TABLE, tag(10, "dept", "other"));
     assertEquals(
         1, resolver.listMembers(METALAKE, anyValue, new DomainEntity[] {anyValue}, all()).length);
+  }
+
+  @Test
+  void testBindingWithoutValueIgnoresAssignmentValues() {
+    DomainEntity dept = domain(1, "Dept", null, 10L, null);
+    DomainEntity[] domains = {dept};
+    candidate(10, TABLE);
+    assign(SCHEMA, tag(10, "dept", "finance"));
+    assertEquals(1, resolver.listMembers(METALAKE, dept, domains, all()).length);
+    assertEquals("Dept", listDomains(METALAKE, TABLE, domains)[0].name());
+    // A nearer assignment with another value of the same tag keeps the object a member.
+    assign(TABLE, tag(10, "dept", "hr"));
+    assertEquals(1, resolver.listMembers(METALAKE, dept, domains, all()).length);
+    assertEquals(1, listDomains(METALAKE, TABLE, domains).length);
+    assign(TABLE, tag(10, "dept"));
+    assertEquals(1, resolver.listMembers(METALAKE, dept, domains, all()).length);
+    assertEquals(1, listDomains(METALAKE, TABLE, domains).length);
   }
 
   @Test

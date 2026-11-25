@@ -125,6 +125,8 @@ dependencies {
     exclude("com.github.spotbugs")
     exclude("com.sun.jersey")
     exclude("com.github.pjfanning", "jersey-json")
+    // hadoop-common 3.4 brings the netty modules, which the catalog does not need.
+    exclude("io.netty")
     exclude("javax.servlet")
     exclude("org.apache.avro")
     exclude("net.java.dev.jets3t")
@@ -134,6 +136,10 @@ dependencies {
     exclude("org.eclipse.jetty")
     exclude("ch.qos.reload4j")
     exclude("org.slf4j", "slf4j-reload4j")
+    // hadoop-common 3.4 declares these, Hadoop 3.3 did not bring them. No Hadoop class that the
+    // catalog uses needs them.
+    exclude("org.bouncycastle", "bcprov-jdk18on")
+    exclude("org.codehaus.jettison", "jettison")
   }
   implementation(libs.hadoop3.hdfs) {
     exclude("*")
@@ -220,7 +226,10 @@ dependencies {
   testImplementation(libs.testcontainers.mysql)
 
   // Keep optional Hadoop S3A dependencies available only to tests.
-  s3aTestRuntime(libs.hadoop3.aws)
+  s3aTestRuntime(libs.hadoop3.aws) {
+    exclude("software.amazon.awssdk", "bundle")
+  }
+  s3aTestRuntime(libs.bundles.hadoop.aws.sdk)
   testRuntimeOnly(libs.junit.jupiter.engine)
   // The embedded JDBC credential integration test loads this driver by class name.
   testRuntimeOnly(libs.sqlite.jdbc)
@@ -228,34 +237,37 @@ dependencies {
 
 val s3aTestLibDirectory =
   "$rootDir/distribution/package-all/catalogs/lakehouse-paimon/libs"
+// hadoop-aws 3.4 is built on the AWS SDK v2, which is made of many jars. Provide all of them
+// except the modules the catalog already ships, in any version, so that no library ends up twice
+// in the directory, and SLF4J, which the server provides.
+val s3aTestJars =
+  provider {
+    fun moduleOf(artifact: ResolvedArtifact) =
+      "${artifact.moduleVersion.id.group}:${artifact.moduleVersion.id.name}"
+    val shipped =
+      configurations.runtimeClasspath.get().resolvedConfiguration.resolvedArtifacts
+        .map(::moduleOf)
+        .toSet()
+    s3aTestRuntime.resolvedConfiguration.resolvedArtifacts
+      .filter { moduleOf(it) != "org.slf4j:slf4j-api" && moduleOf(it) !in shipped }
+      .map { it.file }
+  }
 val copyS3ATestDependencies =
   tasks.register("copyS3ATestDependencies") {
     inputs.files(s3aTestRuntime)
-    outputs.files(
-      provider {
-        s3aTestRuntime.files.filter {
-          it.name.startsWith("hadoop-aws-") || it.name.startsWith("aws-java-sdk-bundle-")
-        }.map { file("$s3aTestLibDirectory/${it.name}") }
-      }
-    )
+    outputs.files(provider { s3aTestJars.get().map { file("$s3aTestLibDirectory/${it.name}") } })
     // Copy tasks targeting the distribution depend on cleanDistributionPackage. Test setup
     // must preserve the existing deployment, so copy the optional jars in a regular task.
     doLast {
       copy {
-        from(s3aTestRuntime) {
-          include("hadoop-aws-*.jar", "aws-java-sdk-bundle-*.jar")
-        }
+        from(s3aTestJars)
         into(s3aTestLibDirectory)
       }
     }
   }
 val cleanS3ATestDependencies =
   tasks.register<Delete>("cleanS3ATestDependencies") {
-    delete(
-      fileTree(s3aTestLibDirectory) {
-        include("hadoop-aws-*.jar", "aws-java-sdk-bundle-*.jar")
-      }
-    )
+    delete(provider { s3aTestJars.get().map { file("$s3aTestLibDirectory/${it.name}") } })
   }
 
 tasks {

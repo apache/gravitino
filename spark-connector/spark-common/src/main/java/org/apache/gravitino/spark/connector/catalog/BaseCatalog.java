@@ -201,16 +201,21 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   public void initialize(String name, CaseInsensitiveStringMap options) {
     this.catalogName = name;
     this.identity = gravitinoCatalogManager.currentIdentity();
-    Catalog gravitinoCatalog = gravitinoCatalogManager.getGravitinoCatalogInfo(name);
+    Catalog gravitinoCatalog = initialGravitinoCatalog(name);
     String provider = gravitinoCatalog.provider();
     Preconditions.checkArgument(
         StringUtils.isNotBlank(provider), name + " catalog provider is empty");
-    Map<String, String> catalogProperties = propsWithSecrets(gravitinoCatalog);
+    Map<String, String> catalogProperties = initializationProperties(gravitinoCatalog);
     this.sparkCatalog = createAndInitSparkCatalog(name, options, catalogProperties);
     this.propertiesConverter = getPropertiesConverter();
     this.sparkTransformConverter = getSparkTransformConverter();
     this.sparkTypeConverter = getSparkTypeConverter();
     this.sparkTableChangeConverter = getSparkTableChangeConverter(sparkTypeConverter);
+  }
+
+  /** Returns the catalog metadata used to initialize this Spark session's catalog. */
+  protected Catalog initialGravitinoCatalog(String name) {
+    return gravitinoCatalogManager.getGravitinoCatalogInfo(name);
   }
 
   @Override
@@ -232,6 +237,18 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
    */
   protected Catalog gravitinoCatalog() {
     return gravitinoCatalogManager.getGravitinoCatalogInfo(identity, catalogName);
+  }
+
+  /**
+   * Loads the current catalog metadata, bypassing the catalog metadata cache.
+   *
+   * <p>Source catalogs that retain connection settings after initialization use this before an IO
+   * operation to prevent an altered Gravitino catalog from silently accessing the old source.
+   *
+   * @return the current Gravitino catalog for this Spark catalog's name and identity
+   */
+  protected Catalog refreshGravitinoCatalog() {
+    return gravitinoCatalogManager.refreshGravitinoCatalogInfo(identity, catalogName);
   }
 
   @Override
@@ -259,9 +276,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       Identifier ident, StructType schema, Transform[] transforms, Map<String, String> properties)
       throws TableAlreadyExistsException, NoSuchNamespaceException {
     try {
+      validateBeforeTableMutation();
       org.apache.gravitino.rel.Table gravitinoTable =
           createGravitinoTable(ident, schema, transforms, properties);
-      org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
+      org.apache.spark.sql.connector.catalog.Table sparkTable =
+          loadSparkTable(ident, gravitinoTable);
       return createSparkTable(
           ident,
           gravitinoTable,
@@ -339,7 +358,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
           Sets.newHashSet(Privilege.Name.SELECT_TABLE),
           e);
     }
-    Table sparkTable = loadSparkTable(ident);
+    Table sparkTable = loadSparkTable(ident, gravitinoTable);
     return createSparkTable(
         ident,
         gravitinoTable,
@@ -383,6 +402,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       return loadTable(ident);
     }
     try {
+      validateBeforeTableMutation();
       Supplier<Column[]> columns =
           Suppliers.memoize(
                   () -> {
@@ -414,7 +434,8 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
               .asTableCatalog()
               .alterTable(
                   NameIdentifier.of(getDatabase(ident), ident.name()), gravitinoTableChanges);
-      org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
+      org.apache.spark.sql.connector.catalog.Table sparkTable =
+          loadSparkTable(ident, gravitinoTable);
       return createSparkTable(
           ident,
           gravitinoTable,
@@ -587,10 +608,12 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   /**
    * Loads a Gravitino view as a Spark Table when {@link #loadTable(Identifier)} fails because the
-   * object is a view. Subclasses can override {@link #createSparkView} to enable view support.
+   * object is a view. Subclasses can override {@link #createSparkView} to enable view support. When
+   * {@link #supportsSparkViews} is true, a view the caller is denied from loading returns the
+   * authorization placeholder instead, as a denied table does.
    *
    * @param ident the identifier to load
-   * @return Spark Table wrapping the view
+   * @return Spark Table wrapping the view, or the authorization placeholder of a denied view
    * @throws NoSuchTableException if no view exists or views are not supported by this catalog
    */
   protected Table loadViewAsTable(Identifier ident) throws NoSuchTableException {
@@ -600,13 +623,35 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
           gravitinoCatalog()
               .asViewCatalog()
               .loadView(NameIdentifier.of(getDatabase(ident), ident.name()));
-    } catch (NoSuchViewException | UnsupportedOperationException | ForbiddenException e) {
+    } catch (ForbiddenException e) {
+      // Only a catalog that can read the view reports the denial. The server also denies a name
+      // that does not exist when its catalog has no views.
+      if (!supportsSparkViews()) {
+        throw new NoSuchTableException(ident);
+      }
+      return AuthorizationTable.deny(
+          ident.name(),
+          String.format("%s.%s.%s", catalogName, getDatabase(ident), ident.name()),
+          Sets.newHashSet(Privilege.Name.SELECT_VIEW),
+          e);
+    } catch (NoSuchViewException | UnsupportedOperationException e) {
       throw new NoSuchTableException(ident);
     }
     // Call sparkCatalog.loadTable directly to surface NoSuchTableException as checked,
     // avoiding the RuntimeException wrapping in loadSparkTable.
     Table sparkTable = sparkCatalog.loadTable(ident);
     return createSparkView(ident, gravitinoView, sparkTable);
+  }
+
+  /**
+   * Returns whether this catalog reads Gravitino views, so that a denied view lookup is reported as
+   * denied rather than as not found. Subclasses that override {@link #createSparkView} must return
+   * true.
+   *
+   * @return true if this catalog reads views
+   */
+  protected boolean supportsSparkViews() {
+    return false;
   }
 
   /**
@@ -749,7 +794,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
                   e);
       throw AuthorizationTable.aggregateFailure(Collections.singletonList(denied)).orElse(e);
     }
-    org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
+    org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident, gravitinoTable);
     // Will create a catalog specific table
     return createSparkTable(
         ident,
@@ -834,7 +879,18 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     throw new NoSuchFunctionException(ident);
   }
 
-  protected Table loadSparkTable(Identifier ident) {
+  /**
+   * Loads the underlying Spark table for an identifier.
+   *
+   * <p>Subclasses that need the Gravitino table for routing must use the passed-in {@code
+   * gravitinoTable} rather than fetching it again: every caller of this hook has just obtained it
+   * (loaded, created, or altered) for this identifier.
+   *
+   * @param ident the Spark table identifier
+   * @param gravitinoTable the Gravitino table the caller already obtained for this identifier
+   * @return the underlying Spark table
+   */
+  protected Table loadSparkTable(Identifier ident, org.apache.gravitino.rel.Table gravitinoTable) {
     try {
       return sparkCatalog.loadTable(ident);
     } catch (NoSuchTableException e) {
@@ -846,18 +902,9 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     }
   }
 
-  private static Map<String, String> propsWithSecrets(Catalog catalog) {
-    Map<String, String> props =
-        new HashMap<>(catalog.properties() == null ? Collections.emptyMap() : catalog.properties());
-    try {
-      Map<String, String> secrets = catalog.supportsSecrets().getSecrets();
-      if (secrets != null) {
-        props.putAll(secrets);
-      }
-    } catch (UnsupportedOperationException | NotFoundException e) {
-      // Stubs may not implement SupportsSecrets; older servers lack /secrets.
-      LOG.debug("Skipping getSecrets while resolving Spark catalog properties: {}", e.toString());
-    }
+  /** Returns the properties used to initialize the underlying Spark catalog. */
+  protected Map<String, String> initializationProperties(Catalog catalog) {
+    Map<String, String> props = propertiesWithSecrets(catalog);
     try {
       Credential[] credentials = catalog.supportsCredentials().getCredentials();
       props.putAll(CredentialInfos.nonExpiringCredentialInfo(credentials));
@@ -873,6 +920,25 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     }
     return props;
   }
+
+  /** Returns a mutable copy of the catalog properties with available secrets resolved. */
+  protected static Map<String, String> propertiesWithSecrets(Catalog catalog) {
+    Map<String, String> props =
+        new HashMap<>(catalog.properties() == null ? Collections.emptyMap() : catalog.properties());
+    try {
+      Map<String, String> secrets = catalog.supportsSecrets().getSecrets();
+      if (secrets != null) {
+        props.putAll(secrets);
+      }
+    } catch (UnsupportedOperationException | NotFoundException e) {
+      // Stubs may not implement SupportsSecrets; older servers lack /secrets.
+      LOG.debug("Skipping getSecrets while resolving Spark catalog properties: {}", e.toString());
+    }
+    return props;
+  }
+
+  /** Checks whether the initialized Spark catalog can return the result of a table mutation. */
+  protected void validateBeforeTableMutation() {}
 
   @Override
   public void invalidateTable(Identifier ident) {

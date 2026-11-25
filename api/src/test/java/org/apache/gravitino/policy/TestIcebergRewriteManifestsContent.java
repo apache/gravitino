@@ -26,9 +26,7 @@ class TestIcebergRewriteManifestsContent {
   void testDefaultsAndRegistration() {
     IcebergRewriteManifestsContent content = new IcebergRewriteManifestsContent();
     content.validate();
-    Assertions.assertEquals(500L, content.manifestCountCritical());
-    Assertions.assertEquals(100L, content.manifestCountWarning());
-    Assertions.assertEquals(8388608L, content.avgManifestSizeThresholdBytes());
+    Assertions.assertEquals(100L, content.manifestCountThreshold());
     Assertions.assertNull(content.specId());
     Assertions.assertNull(content.useCaching());
     Assertions.assertTrue(
@@ -37,6 +35,8 @@ class TestIcebergRewriteManifestsContent {
             .get(IcebergRewriteManifestsContent.TRIGGER_EXPR_KEY)
             .toString()
             .contains(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC));
+    Assertions.assertTrue(
+        content.rules().containsKey(IcebergRewriteManifestsContent.MANIFEST_COUNT_THRESHOLD));
     Assertions.assertEquals(content, PolicyContents.icebergRewriteManifests());
     Assertions.assertEquals(
         content.hashCode(), PolicyContents.icebergRewriteManifests().hashCode());
@@ -51,24 +51,18 @@ class TestIcebergRewriteManifestsContent {
   void testValidationAndOptions() {
     for (IcebergRewriteManifestsContent content :
         new IcebergRewriteManifestsContent[] {
-          PolicyContents.icebergRewriteManifests(
-              99L, 100L, (Long) null, (Integer) null, (Boolean) null),
-          PolicyContents.icebergRewriteManifests(
-              null, 0L, (Long) null, (Integer) null, (Boolean) null),
-          PolicyContents.icebergRewriteManifests(null, null, 0L, (Integer) null, (Boolean) null),
-          PolicyContents.icebergRewriteManifests(null, null, (Long) null, -1, (Boolean) null)
+          PolicyContents.icebergRewriteManifests(0L, (Integer) null, (Boolean) null),
+          PolicyContents.icebergRewriteManifests(null, -1, (Boolean) null)
         }) {
       Assertions.assertThrows(IllegalArgumentException.class, content::validate);
     }
-    IcebergRewriteManifestsContent content =
-        PolicyContents.icebergRewriteManifests(7L, 7L, 1L, 0, false);
+    IcebergRewriteManifestsContent content = PolicyContents.icebergRewriteManifests(7L, 0, false);
     content.validate();
     Assertions.assertEquals(0, content.rules().get("spec_id"));
     Assertions.assertEquals(false, content.rules().get("use_caching"));
     Assertions.assertNotEquals(content, PolicyContents.icebergRewriteManifests());
     IcebergRewriteManifestsContent largestSpec =
-        PolicyContents.icebergRewriteManifests(
-            null, null, (Long) null, Integer.MAX_VALUE, (Boolean) null);
+        PolicyContents.icebergRewriteManifests(null, Integer.MAX_VALUE, (Boolean) null);
     largestSpec.validate();
     Assertions.assertEquals(Integer.MAX_VALUE, largestSpec.specId());
   }

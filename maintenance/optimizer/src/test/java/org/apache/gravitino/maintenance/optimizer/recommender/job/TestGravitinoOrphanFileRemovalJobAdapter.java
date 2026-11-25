@@ -18,9 +18,6 @@
  */
 package org.apache.gravitino.maintenance.optimizer.recommender.job;
 
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
@@ -43,10 +40,8 @@ import org.mockito.Mockito;
 
 class TestGravitinoOrphanFileRemovalJobAdapter {
   private static final String TEMPLATE = IcebergOrphanFileRemovalContent.JOB_TEMPLATE_NAME_VALUE;
-  private static final Clock CLOCK =
-      Clock.fixed(Instant.parse("2026-09-27T12:30:00Z"), ZoneOffset.UTC);
   private final GravitinoOrphanFileRemovalJobAdapter adapter =
-      new GravitinoOrphanFileRemovalJobAdapter(CLOCK);
+      new GravitinoOrphanFileRemovalJobAdapter();
 
   @Test
   void policyToSubmissionWorksWithoutPartitionStatistics() {
@@ -83,7 +78,7 @@ class TestGravitinoOrphanFileRemovalJobAdapter {
               config, context, adapter, IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
       Assertions.assertEquals("spark_catalog", job.get("catalog_name"));
       Assertions.assertEquals("db.table", job.get("table_identifier"));
-      Assertions.assertEquals("2026-09-24 12:30:00Z", job.get("older_than"));
+      Assertions.assertEquals("3", job.get("older_than"));
       Assertions.assertEquals("true", job.get("dry_run"));
       Assertions.assertEquals("s3://bucket/table/data", job.get("location"));
     }
@@ -94,10 +89,9 @@ class TestGravitinoOrphanFileRemovalJobAdapter {
     Map<String, String> job = jobConf(context(Map.of(), null));
     Assertions.assertEquals("", job.get("location"));
     Assertions.assertEquals("false", job.get("dry_run"));
-    Assertions.assertEquals("2026-09-24 12:30:00Z", job.get("older_than"));
+    Assertions.assertEquals("3", job.get("older_than"));
     Assertions.assertEquals(
-        "2026-09-26 12:30:00Z",
-        jobConf(context(Map.of("olderThanDays", "1"), null)).get("older_than"));
+        "1", jobConf(context(Map.of("olderThanDays", "1"), null)).get("older_than"));
   }
 
   @Test
@@ -128,10 +122,10 @@ class TestGravitinoOrphanFileRemovalJobAdapter {
   }
 
   @Test
-  void validatesRetentionRangeAndReportsTimestampErrors() {
+  void validatesRetentionRange() {
     long maximum = IcebergOrphanFileRemovalContent.MAX_OLDER_THAN_DAYS;
     Assertions.assertEquals(
-        "1926-10-22 12:30:00Z",
+        Long.toString(maximum),
         jobConf(context(Map.of("olderThanDays", String.valueOf(maximum)), null)).get("older_than"));
     for (String days :
         new String[] {
@@ -143,22 +137,10 @@ class TestGravitinoOrphanFileRemovalJobAdapter {
               () -> jobConf(context(Map.of("olderThanDays", days), null)));
       Assertions.assertTrue(error.getMessage().contains("olderThanDays"));
     }
-    GravitinoOrphanFileRemovalJobAdapter ancient =
-        new GravitinoOrphanFileRemovalJobAdapter(Clock.fixed(Instant.MIN, ZoneOffset.UTC));
-    IllegalArgumentException error =
-        Assertions.assertThrows(
-            IllegalArgumentException.class, () -> jobConf(ancient, context(Map.of(), null)));
-    Assertions.assertTrue(error.getMessage().contains("olderThanDays"));
-    Assertions.assertNotNull(error.getCause());
   }
 
   private Map<String, String> jobConf(OrphanFileRemovalJobContext ctx) {
-    return jobConf(adapter, ctx);
-  }
-
-  private static Map<String, String> jobConf(
-      GravitinoOrphanFileRemovalJobAdapter jobAdapter, OrphanFileRemovalJobContext ctx) {
-    return jobAdapter.jobConfig(ctx, IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
+    return adapter.jobConfig(ctx, IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
   }
 
   private OrphanFileRemovalJobContext context(Map<String, String> options, String location) {

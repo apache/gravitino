@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.event.semantic;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.event.OperationType;
@@ -28,6 +29,7 @@ import org.apache.gravitino.semantic.OssieFormat;
 @DeveloperApi
 public final class ExportSemanticModelEvent extends SemanticModelEvent {
   private final OssieFormat format;
+  private final int revision;
 
   /**
    * Constructs a {@code ExportSemanticModelEvent}.
@@ -35,10 +37,13 @@ public final class ExportSemanticModelEvent extends SemanticModelEvent {
    * @param user The username of the individual who initiated the operation.
    * @param identifier The Semantic Model identifier.
    * @param format The non-null document format.
+   * @param revision The exported revision number.
    */
-  public ExportSemanticModelEvent(String user, NameIdentifier identifier, OssieFormat format) {
+  public ExportSemanticModelEvent(
+      String user, NameIdentifier identifier, OssieFormat format, int revision) {
     super(user, identifier);
     this.format = format;
+    this.revision = revision;
   }
 
   /**
@@ -48,6 +53,16 @@ public final class ExportSemanticModelEvent extends SemanticModelEvent {
    */
   public OssieFormat format() {
     return format;
+  }
+
+  /** Returns the exported revision number. */
+  public int revision() {
+    return revision;
+  }
+
+  @Override
+  protected Map<String, String> ownCustomInfo() {
+    return Map.of("revision", Integer.toString(revision));
   }
 
   @Override

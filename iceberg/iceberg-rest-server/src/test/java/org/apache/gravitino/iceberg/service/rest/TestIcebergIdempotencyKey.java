@@ -204,11 +204,22 @@ public class TestIcebergIdempotencyKey extends IcebergNamespaceTestBase {
   void testLongQueryBindingsDoNotAlias() {
     Assertions.assertEquals(200, doCreateNamespace(NAMESPACE).getStatus());
     String prefix = "x".repeat(600);
-    try (Response first = createTableWithQuery("long_query", ImmutableMap.of("tag", prefix + "a"));
+    try (Response first =
+            createTableWithQuery(
+                "long_query", ImmutableMap.of("tag", prefix + "a", "mode", "sync"));
+        Response reordered =
+            createTableWithQuery(
+                "long_query", ImmutableMap.of("mode", "sync", "tag", prefix + "a"));
         Response different =
-            createTableWithQuery("long_query", ImmutableMap.of("tag", prefix + "b"))) {
+            createTableWithQuery(
+                "long_query", ImmutableMap.of("tag", prefix + "b", "mode", "sync"))) {
       Assertions.assertEquals(200, first.getStatus());
+      Assertions.assertEquals(200, reordered.getStatus());
+      Assertions.assertEquals(first.readEntity(String.class), reordered.readEntity(String.class));
       Assertions.assertEquals(409, different.getStatus());
+      Assertions.assertEquals(
+          "IdempotencyConflictException",
+          different.readEntity(JsonNode.class).get("error").get("type").asText());
     }
   }
 

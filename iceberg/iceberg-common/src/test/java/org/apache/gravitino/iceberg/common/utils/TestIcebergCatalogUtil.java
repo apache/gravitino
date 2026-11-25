@@ -20,11 +20,16 @@
 package org.apache.gravitino.iceberg.common.utils;
 
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.SQLSyntaxErrorException;
+import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.ClosableJdbcCatalog;
@@ -32,10 +37,12 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.rest.auth.UserPrincipalForwardingAuthManager;
 import org.apache.gravitino.storage.GCSProperties;
+import org.apache.gravitino.utils.jdbc.JdbcSqlScriptUtils;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.hive.HiveCatalog;
@@ -601,5 +608,131 @@ public class TestIcebergCatalogUtil {
         IcebergConstants.REST_BACKEND_AUTH_TYPE,
         IcebergConstants.REST_BACKEND_AUTH_TYPE_SERVICE_ACCOUNT);
     return config;
+  }
+
+  @Test
+  void testH2ManualInitWithDmlOnlyUser() throws Exception {
+    Path dbPath = warehouse.resolve("iceberg_dml_test_" + UUID.randomUUID());
+    String jdbcUrl = "jdbc:h2:" + dbPath.toAbsolutePath() + ";DATABASE_TO_LOWER=TRUE";
+    String dmlUser = "dml_user";
+    String dmlPassword = "dml_password";
+
+    initH2WithDmlUser(jdbcUrl, dmlUser, dmlPassword);
+
+    Map<String, String> properties = new HashMap<>();
+    properties.put(CatalogProperties.URI, jdbcUrl);
+    properties.put(CatalogProperties.WAREHOUSE_LOCATION, warehouse.toString());
+    properties.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.h2.Driver");
+    properties.put(IcebergConstants.ICEBERG_JDBC_USER, dmlUser);
+    properties.put(IcebergConstants.ICEBERG_JDBC_PASSWORD, dmlPassword);
+    properties.put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "false");
+
+    Catalog catalog =
+        IcebergCatalogUtil.loadCatalogBackend(
+            IcebergCatalogBackend.JDBC, new IcebergConfig(properties));
+    try {
+      Assertions.assertInstanceOf(SupportsNamespaces.class, catalog);
+      Namespace ns = Namespace.of("test_ns");
+      Assertions.assertDoesNotThrow(() -> ((SupportsNamespaces) catalog).createNamespace(ns));
+      Assertions.assertTrue(((SupportsNamespaces) catalog).namespaceExists(ns));
+
+      // Verify DML operations on iceberg_tables
+      Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+      TableIdentifier identifier = TableIdentifier.of(ns, "test_table");
+      Assertions.assertNotNull(catalog.createTable(identifier, schema));
+      Assertions.assertTrue(catalog.tableExists(identifier));
+      Assertions.assertEquals(1, catalog.listTables(ns).size());
+    } finally {
+      if (catalog instanceof AutoCloseable) {
+        ((AutoCloseable) catalog).close();
+      }
+    }
+  }
+
+  @Test
+  void testH2ManualInitFailsWithoutDatabaseToLower() throws Exception {
+    // Iceberg's JdbcCatalog (as of 1.11.0) looks up existing columns like 'iceberg_type' using
+    // lowercase metadata names. With H2's default upper-case identifier settings, the column
+    // is stored as uppercase ICEBERG_TYPE and the lookup misses. As a result, Iceberg assumes
+    // view support is missing and attempts an ALTER TABLE ... ADD COLUMN migration, which fails
+    // for a DML-only account with H2 error 90096 (Not enough rights).
+    Path defaultDbPath = warehouse.resolve("iceberg_upper_test_" + UUID.randomUUID());
+    String defaultJdbcUrl = "jdbc:h2:" + defaultDbPath.toAbsolutePath();
+    String dmlUser = "dml_user";
+    String dmlPassword = "dml_password";
+
+    initH2WithDmlUser(defaultJdbcUrl, dmlUser, dmlPassword);
+
+    Map<String, String> properties = new HashMap<>();
+    properties.put(CatalogProperties.URI, defaultJdbcUrl);
+    properties.put(CatalogProperties.WAREHOUSE_LOCATION, warehouse.toString());
+    properties.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.h2.Driver");
+    properties.put(IcebergConstants.ICEBERG_JDBC_USER, dmlUser);
+    properties.put(IcebergConstants.ICEBERG_JDBC_PASSWORD, dmlPassword);
+    properties.put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "false");
+
+    UncheckedSQLException ex =
+        Assertions.assertThrows(
+            UncheckedSQLException.class,
+            () ->
+                IcebergCatalogUtil.loadCatalogBackend(
+                    IcebergCatalogBackend.JDBC, new IcebergConfig(properties)));
+    Assertions.assertTrue(
+        hasSqlErrorCode(ex, 90096),
+        () -> "Expected H2 error 90096 (not enough rights), but got: " + ex);
+  }
+
+  private static void initH2WithDmlUser(String jdbcUrl, String dmlUser, String dmlPassword)
+      throws Exception {
+    Path scriptPath = findH2ScriptPath();
+    String sqlContent = Files.readString(scriptPath);
+    try (Connection conn = DriverManager.getConnection(jdbcUrl, "sa", "")) {
+      JdbcSqlScriptUtils.executeSqlScript(conn, sqlContent);
+      try (Statement stmt = conn.createStatement()) {
+        stmt.execute(String.format("CREATE USER %s PASSWORD '%s'", dmlUser, dmlPassword));
+        stmt.execute(
+            String.format("GRANT SELECT, INSERT, UPDATE, DELETE ON iceberg_tables TO %s", dmlUser));
+        stmt.execute(
+            String.format(
+                "GRANT SELECT, INSERT, UPDATE, DELETE ON iceberg_namespace_properties TO %s",
+                dmlUser));
+      }
+    }
+  }
+
+  private static boolean hasSqlErrorCode(Throwable t, int expectedCode) {
+    for (Throwable current = t; current != null; current = current.getCause()) {
+      if (current instanceof SQLException
+          && ((SQLException) current).getErrorCode() == expectedCode) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static Path findH2ScriptPath() {
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    if (gravitinoHome != null) {
+      Path p = Path.of(gravitinoHome, "scripts", "h2", "iceberg-jdbc-schema-h2.sql");
+      if (Files.exists(p)) {
+        return p;
+      }
+    }
+    String repoRoot = System.getProperty("gravitino.repositoryRoot");
+    if (repoRoot != null) {
+      Path p = Path.of(repoRoot, "scripts", "h2", "iceberg-jdbc-schema-h2.sql");
+      if (Files.exists(p)) {
+        return p;
+      }
+    }
+    Path current = Path.of("").toAbsolutePath();
+    while (current != null) {
+      Path p = current.resolve("scripts/h2/iceberg-jdbc-schema-h2.sql");
+      if (Files.exists(p)) {
+        return p;
+      }
+      current = current.getParent();
+    }
+    throw new IllegalStateException("Cannot find scripts/h2/iceberg-jdbc-schema-h2.sql");
   }
 }

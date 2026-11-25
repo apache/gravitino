@@ -191,9 +191,7 @@ class TestPolicyDTO(unittest.TestCase):
             _policy_json(
                 "system_iceberg_rewrite_manifests",
                 {
-                    "manifest_count_critical": 900,
-                    "manifest_count_warning": 200,
-                    "avg_manifest_size_threshold_bytes": 1024,
+                    "manifest_count_threshold": 900,
                     "spec_id": 3,
                     "use_caching": True,
                 },
@@ -201,21 +199,17 @@ class TestPolicyDTO(unittest.TestCase):
         )
         content = policy.content()
         self.assertIsInstance(content, IcebergRewriteManifestsContentDTO)
-        self.assertEqual(900, content.manifest_count_critical())
-        self.assertEqual(200, content.manifest_count_warning())
-        self.assertEqual(1024, content.avg_manifest_size_threshold_bytes())
+        self.assertEqual(900, content.manifest_count_threshold())
         self.assertEqual(3, content.spec_id())
         self.assertTrue(content.use_caching())
         wire = policy.to_dict()["content"]
-        self.assertEqual(900, wire["manifest_count_critical"])
+        self.assertEqual(900, wire["manifest_count_threshold"])
         self.assertEqual(3, wire["spec_id"])
         self.assertEqual(policy, PolicyDTO.from_json(policy.to_json()))
 
     def test_rewrite_manifests_defaults(self) -> None:
         content = IcebergRewriteManifestsContentDTO.from_dict({}, infer_missing=True)
-        self.assertEqual(500, content.manifest_count_critical())
-        self.assertEqual(100, content.manifest_count_warning())
-        self.assertEqual(8388608, content.avg_manifest_size_threshold_bytes())
+        self.assertEqual(100, content.manifest_count_threshold())
         self.assertEqual({}, content.to_dict())
 
     def test_row_filter_and_column_mask_round_trip(self) -> None:

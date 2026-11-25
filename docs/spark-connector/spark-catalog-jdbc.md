@@ -15,7 +15,11 @@ The Apache Gravitino Spark connector offers the capability to read JDBC tables, 
 
 ## Capabilities
 
-Supports MySQL and PostgreSQL. OceanBase, which is MySQL-compatible, can use the MySQL driver as a workaround. Apache Doris supports an opt-in, read-only governed path described below; when that path is disabled, `jdbc-doris` keeps the generic JDBC behavior.
+The generic JDBC catalog supports the `jdbc-mysql`, `jdbc-doris`, `jdbc-starrocks`, and
+`jdbc-oceanbase` providers. PostgreSQL uses a dedicated catalog path. OceanBase, which is
+MySQL-compatible, can use the MySQL driver as a workaround. Apache Doris supports an opt-in,
+read-only governed path described below; when that path is disabled, `jdbc-doris` keeps the
+generic JDBC behavior. Other JDBC providers require a separate Spark connector extension.
 
 ### Governed Apache Doris batch reads
 
@@ -50,7 +54,8 @@ Spark and driver diagnostic logs and executor failures are controlled by the app
 - `SELECT`
 - `INSERT`
 
-For the specialized Doris path, only `SELECT` batch reads are supported. Spark writes and catalog DDL are rejected. The generic MySQL and PostgreSQL JDBC paths retain their existing behavior.
+For the specialized Doris path, only `SELECT` batch reads are supported. Spark writes and catalog
+DDL are rejected. The generic JDBC paths retain their existing behavior.
 
   :::info
   JDBCTable does not support distributed transaction. When writing data to RDBMS, each task is an independent transaction. If some tasks of spark succeed and some tasks fail, dirty data is generated.
@@ -89,6 +94,24 @@ SELECT * FROM employee WHERE date(hire_date) = '2021-01-01';
 
 
 ```
+
+Connection option names after `spark.bypass.` are case-insensitive. If both `spark.bypass.URL`
+and `jdbc-url` are configured, `jdbc-url` takes precedence. Earlier connector versions could
+select the bypass value when the names differed in case. Check for conflicting settings before
+upgrading. Explicit Spark catalog options take precedence over catalog properties, and vended
+JDBC credentials take precedence over configured user names and passwords.
+
+## Changes during a Spark session
+
+Spark keeps a JDBC catalog's connection settings for the lifetime of the session. The connector
+checks the effective URL, user, password, and catalog creation time when resolving a JDBC table,
+before creating or altering a table, and when building a scan or write or accessing table indexes.
+If the settings change or the catalog is recreated, restart the Spark session before retrying.
+
+A DataFrame resolved before the change is checked when Spark builds its scan. A physical plan or
+writer already built can continue using the original connection. Finish in-flight jobs before
+rotating credentials or switching databases. The metadata check and the JDBC operation are separate
+requests, so a concurrent catalog change can also occur between them.
 
 ## Catalog Properties
 

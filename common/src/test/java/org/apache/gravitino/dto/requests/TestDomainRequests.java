@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.dto.requests;
 
+import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -26,7 +27,6 @@ import org.apache.gravitino.domain.DomainChange;
 import org.apache.gravitino.dto.domain.DomainBackingTagDTO;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.rest.RESTRequest;
-import org.apache.gravitino.tag.TagValue;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -41,7 +41,7 @@ public class TestDomainRequests {
               "comment",
               Collections.singletonMap("k", "v"),
               "Parent",
-              new DomainCreateRequest.BackingTag("tag", create ? null : "value", create));
+              new DomainCreateRequest.BackingTag("tag", create));
       DomainCreateRequest result = roundTrip(request, DomainCreateRequest.class);
       result.validate();
       Assertions.assertEquals("Finance", result.getName());
@@ -49,9 +49,7 @@ public class TestDomainRequests {
       Assertions.assertEquals(Collections.singletonMap("k", "v"), result.getProperties());
       Assertions.assertEquals("Parent", result.getParent());
       Assertions.assertEquals(create, result.getBackingTag().isCreate());
-      Assertions.assertEquals(
-          create ? TagValue.noValue("tag") : TagValue.of("tag", "value"),
-          result.getBackingTag().tagValue());
+      Assertions.assertEquals("tag", result.getBackingTag().getName());
     }
     DomainCreateRequest existing =
         JsonUtils.objectMapper()
@@ -60,24 +58,28 @@ public class TestDomainRequests {
                 DomainCreateRequest.class);
     existing.validate();
     Assertions.assertFalse(existing.getBackingTag().isCreate());
-    Assertions.assertEquals(TagValue.noValue("tag"), existing.getBackingTag().tagValue());
+    Assertions.assertEquals("tag", existing.getBackingTag().getName());
+    Assertions.assertThrows(
+        UnrecognizedPropertyException.class,
+        () ->
+            JsonUtils.objectMapper()
+                .readValue(
+                    "{\"name\":\"Finance\",\"backingTag\":{\"name\":\"tag\",\"value\":\"v\"}}",
+                    DomainCreateRequest.class));
   }
 
   @Test
   public void testBackingTagValidation() {
     for (DomainBackingTagDTO invalid :
         new DomainBackingTagDTO[] {
-          new DomainBackingTagDTO(), new DomainBackingTagDTO(" ", null),
-          new DomainBackingTagDTO("tag", " "),
-              new DomainBackingTagDTO("tag", String.join("", Collections.nCopies(257, "x"))),
-          new DomainCreateRequest.BackingTag("tag", "value", true)
+          new DomainBackingTagDTO(),
+          new DomainBackingTagDTO(" "),
+          new DomainCreateRequest.BackingTag(" ", true)
         }) {
       Assertions.assertThrows(IllegalArgumentException.class, invalid::validate);
-      Assertions.assertThrows(IllegalArgumentException.class, invalid::tagValue);
     }
-    new DomainBackingTagDTO("tag", String.join("", Collections.nCopies(256, "x"))).validate();
-    Assertions.assertEquals(
-        TagValue.noValue("tag"), new DomainBackingTagDTO("tag", null).tagValue());
+    new DomainBackingTagDTO("tag").validate();
+    new DomainCreateRequest.BackingTag("tag", true).validate();
   }
 
   @Test
@@ -91,14 +93,14 @@ public class TestDomainRequests {
     parent.validate();
     Assertions.assertEquals("Parent/US", parent.getParent());
     for (DomainBackingTagDTO tag :
-        new DomainBackingTagDTO[] {null, new DomainBackingTagDTO("tag", "value")}) {
+        new DomainBackingTagDTO[] {null, new DomainBackingTagDTO("tag")}) {
       DomainBackingTagSetRequest request =
           roundTrip(new DomainBackingTagSetRequest(tag), DomainBackingTagSetRequest.class);
       request.validate();
       if (tag == null) {
         Assertions.assertNull(request.getBackingTag());
       } else {
-        Assertions.assertEquals(TagValue.of("tag", "value"), request.getBackingTag().tagValue());
+        Assertions.assertEquals("tag", request.getBackingTag().getName());
       }
     }
     Assertions.assertThrows(
@@ -111,15 +113,15 @@ public class TestDomainRequests {
         new RESTRequest[] {
           new DomainCreateRequest(),
           new DomainCreateRequest(
-              " ", null, null, null, new DomainCreateRequest.BackingTag("tag", null, false)),
+              " ", null, null, null, new DomainCreateRequest.BackingTag("tag", false)),
           new DomainCreateRequest(
-              "Finance", null, null, " ", new DomainCreateRequest.BackingTag("tag", null, false)),
+              "Finance", null, null, " ", new DomainCreateRequest.BackingTag("tag", false)),
           new DomainCreateRequest(
               "Finance",
               null,
               Collections.singletonMap("key", null),
               null,
-              new DomainCreateRequest.BackingTag("tag", null, false)),
+              new DomainCreateRequest.BackingTag("tag", false)),
           new DomainSetRequest(),
           new DomainParentSetRequest(),
           new DomainParentSetRequest(" "),

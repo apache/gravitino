@@ -47,21 +47,16 @@ class TestManifestRewriteStrategyHandler {
   @CsvSource({
     "0,0,false",
     "99,1,false",
-    "100,8388607,true",
-    "100,8388608,false",
-    "100,8388609,false",
-    "499,8388607,true",
-    "499,8388608,false",
+    "99,8388608,false",
+    "100,1,true",
+    "100,8388608,true",
     "500,8388608,true",
-    "500,16777216,true",
     "501,16777216,true"
   })
   void testBoundaries(long count, double average, boolean trigger) {
     ManifestRewriteStrategyHandler handler = new ManifestRewriteStrategyHandler();
     handler.initialize(
-        context(
-            PolicyContents.icebergRewriteManifests(null, null, null, 1, null),
-            statistics(count, average)));
+        context(PolicyContents.icebergRewriteManifests(null, 1, null), statistics(count, average)));
     Assertions.assertEquals(trigger, handler.shouldTrigger());
     Assertions.assertEquals(trigger, handler.evaluate().jobExecutionContext().isPresent());
     if (trigger) {
@@ -77,13 +72,11 @@ class TestManifestRewriteStrategyHandler {
             List.<StatisticEntry<?>>of(),
             List.of(statistics(500, 1).get(0), statistics(500, 1).get(2)),
             statistics(500, 1).subList(1, 3))) {
-      handler.initialize(
-          context(PolicyContents.icebergRewriteManifests(null, null, null, 1, null), stats));
+      handler.initialize(context(PolicyContents.icebergRewriteManifests(null, 1, null), stats));
       Assertions.assertFalse(handler.shouldTrigger());
     }
     handler.initialize(
-        context(
-            PolicyContents.icebergRewriteManifests(null, null, null, 2, null), statistics(500, 1)));
+        context(PolicyContents.icebergRewriteManifests(null, 2, null), statistics(500, 1)));
     Assertions.assertFalse(handler.shouldTrigger());
   }
 
@@ -91,31 +84,21 @@ class TestManifestRewriteStrategyHandler {
   void testMissingDefaultSkipsButExplicitSpecRetainsOptions() {
     ManifestRewriteStrategyHandler handler = new ManifestRewriteStrategyHandler();
     StrategyHandlerContext context =
-        context(
-            PolicyContents.icebergRewriteManifests(null, null, null, null, false),
-            statistics(100, 1));
+        context(PolicyContents.icebergRewriteManifests(null, null, false), statistics(100, 1));
     handler.initialize(context);
     Assertions.assertFalse(handler.shouldTrigger());
     handler.initialize(
-        context(
-            PolicyContents.icebergRewriteManifests(null, null, null, 1, false),
-            statistics(100, 1)));
+        context(PolicyContents.icebergRewriteManifests(null, 1, false), statistics(100, 1)));
     Map<String, String> config =
         new GravitinoManifestRewriteJobAdapter()
             .jobConfig(
                 handler.evaluate().jobExecutionContext().orElseThrow(),
                 IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
-    Assertions.assertEquals(
-        Map.of(
-            "catalog_name",
-            "iceberg",
-            "table_identifier",
-            "db.tbl",
-            "spec_id",
-            "1",
-            "use_caching",
-            "false"),
-        config);
+    Assertions.assertEquals("iceberg", config.get("catalog_name"));
+    Assertions.assertEquals("db.tbl", config.get("table_identifier"));
+    Assertions.assertEquals("1", config.get("spec_id"));
+    Assertions.assertEquals("false", config.get("use_caching"));
+    Assertions.assertEquals("1g", config.get("spark_executor_memory"));
     handler.initialize(context);
     Assertions.assertFalse(handler.shouldTrigger());
   }
@@ -159,8 +142,7 @@ class TestManifestRewriteStrategyHandler {
   @Test
   void testExplicitSpecOverridesCurrentDefault() {
     StrategyHandlerContext context =
-        context(
-            PolicyContents.icebergRewriteManifests(null, null, null, 0, null), statistics(0, 0));
+        context(PolicyContents.icebergRewriteManifests(null, 0, null), statistics(0, 0));
     Table metadata = Mockito.mock(Table.class);
     Mockito.when(metadata.properties())
         .thenReturn(Map.of("current-snapshot-id", "1", "default-spec-id", "1"));
@@ -179,8 +161,39 @@ class TestManifestRewriteStrategyHandler {
   void testConfigurableThresholds() {
     ManifestRewriteStrategyHandler handler = new ManifestRewriteStrategyHandler();
     handler.initialize(
-        context(PolicyContents.icebergRewriteManifests(10L, 5L, 2L, 1, true), statistics(5, 1)));
+        context(PolicyContents.icebergRewriteManifests(5L, 1, true), statistics(5, 1)));
     Assertions.assertTrue(handler.shouldTrigger());
+  }
+
+  @Test
+  void testCustomTriggerExprOverridesHardThreshold() {
+    ManifestRewriteStrategyHandler handler = new ManifestRewriteStrategyHandler();
+    // Default threshold would skip count=50; custom expr uses a lower bound.
+    handler.initialize(
+        context(
+            customContent(
+                Map.of(
+                    "spec_id",
+                    1,
+                    "manifest_count_threshold",
+                    100,
+                    "trigger-expr",
+                    "custom-manifest-number >= 10")),
+            statistics(50, 1)));
+    Assertions.assertTrue(handler.shouldTrigger());
+    // Custom expr above the measured count skips even when threshold alone would fire.
+    handler.initialize(
+        context(
+            customContent(
+                Map.of(
+                    "spec_id",
+                    1,
+                    "manifest_count_threshold",
+                    10,
+                    "trigger-expr",
+                    "custom-manifest-number >= 100")),
+            statistics(50, 1)));
+    Assertions.assertFalse(handler.shouldTrigger());
   }
 
   @Test
@@ -188,10 +201,10 @@ class TestManifestRewriteStrategyHandler {
     List<StatisticEntry<?>> measurements = statistics(0, 0);
     ManifestRewriteStrategyHandler handler = new ManifestRewriteStrategyHandler();
     handler.initialize(
-        context(PolicyContents.icebergRewriteManifests(null, null, null, 1, null), measurements));
+        context(PolicyContents.icebergRewriteManifests(null, 1, null), measurements));
     Assertions.assertFalse(handler.shouldTrigger(), "Spec 1 has zero manifests");
     handler.initialize(
-        context(PolicyContents.icebergRewriteManifests(null, null, null, 0, null), measurements));
+        context(PolicyContents.icebergRewriteManifests(null, 0, null), measurements));
     Assertions.assertTrue(handler.shouldTrigger(), "Spec 0 has 1000 manifests");
     Assertions.assertEquals(1000, handler.evaluate().score());
     Assertions.assertEquals(
@@ -221,11 +234,11 @@ class TestManifestRewriteStrategyHandler {
   @Test
   void testIntegralRuleValues() {
     ManifestRewriteStrategyHandler handler = new ManifestRewriteStrategyHandler();
-    for (Object warning :
+    for (Object threshold :
         new Object[] {(byte) 100, (short) 100, 100, 100L, BigInteger.valueOf(100), "100"}) {
       handler.initialize(
           context(
-              customContent(Map.of("spec_id", 1, "manifest_count_warning", warning)),
+              customContent(Map.of("spec_id", 1, "manifest_count_threshold", threshold)),
               statistics(100, 1)));
       Assertions.assertTrue(handler.shouldTrigger());
     }
@@ -237,7 +250,7 @@ class TestManifestRewriteStrategyHandler {
   @Test
   void testNonIntegerRuleValuesAreRejected() {
     ManifestRewriteStrategyHandler handler = new ManifestRewriteStrategyHandler();
-    for (Object warning :
+    for (Object threshold :
         new Object[] {
           "+100",
           "100.0",
@@ -255,9 +268,9 @@ class TestManifestRewriteStrategyHandler {
           () ->
               handler.initialize(
                   context(
-                      customContent(Map.of("spec_id", 1, "manifest_count_warning", warning)),
+                      customContent(Map.of("spec_id", 1, "manifest_count_threshold", threshold)),
                       statistics(100, 1))),
-          warning.toString());
+          threshold.toString());
     }
   }
 
@@ -271,7 +284,7 @@ class TestManifestRewriteStrategyHandler {
             Map.of("spec_id", -1),
             Map.of("spec_id", 1.5),
             Map.of("spec_id", 1, "use_caching", "yes"),
-            Map.of("spec_id", 1, "manifest_count_critical", 99))) {
+            Map.of("spec_id", 1, "manifest_count_threshold", 0))) {
       PolicyContent content = customContent(rules);
       Assertions.assertThrows(
           IllegalArgumentException.class,
@@ -283,7 +296,7 @@ class TestManifestRewriteStrategyHandler {
           () ->
               handler.initialize(
                   context(
-                      PolicyContents.icebergRewriteManifests(null, null, null, 1, null),
+                      PolicyContents.icebergRewriteManifests(null, 1, null),
                       statistics(500, average))));
     }
   }
@@ -292,8 +305,7 @@ class TestManifestRewriteStrategyHandler {
   void testUnverifiedSnapshotsDoNotTriggerAndClearEarlierEvaluation() {
     ManifestRewriteStrategyHandler handler = new ManifestRewriteStrategyHandler();
     StrategyHandlerContext valid =
-        context(
-            PolicyContents.icebergRewriteManifests(null, null, null, 1, null), statistics(500, 1));
+        context(PolicyContents.icebergRewriteManifests(null, 1, null), statistics(500, 1));
     for (Map<String, String> properties :
         List.of(
             Map.<String, String>of(), Map.of("current-snapshot-id", "2"),
@@ -316,12 +328,12 @@ class TestManifestRewriteStrategyHandler {
     Assertions.assertFalse(handler.shouldTrigger());
     handler.initialize(
         context(
-            PolicyContents.icebergRewriteManifests(null, null, null, 1, null),
+            PolicyContents.icebergRewriteManifests(null, 1, null),
             statistics(500, 1).subList(0, 2)));
     Assertions.assertFalse(handler.shouldTrigger());
     handler.initialize(
         context(
-            PolicyContents.icebergRewriteManifests(null, null, null, 1, null),
+            PolicyContents.icebergRewriteManifests(null, 1, null),
             List.of(
                 statistics(500, 1).get(0),
                 statistics(500, 1).get(1),
@@ -333,8 +345,7 @@ class TestManifestRewriteStrategyHandler {
   @Test
   void testEmptyTableSnapshotIsAccepted() {
     StrategyHandlerContext valid =
-        context(
-            PolicyContents.icebergRewriteManifests(null, null, null, 1, null), statistics(0, 0));
+        context(PolicyContents.icebergRewriteManifests(null, 1, null), statistics(0, 0));
     Table metadata = Mockito.mock(Table.class);
     Mockito.when(metadata.properties()).thenReturn(Map.of("current-snapshot-id", "none"));
     ManifestRewriteStrategyHandler handler = new ManifestRewriteStrategyHandler();

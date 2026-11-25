@@ -23,11 +23,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionContext;
+import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionJobContext;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
@@ -59,17 +61,34 @@ public class GravitinoCompactionJobAdapter implements GravitinoJobAdapter {
         jobContext.getSortOrder() == null
             ? IcebergDataCompactionContent.DEFAULT_SORT_ORDER
             : jobContext.getSortOrder();
-    return ImmutableMap.of(
+    if (submitterConfigs == null) {
+      submitterConfigs = Collections.emptyMap();
+    }
+    String catalogName = sparkCatalogName(submitterConfigs, jobContext);
+    Map<String, String> config = new LinkedHashMap<>();
+    config.putAll(
+        IcebergSparkConfigUtils.resolveTemplateSparkPlaceholders(
+            catalogName,
+            IcebergSparkConfigUtils.parseFlatJsonMap(
+                submitterConfigs.get("spark_conf"), "spark-conf"),
+            submitterConfigs));
+    config.put(
         "table_identifier",
-        IdentifierUtils.toSparkTableIdentifier(jobContext.nameIdentifier(), schemaSeparator),
-        "where_clause",
-        getWhereClause(jobContext, submitterConfigs),
-        "sort_order",
-        sortOrder,
-        "strategy",
-        rewriteStrategy,
-        "options",
-        getOptions(jobContext));
+        IdentifierUtils.toSparkTableIdentifier(jobContext.nameIdentifier(), schemaSeparator));
+    config.put("where_clause", getWhereClause(jobContext, submitterConfigs));
+    config.put("sort_order", sortOrder);
+    config.put("strategy", rewriteStrategy);
+    config.put("options", getOptions(jobContext));
+    return Map.copyOf(config);
+  }
+
+  private static String sparkCatalogName(
+      Map<String, String> submitterConfigs, CompactionJobContext jobContext) {
+    String sparkCatalog = StringUtils.trimToNull(submitterConfigs.get("catalog_name"));
+    if (sparkCatalog != null) {
+      return sparkCatalog;
+    }
+    return IdentifierUtils.getCatalogNameFromTableIdentifier(jobContext.nameIdentifier());
   }
 
   private String getWhereClause(
@@ -79,11 +98,9 @@ public class GravitinoCompactionJobAdapter implements GravitinoJobAdapter {
     }
     // Same Spark catalog alias as CALL (jobSubmitterConfig.catalog_name); fall back to the
     // Gravitino table catalog when unset.
-    String sparkCatalog = submitterConfigs == null ? null : submitterConfigs.get("catalog_name");
-    if (StringUtils.isBlank(sparkCatalog)) {
+    String sparkCatalog = StringUtils.trimToNull(submitterConfigs.get("catalog_name"));
+    if (sparkCatalog == null) {
       sparkCatalog = IdentifierUtils.getCatalogNameFromTableIdentifier(jobContext.nameIdentifier());
-    } else {
-      sparkCatalog = sparkCatalog.trim();
     }
     return PartitionUtils.getWhereClauseForPartitions(
         jobContext.getPartitions(),

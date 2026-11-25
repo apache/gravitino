@@ -56,9 +56,11 @@ class TestCommitJobSpecFactory {
     Assertions.assertEquals(2, spec.getTasks().size());
     Assertions.assertEquals(101L, spec.getTasks().get(0).getTableId());
     Assertions.assertEquals(202L, spec.getTasks().get(0).getPolicyId());
-    Assertions.assertEquals("rewrite_data_files", spec.getTasks().get(0).getMaintenanceType());
-    Assertions.assertEquals("expire_snapshots", spec.getTasks().get(1).getMaintenanceType());
-    Assertions.assertEquals("7d", spec.getTasks().get(1).getParameters().get("older_than"));
+    Assertions.assertEquals("system_iceberg_compaction", spec.getTasks().get(0).getPolicyType());
+    Assertions.assertEquals(
+        "system_iceberg_snapshot_expiration", spec.getTasks().get(1).getPolicyType());
+    String olderThan = spec.getTasks().get(1).getParameters().get("older_than");
+    Assertions.assertEquals("7", olderThan);
     Assertions.assertEquals("10", spec.getTasks().get(1).getParameters().get("retain_last"));
     Assertions.assertTrue(spec.getUpdaterOptions().contains("metalake"));
     Assertions.assertTrue(spec.getSparkConf().contains("spark.executor.memory"));
@@ -66,19 +68,20 @@ class TestCommitJobSpecFactory {
         IcebergSparkConfigUtils.parseFlatJsonMap(spec.getSparkConf(), "spark_conf");
     Assertions.assertEquals("4g", spark.get("spark.executor.memory"));
 
-    Map<String, String> runJob = MaintenanceJobSpecFactory.jobConfForCommitChain(spec);
-    Assertions.assertEquals(
-        "rewrite_data_files,expire_snapshots",
-        runJob.get(MaintenanceJobTemplates.MAINTENANCE_TYPES_KEY));
-    Assertions.assertEquals("202,303", runJob.get(MaintenanceJobTemplates.POLICY_IDS_KEY));
-    Assertions.assertEquals("7d", runJob.get("older_than"));
-    Assertions.assertEquals("10", runJob.get("retain_last"));
-    Assertions.assertEquals("4g", runJob.get("spark_executor_memory"));
-    String rulesByType = runJob.get(MaintenanceJobTemplates.RULES_KEY);
-    Assertions.assertNotNull(rulesByType);
-    Assertions.assertTrue(rulesByType.contains("\"rewrite_data_files\""));
-    Assertions.assertTrue(rulesByType.contains("\"expire_snapshots\""));
-    Assertions.assertTrue(rulesByType.contains("trigger-expr"));
+    Map<String, String> runJob = MaintenanceJobSpecFactory.jobConfForSpec(spec);
+    String tasksJson = runJob.get(MaintenanceJobTemplates.TASKS_KEY);
+    Assertions.assertNotNull(tasksJson);
+    Assertions.assertTrue(tasksJson.contains("system_iceberg_compaction"));
+    Assertions.assertTrue(tasksJson.contains("system_iceberg_snapshot_expiration"));
+    Assertions.assertTrue(tasksJson.contains("\"policy_id\":202"));
+    Assertions.assertTrue(tasksJson.contains("\"policy_id\":303"));
+    Assertions.assertTrue(tasksJson.contains("\"older_than\":\"" + olderThan + "\""));
+    Assertions.assertTrue(tasksJson.contains("\"retain_last\":\"10\""));
+    Assertions.assertFalse(tasksJson.contains("\"action_id\""));
+    Assertions.assertTrue(tasksJson.contains("trigger-expr"));
+    Assertions.assertNull(runJob.get("older_than"));
+    Assertions.assertFalse(runJob.containsKey("spark_executor_memory"));
+    Assertions.assertTrue(runJob.get("spark_conf").contains("spark.executor.memory"));
   }
 
   @Test
@@ -146,11 +149,7 @@ class TestCommitJobSpecFactory {
         .withEnabled(true)
         .withContent(
             PolicyContents.icebergSnapshotExpiration(
-                null,
-                true,
-                null,
-                Map.of("older_than", "7d", "retain_last", "10", "spark_executor_memory", "2g"),
-                Map.of()))
+                7L, 10L, true, null, true, null, Map.of("spark_executor_memory", "2g"), Map.of()))
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.EPOCH).build())
         .build();

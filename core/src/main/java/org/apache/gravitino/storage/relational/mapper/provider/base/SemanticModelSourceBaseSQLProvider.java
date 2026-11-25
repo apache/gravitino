@@ -22,10 +22,25 @@ import static org.apache.gravitino.storage.relational.mapper.SemanticModelSource
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.ibatis.annotations.Param;
 
 /** Provides MySQL-compatible SQL for retiring dataset source associations. */
 public class SemanticModelSourceBaseSQLProvider {
+
+  /** Returns SQL for retiring closed ranges that contain no retained snapshot. */
+  public String softDeleteUnreferencedRanges(@Param("modelId") long modelId) {
+    return softDeleteBy(
+        "semantic_model_id = #{modelId} AND to_version <> 0 AND NOT EXISTS (SELECT 1 FROM "
+            + SemanticModelVersionInfoMapper.TABLE_NAME
+            + " revision WHERE revision.semantic_model_id = #{modelId} AND revision.deleted_at = 0"
+            + " AND revision.version >= "
+            + TABLE_NAME
+            + ".from_version"
+            + " AND revision.version < "
+            + TABLE_NAME
+            + ".to_version)");
+  }
 
   /** Returns SQL for retiring a model's live associations. */
   public String softDeleteByModelId(@Param("modelId") Long modelId) {

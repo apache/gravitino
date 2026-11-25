@@ -66,6 +66,8 @@ class TestMaintenanceCronSubmitPipeline {
     pipeline(false, actions, mgr).submit(INSTANCE, null);
     pipeline(false, actions, mgr)
         .submit(MaintenanceTaskIds.forCronTable(TABLE_ID, POLICY_ID + 1), spec());
+    pipeline(false, actions, mgr)
+        .submit(MaintenanceTaskIds.forCronBatch(0L, POLICY_ID + 1), batchSpec(10L, 11L));
     pipeline(true, actions, mgr).submit(INSTANCE, spec());
     pipeline((t, p) -> t == 11L, actions, mgr)
         .submit(MaintenanceTaskIds.forCronBatch(0L, POLICY_ID), batchSpec(10L, 11L));
@@ -81,6 +83,7 @@ class TestMaintenanceCronSubmitPipeline {
     when(actions.tryAcquireInFlight(TABLE_ID, POLICY_ID, CLAIM_TIMEOUT_MS))
         .thenReturn(Optional.empty());
     pipeline(false, actions, mgr).submit(INSTANCE, spec());
+    verify(actions, never()).deleteClaims(anyList());
     verify(mgr, never()).submitAndBind(anyString(), anyMap(), anyList());
   }
 
@@ -91,19 +94,17 @@ class TestMaintenanceCronSubmitPipeline {
     OccupancyClaim claim = new OccupancyClaim(8L, 2_000L);
     when(actions.tryAcquireInFlight(TABLE_ID, POLICY_ID, CLAIM_TIMEOUT_MS))
         .thenReturn(Optional.of(claim));
-    when(actions.deleteUnboundClaim(claim)).thenReturn(true);
 
     Assertions.assertDoesNotThrow(
         () -> pipeline(false, actions, mgr).submit(INSTANCE, spec(Map.of(), "{not-json")));
-    verify(actions).deleteUnboundClaim(claim);
+    verify(actions).deleteClaims(List.of(claim));
     verify(mgr, never()).submitAndBind(anyString(), anyMap(), anyList());
   }
 
   @Test
-  void testBatchSubmitOneSparkJobPerTable() {
+  void testBatchSubmitOneSparkJobForAllTables() {
     MaintenanceJobManager mgr = mock(MaintenanceJobManager.class);
-    when(mgr.submitAndBind(anyString(), anyMap(), anyList()))
-        .thenReturn(Optional.of(555L), Optional.of(556L));
+    when(mgr.submitAndBind(anyString(), anyMap(), anyList())).thenReturn(Optional.of(555L));
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     OccupancyClaim claimA = new OccupancyClaim(1L, 10L);
     OccupancyClaim claimB = new OccupancyClaim(2L, 20L);
@@ -119,14 +120,18 @@ class TestMaintenanceCronSubmitPipeline {
     ArgumentCaptor<Map<String, String>> confs = ArgumentCaptor.forClass(Map.class);
     @SuppressWarnings("unchecked")
     ArgumentCaptor<List<OccupancyClaim>> claims = ArgumentCaptor.forClass(List.class);
-    verify(mgr, times(2)).submitAndBind(eq("metalake"), confs.capture(), claims.capture());
-    Assertions.assertTrue(confs.getAllValues().get(0).get("tables").contains("db.t1"));
-    Assertions.assertTrue(confs.getAllValues().get(1).get("tables").contains("db.t2"));
-    Assertions.assertEquals(List.of(List.of(claimA), List.of(claimB)), claims.getAllValues());
+    verify(mgr, times(1)).submitAndBind(eq("metalake"), confs.capture(), claims.capture());
+    String tasksJson = confs.getValue().get("tasks");
+    Assertions.assertTrue(tasksJson.contains("db.t1"));
+    Assertions.assertTrue(tasksJson.contains("db.t2"));
+    Assertions.assertTrue(tasksJson.contains("\"older_than\"") || !tasksJson.isEmpty());
+    // action_id is stamped inside submitAndBind from claims, not in the pre-submit jobConf.
+    Assertions.assertFalse(tasksJson.contains("\"action_id\""));
+    Assertions.assertEquals(List.of(claimA, claimB), claims.getValue());
   }
 
   @Test
-  void testMixedPolicySpecSubmitsEachTask() {
+  void testMixedPolicySpecSubmitsOneJobWithBothTasks() {
     long peerTable = TABLE_ID + 1;
     long policyB = POLICY_ID + 1;
     MaintenanceJobManager mgr = mock(MaintenanceJobManager.class);
@@ -144,7 +149,42 @@ class TestMaintenanceCronSubmitPipeline {
 
     verify(actions, times(2)).tryAcquireInFlight(TABLE_ID, POLICY_ID, CLAIM_TIMEOUT_MS);
     verify(actions, times(2)).tryAcquireInFlight(peerTable, policyB, CLAIM_TIMEOUT_MS);
-    verify(mgr, times(4)).submitAndBind(eq("metalake"), anyMap(), anyList());
+    verify(mgr, times(2)).submitAndBind(eq("metalake"), anyMap(), anyList());
+  }
+
+  @Test
+  void testTableInstanceMatchesTableAndPolicy() {
+    long policyB = POLICY_ID + 1;
+    MaintenanceJobManager mgr = mock(MaintenanceJobManager.class);
+    when(mgr.submitAndBind(anyString(), anyMap(), anyList())).thenReturn(Optional.of(1L));
+    TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
+    when(actions.tryAcquireInFlight(TABLE_ID, POLICY_ID, CLAIM_TIMEOUT_MS))
+        .thenReturn(Optional.of(new OccupancyClaim(1L, 10L)));
+    when(actions.tryAcquireInFlight(TABLE_ID, policyB, CLAIM_TIMEOUT_MS))
+        .thenReturn(Optional.of(new OccupancyClaim(2L, 20L)));
+
+    Map<String, String> params =
+        new LinkedHashMap<>(Map.of("catalog_name", "iceberg", "table_identifier", "db.t"));
+    MaintenanceJobSpec sameTable =
+        new MaintenanceJobSpec(
+            List.of(
+                new Task(TABLE_ID, POLICY_ID, "system_iceberg_compaction", null, params),
+                new Task(
+                    TABLE_ID,
+                    policyB,
+                    "system_iceberg_snapshot_expiration",
+                    null,
+                    new LinkedHashMap<>(params))),
+            UPDATER,
+            null);
+
+    // Instance targets the second policy; matching only tableId would wrongly see POLICY_ID first.
+    pipeline(false, actions, mgr)
+        .submit(MaintenanceTaskIds.forCronTable(TABLE_ID, policyB), sameTable);
+
+    verify(actions).tryAcquireInFlight(TABLE_ID, POLICY_ID, CLAIM_TIMEOUT_MS);
+    verify(actions).tryAcquireInFlight(TABLE_ID, policyB, CLAIM_TIMEOUT_MS);
+    verify(mgr).submitAndBind(eq("metalake"), anyMap(), anyList());
   }
 
   @Test
@@ -183,8 +223,10 @@ class TestMaintenanceCronSubmitPipeline {
     verify(actions, never()).deleteUnboundClaim(any());
     Map<String, String> conf = confCaptor.getValue();
     Assertions.assertNull(conf.get("table_identifier"));
-    Assertions.assertEquals("binpack", conf.get("strategy"));
-    Assertions.assertTrue(conf.get("tables").contains("db.t"));
+    Assertions.assertNull(conf.get("strategy"));
+    Assertions.assertTrue(conf.get("tasks").contains("db.t"));
+    Assertions.assertTrue(conf.get("tasks").contains("binpack"));
+    Assertions.assertFalse(conf.get("tasks").contains("\"action_id\""));
     Assertions.assertTrue(conf.get("updater_options").contains("gravitino_uri"));
     Assertions.assertTrue(conf.get("spark_conf").contains("basic"));
   }
@@ -227,7 +269,7 @@ class TestMaintenanceCronSubmitPipeline {
     params.putIfAbsent("catalog_name", "iceberg");
     params.putIfAbsent("table_identifier", "db.t");
     return new MaintenanceJobSpec(
-        List.of(new Task(TABLE_ID, POLICY_ID, "rewrite_data_files", null, params)),
+        List.of(new Task(TABLE_ID, POLICY_ID, "system_iceberg_compaction", null, params)),
         UPDATER,
         sparkConf);
   }
@@ -248,7 +290,7 @@ class TestMaintenanceCronSubmitPipeline {
     return new Task(
         tableId,
         policyId,
-        "expire_snapshots",
+        "system_iceberg_snapshot_expiration",
         null,
         new LinkedHashMap<>(Map.of("catalog_name", "iceberg", "table_identifier", identifier)));
   }

@@ -20,7 +20,6 @@ from typing import Optional
 
 from gravitino.api.domain.domain import Domain
 from gravitino.api.domain.domain_change import DomainChangeVariant
-from gravitino.api.tag.tag_value import TagValue
 
 
 class DomainOperations(ABC):
@@ -51,12 +50,14 @@ class DomainOperations(ABC):
         name: str,
         comment: Optional[str],
         properties: Optional[dict[str, str]],
-        backing_tag: TagValue,
+        backing_tag: str,
         create_backing_tag: bool,
     ) -> Domain:
         """Create a draft top-level domain, explicitly creating or binding its tag.
 
-        A new tag cannot have a value. Existing tags are never adopted implicitly.
+        A new tag is created without values; an existing tag is bound whatever
+        values it allows, and backs at most one domain. Existing tags are never
+        adopted implicitly.
         Domain and new tag creation are atomic. Conflicts raise
         DomainAlreadyExistsException, TagAlreadyExistsException or
         BackingTagAlreadyBoundException; missing tags raise NoSuchTagException.
@@ -70,5 +71,10 @@ class DomainOperations(ABC):
 
     @abstractmethod
     def delete_domain(self, name: str) -> bool:
-        """Delete, keeping tags; return False if absent, reject nonempty parents."""
+        """Delete a draft domain, keeping tags.
+
+        Return False if the domain is absent or is a draft hidden from the
+        caller; a hidden draft is not deleted, so False does not mean absent.
+        Reject published domains (unpublish first) and nonempty parents.
+        """
         raise NotImplementedError

@@ -361,6 +361,7 @@ public class DTOConverters {
    */
   public static SemanticModelDTO toDTO(SemanticModel semanticModel) {
     return SemanticModelDTO.builder()
+        .withRevision(semanticModel)
         .withName(semanticModel.name())
         .withComment(semanticModel.comment())
         .withDefinition(SemanticModelDefinitionDTO.fromDefinition(semanticModel.definition()))
@@ -725,9 +726,7 @@ public class DTOConverters {
     if (policyContent instanceof IcebergRewriteManifestsContent) {
       IcebergRewriteManifestsContent content = (IcebergRewriteManifestsContent) policyContent;
       return PolicyContentDTO.IcebergRewriteManifestsContentDTO.builder()
-          .withManifestCountCritical(content.manifestCountCritical())
-          .withManifestCountWarning(content.manifestCountWarning())
-          .withAvgManifestSizeThresholdBytes(content.avgManifestSizeThresholdBytes())
+          .withManifestCountThreshold(content.manifestCountThreshold())
           .withSpecId(content.specId())
           .withUseCaching(content.useCaching())
           .withExecutionSpec(executionSpec)
