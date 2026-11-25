@@ -32,6 +32,7 @@ load the model or export it as an Ossie document. Permission to read a definitio
 grant access to the source data.
 
 Worked examples are in [Manage Semantic Model Metadata](./manage-semantic-model-metadata-using-gravitino.md).
+Use [Ontologies and Mappings](./ontologies-and-mappings.md) to link a model to a shared vocabulary.
 
 ## The Semantic Model
 
