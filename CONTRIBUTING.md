@@ -103,7 +103,7 @@ Pull request tests run with GitHub Actions in your fork, not in `apache/gravitin
 
 If Fork CI hits Maven Central's HTTP 429 rate limit, **Warm Gradle cache** can populate your fork's default-branch cache for PR branches that use the same Gradle build files as upstream `main`.
 
-Sync your fork's default branch to get the workflow. In your fork, open **Actions → Warm Gradle cache** and select **Enable workflow** if prompted. It checks daily and compiles the core test classes only on a cache miss. To warm the cache immediately, select **Run workflow** on your fork's default branch. [GitHub's workflow enablement guide](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/disable-and-enable-workflows)
+Sync your fork's default branch to get the workflow. In your fork, open **Actions → Warm Gradle cache** and select **Enable workflow** if prompted. It checks daily and resolves Gradle dependencies across the repository only on a cache miss. To warm the cache immediately, select **Run workflow** on your fork's default branch. [GitHub's workflow enablement guide](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/disable-and-enable-workflows)
 
 ### Running Fork CI again
 

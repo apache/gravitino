@@ -31,12 +31,20 @@ concurrency:
 
 jobs:
   warm:
-    if: >-
-      github.event.repository.fork && vars.DISABLE_FORK_CI != 'true' &&
-      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    if: github.event.repository.fork && vars.DISABLE_FORK_CI != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Verify default branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          REF: ${{ github.ref }}
+        run: |
+          if [ "${REF}" != "refs/heads/${DEFAULT_BRANCH}" ]; then
+            echo "::error::Warm Gradle cache must run on the fork's default branch (${DEFAULT_BRANCH}), got ${REF}."
+            exit 1
+          fi
+
       # Fork CI merges feature branches onto upstream main before setup-java hashes the build files.
       - uses: actions/checkout@v4
         with:
@@ -51,6 +59,29 @@ jobs:
           java-version: 17
           cache: gradle
 
-      - name: Compile core test classes to populate the dependency cache
+      - name: Resolve Gradle dependencies across modules to populate the cache
         if: steps.java.outputs.cache-hit != 'true'
-        run: ./gradlew :core:testClasses -PskipWeb=true
+        run: |
+          cat <<'EOF' > "${RUNNER_TEMP}/warm-gradle-cache.init.gradle.kts"
+          allprojects {
+            tasks.register("warmGradleDependencies") {
+              doLast {
+                configurations
+                  .filter { it.isCanBeResolved && !it.name.startsWith("lanceSparkBundle_") }
+                  .forEach { cfg ->
+                    cfg.incoming.artifactView {
+                      componentFilter {
+                        it is org.gradle.api.artifacts.component.ModuleComponentIdentifier
+                      }
+                    }.files.files
+                  }
+              }
+            }
+          }
+          EOF
+          ./gradlew --init-script "${RUNNER_TEMP}/warm-gradle-cache.init.gradle.kts" \
+            warmGradleDependencies -PskipWeb=true --max-workers=2
+          ./gradlew --init-script "${RUNNER_TEMP}/warm-gradle-cache.init.gradle.kts" \
+            :spark-connector:spark-3.5:warmGradleDependencies \
+            -PscalaVersion=2.13 -PskipWeb=true --max-workers=2
+          ./gradlew --stop
