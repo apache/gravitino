@@ -20,7 +20,9 @@ package org.apache.gravitino.catalog.lakehouse.iceberg.utils;
 
 import java.nio.file.Path;
 import java.util.Map;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergColumn;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTable;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.SupportsPartitionSpecs;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
@@ -55,6 +57,21 @@ class TestIcebergTablePropertiesUtil {
     Assertions.assertEquals(1, evolved.defaultSpecId());
     Assertions.assertEquals(
         "1", IcebergTable.fromIcebergTable(evolved, "events").properties().get("default-spec-id"));
+  }
+
+  @Test
+  void testBuilderHydratesDefaultPartitionSpec() {
+    IcebergTable built =
+        IcebergTable.builder()
+            .withName("events")
+            .withColumns(new IcebergColumn[0])
+            .withPartitioning(new Transform[] {Transforms.identity("id")})
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+    SupportsPartitionSpecs specs = built.supportsPartitionSpecs();
+    Assertions.assertEquals(0, specs.defaultPartitionSpecId());
+    Assertions.assertEquals(1, specs.partitionSpecs().size());
+    Assertions.assertArrayEquals(built.partitioning(), specs.partitionSpecs().get(0));
   }
 
   @Test

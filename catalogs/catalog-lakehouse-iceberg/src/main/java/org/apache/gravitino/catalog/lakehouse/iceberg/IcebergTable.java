@@ -45,6 +45,7 @@ import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.iceberg.DistributionMode;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
@@ -80,8 +81,9 @@ public class IcebergTable extends BaseTable implements SupportsPartitionSpecs {
   private String location;
 
   /**
-   * All Iceberg partition specs keyed by {@code spec-id}; never null after {@link
-   * #fromIcebergTable}.
+   * All Iceberg partition specs keyed by {@code spec-id}. Populated from metadata in {@link
+   * #fromIcebergTable}, or from the current {@code partitioning} (spec {@code 0}) in {@link
+   * Builder#internalBuild()}.
    */
   private Map<Integer, Transform[]> icebergPartitionSpecs = ImmutableMap.of();
 
@@ -257,6 +259,12 @@ public class IcebergTable extends BaseTable implements SupportsPartitionSpecs {
       icebergTable.partitioning = partitioning;
       icebergTable.distribution = distribution;
       icebergTable.sortOrders = sortOrders;
+      // Iceberg always retains at least spec 0 (unpartitioned has empty fields). Hydrate a
+      // matching default until fromIcebergTable replaces this with full metadata.
+      Transform[] currentPartitioning =
+          partitioning != null ? partitioning : Transforms.EMPTY_TRANSFORM;
+      icebergTable.icebergPartitionSpecs = ImmutableMap.of(0, currentPartitioning);
+      icebergTable.icebergDefaultSpecId = 0;
       if (null != comment) {
         icebergTable.properties.putIfAbsent(ICEBERG_COMMENT_FIELD_NAME, comment);
       }

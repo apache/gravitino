@@ -627,7 +627,7 @@ public class IcebergCatalogOperations
       loadTableResponse.validate();
 
       LOG.info("Created Iceberg table {}", tableIdent.name());
-      return createdTable;
+      return IcebergTable.fromIcebergTable(loadTableResponse.tableMetadata(), tableIdent.name());
     } catch (AlreadyExistsException e) {
       throw new TableAlreadyExistsException(e, "Table already exists: %s", tableIdent.name());
     } catch (ValidationException | BadRequestException e) {

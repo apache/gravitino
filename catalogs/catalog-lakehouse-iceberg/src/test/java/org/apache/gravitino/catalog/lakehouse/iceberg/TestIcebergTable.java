@@ -54,6 +54,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.iceberg.DistributionMode;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
@@ -202,6 +203,10 @@ public class TestIcebergTable {
     Assertions.assertEquals(ICEBERG_COMMENT, table.comment());
     Assertions.assertEquals("val1", table.properties().get("key1"));
     Assertions.assertEquals("val2", table.properties().get("key2"));
+    Assertions.assertEquals(0, table.supportsPartitionSpecs().defaultPartitionSpecId());
+    Assertions.assertEquals(1, table.supportsPartitionSpecs().partitionSpecs().size());
+    Assertions.assertArrayEquals(
+        Transforms.EMPTY_TRANSFORM, table.supportsPartitionSpecs().partitionSpecs().get(0));
 
     Table loadedTable = icebergCatalogOperations.loadTable(tableIdentifier);
 
@@ -278,6 +283,10 @@ public class TestIcebergTable {
     Assertions.assertEquals("val1", table.properties().get("key1"));
     Assertions.assertEquals("val2", table.properties().get("key2"));
     Assertions.assertArrayEquals(partitions, table.partitioning());
+    Assertions.assertEquals(0, table.supportsPartitionSpecs().defaultPartitionSpecId());
+    Assertions.assertEquals(1, table.supportsPartitionSpecs().partitionSpecs().size());
+    Assertions.assertArrayEquals(
+        partitions, table.supportsPartitionSpecs().partitionSpecs().get(0));
 
     Table loadedTable = icebergCatalogOperations.loadTable(tableIdentifier);
 
