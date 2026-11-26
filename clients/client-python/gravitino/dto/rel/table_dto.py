@@ -23,6 +23,7 @@ from dataclasses_json import DataClassJsonMixin, config
 from gravitino.api.rel.expressions.distributions.distribution import Distribution
 from gravitino.api.rel.expressions.transforms.transform import Transform
 from gravitino.api.rel.indexes.index import Index
+from gravitino.api.rel.supports_partition_specs import SupportsPartitionSpecs
 from gravitino.api.rel.table import Table
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.rel.column_dto import ColumnDTO
@@ -36,11 +37,34 @@ from gravitino.dto.rel.partitioning.json_serdes.partitioning_serdes import (
 )
 from gravitino.dto.rel.partitioning.partitioning import Partitioning
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
+from gravitino.exceptions.base import UnsupportedOperationException
 from gravitino.utils.precondition import Precondition
 
 
+def _encode_partition_specs(
+    specs: Optional[dict[int, list[Partitioning]]],
+) -> Optional[dict[str, list]]:
+    if specs is None:
+        return None
+    return {
+        str(spec_id): [PartitioningSerdes.serialize(item) for item in transforms]
+        for spec_id, transforms in specs.items()
+    }
+
+
+def _decode_partition_specs(values) -> Optional[dict[int, list[Partitioning]]]:
+    if values is None:
+        return None
+    return {
+        int(spec_id): [PartitioningSerdes.deserialize(item) for item in transforms]
+        for spec_id, transforms in values.items()
+    }
+
+
 @dataclass
-class TableDTO(Table, DataClassJsonMixin):  # pylint: disable=R0902
+class TableDTO(
+    Table, SupportsPartitionSpecs, DataClassJsonMixin
+):  # pylint: disable=R0902
     """Represents a Table DTO (Data Transfer Object)."""
 
     _name: Optional[str] = field(default=None, metadata=config(field_name="name"))
@@ -100,6 +124,22 @@ class TableDTO(Table, DataClassJsonMixin):  # pylint: disable=R0902
         default=None,
         metadata=config(field_name="properties", exclude=lambda value: value is None),
     )
+    _default_partition_spec_id: Optional[int] = field(
+        default=None,
+        metadata=config(
+            field_name="defaultPartitionSpecId",
+            exclude=lambda value: value is None,
+        ),
+    )
+    _partition_specs: Optional[dict[int, list[Partitioning]]] = field(
+        default=None,
+        metadata=config(
+            field_name="partitionSpecs",
+            encoder=_encode_partition_specs,
+            decoder=_decode_partition_specs,
+            exclude=lambda value: value is None,
+        ),
+    )
 
     def __post_init__(self):
         Precondition.check_argument(
@@ -138,3 +178,27 @@ class TableDTO(Table, DataClassJsonMixin):  # pylint: disable=R0902
 
     def index(self) -> Optional[list[Index]]:
         return self._indexes
+
+    def supports_partition_specs(self) -> SupportsPartitionSpecs:
+        if self._partition_specs is None or self._default_partition_spec_id is None:
+            raise UnsupportedOperationException(
+                "Table does not support partition specs."
+            )
+        return self
+
+    def default_partition_spec_id(self) -> int:
+        Precondition.check_argument(
+            self._default_partition_spec_id is not None,
+            "Table does not carry a default partition spec id",
+        )
+        return self._default_partition_spec_id
+
+    def partition_specs(self) -> dict[int, list[Transform]]:
+        Precondition.check_argument(
+            self._partition_specs is not None,
+            "Table does not carry partition specs",
+        )
+        return {
+            spec_id: list(transforms)
+            for spec_id, transforms in self._partition_specs.items()
+        }

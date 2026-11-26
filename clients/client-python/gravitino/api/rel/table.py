@@ -28,6 +28,7 @@ from gravitino.api.rel.expressions.transforms.transform import Transform
 from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
+from gravitino.api.rel.supports_partition_specs import SupportsPartitionSpecs
 from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.semantic.supports_semantic_models import SupportsSemanticModels
 from gravitino.api.stats.supports_statistics import SupportsStatistics
@@ -68,6 +69,20 @@ class Table(Auditable):
         """
 
         return Transforms.EMPTY_TRANSFORM
+
+    def supports_partition_specs(self) -> SupportsPartitionSpecs:
+        """Returns partition-spec listing when the table retains historical specs.
+
+        ``partitioning()`` only reflects the current default spec. Use this capability to list
+        every registered ``spec-id`` after partition evolution.
+
+        Returns:
+            SupportsPartitionSpecs: The partition-spec support for the table.
+
+        Raises:
+            UnsupportedOperationException: If the table does not expose partition specs.
+        """
+        raise UnsupportedOperationException("Table does not support partition specs.")
 
     def sort_order(self) -> list[SortOrder]:
         """Gets the sort order of the table.

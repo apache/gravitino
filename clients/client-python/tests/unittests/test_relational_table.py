@@ -29,14 +29,21 @@ from gravitino.api.rel.expressions.sorts.sort_direction import SortDirection
 from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.partitions.partitions import Partitions
+from gravitino.api.rel.types.types import Types
 from gravitino.api.stats.supports_statistics import SupportsStatistics
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.client.generic_column import GenericColumn
 from gravitino.client.relational_table import RelationalTable
+from gravitino.dto.audit_dto import AuditDTO
+from gravitino.dto.rel.column_dto import ColumnDTO
+from gravitino.dto.rel.partitioning.identity_partitioning_dto import (
+    IdentityPartitioningDTO,
+)
 from gravitino.dto.rel.partitions.json_serdes.partition_dto_serdes import (
     PartitionDTOSerdes,
 )
 from gravitino.dto.rel.table_dto import TableDTO
+from gravitino.exceptions.base import UnsupportedOperationException
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.partition_list_response import PartitionListResponse
 from gravitino.dto.responses.partition_name_list_response import (
@@ -154,6 +161,34 @@ class TestRelationalTable(unittest.TestCase):
 
         self.assertEqual(len(partitioning_list), 1)
         self.assertListEqual(partitioning.field_name(), ["dt"])
+
+    def test_supports_partition_specs_from_table_dto(self):
+        identity = [IdentityPartitioningDTO("id")]
+        table_dto = TableDTO(
+            "events",
+            [
+                ColumnDTO.builder()
+                .with_name("id")
+                .with_data_type(Types.LongType.get())
+                .build()
+            ],
+            AuditDTO("test"),
+            "comment",
+            _partitioning=identity,
+            _properties={},
+            _default_partition_spec_id=1,
+            _partition_specs={0: [], 1: identity},
+        )
+        table = RelationalTable(self.namespace, table_dto, self.rest_client)
+        specs = table.supports_partition_specs()
+        self.assertEqual(specs.default_partition_spec_id(), 1)
+        self.assertEqual(len(specs.partition_specs()), 2)
+        self.assertEqual(len(specs.partition_specs()[0]), 0)
+        self.assertIsInstance(specs.partition_specs()[1][0], IdentityPartitioningDTO)
+
+    def test_supports_partition_specs_absent_by_default(self):
+        with self.assertRaises(UnsupportedOperationException):
+            self.relational_table.supports_partition_specs()
 
     def test_get_sort_order(self):
         sort_order_list = self.relational_table.sort_order()

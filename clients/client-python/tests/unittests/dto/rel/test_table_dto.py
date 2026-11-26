@@ -36,7 +36,10 @@ from gravitino.dto.rel.partitioning.partitioning import SingleFieldPartitioning
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
 from gravitino.dto.rel.table_dto import TableDTO
 from gravitino.dto.responses.table_response import TableResponse
-from gravitino.exceptions.base import IllegalArgumentException
+from gravitino.exceptions.base import (
+    IllegalArgumentException,
+    UnsupportedOperationException,
+)
 from tests.unittests.fixtures.table_fixtures import TABLE_DTO_JSON_STRING
 
 
@@ -290,6 +293,50 @@ class TestTableDTO(unittest.TestCase):
         dto_dict = json.loads(dto.to_json())
         self.assertEqual(dto_dict["partitioning"][0]["strategy"], "identity")
         self.assertEqual(dto_dict["partitioning"][0]["fieldName"], ["id"])
+
+    def test_table_dto_partition_specs_round_trip(self):
+        """Tests historical partition specs serialize and remain usable."""
+        identity = [IdentityPartitioningDTO("id")]
+        dto = TableDTO(
+            "example_table",
+            [
+                ColumnDTO.builder()
+                .with_name("id")
+                .with_data_type(Types.IntegerType.get())
+                .build()
+            ],
+            AuditDTO("Apache Gravitino"),
+            "comment for example_table",
+            _partitioning=identity,
+            _default_partition_spec_id=1,
+            _partition_specs={0: [], 1: identity},
+        )
+
+        dto_dict = json.loads(dto.to_json())
+        self.assertEqual(dto_dict["defaultPartitionSpecId"], 1)
+        self.assertIn("0", dto_dict["partitionSpecs"])
+        self.assertIn("1", dto_dict["partitionSpecs"])
+
+        restored = TableDTO.from_json(dto.to_json())
+        specs = restored.supports_partition_specs()
+        self.assertEqual(specs.default_partition_spec_id(), 1)
+        self.assertEqual(len(specs.partition_specs()), 2)
+        self.assertEqual(len(specs.partition_specs()[0]), 0)
+        self.assertIsInstance(specs.partition_specs()[1][0], IdentityPartitioningDTO)
+
+    def test_table_dto_supports_partition_specs_absent_by_default(self):
+        dto = TableDTO(
+            "example_table",
+            [
+                ColumnDTO.builder()
+                .with_name("id")
+                .with_data_type(Types.IntegerType.get())
+                .build()
+            ],
+            AuditDTO("Apache Gravitino"),
+        )
+        with self.assertRaises(UnsupportedOperationException):
+            dto.supports_partition_specs()
 
     def test_table_dto_serialize_with_sort_order(self):
         """Tests the sort order field is serialized correctly."""

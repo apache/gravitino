@@ -30,6 +30,7 @@ from gravitino.api.rel.expressions.sorts.sort_order import SortOrder
 from gravitino.api.rel.expressions.transforms.transform import Transform
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.partitions.partition import Partition
+from gravitino.api.rel.supports_partition_specs import SupportsPartitionSpecs
 from gravitino.api.rel.table import Table
 from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.semantic.supports_semantic_models import SupportsSemanticModels
@@ -143,6 +144,10 @@ class RelationalTable(
 
     def partitioning(self) -> list[Transform]:
         return self._table.partitioning()
+
+    def supports_partition_specs(self) -> SupportsPartitionSpecs:
+        """Return historical partition-spec listing when present on the loaded table."""
+        return self._table.supports_partition_specs()
 
     def sort_order(self) -> list[SortOrder]:
         return self._table.sort_order()

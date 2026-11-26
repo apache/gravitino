@@ -387,12 +387,21 @@ class DTOConverters:
             def audit_info(self) -> Audit:
                 return self._audit_info
 
+            def supports_partition_specs(self):
+                return dto.supports_partition_specs()
+
+        distribution = dto.distribution()
         return TableImpl(
             name=dto.name(),
             columns=DTOConverters.from_dtos(dto.columns()),
             partitioning=DTOConverters.from_dtos(dto.partitioning()),
             sort_order=DTOConverters.from_dtos(dto.sort_order()),
-            distribution=DTOConverters.from_dto(dto.distribution()),
+            # singledispatch cannot register None; match Java fromDTO(DistributionDTO).
+            distribution=(
+                DTOConverters.from_dto(distribution)
+                if distribution is not None
+                else Distributions.NONE
+            ),
             index=DTOConverters.from_dtos(dto.index()),
             comment=dto.comment(),
             properties=dto.properties(),
