@@ -57,7 +57,11 @@ public class TestGravitinoMetricsProvider {
             OptimizerConfig.OPTIMIZER_PREFIX
                 + GenericJdbcMetricsRepository.JDBC_METRICS_PREFIX
                 + GenericJdbcMetricsRepository.JDBC_PASSWORD,
-            "");
+            "",
+            OptimizerConfig.OPTIMIZER_PREFIX
+                + GenericJdbcMetricsRepository.JDBC_METRICS_PREFIX
+                + GenericJdbcMetricsRepository.JDBC_DRIVER,
+            "org.h2.Driver");
     OptimizerEnv optimizerEnv = new OptimizerEnv(new OptimizerConfig(configs));
 
     NameIdentifier table = NameIdentifier.parse("catalog.db.table1");
