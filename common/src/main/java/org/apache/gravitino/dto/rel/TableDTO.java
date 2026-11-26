@@ -210,12 +210,42 @@ public class TableDTO implements Table, SupportsPartitionSpecs {
     if (partitionSpecs == null || defaultPartitionSpecId == null) {
       throw new UnsupportedOperationException("Table does not support partition specs.");
     }
+    validatePartitionSpecFields(defaultPartitionSpecId, partitionSpecs, partitioning);
+    return this;
+  }
+
+  /**
+   * Ensures optional partition-spec fields are consistent with each other and with {@code
+   * partitioning}.
+   *
+   * @param defaultPartitionSpecId The default partition spec id, or null when specs are absent.
+   * @param partitionSpecs Historical specs keyed by id, or null when absent.
+   * @param partitioning The table's current partitioning transforms.
+   */
+  private static void validatePartitionSpecFields(
+      Integer defaultPartitionSpecId,
+      Map<Integer, Partitioning[]> partitionSpecs,
+      Partitioning[] partitioning) {
+    boolean hasDefaultSpecId = defaultPartitionSpecId != null;
+    boolean hasPartitionSpecs = partitionSpecs != null;
+    Preconditions.checkArgument(
+        hasDefaultSpecId == hasPartitionSpecs,
+        "defaultPartitionSpecId and partitionSpecs must both be set or both be null");
+    if (!hasPartitionSpecs) {
+      return;
+    }
     Preconditions.checkArgument(
         partitionSpecs.containsKey(defaultPartitionSpecId),
         "defaultPartitionSpecId %s is missing from partitionSpecs %s",
         defaultPartitionSpecId,
         partitionSpecs.keySet());
-    return this;
+    Partitioning[] defaultSpec = partitionSpecs.get(defaultPartitionSpecId);
+    Partitioning[] current = partitioning == null ? Partitioning.EMPTY_PARTITIONING : partitioning;
+    Partitioning[] expected = defaultSpec == null ? Partitioning.EMPTY_PARTITIONING : defaultSpec;
+    Preconditions.checkArgument(
+        Arrays.equals(current, expected),
+        "partitioning must match partitionSpecs[%s]",
+        defaultPartitionSpecId);
   }
 
   /** {@inheritDoc} */
@@ -412,18 +442,7 @@ public class TableDTO implements Table, SupportsPartitionSpecs {
     public TableDTO build() {
       Preconditions.checkArgument(name != null && !name.isEmpty(), "name cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
-      boolean hasDefaultSpecId = defaultPartitionSpecId != null;
-      boolean hasPartitionSpecs = partitionSpecs != null;
-      Preconditions.checkArgument(
-          hasDefaultSpecId == hasPartitionSpecs,
-          "defaultPartitionSpecId and partitionSpecs must both be set or both be null");
-      if (hasPartitionSpecs) {
-        Preconditions.checkArgument(
-            partitionSpecs.containsKey(defaultPartitionSpecId),
-            "defaultPartitionSpecId %s is missing from partitionSpecs %s",
-            defaultPartitionSpecId,
-            partitionSpecs.keySet());
-      }
+      validatePartitionSpecFields(defaultPartitionSpecId, partitionSpecs, Partitioning);
 
       return new TableDTO(
           name,

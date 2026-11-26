@@ -61,6 +61,15 @@ def _decode_partition_specs(values) -> Optional[dict[int, list[Partitioning]]]:
     }
 
 
+def _partitioning_equal(left: list[Partitioning], right: list[Partitioning]) -> bool:
+    if len(left) != len(right):
+        return False
+    return all(
+        PartitioningSerdes.serialize(lhs) == PartitioningSerdes.serialize(rhs)
+        for lhs, rhs in zip(left, right)
+    )
+
+
 @dataclass
 class TableDTO(
     Table, SupportsPartitionSpecs, DataClassJsonMixin
@@ -151,6 +160,28 @@ class TableDTO(
             self._columns is not None and len(self._columns) > 0,
             "columns cannot be null or empty",
         )
+        self._validate_partition_spec_fields()
+
+    def _validate_partition_spec_fields(self) -> None:
+        has_default = self._default_partition_spec_id is not None
+        has_specs = self._partition_specs is not None
+        Precondition.check_argument(
+            has_default == has_specs,
+            "defaultPartitionSpecId and partitionSpecs must both be set or both be null",
+        )
+        if not has_specs:
+            return
+        Precondition.check_argument(
+            self._default_partition_spec_id in self._partition_specs,
+            f"defaultPartitionSpecId {self._default_partition_spec_id} is missing "
+            f"from partitionSpecs {list(self._partition_specs.keys())}",
+        )
+        current = self._partitioning or []
+        expected = self._partition_specs[self._default_partition_spec_id] or []
+        Precondition.check_argument(
+            _partitioning_equal(current, expected),
+            f"partitioning must match partitionSpecs[{self._default_partition_spec_id}]",
+        )
 
     def name(self) -> str:
         return self._name
@@ -184,11 +215,7 @@ class TableDTO(
             raise UnsupportedOperationException(
                 "Table does not support partition specs."
             )
-        Precondition.check_argument(
-            self._default_partition_spec_id in self._partition_specs,
-            f"defaultPartitionSpecId {self._default_partition_spec_id} is missing "
-            f"from partitionSpecs {list(self._partition_specs.keys())}",
-        )
+        self._validate_partition_spec_fields()
         return self
 
     def default_partition_spec_id(self) -> int:

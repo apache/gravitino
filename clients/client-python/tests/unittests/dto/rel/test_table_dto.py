@@ -339,20 +339,50 @@ class TestTableDTO(unittest.TestCase):
             dto.supports_partition_specs()
 
     def test_table_dto_rejects_default_spec_id_missing_from_specs(self):
-        dto = TableDTO(
-            "example_table",
-            [
-                ColumnDTO.builder()
-                .with_name("id")
-                .with_data_type(Types.IntegerType.get())
-                .build()
-            ],
-            AuditDTO("Apache Gravitino"),
-            _default_partition_spec_id=1,
-            _partition_specs={0: []},
-        )
         with self.assertRaises(IllegalArgumentException):
-            dto.supports_partition_specs()
+            TableDTO(
+                "example_table",
+                [
+                    ColumnDTO.builder()
+                    .with_name("id")
+                    .with_data_type(Types.IntegerType.get())
+                    .build()
+                ],
+                AuditDTO("Apache Gravitino"),
+                _default_partition_spec_id=1,
+                _partition_specs={0: []},
+            )
+
+    def test_table_dto_rejects_partial_partition_spec_fields(self):
+        with self.assertRaises(IllegalArgumentException):
+            TableDTO(
+                "example_table",
+                [
+                    ColumnDTO.builder()
+                    .with_name("id")
+                    .with_data_type(Types.IntegerType.get())
+                    .build()
+                ],
+                AuditDTO("Apache Gravitino"),
+                _default_partition_spec_id=1,
+            )
+
+    def test_table_dto_rejects_partitioning_mismatching_default_spec(self):
+        identity = [IdentityPartitioningDTO("id")]
+        with self.assertRaises(IllegalArgumentException):
+            TableDTO(
+                "example_table",
+                [
+                    ColumnDTO.builder()
+                    .with_name("id")
+                    .with_data_type(Types.IntegerType.get())
+                    .build()
+                ],
+                AuditDTO("Apache Gravitino"),
+                _partitioning=identity,
+                _default_partition_spec_id=0,
+                _partition_specs={0: [], 1: identity},
+            )
 
     def test_table_dto_serialize_with_sort_order(self):
         """Tests the sort order field is serialized correctly."""

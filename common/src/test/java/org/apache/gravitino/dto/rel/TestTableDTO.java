@@ -141,6 +141,24 @@ public class TestTableDTO {
   }
 
   @Test
+  public void testBuildRejectsPartitioningMismatchingDefaultSpec() {
+    AuditDTO audit =
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    Partitioning[] identity = new Partitioning[] {IdentityPartitioningDTO.of("id")};
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            TableDTO.builder()
+                .withName("events")
+                .withAudit(audit)
+                .withColumns(new ColumnDTO[0])
+                .withPartitioning(identity)
+                .withDefaultPartitionSpecId(0)
+                .withPartitionSpecs(ImmutableMap.of(0, new Partitioning[0], 1, identity))
+                .build());
+  }
+
+  @Test
   public void testFromDTOPreservesPartitionSpecs() {
     AuditDTO audit =
         AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
