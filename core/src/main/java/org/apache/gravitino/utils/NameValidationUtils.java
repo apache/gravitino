@@ -19,15 +19,18 @@
 package org.apache.gravitino.utils;
 
 import com.google.common.base.Preconditions;
+import java.util.Locale;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObjects;
 
-/** Naming rules shared by catalogs and domains. */
+/** Shared validation for Gravitino object names. */
 public final class NameValidationUtils {
   /** Reserved name of the system catalog. */
   public static final String SYSTEM_CATALOG_RESERVED_NAME = "system";
 
-  private static final Pattern NAME_PATTERN = Pattern.compile("^\\w[\\w-]{0,63}$");
+  private static final int DEFAULT_MAX_NAME_LENGTH = 64;
+  private static final Pattern NAME_PATTERN = Pattern.compile("\\w[\\w-]*");
 
   private NameValidationUtils() {}
 
@@ -44,9 +47,30 @@ public final class NameValidationUtils {
         || MetadataObjects.METADATA_OBJECT_RESERVED_NAME.equals(name)) {
       throw new IllegalArgumentException("The " + type + " name '" + name + "' is reserved.");
     }
-    if (!NAME_PATTERN.matcher(name).matches()) {
-      throw new IllegalArgumentException("The " + type + " name '" + name + "' is illegal.");
+    String error = nameValidationError(type, name, NAME_PATTERN);
+    if (error != null) {
+      throw new IllegalArgumentException(error);
     }
+  }
+
+  /**
+   * Checks a name against its syntax and the default Gravitino name length limit.
+   *
+   * @param type The object type used in the error message.
+   * @param name The proposed name.
+   * @param syntax The pattern for a valid name, excluding the length limit.
+   * @return The reason for rejection, or null if the name is valid.
+   */
+  @Nullable
+  public static String nameValidationError(String type, String name, Pattern syntax) {
+    if (!syntax.matcher(name).matches()) {
+      return String.format(Locale.ROOT, "The %s name '%s' is illegal.", type, name);
+    }
+    if (name.codePointCount(0, name.length()) > DEFAULT_MAX_NAME_LENGTH) {
+      return String.format(
+          Locale.ROOT, "The %s name must not exceed %d characters.", type, DEFAULT_MAX_NAME_LENGTH);
+    }
+    return null;
   }
 
   /**
