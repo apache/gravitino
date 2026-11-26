@@ -198,21 +198,17 @@ public final class GlossaryTermBindingService {
     return result;
   }
 
-  /** Lists live bindings of a term in keyset order on (target_type, target_id). */
+  /** Lists all live bindings of a term, optionally restricted to the given target types. */
   public List<GlossaryTermBindingPO> listByTerm(
-      long metalakeId,
-      long termId,
-      @Nullable Set<TargetType> targetTypes,
-      @Nullable String afterType,
-      long afterId,
-      int limit) {
+      long metalakeId, long termId, @Nullable Set<TargetType> targetTypes) {
+    if (targetTypes != null && targetTypes.isEmpty()) {
+      return List.of();
+    }
     List<String> typeNames =
-        targetTypes == null || targetTypes.isEmpty()
-            ? null
-            : targetTypes.stream().map(TargetType::name).toList();
+        targetTypes == null ? null : targetTypes.stream().map(TargetType::name).toList();
     return SessionUtils.getWithoutCommit(
         GlossaryTermBindingMapper.class,
-        mapper -> mapper.listByTerm(metalakeId, termId, typeNames, afterType, afterId, limit));
+        mapper -> mapper.listByTerm(metalakeId, termId, typeNames));
   }
 
   /** Retires every binding row of a deleted term inside its deletion transaction. */

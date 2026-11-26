@@ -21,6 +21,10 @@ package org.apache.gravitino.server.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.base.Preconditions;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -40,13 +44,17 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity.EntityType;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.dto.glossary.TermBindingDTO;
 import org.apache.gravitino.dto.requests.TermCreateRequest;
 import org.apache.gravitino.dto.requests.TermUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
+import org.apache.gravitino.dto.responses.TermBindingListResponse;
 import org.apache.gravitino.dto.responses.TermListResponse;
 import org.apache.gravitino.dto.responses.TermResponse;
 import org.apache.gravitino.dto.responses.TermTreeResponse;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NotFoundException;
@@ -54,6 +62,7 @@ import org.apache.gravitino.exceptions.NotInUseException;
 import org.apache.gravitino.glossary.GlossaryManager;
 import org.apache.gravitino.glossary.GlossaryTerm;
 import org.apache.gravitino.glossary.GlossaryTermViews;
+import org.apache.gravitino.glossary.TermBinding;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
@@ -75,6 +84,10 @@ public class TermOperations {
   private static final Logger LOG = LoggerFactory.getLogger(TermOperations.class);
   private static final ExceptionHandler COMMON_ERRORS =
       new ExceptionHandlers.BaseExceptionHandler();
+  // VersioningFilter prepends the default vendor type to a plain JSON Accept header. Prefer
+  // plain JSON when both types are present, while honoring an explicitly versioned request.
+  static final String BINDING_V1_JSON = "application/vnd.gravitino.v1+json;qs=0.9";
+
   private final GlossaryTermViews views;
   @Context private HttpServletRequest httpRequest;
 
@@ -259,6 +272,69 @@ public class TermOperations {
         });
   }
 
+  /** Lists all visible objects or metrics bound to the requested term. */
+  @GET
+  @Path("{term}/objects")
+  @Produces({"application/json", BINDING_V1_JSON})
+  @Timed(name = "list-term-bindings." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-term-bindings", absolute = true)
+  @AuthorizationExpression(expression = "")
+  public Response listTermBindings(
+      @PathParam("metalake") @AuthorizationMetadata(type = EntityType.METALAKE) String metalake,
+      @PathParam("term") String term,
+      @QueryParam("kind") String kind,
+      @QueryParam("types") List<String> types,
+      @QueryParam("status") String status) {
+    return execute(
+        OperationType.LIST,
+        metalake,
+        term,
+        () -> {
+          TermBindingDTO[] bindings =
+              views
+                  .listTermBindings(
+                      metalake,
+                      term,
+                      parseBindingKind(kind),
+                      parseBindingTypes(types),
+                      parseStatus(status))
+                  .stream()
+                  .map(
+                      b ->
+                          new TermBindingDTO(
+                              b.kind(), DTOConverters.toDTO(b.object()), b.metric().orElse(null)))
+                  .toArray(TermBindingDTO[]::new);
+          return Response.ok(new TermBindingListResponse(bindings)).build();
+        });
+  }
+
+  @Nullable
+  private static TermBinding.Kind parseBindingKind(@Nullable String value) {
+    if (value == null) {
+      return null;
+    }
+    try {
+      return TermBinding.Kind.valueOf(value.toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException invalid) {
+      throw new IllegalArgumentException("kind must be IMPLEMENTED_BY or USED_BY", invalid);
+    }
+  }
+
+  private static Set<MetadataObject.Type> parseBindingTypes(List<String> values) {
+    Set<MetadataObject.Type> types = EnumSet.noneOf(MetadataObject.Type.class);
+    for (String value : values) {
+      for (String type : value.split(",", -1)) {
+        try {
+          types.add(MetadataObject.Type.valueOf(type.trim().toUpperCase(Locale.ROOT)));
+        } catch (IllegalArgumentException invalid) {
+          throw new IllegalArgumentException(
+              "Unknown metadata object type in types: " + type, invalid);
+        }
+      }
+    }
+    return types;
+  }
+
   /** Optional query parameters for browsing glossary terms. Combine filters to narrow the list. */
   public static class ListTermsQuery {
     /** Return full definitions with true, or names only with false (default). */
@@ -395,7 +471,7 @@ public class TermOperations {
   }
 
   @Nullable
-  private static GlossaryTerm.Status parseStatus(@Nullable String status) {
+  static GlossaryTerm.Status parseStatus(@Nullable String status) {
     return status == null ? null : GlossaryTerm.Status.fromString(status);
   }
 
@@ -413,6 +489,15 @@ public class TermOperations {
 
   private Response execute(
       OperationType operation, String metalake, @Nullable String term, Supplier<Response> action) {
+    return execute(httpRequest, operation, metalake, term, action);
+  }
+
+  static Response execute(
+      HttpServletRequest httpRequest,
+      OperationType operation,
+      String metalake,
+      @Nullable String term,
+      Supplier<Response> action) {
     try {
       return Utils.doAs(
           httpRequest,

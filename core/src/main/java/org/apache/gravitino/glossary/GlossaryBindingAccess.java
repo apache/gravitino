@@ -88,8 +88,8 @@ final class GlossaryBindingAccess {
     return forSnapshot(metalake, scopes);
   }
 
-  /** Uses the page's relational snapshot for canonical target and ancestor IDs. */
-  static GlossaryBindingAccess forBindingPage(String metalake, boolean enabled, long metalakeId) {
+  /** Uses the binding read snapshot for canonical target and ancestor IDs. */
+  static GlossaryBindingAccess forBindingList(String metalake, boolean enabled, long metalakeId) {
     if (!enabled) {
       return UNRESTRICTED;
     }
