@@ -34,27 +34,26 @@ import org.apache.gravitino.exceptions.TermVersionConflictException;
  * <p>A term that the caller cannot see, for example a {@link GlossaryTerm.Status#DRAFT} term of
  * another user, is left out of lists, and getting it throws {@link NoSuchTermException}.
  *
- * <p>In Step 1, {@code VIEW_DEFINITION} permits reading approved and deprecated terms. {@code
- * CREATE_DEFINITION} includes view access and permits creating and maintaining terms owned by the
- * caller. {@code MANAGE_DEFINITIONS} includes create and view access and permits managing all
- * terms, including other owners' drafts. Ownership means the current owner, including group
- * members; ownership alone does not replace effective create access. Expand allowed grant
- * implications before applying explicit denies to each required capability. All reads and writes of
- * term definitions require effective {@code VIEW_DEFINITION}. Denying view hides terms from reads
- * and blocks writes even for an owner with create access. Denying create prevents creation even
- * with an allow on manage, but effective manage can still authorize edits. Denying manage removes
- * the all-term path without removing effective create access to own terms. These privileges are
- * granted on the metalake in Step 1. The metalake owner passes privilege checks, but remains
- * subject to the Step 2 workflow and no-self-approval rule.
+ * <p>With authorization enabled in Step 1, {@code VIEW_DEFINITION} permits reading approved and
+ * deprecated terms. {@code CREATE_DEFINITION} includes view access and permits creating and
+ * maintaining terms owned by the caller. {@code MANAGE_DEFINITIONS} includes create and view access
+ * and permits managing all terms, including other owners' drafts. Ownership means the current
+ * owner, including group members; ownership alone does not replace effective create access. Expand
+ * allowed grant implications before applying explicit denies to each required capability. All reads
+ * and writes of term definitions require effective {@code VIEW_DEFINITION}. Denying view hides
+ * terms from reads and blocks writes even for an owner with create access. Denying create prevents
+ * creation even with an allow on manage, but effective manage can still authorize edits. Denying
+ * manage removes the all-term path without removing effective create access to own terms. These
+ * privileges are granted on the metalake in Step 1. The metalake owner passes privilege checks, but
+ * remains subject to the Step 2 workflow and no-self-approval rule.
  *
  * <p>The owner API permits the current term owner or metalake owner to transfer ownership
  * independently of glossary privileges.
  *
- * <p>The write methods describe Step 1: changes take effect immediately, without review. Step 2
- * adds scoped management and review: new terms default to draft, and another authorized manage user
- * must approve a submitted change. Neither management privileges nor a direct status update
- * bypasses that workflow. Proposal and decision APIs are separate from these immediate-write
- * operations.
+ * <p>The server publication policy controls whether a write takes effect immediately. The default
+ * policy publishes in one request. A policy requiring approval returns an unpublished candidate.
+ * Inspect {@link GlossaryTerm#publication()} to distinguish a saved draft, submission and
+ * publication. A candidate keeps the legacy DRAFT status until publication.
  */
 @Evolving
 public interface GlossaryOperations {
@@ -86,8 +85,10 @@ public interface GlossaryOperations {
   GlossaryTerm getTerm(String name) throws NoSuchTermException;
 
   /**
-   * Creates a term in Step 1. The caller becomes its owner. Without a status, the server uses
-   * {@link GlossaryTerm.Status#APPROVED}; this does not mean that a human reviewed the term.
+   * Creates a term. With authorization enabled, the registered creator becomes the owner on
+   * publication. With authorization disabled, the owner is unset. Without an explicit status the
+   * default policy publishes an APPROVED term, and an approval policy submits a private candidate.
+   * With approval enabled, DRAFT saves without submitting and explicit APPROVED is rejected.
    *
    * <p>The caller needs effective {@code VIEW_DEFINITION}, effective {@code CREATE_DEFINITION}, and
    * read access to each requested domain ({@code USE_DOMAIN} for published domains, {@code
@@ -95,7 +96,7 @@ public interface GlossaryOperations {
    * relations follow the same visibility rules as reads.
    *
    * @param spec The content of the term.
-   * @return The created term.
+   * @return The published term or candidate with its actual publication outcome.
    * @throws TermAlreadyExistsException If a term with the same name or the same source reference
    *     already exists.
    * @throws NoSuchTermException If a broader or related term does not exist or is not visible to
@@ -111,13 +112,13 @@ public interface GlossaryOperations {
           IllegalArgumentException;
 
   /**
-   * Alters a term in Step 1. All changes take effect immediately and together: if one fails, none
-   * is applied. The revision increases once only when the final effective state changes; a no-op
-   * preserves both the revision and {@link GlossaryTerm#revisionToken()}. This overload is
-   * unconditional and applies changes to the current term, even if its name has been reused since
-   * the caller read it. Use {@link #alterTerm(String, String, TermChange...)} to guard against
-   * stale edits. Use {@link TermChange#setStatus(GlossaryTerm.Status)} to change the status without
-   * an approval decision.
+   * Alters a term atomically. Under an approval policy, effective edits propose a candidate and
+   * ordinary reads keep returning the published term. The revision increases once only when the
+   * final effective state changes; a no-op preserves both the revision and {@link
+   * GlossaryTerm#revisionToken()}. This overload is unconditional and applies changes to the
+   * current term, even if its name has been reused since the caller read it. Use {@link
+   * #alterTerm(String, String, TermChange...)} to guard against stale edits. Setting APPROVED
+   * explicitly is rejected when the policy requires approval.
    *
    * <p>The caller needs effective {@code VIEW_DEFINITION}, plus effective {@code
    * MANAGE_DEFINITIONS} or current ownership with effective {@code CREATE_DEFINITION}. Read access
@@ -126,7 +127,7 @@ public interface GlossaryOperations {
    *
    * @param name The name of the term.
    * @param changes The changes to apply.
-   * @return The altered term.
+   * @return The published term or candidate resulting from the request.
    * @throws NoSuchTermException If the term, or a broader or related term in the changes, does not
    *     exist or is not visible to the caller.
    * @throws TermAlreadyExistsException If the term is renamed to the name of another term, or its
@@ -155,6 +156,11 @@ public interface GlossaryOperations {
    * revision. A hidden or missing root throws {@link NoSuchTermException} before comparing the
    * token. A matching no-op preserves the revision and token.
    *
+   * <p>Under an approval policy, a current candidate token continues editing that candidate and
+   * preserves its pending content. A live token starts a proposal from the published definition.
+   * Address an already-published term by its live name until a proposed rename is published. For a
+   * term awaiting first publication use the current candidate name.
+   *
    * <p>The authorization and change-validation rules of {@link #alterTerm(String, TermChange...)}
    * also apply. After a conflict, reload and reconcile the changes before explicitly resubmitting;
    * do not automatically replay a stale replacement list. Implementations that do not support
@@ -165,7 +171,7 @@ public interface GlossaryOperations {
    * @param name The name of the term.
    * @param expectedRevision The required nonblank opaque token from the last read.
    * @param changes The changes to apply.
-   * @return The altered term.
+   * @return The published term or candidate resulting from the request.
    * @throws NoSuchTermException If the term or a referenced term is missing or hidden.
    * @throws TermAlreadyExistsException If a name or source reference conflicts with another term.
    * @throws NotFoundException If a domain to add or remove is missing or is a draft hidden from the
@@ -192,16 +198,18 @@ public interface GlossaryOperations {
    * <ol>
    *   <li>If the term does not exist, or the caller cannot see it, nothing is dropped and the
    *       result is false. Both cases give the same result, so a hidden term stays hidden.
-   *   <li>If the caller can see the term but lacks the required management privilege, a {@link
-   *       ForbiddenException} is thrown. Owning the term with create access does not permit its
-   *       deletion, even after changing its status.
+   *   <li>If the caller can see the term but lacks the required management privilege, or if the
+   *       server publication policy requires approval, a {@link ForbiddenException} is thrown.
+   *       Owning the term with create access does not permit its deletion, even after changing its
+   *       status.
    *   <li>Otherwise the term is dropped, whether draft, approved or deprecated.
    * </ol>
    *
    * @param name The name of the term.
    * @return True if the term was dropped, false if it does not exist or is not visible to the
    *     caller.
-   * @throws ForbiddenException If the caller can see the term but may not drop it.
+   * @throws ForbiddenException If the caller can see the term but may not drop it, or if deletion
+   *     is disabled while the publication policy requires approval.
    */
   boolean dropTerm(String name) throws ForbiddenException;
 

@@ -59,9 +59,9 @@ public interface TermChange {
   }
 
   /**
-   * Creates a change to set the status of the term. In Step 1, an authorized editor can move a term
-   * from any status to any other without approval. This is not an approval decision: Step 2
-   * publication requires its review workflow and cannot be bypassed with this change.
+   * Requests a term status change. The default policy applies it immediately. Under an approval
+   * policy DRAFT saves a private draft and preserves the status that would take effect on
+   * publication. DEPRECATED proposes deprecation and APPROVED is rejected.
    *
    * @param newStatus The new status.
    * @return The term change.

@@ -53,6 +53,16 @@ public interface GlossaryTermMetaMapper {
       @Param("excludedTermId") long excludedTermId,
       @Param("key") String key);
 
+  /** Finds a different live term with the exact external source reference. */
+  @Nullable
+  @SelectProvider(
+      type = GlossaryTermMetaSQLProviderFactory.class,
+      method = "findOtherTermIdBySourceRef")
+  Long findOtherTermIdBySourceRef(
+      @Param("metalakeId") long metalakeId,
+      @Param("excludedTermId") long excludedTermId,
+      @Param("sourceRef") String sourceRef);
+
   /** Locks the live definition, or returns null; the caller must fence its metalake first. */
   @Nullable
   @SelectProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "getForUpdate")
@@ -123,8 +133,10 @@ public interface GlossaryTermMetaMapper {
       @Param("key") @Nullable String key);
 
   /** Reads definition snapshots for one bounded batch of live endpoints. */
-  @SelectProvider(type = GlossaryTermMetaSQLProviderFactory.class, method = "snapshotByIds")
-  List<GlossaryTermSnapshotPO> snapshotByIds(
+  @SelectProvider(
+      type = GlossaryTermMetaSQLProviderFactory.class,
+      method = "selectTermSnapshotsByIds")
+  List<GlossaryTermSnapshotPO> selectTermSnapshotsByIds(
       @Param("metalakeId") long metalakeId,
       @Param("metalakeName") String metalakeName,
       @Param("ids") List<Long> ids);
