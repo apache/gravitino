@@ -45,6 +45,22 @@ public class ArticleUpdatesRequest implements RESTRequest {
   private ArticleUpdateRequest[] updates;
 
   /**
+   * @param changes the mutations in application order
+   * @param expectedRevision the optional revision token
+   * @return a request applying the mutations atomically
+   */
+  public static ArticleUpdatesRequest from(
+      KnowledgeBaseArticleChange[] changes, @Nullable String expectedRevision) {
+    Preconditions.checkArgument(
+        changes != null && changes.length > 0, "updates must contain one or more changes");
+    ArticleUpdatesRequest request = new ArticleUpdatesRequest();
+    request.expectedRevision = expectedRevision;
+    request.updates =
+        Arrays.stream(changes).map(ArticleUpdateRequest::from).toArray(ArticleUpdateRequest[]::new);
+    return request;
+  }
+
+  /**
    * Converts all updates to Article changes in request order.
    *
    * @return the ordered changes

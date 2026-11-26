@@ -27,7 +27,7 @@ import org.apache.gravitino.kb.ArticleTermBinding;
 
 /** The name and current publication status of a visible bound Term. */
 @Getter
-public class ArticleTermDTO {
+public class ArticleTermDTO implements ArticleTermBinding {
   private final String name;
 
   @JsonSerialize(using = ToStringSerializer.class)
@@ -54,5 +54,17 @@ public class ArticleTermDTO {
    */
   public static ArticleTermDTO from(ArticleTermBinding term) {
     return new ArticleTermDTO(term.name(), term.status());
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String name() {
+    return name;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public ArticleTermBinding.Status status() {
+    return status;
   }
 }

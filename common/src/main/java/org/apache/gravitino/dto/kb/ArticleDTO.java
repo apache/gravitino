@@ -31,11 +31,14 @@ import javax.annotation.Nullable;
 import lombok.Getter;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.authorization.OwnerDTO;
+import org.apache.gravitino.kb.ArticleObjectIdentifier;
 import org.apache.gravitino.kb.ArticleStatus;
+import org.apache.gravitino.kb.ArticleTermBinding;
+import org.apache.gravitino.kb.KnowledgeBaseArticle;
 
 /** Current Article metadata, including bounded previews of the caller's visible bindings. */
 @Getter
-public class ArticleDTO {
+public class ArticleDTO implements KnowledgeBaseArticle {
   private final String name;
   private final String title;
 
@@ -112,5 +115,100 @@ public class ArticleDTO {
     this.owner = owner;
     this.revisionToken = revisionToken;
     this.auditInfo = auditInfo;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String name() {
+    return name;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String title() {
+    return title;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public ArticleStatus status() {
+    return status;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String[] domains() {
+    return domains.toArray(new String[0]);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @Nullable
+  public OwnerDTO owner() {
+    return owner;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public AuditDTO auditInfo() {
+    return auditInfo;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public ArticleTermBinding[] terms() {
+    return terms.toArray(new ArticleTermBinding[0]);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public boolean termsHasMore() {
+    return termsHasMore;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @Nullable
+  public String comment() {
+    return comment;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String[] synonyms() {
+    return synonyms.toArray(new String[0]);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @Nullable
+  public String sourceReference() {
+    return sourceReference;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Map<String, String> properties() {
+    return properties;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public ArticleObjectIdentifier[] objects() {
+    return objects.stream()
+        .map(ArticleObjectDTO::toIdentifier)
+        .toArray(ArticleObjectIdentifier[]::new);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public boolean objectsHasMore() {
+    return objectsHasMore;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String revisionToken() {
+    return revisionToken;
   }
 }

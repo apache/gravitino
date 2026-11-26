@@ -62,6 +62,67 @@ public interface ArticleUpdateRequest {
    */
   KnowledgeBaseArticleChange toChange();
 
+  /**
+   * @param change an Article mutation
+   * @return the corresponding REST update
+   */
+  static ArticleUpdateRequest from(KnowledgeBaseArticleChange change) {
+    Preconditions.checkArgument(change != null, "Article change must not be null");
+    if (change instanceof KnowledgeBaseArticleChange.UpdateTitle) {
+      return new UpdateTitle(((KnowledgeBaseArticleChange.UpdateTitle) change).getNewTitle());
+    }
+    if (change instanceof KnowledgeBaseArticleChange.UpdateBody) {
+      return new UpdateBody(
+          ArticleBodyDTO.from(((KnowledgeBaseArticleChange.UpdateBody) change).getNewBody()));
+    }
+    if (change instanceof KnowledgeBaseArticleChange.UpdateDomains) {
+      return new UpdateDomains(((KnowledgeBaseArticleChange.UpdateDomains) change).getNewDomains());
+    }
+    if (change instanceof KnowledgeBaseArticleChange.UpdateStatus) {
+      return new UpdateStatus(
+          ((KnowledgeBaseArticleChange.UpdateStatus) change).getNewStatus().name());
+    }
+    if (change instanceof KnowledgeBaseArticleChange.UpdateComment) {
+      return new UpdateComment(((KnowledgeBaseArticleChange.UpdateComment) change).getNewComment());
+    }
+    if (change instanceof KnowledgeBaseArticleChange.UpdateSynonyms) {
+      return new UpdateSynonyms(
+          ((KnowledgeBaseArticleChange.UpdateSynonyms) change).getNewSynonyms());
+    }
+    if (change instanceof KnowledgeBaseArticleChange.UpdateSourceReference) {
+      return new UpdateSourceReference(
+          ((KnowledgeBaseArticleChange.UpdateSourceReference) change).getNewSourceReference());
+    }
+    if (change instanceof KnowledgeBaseArticleChange.SetProperty) {
+      KnowledgeBaseArticleChange.SetProperty update =
+          (KnowledgeBaseArticleChange.SetProperty) change;
+      return new SetProperty(update.getProperty(), update.getValue());
+    }
+    if (change instanceof KnowledgeBaseArticleChange.RemoveProperty) {
+      return new RemoveProperty(((KnowledgeBaseArticleChange.RemoveProperty) change).getProperty());
+    }
+    if (change instanceof KnowledgeBaseArticleChange.AddTerms) {
+      return new AddTerms(
+          ((KnowledgeBaseArticleChange.AddTerms) change).getTerms().toArray(new String[0]));
+    }
+    if (change instanceof KnowledgeBaseArticleChange.RemoveTerms) {
+      return new RemoveTerms(
+          ((KnowledgeBaseArticleChange.RemoveTerms) change).getTerms().toArray(new String[0]));
+    }
+    if (change instanceof KnowledgeBaseArticleChange.AddObjects) {
+      return new AddObjects(
+          ArticleObjectDTO.fromIdentifiers(
+              ((KnowledgeBaseArticleChange.AddObjects) change).getObjects()));
+    }
+    if (change instanceof KnowledgeBaseArticleChange.RemoveObjects) {
+      return new RemoveObjects(
+          ArticleObjectDTO.fromIdentifiers(
+              ((KnowledgeBaseArticleChange.RemoveObjects) change).getObjects()));
+    }
+    throw new IllegalArgumentException(
+        "Unsupported Article change: " + change.getClass().getName());
+  }
+
   /** Replaces the display title. */
   class UpdateTitle implements ArticleUpdateRequest {
     @JsonProperty("newTitle")

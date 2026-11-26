@@ -91,6 +91,26 @@ public class ArticleCreateRequest implements RESTRequest {
   private Map<String, String> properties = Collections.emptyMap();
 
   /**
+   * @param create the Article to create, including its initial bindings
+   * @return the corresponding REST request
+   */
+  public static ArticleCreateRequest from(ArticleCreate create) {
+    ArticleCreateRequest request = new ArticleCreateRequest();
+    request.name = create.name();
+    request.title = create.title();
+    request.body = ArticleBodyDTO.from(create.body());
+    request.status = create.status() == null ? null : create.status().name();
+    request.domains = create.domains().toArray(new String[0]);
+    request.terms = create.terms().toArray(new String[0]);
+    request.objects = ArticleObjectDTO.fromIdentifiers(create.objects());
+    request.comment = create.comment();
+    request.synonyms = create.synonyms().toArray(new String[0]);
+    request.sourceReference = create.sourceReference();
+    request.properties = create.properties();
+    return request;
+  }
+
+  /**
    * Creates a validated Article specification.
    *
    * @return the initial Article fields and bindings

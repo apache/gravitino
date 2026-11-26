@@ -34,10 +34,11 @@ import org.apache.gravitino.dto.authorization.OwnerDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.kb.ArticleStatus;
 import org.apache.gravitino.kb.ArticleSummary;
+import org.apache.gravitino.kb.ArticleTermBinding;
 
 /** The fields returned for one visible Knowledge Base Article in a list. */
 @Getter
-public class ArticleSummaryDTO {
+public class ArticleSummaryDTO implements ArticleSummary {
   private final String name;
   private final String title;
 
@@ -95,5 +96,54 @@ public class ArticleSummaryDTO {
             .collect(ImmutableList.toImmutableList()),
         summary.termsHasMore(),
         DTOConverters.toDTO(summary.auditInfo()));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String name() {
+    return name;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String title() {
+    return title;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public ArticleStatus status() {
+    return status;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String[] domains() {
+    return domains.toArray(new String[0]);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @Nullable
+  public OwnerDTO owner() {
+    return owner;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public AuditDTO auditInfo() {
+    return auditInfo;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public ArticleTermBinding[] terms() {
+    return terms.toArray(new ArticleTermBinding[0]);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public boolean termsHasMore() {
+    return termsHasMore;
   }
 }

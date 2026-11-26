@@ -26,6 +26,7 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.OAuth2ErrorResponse;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
+import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
 import org.apache.gravitino.exceptions.BackingTagAlreadyBoundException;
 import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
@@ -45,6 +46,7 @@ import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.IllegalStatisticNameException;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
+import org.apache.gravitino.exceptions.KnowledgeBaseArticleAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
@@ -57,6 +59,7 @@ import org.apache.gravitino.exceptions.NoSuchFunctionException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
+import org.apache.gravitino.exceptions.NoSuchKnowledgeBaseArticleException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -70,6 +73,7 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
@@ -92,6 +96,7 @@ import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
+import org.apache.gravitino.exceptions.UnapprovedTermException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
@@ -245,6 +250,11 @@ public class ErrorHandlers {
    */
   public static Consumer<ErrorResponse> domainErrorHandler() {
     return DomainErrorHandler.INSTANCE;
+  }
+
+  /** Returns the error handler for Knowledge Base Article operations. */
+  static Consumer<ErrorResponse> articleErrorHandler() {
+    return ArticleErrorHandler.INSTANCE;
   }
 
   /**
@@ -1108,6 +1118,61 @@ public class ErrorHandlers {
         default:
           super.accept(errorResponse);
       }
+    }
+  }
+
+  /** Maps Article REST errors to the public Article API exceptions. */
+  private static class ArticleErrorHandler extends RestErrorHandler {
+    private static final ArticleErrorHandler INSTANCE = new ArticleErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse response) {
+      String message = formatErrorMessage(response);
+      String type = response.getType();
+      switch (response.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(message);
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (NoSuchKnowledgeBaseArticleException.class.getSimpleName().equals(type)) {
+            throw new NoSuchKnowledgeBaseArticleException("%s", message);
+          }
+          if (NoSuchTermException.class.getSimpleName().equals(type)) {
+            throw new NoSuchTermException("%s", message);
+          }
+          if (NoSuchDomainException.class.getSimpleName().equals(type)) {
+            throw new NoSuchDomainException("%s", message);
+          }
+          if (NoSuchMetadataObjectException.class.getSimpleName().equals(type)) {
+            throw new NoSuchMetadataObjectException("%s", message);
+          }
+          if (NoSuchMetalakeException.class.getSimpleName().equals(type)) {
+            throw new NoSuchMetalakeException("%s", message);
+          }
+          throw new NotFoundException("%s", message);
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          if (KnowledgeBaseArticleAlreadyExistsException.class.getSimpleName().equals(type)) {
+            throw new KnowledgeBaseArticleAlreadyExistsException("%s", message);
+          }
+          throw new AlreadyExistsException("%s", message);
+        case ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE:
+          if (ArticleRevisionConflictException.class.getSimpleName().equals(type)) {
+            throw new ArticleRevisionConflictException("%s", message);
+          }
+          break;
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          if (UnapprovedTermException.class.getSimpleName().equals(type)) {
+            throw new UnapprovedTermException("%s", message);
+          }
+          break;
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (MetalakeNotInUseException.class.getSimpleName().equals(type)) {
+            throw new MetalakeNotInUseException("%s", message);
+          }
+          throw new NotInUseException("%s", message);
+        default:
+          break;
+      }
+      super.accept(response);
     }
   }
 

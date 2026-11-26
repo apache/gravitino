@@ -140,6 +140,7 @@ import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.SupportsJobs;
+import org.apache.gravitino.kb.KnowledgeBaseArticleOperations;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.policy.PolicyChange;
@@ -183,6 +184,7 @@ public class GravitinoMetalake extends MetalakeDTO
   private static final String BLANK_PLACEHOLDER = "";
 
   private final RESTClient restClient;
+  private final KnowledgeBaseArticleOperations articleOperations;
   private final MetadataObjectRoleOperations metadataObjectRoleOperations;
   private final MetadataObjectSecretOperations metadataObjectSecretOperations;
 
@@ -195,11 +197,18 @@ public class GravitinoMetalake extends MetalakeDTO
       RESTClient restClient) {
     super(name, comment, properties, auditDTO, owner);
     this.restClient = restClient;
+    this.articleOperations = new ArticleOperations(name, restClient);
     MetadataObject metalakeObject = MetadataObjects.of(null, name, MetadataObject.Type.METALAKE);
     this.metadataObjectRoleOperations =
         new MetadataObjectRoleOperations(name, metalakeObject, restClient);
     this.metadataObjectSecretOperations =
         new MetadataObjectSecretOperations(name, metalakeObject, restClient);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public KnowledgeBaseArticleOperations articleOperations() {
+    return articleOperations;
   }
 
   /**

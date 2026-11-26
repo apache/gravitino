@@ -53,4 +53,11 @@ public class ArticleListResponse extends BaseResponse {
     this.articles = ImmutableList.copyOf(articles);
     this.hasMore = hasMore;
   }
+
+  /**
+   * @return the page of Article summaries and its continuation flag
+   */
+  public ArticlePage toPage() {
+    return ArticlePage.of(ImmutableList.copyOf(articles), hasMore);
+  }
 }

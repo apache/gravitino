@@ -19,6 +19,9 @@
 
 package org.apache.gravitino.exceptions;
 
+import com.google.errorprone.annotations.FormatMethod;
+import com.google.errorprone.annotations.FormatString;
+
 /** A visible Glossary Term cannot accept a new Article binding in its current status. */
 public class UnapprovedTermException extends GravitinoRuntimeException {
   /**
@@ -28,5 +31,16 @@ public class UnapprovedTermException extends GravitinoRuntimeException {
    */
   public UnapprovedTermException(String term) {
     super("Term %s must be APPROVED before it can be bound to an Article", term);
+  }
+
+  /**
+   * Creates an exception with the reported detail message.
+   *
+   * @param message the detail message
+   * @param args arguments for the message
+   */
+  @FormatMethod
+  public UnapprovedTermException(@FormatString String message, Object... args) {
+    super(message, args);
   }
 }

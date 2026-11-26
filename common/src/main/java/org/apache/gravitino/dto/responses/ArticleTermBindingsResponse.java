@@ -51,4 +51,11 @@ public class ArticleTermBindingsResponse extends BaseResponse {
     this.terms = ImmutableList.copyOf(terms);
     this.hasMore = hasMore;
   }
+
+  /**
+   * @return the page of Term bindings and its continuation flag
+   */
+  public TermBindingPage toPage() {
+    return new TermBindingPage(ImmutableList.copyOf(terms), hasMore);
+  }
 }

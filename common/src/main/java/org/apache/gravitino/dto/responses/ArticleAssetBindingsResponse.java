@@ -52,4 +52,15 @@ public class ArticleAssetBindingsResponse extends BaseResponse {
     this.objects = ImmutableList.copyOf(objects);
     this.hasMore = hasMore;
   }
+
+  /**
+   * @return the page of structured asset identifiers and its continuation flag
+   */
+  public AssetBindingPage toPage() {
+    return new AssetBindingPage(
+        objects.stream()
+            .map(ArticleObjectDTO::toIdentifier)
+            .collect(ImmutableList.toImmutableList()),
+        hasMore);
+  }
 }

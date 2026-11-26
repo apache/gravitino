@@ -51,4 +51,11 @@ public class ArticleContentResponse extends BaseResponse {
     this.body = body;
     this.revisionToken = revisionToken;
   }
+
+  /**
+   * @return the stored body and the corresponding revision token
+   */
+  public ArticleContent toContent() {
+    return new ArticleContent(body.toBody(), revisionToken);
+  }
 }

@@ -73,6 +73,14 @@ public class ArticleObjectDTO {
   }
 
   /**
+   * @param objects the asset identifiers in request order
+   * @return their structured wire representations
+   */
+  public static ArticleObjectDTO[] fromIdentifiers(List<ArticleObjectIdentifier> objects) {
+    return objects.stream().map(ArticleObjectDTO::from).toArray(ArticleObjectDTO[]::new);
+  }
+
+  /**
    * Converts an array of asset references for a create or binding edit.
    *
    * @param objects the structured references
