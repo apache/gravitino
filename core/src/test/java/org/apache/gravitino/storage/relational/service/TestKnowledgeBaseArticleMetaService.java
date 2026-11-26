@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.storage.relational.service;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -46,6 +47,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
@@ -53,17 +57,23 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.kb.ArticleBody;
 import org.apache.gravitino.kb.KnowledgeBaseArticleEntity;
 import org.apache.gravitino.kb.KnowledgeBaseArticleEntity.Binding;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper;
+import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper.MemberType;
 import org.apache.gravitino.storage.relational.mapper.KnowledgeBaseArticleMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.po.KnowledgeBaseArticlePO;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.ExpectedRevision;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.NameConflictException;
+import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.StoredContent;
+import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.TransactionHook;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -118,6 +128,108 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
         List.of(second, entity),
         backend.batchGet(
             List.of(second.nameIdentifier(), NameIdentifier.of("lake", "absent"), nfd), TYPE));
+  }
+
+  @TestTemplate
+  void testSupplementaryCharactersInArticleBody() throws IOException {
+    createAndInsertMakeLake("lake");
+    var markdown = ArticleBody.of(ArticleBody.Format.MARKDOWN, "a😀b");
+    var original = article(31, "guide").toBuilder().withBodyUpdate(markdown).build();
+    var ident = original.nameIdentifier();
+    STORE.insert(original, false);
+    assertEquals(markdown, STORE.getContent(ident).body());
+
+    var html = ArticleBody.of(ArticleBody.Format.HTML, "<p>𠀀😀</p>");
+    STORE.update(
+        ident,
+        (KnowledgeBaseArticleEntity current) -> current.toBuilder().withBodyUpdate(html).build());
+    assertEquals(html, STORE.getContent(ident).body());
+  }
+
+  @TestTemplate
+  void testNullCharacterMetadataRejectedOnInsertAndUpdate() throws IOException {
+    createAndInsertMakeLake("lake");
+    var original = article(31, "guide");
+    var fresh = article(32, "other");
+    STORE.insert(original, false);
+    String invalid = "a\0b";
+    for (var edit :
+        List.<UnaryOperator<KnowledgeBaseArticleEntity>>of(
+            a -> a.toBuilder().withTitle(invalid).build(),
+            a -> a.toBuilder().withComment(invalid).build(),
+            a -> a.toBuilder().withSourceReference(invalid).build())) {
+      var createError =
+          assertThrows(
+              IllegalArgumentException.class, () -> STORE.insert(edit.apply(fresh), false));
+      assertTrue(createError.getMessage().contains("U+0000"));
+      var editError =
+          assertThrows(
+              IllegalArgumentException.class, () -> STORE.update(original.nameIdentifier(), edit));
+      assertEquals(createError.getMessage(), editError.getMessage());
+    }
+    assertFalse(backend.exists(fresh.nameIdentifier(), TYPE));
+    assertEquals(original, STORE.get(original.nameIdentifier()));
+  }
+
+  @TestTemplate
+  void testStoredNullCharacterMetadataCanBeRepaired() throws Exception {
+    assumeFalse("postgresql".equals(backendType), "PostgreSQL text columns cannot store U+0000");
+    createAndInsertMakeLake("lake");
+    var original = article(31, "guide");
+    STORE.insert(original, false);
+    String legacy = "a\0b";
+    try (var session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        var statement =
+            session
+                .getConnection()
+                .prepareStatement(
+                    "UPDATE kb_article_meta SET title=?, article_comment=?, source_reference=? WHERE article_id=?")) {
+      statement.setString(1, legacy);
+      statement.setString(2, legacy);
+      statement.setString(3, legacy);
+      statement.setLong(4, original.id());
+      assertEquals(1, statement.executeUpdate());
+    }
+    var name = original.nameIdentifier();
+    var stored = STORE.get(name);
+    assertEquals(legacy, stored.title());
+    assertEquals(legacy, stored.comment());
+    assertEquals(legacy, stored.sourceReference());
+    STORE.update(
+        name,
+        (KnowledgeBaseArticleEntity current) -> current.toBuilder().withTitle("Guide").build());
+    String reference = "literal \\u0000";
+    STORE.update(
+        name,
+        (KnowledgeBaseArticleEntity current) ->
+            current.toBuilder().withComment(null).withSourceReference(reference).build());
+    var repaired = STORE.get(name);
+    assertEquals("Guide", repaired.title());
+    assertNull(repaired.comment());
+    assertEquals(reference, repaired.sourceReference());
+    assertEquals(3, repaired.revision());
+  }
+
+  @TestTemplate
+  void testNullCharacterBodyUpdatePreservesStoredContent() throws IOException {
+    createAndInsertMakeLake("lake");
+    var article = article(31, "guide");
+    STORE.insert(article, false);
+    var name = article.nameIdentifier();
+    var before = STORE.getContent(name);
+    var error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                STORE.update(
+                    name,
+                    (KnowledgeBaseArticleEntity current) ->
+                        current.toBuilder()
+                            .withBodyUpdate(ArticleBody.of(ArticleBody.Format.MARKDOWN, "a\0b"))
+                            .build()));
+    assertTrue(error.getMessage().contains("U+0000"));
+    assertEquals(before, STORE.getContent(name));
   }
 
   @TestTemplate
@@ -236,6 +348,128 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testLocalizedMySQLInsertConflicts() throws Exception {
+    assumeTrue("mysql".equals(backendType), "lc_messages is a MySQL session setting");
+    createAndInsertMakeLake("lake");
+    STORE.insert(article(71, "guide"), false);
+    SessionUtils.beginTransaction();
+    try (Statement sql = SqlSessions.currentConnection().createStatement()) {
+      sql.execute("SET @original_locale = @@SESSION.lc_messages");
+      try {
+        sql.execute("SET SESSION lc_messages = 'de_DE'");
+        assertThrows(NameConflictException.class, () -> STORE.insert(article(72, "guide"), false));
+        var duplicateId =
+            assertThrowsExactly(
+                EntityAlreadyExistsException.class,
+                () -> STORE.insert(article(71, "other"), false));
+        assertTrue(duplicateId.getMessage().contains("Article ID 71"));
+      } finally {
+        sql.execute("SET SESSION lc_messages = @original_locale");
+      }
+    } finally {
+      SessionUtils.rollbackTransaction();
+    }
+  }
+
+  @TestTemplate
+  void testLocalizedPostgreSQLInsertConflicts() throws Exception {
+    assumeTrue("postgresql".equals(backendType));
+    // The PostgreSQL 13 image includes German translations but only generates the English locale.
+    var locale =
+        ContainerSuite.getInstance()
+            .getPostgreSQLContainer()
+            .executeInContainer(
+                "localedef", "--no-archive", "-i", "de_DE", "-f", "UTF-8", "de_DE.utf8");
+    assertEquals(0, locale.getExitCode(), locale.getStderr());
+    createAndInsertMakeLake("lake");
+    STORE.insert(article(71, "guide"), false);
+    SessionUtils.beginTransaction();
+    try (Statement sql = SqlSessions.currentConnection().createStatement()) {
+      sql.execute("SET LOCAL lc_messages = 'de_DE.utf8'");
+      assertAll(
+          () ->
+              assertThrowsExactly(
+                  NameConflictException.class, () -> STORE.insert(article(72, "guide"), false)),
+          () ->
+              assertThrowsExactly(
+                  EntityAlreadyExistsException.class,
+                  () -> STORE.insert(article(71, "other"), false)));
+      sql.execute("CREATE UNIQUE INDEX test_unique_title ON kb_article_meta (title)");
+      assertThrowsExactly(
+          PersistenceException.class, () -> STORE.insert(article(73, "third"), false));
+    } finally {
+      SessionUtils.rollbackTransaction();
+    }
+  }
+
+  @TestTemplate
+  void testConcurrentOverwriteUsesWinningInsertIdentity() throws IOException {
+    assumeFalse("h2".equals(backendType), "H2 serializes these writers on the parent row");
+    createAndInsertMakeLake("lake");
+    var store = RelationalEntityStore.forOfflineMigration(backend, new Config(false) {});
+    for (boolean sameId : List.of(true, false)) {
+      var requested = article(sameId ? 71 : 72, sameId ? "guide" : "another");
+      var peer = requested.toBuilder().withId(sameId ? 71L : 73L).withTitle("Peer").build();
+      AtomicInteger reads = new AtomicInteger();
+      try (MockedStatic<SessionUtils> timing =
+          interleaveArticleReads(
+              () -> {},
+              () -> {
+                if (reads.incrementAndGet() == 1) {
+                  STORE.insert(peer, false);
+                }
+              })) {
+        if (sameId) {
+          store.put(requested, true);
+        } else {
+          assertThrows(NameConflictException.class, () -> store.put(requested, true));
+        }
+      }
+      var stored = STORE.get(requested.nameIdentifier());
+      assertEquals(peer.id(), stored.id());
+      assertEquals(sameId ? requested.title() : peer.title(), stored.title());
+      assertEquals(sameId ? 2L : 1L, stored.revision());
+    }
+  }
+
+  @TestTemplate
+  void testOverwriteWithSameIdAtAnotherNamePreservesConflict() throws IOException {
+    createAndInsertMakeLake("lake");
+    var original = article(71, "guide");
+    STORE.insert(original, false);
+    var other = article(71, "other");
+    var conflict =
+        assertThrowsExactly(
+            EntityAlreadyExistsException.class,
+            () -> STORE.insert(other, true, (before, after) -> fail("Unexpected overwrite hook")));
+    assertTrue(conflict.getMessage().contains("Article ID 71"));
+    assertFalse(backend.exists(other.nameIdentifier(), TYPE));
+    assertEquals(1L, STORE.get(original.nameIdentifier()).revision());
+  }
+
+  @TestTemplate
+  void testCallerRetriesConcurrentOverwriteAfterTransactionEnds() throws IOException {
+    assumeFalse("h2".equals(backendType), "H2 serializes these writers on the parent row");
+    createAndInsertMakeLake("lake");
+    var requested = article(71, "guide");
+    var peer = requested.toBuilder().withTitle("Peer").build();
+    AtomicInteger hooks = new AtomicInteger();
+    SessionUtils.beginTransaction();
+    try (MockedStatic<SessionUtils> timing =
+        interleaveArticleReads(() -> {}, () -> STORE.insert(peer, false))) {
+      assertThrows(
+          EntityAlreadyExistsException.class,
+          () -> STORE.insert(requested, true, (before, after) -> hooks.incrementAndGet()));
+      assertEquals(0, hooks.get());
+    } finally {
+      SessionUtils.rollbackTransaction();
+    }
+    STORE.insert(requested, true, (before, after) -> hooks.incrementAndGet());
+    assertEquals(1, hooks.get());
+    assertEquals(requested.title(), STORE.get(requested.nameIdentifier()).title());
+  }
+
+  @TestTemplate
   void testDuplicateBindingInHookPreservesFailureAndRollsBack() throws IOException {
     long lake = createAndInsertMakeLake("lake").id();
     var initial = article(31, "guide");
@@ -266,6 +500,107 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
         List.of(),
         SessionUtils.getWithoutCommit(
             KnowledgeBaseArticleMapper.class, m -> m.bindings(initial.id())));
+  }
+
+  @TestTemplate
+  void testBeforeChangeReadsLockedBodyAndBindings() throws IOException {
+    long lake = createAndInsertMakeLake("lake").id();
+    var original = article(11, "guide");
+    var ident = original.nameIdentifier();
+    List<StoredContent> captured = new ArrayList<>();
+    List<Set<Binding>> bindings = new ArrayList<>();
+    TransactionHook hook =
+        new TransactionHook() {
+          @Override
+          public void beforeChange(
+              KnowledgeBaseArticleEntity before, KnowledgeBaseArticleEntity after) {
+            assertNull(before.bodyUpdate());
+            var current = STORE.get(before.nameIdentifier());
+            assertEquals(before.bindings(), current.bindings());
+            bindings.add(current.bindings());
+            captured.add(STORE.getContent(before.nameIdentifier()));
+          }
+
+          @Override
+          public void onChange(
+              KnowledgeBaseArticleEntity before, KnowledgeBaseArticleEntity after) {}
+        };
+    STORE.insert(original, false, hook);
+    STORE.update(ident, null, current -> current, hook);
+    assertTrue(captured.isEmpty());
+
+    var updatedBody = ArticleBody.of(ArticleBody.Format.MARKDOWN, "Updated");
+    STORE.update(
+        ident,
+        null,
+        current ->
+            current.toBuilder().withBodyUpdate(updatedBody).withBindings(Set.of(TERM)).build(),
+        hook);
+    assertEquals(updatedBody, STORE.getContent(ident).body());
+    var overwrittenBody = ArticleBody.of(ArticleBody.Format.HTML, "<p>Overwritten</p>");
+    STORE.insert(
+        original.toBuilder().withBodyUpdate(overwrittenBody).withBindings(Set.of(TABLE)).build(),
+        true,
+        hook);
+    assertTrue(STORE.delete(ident, hook));
+    assertFalse(STORE.delete(ident, hook));
+    assertThrows(NoSuchEntityException.class, () -> STORE.getContent(ident));
+    assertEquals(List.of(original.bindings(), Set.of(TERM), Set.of(TABLE)), bindings);
+    assertEquals(
+        List.of(
+            new StoredContent(original.bodyUpdate(), new ExpectedRevision(lake, original.id(), 1)),
+            new StoredContent(updatedBody, new ExpectedRevision(lake, original.id(), 2)),
+            new StoredContent(overwrittenBody, new ExpectedRevision(lake, original.id(), 3))),
+        captured);
+  }
+
+  @TestTemplate
+  void testUpdateConflictsWhenBeforeChangeDeletesArticle() throws IOException {
+    assertBeforeChangeConflict(ident -> assertTrue(STORE.delete(ident)));
+  }
+
+  @TestTemplate
+  void testUpdateConflictsWhenBeforeChangeEditsArticle() throws IOException {
+    assertBeforeChangeConflict(
+        ident ->
+            STORE.update(
+                ident,
+                (KnowledgeBaseArticleEntity current) ->
+                    current.toBuilder().withTitle("Inner edit").build()));
+  }
+
+  @TestTemplate
+  void testBeforeChangeFailureRollsBackExtensionWrite() throws IOException {
+    createAndInsertMakeLake("lake");
+    var original = article(11, "guide");
+    var marker = article(12, "marker");
+    STORE.insert(original, false);
+    STORE.insert(marker, false);
+    var ident = original.nameIdentifier();
+    var initialContent = STORE.getContent(ident);
+    var failure = new IllegalStateException("Cannot save old content");
+    TransactionHook hook =
+        new TransactionHook() {
+          @Override
+          public void beforeChange(
+              KnowledgeBaseArticleEntity before, KnowledgeBaseArticleEntity after) {
+            STORE.update(
+                marker.nameIdentifier(),
+                (KnowledgeBaseArticleEntity current) ->
+                    current.toBuilder().withTitle("Extension write").build());
+            throw failure;
+          }
+
+          @Override
+          public void onChange(
+              KnowledgeBaseArticleEntity before, KnowledgeBaseArticleEntity after) {
+            fail("Write continued after beforeChange failed");
+          }
+        };
+    assertSame(failure, assertThrows(IllegalStateException.class, () -> STORE.delete(ident, hook)));
+    assertEquals(initialContent, STORE.getContent(ident));
+    assertEquals(original.bindings(), STORE.get(ident).bindings());
+    assertEquals(marker.title(), STORE.get(marker.nameIdentifier()).title());
   }
 
   @TestTemplate
@@ -343,6 +678,75 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
             KnowledgeBaseArticleMapper.class, m -> m.summaries(lake).get(0));
     assertEquals("New title", summary.getTitle());
     assertNull(summary.getBodyContent());
+  }
+
+  @TestTemplate
+  void testFailedEditDiscardsOnlyItsAfterCommitCallbacks() throws IOException {
+    createAndInsertMakeLake("lake");
+    var article = article(11, "guide");
+    STORE.insert(article, false);
+    List<String> events = new ArrayList<>();
+    var failure = new IllegalStateException("extension failed");
+    SessionUtils.doMultipleWithCommit(
+        () -> {
+          SqlSessions.afterCommit(() -> events.add("before edit"));
+          assertSame(
+              failure,
+              assertThrows(
+                  IllegalStateException.class,
+                  () ->
+                      STORE.update(
+                          article.nameIdentifier(),
+                          null,
+                          current -> current.toBuilder().withTitle("new title").build(),
+                          (before, after) -> {
+                            SqlSessions.afterCommit(() -> events.add("failed edit"));
+                            throw failure;
+                          })));
+          SqlSessions.afterCommit(() -> events.add("after edit"));
+          assertTrue(events.isEmpty());
+        });
+    var stored = STORE.get(article.nameIdentifier());
+    assertEquals(article.title(), stored.title());
+    assertEquals(1, stored.revision());
+    assertEquals(List.of("before edit", "after edit"), events);
+  }
+
+  @TestTemplate
+  void testOuterSavepointRollbackDiscardsSuccessfulNestedEditCallback() throws IOException {
+    createAndInsertMakeLake("lake");
+    var article = article(11, "guide");
+    STORE.insert(article, false);
+    var name = article.nameIdentifier();
+    List<String> events = new ArrayList<>();
+    var failure = new IllegalStateException("outer operation failed");
+    SessionUtils.doMultipleWithCommit(
+        () -> {
+          assertSame(
+              failure,
+              assertThrows(
+                  IllegalStateException.class,
+                  () ->
+                      SqlSessions.withSavepoint(
+                          () -> {
+                            STORE.update(
+                                name,
+                                null,
+                                current -> current.toBuilder().withTitle("discarded").build(),
+                                (before, after) ->
+                                    SqlSessions.afterCommit(() -> events.add(after.title())));
+                            throw failure;
+                          })));
+          assertEquals(article.title(), STORE.get(name).title());
+          STORE.update(
+              name,
+              null,
+              current -> current.toBuilder().withTitle("retained").build(),
+              (before, after) -> SqlSessions.afterCommit(() -> events.add(after.title())));
+          assertTrue(events.isEmpty());
+        });
+    assertEquals(List.of("retained"), events);
+    assertEquals(2, STORE.get(name).revision());
   }
 
   @TestTemplate
@@ -502,6 +906,130 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testDeleteAndGetReturnsTheArticleSelectedByDelete() throws IOException {
+    createAndInsertMakeLake("lake");
+    var original = article(71, "guide");
+    var ident = original.nameIdentifier();
+    STORE.insert(original, false);
+    var store = RelationalEntityStore.forOfflineMigration(backend, new Config(false) {});
+    // Recreate the name just before the delete opens its transaction, after any standalone get.
+    try (MockedStatic<SessionUtils> timing =
+        Mockito.mockStatic(
+            SessionUtils.class,
+            invocation -> {
+              if (invocation.getMethod().getName().equals("doWithCommitAndFetchResult")
+                  && invocation.getArgument(0) == KnowledgeBaseArticleMapper.class) {
+                assertTimeoutPreemptively(
+                    Duration.ofSeconds(15),
+                    () -> {
+                      assertTrue(STORE.delete(ident));
+                      STORE.insert(article(72, "guide"), false);
+                    });
+              }
+              return invocation.callRealMethod();
+            })) {
+      var deleted = store.deleteAndGet(ident, TYPE, KnowledgeBaseArticleEntity.class).orElseThrow();
+      assertEquals(72L, deleted.id());
+    }
+    assertFalse(store.exists(ident, TYPE));
+  }
+
+  @TestTemplate
+  void testDeleteAndGetPropagatesMissingDomain() throws IOException {
+    long lake = createAndInsertMakeLake("lake").id();
+    var article = article(71, "guide");
+    var ident = article.nameIdentifier();
+    STORE.insert(article, false);
+    long missingDomain = 72;
+    SessionUtils.doWithCommit(
+        DomainMemberMapper.class,
+        m -> m.add(lake, MemberType.KNOWLEDGE_BASE_ARTICLE, article.id(), missingDomain, "{}"));
+    var store = RelationalEntityStore.forOfflineMigration(backend, new Config(false) {});
+    var failure =
+        assertThrows(
+            NoSuchEntityException.class,
+            () ->
+                store.deleteAndGet(
+                    ident,
+                    TYPE,
+                    KnowledgeBaseArticleEntity.class,
+                    ignored -> fail("Unexpected delete callback")));
+    assertTrue(failure.getMessage().contains("Domain " + missingDomain));
+    var surviving = STORE.get(ident);
+    assertEquals(article.id(), surviving.id());
+    assertEquals(Set.of(missingDomain), surviving.domainIds());
+  }
+
+  @TestTemplate
+  void testDeleteAndGetCallbackUsesDeletedSnapshot() throws IOException {
+    createAndInsertMakeLake("lake");
+    var original = article(71, "guide");
+    var ident = original.nameIdentifier();
+    STORE.insert(original, false);
+    var store = RelationalEntityStore.forOfflineMigration(backend, new Config(false) {});
+    var failure = new NoSuchEntityException("Callback failed");
+    assertSame(
+        failure,
+        assertThrows(
+            NoSuchEntityException.class,
+            () ->
+                store.deleteAndGet(
+                    ident,
+                    TYPE,
+                    KnowledgeBaseArticleEntity.class,
+                    snapshot -> {
+                      assertEquals(original.id(), snapshot.id());
+                      throw failure;
+                    })));
+    assertEquals(original.id(), STORE.get(ident).id());
+
+    AtomicReference<KnowledgeBaseArticleEntity> callback = new AtomicReference<>();
+    var deleted =
+        store
+            .deleteAndGet(ident, TYPE, KnowledgeBaseArticleEntity.class, callback::set)
+            .orElseThrow();
+    assertSame(deleted, callback.get());
+    assertEquals(original.id(), deleted.id());
+    for (NameIdentifier missing : List.of(ident, NameIdentifier.of("missing-lake", "guide"))) {
+      assertTrue(
+          store
+              .deleteAndGet(
+                  missing,
+                  TYPE,
+                  KnowledgeBaseArticleEntity.class,
+                  ignored -> fail("Unexpected callback"))
+              .isEmpty());
+    }
+  }
+
+  @TestTemplate
+  void testDeleteAndGetPreservesReplacementAfterObservation() throws IOException {
+    assumeFalse("h2".equals(backendType), "H2 serializes these writers on the parent row");
+    createAndInsertMakeLake("lake");
+    var initial = article(71, "guide");
+    var ident = initial.nameIdentifier();
+    STORE.insert(initial, false);
+    var store = RelationalEntityStore.forOfflineMigration(backend, new Config(false) {});
+    try (MockedStatic<SessionUtils> timing =
+        interleaveArticleReads(
+            () -> {},
+            () -> {
+              assertTrue(STORE.delete(ident));
+              STORE.insert(article(72, "guide"), false);
+            })) {
+      assertTrue(
+          store
+              .deleteAndGet(
+                  ident,
+                  TYPE,
+                  KnowledgeBaseArticleEntity.class,
+                  ignored -> fail("Unexpected callback"))
+              .isEmpty());
+    }
+    assertEquals(72L, STORE.get(ident).id());
+  }
+
+  @TestTemplate
   void testDeleteLosingTheLockReturnsFalse() throws IOException {
     assumeFalse("h2".equals(backendType), "H2 serializes these writers on the parent row");
     createAndInsertMakeLake("lake");
@@ -557,6 +1085,79 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testRetriedUpdateRejectsSameNameReplacement() throws IOException {
+    assumeFalse("h2".equals(backendType), "H2 serializes these writers on the parent row");
+    createAndInsertMakeLake("lake");
+    var original = article(71, "guide");
+    var replacement = article(72, "guide");
+    var ident = original.nameIdentifier();
+    STORE.insert(original, false);
+    AtomicInteger observations = new AtomicInteger();
+    List<Long> editedIds = new ArrayList<>();
+    try (MockedStatic<SessionUtils> timing =
+        interleaveArticleReads(
+            () -> {
+              if (observations.incrementAndGet() == 2) {
+                assertTrue(STORE.delete(ident));
+                STORE.insert(replacement, false);
+              }
+            },
+            () -> {
+              if (observations.get() == 1) {
+                STORE.update(
+                    ident,
+                    (KnowledgeBaseArticleEntity a) -> a.toBuilder().withTitle("Peer edit").build());
+              }
+            })) {
+      assertThrows(
+          ArticleRevisionConflictException.class,
+          () ->
+              STORE.update(
+                  ident,
+                  (KnowledgeBaseArticleEntity a) -> {
+                    editedIds.add(a.id());
+                    return a.toBuilder().withTitle("Requested edit").build();
+                  }));
+    }
+    assertEquals(List.of(original.id()), editedIds);
+    var actual = STORE.get(ident);
+    assertEquals(replacement.id(), actual.id());
+    assertEquals(replacement.title(), actual.title());
+    assertEquals(1L, actual.revision());
+  }
+
+  @TestTemplate
+  void testDeadlockVictimCannotCommitLaterWrites() throws Exception {
+    assumeTrue("mysql".equals(backendType), "InnoDB rolls back the entire deadlock victim");
+    createAndInsertMakeLake("lake");
+    var first = article(71, "first");
+    var second = article(72, "second");
+    var firstMarker = article(73, "first-marker");
+    var secondMarker = article(74, "second-marker");
+    for (var article : List.of(first, second, firstMarker, secondMarker)) {
+      STORE.insert(article, false);
+    }
+    var firstLocked = new CompletableFuture<Void>();
+    var secondLocked = new CompletableFuture<Void>();
+    var firstCommit =
+        CompletableFuture.supplyAsync(
+            () -> commitWithCompetingEdit(first, second, firstMarker, firstLocked, secondLocked));
+    var secondCommit =
+        CompletableFuture.supplyAsync(
+            () -> commitWithCompetingEdit(second, first, secondMarker, secondLocked, firstLocked));
+    CompletableFuture.allOf(firstCommit, secondCommit).get(30, TimeUnit.SECONDS);
+    assertEquals(!firstCommit.join(), secondCommit.join());
+    var winner = firstCommit.join() ? first : second;
+    var victim = firstCommit.join() ? second : first;
+    var winningMarker = firstCommit.join() ? firstMarker : secondMarker;
+    var losingMarker = firstCommit.join() ? secondMarker : firstMarker;
+    assertEquals("Before", STORE.get(winner.nameIdentifier()).title());
+    assertEquals("After", STORE.get(winningMarker.nameIdentifier()).title());
+    assertEquals(victim.title(), STORE.get(victim.nameIdentifier()).title());
+    assertEquals(losingMarker.title(), STORE.get(losingMarker.nameIdentifier()).title());
+  }
+
+  @TestTemplate
   void testParentLockTimeoutRollsBackOnlyNestedWrite() throws Exception {
     assumeTrue(
         "postgresql".equals(backendType), "PostgreSQL aborts the transaction after a lock timeout");
@@ -601,9 +1202,9 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
         KnowledgeBaseArticleMapper.class,
         mapper -> {
           mapper.deleteBindings(newer.id(), 20);
-          mapper.delete(newer.id(), 20);
+          mapper.delete(newer.id(), newer.revision(), 20);
           mapper.deleteBindings(older.id(), 10);
-          mapper.delete(older.id(), 10);
+          mapper.delete(older.id(), older.revision(), 10);
 
           assertEquals(1, mapper.purgeBindings(21, 1));
           assertEquals(0, mapper.purgeBindings(20, 1));
@@ -650,6 +1251,40 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
     assertEquals(articleAudit, STORE.get(entity.nameIdentifier()).auditInfo());
   }
 
+  private static boolean commitWithCompetingEdit(
+      KnowledgeBaseArticleEntity first,
+      KnowledgeBaseArticleEntity second,
+      KnowledgeBaseArticleEntity marker,
+      CompletableFuture<Void> locked,
+      CompletableFuture<Void> peerLocked) {
+    AtomicReference<RuntimeException> deadlock = new AtomicReference<>();
+    try {
+      SessionUtils.doMultipleWithCommit(
+          () -> {
+            STORE.update(
+                first.nameIdentifier(),
+                (KnowledgeBaseArticleEntity a) -> a.toBuilder().withTitle("Before").build());
+            locked.complete(null);
+            peerLocked.orTimeout(15, TimeUnit.SECONDS).join();
+            try {
+              STORE.update(second.nameIdentifier(), (KnowledgeBaseArticleEntity a) -> a);
+            } catch (RuntimeException e) {
+              assertTrue(ExceptionUtils.hasSqlException(e, Set.of(), Set.of(1213)), e.toString());
+              deadlock.set(e);
+            }
+            STORE.update(
+                marker.nameIdentifier(),
+                (KnowledgeBaseArticleEntity a) -> a.toBuilder().withTitle("After").build());
+          });
+      assertNull(deadlock.get(), "A transaction aborted by InnoDB reported commit success");
+      return true;
+    } catch (IllegalStateException e) {
+      assertTrue(deadlock.get() != null);
+      assertSame(deadlock.get(), e.getCause());
+      return false;
+    }
+  }
+
   // The peer uses its own transaction; both the observation and the later lock still hit the DB.
   private static MockedStatic<SessionUtils> interleaveArticleReads(
       Executable before, Executable after) {
@@ -684,6 +1319,41 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
         return JsonUtils.anyFieldMapper().readValue(rows.getString(1), AuditInfo.class);
       }
     }
+  }
+
+  private void assertBeforeChangeConflict(Consumer<NameIdentifier> change) throws IOException {
+    createAndInsertMakeLake("lake");
+    var original = article(11, "guide");
+    var ident = original.nameIdentifier();
+    STORE.insert(original, false);
+    var initialContent = STORE.getContent(ident);
+    TransactionHook hook =
+        new TransactionHook() {
+          @Override
+          public void beforeChange(
+              KnowledgeBaseArticleEntity before, KnowledgeBaseArticleEntity after) {
+            change.accept(ident);
+          }
+
+          @Override
+          public void onChange(
+              KnowledgeBaseArticleEntity before, KnowledgeBaseArticleEntity after) {
+            fail("onChange ran after the Article changed in beforeChange");
+          }
+        };
+    assertThrows(
+        ArticleRevisionConflictException.class,
+        () ->
+            STORE.update(
+                ident,
+                null,
+                current ->
+                    current.toBuilder().withTitle("Outer edit").withBindings(Set.of()).build(),
+                hook));
+    var restored = STORE.get(ident);
+    assertEquals(original.title(), restored.title());
+    assertEquals(original.bindings(), restored.bindings());
+    assertEquals(initialContent, STORE.getContent(ident));
   }
 
   private static KnowledgeBaseArticleEntity article(long id, String name) {

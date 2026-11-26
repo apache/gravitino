@@ -92,6 +92,7 @@ public class TestPassThroughAuthorizer {
     Assertions.assertFalse(custom.canAccessGlossaryTerm(user, "lake", term, context));
     try (PassThroughAuthorizer passThrough = new PassThroughAuthorizer()) {
       Assertions.assertTrue(passThrough.canAccessGlossaryTerm(user, "lake", term, context));
+      Assertions.assertTrue(passThrough.supportsResolvedTargetAuthorization());
       Assertions.assertTrue(passThrough.isGlossaryTermOwner(user, "lake", 7L, context));
     }
   }

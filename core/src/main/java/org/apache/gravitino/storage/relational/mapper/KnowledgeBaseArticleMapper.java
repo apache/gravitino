@@ -29,6 +29,7 @@ import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.Update;
 
 /** Article row and binding operations on the caller's SQL session. */
@@ -88,53 +89,12 @@ public interface KnowledgeBaseArticleMapper {
   KnowledgeBaseArticlePO ids(@Param("metalake") String metalake, @Param("name") String name);
 
   /** Reads metadata and relations together in a caller's transaction. */
-  @Select(
-      """
-      <script>
-      SELECT a.title, a.status, a.synonyms, a.properties, a.revision, a.article_id AS articleId,
-          m.metalake_id AS metalakeId, a.article_name AS articleName, a.article_comment AS articleComment,
-          a.source_reference AS sourceReference, a.audit_info AS auditInfo, b.target_type AS
-          targetType, b.target_id AS targetId, b.domain_id AS domainId
-      FROM metalake_meta m
-      LEFT JOIN kb_article_meta a ON a.metalake_id=m.metalake_id AND a.deleted_at=0
-      LEFT JOIN (
-        SELECT article_id, target_type, target_id, NULL AS domain_id
-        FROM kb_article_relation_meta WHERE deleted_at=0
-        UNION ALL
-        SELECT member_id, NULL, NULL, domain_id FROM domain_member_rel
-        WHERE member_type='KNOWLEDGE_BASE_ARTICLE' AND deleted_at=0
-      ) b ON b.article_id=a.article_id
-      WHERE m.metalake_name=#{metalake} AND m.deleted_at=0
-      <if test='name != null'>AND a.article_name=#{name}</if>
-      ORDER BY a.article_id
-      </script>
-      """)
+  @SelectProvider(type = KnowledgeBaseArticleLookupSQL.class, method = "joined")
   List<KnowledgeBaseArticlePO> joined(
       @Param("metalake") String metalake, @Param("name") @Nullable String name);
 
   /** Reads metadata and relations for a batch of Articles from the same snapshot. */
-  @Select(
-      """
-      <script>
-      SELECT a.title, a.status, a.synonyms, a.properties, a.revision, a.article_id AS articleId,
-          a.metalake_id AS metalakeId, a.article_name AS articleName, a.article_comment AS articleComment,
-          a.source_reference AS sourceReference, a.audit_info AS auditInfo, b.target_type AS
-          targetType, b.target_id AS targetId, b.domain_id AS domainId
-      FROM kb_article_meta a
-      JOIN metalake_meta m ON m.metalake_id=a.metalake_id
-      LEFT JOIN (
-        SELECT article_id, target_type, target_id, NULL AS domain_id
-        FROM kb_article_relation_meta WHERE deleted_at=0
-        UNION ALL
-        SELECT member_id, NULL, NULL, domain_id FROM domain_member_rel
-        WHERE member_type='KNOWLEDGE_BASE_ARTICLE' AND deleted_at=0
-      ) b ON b.article_id=a.article_id
-      WHERE m.metalake_name=#{metalake} AND m.deleted_at=0 AND a.deleted_at=0
-        AND a.article_name IN
-        <foreach item="name" collection="names" open="(" separator="," close=")">#{name}</foreach>
-      ORDER BY a.article_id
-      </script>
-      """)
+  @SelectProvider(type = KnowledgeBaseArticleLookupSQL.class, method = "joinedBatch")
   List<KnowledgeBaseArticlePO> joinedBatch(
       @Param("metalake") String metalake, @Param("names") List<String> names);
 
@@ -206,7 +166,7 @@ public interface KnowledgeBaseArticleMapper {
       @Param("content") String content,
       @Param("bytes") int bytes);
 
-  /** Updates changed metadata and advances the revision while the Article is locked. */
+  /** Updates the live Article at the given revision and returns the number of rows updated. */
   @Update(
       """
       <script>
@@ -219,10 +179,10 @@ public interface KnowledgeBaseArticleMapper {
         <if test="before.properties != after.properties">properties=#{after.properties},</if>
         <if test="after.bodyContent != null">body_format=#{after.bodyFormat}, body_content=#{after.bodyContent},</if>
         revision=#{after.revision}, audit_info=#{after.auditInfo}
-      WHERE article_id=#{after.articleId} AND deleted_at=0
+      WHERE article_id=#{after.articleId} AND revision=#{before.revision} AND deleted_at=0
       </script>
       """)
-  void update(
+  int update(
       @Param("before") KnowledgeBaseArticlePO before, @Param("after") KnowledgeBaseArticlePO after);
 
   /** Adds a new binding in the same transaction as the Article revision. */
@@ -247,9 +207,13 @@ public interface KnowledgeBaseArticleMapper {
       """)
   void unbind(@Param("id") long id, @Param("b") Binding binding, @Param("now") long now);
 
-  /** Retires the locked Article. */
-  @Update("UPDATE kb_article_meta SET deleted_at=#{now} WHERE article_id=#{id} AND deleted_at=0")
-  void delete(@Param("id") long id, @Param("now") long now);
+  /** Retires the live Article at the given revision and returns the number of rows updated. */
+  @Update(
+      """
+      UPDATE kb_article_meta SET deleted_at=#{now}
+      WHERE article_id=#{id} AND revision=#{revision} AND deleted_at=0
+      """)
+  int delete(@Param("id") long id, @Param("revision") long revision, @Param("now") long now);
 
   /** Retires all live bindings owned by an Article. */
   @Update(
