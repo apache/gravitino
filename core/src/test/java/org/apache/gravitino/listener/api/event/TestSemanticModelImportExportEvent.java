@@ -109,9 +109,10 @@ class TestSemanticModelImportExportEvent {
     owners = mock(OwnerDispatcher.class);
     operation = mock(SemanticModelOperationDispatcher.class);
     doCallRealMethod().when(operation).importSemanticModel(any(), any(), any(), any(), any());
-    doCallRealMethod().when(operation).exportOssieDocument(any(), any());
+    doCallRealMethod().when(operation).exportSemanticModel(any(), any(), any());
     model = mock(SemanticModel.class);
     when(model.name()).thenReturn(IDENT.name());
+    when(model.revision()).thenReturn(7);
     when(model.definition()).thenReturn(definition());
     when(model.properties()).thenReturn(Map.of());
     when(operation.createSemanticModel(any(), any(), any(), any(), any())).thenReturn(model);
@@ -323,6 +324,8 @@ class TestSemanticModelImportExportEvent {
     assertEquals(format, pre.format());
     assertEquals(IDENT, event.identifier());
     assertEquals(format, event.format());
+    assertEquals(7, event.revision());
+    assertEquals("7", event.customInfo().get("revision"));
     assertAudit(event, AuditLog.Operation.EXPORT_SEMANTIC_MODEL, OperationStatus.SUCCESS);
   }
 

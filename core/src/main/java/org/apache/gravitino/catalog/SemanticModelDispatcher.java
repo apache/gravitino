@@ -39,6 +39,8 @@ import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelRevision;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 
 /** Dispatches Semantic Model operations through the server pipeline. */
@@ -89,6 +91,13 @@ public interface SemanticModelDispatcher {
    * @throws NoSuchSemanticModelException If the Semantic Model does not exist.
    */
   SemanticModel loadSemanticModel(NameIdentifier ident) throws NoSuchSemanticModelException;
+
+  /** Loads a selected revision. */
+  SemanticModel loadSemanticModelRevision(
+      NameIdentifier ident, SemanticModelRevisionSelector selector);
+
+  /** Lists retained revision metadata for a model. */
+  SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident);
 
   /**
    * Returns whether a Semantic Model exists.
@@ -192,7 +201,16 @@ public interface SemanticModelDispatcher {
    * @throws NoSuchSemanticModelException If the Semantic Model does not exist.
    * @throws IllegalSemanticModelException If the model cannot be represented as an Ossie document.
    */
-  OssieDocument exportOssieDocument(NameIdentifier ident, OssieFormat format);
+  default OssieDocument exportOssieDocument(NameIdentifier ident, OssieFormat format) {
+    return exportSemanticModel(ident, SemanticModelRevisionSelector.ACTIVE, format).document();
+  }
+
+  /** Exports a selected revision. */
+  SemanticModelExport exportSemanticModel(
+      NameIdentifier ident, SemanticModelRevisionSelector selector, OssieFormat format);
+
+  /** An exported document and the exact revision used to serialize it. */
+  record SemanticModelExport(OssieDocument document, int revision) {}
 
   /**
    * Applies changes atomically to a Semantic Model.
@@ -207,10 +225,19 @@ public interface SemanticModelDispatcher {
    *     Model.
    * @throws IllegalSemanticModelException If a change or the resulting Semantic Model is invalid.
    */
+  default SemanticModel alterSemanticModel(
+      NameIdentifier ident,
+      SemanticModelSourceUpdate sourceUpdate,
+      SemanticModelChange... changes) {
+    return alterSemanticModel(ident, null, sourceUpdate, changes);
+  }
+
+  /** Applies changes to latest, optionally requiring the caller's expected revision. */
   SemanticModel alterSemanticModel(
-      NameIdentifier ident, SemanticModelSourceUpdate sourceUpdate, SemanticModelChange... changes)
-      throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
-          IllegalSemanticModelException;
+      NameIdentifier ident,
+      @Nullable Integer expectedRevision,
+      SemanticModelSourceUpdate sourceUpdate,
+      SemanticModelChange... changes);
 
   /**
    * Drops a Semantic Model.

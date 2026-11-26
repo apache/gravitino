@@ -41,7 +41,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.dto.responses.SecretsResponse;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.secret.SecretPropertyOperationDispatcher;
-import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
@@ -125,10 +124,8 @@ public class MetadataObjectSecretOperations {
                     AuthorizationExpressionConstants
                         .FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION);
             Map<String, String> secrets =
-                secretPropertyOperationDispatcher.getSecrets(identifier, entityType);
-            if (!canIncludeCredentialSecrets) {
-              secrets = SecretPropertyUtils.omitCloudAccessKeyPairSecrets(secrets);
-            }
+                secretPropertyOperationDispatcher.getSecrets(
+                    identifier, entityType, canIncludeCredentialSecrets);
             return Utils.ok(new SecretsResponse(secrets));
           });
     } catch (Exception e) {

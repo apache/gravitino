@@ -832,7 +832,7 @@ subprojects {
   // These notices cover copied production sources, not dependencies declared only in the POM.
   val sourceNoticeNames = mapOf(
     ":api" to listOf("spark", "iceberg"),
-    ":common" to listOf("iceberg", "hadoop"),
+    ":common" to listOf("iceberg", "hadoop", "ossie"),
     ":core" to listOf("spark", "iceberg", "kafka", "aws"),
     ":clients:client-java" to listOf("iceberg"),
     ":bundles:aws" to listOf("doris"),
