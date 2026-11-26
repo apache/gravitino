@@ -47,6 +47,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity.EntityType;
@@ -127,6 +128,22 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
         List.of(second, entity),
         backend.batchGet(
             List.of(second.nameIdentifier(), NameIdentifier.of("lake", "absent"), nfd), TYPE));
+  }
+
+  @TestTemplate
+  void testSupplementaryCharactersInArticleBody() throws IOException {
+    createAndInsertMakeLake("lake");
+    var markdown = ArticleBody.of(ArticleBody.Format.MARKDOWN, "a😀b");
+    var original = article(31, "guide").toBuilder().withBodyUpdate(markdown).build();
+    var ident = original.nameIdentifier();
+    STORE.insert(original, false);
+    assertEquals(markdown, STORE.getContent(ident).body());
+
+    var html = ArticleBody.of(ArticleBody.Format.HTML, "<p>𠀀😀</p>");
+    STORE.update(
+        ident,
+        (KnowledgeBaseArticleEntity current) -> current.toBuilder().withBodyUpdate(html).build());
+    assertEquals(html, STORE.getContent(ident).body());
   }
 
   @TestTemplate
@@ -535,6 +552,21 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
             new StoredContent(updatedBody, new ExpectedRevision(lake, original.id(), 2)),
             new StoredContent(overwrittenBody, new ExpectedRevision(lake, original.id(), 3))),
         captured);
+  }
+
+  @TestTemplate
+  void testUpdateConflictsWhenBeforeChangeDeletesArticle() throws IOException {
+    assertBeforeChangeConflict(ident -> assertTrue(STORE.delete(ident)));
+  }
+
+  @TestTemplate
+  void testUpdateConflictsWhenBeforeChangeEditsArticle() throws IOException {
+    assertBeforeChangeConflict(
+        ident ->
+            STORE.update(
+                ident,
+                (KnowledgeBaseArticleEntity current) ->
+                    current.toBuilder().withTitle("Inner edit").build()));
   }
 
   @TestTemplate
@@ -1287,6 +1319,41 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
         return JsonUtils.anyFieldMapper().readValue(rows.getString(1), AuditInfo.class);
       }
     }
+  }
+
+  private void assertBeforeChangeConflict(Consumer<NameIdentifier> change) throws IOException {
+    createAndInsertMakeLake("lake");
+    var original = article(11, "guide");
+    var ident = original.nameIdentifier();
+    STORE.insert(original, false);
+    var initialContent = STORE.getContent(ident);
+    TransactionHook hook =
+        new TransactionHook() {
+          @Override
+          public void beforeChange(
+              KnowledgeBaseArticleEntity before, KnowledgeBaseArticleEntity after) {
+            change.accept(ident);
+          }
+
+          @Override
+          public void onChange(
+              KnowledgeBaseArticleEntity before, KnowledgeBaseArticleEntity after) {
+            fail("onChange ran after the Article changed in beforeChange");
+          }
+        };
+    assertThrows(
+        ArticleRevisionConflictException.class,
+        () ->
+            STORE.update(
+                ident,
+                null,
+                current ->
+                    current.toBuilder().withTitle("Outer edit").withBindings(Set.of()).build(),
+                hook));
+    var restored = STORE.get(ident);
+    assertEquals(original.title(), restored.title());
+    assertEquals(original.bindings(), restored.bindings());
+    assertEquals(initialContent, STORE.getContent(ident));
   }
 
   private static KnowledgeBaseArticleEntity article(long id, String name) {

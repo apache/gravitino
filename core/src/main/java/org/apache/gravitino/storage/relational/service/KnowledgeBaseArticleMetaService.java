@@ -729,7 +729,9 @@ public final class KnowledgeBaseArticleMetaService {
       next.setBodyContent(body.content());
     }
     hook.beforeChange(before, after);
-    mapper.update(encode(before, row.getMetalakeId()), next);
+    if (mapper.update(encode(before, row.getMetalakeId()), next) != 1) {
+      throw new ArticleRevisionConflictException("Article %s has changed", before.nameIdentifier());
+    }
     long now = System.currentTimeMillis();
     for (Binding removed : Sets.difference(before.bindings(), after.bindings())) {
       mapper.unbind(before.id(), removed, now);

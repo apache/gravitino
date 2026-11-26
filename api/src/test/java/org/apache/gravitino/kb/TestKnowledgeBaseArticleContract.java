@@ -73,6 +73,15 @@ public class TestKnowledgeBaseArticleContract {
   }
 
   @Test
+  public void testArticleBodyRequiresPairedSurrogates() {
+    for (ArticleBody.Format format : ArticleBody.Format.values()) {
+      assertThrows(IllegalArgumentException.class, () -> ArticleBody.of(format, "a\uD800b"));
+      assertThrows(IllegalArgumentException.class, () -> ArticleBody.of(format, "a\uDC00b"));
+      assertEquals("a😀b", ArticleBody.of(format, "a😀b").content());
+    }
+  }
+
+  @Test
   public void testCreateAndEditRejectNullCharacterInMetadata() {
     String invalid = "a\0b";
     var builder =

@@ -154,7 +154,7 @@ public interface KnowledgeBaseArticleMapper {
       @Param("content") String content,
       @Param("bytes") int bytes);
 
-  /** Updates changed metadata and advances the revision while the Article is locked. */
+  /** Updates the live Article at the given revision and returns the number of rows updated. */
   @Update(
       """
       <script>
@@ -167,10 +167,10 @@ public interface KnowledgeBaseArticleMapper {
         <if test="before.properties != after.properties">properties=#{after.properties},</if>
         <if test="after.bodyContent != null">body_format=#{after.bodyFormat}, body_content=#{after.bodyContent},</if>
         revision=#{after.revision}, audit_info=#{after.auditInfo}
-      WHERE article_id=#{after.articleId} AND deleted_at=0
+      WHERE article_id=#{after.articleId} AND revision=#{before.revision} AND deleted_at=0
       </script>
       """)
-  void update(
+  int update(
       @Param("before") KnowledgeBaseArticlePO before, @Param("after") KnowledgeBaseArticlePO after);
 
   /** Adds a new binding in the same transaction as the Article revision. */
