@@ -298,8 +298,11 @@ public class TestSqlSession {
   @Test
   public void testRollbackOnlyAppliesToOutermostCommit() {
     RuntimeException failure = new IllegalStateException("Savepoint recovery failed");
+    Runnable rolledBack = Mockito.mock(Runnable.class);
+    Runnable committed = Mockito.mock(Runnable.class);
     SessionUtils.beginTransaction();
     try {
+      SqlSessions.afterCommit(rolledBack);
       SessionUtils.doMultipleWithCommit(() -> SqlSessions.markRollbackOnly(failure));
       assertTrue(SessionUtils.isInTransaction());
       var rejected = assertThrows(IllegalStateException.class, SessionUtils::commitTransaction);
@@ -309,7 +312,10 @@ public class TestSqlSession {
     }
     assertFalse(SessionUtils.isInTransaction());
     SessionUtils.beginTransaction();
+    SqlSessions.afterCommit(committed);
     SessionUtils.commitTransaction();
+    Mockito.verifyNoInteractions(rolledBack);
+    Mockito.verify(committed).run();
   }
 
   @Test

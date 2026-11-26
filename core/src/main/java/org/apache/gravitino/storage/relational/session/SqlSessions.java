@@ -23,6 +23,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import org.apache.ibatis.session.SqlSession;
@@ -42,6 +44,7 @@ public final class SqlSessions {
   private static final ThreadLocal<AtomicInteger> sessionCount =
       ThreadLocal.withInitial(() -> new AtomicInteger(0));
   private static final ThreadLocal<Throwable> rollbackCause = new ThreadLocal<>();
+  private static final ThreadLocal<List<Runnable>> afterCommitCallbacks = new ThreadLocal<>();
 
   private SqlSessions() {}
 
@@ -172,6 +175,27 @@ public final class SqlSessions {
     return sqlSession.getConnection();
   }
 
+  /**
+   * Registers a callback to execute only after the outermost active SQL session commits
+   * successfully. Callbacks are discarded on rollback or commit failure. If no session is active,
+   * the callback runs immediately.
+   *
+   * @param callback the post-commit action
+   */
+  public static void afterCommit(Runnable callback) {
+    Preconditions.checkArgument(callback != null, "callback cannot be null");
+    if (sessions.get() == null) {
+      callback.run();
+      return;
+    }
+    List<Runnable> callbacks = afterCommitCallbacks.get();
+    if (callbacks == null) {
+      callbacks = new ArrayList<>();
+      afterCommitCallbacks.set(callbacks);
+    }
+    callbacks.add(callback);
+  }
+
   private static void handleSessionClose(boolean commit, boolean rollback) {
     SqlSession sqlSession = sessions.get();
     if (sqlSession == null) {
@@ -180,6 +204,8 @@ public final class SqlSessions {
 
     int count = sessionCount.get().decrementAndGet();
     if (count == 0) {
+      List<Runnable> callbacks = afterCommitCallbacks.get();
+      boolean committed = false;
       try {
         Throwable cause = rollbackCause.get();
         if (rollback || cause != null) {
@@ -194,6 +220,7 @@ public final class SqlSessions {
           }
         } else if (commit) {
           sqlSession.commit();
+          committed = true;
         }
       } finally {
         try {
@@ -204,6 +231,16 @@ public final class SqlSessions {
           sessions.remove();
           sessionCount.remove();
           rollbackCause.remove();
+          afterCommitCallbacks.remove();
+        }
+      }
+      if (committed && callbacks != null) {
+        for (Runnable callback : callbacks) {
+          try {
+            callback.run();
+          } catch (RuntimeException e) {
+            LOG.warn("After-commit callback failed", e);
+          }
         }
       }
     } else if (count < 0) {
@@ -214,6 +251,7 @@ public final class SqlSessions {
       sessions.remove();
       sessionCount.remove();
       rollbackCause.remove();
+      afterCommitCallbacks.remove();
     }
   }
 
