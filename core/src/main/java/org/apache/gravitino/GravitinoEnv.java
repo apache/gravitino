@@ -19,6 +19,7 @@
 package org.apache.gravitino;
 
 import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 import org.apache.gravitino.audit.AuditLogManager;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AccessControlManager;
@@ -275,7 +276,7 @@ public class GravitinoEnv {
     initializeConfig(config);
     this.manageFullComponents = false;
     initCommonComponents();
-    initMetadataComponents();
+    initMetadataComponents(null);
     LOG.info("Gravitino metadata environment is initialized.");
   }
 
@@ -950,7 +951,7 @@ public class GravitinoEnv {
     metricsSystem.register(new JVMMetricsSource());
   }
 
-  private MetadataOperations initMetadataComponents() {
+  private MetadataOperations initMetadataComponents(@Nullable EventBus articleEventBus) {
     initEntityStoreAndCatalogManager();
 
     this.metalakeManager = new MetalakeManager(entityStore, idGenerator, catalogManager);
@@ -986,7 +987,8 @@ public class GravitinoEnv {
         new ArticleManager(
             idGenerator,
             config.get(Configs.KB_ARTICLE_MAX_BODY_BYTES),
-            config.get(Configs.ENABLE_AUTHORIZATION));
+            config.get(Configs.ENABLE_AUTHORIZATION),
+            articleEventBus);
     this.domainManager = new DomainManager(idGenerator, entityStore);
     this.internalDomainDispatcher = new DomainNormalizeDispatcher(domainManager);
 
@@ -1111,7 +1113,7 @@ public class GravitinoEnv {
   }
 
   private void initGravitinoServerComponents() {
-    MetadataOperations metadataOperations = initMetadataComponents();
+    MetadataOperations metadataOperations = initMetadataComponents(eventBus);
     initPublicMetadataDispatchers(metadataOperations);
 
     this.auxServiceManager = new AuxiliaryServiceManager();

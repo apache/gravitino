@@ -44,10 +44,15 @@ import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Collects relation rows whose referenced metadata object is no longer live. */
 public class OrphanedMetadataObjectRelationService {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OrphanedMetadataObjectRelationService.class);
   private static final OrphanedMetadataObjectRelationService INSTANCE =
       new OrphanedMetadataObjectRelationService();
 
@@ -141,6 +146,19 @@ public class OrphanedMetadataObjectRelationService {
                       metadataObjectType.name(),
                       ids,
                       deletedAt);
+              if (bindings > 0) {
+                var retired = mapper.listRetiredArticleTargets(ids, deletedAt);
+                SqlSessions.afterCommit(
+                    () ->
+                        retired.forEach(
+                            target ->
+                                LOG.info(
+                                    "Article binding cleanup actor=system metalakeId={} targetType={} targetId={} removedRows={}",
+                                    target.metalakeId(),
+                                    metadataObjectType,
+                                    target.targetId(),
+                                    target.removedRows())));
+              }
             }
           }
           // Term registration here covers Article bindings to Terms.

@@ -35,6 +35,27 @@ public enum OperationType {
   TABLE_EXISTS,
   REPORT_TABLE_METRICS,
 
+  /** Lists readable Articles. */
+  LIST_ARTICLES,
+  /** Loads Article metadata. */
+  LOAD_ARTICLE,
+  /** Reads Article content. */
+  LOAD_ARTICLE_CONTENT,
+  /** Lists the Terms bound to an Article. */
+  LIST_ARTICLE_TERMS,
+  /** Lists the assets bound to an Article. */
+  LIST_ARTICLE_ASSETS,
+  /** Creates an Article. */
+  CREATE_ARTICLE,
+  /** Changes an Article. */
+  ALTER_ARTICLE,
+  /** Deletes an Article. */
+  DROP_ARTICLE,
+  /** Changes the bindings of an Article. */
+  ALTER_ARTICLE_BINDINGS,
+  /** Detaches an Article from a Domain. */
+  DETACH_ARTICLE_DOMAIN,
+
   // Domain operations
   /** Domain operation: ListDomains. */
   LIST_DOMAIN,

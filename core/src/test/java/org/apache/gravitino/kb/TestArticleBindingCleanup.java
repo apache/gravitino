@@ -20,12 +20,18 @@
 package org.apache.gravitino.kb;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -59,9 +65,17 @@ import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.OrphanedMetadataObjectRelationMapper;
+import org.apache.gravitino.storage.relational.mapper.OrphanedMetadataObjectRelationMapper.RetiredTarget;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
 import org.apache.gravitino.storage.relational.service.OrphanedMetadataObjectRelationService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.ibatis.session.TransactionIsolationLevel;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.appender.WriterAppender;
+import org.apache.logging.log4j.core.layout.PatternLayout;
 import org.junit.jupiter.api.TestTemplate;
 import org.mockito.AdditionalAnswers;
 import org.mockito.Mockito;
@@ -71,6 +85,105 @@ class TestArticleBindingCleanup extends TestJDBCBackend {
   private static final Namespace NS = Namespace.of(LAKE, "warehouse", "sales");
   private final AtomicLong ids = new AtomicLong(100);
   private final ArticleManager articles = new ArticleManager(ids::incrementAndGet, 1024);
+
+  @TestTemplate
+  void auditsRetiredTargetsOnlyAfterCommit() throws Exception {
+    long lake = createAndInsertMakeLake(LAKE).id();
+    var glossary = new GlossaryManager(ids::incrementAndGet, false);
+    long term = glossary.createTerm(LAKE, TermSpec.builder("Revenue").build()).id();
+    articles.createArticle(LAKE, request("first").addTerms("Revenue").build());
+    articles.createArticle(LAKE, request("second").addTerms("Revenue").build());
+    assertTrue(glossary.dropTerm(LAKE, "Revenue"));
+
+    var context = (LoggerContext) LogManager.getContext(false);
+    var logger = context.getLogger(OrphanedMetadataObjectRelationService.class.getName());
+    Level previous = logger.getLevel();
+    StringWriter logs = new StringWriter();
+    WriterAppender appender =
+        WriterAppender.newBuilder()
+            .setName("articleCleanup")
+            .setTarget(logs)
+            .setLayout(PatternLayout.newBuilder().withPattern("%m%n").build())
+            .build();
+    appender.start();
+    logger.addAppender(appender);
+    logger.setLevel(Level.INFO);
+    try {
+      SessionUtils.beginTransaction();
+      try {
+        assertEquals(2, sweep(MetadataObject.Type.GLOSSARY_TERM, 10));
+        assertTrue(logs.toString().isEmpty());
+      } finally {
+        SessionUtils.rollbackTransaction();
+      }
+      assertTrue(logs.toString().isEmpty());
+      assertEquals(2, sweep(MetadataObject.Type.GLOSSARY_TERM, 10));
+      assertEquals(0, sweep(MetadataObject.Type.GLOSSARY_TERM, 10));
+      assertEquals(
+          List.of(
+              "Article binding cleanup actor=system metalakeId="
+                  + lake
+                  + " targetType=GLOSSARY_TERM targetId="
+                  + term
+                  + " removedRows=2"),
+          logs.toString().lines().toList());
+    } finally {
+      logger.removeAppender(appender);
+      logger.setLevel(previous);
+      appender.stop();
+    }
+  }
+
+  @TestTemplate
+  void concurrentSweepsWithTheSameTimestampReportOnlyTheirOwnRetirements() throws Exception {
+    long lake = createAndInsertMakeLake(LAKE).id();
+    var glossary = new GlossaryManager(ids::incrementAndGet, false);
+    long first = glossary.createTerm(LAKE, TermSpec.builder("Revenue").build()).id();
+    long second = glossary.createTerm(LAKE, TermSpec.builder("Tax").build()).id();
+    articles.createArticle(LAKE, request("one").addTerms("Revenue").build());
+    articles.createArticle(LAKE, request("two").addTerms("Tax").build());
+    assertTrue(glossary.dropTerm(LAKE, "Revenue"));
+    assertTrue(glossary.dropTerm(LAKE, "Tax"));
+
+    var sessions = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory();
+    long deletedAt = System.currentTimeMillis();
+    var worker = Executors.newSingleThreadExecutor();
+    try (var firstSession = sessions.openSession(TransactionIsolationLevel.READ_COMMITTED)) {
+      var mapper = firstSession.getMapper(OrphanedMetadataObjectRelationMapper.class);
+      String table = "glossary_term_meta";
+      String type = "GLOSSARY_TERM";
+      var ids = mapper.orphanedArticleBindingIds(table, "term_id", type, 1);
+      assertEquals(1, mapper.retireOrphanedArticleBindings(table, "term_id", type, ids, deletedAt));
+      assertEquals(
+          List.of(new RetiredTarget(lake, first, 1)),
+          mapper.listRetiredArticleTargets(ids, deletedAt));
+
+      var started = new CountDownLatch(1);
+      var remaining =
+          worker.submit(
+              () -> {
+                try (var session = sessions.openSession(TransactionIsolationLevel.READ_COMMITTED)) {
+                  var concurrent = session.getMapper(OrphanedMetadataObjectRelationMapper.class);
+                  started.countDown();
+                  var batch = concurrent.orphanedArticleBindingIds(table, "term_id", type, 10);
+                  assertEquals(
+                      1,
+                      concurrent.retireOrphanedArticleBindings(
+                          table, "term_id", type, batch, deletedAt));
+                  var targets = concurrent.listRetiredArticleTargets(batch, deletedAt);
+                  session.commit();
+                  return targets;
+                }
+              });
+      assertTrue(started.await(10, TimeUnit.SECONDS));
+      assertThrows(TimeoutException.class, () -> remaining.get(150, TimeUnit.MILLISECONDS));
+      firstSession.commit();
+      assertEquals(
+          List.of(new RetiredTarget(lake, second, 1)), remaining.get(10, TimeUnit.SECONDS));
+    } finally {
+      worker.shutdownNow();
+    }
+  }
 
   @TestTemplate
   void termRetirementIsBatchedByBindingAndPreservesArticles() throws Exception {
@@ -204,10 +317,16 @@ class TestArticleBindingCleanup extends TestJDBCBackend {
       backend.insert(createTableEntity(99L, NS, "orders", AUDIT_INFO), false);
       backend.insert(createTableEntity(77L, NS, "restored", AUDIT_INFO), false);
       articles.alterArticle(LAKE, "guide", null, KnowledgeBaseArticleChange.addObjects(table()));
+      long deletedAt = System.currentTimeMillis();
       assertEquals(
           1,
           mapper.retireOrphanedArticleBindings(
-              "table_meta", "table_id", "TABLE", candidates, System.currentTimeMillis()));
+              "table_meta", "table_id", "TABLE", candidates, deletedAt));
+      assertEquals(
+          List.of(42L),
+          mapper.listRetiredArticleTargets(candidates, deletedAt).stream()
+              .map(OrphanedMetadataObjectRelationMapper.RetiredTarget::targetId)
+              .toList());
       sweepSession.commit();
     }
     assertEquals(

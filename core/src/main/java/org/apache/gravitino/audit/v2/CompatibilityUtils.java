@@ -29,6 +29,16 @@ public class CompatibilityUtils {
 
   private static final ImmutableMap<OperationType, Operation> OPERATION_TYPE_MAP =
       ImmutableMap.<OperationType, Operation>builder()
+          .put(OperationType.LIST_ARTICLES, Operation.LIST_ARTICLES)
+          .put(OperationType.LOAD_ARTICLE, Operation.LOAD_ARTICLE)
+          .put(OperationType.LOAD_ARTICLE_CONTENT, Operation.LOAD_ARTICLE_CONTENT)
+          .put(OperationType.LIST_ARTICLE_TERMS, Operation.LIST_ARTICLE_TERMS)
+          .put(OperationType.LIST_ARTICLE_ASSETS, Operation.LIST_ARTICLE_ASSETS)
+          .put(OperationType.CREATE_ARTICLE, Operation.CREATE_ARTICLE)
+          .put(OperationType.ALTER_ARTICLE, Operation.ALTER_ARTICLE)
+          .put(OperationType.DROP_ARTICLE, Operation.DROP_ARTICLE)
+          .put(OperationType.ALTER_ARTICLE_BINDINGS, Operation.ALTER_ARTICLE_BINDINGS)
+          .put(OperationType.DETACH_ARTICLE_DOMAIN, Operation.DETACH_ARTICLE_DOMAIN)
           .put(OperationType.LIST_DOMAIN, Operation.LIST_DOMAIN)
           .put(OperationType.LIST_DOMAINS_INFO, Operation.LIST_DOMAINS_INFO)
           .put(OperationType.GET_DOMAIN, Operation.GET_DOMAIN)

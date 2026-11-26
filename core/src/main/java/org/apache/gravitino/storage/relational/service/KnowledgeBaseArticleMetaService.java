@@ -136,6 +136,21 @@ public final class KnowledgeBaseArticleMetaService {
      */
     void onChange(
         @Nullable KnowledgeBaseArticleEntity before, @Nullable KnowledgeBaseArticleEntity after);
+
+    /**
+     * Reports an effective change, including whether it wrote new body content. The snapshots
+     * remain metadata-only.
+     *
+     * @param before the previous Article, or null on creation
+     * @param after the resulting Article, or null on deletion
+     * @param bodyChanged whether a new body was persisted
+     */
+    default void onChange(
+        @Nullable KnowledgeBaseArticleEntity before,
+        @Nullable KnowledgeBaseArticleEntity after,
+        boolean bodyChanged) {
+      onChange(before, after);
+    }
   }
 
   /** Stable identity and revision decoded from an editing token by the caller. */
@@ -386,7 +401,7 @@ public final class KnowledgeBaseArticleMetaService {
             }
             addBindings(mapper, row, initial.bindings());
             changeMemberships(row, Set.of(), initial.domainIds());
-            hook.onChange(null, initial);
+            hook.onChange(null, initial, true);
             return new ScopedArticle(metalakeId, project.apply(initial));
           });
     } catch (RuntimeException e) {
@@ -686,7 +701,7 @@ public final class KnowledgeBaseArticleMetaService {
           }
           mapper.deleteBindings(row.getArticleId(), now);
           changeMemberships(row, old.domainIds(), Set.of());
-          hook.onChange(old, null);
+          hook.onChange(old, null, false);
           return Optional.of(old);
         });
   }
@@ -1053,7 +1068,7 @@ public final class KnowledgeBaseArticleMetaService {
     }
     addBindings(mapper, next, Sets.difference(after.bindings(), before.bindings()));
     changeMemberships(next, before.domainIds(), after.domainIds());
-    hook.onChange(before, after);
+    hook.onChange(before, after, bodyChanged);
     return after;
   }
 

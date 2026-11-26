@@ -91,7 +91,10 @@ public final class RelationalGarbageCollector implements Closeable {
                       metadataObjectType, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
             }
           } catch (RuntimeException e) {
-            LOG.error("Failed to softly delete orphaned " + metadataObjectType + " relations: ", e);
+            LOG.error(
+                "Orphaned relation cleanup failed actor=system targetType={}",
+                metadataObjectType,
+                e);
           }
         }
       }

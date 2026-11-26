@@ -31,13 +31,13 @@ import org.apache.ibatis.annotations.Param;
 public class OrphanedMetadataObjectRelationSQLProvider {
 
   /**
-   * Selects individual Article binding rows so a frequently bound target cannot exceed the limit.
+   * Locks a bounded batch of live binding rows so concurrent sweeps cannot claim the same removal.
    */
   public static String orphanedArticleBindingIds(
       @Param("entityTable") String entityTable, @Param("entityIdColumn") String entityIdColumn) {
     return "SELECT id FROM kb_article_relation_meta WHERE "
         + orphanedArticleBinding(entityTable, entityIdColumn)
-        + " ORDER BY id LIMIT #{limit}";
+        + " ORDER BY id LIMIT #{limit} FOR UPDATE";
   }
 
   /** Retires only the original binding rows that still reference a retired target. */

@@ -31,6 +31,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.OwnerEventManager;
@@ -38,6 +39,7 @@ import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.listener.DummyEventListener;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.info.OwnerInfo;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -82,6 +84,29 @@ public class TestOwnerEvent {
     public Type type() {
       return type;
     }
+  }
+
+  @Test
+  void testArticleOwnerTransferRetainsActorAndTarget() throws Exception {
+    var target = MetadataObjects.parse("guide", MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE);
+    var transfers = Mockito.mock(OwnerDispatcher.class);
+    var listener = new DummyEventListener();
+    var dispatcher = new OwnerEventManager(new EventBus(List.of(listener)), transfers);
+
+    PrincipalUtils.doAs(
+        new UserPrincipal("editor"),
+        () -> {
+          dispatcher.setOwner("lake", target, "writers", Owner.Type.GROUP);
+          return null;
+        });
+
+    Assertions.assertEquals(1, listener.getPreEvents().size());
+    Assertions.assertEquals(1, listener.getPostEvents().size());
+    var event = Assertions.assertInstanceOf(SetOwnerEvent.class, listener.getPostEvents().get(0));
+    Assertions.assertEquals("editor", event.user());
+    Assertions.assertEquals(NameIdentifier.of("lake", "guide"), event.identifier());
+    Assertions.assertEquals(MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE, event.metadataObjectType());
+    Assertions.assertEquals(new OwnerInfo("writers", Owner.Type.GROUP), event.ownerInfo());
   }
 
   @Test
