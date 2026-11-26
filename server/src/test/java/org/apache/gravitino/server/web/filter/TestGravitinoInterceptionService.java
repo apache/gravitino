@@ -121,6 +121,7 @@ import org.apache.gravitino.server.web.rest.SecretsProviderOperations;
 import org.apache.gravitino.server.web.rest.SemanticModelMetricOperations;
 import org.apache.gravitino.server.web.rest.SemanticModelOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
+import org.apache.gravitino.server.web.rest.TermOperations;
 import org.apache.gravitino.server.web.rest.ViewOperations;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -252,9 +253,10 @@ public class TestGravitinoInterceptionService {
     }
   }
 
-  /** Verifies that every Domain endpoint rejects non-members before dispatch. */
+  /** Verifies that every domain and glossary endpoint rejects non-members before dispatch. */
   @Test
-  public void testDomainEndpointsValidateMetalakeMembershipBeforeDispatch() throws Throwable {
+  public void testDomainAndTermEndpointsValidateMetalakeMembershipBeforeDispatch()
+      throws Throwable {
     try (MockedStatic<PrincipalUtils> principals = mockStatic(PrincipalUtils.class);
         MockedStatic<AuthorizationUtils> authorization = mockStatic(AuthorizationUtils.class)) {
       principals.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
@@ -270,6 +272,7 @@ public class TestGravitinoInterceptionService {
       for (Class<?> resource :
           Arrays.asList(
               DomainOperations.class,
+              TermOperations.class,
               DomainMembershipOperations.class,
               MetadataObjectDomainOperations.class)) {
         Descriptor descriptor = mock(Descriptor.class);
