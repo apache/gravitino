@@ -87,6 +87,12 @@ paths:
   /metalakes/{metalake}/kb-articles/{article}/content:
     $ref: "./kb-articles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1kb-articles~1%7Barticle%7D~1content"
 
+  /metalakes/{metalake}/kb-articles/{article}/terms:
+    $ref: "./kb-articles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1kb-articles~1%7Barticle%7D~1terms"
+
+  /metalakes/{metalake}/kb-articles/{article}/objects:
+    $ref: "./kb-articles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1kb-articles~1%7Barticle%7D~1objects"
+
   /metalakes/{metalake}/tags:
     $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags"
 

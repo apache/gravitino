@@ -45,8 +45,10 @@ import org.apache.gravitino.dto.kb.ArticleObjectDTO;
 import org.apache.gravitino.dto.kb.ArticleTermDTO;
 import org.apache.gravitino.dto.requests.ArticleCreateRequest;
 import org.apache.gravitino.dto.requests.ArticleUpdatesRequest;
+import org.apache.gravitino.dto.responses.ArticleAssetBindingsResponse;
 import org.apache.gravitino.dto.responses.ArticleContentResponse;
 import org.apache.gravitino.dto.responses.ArticleResponse;
+import org.apache.gravitino.dto.responses.ArticleTermBindingsResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
@@ -157,6 +159,66 @@ public class ArticleOperations {
         metalake,
         article,
         () -> Utils.ok(new ArticleContentResponse(manager.getArticleContent(metalake, article))));
+  }
+
+  /**
+   * Lists the live, readable Terms bound to an Article.
+   *
+   * @param metalake the metalake name
+   * @param article the Article name
+   * @param limit maximum number of readable Terms to return
+   * @param offset number of readable Terms to skip
+   * @return the binding page
+   */
+  @GET
+  @Path("{article}/terms")
+  @Timed(name = "list-article-terms." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-article-terms", absolute = true)
+  @AuthorizationExpression(expression = "")
+  public Response listTermBindings(
+      @PathParam("metalake") @AuthorizationMetadata(type = EntityType.METALAKE) String metalake,
+      @PathParam("article") String article,
+      @QueryParam("limit") @DefaultValue("20") String limit,
+      @QueryParam("offset") @DefaultValue("0") String offset) {
+    return execute(
+        OperationType.LIST,
+        metalake,
+        article,
+        () ->
+            Utils.ok(
+                new ArticleTermBindingsResponse(
+                    manager.listTermBindings(
+                        metalake, article, Integer.parseInt(limit), Integer.parseInt(offset)))));
+  }
+
+  /**
+   * Lists the live, readable assets bound to an Article.
+   *
+   * @param metalake the metalake name
+   * @param article the Article name
+   * @param limit maximum number of readable assets to return
+   * @param offset number of readable assets to skip
+   * @return the binding page
+   */
+  @GET
+  @Path("{article}/objects")
+  @Timed(name = "list-article-objects." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-article-objects", absolute = true)
+  @AuthorizationExpression(expression = "")
+  public Response listAssetBindings(
+      @PathParam("metalake") @AuthorizationMetadata(type = EntityType.METALAKE) String metalake,
+      @PathParam("article") String article,
+      @QueryParam("limit") @DefaultValue("20") String limit,
+      @QueryParam("offset") @DefaultValue("0") String offset) {
+    return execute(
+        OperationType.LIST,
+        metalake,
+        article,
+        () ->
+            Utils.ok(
+                new ArticleAssetBindingsResponse(
+                    manager.listAssetBindings(
+                        metalake, article, Integer.parseInt(limit), Integer.parseInt(offset)))));
   }
 
   /**

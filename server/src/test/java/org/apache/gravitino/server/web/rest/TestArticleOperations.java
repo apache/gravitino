@@ -62,8 +62,11 @@ import org.apache.gravitino.kb.ArticleContent;
 import org.apache.gravitino.kb.ArticleCreate;
 import org.apache.gravitino.kb.ArticleManager;
 import org.apache.gravitino.kb.ArticleObjectIdentifier;
+import org.apache.gravitino.kb.ArticleTermBinding;
+import org.apache.gravitino.kb.AssetBindingPage;
 import org.apache.gravitino.kb.KnowledgeBaseArticleChange;
 import org.apache.gravitino.kb.KnowledgeBaseArticleEntity;
+import org.apache.gravitino.kb.TermBindingPage;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.rest.RESTUtils;
@@ -195,6 +198,79 @@ class TestArticleOperations extends BaseOperationsTest {
       assertEquals("MARKDOWN", content.get("body").get("format").asText());
       assertEquals("token", content.get("revisionToken").asText());
       assertFalse(content.has("article"));
+    }
+  }
+
+  @Test
+  void listsTermBindingsWithCurrentStatusAndContinuation() throws IOException {
+    var term = mock(ArticleTermBinding.class);
+    when(term.name()).thenReturn("Revenue");
+    when(term.status()).thenReturn(ArticleTermBinding.Status.DEPRECATED);
+    when(manager.listTermBindings("test", "销售", 20, 0))
+        .thenReturn(new TermBindingPage(List.of(term), true));
+    when(manager.listTermBindings("test", "销售", 1, 42))
+        .thenReturn(new TermBindingPage(List.of(), false));
+    var terms = target(BASE + "/%E9%94%80%E5%94%AE/terms");
+    try (Response response = terms.request(V1).get()) {
+      assertEquals(
+          JsonUtils.objectMapper()
+              .readTree(
+                  """
+          {"code":0,"terms":[{"name":"Revenue","status":"DEPRECATED"}],"hasMore":true}
+          """),
+          success(response));
+    }
+    try (Response response =
+        terms.queryParam("limit", 1).queryParam("offset", 42).request().get()) {
+      assertEquals(
+          JsonUtils.objectMapper()
+              .readTree("""
+          {"code":0,"terms":[],"hasMore":false}
+          """),
+          success(response));
+    }
+  }
+
+  @Test
+  void listsAssetBindingsWithStructuredIdentifiers() throws IOException {
+    var column =
+        ArticleObjectIdentifier.of(
+            MetadataObject.Type.COLUMN, List.of("warehouse", "sales", "orders"), "total.amount");
+    when(manager.listAssetBindings("test", "guide", 1, 1))
+        .thenReturn(new AssetBindingPage(List.of(column), false));
+    when(manager.listAssetBindings("test", "guide", 20, 0))
+        .thenReturn(new AssetBindingPage(List.of(), false));
+    var objects = target(BASE + "/guide/objects");
+    try (Response response =
+        objects.queryParam("limit", 1).queryParam("offset", 1).request().get()) {
+      assertEquals(
+          JsonUtils.objectMapper()
+              .readTree(
+                  """
+          {"code":0,"objects":[{"type":"COLUMN","namespace":["warehouse","sales","orders"],
+          "name":"total.amount"}],"hasMore":false}
+          """),
+          success(response));
+    }
+    try (Response response = objects.request(V1).get()) {
+      assertEquals(
+          JsonUtils.objectMapper()
+              .readTree("""
+          {"code":0,"objects":[],"hasMore":false}
+          """),
+          success(response));
+    }
+  }
+
+  @Test
+  void bindingPagesPreserveHiddenArticleAndInvalidPaginationErrors() {
+    var hidden = new NoSuchKnowledgeBaseArticleException("hidden");
+    when(manager.listTermBindings("test", "draft", 20, 0)).thenThrow(hidden);
+    when(manager.listAssetBindings("test", "draft", 20, 0)).thenThrow(hidden);
+    for (String path : List.of("terms", "objects")) {
+      var page = target(BASE + "/draft/" + path);
+      assertError(page.request().get(), 404, "NoSuchKnowledgeBaseArticleException");
+      assertError(page.queryParam("offset", "bad").request().get(), 400, "NumberFormatException");
     }
   }
 

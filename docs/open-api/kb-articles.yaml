@@ -62,14 +62,8 @@ paths:
       description: Returns metadata and independent previews of readable Terms and assets from the same snapshot.
         Use the content endpoint to read the body.
       parameters:
-        - in: query
-          name: limit
-          description: Maximum entries per binding preview.
-          schema: {type: integer, format: int32, minimum: 1, maximum: 1000, default: 20}
-        - in: query
-          name: offset
-          description: Number of readable entries to skip in each preview.
-          schema: {type: integer, format: int32, minimum: 0, default: 0}
+        - $ref: "#/components/parameters/bindingLimit"
+        - $ref: "#/components/parameters/bindingOffset"
       responses:
         "200":
           $ref: "#/components/responses/ArticleMetadata"
@@ -161,8 +155,81 @@ paths:
         5XX:
           $ref: "#/components/responses/ServerError"
 
+  "/metalakes/{metalake}/kb-articles/{article}/terms":
+    parameters:
+      - $ref: ./openapi.yaml#/components/parameters/metalake
+      - $ref: "#/components/parameters/article"
+    get:
+      operationId: listKnowledgeBaseArticleTermBindings
+      tags: [knowledge-base]
+      summary: List Terms bound to an Article
+      description: Returns live, readable Terms in stable binding order. Visibility is applied before pagination.
+      parameters:
+        - $ref: "#/components/parameters/bindingLimit"
+        - $ref: "#/components/parameters/bindingOffset"
+      responses:
+        "200":
+          description: The binding page. An additional readable binding sets hasMore to true.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArticleTermBindingsResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: ./openapi.yaml#/components/responses/ForbiddenErrorResponse
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "406":
+          $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
+        "409":
+          $ref: "#/components/responses/MetalakeNotInUse"
+        5XX:
+          $ref: "#/components/responses/ServerError"
+  "/metalakes/{metalake}/kb-articles/{article}/objects":
+    parameters:
+      - $ref: ./openapi.yaml#/components/parameters/metalake
+      - $ref: "#/components/parameters/article"
+    get:
+      operationId: listKnowledgeBaseArticleAssetBindings
+      tags: [knowledge-base]
+      summary: List assets bound to an Article
+      description: Returns live, readable assets in stable binding order. Visibility is applied before pagination.
+      parameters:
+        - $ref: "#/components/parameters/bindingLimit"
+        - $ref: "#/components/parameters/bindingOffset"
+      responses:
+        "200":
+          description: The binding page. An additional readable binding sets hasMore to true.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArticleAssetBindingsResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: ./openapi.yaml#/components/responses/ForbiddenErrorResponse
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "406":
+          $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
+        "409":
+          $ref: "#/components/responses/MetalakeNotInUse"
+        5XX:
+          $ref: "#/components/responses/ServerError"
+
 components:
   parameters:
+    bindingLimit:
+      in: query
+      name: limit
+      description: Maximum number of readable entries per binding list.
+      schema: {type: integer, format: int32, minimum: 1, maximum: 1000, default: 20}
+    bindingOffset:
+      in: query
+      name: offset
+      description: Number of readable entries to skip in each binding list.
+      schema: {type: integer, format: int32, minimum: 0, default: 0}
     article:
       in: path
       name: article
@@ -360,6 +427,31 @@ components:
             "@type": {type: string, enum: [addObjects, removeObjects]}
             objects:
               $ref: "#/components/schemas/ArticleObjects"
+    ArticleTerms:
+      type: array
+      items:
+        type: object
+        required: [name, status]
+        properties:
+          name: {type: string}
+          status:
+            $ref: ./terms.yaml#/components/schemas/TermStatus
+    ArticleTermBindingsResponse:
+      type: object
+      required: [code, terms, hasMore]
+      properties:
+        code: {type: integer, enum: [0]}
+        terms:
+          $ref: "#/components/schemas/ArticleTerms"
+        hasMore: {type: boolean}
+    ArticleAssetBindingsResponse:
+      type: object
+      required: [code, objects, hasMore]
+      properties:
+        code: {type: integer, enum: [0]}
+        objects:
+          $ref: "#/components/schemas/ArticleObjects"
+        hasMore: {type: boolean}
     ArticleMetadata:
       type: object
       required: [name, title, status, domains, terms, termsHasMore, objects, objectsHasMore,
@@ -372,14 +464,7 @@ components:
         domains:
           $ref: "#/components/schemas/Names"
         terms:
-          type: array
-          items:
-            type: object
-            required: [name, status]
-            properties:
-              name: {type: string}
-              status:
-                $ref: ./terms.yaml#/components/schemas/TermStatus
+          $ref: "#/components/schemas/ArticleTerms"
         termsHasMore: {type: boolean}
         objects:
           $ref: "#/components/schemas/ArticleObjects"
