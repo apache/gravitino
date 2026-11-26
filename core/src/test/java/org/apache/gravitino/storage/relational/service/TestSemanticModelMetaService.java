@@ -156,7 +156,7 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testUpdateAndRenameCreatePublishedSnapshots() throws IOException {
+  public void testUpdateCreatesSnapshotAndRenameOnlyUpdatesIdentity() throws IOException {
     String oldName = GravitinoITUtils.genRandomName("sales_model_old");
     String newName = GravitinoITUtils.genRandomName("sales_model_new");
     SemanticModelEntity original =
@@ -177,7 +177,7 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
         semanticModelEntity(original.id(), newName, "orders_v2", "v2 comment", "v2");
     SemanticModelMetaService service = SemanticModelMetaService.getInstance();
     assertEquals(
-        3, service.updateSemanticModel(original.nameIdentifier(), ignored -> renamed).revision());
+        2, service.updateSemanticModel(original.nameIdentifier(), ignored -> renamed).revision());
     assertEquals(
         newName,
         service
@@ -198,18 +198,17 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
             .getSemanticModelIdBySchemaIdAndName(schemaId, newName));
 
     Map<Integer, VersionState> versions = listSemanticModelVersions(original.id());
-    assertEquals(3, versions.size());
+    assertEquals(2, versions.size());
     assertEquals("v1 comment", versions.get(1).comment);
     assertTrue(versions.get(1).datasets.contains("orders_v1"));
     assertEquals("v2 comment", versions.get(2).comment);
     assertTrue(versions.get(2).datasets.contains("orders_v2"));
     assertEquals(0L, versions.get(1).deletedAt);
     assertEquals(0L, versions.get(2).deletedAt);
-    assertEquals(0L, versions.get(3).deletedAt);
 
     long[] identityVersions = semanticModelIdentityVersions(original.id());
-    assertEquals(3L, identityVersions[0]);
-    assertEquals(3L, identityVersions[1]);
+    assertEquals(2L, identityVersions[0]);
+    assertEquals(2L, identityVersions[1]);
     assertEntityChange(lastChangeId, oldName, OperateType.ALTER);
   }
 
@@ -481,7 +480,7 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
         () -> service.deleteObservedSemanticModel(original.nameIdentifier(), observed));
     assertEquals(
         "original", service.getSemanticModelByIdentifier(renamed.nameIdentifier()).comment());
-    assertEquals(2, listSemanticModelVersions(original.id()).size());
+    assertEquals(1, listSemanticModelVersions(original.id()).size());
   }
 
   @TestTemplate

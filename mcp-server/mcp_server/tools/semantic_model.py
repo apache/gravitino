@@ -19,6 +19,7 @@ from typing import Literal, Optional
 
 from fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
+from pydantic import StrictInt
 
 
 def load_semantic_model_tools(mcp: FastMCP):
@@ -119,6 +120,7 @@ def load_semantic_model_tools(mcp: FastMCP):
         catalog_name: str,
         schema_name: str,
         semantic_model_name: str,
+        revision: Optional[int | Literal["latest"]] = None,
     ) -> str:
         """Load a Semantic Model's metadata and complete semantic definition.
 
@@ -127,13 +129,36 @@ def load_semantic_model_tools(mcp: FastMCP):
             catalog_name: Name of the catalog.
             schema_name: Name of the schema.
             semantic_model_name: Name of the Semantic Model.
+            revision: A positive revision number or "latest". Omit for active.
 
         Returns:
-            A JSON object containing name, comment, definition, properties,
-            and audit information in Gravitino's native REST format.
+            The definition and audit information, including revision, status,
+            and publishedBy and publishedAt for a published revision.
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_semantic_model_operation().load_semantic_model(
+            catalog_name, schema_name, semantic_model_name, revision
+        )
+
+    @mcp.tool(
+        tags={"semantic_model"},
+        annotations=ToolAnnotations(
+            readOnlyHint=True, destructiveHint=False, idempotentHint=True
+        ),
+    )
+    async def list_semantic_model_revisions(
+        ctx: Context,
+        catalog_name: str,
+        schema_name: str,
+        semantic_model_name: str,
+    ) -> str:
+        """List retained revisions of a Semantic Model, newest first.
+
+        Each summary reports the revision number, publication status, writer audit,
+        and publisher and time when published. Drafts require modify access.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_semantic_model_operation().list_semantic_model_revisions(
             catalog_name, schema_name, semantic_model_name
         )
 
@@ -160,8 +185,7 @@ def load_semantic_model_tools(mcp: FastMCP):
         dots. The REST source lookup route uses catalog.schema.name without
         component escaping; these inputs are rejected before sending a request.
 
-        Associations reflect the latest definition write, not model execution
-        validity or transitive dependencies. An empty result does not establish
+        Associations reflect the active revision and cover direct dependencies. An empty result does not establish
         that changing or deleting the source is safe.
 
         Args:
@@ -213,7 +237,7 @@ def load_semantic_model_tools(mcp: FastMCP):
             properties: Optional Gravitino properties with string values.
 
         Returns:
-            The created Semantic Model as a JSON object.
+            The created Semantic Model as JSON, including its revision and status.
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_semantic_model_operation().create_semantic_model(
@@ -227,6 +251,8 @@ def load_semantic_model_tools(mcp: FastMCP):
         schema_name: str,
         semantic_model_name: str,
         updates: list[dict],
+        *,
+        expected_revision: Optional[StrictInt] = None,
     ) -> str:
         """Apply an ordered, non-empty list of updates atomically.
 
@@ -241,14 +267,21 @@ def load_semantic_model_tools(mcp: FastMCP):
                 or replaceDefinition (definition). Example:
                 [{"@type": "setProperty", "property": "domain",
                   "value": "sales"}]. replaceDefinition supplies the entire
-                definition and revalidates source access.
+                definition and revalidates source access. Send rename by itself.
+            expected_revision: Required for replaceDefinition. Load "latest" to
+                prepare an edit and use its revision. On a conflict, reload,
+                reapply your changes to the new latest revision, and retry.
 
         Returns:
-            The altered Semantic Model as a JSON object.
+            The altered Semantic Model as JSON, including its revision and status.
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_semantic_model_operation().alter_semantic_model(
-            catalog_name, schema_name, semantic_model_name, updates
+            catalog_name,
+            schema_name,
+            semantic_model_name,
+            updates,
+            expected_revision=expected_revision,
         )
 
     @mcp.tool(tags={"semantic_model"})

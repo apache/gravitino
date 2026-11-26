@@ -63,7 +63,11 @@ class _InMemorySemanticModelCatalog(SemanticModelCatalog):
             NameIdentifier.of(namespace.level(0), name) for name in sorted(self._models)
         ]
 
-    def load_semantic_model(self, identifier: NameIdentifier) -> SemanticModel:
+    def load_semantic_model(
+        self, identifier: NameIdentifier, revision: Optional[int | str] = None
+    ) -> SemanticModel:
+        if revision is not None:
+            raise UnsupportedOperationException("Revision reads are not supported")
         model = self._models.get(identifier.name())
         if model is None:
             raise NoSuchSemanticModelException(
@@ -83,8 +87,13 @@ class _InMemorySemanticModelCatalog(SemanticModelCatalog):
         return model
 
     def alter_semantic_model(
-        self, identifier: NameIdentifier, *changes: SemanticModelChange
+        self,
+        identifier: NameIdentifier,
+        *changes: SemanticModelChange,
+        expected_revision: Optional[int] = None,
     ) -> SemanticModel:
+        if expected_revision is not None:
+            raise UnsupportedOperationException("Conditional updates are not supported")
         return self.load_semantic_model(identifier)
 
     def drop_semantic_model(self, identifier: NameIdentifier) -> bool:

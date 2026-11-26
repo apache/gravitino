@@ -820,7 +820,6 @@ export default function SemanticModelDetailsPage() {
       )}
       {definition && metadataEdit && (
         <SemanticMetadataEditor
-          definition={definition}
           target={metadataEdit}
           metalake={metalake}
           catalog={catalog}
