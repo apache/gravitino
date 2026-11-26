@@ -94,6 +94,18 @@ CREATE TABLE IF NOT EXISTS `policy_tag_relation_meta` (
     KEY `policy_tag_relation_meta_idx_tag_id` (`tag_id`)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS `policy_role_relation_meta` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id',
+    `role_name` VARCHAR(128) NOT NULL COMMENT 'role name referenced by the policy content',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy role relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy role relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy role relation deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `policy_role_relation_meta_uk_pid_rn_del` (`policy_id`, `role_name`, `deleted_at`),
+    KEY `policy_role_relation_meta_idx_role_name` (`role_name`)
+) ENGINE=InnoDB;
+
 ALTER TABLE `job_run_meta` ADD COLUMN IF NOT EXISTS `runtime_job_template` CLOB DEFAULT NULL COMMENT 'job run runtime job template' AFTER `job_finished_at`;
 
 CREATE TABLE IF NOT EXISTS `semantic_model_meta` (
@@ -429,6 +441,26 @@ CREATE TABLE IF NOT EXISTS `domain_rel` (
     UNIQUE KEY `uk_dr_ci_del` (`child_id`, `deleted_at`),
     KEY `domain_rel_idx_parent` (`parent_id`, `deleted_at`),
     KEY `domain_rel_idx_metalake` (`metalake_id`, `deleted_at`)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `iceberg_idempotency_meta` (
+  `idempotency_key`  VARCHAR(36) NOT NULL     COMMENT 'client-provided UUIDv7 idempotency key',
+  `http_method`      VARCHAR(16) NOT NULL     COMMENT 'HTTP method of the request',
+  `request_uri`      TEXT        NOT NULL     COMMENT 'encoded request path and sorted query string',
+  `generation`       BIGINT      NOT NULL     COMMENT 'reservation fencing token',
+  `http_status`      INT         NULL         COMMENT 'HTTP status of finalized response, NULL while reserved',
+  `response_summary` CLOB        NULL         COMMENT 'serialized response body (JSON) for replay',
+  `audit_info`       CLOB        NOT NULL     COMMENT 'idempotency record audit info',
+  `created_at`       BIGINT      NOT NULL     COMMENT 'record created at (unix epoch millis)',
+  `expires_at`       BIGINT      NOT NULL     COMMENT 'record expires at (unix epoch millis)',
+  PRIMARY KEY (`idempotency_key`)
+) COMMENT='Iceberg REST idempotency records';
+CREATE INDEX IF NOT EXISTS `idx_iim_expires` ON `iceberg_idempotency_meta` (`expires_at`);
+
+
+CREATE TABLE IF NOT EXISTS iceberg_idempotency_generation_meta (
+  stripe INT NOT NULL PRIMARY KEY,
+  generation BIGINT NOT NULL
 ) ENGINE=InnoDB;
 
 -- Index live metadata lists and relationship cleanup by their lookup keys and deletion status.

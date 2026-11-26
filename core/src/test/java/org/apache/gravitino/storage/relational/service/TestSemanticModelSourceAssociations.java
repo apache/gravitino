@@ -152,7 +152,7 @@ public class TestSemanticModelSourceAssociations extends TestJDBCBackend {
     assertEquals(initial, rows(original.id()));
     SemanticModelEntity loaded = service().getSemanticModelByIdentifier(renamed.nameIdentifier());
     assertEquals(renamed.fields(), loaded.fields());
-    assertEquals(3, loaded.revision());
+    assertEquals(2, loaded.revision());
 
     SemanticModelSourceUpdate rebound =
         SemanticModelSourceUpdate.replace(
@@ -163,7 +163,7 @@ public class TestSemanticModelSourceAssociations extends TestJDBCBackend {
         old -> copy(renamed, renamed.name(), renamed.definition(), rebound));
     assertEquals(Set.copyOf(rebound.sources()), sourceSet(original.id()));
     assertEquals(2, rows(original.id()).size());
-    assertEquals(4, rows(original.id()).get(0).toVersion());
+    assertEquals(3, rows(original.id()).get(0).toVersion());
     assertEquals(0, rows(original.id()).get(0).deletedAt());
   }
 

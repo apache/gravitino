@@ -177,11 +177,11 @@ public class SemanticModelMetaBaseSQLProvider {
       @Param("oldSemanticModelMeta") SemanticModelPO oldSemanticModelPO) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET semantic_model_name = #{newSemanticModelMeta.semanticModelName},"
-        + " audit_info = #{newSemanticModelMeta.auditInfo},"
-        + " current_version = #{newSemanticModelMeta.currentVersion},"
+        + " SET current_version = #{newSemanticModelMeta.currentVersion},"
         + " last_version = #{newSemanticModelMeta.lastVersion}"
-        + ", active_version = #{newSemanticModelMeta.activeVersion}"
+        + (newSemanticModelPO.getActiveVersion() == 0
+            ? ""
+            : ", active_version = #{newSemanticModelMeta.activeVersion}")
         + " WHERE semantic_model_id = #{oldSemanticModelMeta.semanticModelId}"
         + " AND semantic_model_name = #{oldSemanticModelMeta.semanticModelName}"
         + " AND current_version = #{oldSemanticModelMeta.currentVersion}"

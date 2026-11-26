@@ -234,6 +234,7 @@ public class TestSQLScripts extends TestJDBCBackend {
         assertCleanupIndexes("schema " + versionScripts.getKey());
         assertLiveRowIndexes("schema " + versionScripts.getKey());
         assertNameColumnWidths("schema " + versionScripts.getKey());
+        assertIdempotencySchema("schema " + versionScripts.getKey());
       }
     }
 
@@ -277,6 +278,7 @@ public class TestSQLScripts extends TestJDBCBackend {
         assertCleanupIndexes(upgradeScript.getName());
         assertLiveRowIndexes(upgradeScript.getName());
         assertNameColumnWidths(upgradeScript.getName());
+        assertIdempotencySchema(upgradeScript.getName());
       }
     }
   }
@@ -855,6 +857,45 @@ public class TestSQLScripts extends TestJDBCBackend {
         }
       }
     }
+  }
+
+  private void assertIdempotencySchema(String source) throws SQLException {
+    Map<String, Set<String>> columns = readSchemaColumns();
+    String counterTable =
+        columns.keySet().stream()
+            .filter(name -> name.equalsIgnoreCase("iceberg_idempotency_generation_meta"))
+            .findFirst()
+            .orElseThrow(
+                () -> new AssertionFailedError("Missing idempotency counters after " + source));
+    Assertions.assertEquals(
+        Set.of("stripe", "generation"),
+        Set.copyOf(
+            columns.get(counterTable).stream().map(name -> name.toLowerCase(Locale.ROOT)).toList()),
+        "Idempotency counter columns after " + source);
+    String table =
+        columns.keySet().stream()
+            .filter(name -> name.equalsIgnoreCase("iceberg_idempotency_meta"))
+            .findFirst()
+            .orElseThrow(
+                () -> new AssertionFailedError("Missing idempotency table after " + source));
+    Assertions.assertEquals(
+        Set.of(
+            "idempotency_key",
+            "http_method",
+            "request_uri",
+            "generation",
+            "http_status",
+            "response_summary",
+            "audit_info",
+            "created_at",
+            "expires_at"),
+        Set.copyOf(columns.get(table).stream().map(name -> name.toLowerCase(Locale.ROOT)).toList()),
+        "Idempotency columns after " + source);
+    Assertions.assertTrue(
+        readSchemaIndexes(Set.of(table)).stream()
+            .anyMatch(
+                index -> index.equalsIgnoreCase(table + ":idx_iim_expires:1:expires_at:true")),
+        "Missing idempotency expiry index after " + source);
   }
 
   private void assertCleanupIndexes(String source) throws SQLException {

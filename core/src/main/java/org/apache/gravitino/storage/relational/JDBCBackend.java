@@ -77,6 +77,8 @@ import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelRevision;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.database.H2Database;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
@@ -143,8 +145,37 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   }
 
   @Override
+  public SemanticModelEntity loadSemanticModelRevision(
+      NameIdentifier ident, SemanticModelRevisionSelector selector) throws IOException {
+    return SemanticModelMetaService.getInstance().getSemanticModelByIdentifier(ident, selector);
+  }
+
+  @Override
+  public SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident)
+      throws IOException {
+    return SemanticModelMetaService.getInstance().listSemanticModelRevisions(ident);
+  }
+
+  @Override
+  public SemanticModelEntity publishSemanticModelRevision(
+      NameIdentifier ident, int revision, String principal) throws IOException {
+    return SemanticModelMetaService.getInstance().publishRevision(ident, revision, principal);
+  }
+
+  @Override
   public List<NameIdentifier> listSemanticModelIdentifiers(Namespace namespace) throws IOException {
     return SemanticModelMetaService.getInstance().listSemanticModelIdentifiers(namespace);
+  }
+
+  @Override
+  public SemanticModelEntity updateSemanticModel(
+      NameIdentifier ident,
+      @Nullable Integer expectedRevision,
+      boolean rename,
+      Function<SemanticModelEntity, SemanticModelEntity> updater)
+      throws IOException {
+    return SemanticModelMetaService.getInstance()
+        .updateSemanticModel(ident, expectedRevision, rename, updater);
   }
 
   @Override

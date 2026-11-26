@@ -26,15 +26,36 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelRevision;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.utils.Executable;
 
 public interface EntityStore extends Closeable {
+
+  /** Loads a retained Semantic Model snapshot or the latest saved revision. */
+  default SemanticModelEntity loadSemanticModelRevision(
+      NameIdentifier ident, SemanticModelRevisionSelector selector) throws IOException {
+    throw new UnsupportedOperationException("Loading Semantic Model revisions is not supported");
+  }
+
+  /** Lists retained Semantic Model revision metadata newest first. */
+  default SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident)
+      throws IOException {
+    throw new UnsupportedOperationException("Listing Semantic Model revisions is not supported");
+  }
+
+  /** Publishes the latest Semantic Model revision. */
+  default SemanticModelEntity publishSemanticModelRevision(
+      NameIdentifier ident, int revision, String principal) throws IOException {
+    throw new UnsupportedOperationException("Publishing Semantic Model revisions is not supported");
+  }
 
   /** Lists model identities for governance, irrespective of publication state. */
   default List<NameIdentifier> listSemanticModelIdentifiers(Namespace namespace)
@@ -42,6 +63,16 @@ public interface EntityStore extends Closeable {
     return list(namespace, SemanticModelEntity.class, EntityType.SEMANTIC_MODEL).stream()
         .map(SemanticModelEntity::nameIdentifier)
         .toList();
+  }
+
+  /** Applies a Semantic Model update with an optional revision precondition. */
+  default SemanticModelEntity updateSemanticModel(
+      NameIdentifier ident,
+      @Nullable Integer expectedRevision,
+      boolean rename,
+      Function<SemanticModelEntity, SemanticModelEntity> updater)
+      throws IOException {
+    return update(ident, SemanticModelEntity.class, EntityType.SEMANTIC_MODEL, updater);
   }
 
   /**

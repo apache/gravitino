@@ -19,15 +19,19 @@
 package org.apache.gravitino.catalog;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Suppliers;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.ServiceLoader;
 import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -38,6 +42,7 @@ import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SemanticModelEntity;
@@ -46,16 +51,26 @@ import org.apache.gravitino.semantic.SemanticModel.Status;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelPublicationPolicy;
+import org.apache.gravitino.semantic.SemanticModelRevision;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** EntityStore-backed operations for Gravitino-managed Semantic Models. */
 public class ManagedSemanticModelOperations {
 
+  private static final Logger LOG = LoggerFactory.getLogger(ManagedSemanticModelOperations.class);
+  private static final Supplier<SemanticModelPublicationPolicy> PUBLICATION_POLICY_SUPPLIER =
+      Suppliers.memoize(ManagedSemanticModelOperations::loadPublicationPolicy);
+
   private final EntityStore store;
   private final IdGenerator idGenerator;
   private final BiConsumer<NameIdentifier, SemanticModelDefinition> writeValidator;
+  private final SemanticModelPublicationPolicy publicationPolicy;
 
   /**
    * Creates managed Semantic Model operations.
@@ -68,12 +83,22 @@ public class ManagedSemanticModelOperations {
       EntityStore store,
       IdGenerator idGenerator,
       BiConsumer<NameIdentifier, SemanticModelDefinition> writeValidator) {
+    this(store, idGenerator, writeValidator, PUBLICATION_POLICY_SUPPLIER.get());
+  }
+
+  ManagedSemanticModelOperations(
+      EntityStore store,
+      IdGenerator idGenerator,
+      BiConsumer<NameIdentifier, SemanticModelDefinition> writeValidator,
+      SemanticModelPublicationPolicy publicationPolicy) {
     Preconditions.checkArgument(store != null, "EntityStore must not be null");
     Preconditions.checkArgument(idGenerator != null, "IdGenerator must not be null");
     Preconditions.checkArgument(writeValidator != null, "Write validator must not be null");
+    Preconditions.checkArgument(publicationPolicy != null, "Publication policy must not be null");
     this.store = store;
     this.idGenerator = idGenerator;
     this.writeValidator = writeValidator;
+    this.publicationPolicy = publicationPolicy;
   }
 
   /**
@@ -160,12 +185,47 @@ public class ManagedSemanticModelOperations {
     }
   }
 
+  /** Loads the requested retained snapshot. */
+  public SemanticModel loadSemanticModelRevision(
+      NameIdentifier ident, SemanticModelRevisionSelector selector) {
+    try {
+      return store.loadSemanticModelRevision(ident, selector);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchSemanticModelException(e, "Semantic Model %s does not exist", ident);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to load Semantic Model revision for " + ident, e);
+    }
+  }
+
   /** Returns whether the identity exists, even when the model has no active revision. */
   public boolean semanticModelExists(NameIdentifier ident) {
     try {
       return store.exists(ident, Entity.EntityType.SEMANTIC_MODEL);
     } catch (IOException e) {
       throw new RuntimeException("Failed to check Semantic Model " + ident, e);
+    }
+  }
+
+  /** Lists retained revision summaries for the requested model. */
+  public SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident) {
+    try {
+      return store.listSemanticModelRevisions(ident);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchSemanticModelException(e, "Semantic Model %s does not exist", ident);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to list Semantic Model revisions for " + ident, e);
+    }
+  }
+
+  /** Publishes the latest revision on behalf of the supplied principal. */
+  public SemanticModel publishSemanticModelRevision(
+      NameIdentifier ident, int revision, String principal) {
+    try {
+      return store.publishSemanticModelRevision(ident, revision, principal);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchSemanticModelException(e, "Semantic Model %s does not exist", ident);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to publish Semantic Model revision for " + ident, e);
     }
   }
 
@@ -199,6 +259,7 @@ public class ManagedSemanticModelOperations {
 
     Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
     String writer = PrincipalUtils.getCurrentUserName();
+    boolean publish = publicationPolicy.publishOnSave(ident);
     SemanticModelEntity entity =
         SemanticModelEntity.builder()
             .withId(idGenerator.nextId())
@@ -208,7 +269,11 @@ public class ManagedSemanticModelOperations {
             .withDefinition(definition)
             .withSourceUpdate(sourceUpdate)
             .withProperties(properties)
-            .withRevision(1, Status.PUBLISHED, writer, now)
+            .withRevision(
+                1,
+                publish ? Status.PUBLISHED : Status.DRAFT,
+                publish ? writer : null,
+                publish ? now : null)
             .withAuditInfo(AuditInfo.builder().withCreator(writer).withCreateTime(now).build())
             .build();
 
@@ -239,18 +304,44 @@ public class ManagedSemanticModelOperations {
       NameIdentifier ident, SemanticModelSourceUpdate sourceUpdate, SemanticModelChange... changes)
       throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
+    return alterSemanticModel(ident, sourceUpdate, null, changes);
+  }
+
+  /** Applies changes to latest, optionally requiring the caller's expected revision. */
+  public SemanticModel alterSemanticModel(
+      NameIdentifier ident,
+      SemanticModelSourceUpdate sourceUpdate,
+      @Nullable Integer expectedRevision,
+      SemanticModelChange... changes) {
     boolean validateForWrite = requiresWriteValidation(changes);
+    Preconditions.checkArgument(
+        expectedRevision == null || expectedRevision > 0, "expectedRevision must be positive");
+    Preconditions.checkArgument(
+        !validateForWrite || expectedRevision != null,
+        "expectedRevision is required when replacing the definition");
+    boolean rename = changes[0] instanceof SemanticModelChange.RenameSemanticModel;
     Preconditions.checkArgument(
         validateForWrite == sourceUpdate.replacesSources(),
         "Definition replacement must replace sources; metadata-only changes must preserve sources");
 
     try {
-      return store.update(
+      return store.updateSemanticModel(
           ident,
-          SemanticModelEntity.class,
-          Entity.EntityType.SEMANTIC_MODEL,
+          expectedRevision,
+          rename,
           oldEntity -> {
-            SemanticModelEntity candidate = applyChanges(oldEntity, sourceUpdate, changes);
+            if (expectedRevision != null && oldEntity.revision() != expectedRevision) {
+              throw new OptimisticLockException(
+                  "Semantic Model %s is at revision %s, expected %s",
+                  ident, oldEntity.revision(), expectedRevision);
+            }
+            SemanticModelEntity candidate =
+                applyChanges(
+                    oldEntity,
+                    sourceUpdate,
+                    rename,
+                    !rename && publicationPolicy.publishOnSave(ident),
+                    changes);
             if (validateForWrite) {
               NameIdentifier candidateIdent =
                   NameIdentifier.of(candidate.namespace(), candidate.name());
@@ -306,8 +397,10 @@ public class ManagedSemanticModelOperations {
 
       if (change instanceof SemanticModelChange.ReplaceDefinition) {
         requiresWriteValidation = true;
-      } else if (change instanceof SemanticModelChange.RenameSemanticModel
-          || change instanceof SemanticModelChange.UpdateComment
+      } else if (change instanceof SemanticModelChange.RenameSemanticModel) {
+        Preconditions.checkArgument(
+            changes.length == 1, "Rename must be the only Semantic Model change");
+      } else if (change instanceof SemanticModelChange.UpdateComment
           || change instanceof SemanticModelChange.SetProperty
           || change instanceof SemanticModelChange.RemoveProperty) {
         // These changes do not modify the definition and must not revisit its sources.
@@ -322,6 +415,8 @@ public class ManagedSemanticModelOperations {
   private static SemanticModelEntity applyChanges(
       SemanticModelEntity oldEntity,
       SemanticModelSourceUpdate sourceUpdate,
+      boolean rename,
+      boolean publish,
       SemanticModelChange[] changes) {
     String newName = oldEntity.name();
     String newComment = oldEntity.comment();
@@ -346,22 +441,48 @@ public class ManagedSemanticModelOperations {
     AuditInfo oldAudit = oldEntity.auditInfo();
     Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
     String writer = PrincipalUtils.getCurrentUserName();
-    return SemanticModelEntity.builder()
-        .withId(oldEntity.id())
-        .withName(newName)
-        .withNamespace(oldEntity.namespace())
-        .withComment(newComment)
-        .withDefinition(newDefinition)
-        .withSourceUpdate(sourceUpdate)
-        .withProperties(newProperties)
-        .withRevision(Math.incrementExact(oldEntity.revision()), Status.PUBLISHED, writer, now)
-        .withAuditInfo(
-            AuditInfo.builder()
-                .withCreator(oldAudit.creator())
-                .withCreateTime(oldAudit.createTime())
-                .withLastModifier(writer)
-                .withLastModifiedTime(now)
-                .build())
-        .build();
+    SemanticModelEntity.Builder builder =
+        SemanticModelEntity.builder()
+            .withId(oldEntity.id())
+            .withName(newName)
+            .withNamespace(oldEntity.namespace())
+            .withComment(newComment)
+            .withDefinition(newDefinition)
+            .withSourceUpdate(sourceUpdate)
+            .withProperties(newProperties)
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(oldAudit.creator())
+                    .withCreateTime(oldAudit.createTime())
+                    .withLastModifier(writer)
+                    .withLastModifiedTime(now)
+                    .build());
+    if (rename) {
+      builder.withRevision(
+          oldEntity.revision(),
+          oldEntity.status(),
+          oldEntity.publishedBy(),
+          oldEntity.publishedAt());
+    } else {
+      builder.withRevision(
+          Math.incrementExact(oldEntity.revision()),
+          publish ? Status.PUBLISHED : Status.DRAFT,
+          publish ? writer : null,
+          publish ? now : null);
+    }
+    return builder.build();
+  }
+
+  private static SemanticModelPublicationPolicy loadPublicationPolicy() {
+    Iterator<SemanticModelPublicationPolicy> policies =
+        ServiceLoader.load(SemanticModelPublicationPolicy.class).iterator();
+    if (!policies.hasNext()) {
+      return ident -> true;
+    }
+    SemanticModelPublicationPolicy policy = policies.next();
+    Preconditions.checkState(
+        !policies.hasNext(), "Multiple Semantic Model publication policies are registered");
+    LOG.info("Loaded Semantic Model publication policy {}", policy.getClass().getName());
+    return policy;
   }
 }

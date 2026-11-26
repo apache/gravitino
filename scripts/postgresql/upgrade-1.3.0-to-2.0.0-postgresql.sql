@@ -107,6 +107,26 @@ COMMENT ON COLUMN policy_tag_relation_meta.current_version IS 'policy tag relati
 COMMENT ON COLUMN policy_tag_relation_meta.last_version IS 'policy tag relation last version';
 COMMENT ON COLUMN policy_tag_relation_meta.deleted_at IS 'policy tag relation deleted at';
 
+CREATE TABLE IF NOT EXISTS policy_role_relation_meta (
+    id BIGSERIAL NOT NULL,
+    policy_id BIGINT NOT NULL,
+    role_name VARCHAR(128) NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE (policy_id, role_name, deleted_at)
+);
+
+CREATE INDEX IF NOT EXISTS policy_role_relation_meta_idx_role_name ON policy_role_relation_meta (role_name);
+COMMENT ON TABLE policy_role_relation_meta IS 'policy role relation';
+COMMENT ON COLUMN policy_role_relation_meta.id IS 'auto increment id';
+COMMENT ON COLUMN policy_role_relation_meta.policy_id IS 'policy id';
+COMMENT ON COLUMN policy_role_relation_meta.role_name IS 'role name referenced by the policy content';
+COMMENT ON COLUMN policy_role_relation_meta.current_version IS 'policy role relation current version';
+COMMENT ON COLUMN policy_role_relation_meta.last_version IS 'policy role relation last version';
+COMMENT ON COLUMN policy_role_relation_meta.deleted_at IS 'policy role relation deleted at';
+
 ALTER TABLE job_run_meta ADD COLUMN IF NOT EXISTS runtime_job_template TEXT DEFAULT NULL;
 COMMENT ON COLUMN job_run_meta.runtime_job_template IS 'job run runtime job template';
 
@@ -564,6 +584,35 @@ COMMENT ON COLUMN domain_rel.audit_info IS 'domain relation audit info';
 COMMENT ON COLUMN domain_rel.current_version IS 'domain relation current version';
 COMMENT ON COLUMN domain_rel.last_version IS 'domain relation last version';
 COMMENT ON COLUMN domain_rel.deleted_at IS 'domain relation deleted at';
+
+CREATE TABLE IF NOT EXISTS iceberg_idempotency_meta (
+  idempotency_key  VARCHAR(36) NOT NULL PRIMARY KEY,
+  http_method      VARCHAR(16) NOT NULL,
+  request_uri      TEXT        NOT NULL,
+  generation       BIGINT      NOT NULL,
+  http_status      INT,
+  response_summary TEXT,
+  audit_info       TEXT        NOT NULL,
+  created_at       BIGINT      NOT NULL,
+  expires_at       BIGINT      NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_iim_expires ON iceberg_idempotency_meta (expires_at);
+COMMENT ON TABLE iceberg_idempotency_meta IS 'Iceberg REST idempotency records';
+COMMENT ON COLUMN iceberg_idempotency_meta.idempotency_key IS 'client-provided UUIDv7 idempotency key';
+COMMENT ON COLUMN iceberg_idempotency_meta.http_method IS 'HTTP method of the request';
+COMMENT ON COLUMN iceberg_idempotency_meta.request_uri IS 'encoded request path and sorted query string';
+COMMENT ON COLUMN iceberg_idempotency_meta.generation IS 'reservation fencing token';
+COMMENT ON COLUMN iceberg_idempotency_meta.http_status IS 'HTTP status of finalized response, NULL while reserved';
+COMMENT ON COLUMN iceberg_idempotency_meta.response_summary IS 'serialized response body (JSON) for replay';
+COMMENT ON COLUMN iceberg_idempotency_meta.audit_info IS 'idempotency record audit info';
+COMMENT ON COLUMN iceberg_idempotency_meta.created_at IS 'record created at (unix epoch millis)';
+COMMENT ON COLUMN iceberg_idempotency_meta.expires_at IS 'record expires at (unix epoch millis)';
+
+
+CREATE TABLE IF NOT EXISTS iceberg_idempotency_generation_meta (
+  stripe INT NOT NULL PRIMARY KEY,
+  generation BIGINT NOT NULL
+);
 
 -- Keep retained deletions out of live metadata lists and relationship cleanup scans.
 CREATE INDEX IF NOT EXISTS idx_tag_meta_live ON tag_meta (metalake_id) WHERE deleted_at = 0;

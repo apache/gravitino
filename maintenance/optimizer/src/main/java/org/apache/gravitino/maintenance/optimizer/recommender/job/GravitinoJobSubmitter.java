@@ -21,7 +21,6 @@ package org.apache.gravitino.maintenance.optimizer.recommender.job;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.client.GravitinoClient;
@@ -110,15 +109,12 @@ public class GravitinoJobSubmitter implements JobSubmitter {
   }
 
   /**
-   * Merge job configs with precedence: optimizer config < adapter config.
+   * Builds the {@code runJob} configuration from the adapter only.
    *
-   * <p>Typical use cases:
-   *
-   * <ul>
-   *   <li>Optimizer config: shared engine/runtime defaults (for example, Spark settings).
-   *   <li>Adapter config: adapter-specific parameters (for example, WHERE filters) required by the
-   *       job template.
-   * </ul>
+   * <p>{@code gravitino.optimizer.jobSubmitterConfig.*} is passed into the adapter as raw material
+   * (for example Spark resources and catalog connection). The adapter must emit only keys the job
+   * template declares. Forwarding the submitter map wholesale would fail once unused configuration
+   * keys are rejected.
    */
   @VisibleForTesting
   static Map<String, String> buildJobConfig(
@@ -145,15 +141,10 @@ public class GravitinoJobSubmitter implements JobSubmitter {
       String schemaSeparator) {
     Map<String, String> submitterConfigs =
         optimizerConfig == null ? Map.of() : optimizerConfig.jobSubmitterConfigs();
-    Map<String, String> adapterConfigs =
-        jobAdapter == null
-            ? Map.of()
-            : jobAdapter.jobConfig(jobExecutionContext, submitterConfigs, schemaSeparator);
-
-    Map<String, String> mergedConfigs = new LinkedHashMap<>();
-    mergedConfigs.putAll(submitterConfigs);
-    mergedConfigs.putAll(adapterConfigs);
-    return mergedConfigs;
+    if (jobAdapter == null) {
+      return Map.of();
+    }
+    return Map.copyOf(jobAdapter.jobConfig(jobExecutionContext, submitterConfigs, schemaSeparator));
   }
 
   @VisibleForTesting

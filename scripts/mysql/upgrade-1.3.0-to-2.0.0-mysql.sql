@@ -571,6 +571,18 @@ CREATE TABLE IF NOT EXISTS `policy_tag_relation_meta` (
     KEY `policy_tag_relation_meta_idx_tag_id` (`tag_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy tag relation';
 
+CREATE TABLE IF NOT EXISTS `policy_role_relation_meta` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id',
+    `role_name` VARCHAR(128) NOT NULL COMMENT 'role name referenced by the policy content',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy role relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy role relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy role relation deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `policy_role_relation_meta_uk_pid_rn_del` (`policy_id`, `role_name`, `deleted_at`),
+    KEY `policy_role_relation_meta_idx_role_name` (`role_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy role relation';
+
 SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
     WHERE table_schema = DATABASE() AND table_name = 'job_run_meta' AND column_name = 'runtime_job_template'),
     'SELECT 1',
@@ -928,6 +940,26 @@ CREATE TABLE IF NOT EXISTS `domain_rel` (
     KEY `domain_rel_idx_parent` (`parent_id`, `deleted_at`),
     KEY `domain_rel_idx_metalake` (`metalake_id`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'domain parent relation';
+
+CREATE TABLE IF NOT EXISTS `iceberg_idempotency_meta` (
+  `idempotency_key`  VARCHAR(36)         NOT NULL     COMMENT 'client-provided UUIDv7 idempotency key',
+  `http_method`      VARCHAR(16)         NOT NULL     COMMENT 'HTTP method of the request',
+  `request_uri`      MEDIUMTEXT          NOT NULL     COMMENT 'encoded request path and sorted query string',
+  `generation`       BIGINT              NOT NULL     COMMENT 'reservation fencing token',
+  `http_status`      INT(10) UNSIGNED    DEFAULT NULL COMMENT 'HTTP status of finalized response, NULL while reserved',
+  `response_summary` MEDIUMTEXT          DEFAULT NULL COMMENT 'serialized response body (JSON) for replay',
+  `audit_info`       MEDIUMTEXT          NOT NULL     COMMENT 'idempotency record audit info',
+  `created_at`       BIGINT(20) UNSIGNED NOT NULL     COMMENT 'record created at (unix epoch millis)',
+  `expires_at`       BIGINT(20) UNSIGNED NOT NULL     COMMENT 'record expires at (unix epoch millis)',
+  PRIMARY KEY (`idempotency_key`),
+  KEY `idx_iim_expires` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Iceberg REST idempotency records';
+
+
+CREATE TABLE IF NOT EXISTS iceberg_idempotency_generation_meta (
+  stripe INT NOT NULL PRIMARY KEY,
+  generation BIGINT NOT NULL
+) ENGINE=InnoDB;
 
 -- Index live metadata lists and relationship cleanup by their lookup keys and deletion status.
 SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics

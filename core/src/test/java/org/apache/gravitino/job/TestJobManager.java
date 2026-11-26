@@ -1315,8 +1315,7 @@ public class TestJobManager {
     doNothing().when(entityStore).put(any(JobEntity.class), anyBoolean());
 
     JobEntity jobEntity =
-        jobManager.runJob(
-            metalake, jobTemplateEntity.name(), ImmutableMap.of("name", "Bob", "unused", "x"));
+        jobManager.runJob(metalake, jobTemplateEntity.name(), ImmutableMap.of("name", "Bob"));
 
     ShellJobTemplateDTO runtimeJobTemplateDTO =
         (ShellJobTemplateDTO)
@@ -1325,6 +1324,32 @@ public class TestJobManager {
     Assertions.assertEquals(
         Lists.newArrayList("--greeting", "Hi", "--note", "", "Bob"),
         runtimeJobTemplateDTO.arguments());
+  }
+
+  @Test
+  public void testRunJobRejectsUnusedParametersBeforeStaging() {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    JobTemplateEntity jobTemplateEntity =
+        newShellJobTemplateEntity(
+            "shell_job_unused_key",
+            Lists.newArrayList("--greeting", "{{greeting:-Hi}}", "{{name}}"));
+    when(jobManager.getJobTemplate(metalake, jobTemplateEntity.name()))
+        .thenReturn(jobTemplateEntity);
+
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                jobManager.runJob(
+                    metalake,
+                    jobTemplateEntity.name(),
+                    ImmutableMap.of("name", "Bob", "unused", "x")));
+    Assertions.assertTrue(e.getMessage().contains("[unused]"), e.getMessage());
+    Assertions.assertTrue(e.getMessage().contains("[greeting, name]"), e.getMessage());
+    verify(jobExecutor, never()).submitJob(any(), any());
   }
 
   @Test
