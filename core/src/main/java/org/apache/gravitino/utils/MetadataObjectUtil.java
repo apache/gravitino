@@ -24,6 +24,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.ImmutableBiMap;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -32,13 +33,16 @@ import java.util.Set;
 import java.util.function.Supplier;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.SupportsOntologyIdLookup;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -47,6 +51,7 @@ import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.meta.OntologyEntity;
 
 public class MetadataObjectUtil {
 
@@ -71,6 +76,7 @@ public class MetadataObjectUtil {
           .put(MetadataObject.Type.SEMANTIC_MODEL, Entity.EntityType.SEMANTIC_MODEL)
           .put(MetadataObject.Type.FUNCTION, Entity.EntityType.FUNCTION)
           .put(MetadataObject.Type.DOMAIN, Entity.EntityType.DOMAIN)
+          .put(MetadataObject.Type.ONTOLOGY, Entity.EntityType.ONTOLOGY)
           .build();
 
   private MetadataObjectUtil() {}
@@ -142,6 +148,8 @@ public class MetadataObjectUtil {
         return NameIdentifierUtil.ofJob(metalakeName, metadataObject.name());
       case JOB_TEMPLATE:
         return NameIdentifierUtil.ofJobTemplate(metalakeName, metadataObject.name());
+      case ONTOLOGY:
+        return NameIdentifierUtil.ofOntology(metalakeName, metadataObject.name());
       case DOMAIN:
         String domainName = metadataObject.fullName();
         NameValidationUtils.validateName("domain", domainName);
@@ -359,6 +367,22 @@ public class MetadataObjectUtil {
           env.internalJobOperationDispatcher().getJobTemplate(metalake, object.fullName());
         } catch (NoSuchJobTemplateException e) {
           throw exceptionToThrowSupplier.get();
+        }
+        break;
+
+      case ONTOLOGY:
+        try {
+          // An existence check needs only the ID, not the ontology definition.
+          EntityStore store = env.entityStore();
+          if (store instanceof SupportsOntologyIdLookup) {
+            ((SupportsOntologyIdLookup) store).getOntologyId(identifier);
+          } else {
+            store.get(identifier, Entity.EntityType.ONTOLOGY, OntologyEntity.class);
+          }
+        } catch (NoSuchEntityException e) {
+          throw exceptionToThrowSupplier.get();
+        } catch (IOException e) {
+          throw new RuntimeException("Failed to load ontology metadata", e);
         }
         break;
 

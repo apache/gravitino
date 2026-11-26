@@ -361,6 +361,7 @@ public class MetalakeMetaService {
                 SessionUtils.doWithoutCommit(
                     SemanticModelVersionInfoMapper.class,
                     mapper -> mapper.softDeleteSemanticModelVersionsByMetalakeId(metalakeId)),
+            () -> OntologyMetaService.getInstance().cascadeMetalake(metalakeId),
             () ->
                 SessionUtils.doWithoutCommit(
                     SemanticModelMetricMapper.class,
@@ -388,6 +389,7 @@ public class MetalakeMetaService {
                     "Entity %s has sub-entities, you should remove sub-entities first", ident);
               }
             },
+            () -> OntologyMetaService.getInstance().cascadeMetalake(metalakeId),
             () ->
                 SessionUtils.doWithoutCommit(
                     UserRoleRelMapper.class,

@@ -243,6 +243,16 @@ public class NamespaceUtil {
   }
 
   /**
+   * Creates the namespace for a metalake's ontologies.
+   *
+   * @param metalake The metalake name.
+   * @return The ontology namespace.
+   */
+  public static Namespace ofOntology(String metalake) {
+    return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ONTOLOGY_SCHEMA_NAME);
+  }
+
+  /**
    * Create a namespace for job.
    *
    * @param metalake The metalake name

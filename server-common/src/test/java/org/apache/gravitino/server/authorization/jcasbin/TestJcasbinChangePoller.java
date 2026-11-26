@@ -156,7 +156,7 @@ public class TestJcasbinChangePoller {
 
     JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
 
-    // TAG/POLICY/JOB/JOB_TEMPLATE/DOMAIN live in a virtual namespace
+    // TAG/POLICY/JOB/JOB_TEMPLATE/DOMAIN/ONTOLOGY live in a virtual namespace
     // (<metalake>.system.<kind>.<name>).
     // Authorization caches their ids by leaf name, so a peer must drop exactly that key.
     poller.onEntityChange(
@@ -170,7 +170,12 @@ public class TestJcasbinChangePoller {
                 6L,
                 MetadataObject.Type.DOMAIN,
                 EntityChangeLogNameIdentifierCodec.encode(
-                    NameIdentifier.of("ml1", "system", "domain", "Trading_v1")))));
+                    NameIdentifier.of("ml1", "system", "domain", "Trading_v1"))),
+            change(
+                7L,
+                MetadataObject.Type.ONTOLOGY,
+                EntityChangeLogNameIdentifierCodec.encode(
+                    NameIdentifier.of("ml1", "system", "ontology", "TradingTerms")))));
 
     Assertions.assertEquals(
         List.of(key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "TABLE", "tbl1", "")),
@@ -181,7 +186,8 @@ public class TestJcasbinChangePoller {
             lookupKey("retention", MetadataObject.Type.POLICY),
             lookupKey("job1", MetadataObject.Type.JOB),
             lookupKey("tpl1", MetadataObject.Type.JOB_TEMPLATE),
-            lookupKey("Trading_v1", MetadataObject.Type.DOMAIN)),
+            lookupKey("Trading_v1", MetadataObject.Type.DOMAIN),
+            lookupKey("TradingTerms", MetadataObject.Type.ONTOLOGY)),
         metadataIdCache.invalidatedKeys);
   }
 

@@ -518,7 +518,7 @@ class TestAuthorizationUtils {
   }
 
   @Test
-  void testDomainPrivilegesDoNotUpdateMixedMetalakeConnectorGrants() {
+  void testGravitinoOnlyPrivilegesDoNotUpdateMixedMetalakeConnectorGrants() {
     CatalogManager catalogs = Mockito.mock(CatalogManager.class);
     BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
     AuthorizationPlugin plugin = Mockito.mock(AuthorizationPlugin.class);
@@ -539,7 +539,13 @@ class TestAuthorizationUtils {
               Privileges.ManageDomain.allow(),
               Privileges.UseDomain.allow(),
               Privileges.ManageDomain.deny(),
-              Privileges.UseDomain.deny())) {
+              Privileges.UseDomain.deny(),
+              Privileges.CreateOntology.allow(),
+              Privileges.UseOntology.allow(),
+              Privileges.ModifyOntology.allow(),
+              Privileges.CreateOntology.deny(),
+              Privileges.UseOntology.deny(),
+              Privileges.ModifyOntology.deny())) {
         SecurableObject mixed =
             SecurableObjects.parse(
                 metalake,

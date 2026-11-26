@@ -22,6 +22,7 @@ import static org.apache.gravitino.Entity.EntityType.DOMAIN;
 import static org.apache.gravitino.Entity.EntityType.GROUP;
 import static org.apache.gravitino.Entity.EntityType.JOB;
 import static org.apache.gravitino.Entity.EntityType.JOB_TEMPLATE;
+import static org.apache.gravitino.Entity.EntityType.ONTOLOGY;
 import static org.apache.gravitino.Entity.EntityType.POLICY;
 import static org.apache.gravitino.Entity.EntityType.ROLE;
 import static org.apache.gravitino.Entity.EntityType.TAG;
@@ -58,7 +59,7 @@ public class NameIdentifierUtil {
   private NameIdentifierUtil() {}
 
   private static final Set<Entity.EntityType> SUPPORT_VIRTUAL_NAMESPACE_TYPES =
-      ImmutableSet.of(USER, GROUP, ROLE, TAG, POLICY, JOB, JOB_TEMPLATE, DOMAIN);
+      ImmutableSet.of(USER, GROUP, ROLE, TAG, POLICY, JOB, JOB_TEMPLATE, DOMAIN, ONTOLOGY);
 
   /**
    * Create the metalake {@link NameIdentifierUtil} with the given name.
@@ -642,6 +643,17 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Creates the identifier of a metalake-wide ontology.
+   *
+   * @param metalake The metalake name.
+   * @param ontology The ontology name.
+   * @return The ontology identifier.
+   */
+  public static NameIdentifier ofOntology(String metalake, String ontology) {
+    return NameIdentifier.of(NamespaceUtil.ofOntology(metalake), ontology);
+  }
+
+  /**
    * Check whether the metadata object name can be represented in a qualified metadata object name.
    *
    * @param ident The metadata object identifier to check
@@ -754,6 +766,13 @@ public class NameIdentifierUtil {
       case JOB_TEMPLATE:
         checkJobTemplate(ident);
         return MetadataObjects.of(null, ident.name(), MetadataObject.Type.JOB_TEMPLATE);
+
+      case ONTOLOGY:
+        NameIdentifier.check(
+            ident.namespace().equals(NamespaceUtil.ofOntology(getMetalake(ident))),
+            "Invalid ontology namespace: %s",
+            ident.namespace());
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.ONTOLOGY);
 
       case DOMAIN:
         checkDomain(ident);
@@ -1026,6 +1045,7 @@ public class NameIdentifierUtil {
       case JOB:
       case JOB_TEMPLATE:
       case DOMAIN:
+      case ONTOLOGY:
         return Entity.EntityType.METALAKE;
 
       case METALAKE:
@@ -1074,6 +1094,8 @@ public class NameIdentifierUtil {
         return NamespaceUtil.ofJobTemplate(metalake);
       case DOMAIN:
         return NamespaceUtil.ofDomain(metalake);
+      case ONTOLOGY:
+        return NamespaceUtil.ofOntology(metalake);
       default:
         throw new IllegalArgumentException("Unsupported virtual namespace type: " + type);
     }
