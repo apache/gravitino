@@ -111,6 +111,7 @@ import org.apache.gravitino.hook.SemanticModelHookDispatcher;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
@@ -142,6 +143,7 @@ import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.tag.TagAssignmentAuthorization;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -153,6 +155,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -6029,6 +6032,379 @@ public class TestJcasbinAuthorizer {
     assertNotNull(ownerRelCache, "ownerRel cache should be initialized");
   }
 
+  @Test
+  void testAccessTagRejectsStaleCachedIdentity() throws Throwable {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    long roleId = 991L;
+    RoleEntity role =
+        mockRoleInStore(
+            roleId,
+            "oldTagGrant",
+            ImmutableList.of(
+                buildSecurableObject(
+                    roleId,
+                    MetadataObject.Type.TAG,
+                    "sensitive",
+                    Privilege.Name.APPLY_TAG,
+                    "ALLOW")));
+    mockDirectUserRoles(role);
+    MetadataObject tag = MetadataObjects.of(null, "sensitive", MetadataObject.Type.TAG);
+    UserPrincipal principal = new UserPrincipal(USERNAME);
+    assertTrue(
+        jcasbinAuthorizer.authorize(
+            principal, METALAKE, tag, Privilege.Name.APPLY_TAG, new AuthorizationRequestContext()));
+    long replacementId = CATALOG_ID + 10000L;
+    withMetadataIds(
+        Map.of(tag, Optional.of(replacementId)),
+        () -> {
+          try (TagAssignmentAuthorization scope = TagAssignmentAuthorization.open()) {
+            TagAssignmentAuthorization.recordIdentity(
+                NameIdentifierUtil.ofTag(METALAKE, "sensitive"), replacementId);
+            assertFalse(
+                jcasbinAuthorizer.authorize(
+                    principal,
+                    METALAKE,
+                    tag,
+                    Privilege.Name.APPLY_TAG,
+                    new AuthorizationRequestContext()));
+            assertTrue(
+                jcasbinAuthorizer.deny(
+                    principal,
+                    METALAKE,
+                    tag,
+                    Privilege.Name.APPLY_TAG,
+                    new AuthorizationRequestContext()));
+          }
+        });
+  }
+
+  @Test
+  void testAssignmentRejectsStaleCachedTargetIdentity() throws Throwable {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    long roleId = 992L;
+    RoleEntity role =
+        mockRoleInStore(
+            roleId,
+            "oldObjectGrant",
+            ImmutableList.of(
+                buildManageGrantsSecurableObject(
+                    roleId, MetadataObject.Type.CATALOG, "testCatalog")));
+    mockDirectUserRoles(role);
+    MetadataObject catalog = MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG);
+    UserPrincipal principal = new UserPrincipal(USERNAME);
+    assertTrue(
+        jcasbinAuthorizer.authorize(
+            principal,
+            METALAKE,
+            catalog,
+            Privilege.Name.MANAGE_GRANTS,
+            new AuthorizationRequestContext()));
+    long replacementId = CATALOG_ID + 10000L;
+    withMetadataIds(
+        Map.of(catalog, Optional.of(replacementId)),
+        () -> {
+          try (TagAssignmentAuthorization scope = TagAssignmentAuthorization.open()) {
+            TagAssignmentAuthorization.recordTarget(
+                NameIdentifier.of(METALAKE, "testCatalog"),
+                Entity.EntityType.CATALOG,
+                new NamespacedEntityId(replacementId, USER_METALAKE_ID));
+            assertFalse(
+                jcasbinAuthorizer.authorize(
+                    principal,
+                    METALAKE,
+                    catalog,
+                    Privilege.Name.MANAGE_GRANTS,
+                    new AuthorizationRequestContext()));
+            TagAssignmentAuthorization.recordTarget(
+                NameIdentifier.of(METALAKE, "testCatalog"), Entity.EntityType.CATALOG, null);
+            TagAssignmentAuthorization.recordMissingTargetAncestor(
+                new NamespacedEntityId(USER_METALAKE_ID));
+            assertFalse(
+                jcasbinAuthorizer.authorize(
+                    principal,
+                    METALAKE,
+                    catalog,
+                    Privilege.Name.MANAGE_GRANTS,
+                    new AuthorizationRequestContext()));
+            assertTrue(
+                jcasbinAuthorizer.deny(
+                    principal,
+                    METALAKE,
+                    catalog,
+                    Privilege.Name.MANAGE_GRANTS,
+                    new AuthorizationRequestContext()));
+          }
+        });
+  }
+
+  @Test
+  void testAssignmentRejectsStaleCachedAncestorIdentity() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    long roleId = 993L;
+    RoleEntity role =
+        mockRoleInStore(
+            roleId,
+            "oldAncestorGrant",
+            ImmutableList.of(
+                buildManageGrantsSecurableObject(
+                    roleId, MetadataObject.Type.CATALOG, "testCatalog")));
+    mockDirectUserRoles(role);
+    MetadataObject catalog = MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG);
+    UserPrincipal principal = new UserPrincipal(USERNAME);
+    assertTrue(
+        jcasbinAuthorizer.authorize(
+            principal,
+            METALAKE,
+            catalog,
+            Privilege.Name.MANAGE_GRANTS,
+            new AuthorizationRequestContext()));
+    try (TagAssignmentAuthorization scope = TagAssignmentAuthorization.open()) {
+      TagAssignmentAuthorization.recordTarget(
+          NameIdentifier.of(METALAKE, "testCatalog", "testSchema", "testTable"),
+          Entity.EntityType.TABLE,
+          new NamespacedEntityId(100L, USER_METALAKE_ID, CATALOG_ID + 10000L, 99L));
+      assertFalse(
+          jcasbinAuthorizer.authorize(
+              principal,
+              METALAKE,
+              catalog,
+              Privilege.Name.MANAGE_GRANTS,
+              new AuthorizationRequestContext()));
+      assertTrue(
+          jcasbinAuthorizer.deny(
+              principal,
+              METALAKE,
+              catalog,
+              Privilege.Name.MANAGE_GRANTS,
+              new AuthorizationRequestContext()));
+    }
+  }
+
+  @Test
+  void testAbsentTargetRejectsStaleDirectGrant() throws Throwable {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    long roleId = 995L;
+    RoleEntity role =
+        mockRoleInStore(
+            roleId,
+            "staleTableGrant",
+            ImmutableList.of(
+                buildSecurableObject(
+                    roleId,
+                    MetadataObject.Type.TABLE,
+                    "testCatalog.testSchema.testTable",
+                    Privilege.Name.SELECT_TABLE,
+                    "ALLOW")));
+    mockDirectUserRoles(role);
+    MetadataObject table =
+        MetadataObjects.parse("testCatalog.testSchema.testTable", MetadataObject.Type.TABLE);
+    UserPrincipal principal = new UserPrincipal(USERNAME);
+    assertTrue(
+        jcasbinAuthorizer.authorize(
+            principal,
+            METALAKE,
+            table,
+            Privilege.Name.SELECT_TABLE,
+            new AuthorizationRequestContext()));
+    withMetadataIds(
+        Map.of(table, Optional.empty()),
+        () -> {
+          assertEquals(Optional.empty(), MetadataIdConverter.getID(table, METALAKE));
+          assertTrue(
+              jcasbinAuthorizer.authorize(
+                  principal,
+                  METALAKE,
+                  table,
+                  Privilege.Name.SELECT_TABLE,
+                  new AuthorizationRequestContext()));
+          try (TagAssignmentAuthorization scope = TagAssignmentAuthorization.open()) {
+            TagAssignmentAuthorization.recordTarget(
+                NameIdentifier.of(METALAKE, "testCatalog", "testSchema", "testTable"),
+                Entity.EntityType.TABLE,
+                null);
+            TagAssignmentAuthorization.recordMissingTargetAncestor(
+                new NamespacedEntityId(99L, USER_METALAKE_ID, CATALOG_ID));
+            assertFalse(
+                jcasbinAuthorizer.authorize(
+                    principal,
+                    METALAKE,
+                    table,
+                    Privilege.Name.SELECT_TABLE,
+                    new AuthorizationRequestContext()));
+            assertTrue(
+                jcasbinAuthorizer.deny(
+                    principal,
+                    METALAKE,
+                    table,
+                    Privilege.Name.SELECT_TABLE,
+                    new AuthorizationRequestContext()));
+          }
+        });
+  }
+
+  @Test
+  void testAccessTagExpressionWithGrantAuthority() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    long roleId = 901L;
+    RoleEntity role =
+        mockRoleInStore(
+            roleId,
+            "accessTagRole",
+            withTableParentUsage(
+                roleId,
+                buildSecurableObject(
+                    roleId,
+                    MetadataObject.Type.TAG,
+                    "sensitive",
+                    Privilege.Name.APPLY_TAG,
+                    "ALLOW"),
+                buildManageGrantsSecurableObject(
+                    roleId, MetadataObject.Type.CATALOG, "testCatalog")));
+    mockDirectUserRoles(role);
+    Map<Entity.EntityType, NameIdentifier> metadata = sensitiveTagMetadata();
+    Map<String, Object> path = testTablePath();
+    AuthorizationExpressionEvaluator evaluator =
+        new AuthorizationExpressionEvaluator(
+            AuthorizationExpressionConstants.APPLY_ACCESS_TAG_AUTHORIZATION_EXPRESSION,
+            jcasbinAuthorizer);
+    RoleEntity broadRole =
+        mockRoleInStore(
+            903L,
+            "broadApplyRole",
+            withTableParentUsage(
+                903L,
+                buildSecurableObject(
+                    903L,
+                    MetadataObject.Type.METALAKE,
+                    METALAKE,
+                    Privilege.Name.APPLY_TAG,
+                    "ALLOW"),
+                buildManageGrantsSecurableObject(
+                    903L, MetadataObject.Type.CATALOG, "testCatalog")));
+    mockDirectUserRoles(broadRole);
+    assertFalse(
+        evaluator.evaluate(metadata, path, new AuthorizationRequestContext(), Optional.empty()));
+    RoleEntity reader =
+        mockRoleInStore(
+            905L,
+            "readerOnlyRole",
+            withTableParentUsage(
+                905L,
+                buildSecurableObject(
+                    905L,
+                    MetadataObject.Type.TABLE,
+                    "testCatalog.testSchema.testTable",
+                    Privilege.Name.SELECT_TABLE,
+                    "ALLOW")));
+    mockDirectUserRoles(reader);
+    assertFalse(
+        evaluator.evaluate(metadata, path, new AuthorizationRequestContext(), Optional.empty()));
+    RoleEntity tagOnly =
+        mockRoleInStore(
+            904L,
+            "tagOnlyRole",
+            withTableParentUsage(
+                904L,
+                buildSecurableObject(
+                    904L,
+                    MetadataObject.Type.TAG,
+                    "sensitive",
+                    Privilege.Name.APPLY_TAG,
+                    "ALLOW")));
+    mockDirectUserRoles(tagOnly);
+    assertFalse(
+        evaluator.evaluate(metadata, path, new AuthorizationRequestContext(), Optional.empty()));
+    mockDirectUserRoles(role);
+    assertTrue(
+        evaluator.evaluate(metadata, path, new AuthorizationRequestContext(), Optional.empty()));
+    AuthorizationRequestContext noActiveRoles = new AuthorizationRequestContext();
+    noActiveRoles.setActiveRoles(ActiveRoles.none());
+    assertFalse(evaluator.evaluate(metadata, path, noActiveRoles, Optional.empty()));
+    RoleEntity denyRole =
+        mockRoleInStore(
+            902L,
+            "denyAccessTagRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    902L, MetadataObject.Type.TAG, "sensitive", Privilege.Name.APPLY_TAG, "DENY")));
+    mockDirectUserRoles(role, denyRole);
+    assertFalse(
+        evaluator.evaluate(metadata, path, new AuthorizationRequestContext(), Optional.empty()));
+    AuthorizationRequestContext narrowed = new AuthorizationRequestContext();
+    narrowed.setActiveRoles(ActiveRoles.of(Set.of("accessTagRole")));
+    assertFalse(evaluator.evaluate(metadata, path, narrowed, Optional.empty()));
+  }
+
+  @Test
+  void testAccessTagExpressionDoesNotAddServiceAdminBypass() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    AccessControlDispatcher dispatcher = mock(AccessControlDispatcher.class);
+    when(gravitinoEnv.internalAccessControlDispatcher()).thenReturn(dispatcher);
+    when(dispatcher.isServiceAdmin(USERNAME)).thenReturn(true);
+    mockDirectUserRoles();
+    AuthorizationExpressionEvaluator evaluator =
+        new AuthorizationExpressionEvaluator(
+            AuthorizationExpressionConstants.APPLY_ACCESS_TAG_AUTHORIZATION_EXPRESSION,
+            jcasbinAuthorizer);
+    assertTrue(jcasbinAuthorizer.isServiceAdmin());
+    assertFalse(
+        evaluator.evaluate(
+            sensitiveTagMetadata(),
+            testTablePath(),
+            new AuthorizationRequestContext(),
+            Optional.empty()));
+  }
+
+  @Test
+  void testAccessTagExpressionWithOwnership() throws Throwable {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    MetadataObject table =
+        MetadataObjects.parse("testCatalog.testSchema.testTable", MetadataObject.Type.TABLE);
+    MetadataObject tag = MetadataObjects.of(null, "sensitive", MetadataObject.Type.TAG);
+    MetadataObject metalake = MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE);
+    withMetadataIds(
+        Map.of(table, Optional.of(911L), tag, Optional.of(912L), metalake, Optional.of(913L)),
+        () -> {
+          RoleEntity tagGrant =
+              mockRoleInStore(
+                  914L,
+                  "ownerTagGrant",
+                  withTableParentUsage(
+                      914L,
+                      buildSecurableObject(
+                          914L,
+                          MetadataObject.Type.TAG,
+                          "sensitive",
+                          Privilege.Name.APPLY_TAG,
+                          "ALLOW")));
+          Map<Entity.EntityType, NameIdentifier> metadata = sensitiveTagMetadata();
+          Map<String, Object> path = testTablePath();
+          AuthorizationExpressionEvaluator evaluator =
+              new AuthorizationExpressionEvaluator(
+                  AuthorizationExpressionConstants.APPLY_ACCESS_TAG_AUTHORIZATION_EXPRESSION,
+                  jcasbinAuthorizer);
+          GravitinoCache<Long, Optional<OwnerInfo>> owners = getOwnerRelCache(jcasbinAuthorizer);
+          owners.put(911L, Optional.of(new OwnerInfo(USER_ID, "USER")));
+          mockDirectUserRoles(tagGrant);
+          assertTrue(
+              evaluator.evaluate(
+                  metadata, path, new AuthorizationRequestContext(), Optional.empty()));
+          mockDirectUserRoles();
+          assertFalse(
+              evaluator.evaluate(
+                  metadata, path, new AuthorizationRequestContext(), Optional.empty()));
+          owners.invalidate(911L);
+          owners.put(912L, Optional.of(new OwnerInfo(USER_ID, "USER")));
+          assertFalse(
+              evaluator.evaluate(
+                  metadata, path, new AuthorizationRequestContext(), Optional.empty()));
+          owners.put(913L, Optional.of(new OwnerInfo(USER_ID, "USER")));
+          assertTrue(
+              evaluator.evaluate(
+                  metadata, path, new AuthorizationRequestContext(), Optional.empty()));
+        });
+  }
+
   /** Tests {@link JcasbinAuthorizer#hasMetadataPrivilegePermission} hierarchy walk */
   @Test
   public void testHasMetadataPrivilegePermission() throws Exception {
@@ -6462,6 +6838,61 @@ public class TestJcasbinAuthorizer {
       return POConverters.fromSecurableObjectPO(objectName, po, type);
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  /** Returns {@code grants} followed by USE_CATALOG and USE_SCHEMA for the test table's parents. */
+  private static ImmutableList<SecurableObject> withTableParentUsage(
+      long roleId, SecurableObject... grants) {
+    return ImmutableList.<SecurableObject>builder()
+        .add(grants)
+        .add(
+            buildSecurableObject(
+                roleId, MetadataObject.Type.CATALOG, "testCatalog", USE_CATALOG, "ALLOW"))
+        .add(
+            buildSecurableObject(
+                roleId, MetadataObject.Type.SCHEMA, "testCatalog.testSchema", USE_SCHEMA, "ALLOW"))
+        .build();
+  }
+
+  private static Map<Entity.EntityType, NameIdentifier> sensitiveTagMetadata() {
+    return Map.of(
+        Entity.EntityType.METALAKE,
+        NameIdentifier.of(METALAKE),
+        Entity.EntityType.TAG,
+        NameIdentifierUtil.ofTag(METALAKE, "sensitive"));
+  }
+
+  private static Map<String, Object> testTablePath() {
+    return Map.of(
+        "p_metalake",
+        METALAKE,
+        "p_type",
+        "TABLE",
+        "p_fullName",
+        "testCatalog.testSchema.testTable");
+  }
+
+  /**
+   * Runs {@code body} with the given metadata IDs stubbed, then restores each stub to {@link
+   * #CATALOG_ID}.
+   */
+  private static void withMetadataIds(Map<MetadataObject, Optional<Long>> ids, Executable body)
+      throws Throwable {
+    ids.forEach(
+        (object, id) ->
+            metadataIdConverterMockedStatic
+                .when(() -> MetadataIdConverter.getID(object, METALAKE))
+                .thenReturn(id));
+    try {
+      body.execute();
+    } finally {
+      ids.keySet()
+          .forEach(
+              object ->
+                  metadataIdConverterMockedStatic
+                      .when(() -> MetadataIdConverter.getID(object, METALAKE))
+                      .thenReturn(Optional.of(CATALOG_ID)));
     }
   }
 
