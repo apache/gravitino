@@ -39,6 +39,22 @@ import org.apache.gravitino.utils.Executable;
 
 public interface EntityStore extends Closeable {
 
+  /**
+   * Resolves the stable ID of a Semantic Model identity, whether or not it has an active revision.
+   *
+   * <p>The default reads the model through {@link #get}. A store whose {@code get} returns only the
+   * active revision and that supports deferred publication must override this method, so that a
+   * model with only drafts still resolves.
+   *
+   * @param ident The Semantic Model identifier.
+   * @return The stable Semantic Model ID.
+   * @throws NoSuchEntityException If the Semantic Model or its namespace does not exist.
+   * @throws IOException If the lookup fails.
+   */
+  default long getSemanticModelId(NameIdentifier ident) throws IOException {
+    return get(ident, EntityType.SEMANTIC_MODEL, SemanticModelEntity.class).id();
+  }
+
   /** Loads a retained Semantic Model snapshot or the latest saved revision. */
   default SemanticModelEntity loadSemanticModelRevision(
       NameIdentifier ident, SemanticModelRevisionSelector selector) throws IOException {

@@ -46,8 +46,11 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.cache.CaffeineEntityCache;
+import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelRevisionException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
@@ -448,6 +451,48 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
     assertEquals(renamed.name(), r1.name());
     assertEquals(original, r1.definition());
     assertArrayEquals(new int[] {2, 1}, revisionNumbers(operations, renamed));
+  }
+
+  @TestTemplate
+  void testDraftOnlyModelResolvesIdentityIdWithAndWithoutCache() throws Exception {
+    ManagedSemanticModelOperations deferred =
+        new ManagedSemanticModelOperations(
+            store, RandomIdGenerator.INSTANCE, (ident, definition) -> {}, ident -> false);
+    TableEntity source = createAndInsertTableEntity(modelIdent.namespace(), "orders");
+    SemanticModelEntity draft =
+        (SemanticModelEntity)
+            deferred.createSemanticModel(
+                modelIdent,
+                null,
+                definitionWithMetric(source, "order_count"),
+                Map.of(),
+                associations(source));
+    NameIdentifier missingModel = NameIdentifier.of(modelIdent.namespace(), "missing_model");
+    NameIdentifier missingSchema =
+        NameIdentifier.of(
+            modelIdent.namespace().level(0),
+            modelIdent.namespace().level(1),
+            "missing_schema",
+            modelIdent.name());
+
+    Config cacheConfig = new Config(false) {};
+    cacheConfig.set(Configs.CACHE_ENABLED, true);
+    CaffeineEntityCache caffeine = new CaffeineEntityCache(cacheConfig);
+    try {
+      for (EntityCache cache : List.of(new NoOpsCache(cacheConfig), caffeine)) {
+        FieldUtils.writeField(store, "cache", cache, true);
+        // Consumer reads see only the active revision, which a draft-only model does not have.
+        assertThrows(
+            NoSuchEntityException.class,
+            () ->
+                store.get(modelIdent, Entity.EntityType.SEMANTIC_MODEL, SemanticModelEntity.class));
+        assertEquals(draft.id(), store.getSemanticModelId(modelIdent));
+        assertThrows(NoSuchEntityException.class, () -> store.getSemanticModelId(missingModel));
+        assertThrows(NoSuchEntityException.class, () -> store.getSemanticModelId(missingSchema));
+      }
+    } finally {
+      caffeine.clear();
+    }
   }
 
   @TestTemplate
