@@ -21,10 +21,12 @@ package org.apache.gravitino.storage.relational.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -33,6 +35,8 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -64,6 +68,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.policy.AccessControlContent;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.rel.Column;
@@ -84,6 +89,7 @@ import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
+import org.apache.gravitino.storage.relational.po.PolicyRoleRelPO;
 import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
@@ -1635,6 +1641,50 @@ public class POConverters {
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
     }
+  }
+
+  /**
+   * Builds the role reference rows derived from a policy's content.
+   *
+   * <p>Only access control content names roles, so every other policy type yields no rows. Exact
+   * duplicate names in the content collapse to one row. Names that differ as strings but compare
+   * equal under the backend's collation, such as "analyst" and "analyst " on MySQL, are not
+   * collapsed here; the insert rejects them as naming one role twice, the same way the role table
+   * would.
+   *
+   * <p>A role name longer than the role table allows is rejected here rather than left to the
+   * database, so every backend reports it the same way and none can store a shortened name.
+   *
+   * @param policyId the ID of the policy row the references belong to
+   * @param policyEntity the policy being written
+   * @return the references the content currently names
+   * @throws IllegalArgumentException if a role name is longer than a role name can be
+   */
+  public static List<PolicyRoleRelPO> initializePolicyRoleRelPOs(
+      Long policyId, PolicyEntity policyEntity) {
+    PolicyContent content = policyEntity.content();
+    if (!(content instanceof AccessControlContent)) {
+      return ImmutableList.of();
+    }
+
+    ImmutableList.Builder<PolicyRoleRelPO> relations = ImmutableList.builder();
+    for (String roleName :
+        new LinkedHashSet<>(((AccessControlContent) content).applicableRoles())) {
+      EntityFieldLimits.checkMaxLength(
+          roleName,
+          EntityFieldLimits.MAX_NAME_LENGTH,
+          "applicable role name",
+          Entity.EntityType.POLICY);
+      relations.add(
+          PolicyRoleRelPO.builder()
+              .withPolicyId(policyId)
+              .withRoleName(roleName)
+              .withCurrentVersion(INIT_VERSION)
+              .withLastVersion(INIT_VERSION)
+              .withDeletedAt(DEFAULT_DELETED_AT)
+              .build());
+    }
+    return relations.build();
   }
 
   public static OwnerRelPO initializeOwnerRelPOsWithVersion(
