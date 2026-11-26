@@ -26,6 +26,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.glossary.TermBinding;
 
 /** A visible glossary binding. A metric binding identifies its containing semantic model. */
@@ -40,6 +41,17 @@ public final class TermBindingDTO {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   @Nullable
   private final String metric;
+
+  /**
+   * Converts an authorized binding to its REST representation.
+   *
+   * @param binding The binding to expose.
+   * @return Its kind, metadata object and optional metric.
+   */
+  public static TermBindingDTO from(TermBinding binding) {
+    return new TermBindingDTO(
+        binding.kind(), DTOConverters.toDTO(binding.object()), binding.metric().orElse(null));
+  }
 
   /**
    * Creates the wire representation of a metadata object or metric binding.

@@ -169,7 +169,11 @@ public final class GlossaryAccess {
   }
 
   boolean canRead(GlossaryTermEntity term) {
-    return view && (term.status() != GlossaryTerm.Status.DRAFT || canEdit(term));
+    return canRead(term.id(), term.status());
+  }
+
+  boolean canRead(long id, GlossaryTerm.Status status) {
+    return view && (status != GlossaryTerm.Status.DRAFT || canEdit(id));
   }
 
   boolean canEdit(GlossaryTermEntity term) {

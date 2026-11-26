@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import java.util.Collection;
+import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermRelMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
@@ -132,7 +133,8 @@ public class GlossaryTermRelBaseSQLProvider {
       @Param("metalakeId") long metalakeId,
       @Param("ids") Collection<Long> ids,
       @Param("type") String type,
-      @Param("reverse") boolean reverse) {
+      @Param("reverse") boolean reverse,
+      @Param("limit") @Nullable Integer limit) {
     return "<script>SELECT "
         + COLUMNS
         + " FROM "
@@ -151,7 +153,7 @@ public class GlossaryTermRelBaseSQLProvider {
         + "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
         + "<if test='type == &quot;RELATED&quot;'> OR r.to_term_id IN "
         + "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach></if>"
-        + ") ORDER BY r.from_term_id, r.to_term_id</script>";
+        + ") ORDER BY r.from_term_id, r.to_term_id <if test='limit != null'>LIMIT #{limit}</if></script>";
   }
 
   /** Selects a bounded batch of retired edges for garbage collection. */
