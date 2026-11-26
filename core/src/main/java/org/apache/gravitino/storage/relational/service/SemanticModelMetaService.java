@@ -65,6 +65,7 @@ import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMa
 import org.apache.gravitino.storage.relational.po.SemanticModelMetricPO;
 import org.apache.gravitino.storage.relational.po.SemanticModelPO;
 import org.apache.gravitino.storage.relational.po.SemanticModelVersionInfoPO;
+import org.apache.gravitino.storage.relational.po.SemanticModelVersionInfoPO.PublicationStatus;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -251,9 +252,7 @@ public class SemanticModelMetaService {
                         }
                         persistedPO.set(replacementPO);
                       }),
-              () ->
-                  reconcileMetricIdentities(
-                      persistedPO.get(), metricNames(semanticModelEntity.definition())),
+              () -> reconcileForSave(persistedPO.get(), semanticModelEntity.definition()),
               () -> replaceSources(persistedPO.get(), semanticModelEntity),
               () ->
                   SessionUtils.doWithoutCommit(
@@ -326,7 +325,7 @@ public class SemanticModelMetaService {
             if (mapper.updateSemanticModelMeta(next, observed) != 1) {
               throw semanticModelWriteFailure(identifier, observed);
             }
-            reconcileMetricIdentities(next, metricNames(newEntity.definition()));
+            reconcileForSave(next, newEntity.definition());
             replaceSources(next, newEntity);
             SessionUtils.doWithoutCommit(
                 SemanticModelVersionInfoMapper.class,
@@ -339,6 +338,57 @@ public class SemanticModelMetaService {
           e, Entity.EntityType.SEMANTIC_MODEL, newEntity.nameIdentifier().toString());
       throw e;
     }
+  }
+
+  /** Publishes the requested revision if it is still latest, returning the published snapshot. */
+  public SemanticModelEntity publishRevision(
+      NameIdentifier identifier, int revision, String principal) {
+    SemanticModelRevisionSelector selector = SemanticModelRevisionSelector.numbered(revision);
+    Preconditions.checkArgument(
+        principal != null && !principal.isBlank(), "Publisher must not be blank");
+    SemanticModelPO observed = selectModel(identifier, identityOps);
+    return SessionUtils.doWithCommitAndFetchResult(
+        SemanticModelMetaMapper.class,
+        mapper -> {
+          lockParent(identifier, observed);
+          SemanticModelPO current =
+              mapper.selectSemanticModelMetaByIdForUpdate(observed.getSemanticModelId());
+          if (current == null) {
+            throw missingModel(identifier);
+          }
+          SemanticModelPO selected =
+              mapper.selectSemanticModelMetaById(current.getSemanticModelId(), selector);
+          SemanticModelVersionInfoPO snapshot = selected.getSemanticModelVersionInfoPO();
+          if (snapshot == null) {
+            throw missingRevision(identifier, revision, current.getCurrentVersion());
+          }
+          checkExpectedRevision(identifier, current, revision);
+          if (snapshot.publicationStatus() != PublicationStatus.DRAFT) {
+            return fromSemanticModelPO(selected, identifier.namespace());
+          }
+
+          long publishedAt = System.currentTimeMillis();
+          int published =
+              SessionUtils.getWithoutCommit(
+                  SemanticModelVersionInfoMapper.class,
+                  versions ->
+                      versions.publishRevision(
+                          current.getSemanticModelId(), revision, principal, publishedAt));
+          Preconditions.checkState(
+              published == 1,
+              "Failed to record publication of Semantic Model %s revision %s",
+              identifier,
+              revision);
+          if (mapper.activateRevision(current.getSemanticModelId(), revision) != 1) {
+            throw ExceptionUtils.concurrentModification(
+                Entity.EntityType.SEMANTIC_MODEL, identifier);
+          }
+          SemanticModelPO activated =
+              mapper.selectSemanticModelMetaById(current.getSemanticModelId(), selector);
+          SemanticModelEntity result = fromSemanticModelPO(activated, identifier.namespace());
+          reconcileMetricIdentities(activated, metricNames(result.definition()));
+          return result;
+        });
   }
 
   /**
@@ -510,6 +560,24 @@ public class SemanticModelMetaService {
         });
   }
 
+  private static void reconcileForSave(SemanticModelPO model, SemanticModelDefinition definition) {
+    Set<String> names = metricNames(definition);
+    if (model.getActiveVersion() == 0) {
+      SemanticModelPO active =
+          SessionUtils.getWithoutCommit(
+              SemanticModelMetaMapper.class,
+              mapper -> mapper.selectSemanticModelMetaById(model.getSemanticModelId(), ACTIVE));
+      if (active.getActiveVersion() > 0) {
+        requireSnapshot(active, active.getActiveVersion(), "active");
+        String metrics = active.getSemanticModelVersionInfoPO().metrics();
+        if (metrics != null) {
+          names.addAll(SemanticModelMetricService.decodeMetricNames(metrics));
+        }
+      }
+    }
+    reconcileMetricIdentities(model, names);
+  }
+
   private static void reconcileMetricIdentities(SemanticModelPO model, Set<String> names) {
     // The caller has already inserted or version-checked the model in this transaction. A locking
     // read also observes the latest identities on backends using repeatable-read isolation.
@@ -605,7 +673,7 @@ public class SemanticModelMetaService {
         .withSchemaId(persistedPO.getSchemaId())
         .withAuditInfo(source.getAuditInfo())
         .withCurrentVersion(nextVersion)
-        .withActiveVersion(nextVersion)
+        .withActiveVersion(source.getActiveVersion() == 0 ? 0 : nextVersion)
         .withLastVersion(nextVersion)
         .withDeletedAt(source.getDeletedAt())
         .withSemanticModelVersionInfoPO(

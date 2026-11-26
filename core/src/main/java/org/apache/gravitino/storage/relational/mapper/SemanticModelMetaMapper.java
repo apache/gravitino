@@ -211,6 +211,14 @@ public interface SemanticModelMetaMapper {
       @Param("auditInfo") String auditInfo,
       @Param("expectedRevision") @Nullable Integer expectedRevision);
 
+  /** Activates a revision if it is still the latest saved revision. */
+  @Update(
+      """
+      UPDATE semantic_model_meta SET active_version = #{revision}
+      WHERE semantic_model_id = #{modelId} AND current_version = #{revision} AND deleted_at = 0
+      """)
+  int activateRevision(@Param("modelId") long modelId, @Param("revision") int revision);
+
   /** Soft-deletes a Semantic Model identity by stable ID and observed name. */
   @UpdateProvider(
       type = SemanticModelMetaSQLProviderFactory.class,

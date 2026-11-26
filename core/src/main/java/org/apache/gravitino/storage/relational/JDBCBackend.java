@@ -158,6 +158,12 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   }
 
   @Override
+  public SemanticModelEntity publishSemanticModelRevision(
+      NameIdentifier ident, int revision, String principal) throws IOException {
+    return SemanticModelMetaService.getInstance().publishRevision(ident, revision, principal);
+  }
+
+  @Override
   public List<NameIdentifier> listSemanticModelIdentifiers(Namespace namespace) throws IOException {
     return SemanticModelMetaService.getInstance().listSemanticModelIdentifiers(namespace);
   }

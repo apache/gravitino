@@ -134,6 +134,8 @@ import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricI
 import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricInfosFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.LoadSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.LoadSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.PublishSemanticModelRevisionEvent;
+import org.apache.gravitino.listener.api.event.semantic.PublishSemanticModelRevisionFailureEvent;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
 import org.apache.gravitino.listener.api.event.view.AlterViewEvent;
 import org.apache.gravitino.listener.api.event.view.AlterViewFailureEvent;
@@ -601,6 +603,8 @@ public interface AuditLog {
     IMPORT_SEMANTIC_MODEL,
     /** Export a Semantic Model as an Ossie document. */
     EXPORT_SEMANTIC_MODEL,
+    /** Publish a saved Semantic Model revision. */
+    PUBLISH_SEMANTIC_MODEL_REVISION,
     /** Create an ontology. */
     CREATE_ONTOLOGY,
     /** Load an ontology. */
@@ -763,6 +767,9 @@ public interface AuditLog {
       } else if (event instanceof ExportSemanticModelEvent
           || event instanceof ExportSemanticModelFailureEvent) {
         return EXPORT_SEMANTIC_MODEL;
+      } else if (event instanceof PublishSemanticModelRevisionEvent
+          || event instanceof PublishSemanticModelRevisionFailureEvent) {
+        return PUBLISH_SEMANTIC_MODEL_REVISION;
       } else if (event instanceof CreateFilesetEvent
           || event instanceof CreateFilesetFailureEvent) {
         return CREATE_FILESET;

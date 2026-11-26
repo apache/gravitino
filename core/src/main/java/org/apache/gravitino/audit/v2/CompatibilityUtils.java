@@ -228,6 +228,9 @@ public class CompatibilityUtils {
               Operation.LIST_SEMANTIC_MODEL_METRIC_INFOS)
           .put(OperationType.IMPORT_SEMANTIC_MODEL, Operation.IMPORT_SEMANTIC_MODEL)
           .put(OperationType.EXPORT_SEMANTIC_MODEL, Operation.EXPORT_SEMANTIC_MODEL)
+          .put(
+              OperationType.PUBLISH_SEMANTIC_MODEL_REVISION,
+              Operation.PUBLISH_SEMANTIC_MODEL_REVISION)
           .put(OperationType.CREATE_ONTOLOGY, Operation.CREATE_ONTOLOGY)
           .put(OperationType.LOAD_ONTOLOGY, Operation.LOAD_ONTOLOGY)
           .put(OperationType.ALTER_ONTOLOGY, Operation.ALTER_ONTOLOGY)

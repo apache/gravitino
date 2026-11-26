@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -48,12 +49,16 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
+import org.apache.gravitino.exceptions.NoSuchSemanticModelRevisionException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.semantic.CustomExtension;
 import org.apache.gravitino.semantic.Dataset;
+import org.apache.gravitino.semantic.DialectExpression;
+import org.apache.gravitino.semantic.Dialects;
+import org.apache.gravitino.semantic.Expression;
 import org.apache.gravitino.semantic.Metric;
 import org.apache.gravitino.semantic.Relationship;
 import org.apache.gravitino.semantic.SemanticModel;
@@ -67,7 +72,10 @@ import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.gravitino.storage.relational.po.SemanticModelMetricPO;
+import org.apache.gravitino.storage.relational.service.SemanticModelMetaService;
+import org.apache.gravitino.storage.relational.service.SemanticModelSourceService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -442,6 +450,131 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
     assertArrayEquals(new int[] {2, 1}, revisionNumbers(operations, renamed));
   }
 
+  @TestTemplate
+  void testDeferredPublishingAndRetentionAcrossConsumers() throws Exception {
+    ManagedSemanticModelOperations deferred =
+        new ManagedSemanticModelOperations(
+            store, RandomIdGenerator.INSTANCE, (ident, definition) -> {}, ident -> false);
+    TableEntity sourceA = createAndInsertTableEntity(modelIdent.namespace(), "orders");
+    TableEntity sourceB = createAndInsertTableEntity(modelIdent.namespace(), "invoices");
+    SemanticModelDefinition original = definitionWithMetric(sourceA, "order_count");
+    SemanticModelDefinition replacement = definitionWithMetric(sourceB, "invoice_count");
+
+    SemanticModelEntity draft =
+        (SemanticModelEntity)
+            deferred.createSemanticModel(
+                modelIdent, "Draft one", original, Map.of(), associations(sourceA));
+    assertEquals(1, draft.revision());
+    assertEquals(SemanticModel.Status.DRAFT, draft.status());
+    assertNull(draft.publishedAt());
+    assertNull(draft.publishedBy());
+    assertTrue(deferred.semanticModelExists(modelIdent));
+    assertEquals(List.of(modelIdent), store.listSemanticModelIdentifiers(modelIdent.namespace()));
+    assertThrows(NoSuchSemanticModelException.class, () -> deferred.loadSemanticModel(modelIdent));
+    assertEquals(0, deferred.listSemanticModels(modelIdent.namespace()).length);
+    assertEquals(0, deferred.listMetrics(modelIdent.namespace()).length);
+    assertEquals(0, deferred.listMetricInfos(modelIdent.namespace()).length);
+    assertFalse(hasAssociation(sourceA));
+    assertEquals(
+        draft,
+        deferred.loadSemanticModelRevision(modelIdent, SemanticModelRevisionSelector.LATEST));
+    assertThrows(
+        SemanticModelAlreadyExistsException.class,
+        () ->
+            deferred.createSemanticModel(
+                modelIdent, null, original, Map.of(), associations(sourceA)));
+
+    SemanticModel r1 = deferred.publishSemanticModelRevision(modelIdent, 1, "reviewer");
+    assertEquals("reviewer", r1.publishedBy());
+    assertNotNull(r1.publishedAt());
+    assertEquals(SemanticModel.Status.PUBLISHED, r1.status());
+    assertEquals(draft.auditInfo(), r1.auditInfo());
+    assertEquals(r1, deferred.publishSemanticModelRevision(modelIdent, 1, "different_reviewer"));
+    assertTrue(hasAssociation(sourceA));
+
+    SemanticModel r2 =
+        deferred.alterSemanticModel(
+            modelIdent,
+            associations(sourceB),
+            1,
+            SemanticModelChange.replaceDefinition(replacement));
+    assertEquals(SemanticModel.Status.DRAFT, r2.status());
+    assertArrayEquals(
+        new NameIdentifier[] {modelIdent}, deferred.listSemanticModels(modelIdent.namespace()));
+    assertEquals(r1, deferred.loadSemanticModel(modelIdent));
+    assertEquals("order_count", deferred.listMetrics(modelIdent.namespace())[0].name());
+    assertEquals(
+        "order_count", deferred.listMetricInfos(modelIdent.namespace())[0].metric().name());
+    assertEquals(Set.of("order_count", "invoice_count"), metricIdentities(draft.id()));
+    assertTrue(hasAssociation(sourceA));
+    assertFalse(hasAssociation(sourceB));
+    assertThrows(
+        OptimisticLockException.class,
+        () -> deferred.publishSemanticModelRevision(modelIdent, 1, "reviewer"));
+    assertThrows(
+        NoSuchSemanticModelRevisionException.class,
+        () -> deferred.publishSemanticModelRevision(modelIdent, 9, "reviewer"));
+
+    deferred.publishSemanticModelRevision(modelIdent, 2, "reviewer");
+    assertEquals(2, deferred.loadSemanticModel(modelIdent).revision());
+    assertEquals("invoice_count", deferred.listMetrics(modelIdent.namespace())[0].name());
+    assertEquals(
+        "invoice_count", deferred.listMetricInfos(modelIdent.namespace())[0].metric().name());
+    assertEquals(Set.of("invoice_count"), metricIdentities(draft.id()));
+    assertFalse(hasAssociation(sourceA));
+    assertTrue(hasAssociation(sourceB));
+
+    deferred.alterSemanticModel(
+        modelIdent,
+        SemanticModelSourceUpdate.preserve(),
+        SemanticModelChange.updateComment("Unpublished"));
+    operations.alterSemanticModel(
+        modelIdent, associations(sourceA), 3, SemanticModelChange.replaceDefinition(original));
+    assertTrue(hasAssociation(sourceA));
+    assertFalse(hasAssociation(sourceB));
+
+    SemanticModelMetaService.getInstance().deleteSemanticModelVersionsByRetentionCount(1L, 100);
+    assertArrayEquals(new int[] {4, 2, 1}, revisionNumbers(deferred, modelIdent));
+    assertThrows(
+        NoSuchSemanticModelRevisionException.class,
+        () ->
+            deferred.loadSemanticModelRevision(
+                modelIdent, SemanticModelRevisionSelector.numbered(3)));
+    assertEquals(3, retainedSourceRangeCount(draft.id()));
+    assertFalse(
+        SessionUtils.getWithoutCommit(
+                SemanticModelVersionInfoMapper.class,
+                mapper -> mapper.selectSemanticModelVersionsByRetentionCount(1L))
+            .stream()
+            .anyMatch(candidate -> candidate.semanticModelId().equals(draft.id())));
+  }
+
+  @TestTemplate
+  void testRetentionProtectsAnOlderActiveRevisionAndPrunesUnusedRanges() throws Exception {
+    ManagedSemanticModelOperations deferred =
+        new ManagedSemanticModelOperations(
+            store, RandomIdGenerator.INSTANCE, (ident, definition) -> {}, ident -> false);
+    TableEntity sourceA = createAndInsertTableEntity(modelIdent.namespace(), "orders");
+    TableEntity sourceB = createAndInsertTableEntity(modelIdent.namespace(), "invoices");
+    SemanticModelDefinition original = definitionWithMetric(sourceA, "order_count");
+    SemanticModelDefinition replacement = definitionWithMetric(sourceB, "invoice_count");
+    SemanticModelEntity created =
+        (SemanticModelEntity)
+            operations.createSemanticModel(
+                modelIdent, null, original, Map.of(), associations(sourceA));
+    deferred.alterSemanticModel(
+        modelIdent, associations(sourceB), 1, SemanticModelChange.replaceDefinition(replacement));
+    deferred.alterSemanticModel(
+        modelIdent, associations(sourceA), 2, SemanticModelChange.replaceDefinition(original));
+
+    SemanticModelMetaService.getInstance().deleteSemanticModelVersionsByRetentionCount(1L, 100);
+    assertArrayEquals(new int[] {3, 1}, revisionNumbers(deferred, modelIdent));
+    assertEquals(2, retainedSourceRangeCount(created.id()));
+    assertEquals(created, deferred.loadSemanticModel(modelIdent));
+    assertTrue(hasAssociation(sourceA));
+    assertFalse(hasAssociation(sourceB));
+  }
+
   private static int[] revisionNumbers(
       ManagedSemanticModelOperations managed, NameIdentifier ident) {
     return Arrays.stream(managed.listSemanticModelRevisions(ident))
@@ -458,9 +591,38 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
         .collect(Collectors.toSet());
   }
 
+  private static boolean hasAssociation(TableEntity source) {
+    return !SemanticModelSourceService.getInstance()
+        .listForSource(source.nameIdentifier(), source.type())
+        .isEmpty();
+  }
+
   private static SemanticModelSourceUpdate associations(TableEntity source) {
     return SemanticModelSourceUpdate.replace(
         List.of(new SemanticModelSource(source.name(), source.type(), source.id())));
+  }
+
+  private SemanticModelDefinition definitionWithMetric(TableEntity source, String metricName) {
+    Namespace namespace = modelIdent.namespace();
+    Expression expression =
+        Expression.builder()
+            .withDialects(
+                new DialectExpression[] {
+                  DialectExpression.builder()
+                      .withDialect(Dialects.ANSI_SQL)
+                      .withExpression("COUNT(*)")
+                      .build()
+                })
+            .build();
+    return SemanticModelDefinition.builder()
+        .withDatasets(
+            definition(
+                    source.name(),
+                    NameIdentifier.of(namespace.level(1), namespace.level(2), source.name()))
+                .datasets())
+        .withMetrics(
+            new Metric[] {Metric.builder().withName(metricName).withExpression(expression).build()})
+        .build();
   }
 
   private static int retainedSourceRangeCount(long modelId) throws Exception {

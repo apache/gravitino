@@ -107,6 +107,26 @@ COMMENT ON COLUMN policy_tag_relation_meta.current_version IS 'policy tag relati
 COMMENT ON COLUMN policy_tag_relation_meta.last_version IS 'policy tag relation last version';
 COMMENT ON COLUMN policy_tag_relation_meta.deleted_at IS 'policy tag relation deleted at';
 
+CREATE TABLE IF NOT EXISTS policy_role_relation_meta (
+    id BIGSERIAL NOT NULL,
+    policy_id BIGINT NOT NULL,
+    role_name VARCHAR(128) NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE (policy_id, role_name, deleted_at)
+);
+
+CREATE INDEX IF NOT EXISTS policy_role_relation_meta_idx_role_name ON policy_role_relation_meta (role_name);
+COMMENT ON TABLE policy_role_relation_meta IS 'policy role relation';
+COMMENT ON COLUMN policy_role_relation_meta.id IS 'auto increment id';
+COMMENT ON COLUMN policy_role_relation_meta.policy_id IS 'policy id';
+COMMENT ON COLUMN policy_role_relation_meta.role_name IS 'role name referenced by the policy content';
+COMMENT ON COLUMN policy_role_relation_meta.current_version IS 'policy role relation current version';
+COMMENT ON COLUMN policy_role_relation_meta.last_version IS 'policy role relation last version';
+COMMENT ON COLUMN policy_role_relation_meta.deleted_at IS 'policy role relation deleted at';
+
 ALTER TABLE job_run_meta ADD COLUMN IF NOT EXISTS runtime_job_template TEXT DEFAULT NULL;
 COMMENT ON COLUMN job_run_meta.runtime_job_template IS 'job run runtime job template';
 
@@ -617,6 +637,14 @@ CREATE TABLE IF NOT EXISTS ontology_meta (
 );
 
 CREATE INDEX IF NOT EXISTS idx_onm_deleted ON ontology_meta (deleted_at);
+COMMENT ON TABLE ontology_meta IS 'ontology identity';
+COMMENT ON COLUMN ontology_meta.ontology_id IS 'ontology id';
+COMMENT ON COLUMN ontology_meta.ontology_name IS 'ontology name';
+COMMENT ON COLUMN ontology_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN ontology_meta.audit_info IS 'ontology identity audit info';
+COMMENT ON COLUMN ontology_meta.current_version IS 'current version';
+COMMENT ON COLUMN ontology_meta.last_version IS 'last allocated version';
+COMMENT ON COLUMN ontology_meta.deleted_at IS 'ontology deleted at';
 
 CREATE TABLE IF NOT EXISTS ontology_version_info (
     id BIGSERIAL,
@@ -635,3 +663,13 @@ CREATE TABLE IF NOT EXISTS ontology_version_info (
 CREATE INDEX IF NOT EXISTS idx_onvi_mid ON ontology_version_info (metalake_id) WHERE deleted_at = 0;
 
 CREATE INDEX IF NOT EXISTS idx_onvi_deleted ON ontology_version_info (deleted_at);
+COMMENT ON TABLE ontology_version_info IS 'ontology versions';
+COMMENT ON COLUMN ontology_version_info.id IS 'auto increment id';
+COMMENT ON COLUMN ontology_version_info.metalake_id IS 'metalake id';
+COMMENT ON COLUMN ontology_version_info.ontology_id IS 'ontology id';
+COMMENT ON COLUMN ontology_version_info.version IS 'version';
+COMMENT ON COLUMN ontology_version_info.ontology_comment IS 'comment snapshot';
+COMMENT ON COLUMN ontology_version_info.definition IS 'normalized OntologyDefinition (JSON)';
+COMMENT ON COLUMN ontology_version_info.properties IS 'properties snapshot (JSON)';
+COMMENT ON COLUMN ontology_version_info.audit_info IS 'version audit info';
+COMMENT ON COLUMN ontology_version_info.deleted_at IS 'version deleted at';

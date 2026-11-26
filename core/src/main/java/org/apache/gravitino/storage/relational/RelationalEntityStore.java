@@ -277,6 +277,16 @@ public class RelationalEntityStore
   }
 
   @Override
+  public SemanticModelEntity publishSemanticModelRevision(
+      NameIdentifier ident, int revision, String principal) throws IOException {
+    try {
+      return backend.publishSemanticModelRevision(ident, revision, principal);
+    } catch (RuntimeException e) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(e, Entity.EntityType.SEMANTIC_MODEL, ident);
+    }
+  }
+
+  @Override
   public List<NameIdentifier> listSemanticModelIdentifiers(Namespace namespace) throws IOException {
     return backend.listSemanticModelIdentifiers(namespace);
   }
