@@ -111,7 +111,8 @@ public interface SemanticModelDispatcher {
   /**
    * Publishes the latest revision using the supplied principal.
    *
-   * <p>The extension entry point authorizes the caller before dispatching publication.
+   * <p>The extension entry point must verify that the authenticated principal can modify the target
+   * model before calling this method. It must pass that same principal for auditing.
    */
   SemanticModel publishSemanticModelRevision(NameIdentifier ident, int revision, String principal);
 

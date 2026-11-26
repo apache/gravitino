@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Suppliers;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -62,6 +64,8 @@ import org.slf4j.LoggerFactory;
 public class ManagedSemanticModelOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(ManagedSemanticModelOperations.class);
+  private static final Supplier<SemanticModelPublicationPolicy> PUBLICATION_POLICY_SUPPLIER =
+      Suppliers.memoize(ManagedSemanticModelOperations::loadPublicationPolicy);
 
   private final EntityStore store;
   private final IdGenerator idGenerator;
@@ -79,7 +83,7 @@ public class ManagedSemanticModelOperations {
       EntityStore store,
       IdGenerator idGenerator,
       BiConsumer<NameIdentifier, SemanticModelDefinition> writeValidator) {
-    this(store, idGenerator, writeValidator, LoadedPolicy.INSTANCE);
+    this(store, idGenerator, writeValidator, PUBLICATION_POLICY_SUPPLIER.get());
   }
 
   ManagedSemanticModelOperations(
@@ -90,6 +94,7 @@ public class ManagedSemanticModelOperations {
     Preconditions.checkArgument(store != null, "EntityStore must not be null");
     Preconditions.checkArgument(idGenerator != null, "IdGenerator must not be null");
     Preconditions.checkArgument(writeValidator != null, "Write validator must not be null");
+    Preconditions.checkArgument(publicationPolicy != null, "Publication policy must not be null");
     this.store = store;
     this.idGenerator = idGenerator;
     this.writeValidator = writeValidator;
@@ -468,20 +473,16 @@ public class ManagedSemanticModelOperations {
     return builder.build();
   }
 
-  private static final class LoadedPolicy {
-    private static final SemanticModelPublicationPolicy INSTANCE = load();
-
-    private static SemanticModelPublicationPolicy load() {
-      Iterator<SemanticModelPublicationPolicy> policies =
-          ServiceLoader.load(SemanticModelPublicationPolicy.class).iterator();
-      if (!policies.hasNext()) {
-        return ident -> true;
-      }
-      SemanticModelPublicationPolicy policy = policies.next();
-      Preconditions.checkState(
-          !policies.hasNext(), "Multiple Semantic Model publication policies are registered");
-      LOG.info("Loaded Semantic Model publication policy {}", policy.getClass().getName());
-      return policy;
+  private static SemanticModelPublicationPolicy loadPublicationPolicy() {
+    Iterator<SemanticModelPublicationPolicy> policies =
+        ServiceLoader.load(SemanticModelPublicationPolicy.class).iterator();
+    if (!policies.hasNext()) {
+      return ident -> true;
     }
+    SemanticModelPublicationPolicy policy = policies.next();
+    Preconditions.checkState(
+        !policies.hasNext(), "Multiple Semantic Model publication policies are registered");
+    LOG.info("Loaded Semantic Model publication policy {}", policy.getClass().getName());
+    return policy;
   }
 }
