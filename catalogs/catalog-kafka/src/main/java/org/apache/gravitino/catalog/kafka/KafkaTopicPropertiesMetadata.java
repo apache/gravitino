@@ -19,42 +19,455 @@
 package org.apache.gravitino.catalog.kafka;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
+/** Property definitions and Table Topic validation rules for Kafka catalog topics. */
 public class KafkaTopicPropertiesMetadata extends BasePropertiesMetadata {
+  /** Number of partitions configured for the topic. */
   public static final String PARTITION_COUNT = "partition-count";
+
+  /** Replication factor configured for the topic. */
   public static final String REPLICATION_FACTOR = "replication-factor";
+
+  /** Persisted AutoMQ Table Topic enablement flag. */
+  public static final String AUTOMQ_TABLE_TOPIC_ENABLE = "automq.table.topic.enable";
+
+  /** AutoMQ Table Topic Iceberg commit interval in milliseconds. */
+  public static final String AUTOMQ_TABLE_TOPIC_COMMIT_INTERVAL_MS =
+      "automq.table.topic.commit.interval.ms";
+
+  /** Target Iceberg namespace (schema) configured on the AutoMQ Table Topic. */
+  public static final String AUTOMQ_TABLE_TOPIC_NAMESPACE = "automq.table.topic.namespace";
+
+  /** AutoMQ Table Topic schema evolution mode. */
+  public static final String AUTOMQ_TABLE_TOPIC_SCHEMA_TYPE = "automq.table.topic.schema.type";
+
+  /** Comma-separated primary key column names for Iceberg equality deletes and upserts. */
+  public static final String AUTOMQ_TABLE_TOPIC_ID_COLUMNS = "automq.table.topic.id.columns";
+
+  /** Iceberg partition transform expressions for the materialized Table Topic. */
+  public static final String AUTOMQ_TABLE_TOPIC_PARTITION_BY = "automq.table.topic.partition.by";
+
+  /** AutoMQ Table Topic upsert enablement flag. */
+  public static final String AUTOMQ_TABLE_TOPIC_UPSERT_ENABLE = "automq.table.topic.upsert.enable";
+
+  /** Field name carrying the CDC operation code for AutoMQ Table Topic materialization. */
+  public static final String AUTOMQ_TABLE_TOPIC_CDC_FIELD = "automq.table.topic.cdc.field";
+
+  /** Deserialization error tolerance policy for AutoMQ Table Topic ingestion. */
+  public static final String AUTOMQ_TABLE_TOPIC_ERRORS_TOLERANCE =
+      "automq.table.topic.errors.tolerance";
+
+  /** Key conversion strategy for AutoMQ Table Topic record deserialization. */
+  public static final String AUTOMQ_TABLE_TOPIC_CONVERT_KEY_TYPE =
+      "automq.table.topic.convert.key.type";
+
+  /** Value conversion strategy for AutoMQ Table Topic record deserialization. */
+  public static final String AUTOMQ_TABLE_TOPIC_CONVERT_VALUE_TYPE =
+      "automq.table.topic.convert.value.type";
+
+  /** Value transformation type applied during AutoMQ Table Topic record materialization. */
+  public static final String AUTOMQ_TABLE_TOPIC_TRANSFORM_VALUE_TYPE =
+      "automq.table.topic.transform.value.type";
+
+  /** Synthetic read-only property indicating whether Table Topic materialization is enabled. */
+  public static final String TABLE_TOPIC_ENABLED = "table-topic.enabled";
+
+  /** Synthetic read-only property carrying the linked Iceberg catalog name. */
+  public static final String TABLE_TOPIC_ICEBERG_CATALOG = "table-topic.iceberg-catalog";
+
+  /** Synthetic read-only property carrying the resolved target Iceberg namespace. */
+  public static final String TABLE_TOPIC_ICEBERG_NAMESPACE = "table-topic.iceberg-namespace";
+
+  /** Synthetic read-only property carrying the target Iceberg table name. */
+  public static final String TABLE_TOPIC_ICEBERG_TABLE = "table-topic.iceberg-table";
+
+  /** Synthetic read-only property carrying the qualified linked Iceberg table identifier. */
+  public static final String TABLE_TOPIC_ICEBERG_IDENT = "table-topic.iceberg-ident";
+
+  /** Set of synthetic read-only Table Topic linkage keys managed by Gravitino. */
+  public static final Set<String> RESERVED_TABLE_TOPIC_LINKAGE_KEYS =
+      ImmutableSet.of(
+          TABLE_TOPIC_ENABLED,
+          TABLE_TOPIC_ICEBERG_CATALOG,
+          TABLE_TOPIC_ICEBERG_NAMESPACE,
+          TABLE_TOPIC_ICEBERG_TABLE,
+          TABLE_TOPIC_ICEBERG_IDENT);
+
+  /** Supported AutoMQ Table Topic schema evolution modes. */
+  public enum TableTopicSchemaType {
+    /** Schemaless payload ingestion without external schema registry enforcement. */
+    SCHEMALESS,
+    /** Schema-driven ingestion derived from attached record schemas. */
+    SCHEMA,
+    /** Subject naming strategy based on the record name. */
+    RECORD_NAME,
+    /** Subject naming strategy based on the topic name. */
+    TOPIC_NAME
+  }
+
+  /** Supported AutoMQ Table Topic deserialization error tolerance policies. */
+  public enum TableTopicErrorsTolerance {
+    /** Fail immediately on record conversion errors. */
+    NONE,
+    /** Skip malformed or schema-mismatched records while failing on unexpected system errors. */
+    INVALID_DATA,
+    /** Tolerate and skip all record conversion and transformation errors during ingestion. */
+    ALL
+  }
+
+  /** Supported AutoMQ Table Topic key/value record conversion strategies. */
+  public enum TableTopicConvertType {
+    /** Treat record bytes as raw binary payload. */
+    RAW,
+    /** Decode record bytes as UTF-8 string payload. */
+    STRING,
+    /** Decode record payload using the schema ID embedded in the wire format. */
+    BY_SCHEMA_ID,
+    /** Decode record payload using the latest registered subject schema. */
+    BY_LATEST_SCHEMA
+  }
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
   static {
     List<PropertyEntry<?>> propertyEntries =
-        ImmutableList.of(
-            PropertyEntry.integerOptionalPropertyEntry(
-                PARTITION_COUNT,
-                "The number of partitions for the topic, if not specified, "
-                    + "will use the num.partitions property in the broker",
-                false /* immutable */,
-                null /* default value */,
-                false /* hidden */),
-            // TODO: make REPLICATION_FACTOR mutable if needed
-            PropertyEntry.shortOptionalPropertyEntry(
-                REPLICATION_FACTOR,
-                "The number of replications for the topic, if not specified, "
-                    + "will use the default.replication.factor property in the broker",
-                true /* immutable */,
-                null /* default value */,
-                false /* hidden */));
+        ImmutableList.<PropertyEntry<?>>builder()
+            .add(
+                PropertyEntry.integerOptionalPropertyEntry(
+                    PARTITION_COUNT,
+                    "The number of partitions for the topic, if not specified, "
+                        + "will use the num.partitions property in the broker",
+                    false /* immutable */,
+                    null /* default value */,
+                    false /* hidden */),
+                // TODO: make REPLICATION_FACTOR mutable if needed
+                PropertyEntry.shortOptionalPropertyEntry(
+                    REPLICATION_FACTOR,
+                    "The number of replications for the topic, if not specified, "
+                        + "will use the default.replication.factor property in the broker",
+                    true /* immutable */,
+                    null /* default value */,
+                    false /* hidden */),
+                strictBooleanPropertyEntry(
+                    AUTOMQ_TABLE_TOPIC_ENABLE,
+                    "Whether to materialize this Kafka topic as an AutoMQ Table Topic in Iceberg"),
+                positiveLongPropertyEntry(
+                    AUTOMQ_TABLE_TOPIC_COMMIT_INTERVAL_MS,
+                    "Commit interval in milliseconds for materializing AutoMQ Table Topic records"),
+                nonBlankStringPropertyEntry(
+                    AUTOMQ_TABLE_TOPIC_NAMESPACE,
+                    "Target Iceberg namespace (schema) for the materialized AutoMQ Table Topic"),
+                localeSafeEnumPropertyEntry(
+                    AUTOMQ_TABLE_TOPIC_SCHEMA_TYPE,
+                    "Schema mode for AutoMQ Table Topic conversion (schemaless, schema,"
+                        + " record_name, or topic_name)",
+                    TableTopicSchemaType.class),
+                columnListPropertyEntry(
+                    AUTOMQ_TABLE_TOPIC_ID_COLUMNS,
+                    "Primary key column names (comma-separated or bracketed list) for Iceberg"
+                        + " equality deletes and upserts"),
+                nonBlankStringPropertyEntry(
+                    AUTOMQ_TABLE_TOPIC_PARTITION_BY,
+                    "Iceberg partition transform expressions for the materialized Table Topic"),
+                strictBooleanPropertyEntry(
+                    AUTOMQ_TABLE_TOPIC_UPSERT_ENABLE,
+                    "Whether upsert mode is enabled for the materialized AutoMQ Table Topic"),
+                nonBlankStringPropertyEntry(
+                    AUTOMQ_TABLE_TOPIC_CDC_FIELD,
+                    "Field name carrying the CDC operation code for AutoMQ Table Topic"
+                        + " materialization"),
+                localeSafeEnumPropertyEntry(
+                    AUTOMQ_TABLE_TOPIC_ERRORS_TOLERANCE,
+                    "Error tolerance policy when converting records for an AutoMQ Table Topic"
+                        + " (none, invalid_data, or all)",
+                    TableTopicErrorsTolerance.class),
+                localeSafeEnumPropertyEntry(
+                    AUTOMQ_TABLE_TOPIC_CONVERT_KEY_TYPE,
+                    "Key conversion strategy for AutoMQ Table Topic records (raw, string,"
+                        + " by_schema_id, or by_latest_schema)",
+                    TableTopicConvertType.class),
+                localeSafeEnumPropertyEntry(
+                    AUTOMQ_TABLE_TOPIC_CONVERT_VALUE_TYPE,
+                    "Value conversion strategy for AutoMQ Table Topic records (raw, string,"
+                        + " by_schema_id, or by_latest_schema)",
+                    TableTopicConvertType.class),
+                nonBlankStringPropertyEntry(
+                    AUTOMQ_TABLE_TOPIC_TRANSFORM_VALUE_TYPE,
+                    "Value transformation type applied when materializing AutoMQ Table Topic"
+                        + " records"),
+                PropertyEntry.stringReservedPropertyEntry(
+                    TABLE_TOPIC_ENABLED,
+                    "Synthetic read-only flag indicating whether AutoMQ Table Topic"
+                        + " materialization is enabled",
+                    false /* hidden */),
+                PropertyEntry.stringReservedPropertyEntry(
+                    TABLE_TOPIC_ICEBERG_CATALOG,
+                    "Synthetic read-only name of the linked Iceberg catalog configured on the"
+                        + " Kafka catalog",
+                    false /* hidden */),
+                PropertyEntry.stringReservedPropertyEntry(
+                    TABLE_TOPIC_ICEBERG_NAMESPACE,
+                    "Synthetic read-only Iceberg namespace resolved for the Table Topic",
+                    false /* hidden */),
+                PropertyEntry.stringReservedPropertyEntry(
+                    TABLE_TOPIC_ICEBERG_TABLE,
+                    "Synthetic read-only Iceberg table name linked to the Table Topic",
+                    false /* hidden */),
+                PropertyEntry.stringReservedPropertyEntry(
+                    TABLE_TOPIC_ICEBERG_IDENT,
+                    "Synthetic read-only qualified Iceberg identifier linked to the Table Topic",
+                    false /* hidden */))
+            .build();
 
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
+  }
+
+  /**
+   * Validates AutoMQ Table Topic property values and cross-property constraints.
+   *
+   * @param properties topic properties to validate; null or empty maps are accepted as no-ops
+   */
+  public static void validateTableTopicProperties(Map<String, String> properties) {
+    if (properties == null || properties.isEmpty()) {
+      return;
+    }
+
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      String key = entry.getKey();
+      if (RESERVED_TABLE_TOPIC_LINKAGE_KEYS.contains(key)) {
+        continue;
+      }
+      PropertyEntry<?> propertyEntry = PROPERTIES_METADATA.get(key);
+      if (propertyEntry != null && key.startsWith("automq.table.topic.")) {
+        propertyEntry.decode(entry.getValue());
+      }
+    }
+
+    String tableTopicEnable = properties.get(AUTOMQ_TABLE_TOPIC_ENABLE);
+    boolean tableTopicEnabled =
+        tableTopicEnable != null && "true".equalsIgnoreCase(tableTopicEnable.trim());
+    String upsertEnable = properties.get(AUTOMQ_TABLE_TOPIC_UPSERT_ENABLE);
+    boolean upsertEnabled = upsertEnable != null && "true".equalsIgnoreCase(upsertEnable.trim());
+    boolean cdcFieldSet = !isBlank(properties.get(AUTOMQ_TABLE_TOPIC_CDC_FIELD));
+    if (tableTopicEnabled && (upsertEnabled || cdcFieldSet)) {
+      String idColumns = properties.get(AUTOMQ_TABLE_TOPIC_ID_COLUMNS);
+      if (isBlank(idColumns)) {
+        throw new IllegalArgumentException(
+            "Property "
+                + AUTOMQ_TABLE_TOPIC_ID_COLUMNS
+                + " is required when "
+                + (upsertEnabled
+                    ? AUTOMQ_TABLE_TOPIC_UPSERT_ENABLE + " is true"
+                    : AUTOMQ_TABLE_TOPIC_CDC_FIELD + " is set"));
+      }
+    }
   }
 
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
     return PROPERTIES_METADATA;
+  }
+
+  private static PropertyEntry<Boolean> strictBooleanPropertyEntry(
+      String name, String description) {
+    return new PropertyEntry.Builder<Boolean>()
+        .withName(name)
+        .withDescription(description)
+        .withRequired(false)
+        .withImmutable(false)
+        .withJavaType(Boolean.class)
+        .withDefaultValue(null)
+        .withDecoder(
+            value -> {
+              if (value == null) {
+                throw new IllegalArgumentException(
+                    "Invalid boolean value for property " + name + ": null");
+              }
+              String normalized = value.trim().toLowerCase(Locale.ROOT);
+              if ("true".equals(normalized)) {
+                return Boolean.TRUE;
+              }
+              if ("false".equals(normalized)) {
+                return Boolean.FALSE;
+              }
+              throw new IllegalArgumentException(
+                  String.format(
+                      "Invalid boolean value '%s' for property %s; expected 'true' or 'false'",
+                      value, name));
+            })
+        .withEncoder(String::valueOf)
+        .withHidden(false)
+        .withReserved(false)
+        .build();
+  }
+
+  private static PropertyEntry<Long> positiveLongPropertyEntry(String name, String description) {
+    return new PropertyEntry.Builder<Long>()
+        .withName(name)
+        .withDescription(description)
+        .withRequired(false)
+        .withImmutable(false)
+        .withJavaType(Long.class)
+        .withDefaultValue(null)
+        .withDecoder(
+            value -> {
+              if (isBlank(value)) {
+                throw new IllegalArgumentException(
+                    "Invalid positive long value for property " + name + ": " + value);
+              }
+              try {
+                long parsed = Long.parseLong(value.trim());
+                if (parsed <= 0) {
+                  throw new IllegalArgumentException(
+                      String.format("Property %s must be greater than 0, got %d", name, parsed));
+                }
+                return parsed;
+              } catch (NumberFormatException e) {
+                throw new IllegalArgumentException(
+                    String.format("Invalid long value '%s' for property %s", value, name), e);
+              }
+            })
+        .withEncoder(String::valueOf)
+        .withHidden(false)
+        .withReserved(false)
+        .build();
+  }
+
+  private static PropertyEntry<String> nonBlankStringPropertyEntry(
+      String name, String description) {
+    return new PropertyEntry.Builder<String>()
+        .withName(name)
+        .withDescription(description)
+        .withRequired(false)
+        .withImmutable(false)
+        .withJavaType(String.class)
+        .withDefaultValue(null)
+        .withDecoder(
+            value -> {
+              if (isBlank(value)) {
+                throw new IllegalArgumentException(
+                    "Property " + name + " must not be null or blank");
+              }
+              return value.trim();
+            })
+        .withEncoder(v -> v)
+        .withHidden(false)
+        .withReserved(false)
+        .build();
+  }
+
+  private static <T extends Enum<T>> PropertyEntry<T> localeSafeEnumPropertyEntry(
+      String name, String description, Class<T> enumClass) {
+    return new PropertyEntry.Builder<T>()
+        .withName(name)
+        .withDescription(description)
+        .withRequired(false)
+        .withImmutable(false)
+        .withJavaType(enumClass)
+        .withDefaultValue(null)
+        .withDecoder(
+            value -> {
+              if (isBlank(value)) {
+                throw new IllegalArgumentException(
+                    "Property " + name + " must not be null or blank");
+              }
+              String normalized = value.trim().toUpperCase(Locale.ROOT);
+              try {
+                return Enum.valueOf(enumClass, normalized);
+              } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException(
+                    String.format(
+                        "Invalid value '%s' for property %s; valid values are: %s",
+                        value,
+                        name,
+                        Arrays.stream(enumClass.getEnumConstants())
+                            .map(constant -> constant.name().toLowerCase(Locale.ROOT))
+                            .collect(Collectors.joining(", "))),
+                    e);
+              }
+            })
+        .withEncoder(v -> v.name().toLowerCase(Locale.ROOT))
+        .withHidden(false)
+        .withReserved(false)
+        .build();
+  }
+
+  private static PropertyEntry<String> columnListPropertyEntry(String name, String description) {
+    return new PropertyEntry.Builder<String>()
+        .withName(name)
+        .withDescription(description)
+        .withRequired(false)
+        .withImmutable(false)
+        .withJavaType(String.class)
+        .withDefaultValue(null)
+        .withDecoder(
+            value -> {
+              if (isBlank(value)) {
+                throw new IllegalArgumentException(
+                    "Property " + name + " must not be null or blank");
+              }
+              String trimmedValue = value.trim();
+              boolean startsWithBracket = trimmedValue.startsWith("[");
+              boolean endsWithBracket = trimmedValue.endsWith("]");
+              if (startsWithBracket != endsWithBracket) {
+                throw new IllegalArgumentException(
+                    "Property " + name + " has unbalanced brackets: '" + value + "'");
+              }
+              String inner =
+                  startsWithBracket
+                      ? trimmedValue.substring(1, trimmedValue.length() - 1).trim()
+                      : trimmedValue;
+              if (inner.isEmpty()) {
+                throw new IllegalArgumentException(
+                    "Property " + name + " must contain at least one column name: '" + value + "'");
+              }
+              String[] columns = inner.split(",", -1);
+              Set<String> seen = new HashSet<>();
+              for (String column : columns) {
+                String trimmed = column.trim();
+                if (trimmed.isEmpty()) {
+                  throw new IllegalArgumentException(
+                      "Property " + name + " contains a blank column name: '" + value + "'");
+                }
+                if (trimmed.indexOf('[') >= 0 || trimmed.indexOf(']') >= 0) {
+                  throw new IllegalArgumentException(
+                      "Property "
+                          + name
+                          + " contains unexpected brackets in column '"
+                          + trimmed
+                          + "'");
+                }
+                if (!seen.add(trimmed)) {
+                  throw new IllegalArgumentException(
+                      "Property "
+                          + name
+                          + " contains duplicate column name '"
+                          + trimmed
+                          + "': '"
+                          + value
+                          + "'");
+                }
+              }
+              return trimmedValue;
+            })
+        .withEncoder(v -> v)
+        .withHidden(false)
+        .withReserved(false)
+        .build();
+  }
+
+  private static boolean isBlank(String value) {
+    return value == null || value.trim().isEmpty();
   }
 }

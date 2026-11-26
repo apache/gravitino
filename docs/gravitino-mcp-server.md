@@ -105,6 +105,7 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 | `create_topic`                      | Create a new topic.                                                            | `topic`         |
 | `alter_topic`                       | Alter an existing topic.                                                       | `topic`         |
 | `delete_topic`                      | Delete a topic.                                                                | `topic`         |
+| `get_topic_iceberg_linkage`         | Resolve AutoMQ Table Topic configuration and linked Iceberg table metadata.    | `topic`         |
 | `list_of_filesets`                  | Retrieve a list of filesets within a specific catalog and schema.              | `fileset`       |
 | `load_fileset`                      | Retrieve comprehensive metadata details for a specific fileset.                | `fileset`       |
 | `list_files_in_fileset`             | Retrieve a list of files within a specific fileset.                            | `fileset`       |

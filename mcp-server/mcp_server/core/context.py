@@ -337,6 +337,10 @@ class GravitinoContext:
         self._cache_put(key, client)
         return self._borrow(client)
 
+    def resolve_metalake(self) -> str:
+        """Return the resolved metalake name for the current tool call."""
+        return self._resolve_metalake()
+
     def _resolve_metalake(self) -> str:
         """Resolve the metalake for the current call, tool argument first.
 
