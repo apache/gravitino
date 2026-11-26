@@ -21,6 +21,98 @@ paths:
   "/metalakes/{metalake}/kb-articles":
     parameters:
       - $ref: ./openapi.yaml#/components/parameters/metalake
+    get:
+      operationId: listKnowledgeBaseArticles
+      tags: [knowledge-base]
+      summary: List or search Knowledge Base Articles
+      description: Returns readable Articles ordered by title, then immutable name. All supplied filters
+        apply together before pagination. Ordinary lists include readable drafts and deprecated Articles.
+        Filtering by Term or asset matches live direct bindings and always excludes drafts.
+        A missing or unreadable Term or asset returns 404. Without effective Article VIEW, the
+        ordinary list returns an empty page.
+      parameters:
+        - in: query
+          name: q
+          description: Case-insensitive literal substring of the current title, a synonym or the stored body,
+            including markup. Percent, underscore, exclamation mark and backslash are literal.
+            Non-ASCII case matching depends on the database locale.
+          schema: {type: string}
+        - in: query
+          name: domain
+          description: Match members of this Domain or its readable subdomains. The server resolves
+            this filter for callers with Article VIEW. A missing Domain or hidden draft returns 404.
+            A published Domain for which the caller lacks USE returns 403.
+          schema: {type: string, minLength: 1}
+        - in: query
+          name: status
+          description: Select one Article status from those eligible for this request.
+          schema:
+            $ref: "#/components/schemas/ArticleStatus"
+        - in: query
+          name: owner
+          description: Direct owner in user:<name> or group:<name> form. Group membership is not expanded.
+          schema: {type: string, pattern: "^(user|group):.+$"}
+          example: "group:Finance"
+        - in: query
+          name: term
+          description: Exact name of a readable bound Term.
+          schema: {type: string, minLength: 1}
+        - in: query
+          name: objectType
+          description: Type of the bound asset. Requires name and the namespace components for that type.
+            Input is case-insensitive. Supported types are CATALOG, SCHEMA, TABLE, VIEW, FILESET,
+            TOPIC, MODEL, SEMANTIC_MODEL and COLUMN (table column).
+          schema: {type: string}
+          example: COLUMN
+        - in: query
+          name: namespace
+          description: Repeat once per exact asset namespace component, from outermost to innermost.
+            Omit for CATALOG. Pass one component for SCHEMA, two for a schema child, or three for COLUMN.
+            A dot within a component is literal.
+          style: form
+          explode: true
+          schema:
+            type: array
+            maxItems: 3
+            items: {type: string, minLength: 1}
+          example: [iceberg, sales, orders]
+        - in: query
+          name: name
+          description: Exact name of the bound asset. Requires objectType. Dots are literal.
+          schema: {type: string, minLength: 1}
+          example: total.amount
+        - in: query
+          name: includeDeprecated
+          description: Include deprecated Articles alongside published Articles when filtering by Term or asset.
+          schema: {type: boolean, default: false}
+        - in: query
+          name: limit
+          description: Maximum number of readable matching Articles to return.
+          schema: {type: integer, format: int32, minimum: 1, maximum: 1000, default: 20}
+        - in: query
+          name: offset
+          description: Number of readable matching Articles to skip.
+          schema: {type: integer, format: int32, minimum: 0, default: 0}
+      responses:
+        "200":
+          description: A page of Article summaries. An additional readable match sets hasMore to true.
+            To continue, keep the same filters and advance the offset by the number of Articles returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArticleListResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: ./openapi.yaml#/components/responses/ForbiddenErrorResponse
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "406":
+          $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
+        "409":
+          $ref: "#/components/responses/MetalakeNotInUse"
+        5XX:
+          $ref: "#/components/responses/ServerError"
     post:
       operationId: createKnowledgeBaseArticle
       tags: [knowledge-base]
@@ -489,6 +581,46 @@ components:
         objects:
           $ref: "#/components/schemas/ArticleObjects"
         hasMore: {type: boolean}
+    ArticleOwner:
+      description: Current direct owner. Null when there is no owner relation.
+      type: object
+      nullable: true
+      required: [name, type]
+      properties:
+        name: {type: string}
+        type: {type: string, enum: [user, group]}
+    ArticleSummary:
+      type: object
+      required: [name, title, status, domains, owner, terms, termsHasMore, audit_info]
+      properties:
+        name: {type: string}
+        title: {type: string}
+        status:
+          $ref: "#/components/schemas/ArticleStatus"
+        domains:
+          $ref: "#/components/schemas/Names"
+        owner:
+          $ref: "#/components/schemas/ArticleOwner"
+        terms:
+          description: Preview of up to 20 readable bound Terms.
+          maxItems: 20
+          allOf:
+            - $ref: "#/components/schemas/ArticleTerms"
+        termsHasMore:
+          type: boolean
+          description: An additional readable bound Term follows the preview.
+        audit_info:
+          $ref: ./openapi.yaml#/components/schemas/Audit
+    ArticleListResponse:
+      type: object
+      required: [code, articles, hasMore]
+      properties:
+        code: {type: integer, enum: [0]}
+        articles:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArticleSummary"
+        hasMore: {type: boolean}
     ArticleMetadata:
       type: object
       required: [name, title, status, domains, terms, termsHasMore, objects, objectsHasMore,
@@ -513,13 +645,7 @@ components:
         properties:
           $ref: "#/components/schemas/Properties"
         owner:
-          description: Current owner. Null when there is no owner relation.
-          type: object
-          nullable: true
-          required: [name, type]
-          properties:
-            name: {type: string}
-            type: {type: string, enum: [user, group]}
+          $ref: "#/components/schemas/ArticleOwner"
         audit_info:
           $ref: ./openapi.yaml#/components/schemas/Audit
         revisionToken:

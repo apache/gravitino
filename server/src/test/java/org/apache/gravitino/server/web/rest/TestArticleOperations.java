@@ -21,6 +21,7 @@ package org.apache.gravitino.server.web.rest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -57,14 +58,20 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.KnowledgeBaseArticleAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchKnowledgeBaseArticleException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.apache.gravitino.exceptions.UnapprovedTermException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.kb.ArticleBody;
 import org.apache.gravitino.kb.ArticleContent;
 import org.apache.gravitino.kb.ArticleCreate;
+import org.apache.gravitino.kb.ArticleListFilter;
 import org.apache.gravitino.kb.ArticleManager;
 import org.apache.gravitino.kb.ArticleObjectIdentifier;
+import org.apache.gravitino.kb.ArticlePage;
+import org.apache.gravitino.kb.ArticleStatus;
+import org.apache.gravitino.kb.ArticleSummary;
 import org.apache.gravitino.kb.ArticleTermBinding;
 import org.apache.gravitino.kb.AssetBindingPage;
 import org.apache.gravitino.kb.KnowledgeBaseArticleChange;
@@ -141,6 +148,149 @@ class TestArticleOperations extends BaseOperationsTest {
                 bindFactory(RequestFactory.class).to(HttpServletRequest.class);
               }
             });
+  }
+
+  @Test
+  void listsSummariesWithCombinedFiltersAndAnOrderedAssetIdentifier() throws IOException {
+    var term = mock(ArticleTermBinding.class);
+    when(term.name()).thenReturn("Gross Revenue");
+    when(term.status()).thenReturn(ArticleTermBinding.Status.APPROVED);
+    var summary = mock(ArticleSummary.class);
+    var group = OwnerDTO.builder().withType(Owner.Type.GROUP).withName("sales:team").build();
+    when(summary.name()).thenReturn("sales-guide");
+    when(summary.title()).thenReturn("Sales Guide");
+    when(summary.status()).thenReturn(ArticleStatus.DEPRECATED);
+    when(summary.domains()).thenReturn(new String[] {"Finance"});
+    when(summary.owner()).thenReturn(group);
+    when(summary.auditInfo())
+        .thenReturn(AuditInfo.builder().withCreator("alice").withCreateTime(Instant.EPOCH).build());
+    when(summary.terms()).thenReturn(new ArticleTermBinding[] {term});
+    when(summary.termsHasMore()).thenReturn(true);
+    when(manager.listArticleSummaries(eq("test"), any()))
+        .thenReturn(ArticlePage.of(List.of(summary), true));
+    var request =
+        target(BASE)
+            .queryParam("q", "销售!%_")
+            .queryParam("domain", "Finance")
+            .queryParam("status", "deprecated")
+            .queryParam("owner", "group:sales:team")
+            .queryParam("term", "Gross Revenue")
+            .queryParam("objectType", "COLUMN")
+            .queryParam("namespace", "ice.berg", "sales", "orders")
+            .queryParam("name", "total.amount")
+            .queryParam("includeDeprecated", "true")
+            .queryParam("limit", 1)
+            .queryParam("offset", 5);
+    try (Response r = request.request(V1).get()) {
+      var page = success(r);
+      var article = page.get("articles").get(0);
+      assertTrue(page.get("hasMore").asBoolean());
+      assertEquals("sales-guide", article.get("name").asText());
+      assertEquals("Sales Guide", article.get("title").asText());
+      assertEquals("DEPRECATED", article.get("status").asText());
+      assertEquals("Finance", article.get("domains").get(0).asText());
+      assertEquals("sales:team", article.get("owner").get("name").asText());
+      assertEquals("Gross Revenue", article.get("terms").get(0).get("name").asText());
+      assertTrue(article.get("termsHasMore").asBoolean());
+      assertEquals("alice", article.get("audit_info").get("creator").asText());
+      assertFalse(article.has("body"));
+      assertFalse(article.has("revisionToken"));
+    }
+    var captured = ArgumentCaptor.forClass(ArticleListFilter.class);
+    verify(manager).listArticleSummaries(eq("test"), captured.capture());
+    var filter = captured.getValue();
+    assertEquals("销售!%_", filter.query());
+    assertEquals("Finance", filter.domain());
+    assertEquals(ArticleStatus.DEPRECATED, filter.status());
+    assertEquals(Owner.Type.GROUP, filter.owner().type());
+    assertEquals("sales:team", filter.owner().name());
+    assertEquals("Gross Revenue", filter.term());
+    assertEquals(
+        ArticleObjectIdentifier.of(
+            MetadataObject.Type.COLUMN, List.of("ice.berg", "sales", "orders"), "total.amount"),
+        filter.object());
+    assertTrue(filter.includeDeprecated());
+    assertEquals(1, filter.limit());
+    assertEquals(5, filter.offset());
+  }
+
+  @Test
+  void listsWithDefaultsAndSupportsCatalogAndUserFilters() throws IOException {
+    when(manager.listArticleSummaries(eq("test"), any()))
+        .thenReturn(ArticlePage.of(List.of(), false));
+    var articles = target(BASE);
+    var catalog =
+        articles
+            .queryParam("objectType", "CATALOG")
+            .queryParam("name", "ice.berg")
+            .queryParam("owner", "user:alice");
+    for (var target : List.of(articles, catalog)) {
+      try (Response r = target.request().get()) {
+        assertEquals(
+            JsonUtils.objectMapper().readTree("{\"code\":0,\"articles\":[],\"hasMore\":false}"),
+            success(r));
+      }
+    }
+    var captured = ArgumentCaptor.forClass(ArticleListFilter.class);
+    verify(manager, times(2)).listArticleSummaries(eq("test"), captured.capture());
+    var defaults = captured.getAllValues().get(0);
+    assertEquals(20, defaults.limit());
+    assertEquals(0, defaults.offset());
+    assertFalse(defaults.includeDeprecated());
+    assertNull(defaults.object());
+    assertNull(defaults.term());
+    assertNull(defaults.status());
+    assertNull(defaults.owner());
+    var filtered = captured.getValue();
+    assertEquals(Owner.Type.USER, filtered.owner().type());
+    assertEquals("alice", filtered.owner().name());
+    assertEquals(
+        ArticleObjectIdentifier.of(MetadataObject.Type.CATALOG, List.of(), "ice.berg"),
+        filtered.object());
+  }
+
+  @Test
+  void rejectsInvalidListFiltersBeforeDispatch() {
+    var articles = target(BASE);
+    var column = articles.queryParam("objectType", "COLUMN").queryParam("name", "col");
+    for (var invalid :
+        List.of(
+            articles.queryParam("domain", " "),
+            articles.queryParam("status", "APPROVED"),
+            articles.queryParam("owner", "alice"),
+            articles.queryParam("owner", "role:writer"),
+            articles.queryParam("owner", "user: "),
+            articles.queryParam("term", " "),
+            articles.queryParam("name", "sales"),
+            articles.queryParam("namespace", "sales"),
+            articles.queryParam("objectType", "CATALOG"),
+            articles.queryParam("objectType", "GLOSSARY_TERM").queryParam("name", "term"),
+            column.queryParam("namespace", "catalog.schema.table"),
+            column.queryParam("namespace", "catalog", " ", "table"),
+            articles.queryParam("includeDeprecated", "yes"),
+            articles.queryParam("limit", "bad"),
+            articles.queryParam("limit", 0),
+            articles.queryParam("limit", 1001),
+            articles.queryParam("offset", -1))) {
+      try (Response r = invalid.request().get()) {
+        assertEquals(400, r.getStatus(), invalid.getUri().toString());
+      }
+    }
+    verifyNoInteractions(manager);
+  }
+
+  @Test
+  void preservesNotFoundForMissingOrHiddenListTargets() {
+    when(manager.listArticleSummaries(eq("test"), any()))
+        .thenThrow(
+            new NoSuchTermException("hidden Term"),
+            new NoSuchMetadataObjectException("missing asset"));
+    var articles = target(BASE);
+    assertError(articles.queryParam("term", "Revenue").request().get(), 404, "NoSuchTermException");
+    assertError(
+        articles.queryParam("objectType", "CATALOG").queryParam("name", "absent").request().get(),
+        404,
+        "NoSuchMetadataObjectException");
   }
 
   @Test

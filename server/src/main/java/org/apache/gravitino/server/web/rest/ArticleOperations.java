@@ -22,10 +22,13 @@ package org.apache.gravitino.server.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.base.Preconditions;
+import java.util.List;
+import java.util.Locale;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.BeanParam;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -39,7 +42,10 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity.EntityType;
+import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.dto.authorization.OwnerDTO;
 import org.apache.gravitino.dto.kb.ArticleDTO;
 import org.apache.gravitino.dto.kb.ArticleObjectDTO;
 import org.apache.gravitino.dto.kb.ArticleTermDTO;
@@ -47,6 +53,7 @@ import org.apache.gravitino.dto.requests.ArticleCreateRequest;
 import org.apache.gravitino.dto.requests.ArticleUpdatesRequest;
 import org.apache.gravitino.dto.responses.ArticleAssetBindingsResponse;
 import org.apache.gravitino.dto.responses.ArticleContentResponse;
+import org.apache.gravitino.dto.responses.ArticleListResponse;
 import org.apache.gravitino.dto.responses.ArticleResponse;
 import org.apache.gravitino.dto.responses.ArticleTermBindingsResponse;
 import org.apache.gravitino.dto.responses.BaseResponse;
@@ -57,7 +64,9 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
 import org.apache.gravitino.exceptions.UnapprovedTermException;
+import org.apache.gravitino.kb.ArticleListFilter;
 import org.apache.gravitino.kb.ArticleManager;
+import org.apache.gravitino.kb.ArticleStatus;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
@@ -84,6 +93,109 @@ public class ArticleOperations {
   @Inject
   public ArticleOperations(ArticleManager manager) {
     this.manager = manager;
+  }
+
+  /**
+   * Lists readable Article summaries matching all supplied filters.
+   *
+   * @param metalake the metalake name
+   * @param query the optional filters and pagination
+   * @return the requested summary page
+   */
+  @GET
+  @Timed(name = "list-articles." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-articles", absolute = true)
+  @AuthorizationExpression(expression = "")
+  public Response listArticles(
+      @PathParam("metalake") @AuthorizationMetadata(type = EntityType.METALAKE) String metalake,
+      @BeanParam ListArticlesQuery query) {
+    return execute(
+        OperationType.LIST,
+        metalake,
+        null,
+        () ->
+            Utils.ok(
+                new ArticleListResponse(manager.listArticleSummaries(metalake, query.toFilter()))));
+  }
+
+  /** Query parameters for the Article summary collection. */
+  public static class ListArticlesQuery {
+    @QueryParam("q")
+    private String query;
+
+    @QueryParam("domain")
+    private String domain;
+
+    @QueryParam("status")
+    private String status;
+
+    @QueryParam("owner")
+    private String owner;
+
+    @QueryParam("term")
+    private String term;
+
+    @QueryParam("objectType")
+    private String objectType;
+
+    @QueryParam("namespace")
+    private List<String> namespace;
+
+    @QueryParam("name")
+    private String name;
+
+    @QueryParam("includeDeprecated")
+    @DefaultValue("false")
+    private String includeDeprecated;
+
+    @QueryParam("limit")
+    @DefaultValue("" + ArticleListFilter.DEFAULT_LIMIT)
+    private String limit;
+
+    @QueryParam("offset")
+    @DefaultValue("0")
+    private String offset;
+
+    private ArticleListFilter toFilter() {
+      Preconditions.checkArgument(
+          domain == null || StringUtils.isNotBlank(domain), "domain must not be blank");
+      Preconditions.checkArgument(
+          "true".equalsIgnoreCase(includeDeprecated) || "false".equalsIgnoreCase(includeDeprecated),
+          "includeDeprecated must be true or false");
+      var filter =
+          ArticleListFilter.builder()
+              .withQuery(query)
+              .withDomain(domain)
+              .withIncludeDeprecated(Boolean.parseBoolean(includeDeprecated))
+              .withLimit(Integer.parseInt(limit))
+              .withOffset(Integer.parseInt(offset));
+      if (status != null) {
+        filter.withStatus(ArticleStatus.valueOf(status.toUpperCase(Locale.ROOT)));
+      }
+      if (owner != null) {
+        filter.withOwner(parseOwner(owner));
+      }
+      if (term != null) {
+        filter.withTerm(term);
+      }
+      if (objectType != null || name != null || !namespace.isEmpty()) {
+        filter.withObject(new ArticleObjectDTO(objectType, namespace, name).toIdentifier());
+      }
+      return filter.build();
+    }
+
+    private static Owner parseOwner(String owner) {
+      String[] parts = owner.split(":", 2);
+      Preconditions.checkArgument(
+          parts.length == 2
+              && ("user".equals(parts[0]) || "group".equals(parts[0]))
+              && StringUtils.isNotBlank(parts[1]),
+          "owner must be user:<name> or group:<name>");
+      return OwnerDTO.builder()
+          .withType(Owner.Type.valueOf(parts[0].toUpperCase(Locale.ROOT)))
+          .withName(parts[1])
+          .build();
+    }
   }
 
   /**
