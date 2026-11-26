@@ -73,6 +73,26 @@ public class GlossaryTermMetaBaseSQLProvider {
     return SELECT_TERM + " WHERE " + liveTermByName(metalakeId, key) + " FOR UPDATE";
   }
 
+  /** Locks a live definition by ID in its metalake. */
+  public String getByIdForUpdate(
+      @Param("metalakeId") long metalakeId, @Param("termId") long termId) {
+    return SELECT_TERM
+        + " WHERE metalake_id=#{metalakeId} AND term_id=#{termId} AND deleted_at=0 FOR UPDATE";
+  }
+
+  /** Increments the revision of a live term by one when its version matches. */
+  public String incrementVersion(
+      @Param("metalakeId") long metalakeId,
+      @Param("termId") long termId,
+      @Param("version") long version,
+      @Param("auditInfo") String auditInfo) {
+    return "UPDATE "
+        + GlossaryTermMetaMapper.TABLE_NAME
+        + " SET current_version = current_version + 1, audit_info=#{auditInfo}"
+        + " WHERE term_id=#{termId} AND metalake_id=#{metalakeId}"
+        + " AND current_version=#{version} AND deleted_at=0";
+  }
+
   /** Resolves IDs only while the parent still has the requested live name. */
   public String getIds(
       @Param("metalakeId") long metalakeId,

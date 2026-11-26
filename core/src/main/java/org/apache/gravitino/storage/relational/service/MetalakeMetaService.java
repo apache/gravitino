@@ -301,7 +301,6 @@ public class MetalakeMetaService {
                 SessionUtils.doWithoutCommit(
                     TagMetaMapper.class,
                     mapper -> mapper.softDeleteTagMetasByMetalakeId(metalakeId)),
-            () -> GlossaryTermMetaService.getInstance().dropMetalake(metalakeId),
             () ->
                 SessionUtils.doWithoutCommit(
                     PolicyTagRelMapper.class, mapper -> mapper.softDeleteByMetalakeId(metalakeId)),
@@ -364,7 +363,11 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     SemanticModelSourceMapper.class,
-                    mapper -> mapper.softDeleteByMetalakeId(metalakeId)));
+                    mapper -> mapper.softDeleteByMetalakeId(metalakeId)),
+            // Retire glossary terms and bindings last so every metadata endpoint lock (including
+            // model, view, and semantic model rows) is acquired before locking glossary_term_meta,
+            // preserving the global endpoint -> term lock order.
+            () -> GlossaryTermMetaService.getInstance().dropMetalake(metalakeId));
       } else {
         SessionUtils.doMultipleWithCommit(
             () -> {
@@ -426,7 +429,6 @@ public class MetalakeMetaService {
                 SessionUtils.doWithoutCommit(
                     TagMetaMapper.class,
                     mapper -> mapper.softDeleteTagMetasByMetalakeId(metalakeId)),
-            () -> GlossaryTermMetaService.getInstance().dropMetalake(metalakeId),
             () ->
                 SessionUtils.doWithoutCommit(
                     PolicyTagRelMapper.class, mapper -> mapper.softDeleteByMetalakeId(metalakeId)),
@@ -453,7 +455,8 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     JobMetaMapper.class,
-                    mapper -> mapper.softDeleteJobMetasByMetalakeId(metalakeId)));
+                    mapper -> mapper.softDeleteJobMetasByMetalakeId(metalakeId)),
+            () -> GlossaryTermMetaService.getInstance().dropMetalake(metalakeId));
       }
     }
     return true;

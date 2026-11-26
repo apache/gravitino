@@ -522,5 +522,12 @@ public class ModelMetaService {
                 modelId, MetadataObject.Type.MODEL.name()));
     SessionUtils.doWithoutCommit(
         StatisticMetaMapper.class, mapper -> mapper.softDeleteStatisticsByEntityId(modelId));
+    GlossaryTermBindingService.getInstance()
+        .cleanupObjectBindings(
+            modelPO.getMetalakeId(),
+            GlossaryTermBindingService.TargetType.MODEL,
+            modelId,
+            modelPO.getModelName(),
+            "DROP_MODEL");
   }
 }

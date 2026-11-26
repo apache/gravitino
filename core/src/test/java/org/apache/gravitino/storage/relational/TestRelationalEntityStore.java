@@ -38,6 +38,7 @@ import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.BaseEntityCache;
+import org.apache.gravitino.cache.CachedEntityIdResolver;
 import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.NoOpsCache;
@@ -46,15 +47,20 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
+import org.apache.gravitino.meta.EntityIdResolver;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.NamespacedEntityId;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestRelationalEntityStore {
@@ -75,6 +81,34 @@ public class TestRelationalEntityStore {
 
     FieldUtils.writeField(store, "backend", backend, true);
     FieldUtils.writeField(store, "cache", Mockito.spy(new NoOpsCache(config)), true);
+  }
+
+  @Test
+  void testTransactionalReadsUseOnlyTheirDatabaseSession() throws Exception {
+    EntityCache cache = Mockito.mock(EntityCache.class);
+    FieldUtils.writeField(store, "cache", cache, true);
+    NameIdentifier ident = NameIdentifier.of("lake", "catalog", "schema", "table");
+    Entity.EntityType type = Entity.EntityType.TABLE;
+    TableEntity table = Mockito.mock(TableEntity.class);
+    Mockito.when(backend.get(ident, type)).thenReturn(table);
+    Mockito.when(backend.batchGet(List.of(ident), type)).thenReturn(List.of(table));
+    Mockito.when(backend.exists(ident, type)).thenReturn(true);
+    try (MockedStatic<SqlSessions> sessions = Mockito.mockStatic(SqlSessions.class)) {
+      sessions.when(SqlSessions::hasActiveSession).thenReturn(true);
+      Assertions.assertSame(table, store.get(ident, type, TableEntity.class));
+      Assertions.assertEquals(
+          List.of(table), store.batchGet(List.of(ident), type, TableEntity.class));
+      Assertions.assertTrue(store.exists(ident, type));
+
+      EntityIdResolver underlying = Mockito.mock(EntityIdResolver.class);
+      NamespacedEntityId ids = new NamespacedEntityId(42L, 1L, 2L, 3L);
+      Mockito.when(underlying.getEntityIds(ident, type)).thenReturn(ids);
+      Mockito.when(underlying.getEntityId(ident, type)).thenReturn(42L);
+      CachedEntityIdResolver idResolver = new CachedEntityIdResolver(cache, underlying);
+      Assertions.assertSame(ids, idResolver.getEntityIds(ident, type));
+      Assertions.assertEquals(42L, idResolver.getEntityId(ident, type));
+    }
+    Mockito.verifyNoInteractions(cache);
   }
 
   @Test
