@@ -37,7 +37,17 @@ class TestKnowledgeBaseArticleMapper {
     var after = new KnowledgeBaseArticlePO();
     after.setTitle("New title");
     var params =
-        Map.of("name", "guide", "names", List.of("guide"), "before", before, "after", after);
+        Map.of(
+            "name",
+            "guide",
+            "names",
+            List.of("guide"),
+            "before",
+            before,
+            "after",
+            after,
+            "includeBindings",
+            true);
     String prefix = KnowledgeBaseArticleMapper.class.getName() + ".";
     for (String method :
         List.of(

@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
@@ -72,6 +73,18 @@ public class SemanticModelMetricSQLProviderFactory {
   public static String selectSemanticModelMetricsByModelIdForUpdate(
       @Param("semanticModelId") Long semanticModelId) {
     return getProvider().selectSemanticModelMetricsByModelIdForUpdate(semanticModelId);
+  }
+
+  /** Finds a live metric identity by containing Semantic Model ID and exact metric name. */
+  public static String selectSemanticModelMetricByModelIdAndName(
+      @Param("semanticModelId") Long semanticModelId, @Param("metricName") String metricName) {
+    return getProvider().selectSemanticModelMetricByModelIdAndName(semanticModelId, metricName);
+  }
+
+  /** Lists live metric identities for a nonempty batch of metric IDs. */
+  public static String listSemanticModelMetricsByMetricIds(
+      @Param("metricIds") Collection<Long> metricIds) {
+    return getProvider().listSemanticModelMetricsByMetricIds(metricIds);
   }
 
   /** Retires selected live identities belonging to a Semantic Model. */

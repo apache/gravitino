@@ -280,7 +280,7 @@ public class FilesetMetaService {
     // before it can remove versions, tags, policies, or any other related data.
     SessionUtils.doMultipleWithCommit(
         () -> deleteFilesetWithVersion(identifier, filesetPO),
-        () -> deleteFilesetDependents(filesetPO.getFilesetId()));
+        () -> deleteFilesetDependents(filesetPO));
 
     return deletedFileset;
   }
@@ -527,7 +527,8 @@ public class FilesetMetaService {
         .build();
   }
 
-  private void deleteFilesetDependents(Long filesetId) {
+  private void deleteFilesetDependents(FilesetPO filesetPO) {
+    Long filesetId = filesetPO.getFilesetId();
     // The fileset row has already passed its version check. All cleanup below uses the same
     // transaction, so either the root and every related row are deleted together, or none are.
     SessionUtils.doWithoutCommit(
@@ -550,6 +551,13 @@ public class FilesetMetaService {
                 filesetId, MetadataObject.Type.FILESET.name()));
     SessionUtils.doWithoutCommit(
         StatisticMetaMapper.class, mapper -> mapper.softDeleteStatisticsByEntityId(filesetId));
+    GlossaryTermBindingService.getInstance()
+        .cleanupObjectBindings(
+            filesetPO.getMetalakeId(),
+            GlossaryTermBindingService.TargetType.FILESET,
+            filesetId,
+            filesetPO.getFilesetName(),
+            "DROP_FILESET");
   }
 
   private RuntimeException filesetWriteFailure(

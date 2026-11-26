@@ -30,7 +30,7 @@ import org.apache.gravitino.annotation.Evolving;
 
 /**
  * A change to current Article content, metadata or bindings. All changes in one alter request are
- * applied atomically.
+ * applied atomically. New title, comment and source reference values must be free of U+0000.
  *
  * <p>The article name is immutable, so no rename change exists.
  */
@@ -279,6 +279,7 @@ public interface KnowledgeBaseArticleChange {
     private final String newTitle;
 
     private UpdateTitle(String newTitle) {
+      ArticleValidation.checkNoNullCharacter(newTitle, "Title");
       this.newTitle = ArticleValidation.title(newTitle);
     }
 
@@ -433,6 +434,7 @@ public interface KnowledgeBaseArticleChange {
     @Nullable private final String newComment;
 
     private UpdateComment(@Nullable String newComment) {
+      ArticleValidation.checkNoNullCharacter(newComment, "Comment");
       this.newComment =
           ArticleValidation.length(newComment, KnowledgeBaseArticle.COMMENT_MAX_LENGTH, "Comment");
     }
@@ -513,6 +515,7 @@ public interface KnowledgeBaseArticleChange {
     @Nullable private final String newSourceReference;
 
     private UpdateSourceReference(@Nullable String newSourceReference) {
+      ArticleValidation.checkNoNullCharacter(newSourceReference, "Source reference");
       this.newSourceReference =
           ArticleValidation.length(
               newSourceReference,
