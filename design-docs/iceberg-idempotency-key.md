@@ -298,9 +298,7 @@ CREATE TABLE IF NOT EXISTS `iceberg_idempotency_meta` (
 
 The H2 and PostgreSQL variants use the same columns. All three backends ship the
 table in `scripts/<backend>/schema-2.0.0-<backend>.sql` and
-`scripts/<backend>/upgrade-1.3.0-to-2.0.0-<backend>.sql`. Upgrade scripts also
-`DROP` any leftover `iceberg_idempotency_generation_meta` from earlier
-development builds.
+`scripts/<backend>/upgrade-1.3.0-to-2.0.0-<backend>.sql`.
 
 Hard-deleted, released, or purged keys are treated as never seen. Each live row
 stores a fixed claim (`generation = 1`). That matches common HTTP

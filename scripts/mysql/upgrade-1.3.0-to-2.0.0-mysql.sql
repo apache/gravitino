@@ -955,9 +955,6 @@ CREATE TABLE IF NOT EXISTS `iceberg_idempotency_meta` (
   KEY `idx_iim_expires` (`expires_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Iceberg REST idempotency records';
 
--- Drop the unreleased stripe counter table from earlier development builds.
-DROP TABLE IF EXISTS iceberg_idempotency_generation_meta;
-
 -- Index live metadata lists and relationship cleanup by their lookup keys and deletion status.
 SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
     WHERE table_schema = DATABASE() AND table_name = 'tag_meta' AND index_name = 'idx_tag_meta_live'),

@@ -235,9 +235,8 @@ database lock contention. Close the store when stopping the service to shut down
 Initialize a new database with the 2.0.0 schema or apply the 1.3.0-to-2.0.0 upgrade before selecting
 `jdbc`. An existing development 2.0.0 database created before this table was added must also apply
 the `iceberg_idempotency_meta` table and the expiry index from the matching database's schema
-script. Drop `iceberg_idempotency_generation_meta` if an earlier development build created it. Store
-initialization fails if `iceberg_idempotency_meta` is missing. The table is additive and does not
-modify catalog metadata.
+script. Store initialization fails if `iceberg_idempotency_meta` is missing. The table is additive
+and does not modify catalog metadata.
 
 When switching from an earlier development build that used `iceberg_idempotency_key_meta` or
 `query_digest`, drain in-flight mutations and let existing reuse windows expire before changing

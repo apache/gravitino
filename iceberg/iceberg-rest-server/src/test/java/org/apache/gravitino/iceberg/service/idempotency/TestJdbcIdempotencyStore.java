@@ -526,7 +526,6 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession();
         var statement = session.getConnection().createStatement()) {
       statement.execute("DROP TABLE iceberg_idempotency_meta");
-      statement.execute("DROP TABLE IF EXISTS iceberg_idempotency_generation_meta");
       ScriptRunner runner = new ScriptRunner(session.getConnection());
       runner.setLogWriter(null);
       runner.setStopOnError(true);

@@ -608,9 +608,6 @@ COMMENT ON COLUMN iceberg_idempotency_meta.audit_info IS 'idempotency record aud
 COMMENT ON COLUMN iceberg_idempotency_meta.created_at IS 'record created at (unix epoch millis)';
 COMMENT ON COLUMN iceberg_idempotency_meta.expires_at IS 'record expires at (unix epoch millis)';
 
--- Drop the unreleased stripe counter table from earlier development builds.
-DROP TABLE IF EXISTS iceberg_idempotency_generation_meta;
-
 -- Keep retained deletions out of live metadata lists and relationship cleanup scans.
 CREATE INDEX IF NOT EXISTS idx_tag_meta_live ON tag_meta (metalake_id) WHERE deleted_at = 0;
 CREATE INDEX IF NOT EXISTS idx_policy_meta_live ON policy_meta (metalake_id) WHERE deleted_at = 0;
