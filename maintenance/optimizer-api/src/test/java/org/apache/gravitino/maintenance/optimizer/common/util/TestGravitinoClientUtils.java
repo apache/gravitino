@@ -73,26 +73,34 @@ class TestGravitinoClientUtils {
   }
 
   @Test
-  void testRequireJdbcMetricsUrlIfNeeded() {
-    Map<String, String> withoutUrl = new HashMap<>();
-    withoutUrl.put("gravitino_uri", "http://localhost:8090");
-    GravitinoClientUtils.requireJdbcMetricsUrlIfNeeded("stats", withoutUrl);
+  void testRequireJdbcMetricsConfigIfNeeded() {
+    Map<String, String> withoutJdbc = new HashMap<>();
+    withoutJdbc.put("gravitino_uri", "http://localhost:8090");
+    GravitinoClientUtils.requireJdbcMetricsConfigIfNeeded("stats", withoutJdbc);
 
     assertThrows(
         IllegalArgumentException.class,
-        () -> GravitinoClientUtils.requireJdbcMetricsUrlIfNeeded("metrics", withoutUrl));
+        () -> GravitinoClientUtils.requireJdbcMetricsConfigIfNeeded("metrics", withoutJdbc));
     assertThrows(
         IllegalArgumentException.class,
-        () -> GravitinoClientUtils.requireJdbcMetricsUrlIfNeeded("all", withoutUrl));
+        () -> GravitinoClientUtils.requireJdbcMetricsConfigIfNeeded("all", withoutJdbc));
     assertThrows(
         IllegalArgumentException.class,
-        () -> GravitinoClientUtils.requireJdbcMetricsUrlIfNeeded("ALL", withoutUrl));
+        () -> GravitinoClientUtils.requireJdbcMetricsConfigIfNeeded("ALL", withoutJdbc));
 
-    Map<String, String> withUrl = new HashMap<>(withoutUrl);
-    withUrl.put(
+    Map<String, String> urlOnly = new HashMap<>(withoutJdbc);
+    urlOnly.put(
         OptimizerConfig.JDBC_METRICS_JDBC_URL, "jdbc:postgresql://localhost:5432/optimizer");
-    GravitinoClientUtils.requireJdbcMetricsUrlIfNeeded("metrics", withUrl);
-    GravitinoClientUtils.requireJdbcMetricsUrlIfNeeded("all", withUrl);
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> GravitinoClientUtils.requireJdbcMetricsConfigIfNeeded("metrics", urlOnly));
+
+    Map<String, String> withJdbc = new HashMap<>(urlOnly);
+    withJdbc.put(OptimizerConfig.JDBC_METRICS_JDBC_USER, "postgres");
+    withJdbc.put(OptimizerConfig.JDBC_METRICS_JDBC_PASSWORD, "postgres");
+    withJdbc.put(OptimizerConfig.JDBC_METRICS_JDBC_DRIVER, "org.postgresql.Driver");
+    GravitinoClientUtils.requireJdbcMetricsConfigIfNeeded("metrics", withJdbc);
+    GravitinoClientUtils.requireJdbcMetricsConfigIfNeeded("all", withJdbc);
   }
 
   @Test

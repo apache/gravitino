@@ -341,7 +341,7 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
             + OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX
             + "updater_options) "
             + "must contain 'gravitino_uri'");
-    GravitinoClientUtils.requireJdbcMetricsUrlIfNeeded(updateMode, updaterOptions);
+    GravitinoClientUtils.requireJdbcMetricsConfigIfNeeded(updateMode, updaterOptions);
     if (!"stats".equals(updateMode) && !"all".equals(updateMode)) {
       return;
     }

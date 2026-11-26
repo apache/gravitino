@@ -150,37 +150,33 @@ public final class GravitinoClientUtils {
   }
 
   /**
-   * When {@code updateMode} is {@code metrics} or {@code all}, requires a non-blank {@link
-   * OptimizerConfig#JDBC_METRICS_JDBC_URL} in {@code updaterOptions}. {@code stats} skips this
-   * check. Shared by the built-in update-stats Spark job and {@code submit-update-stats-job}.
+   * When {@code updateMode} is {@code metrics} or {@code all}, requires non-blank JDBC metrics
+   * settings in {@code updaterOptions}: {@link OptimizerConfig#JDBC_METRICS_JDBC_URL}, {@link
+   * OptimizerConfig#JDBC_METRICS_JDBC_USER}, {@link OptimizerConfig#JDBC_METRICS_JDBC_PASSWORD},
+   * and {@link OptimizerConfig#JDBC_METRICS_JDBC_DRIVER}. {@code stats} skips this check. Shared by
+   * the built-in update-stats Spark job and {@code submit-update-stats-job}.
    *
    * @param updateMode update-stats mode ({@code stats}, {@code metrics}, or {@code all})
    * @param updaterOptions updater-options map (raw or normalized)
    */
-  public static void requireJdbcMetricsUrlIfNeeded(
+  public static void requireJdbcMetricsConfigIfNeeded(
       String updateMode, Map<String, String> updaterOptions) {
     Preconditions.checkArgument(updaterOptions != null, "updaterOptions must not be null");
     String mode = updateMode == null ? "" : updateMode.trim().toLowerCase(Locale.ROOT);
     if (!"metrics".equals(mode) && !"all".equals(mode)) {
       return;
     }
-    requireJdbcMetricsUrl(updaterOptions);
+    requireNonBlankJdbcMetricsProperty(updaterOptions, OptimizerConfig.JDBC_METRICS_JDBC_URL);
+    requireNonBlankJdbcMetricsProperty(updaterOptions, OptimizerConfig.JDBC_METRICS_JDBC_USER);
+    requireNonBlankJdbcMetricsProperty(updaterOptions, OptimizerConfig.JDBC_METRICS_JDBC_PASSWORD);
+    requireNonBlankJdbcMetricsProperty(updaterOptions, OptimizerConfig.JDBC_METRICS_JDBC_DRIVER);
   }
 
-  /**
-   * Requires a non-blank {@link OptimizerConfig#JDBC_METRICS_JDBC_URL} so metrics updates do not
-   * silently fall back to the embedded H2 default.
-   *
-   * @param updaterOptions updater-options map carrying jdbcMetrics settings
-   */
-  public static void requireJdbcMetricsUrl(Map<String, String> updaterOptions) {
-    Preconditions.checkArgument(updaterOptions != null, "updaterOptions must not be null");
-    String jdbcUrl = updaterOptions.get(OptimizerConfig.JDBC_METRICS_JDBC_URL);
+  private static void requireNonBlankJdbcMetricsProperty(
+      Map<String, String> updaterOptions, String propertyKey) {
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(jdbcUrl),
-        "updater_options must contain '"
-            + OptimizerConfig.JDBC_METRICS_JDBC_URL
-            + "' when update_mode is metrics or all");
+        StringUtils.isNotBlank(updaterOptions.get(propertyKey)),
+        "updater_options must contain '" + propertyKey + "' when update_mode is metrics or all");
   }
 
   private static Optional<String> firstNonEmpty(String... candidates) {

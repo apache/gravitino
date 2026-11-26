@@ -615,7 +615,10 @@ class TestOptimizerCmd {
                 + configsServerUri
                 + "\",\"metrics_updater\":\"custom-metrics-updater\","
                 + "\"gravitino.optimizer.jdbcMetrics.jdbcUrl\":"
-                + "\"jdbc:postgresql://localhost:5432/optimizer\"}",
+                + "\"jdbc:postgresql://localhost:5432/optimizer\","
+                + "\"gravitino.optimizer.jdbcMetrics.jdbcUser\":\"postgres\","
+                + "\"gravitino.optimizer.jdbcMetrics.jdbcPassword\":\"postgres\","
+                + "\"gravitino.optimizer.jdbcMetrics.jdbcDriver\":\"org.postgresql.Driver\"}",
             "--spark-conf",
             "{\"spark.sql.catalog.rest\":\"org.apache.iceberg.spark.SparkCatalog\","
                 + "\"spark.sql.catalog.rest.type\":\"rest\","

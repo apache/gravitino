@@ -66,11 +66,20 @@ public class OptimizerConfig extends Config {
   private static final String STATISTICS_UPDATER = UPDATER_PREFIX + "statisticsUpdater";
   private static final String METRICS_UPDATER = UPDATER_PREFIX + "metricsUpdater";
 
-  /**
-   * Canonical JDBC URL for metrics storage under {@code updater-options} / optimizer config. Must
-   * match {@code GenericJdbcMetricsRepository}'s {@code jdbcMetrics.jdbcUrl} property.
-   */
-  public static final String JDBC_METRICS_JDBC_URL = OPTIMIZER_PREFIX + "jdbcMetrics.jdbcUrl";
+  /** Prefix for JDBC metrics storage keys under {@code updater-options} / optimizer config. */
+  public static final String JDBC_METRICS_PREFIX = OPTIMIZER_PREFIX + "jdbcMetrics.";
+
+  /** Canonical JDBC URL for metrics storage ({@code jdbcMetrics.jdbcUrl}). */
+  public static final String JDBC_METRICS_JDBC_URL = JDBC_METRICS_PREFIX + "jdbcUrl";
+
+  /** Canonical JDBC username for metrics storage ({@code jdbcMetrics.jdbcUser}). */
+  public static final String JDBC_METRICS_JDBC_USER = JDBC_METRICS_PREFIX + "jdbcUser";
+
+  /** Canonical JDBC password for metrics storage ({@code jdbcMetrics.jdbcPassword}). */
+  public static final String JDBC_METRICS_JDBC_PASSWORD = JDBC_METRICS_PREFIX + "jdbcPassword";
+
+  /** Canonical JDBC driver class for metrics storage ({@code jdbcMetrics.jdbcDriver}). */
+  public static final String JDBC_METRICS_JDBC_DRIVER = JDBC_METRICS_PREFIX + "jdbcDriver";
 
   public static final String MONITOR_PREFIX = OPTIMIZER_PREFIX + "monitor.";
   private static final String METRICS_PROVIDER = MONITOR_PREFIX + "metricsProvider";
