@@ -116,14 +116,11 @@ public class GlossaryTermBindingBaseSQLProvider {
         + "</foreach> ORDER BY b.term_id, b.target_type, b.target_id</script>";
   }
 
-  /** Lists live bindings of a term in keyset order on (target_type, target_id). */
+  /** Lists live bindings of a term ordered by target type and ID. */
   public String listByTerm(
       @Param("metalakeId") long metalakeId,
       @Param("termId") long termId,
-      @Param("targetTypes") @Nullable Collection<String> targetTypes,
-      @Param("afterType") @Nullable String afterType,
-      @Param("afterId") long afterId,
-      @Param("limit") int limit) {
+      @Param("targetTypes") @Nullable Collection<String> targetTypes) {
     StringBuilder sql =
         new StringBuilder("<script>SELECT ")
             .append(SELECT_COLUMNS)
@@ -136,11 +133,7 @@ public class GlossaryTermBindingBaseSQLProvider {
           .append(
               "<foreach collection='targetTypes' item='t' open='(' separator=',' close=')'>#{t}</foreach>");
     }
-    if (afterType != null) {
-      sql.append(
-          " AND (b.target_type > #{afterType} OR (b.target_type=#{afterType} AND b.target_id > #{afterId}))");
-    }
-    sql.append(" ORDER BY b.target_type, b.target_id LIMIT #{limit}</script>");
+    sql.append(" ORDER BY b.target_type, b.target_id</script>");
     return sql.toString();
   }
 

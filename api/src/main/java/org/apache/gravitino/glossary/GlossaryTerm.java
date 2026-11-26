@@ -25,7 +25,6 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchTermException;
-import org.apache.gravitino.exceptions.TermVersionConflictException;
 
 /**
  * A glossary term defines a business word, such as "Active Customer", in a metalake. A term has a
@@ -238,8 +237,8 @@ public interface GlossaryTerm extends Auditable {
    *
    * <p>The server first leaves out the objects and metrics that the caller cannot access, the same
    * as {@link #listBindings(TermBinding.Kind)}. Then it keeps at most 20 of the remaining bindings;
-   * see {@link #bindingsTruncated()}. Use {@link #listBindings(TermBinding.Kind)} to begin a paged
-   * read of all bindings, following each continuation until it is absent.
+   * see {@link #bindingsTruncated()}. Use {@link #listBindings(TermBinding.Kind)} to retrieve the
+   * full list of visible bindings.
    *
    * @return The authorized preview, or an empty array when none are visible or not requested; check
    *     {@link #bindingsIncluded()} to distinguish those cases.
@@ -261,45 +260,11 @@ public interface GlossaryTerm extends Auditable {
   }
 
   /**
-   * Returns the first page of bindings using {@link TermBindingPage#DEFAULT_PAGE_SIZE}.
+   * Lists all bindings of this term whose targets the caller can read.
    *
-   * <p>The same page type is returned even for an empty first page, preserving any continuation.
-   * This method does not automatically read subsequent pages.
-   *
-   * @param kind The kind of bindings to list, or null to list both kinds.
-   * @return The first page of authorized bindings and its continuation, if any.
-   * @throws NoSuchTermException If the term does not exist or is not visible to the caller.
-   */
-  default TermBindingPage listBindings(@Nullable TermBinding.Kind kind) throws NoSuchTermException {
-    return listBindings(kind, TermBindingPage.DEFAULT_PAGE_SIZE, null);
-  }
-
-  /**
-   * Returns one bounded page of authorized bindings of the current term.
-   *
-   * <p>Each call examines at most 1,000 candidates and returns at most {@code pageSize} visible
-   * bindings. Hidden candidates advance the cursor, so an empty page can still have a continuation.
-   * Only an absent continuation proves that scanning is complete. Do not silently drain all pages
-   * or discard the token. Every page rechecks term visibility and target access; paging does not
-   * freeze authorization.
-   *
-   * <p>The opaque, tamper-resistant cursor binds the metalake, term identity, revision, filters and
-   * scan position without revealing hidden target IDs/counts. A changed identity or revision throws
-   * {@link TermVersionConflictException}; restart explicitly from the first page without combining
-   * old and new pages. A malformed cursor or changed filters throws {@link
-   * IllegalArgumentException}. Missing/hidden roots throw {@link NoSuchTermException} before cursor
-   * comparison. An implementation must not silently ignore a cursor or page size.
-   *
-   * @param kind The binding kind, or null for both kinds; retain it on subsequent pages.
-   * @param pageSize The maximum visible results, from 1 to {@link TermBindingPage#MAX_PAGE_SIZE}.
-   * @param pageToken The previous page's continuation, or null to start a new scan.
-   * @return One page of visible bindings, possibly empty with a continuation.
+   * @param kind The binding kind, or null to list both kinds.
+   * @return The visible bindings, or an empty array if none match.
    * @throws NoSuchTermException If the term is missing or hidden.
-   * @throws IllegalArgumentException If the page size is invalid, the cursor is malformed or the
-   *     filters changed.
-   * @throws TermVersionConflictException If the cursor's term identity or revision changed.
    */
-  TermBindingPage listBindings(
-      @Nullable TermBinding.Kind kind, int pageSize, @Nullable String pageToken)
-      throws NoSuchTermException, IllegalArgumentException, TermVersionConflictException;
+  TermBinding[] listBindings(@Nullable TermBinding.Kind kind) throws NoSuchTermException;
 }
