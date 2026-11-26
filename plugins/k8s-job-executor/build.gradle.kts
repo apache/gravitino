@@ -47,8 +47,8 @@ listOf(
   configurations.named(it) { extendsFrom(jacksonBom) }
 }
 // The unit tests put the Gravitino modules next to fabric8 without relocation, and those modules
-// bring the newer Jackson of the catalog. Keep the test classpaths on the line fabric8 needs; the
-// shadedJarTest below covers the relocated jar next to the Jackson of the Gravitino server.
+// bring the newer Jackson of the Gravitino server. Keep the test classpaths on the line fabric8
+// needs; the shadedJarTest below covers the relocated jar next to the Jackson of the server.
 val jackson218Version: String = libs.versions.jackson218.get()
 listOf("testCompileClasspath", "testRuntimeClasspath").forEach {
   configurations.named(it) {
@@ -73,7 +73,8 @@ dependencies {
   compileOnly(libs.lombok)
   compileOnly(libs.slf4j.api)
 
-  // Bundled and relocated, as fabric8 needs a newer Jackson than the Gravitino server ships.
+  // Bundled and relocated, as fabric8 needs an older Jackson (the 2.18 line) than the one the
+  // Gravitino server ships.
   implementation(libs.fabric8.kubernetes.client) {
     exclude(group = "io.fabric8", module = "kubernetes-httpclient-okhttp")
     exclude(group = "io.fabric8", module = "kubernetes-httpclient-vertx")
