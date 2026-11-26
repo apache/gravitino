@@ -24,6 +24,7 @@ import com.google.common.collect.Lists;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -145,7 +146,9 @@ public class TableColumnMetaService {
 
   /**
    * Gives each column the id of the stored live column with the same name, if there is one, and
-   * removes the relations of the stored columns that are gone.
+   * removes the non-glossary relations of the stored columns that are gone, returning those removed
+   * columns in {@code deletedColumnsOut} so the caller can retire glossary bindings after all
+   * table/column locks are held.
    *
    * <p>Tags, owners and privileges are attached to a column by id, so a table that is written again
    * as a whole, e.g. re-imported, must keep the ids of the columns it still has. Columns with no
@@ -154,14 +157,15 @@ public class TableColumnMetaService {
    * kept is dropped, so its relations are removed in the same transaction, as for a column dropped
    * by an alter.
    *
-   * @param tableId the id of the stored table
-   * @param tableVersion the table version whose columns are reused
+   * @param tablePO the stored table whose column identities are reused
    * @param columns the columns to write
+   * @param deletedColumnsOut receives the IDs and names of dropped stored columns
    * @return the columns, with the stored ids where the names match
    */
   List<ColumnEntity> reuseStoredColumnIds(
-      Long tableId, Long tableVersion, List<ColumnEntity> columns) {
-    List<ColumnPO> storedColumns = getColumnsByTableIdAndVersion(tableId, tableVersion);
+      TablePO tablePO, List<ColumnEntity> columns, Map<Long, String> deletedColumnsOut) {
+    List<ColumnPO> storedColumns =
+        getColumnsByTableIdAndVersion(tablePO.getTableId(), tablePO.getCurrentVersion());
     if (storedColumns.isEmpty()) {
       return columns;
     }
@@ -190,12 +194,16 @@ public class TableColumnMetaService {
     }
 
     Set<Long> keptIds = result.stream().map(ColumnEntity::id).collect(Collectors.toSet());
-    deleteColumnRelations(
-        storedColumns.stream()
-            .map(ColumnPO::getColumnId)
-            .filter(id -> !keptIds.contains(id))
-            .distinct()
-            .collect(Collectors.toList()));
+    Map<Long, String> deletedColumns = new LinkedHashMap<>();
+    for (ColumnPO storedColumn : storedColumns) {
+      if (!keptIds.contains(storedColumn.getColumnId())) {
+        deletedColumns.putIfAbsent(storedColumn.getColumnId(), storedColumn.getColumnName());
+      }
+    }
+    deleteColumnRelations(Lists.newArrayList(deletedColumns.keySet()));
+    if (!deletedColumns.isEmpty()) {
+      deletedColumnsOut.putAll(deletedColumns);
+    }
     return result;
   }
 
@@ -262,12 +270,12 @@ public class TableColumnMetaService {
     }
 
     // Mark the columns to DELETE if they are not existed in new columns.
-    List<Long> deletedColumnIds = Lists.newArrayList();
+    Map<Long, String> deletedColumnNamesById = new LinkedHashMap<>();
     for (ColumnEntity oldColumn : oldColumns.values()) {
       if (!newColumns.containsKey(oldColumn.id())) {
         columnPOsToInsert.add(
             POConverters.initializeColumnPO(newTablePO, oldColumn, ColumnPO.ColumnOpType.DELETE));
-        deletedColumnIds.add(oldColumn.id());
+        deletedColumnNamesById.put(oldColumn.id(), oldColumn.name());
       }
     }
 
@@ -287,7 +295,16 @@ public class TableColumnMetaService {
     }
 
     insertColumnPOsInBatches(columnPOsToInsert);
-    deleteColumnRelations(deletedColumnIds);
+    deleteColumnRelations(Lists.newArrayList(deletedColumnNamesById.keySet()));
+    if (!deletedColumnNamesById.isEmpty()) {
+      GlossaryTermBindingService.getInstance()
+          .cleanupColumnBindings(
+              newTablePO.getMetalakeId(),
+              newTablePO.getTableId(),
+              newTablePO.getTableName(),
+              deletedColumnNamesById,
+              "ALTER_TABLE");
+    }
   }
 
   private void deleteColumnRelations(List<Long> columnIds) {

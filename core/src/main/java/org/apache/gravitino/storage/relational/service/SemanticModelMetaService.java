@@ -27,6 +27,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -55,6 +56,7 @@ import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelSourceMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
+import org.apache.gravitino.storage.relational.po.GlossaryTermBindingPO;
 import org.apache.gravitino.storage.relational.po.SemanticModelMetricPO;
 import org.apache.gravitino.storage.relational.po.SemanticModelPO;
 import org.apache.gravitino.storage.relational.po.SemanticModelVersionInfoPO;
@@ -159,6 +161,7 @@ public class SemanticModelMetaService {
       SemanticModelPO po =
           initializeSemanticModelPO(semanticModelEntity, SemanticModelPO.builder());
       AtomicReference<SemanticModelPO> persistedPO = new AtomicReference<>(po);
+      AtomicReference<Map<Long, String>> retiredMetrics = new AtomicReference<>(Map.of());
       SchemaMetaService.getInstance()
           .doWithSchemaWriteLock(
               semanticModelEntity.nameIdentifier(),
@@ -189,14 +192,28 @@ public class SemanticModelMetaService {
                         }
                         persistedPO.set(replacementPO);
                       }),
-              () -> reconcileMetricIdentities(persistedPO.get(), semanticModelEntity.definition()),
+              () ->
+                  retiredMetrics.set(
+                      reconcileMetricIdentities(
+                          persistedPO.get(), semanticModelEntity.definition())),
               () -> replaceSources(persistedPO.get(), semanticModelEntity),
               () ->
                   SessionUtils.doWithoutCommit(
                       SemanticModelVersionInfoMapper.class,
                       mapper ->
                           mapper.insertSemanticModelVersionInfo(
-                              persistedPO.get().getSemanticModelVersionInfoPO())));
+                              persistedPO.get().getSemanticModelVersionInfoPO())),
+              () -> {
+                if (!retiredMetrics.get().isEmpty()) {
+                  GlossaryTermBindingService.getInstance()
+                      .cleanupMetricBindings(
+                          persistedPO.get().getMetalakeId(),
+                          persistedPO.get().getSemanticModelId(),
+                          persistedPO.get().getSemanticModelName(),
+                          retiredMetrics.get(),
+                          "OVERWRITE_SEMANTIC_MODEL");
+                }
+              });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.SEMANTIC_MODEL, semanticModelEntity.nameIdentifier().toString());
@@ -248,6 +265,7 @@ public class SemanticModelMetaService {
           !Objects.equals(
               oldSemanticModelPO.getSemanticModelName(), newSemanticModelPO.getSemanticModelName());
 
+      AtomicReference<Map<Long, String>> retiredMetrics = new AtomicReference<>(Map.of());
       SessionUtils.doMultipleWithCommit(
           // The Semantic Model and its parent were read before this transaction started. Lock the
           // observed parent again before either identity or version writes, so a schema cascade
@@ -274,7 +292,8 @@ public class SemanticModelMetaService {
                     newSemanticModelPO.getSemanticModelVersionInfoPO().metrics())
                 && !metricNames(oldSemanticModelEntity.definition())
                     .equals(metricNames(newEntity.definition()))) {
-              reconcileMetricIdentities(newSemanticModelPO, newEntity.definition());
+              retiredMetrics.set(
+                  reconcileMetricIdentities(newSemanticModelPO, newEntity.definition()));
             }
           },
           () -> replaceSources(newSemanticModelPO, newEntity),
@@ -288,6 +307,17 @@ public class SemanticModelMetaService {
             if (isRenamed && updateResult.get() > 0) {
               EntityChangeLogWriter.append(
                   oldSemanticModelIdent, Entity.EntityType.SEMANTIC_MODEL, OperateType.ALTER);
+            }
+          },
+          () -> {
+            if (!retiredMetrics.get().isEmpty()) {
+              GlossaryTermBindingService.getInstance()
+                  .cleanupMetricBindings(
+                      newSemanticModelPO.getMetalakeId(),
+                      newSemanticModelPO.getSemanticModelId(),
+                      newSemanticModelPO.getSemanticModelName(),
+                      retiredMetrics.get(),
+                      "ALTER_SEMANTIC_MODEL");
             }
           });
       return newEntity;
@@ -409,6 +439,7 @@ public class SemanticModelMetaService {
             observedSemanticModelPO.getSemanticModelName());
     // Orphaned owner, tag, and securable-object relations are cleaned up by
     // OrphanedMetadataObjectRelationService during garbage collection.
+    AtomicReference<List<GlossaryTermBindingPO>> modelBindings = new AtomicReference<>(List.of());
     SessionUtils.doMultipleWithCommit(
         () ->
             OccWriteSupport.deleteWithVersion(
@@ -424,6 +455,16 @@ public class SemanticModelMetaService {
                 SemanticModelVersionInfoMapper.class,
                 mapper -> mapper.softDeleteSemanticModelVersionsBySemanticModelId(semanticModelId)),
         () ->
+            // Collect live metric bindings before soft-deleting metric rows without locking
+            // glossary_term_meta yet; term locks are acquired last to preserve endpoint -> term
+            // lock order.
+            modelBindings.set(
+                GlossaryTermBindingService.getInstance()
+                    .collectSemanticModelBindings(
+                        observedSemanticModelPO.getMetalakeId(),
+                        semanticModelId,
+                        "DROP_SEMANTIC_MODEL")),
+        () ->
             SessionUtils.doWithoutCommit(
                 SemanticModelMetricMapper.class,
                 mapper -> mapper.softDeleteSemanticModelMetricsBySemanticModelId(semanticModelId)),
@@ -431,6 +472,18 @@ public class SemanticModelMetaService {
             SessionUtils.doWithoutCommit(
                 SemanticModelSourceMapper.class,
                 mapper -> mapper.softDeleteByModelId(semanticModelId)),
+        () -> {
+          List<GlossaryTermBindingPO> live = modelBindings.get();
+          if (!live.isEmpty()) {
+            GlossaryTermBindingService bindingService = GlossaryTermBindingService.getInstance();
+            bindingService.retireCollectedBindings(
+                observedSemanticModelPO.getMetalakeId(),
+                live,
+                bindingService.semanticModelBindingMetadata(
+                    semanticModelId, observedSemanticModelPO.getSemanticModelName(), live),
+                "DROP_SEMANTIC_MODEL");
+          }
+        },
         () ->
             EntityChangeLogWriter.append(
                 semanticModelIdent, Entity.EntityType.SEMANTIC_MODEL, OperateType.DROP));
@@ -455,12 +508,13 @@ public class SemanticModelMetaService {
         });
   }
 
-  private static void reconcileMetricIdentities(
+  private static Map<Long, String> reconcileMetricIdentities(
       SemanticModelPO model, SemanticModelDefinition definition) {
     Set<String> names = metricNames(definition);
 
     // The caller has already inserted or version-checked the model in this transaction. A locking
     // read also observes the latest identities on backends using repeatable-read isolation.
+    Map<Long, String> retiredMetrics = new LinkedHashMap<>();
     SessionUtils.doWithoutCommit(
         SemanticModelMetricMapper.class,
         mapper -> {
@@ -497,13 +551,14 @@ public class SemanticModelMetaService {
                 .forEach(mapper::insertSemanticModelMetrics);
           }
           if (!live.isEmpty()) {
+            for (SemanticModelMetricPO retired : live.values()) {
+              retiredMetrics.put(retired.metricId(), retired.metricName());
+            }
             mapper.softDeleteSemanticModelMetricsByIds(
-                model.getSemanticModelId(),
-                live.values().stream()
-                    .map(SemanticModelMetricPO::metricId)
-                    .collect(Collectors.toList()));
+                model.getSemanticModelId(), new ArrayList<>(retiredMetrics.keySet()));
           }
         });
+    return retiredMetrics;
   }
 
   private static Set<String> metricNames(SemanticModelDefinition definition) {
