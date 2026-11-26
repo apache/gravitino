@@ -105,6 +105,11 @@ If Fork CI hits Maven Central's HTTP 429 rate limit, **Warm Gradle cache** can p
 
 Sync your fork's default branch to get the workflow. In your fork, open **Actions → Warm Gradle cache** and select **Enable workflow** if prompted. It checks daily and resolves Gradle dependencies across the repository only on a cache miss. To warm the cache immediately, select **Run workflow** on your fork's default branch. [GitHub's workflow enablement guide](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/disable-and-enable-workflows)
 
+If Fork CI still downloads missing dependencies after a cache hit, copy the Gradle cache key from the `actions/setup-java` step in the affected job. In your fork, open **Actions → Caches** and find the entry by key and branch.
+
+1. If the **default branch** has a partial entry for that key, delete that entry, run **Warm Gradle cache** on the default branch, and wait for it to save the new cache. An exact hit skips dependency resolution.
+2. If the **PR branch** has a stale entry for the same key, delete that branch's entry before rerunning **Fork CI**. GitHub checks the current branch first, so a matching PR-branch entry takes precedence over the warmed default-branch entry. [GitHub's cache lookup order](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#cache-key-matching)
+
 ### Running Fork CI again
 
 `apache/gravitino` cannot start or cancel runs in your fork, so you control Fork CI from your fork. To run CI again without changing code, use any of these:
