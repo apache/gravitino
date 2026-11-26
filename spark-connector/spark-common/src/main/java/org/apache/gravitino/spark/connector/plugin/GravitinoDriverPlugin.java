@@ -187,9 +187,26 @@ public class GravitinoDriverPlugin implements DriverPlugin {
                 return;
               }
               if (SparkCatalogKind.LAKEHOUSE_ICEBERG.equals(kind) && !enableIcebergSupport) {
+                LOG.warn(
+                    "Skip registering catalog {} because {} is not set to true.",
+                    catalogName,
+                    GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT);
                 return;
               }
               if (SparkCatalogKind.LAKEHOUSE_PAIMON.equals(kind) && !enablePaimonSupport) {
+                // Naming the flag only helps when this build can register a Paimon catalog.
+                if (catalogClassName(kind) == null) {
+                  LOG.warn(
+                      "Skip registering {} because no {} catalog is available: this build has none,"
+                          + " or its runtime jar is not on the classpath.",
+                      catalogName,
+                      kind);
+                } else {
+                  LOG.warn(
+                      "Skip registering catalog {} because {} is not set to true.",
+                      catalogName,
+                      GravitinoSparkConfig.GRAVITINO_ENABLE_PAIMON_SUPPORT);
+                }
                 return;
               }
               if ("jdbc-doris".equalsIgnoreCase(provider) && enableDorisSupport) {
@@ -221,7 +238,11 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   void registerCatalog(SparkConf sparkConf, String catalogName, SparkCatalogKind kind) {
     String catalogClassName = catalogClassName(kind);
     if (catalogClassName == null) {
-      LOG.warn("Skip registering {} because this build has no {} catalog.", catalogName, kind);
+      LOG.warn(
+          "Skip registering {} because no {} catalog is available: this build has none,"
+              + " or its runtime jar is not on the classpath.",
+          catalogName,
+          kind);
       return;
     }
 
