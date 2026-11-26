@@ -166,16 +166,21 @@ public final class GravitinoClientUtils {
     if (!"metrics".equals(mode) && !"all".equals(mode)) {
       return;
     }
-    requireNonBlankJdbcMetricsProperty(updaterOptions, OptimizerConfig.JDBC_METRICS_JDBC_URL);
-    requireNonBlankJdbcMetricsProperty(updaterOptions, OptimizerConfig.JDBC_METRICS_JDBC_USER);
-    requireNonBlankJdbcMetricsProperty(updaterOptions, OptimizerConfig.JDBC_METRICS_JDBC_DRIVER);
-  }
-
-  private static void requireNonBlankJdbcMetricsProperty(
-      Map<String, String> updaterOptions, String propertyKey) {
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(updaterOptions.get(propertyKey)),
-        "updater_options must contain '" + propertyKey + "' when update_mode is metrics or all");
+        StringUtils.isNotBlank(updaterOptions.get(OptimizerConfig.JDBC_METRICS_JDBC_URL)),
+        "updater_options must contain '"
+            + OptimizerConfig.JDBC_METRICS_JDBC_URL
+            + "' when update_mode is metrics or all");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(updaterOptions.get(OptimizerConfig.JDBC_METRICS_JDBC_USER)),
+        "updater_options must contain '"
+            + OptimizerConfig.JDBC_METRICS_JDBC_USER
+            + "' when update_mode is metrics or all");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(updaterOptions.get(OptimizerConfig.JDBC_METRICS_JDBC_DRIVER)),
+        "updater_options must contain '"
+            + OptimizerConfig.JDBC_METRICS_JDBC_DRIVER
+            + "' when update_mode is metrics or all");
   }
 
   private static Optional<String> firstNonEmpty(String... candidates) {
