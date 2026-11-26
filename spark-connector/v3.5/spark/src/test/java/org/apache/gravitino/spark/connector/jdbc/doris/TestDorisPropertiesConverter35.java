@@ -156,13 +156,7 @@ public class TestDorisPropertiesConverter35 {
         () ->
             DorisPropertiesConverter35.nativeOptions(
                 Map.of("spark.bypass.doris.read.mode", "thrift")));
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            DorisPropertiesConverter35.nativeOptions(
-                Map.of(
-                    "spark.bypass.doris.fenodes", "fe:8030",
-                    "spark.bypass.doris.password", "secret")));
+    assertInvalidNativeOption("doris.password", "secret");
     for (String name : List.of("doris.fenodes", "DORIS_password", "doris.table.identifier")) {
       assertThrows(
           IllegalArgumentException.class,
@@ -190,31 +184,19 @@ public class TestDorisPropertiesConverter35 {
   @Test
   void testNativeOptionsRejectInvalidTabletSizeAndReadMode() {
     for (String value : List.of("0", "-1", "bad", "2147483648")) {
-      assertThrows(
-          IllegalArgumentException.class,
-          () ->
-              DorisPropertiesConverter35.nativeOptions(
-                  Map.of(
-                      "spark.bypass.doris.fenodes",
-                      "fe:8030",
-                      "spark.bypass.doris.request.tablet.size",
-                      value)));
+      assertInvalidNativeOption("doris.request.tablet.size", value);
     }
+    assertInvalidNativeOption("doris.read.mode", "other");
+    for (String key : List.of("doris.batch.size", "doris.read.arrow-flight-sql.port")) {
+      assertInvalidNativeOption(key, "65536");
+    }
+  }
+
+  private static void assertInvalidNativeOption(String key, String value) {
     assertThrows(
         IllegalArgumentException.class,
         () ->
             DorisPropertiesConverter35.nativeOptions(
-                Map.of(
-                    "spark.bypass.doris.fenodes",
-                    "fe:8030",
-                    "spark.bypass.doris.read.mode",
-                    "other")));
-    for (String key : List.of("doris.batch.size", "doris.read.arrow-flight-sql.port")) {
-      assertThrows(
-          IllegalArgumentException.class,
-          () ->
-              DorisPropertiesConverter35.nativeOptions(
-                  Map.of("spark.bypass.doris.fenodes", "fe:8030", "spark.bypass." + key, "65536")));
-    }
+                Map.of("spark.bypass.doris.fenodes", "fe:8030", "spark.bypass." + key, value)));
   }
 }

@@ -127,15 +127,6 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     return Collections.emptyMap();
   }
 
-  /**
-   * Returns the Spark master used by this suite.
-   *
-   * @return the Spark master URL
-   */
-  protected String getSparkMaster() {
-    return "local[1]";
-  }
-
   /** Returns the Gravitino {@link Catalog} for the catalog under test. */
   protected Catalog getGravitinoCatalog() {
     return client.loadMetalake(metalakeName).loadCatalog(getCatalogName());
@@ -347,7 +338,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     getExtraSparkConfigs().forEach(sparkConf::set);
     sparkSession =
         SparkSession.builder()
-            .master(getSparkMaster())
+            .master("local[1]")
             .appName("Spark connector integration test")
             .config(sparkConf)
             .enableHiveSupport()

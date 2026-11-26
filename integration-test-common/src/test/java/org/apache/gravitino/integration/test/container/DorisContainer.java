@@ -199,24 +199,6 @@ public class DorisContainer extends BaseContainer {
     return feMysqlPort;
   }
 
-  /**
-   * Returns the host address of the Doris FE HTTP endpoint.
-   *
-   * @return the host-accessible FE address
-   */
-  public String getFeHttpHost() {
-    return composeContainer.getServiceHost(FE_SERVICE, FE_HTTP_PORT);
-  }
-
-  /**
-   * Returns the host-mapped port of the Doris FE HTTP endpoint.
-   *
-   * @return the host-mapped FE HTTP port
-   */
-  public int getFeHttpPort() {
-    return composeContainer.getServicePort(FE_SERVICE, FE_HTTP_PORT);
-  }
-
   @Override
   protected boolean checkContainerStatus(int retryLimit) {
     String dorisJdbcUrl = format("jdbc:mysql://%s:%d/", feIpAddress, feMysqlPort);

@@ -267,14 +267,20 @@ dependencies {
 }
 
 tasks.test {
-  if (!project.hasProperty("dorisStandaloneIT")) {
-    useJUnitPlatform {
+  val dorisStandaloneIT = project.hasProperty("dorisStandaloneIT")
+  useJUnitPlatform {
+    if (dorisStandaloneIT) {
+      includeTags("doris-standalone")
+    } else {
       excludeTags("doris-standalone")
     }
   }
+  if (dorisStandaloneIT) {
+    systemProperty("gravitino.test.doris.standalone", "true")
+  }
   // Standalone executors use uninstrumented JARs. Instrumenting only the test driver changes the
   // default serialVersionUID of classes without an explicit value and breaks task serialization.
-  if (System.getenv("GRAVITINO_TEST_SPARK_MASTER") != null) {
+  if (dorisStandaloneIT && System.getenv("GRAVITINO_TEST_SPARK_MASTER") != null) {
     extensions.configure<JacocoTaskExtension> {
       isEnabled = false
     }

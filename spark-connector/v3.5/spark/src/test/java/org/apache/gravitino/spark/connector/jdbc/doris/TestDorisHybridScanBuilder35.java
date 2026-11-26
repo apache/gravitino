@@ -21,228 +21,140 @@ package org.apache.gravitino.spark.connector.jdbc.doris;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import java.sql.Timestamp;
 import org.apache.spark.sql.connector.expressions.Expression;
 import org.apache.spark.sql.connector.expressions.Expressions;
-import org.apache.spark.sql.connector.expressions.SortOrder;
-import org.apache.spark.sql.connector.expressions.aggregate.Aggregation;
 import org.apache.spark.sql.connector.expressions.filter.Predicate;
 import org.apache.spark.sql.connector.read.Scan;
 import org.apache.spark.sql.connector.read.ScanBuilder;
-import org.apache.spark.sql.connector.read.SupportsPushDownAggregates;
-import org.apache.spark.sql.connector.read.SupportsPushDownLimit;
-import org.apache.spark.sql.connector.read.SupportsPushDownOffset;
 import org.apache.spark.sql.connector.read.SupportsPushDownRequiredColumns;
-import org.apache.spark.sql.connector.read.SupportsPushDownTopN;
 import org.apache.spark.sql.connector.read.SupportsPushDownV2Filters;
+import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCScan;
+import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCScanBuilder;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** Tests the coordination of native and JDBC scan delegates. */
-@TestInstance(TestInstance.Lifecycle.PER_METHOD)
 public class TestDorisHybridScanBuilder35 {
-  private final RecordingBuilder nativeBuilder = new RecordingBuilder();
-  private final RecordingBuilder jdbcBuilder = new RecordingBuilder();
-
-  @Test
-  void testDetailReadDelegatesColumnsAndSelectsNative() {
-    StructType schema =
-        new StructType()
-            .add("id", DataTypes.IntegerType)
-            .add("event_time", DataTypes.TimestampType);
-    DorisHybridScanBuilder35 builder =
-        new DorisHybridScanBuilder35(nativeBuilder, jdbcBuilder, schema);
-    StructType required = new StructType().add("id", DataTypes.IntegerType);
-
-    builder.pruneColumns(required);
-    assertSame(required, nativeBuilder.required);
-    assertSame(required, jdbcBuilder.required);
-    assertSame(nativeBuilder.scan, builder.build());
-  }
+  private final ScanBuilder nativeBuilder =
+      mock(
+          ScanBuilder.class,
+          withSettings()
+              .extraInterfaces(
+                  SupportsPushDownRequiredColumns.class, SupportsPushDownV2Filters.class));
+  private final SupportsPushDownRequiredColumns nativeColumns =
+      (SupportsPushDownRequiredColumns) nativeBuilder;
+  private final SupportsPushDownV2Filters nativeFilters = (SupportsPushDownV2Filters) nativeBuilder;
+  private final JDBCScanBuilder jdbcBuilder = mock(JDBCScanBuilder.class);
+  private final JDBCScan jdbcScan = mock(JDBCScan.class);
 
   @Test
   void testRequiredTimestampUsesJdbcWithoutPruningNativeSchema() {
     for (DataType type : new DataType[] {DataTypes.TimestampType, DataTypes.TimestampNTZType}) {
-      RecordingBuilder nativeBuilder = new RecordingBuilder();
-      RecordingBuilder jdbcBuilder = new RecordingBuilder();
-      StructType schema = new StructType().add("EVENT_TIME", type);
+      DorisHybridScanBuilder35 builder = builder(new StructType().add("EVENT_TIME", type));
       StructType required = new StructType().add("event_time", type);
-      DorisHybridScanBuilder35 builder =
-          new DorisHybridScanBuilder35(nativeBuilder, jdbcBuilder, schema);
-
       builder.pruneColumns(required);
-
-      assertSame(jdbcBuilder.scan, builder.build());
-      assertSame(required, jdbcBuilder.required);
-      assertNull(nativeBuilder.required);
+      assertSame(jdbcScan, builder.build());
+      verify(jdbcBuilder).pruneColumns(required);
+      verify(nativeColumns, never()).pruneColumns(any());
     }
   }
 
-  @Test
-  void testPredicatesRejectedByEitherDelegateRemainResidual() {
-    DorisHybridScanBuilder35 builder =
-        new DorisHybridScanBuilder35(nativeBuilder, jdbcBuilder, new StructType());
-    Predicate supported =
-        new Predicate("=", new Expression[] {Expressions.column("id"), Expressions.literal(1)});
-    Predicate residual =
-        new Predicate(
-            "=", new Expression[] {Expressions.column("name"), Expressions.literal("one")});
-    nativeBuilder.residual = new Predicate[] {residual};
-
+  @ParameterizedTest(name = "nativeRejects={0}")
+  @ValueSource(booleans = {true, false})
+  void testPredicatesRejectedByEitherDelegateRemainResidual(boolean nativeRejects) {
+    DorisHybridScanBuilder35 builder = builder(new StructType());
+    Predicate supported = predicate("id", 1);
+    Predicate residual = predicate("name", "one");
+    if (nativeRejects) {
+      when(nativeFilters.pushPredicates(any(Predicate[].class)))
+          .thenReturn(new Predicate[] {residual});
+    } else {
+      when(jdbcBuilder.pushPredicates(any(Predicate[].class)))
+          .thenReturn(new Predicate[] {residual});
+    }
     assertArrayEquals(
         new Predicate[] {residual}, builder.pushPredicates(new Predicate[] {supported, residual}));
     assertArrayEquals(new Predicate[] {supported}, builder.pushedPredicates());
-    assertArrayEquals(new Predicate[] {supported, residual}, jdbcBuilder.received);
-  }
-
-  @Test
-  void testJdbcResidualIsNotPushedToNative() {
-    DorisHybridScanBuilder35 builder =
-        new DorisHybridScanBuilder35(nativeBuilder, jdbcBuilder, new StructType());
-    Predicate predicate =
-        new Predicate("=", new Expression[] {Expressions.column("id"), Expressions.literal(1)});
-    jdbcBuilder.residual = new Predicate[] {predicate};
-
-    assertArrayEquals(
-        new Predicate[] {predicate}, builder.pushPredicates(new Predicate[] {predicate}));
-    assertArrayEquals(new Predicate[0], nativeBuilder.received);
-    assertArrayEquals(new Predicate[] {predicate}, jdbcBuilder.received);
-    assertArrayEquals(new Predicate[0], builder.pushedPredicates());
+    verify(jdbcBuilder).pushPredicates(new Predicate[] {supported, residual});
+    verify(nativeFilters)
+        .pushPredicates(
+            nativeRejects ? new Predicate[] {supported, residual} : new Predicate[] {supported});
+    StructType required = new StructType().add("id", DataTypes.IntegerType);
+    builder.pruneColumns(required);
+    verify(nativeColumns).pruneColumns(required);
+    verify(jdbcBuilder).pruneColumns(required);
+    Scan scan = mock(Scan.class);
+    when(nativeBuilder.build()).thenReturn(scan);
+    assertSame(scan, builder.build());
   }
 
   @Test
   void testLimitRoutesToJdbcAndOffsetDoesNotMakeLimitNonpositive() {
-    DorisHybridScanBuilder35 builder =
-        new DorisHybridScanBuilder35(nativeBuilder, jdbcBuilder, new StructType());
-
+    DorisHybridScanBuilder35 builder = builder(new StructType());
+    when(jdbcBuilder.pushLimit(10)).thenReturn(true);
     assertTrue(builder.pushLimit(10));
     assertFalse(builder.pushOffset(10));
-    assertSame(jdbcBuilder.scan, builder.build());
+    assertSame(jdbcScan, builder.build());
   }
 
   @Test
   void testJdbcAggregateColumnsAreNotPrunedAgainstNativeSchema() {
-    DorisHybridScanBuilder35 builder =
-        new DorisHybridScanBuilder35(nativeBuilder, jdbcBuilder, new StructType());
-    StructType aggregateOutput = new StructType().add("count(*)", DataTypes.LongType);
-
+    DorisHybridScanBuilder35 builder = builder(new StructType());
+    StructType output = new StructType().add("count(*)", DataTypes.LongType);
+    when(jdbcBuilder.pushAggregation(null)).thenReturn(true);
     assertTrue(builder.pushAggregation(null));
-    builder.pruneColumns(aggregateOutput);
-
-    assertSame(jdbcBuilder.scan, builder.build());
-    assertSame(aggregateOutput, jdbcBuilder.required);
-    assertNull(nativeBuilder.required);
+    builder.pruneColumns(output);
+    assertSame(jdbcScan, builder.build());
+    verify(jdbcBuilder).pruneColumns(output);
+    verify(nativeColumns, never()).pruneColumns(any());
   }
 
   @Test
   void testTimestampPredicateRemainsResidualBeforeScanSelection() {
-    StructType schema =
-        new StructType()
-            .add("id", DataTypes.IntegerType)
-            .add("event_time", DataTypes.TimestampType);
     DorisHybridScanBuilder35 builder =
-        new DorisHybridScanBuilder35(nativeBuilder, jdbcBuilder, schema);
-    Predicate predicate =
+        builder(new StructType().add("event_time", DataTypes.TimestampType));
+    Predicate timestamp =
         new Predicate(
             ">",
             new Expression[] {
               Expressions.column("event_time"),
               Expressions.literal(Timestamp.valueOf("2026-01-01 00:00:00"))
             });
-    Predicate ordinary =
-        new Predicate("=", new Expression[] {Expressions.column("id"), Expressions.literal(1)});
-
-    assertArrayEquals(
-        new Predicate[] {predicate}, builder.pushPredicates(new Predicate[] {predicate, ordinary}));
-    assertArrayEquals(new Predicate[] {ordinary}, nativeBuilder.received);
-    assertArrayEquals(new Predicate[] {ordinary}, jdbcBuilder.received);
-    assertArrayEquals(new Predicate[] {ordinary}, builder.pushedPredicates());
-  }
-
-  @Test
-  void testTimestampNullCheckCanBePushed() {
-    DorisHybridScanBuilder35 builder =
-        new DorisHybridScanBuilder35(
-            nativeBuilder,
-            jdbcBuilder,
-            new StructType().add("event_time", DataTypes.TimestampType));
-    Predicate predicate =
+    Predicate ordinary = predicate("id", 1);
+    Predicate nullCheck =
         new Predicate("IS_NOT_NULL", new Expression[] {Expressions.column("event_time")});
-
-    assertArrayEquals(new Predicate[0], builder.pushPredicates(new Predicate[] {predicate}));
-    assertArrayEquals(new Predicate[] {predicate}, nativeBuilder.received);
-    assertArrayEquals(new Predicate[] {predicate}, jdbcBuilder.received);
+    assertArrayEquals(
+        new Predicate[] {timestamp},
+        builder.pushPredicates(new Predicate[] {timestamp, ordinary, nullCheck}));
+    Predicate[] pushed = new Predicate[] {ordinary, nullCheck};
+    verify(nativeFilters).pushPredicates(pushed);
+    verify(jdbcBuilder).pushPredicates(pushed);
+    assertArrayEquals(pushed, builder.pushedPredicates());
   }
 
-  private static final class RecordingBuilder
-      implements ScanBuilder,
-          SupportsPushDownRequiredColumns,
-          SupportsPushDownV2Filters,
-          SupportsPushDownLimit,
-          SupportsPushDownAggregates,
-          SupportsPushDownTopN,
-          SupportsPushDownOffset {
-    private final Scan scan = () -> new StructType();
-    private Predicate[] residual = new Predicate[0];
-    private Predicate[] received = new Predicate[0];
-    private StructType required;
+  private DorisHybridScanBuilder35 builder(StructType schema) {
+    when(jdbcBuilder.build()).thenReturn(jdbcScan);
+    when(nativeFilters.pushPredicates(any(Predicate[].class))).thenReturn(new Predicate[0]);
+    when(jdbcBuilder.pushPredicates(any(Predicate[].class))).thenReturn(new Predicate[0]);
+    return new DorisHybridScanBuilder35(nativeBuilder, jdbcBuilder, schema);
+  }
 
-    @Override
-    public Scan build() {
-      return scan;
-    }
-
-    @Override
-    public void pruneColumns(StructType schema) {
-      required = schema;
-    }
-
-    @Override
-    public Predicate[] pushPredicates(Predicate[] predicates) {
-      received = predicates;
-      return residual;
-    }
-
-    @Override
-    public Predicate[] pushedPredicates() {
-      return new Predicate[0];
-    }
-
-    @Override
-    public boolean pushLimit(int limit) {
-      return true;
-    }
-
-    @Override
-    public boolean supportCompletePushDown(Aggregation aggregation) {
-      return true;
-    }
-
-    @Override
-    public boolean pushAggregation(Aggregation aggregation) {
-      return true;
-    }
-
-    @Override
-    public boolean pushTopN(SortOrder[] orders, int limit) {
-      return true;
-    }
-
-    @Override
-    public boolean isPartiallyPushed() {
-      return false;
-    }
-
-    @Override
-    public boolean pushOffset(int offset) {
-      return true;
-    }
+  private static Predicate predicate(String column, Object value) {
+    return new Predicate(
+        "=", new Expression[] {Expressions.column(column), Expressions.literal(value)});
   }
 }
