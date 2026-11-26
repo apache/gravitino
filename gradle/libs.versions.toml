@@ -239,6 +239,7 @@ reactor-netty-http = {group = "io.projectreactor.netty", name = "reactor-netty-h
 reactor-netty-core = {group = "io.projectreactor.netty", name = "reactor-netty-core", version.ref = "reactor-netty-core"}
 jackson-bom-v218 = { group = "com.fasterxml.jackson", name = "jackson-bom", version.ref = "jackson218" }
 jackson-bom-v221 = { group = "com.fasterxml.jackson", name = "jackson-bom", version.ref = "jackson221" }
+json-schema-validator = { group = "com.networknt", name = "json-schema-validator", version = "1.5.9" }
 jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-databind", version.ref = "jackson" }
 jackson-annotations = { group = "com.fasterxml.jackson.core", name = "jackson-annotations", version.ref = "jackson" }
 jackson-datatype-jdk8 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jdk8", version.ref = "jackson" }

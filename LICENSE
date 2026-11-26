@@ -211,6 +211,11 @@
    ./gradlew
    ./gradle/wrapper/gradle-wrapper.properties
 
+   Apache Ossie (incubating) (https://github.com/apache/ossie)
+   ./common/src/main/resources/ossie/core-spec/ossie-schema.json
+   ./common/src/main/resources/ossie/ontology/ontology.json
+   ./common/src/testFixtures/resources/ossie/ontology/flights.ontology.yaml
+
    Apache Spark
    ./api/src/main/java/org/apache/gravitino/SchemaChange.java
    ./api/src/main/java/org/apache/gravitino/SupportsSchemas.java
