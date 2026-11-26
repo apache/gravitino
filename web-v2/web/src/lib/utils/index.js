@@ -19,7 +19,7 @@
 
 import _, { intersectionWith, isEqual, mergeWith, unionWith } from 'lodash-es'
 import { isArray, isObject } from './is'
-import { ColumnSpesicalType } from '@/config'
+import { ColumnSpesicalType, ColumnTypeSupportAutoIncrement } from '@/config'
 import dayjs from 'dayjs'
 import { original } from '@reduxjs/toolkit'
 
@@ -31,6 +31,37 @@ const getColumnType = type => {
   } else {
     return type.type
   }
+}
+
+export const isAutoIncrementColumnTypeSupported = type => {
+  if (typeof type !== 'string') return false
+
+  return ColumnTypeSupportAutoIncrement.includes(type.trim().toLowerCase())
+}
+
+export const hasAutoIncrementEditConflict = (provider, originalColumns, newColumns) => {
+  if (!['jdbc-mysql', 'jdbc-oceanbase'].includes(provider)) return false
+
+  const originalColumnsMap = _.keyBy(originalColumns || [], 'uniqueId')
+
+  return (newColumns || []).some(newColumn => {
+    if (!newColumn?.uniqueId || typeof newColumn.autoIncrement !== 'boolean') return false
+
+    const originalColumn = originalColumnsMap[newColumn.uniqueId]
+    if (!originalColumn || Boolean(originalColumn.autoIncrement) === newColumn.autoIncrement) return false
+
+    const originalType = originalColumn.type && getColumnType(originalColumn.type)
+    const editedType = newColumn.typeObj?.type
+    const wasRequired = !originalColumn.nullable
+
+    return (
+      (!newColumn.autoIncrement && originalColumn.name !== newColumn.name) ||
+      (originalColumn.comment || '') !== (newColumn.comment || '') ||
+      hasColumnDefaultValueChanged(originalColumn.defaultValue, newColumn.defaultValue) ||
+      (typeof newColumn.required === 'boolean' && newColumn.required !== wasRequired) ||
+      (originalType && editedType && originalType.toLowerCase() !== editedType.toLowerCase())
+    )
+  })
 }
 
 export const isDevEnv = process.env.NODE_ENV === 'development'
@@ -64,6 +95,55 @@ export const loggerGitHubInfo = (stars, forks) => {
     `color: white; background-color: #6062E0; padding: 2px; border-radius: 4px;`
   )
 }
+
+export const normalizeColumnDefaultValue = expression => {
+  if (expression == null) return undefined
+  if (typeof expression !== 'object') return expression
+  if (!expression.type && expression.value === undefined) return undefined
+
+  switch (expression.type) {
+    case 'literal':
+      return {
+        type: 'literal',
+        dataType: expression.dataType || 'string',
+        value: expression.value
+      }
+
+    case 'field': {
+      const fieldName = expression.fieldName
+
+      return {
+        type: 'field',
+        fieldName: Array.isArray(fieldName) ? fieldName : [fieldName]
+      }
+    }
+
+    case 'function':
+      return {
+        type: 'function',
+        funcName: expression.funcName,
+        funcArgs: (expression.funcArgs ?? []).map(normalizeColumnDefaultValue)
+      }
+
+    case 'unparsed':
+      return {
+        type: 'unparsed',
+        unparsedExpression: expression.value !== undefined ? expression.value : expression.unparsedExpression
+      }
+
+    default:
+      return expression.type
+        ? expression
+        : {
+            type: 'literal',
+            dataType: expression.dataType || 'string',
+            value: expression.value
+          }
+  }
+}
+
+const hasColumnDefaultValueChanged = (saved, edited) =>
+  !isEqual(normalizeColumnDefaultValue(saved), normalizeColumnDefaultValue(edited))
 
 export const genUpdates = (originalData, newData, disableUpdate = false) => {
   const updates = []
@@ -154,6 +234,7 @@ export const genUpdates = (originalData, newData, disableUpdate = false) => {
         fieldName: [newColumn.name],
         type: newColumn.type,
         nullable: newColumn.nullable,
+        autoIncrement: Boolean(newColumn.autoIncrement),
         comment: newColumn.comment,
         ...(newColumn.defaultValue !== undefined && newColumn.defaultValue !== null
           ? { defaultValue: newColumn.defaultValue }
@@ -190,7 +271,19 @@ export const genUpdates = (originalData, newData, disableUpdate = false) => {
           nullable: newColumnsMap[key].nullable
         })
       }
-      if (JSON.stringify(originalColumnsMap[key].defaultValue) !== JSON.stringify(newColumnsMap[key].defaultValue)) {
+      const newAutoIncrement = newColumnsMap[key].autoIncrement
+      if (
+        newAutoIncrement !== undefined &&
+        newAutoIncrement !== null &&
+        Boolean(originalColumnsMap[key].autoIncrement) !== Boolean(newAutoIncrement)
+      ) {
+        updates.push({
+          '@type': 'updateColumnAutoIncrement',
+          fieldName: [newColumnsMap[key].name],
+          autoIncrement: Boolean(newColumnsMap[key].autoIncrement)
+        })
+      }
+      if (hasColumnDefaultValueChanged(originalColumnsMap[key].defaultValue, newColumnsMap[key].defaultValue)) {
         updates.push({
           '@type': 'updateColumnDefaultValue',
           fieldName: [newColumnsMap[key].name],

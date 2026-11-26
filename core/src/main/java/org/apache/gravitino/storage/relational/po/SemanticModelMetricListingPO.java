@@ -27,7 +27,6 @@ public class SemanticModelMetricListingPO {
   @Nullable private Long schemaId;
   @Nullable private Long semanticModelId;
   @Nullable private String semanticModelName;
-  @Nullable private String metricName;
   @Nullable private Integer version;
   @Nullable private String metrics;
 

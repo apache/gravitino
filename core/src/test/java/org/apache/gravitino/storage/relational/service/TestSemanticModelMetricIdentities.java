@@ -103,13 +103,17 @@ public class TestSemanticModelMetricIdentities extends TestJDBCBackend {
                         .withDescription("Updated description")
                         .build())
             .toArray(Metric[]::new);
-    SemanticModelEntity renamed = copy(original, original.id(), "renamed", reordered);
+    SemanticModelEntity updated = copy(original, original.id(), original.name(), reordered);
+    backend.update(original.nameIdentifier(), original.type(), old -> updated);
+    SemanticModelEntity renamed = copy(updated, updated.id(), "renamed", reordered);
     try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class, CALLS_REAL_METHODS)) {
       backend.update(original.nameIdentifier(), original.type(), old -> renamed);
       sessions.verify(
           () -> SessionUtils.doWithoutCommit(eq(SemanticModelMetricMapper.class), any()), never());
     }
-    assertEquals(renamed, backend.get(renamed.nameIdentifier(), renamed.type()));
+    SemanticModelEntity loaded = backend.get(renamed.nameIdentifier(), renamed.type());
+    assertEquals(renamed.fields(), loaded.fields());
+    assertEquals(2, loaded.revision());
     assertEquals(
         2, service().getSemanticModelPOByIdentifier(renamed.nameIdentifier()).getCurrentVersion());
     assertEquals(2, count("semantic_model_version_info", original.id()));
@@ -130,7 +134,7 @@ public class TestSemanticModelMetricIdentities extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testUnchangedMetricsSkipIdentityReconciliation() throws Exception {
+  void testUnchangedMetricsKeepTheirIdentities() throws Exception {
     Namespace namespace = parents();
     SemanticModelEntity original = model(namespace, "sales", "revenue");
     backend.insert(original, false);
@@ -138,13 +142,9 @@ public class TestSemanticModelMetricIdentities extends TestJDBCBackend {
     SemanticModelEntity replacement =
         copy(original, original.id(), original.name(), original.definition().metrics());
 
-    try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class, CALLS_REAL_METHODS)) {
-      backend.update(original.nameIdentifier(), original.type(), old -> replacement);
-      sessions.verify(
-          () -> SessionUtils.doWithoutCommit(eq(SemanticModelMetricMapper.class), any()), never());
-    }
-
-    assertEquals(replacement, backend.get(replacement.nameIdentifier(), replacement.type()));
+    backend.update(original.nameIdentifier(), original.type(), old -> replacement);
+    SemanticModelEntity loaded = backend.get(replacement.nameIdentifier(), replacement.type());
+    assertEquals(replacement.fields(), loaded.fields());
     assertEquals(
         2,
         service().getSemanticModelPOByIdentifier(replacement.nameIdentifier()).getCurrentVersion());
@@ -190,7 +190,8 @@ public class TestSemanticModelMetricIdentities extends TestJDBCBackend {
 
     assertTrue(liveIds(original.id()).isEmpty());
     assertEquals(2, count("semantic_model_metric_meta", original.id()));
-    assertEquals(empty, backend.get(original.nameIdentifier(), original.type()));
+    SemanticModelEntity loaded = backend.get(original.nameIdentifier(), original.type());
+    assertEquals(empty.fields(), loaded.fields());
     assertEquals(
         4, service().getSemanticModelPOByIdentifier(original.nameIdentifier()).getCurrentVersion());
   }
@@ -361,7 +362,7 @@ public class TestSemanticModelMetricIdentities extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testStaleUpdateAndDropLeaveWinningIdentities() throws Exception {
+  void testStaleUpdateKeepsWinningIdentitiesAndDropUsesTheObservedName() throws Exception {
     SemanticModelEntity original = model(parents(), "sales", "original", "kept");
     backend.insert(original, false);
     SemanticModelPO stale = service().getSemanticModelPOByIdentifier(original.nameIdentifier());
@@ -383,13 +384,14 @@ public class TestSemanticModelMetricIdentities extends TestJDBCBackend {
                   }
                   return loser;
                 }));
-    assertThrows(
-        OptimisticLockException.class,
-        () -> service().deleteSemanticModelWithVersion(original.nameIdentifier(), stale));
     assertEquals(Set.of("winner", "kept"), liveIds(original.id()).keySet());
     assertEquals(keptId, liveIds(original.id()).get("kept"));
     assertEquals(3, count("semantic_model_metric_meta", original.id()));
-    assertEquals(winner, backend.get(original.nameIdentifier(), original.type()));
+    SemanticModelEntity loaded = backend.get(original.nameIdentifier(), original.type());
+    assertEquals(winner.fields(), loaded.fields());
+    assertEquals(2, loaded.revision());
+    service().deleteObservedSemanticModel(original.nameIdentifier(), stale);
+    assertTrue(liveIds(original.id()).isEmpty());
   }
 
   @TestTemplate
@@ -427,7 +429,8 @@ public class TestSemanticModelMetricIdentities extends TestJDBCBackend {
       executor.shutdownNow();
     }
     SemanticModelEntity current = backend.get(original.nameIdentifier(), original.type());
-    assertTrue(current.equals(first) || current.equals(second));
+    assertEquals(3, current.revision());
+    assertTrue(current.fields().equals(first.fields()) || current.fields().equals(second.fields()));
     assertSnapshotNames(current);
     assertEquals(keptId, liveIds(original.id()).get("kept"));
     assertEquals(4, count("semantic_model_metric_meta", original.id()));

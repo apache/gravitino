@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS `semantic_model_meta` (
     `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
     `audit_info` CLOB NOT NULL COMMENT 'semantic model identity audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'current version',
+    `active_version` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'published revision, 0 if none',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'last allocated version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'semantic model deleted at',
     PRIMARY KEY (`semantic_model_id`),
@@ -119,7 +120,9 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
     `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'semantic model id',
     `version` INT UNSIGNED NOT NULL COMMENT 'semantic model version',
-    `semantic_model_name` VARCHAR(128) NOT NULL COMMENT 'semantic model name snapshot',
+    `publication_status` VARCHAR(32) NOT NULL DEFAULT 'DRAFT' COMMENT 'publication status of the revision',
+    `published_by` VARCHAR(128) NOT NULL DEFAULT '' COMMENT 'publishing principal, empty for a draft',
+    `published_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'publication time in epoch millis, 0 for a draft',
     `semantic_model_comment` CLOB DEFAULT NULL COMMENT 'semantic model comment snapshot',
     `datasets` CLOB NOT NULL COMMENT 'dataset definitions snapshot (JSON)',
     `relationships` CLOB DEFAULT NULL COMMENT 'relationship definitions snapshot (JSON)',
@@ -264,12 +267,14 @@ CREATE TABLE IF NOT EXISTS `semantic_model_source_rel` (
     `id` BIGINT AUTO_INCREMENT COMMENT 'auto increment id',
     `metalake_id` BIGINT NOT NULL COMMENT 'containing metalake id',
     `semantic_model_id` BIGINT NOT NULL COMMENT 'containing semantic model id',
-    `dataset_name` CLOB NOT NULL COMMENT 'exact dataset name in the current definition',
+    `dataset_name` CLOB NOT NULL COMMENT 'exact dataset name in the associated revisions',
     `source_type` VARCHAR(64) NOT NULL COMMENT 'TABLE or VIEW',
     `source_id` BIGINT NOT NULL COMMENT 'resolved source object id',
+    `from_version` INT UNSIGNED NOT NULL COMMENT 'first revision containing this association',
+    `to_version` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'first revision without it, 0 if open',
     `deleted_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'association retired at',
     PRIMARY KEY (`id`)
-) COMMENT='current semantic model dataset source associations';
+) COMMENT='versioned semantic model dataset source associations';
 CREATE INDEX IF NOT EXISTS `idx_smsr_model` ON `semantic_model_source_rel` (`semantic_model_id`, `deleted_at`);
 CREATE INDEX IF NOT EXISTS `idx_smsr_source` ON `semantic_model_source_rel` (`metalake_id`, `source_type`, `source_id`, `deleted_at`);
 CREATE INDEX IF NOT EXISTS `idx_smsr_deleted_at` ON `semantic_model_source_rel` (`deleted_at`);
@@ -445,3 +450,13 @@ CREATE TABLE IF NOT EXISTS iceberg_idempotency_generation_meta (
   stripe INT NOT NULL PRIMARY KEY,
   generation BIGINT NOT NULL
 ) ENGINE=InnoDB;
+
+-- Index live metadata lists and relationship cleanup by their lookup keys and deletion status.
+CREATE INDEX IF NOT EXISTS `idx_tag_meta_live` ON `tag_meta` (`metalake_id`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_policy_meta_live` ON `policy_meta` (`metalake_id`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_role_meta_live` ON `role_meta` (`metalake_id`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_user_meta_live` ON `user_meta` (`metalake_id`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_tag_relation_meta_live` ON `tag_relation_meta` (`metadata_object_id`, `metadata_object_type`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_role_meta_securable_object_live` ON `role_meta_securable_object` (`metadata_object_id`, `type`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_user_role_rel_live` ON `user_role_rel` (`role_id`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_policy_tag_relation_meta_live` ON `policy_tag_relation_meta` (`tag_id`, `deleted_at`);

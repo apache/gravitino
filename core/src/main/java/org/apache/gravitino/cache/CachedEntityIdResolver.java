@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.cache;
 
+import java.util.Optional;
+import java.util.function.BiPredicate;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
@@ -29,36 +31,72 @@ public class CachedEntityIdResolver implements EntityIdResolver {
 
   private final EntityCache entityCache;
   private final EntityIdResolver underlyingResolver;
+  private final BiPredicate<NameIdentifier, Entity.EntityType> allowCacheRead;
 
   public CachedEntityIdResolver(EntityCache entityCache, EntityIdResolver underlyingResolver) {
+    this(entityCache, underlyingResolver, (ident, type) -> true);
+  }
+
+  /**
+   * Creates a resolver that consults {@code allowCacheRead} before using a cache hit.
+   *
+   * @param entityCache The entity cache.
+   * @param underlyingResolver Resolver used on a cache miss or when the predicate disallows a cache
+   *     read.
+   * @param allowCacheRead Whether a cache hit may be used for the given key.
+   */
+  public CachedEntityIdResolver(
+      EntityCache entityCache,
+      EntityIdResolver underlyingResolver,
+      BiPredicate<NameIdentifier, Entity.EntityType> allowCacheRead) {
     this.entityCache = entityCache;
     this.underlyingResolver = underlyingResolver;
+    this.allowCacheRead = allowCacheRead;
   }
 
   @Override
   public NamespacedEntityId getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type) {
-    return entityCache
-        .getIfPresent(nameIdentifier, type)
-        .map(
-            entity -> {
-              if (nameIdentifier.hasNamespace()) {
-                NamespacedEntityId namespaceIds =
-                    getEntityIds(
-                        NameIdentifierUtil.parentNameIdentifier(nameIdentifier, type),
-                        NameIdentifierUtil.parentEntityType(type));
-                return new NamespacedEntityId(entity.id(), namespaceIds.fullIds());
-              } else {
-                return new NamespacedEntityId(entity.id());
-              }
-            })
+    // All-or-nothing: never stitch a cached leaf id with parents from another resolution. Gate +
+    // getIfPresent stay under the key lock (matching RelationalEntityStore#get); JDBC stays
+    // outside.
+    return tryCachedEntityIds(nameIdentifier, type)
         .orElseGet(() -> underlyingResolver.getEntityIds(nameIdentifier, type));
   }
 
   @Override
   public Long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type) {
-    return entityCache
-        .getIfPresent(nameIdentifier, type)
-        .map(HasIdentifier::id)
+    // Same all-or-nothing gate as getEntityIds: an ancestor pending/publishing blocks the leaf
+    // cache hit so the two entry points stay consistent.
+    return tryCachedEntityIds(nameIdentifier, type)
+        .map(NamespacedEntityId::entityId)
         .orElseGet(() -> underlyingResolver.getEntityId(nameIdentifier, type));
+  }
+
+  /**
+   * Returns a namespaced id only when every ancestor is also resolved from cache. Empty means the
+   * caller must use the underlying resolver for the original identifier.
+   */
+  private Optional<NamespacedEntityId> tryCachedEntityIds(
+      NameIdentifier nameIdentifier, Entity.EntityType type) {
+    Optional<Long> cachedId =
+        entityCache.withCacheLock(
+            EntityCacheKey.of(nameIdentifier, type),
+            () -> {
+              if (!allowCacheRead.test(nameIdentifier, type)) {
+                return Optional.empty();
+              }
+              return entityCache.getIfPresent(nameIdentifier, type).map(HasIdentifier::id);
+            });
+    if (cachedId.isEmpty()) {
+      return Optional.empty();
+    }
+    if (!nameIdentifier.hasNamespace()) {
+      return Optional.of(new NamespacedEntityId(cachedId.get()));
+    }
+    Optional<NamespacedEntityId> parents =
+        tryCachedEntityIds(
+            NameIdentifierUtil.parentNameIdentifier(nameIdentifier, type),
+            NameIdentifierUtil.parentEntityType(type));
+    return parents.map(p -> new NamespacedEntityId(cachedId.get(), p.fullIds()));
   }
 }

@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational;
 
 import static org.apache.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT;
+import static org.apache.gravitino.Configs.SEMANTIC_MODEL_VERSION_RETENTION_COUNT;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.mockito.Mockito.mock;
@@ -28,6 +29,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
 
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -46,11 +48,15 @@ public class TestRelationalGarbageCollector {
     Config config = mock(Config.class);
     when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(1000L);
     when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
+    when(config.get(SEMANTIC_MODEL_VERSION_RETENTION_COUNT)).thenReturn(100L);
     when(orphanedRelationCleanup.softDeleteOrphanedRelations(
             MetadataObject.Type.TABLE, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT))
         .thenReturn(2, 0);
 
     new RelationalGarbageCollector(backend, config).collectAndClean();
+
+    verify(backend).deleteOldVersionData(Entity.EntityType.SEMANTIC_MODEL, 100L);
+    verify(backend).deleteOldVersionData(Entity.EntityType.TABLE, 1L);
 
     for (MetadataObject.Type type : MetadataObject.Type.values()) {
       int expectedInvocations = type == MetadataObject.Type.TABLE ? 2 : 1;
@@ -65,6 +71,7 @@ public class TestRelationalGarbageCollector {
     Config config = mock(Config.class);
     when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(1000L);
     when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
+    when(config.get(SEMANTIC_MODEL_VERSION_RETENTION_COUNT)).thenReturn(100L);
 
     Assertions.assertDoesNotThrow(
         () -> new RelationalGarbageCollector(backend, config).collectAndClean());

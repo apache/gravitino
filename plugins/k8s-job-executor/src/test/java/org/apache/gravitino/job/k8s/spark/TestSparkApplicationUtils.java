@@ -844,7 +844,18 @@ public class TestSparkApplicationUtils {
 
   @Test
   public void testRejectInvalidEnvironmentName() {
-    for (String invalid : new String[] {"", "MY VAR", "A=B", "1ST", "PATH/X", ".", "..", "..CFG"}) {
+    // A blank name is rejected when the template is built, before it reaches the executor.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            SparkJobTemplate.builder()
+                .withName("user-job")
+                .withExecutable("https://repo/app.jar")
+                .withClassName("org.example.App")
+                .withEnvironments(ImmutableMap.of("", "secret-value"))
+                .build());
+
+    for (String invalid : new String[] {"MY VAR", "A=B", "1ST", "PATH/X", ".", "..", "..CFG"}) {
       SparkJobTemplate template =
           SparkJobTemplate.builder()
               .withName("user-job")

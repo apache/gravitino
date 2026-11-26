@@ -15,13 +15,16 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import json
 import unittest
+from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
 from gravitino.api.semantic.dataset import Dataset
 from gravitino.api.semantic.semantic_model_catalog import SemanticModelCatalog
 from gravitino.api.semantic.semantic_model_change import SemanticModelChange
 from gravitino.api.semantic.semantic_model_definition import SemanticModelDefinition
+from gravitino.api.semantic.semantic_model_revision import SemanticModelStatus
 from gravitino.client.relational_catalog import RelationalCatalog
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.responses.drop_response import DropResponse
@@ -256,6 +259,55 @@ class TestSemanticModelCatalog(unittest.TestCase):
                     {},
                 )
 
+    def test_history_load_and_export_address_revisions(self):
+        identifier = NameIdentifier.of(self.schema_name, self.model_name)
+        models = self.catalog.as_semantic_model_catalog()
+        metadata = {
+            "revision": 4,
+            "status": "PUBLISHED",
+            "publishedBy": "reviewer",
+            "publishedAt": "2026-01-02T00:00:00Z",
+            "audit": {"creator": "author"},
+        }
+        snapshot = json.loads(self._mock_semantic_model_response().body)
+        snapshot["semanticModel"].update(metadata)
+        path = f"{self.request_path}/{self.model_name}/revisions"
+        with patch("gravitino.utils.http_client.HTTPClient.get") as mock_get:
+            mock_get.return_value = self._get_mock_http_resp(
+                json.dumps({"code": 0, "revisions": [metadata]})
+            )
+            summary = models.list_semantic_model_revisions(identifier)[0]
+            self.assertEqual(path, mock_get.call_args.args[0])
+            self.assertEqual(4, summary.revision())
+            self.assertEqual(SemanticModelStatus.PUBLISHED, summary.status())
+            self.assertEqual("author", summary.audit_info().creator())
+            self.assertEqual("reviewer", summary.published_by())
+            self.assertEqual(
+                datetime(2026, 1, 2, tzinfo=timezone.utc), summary.published_at()
+            )
+
+            mock_get.return_value = self._get_mock_http_resp(json.dumps(snapshot))
+            loaded = models.load_semantic_model(identifier, "latest")
+            self.assertEqual(f"{path}/latest", mock_get.call_args.args[0])
+            self.assertEqual(summary.published_at(), loaded.published_at())
+            self.assertEqual(4, loaded.revision())
+
+            mock_get.return_value = self._get_mock_http_resp("name: sales_model")
+            self.assertEqual(
+                "name: sales_model",
+                models.export_ossie_document(identifier, revision=4),
+            )
+            self.assertEqual(f"{path}/4/ossie", mock_get.call_args.args[0])
+
+    def test_replacement_without_expected_revision_is_rejected(self):
+        identifier = NameIdentifier.of(self.schema_name, self.model_name)
+        with self.assertRaisesRegex(
+            IllegalArgumentException, "expected_revision is required"
+        ):
+            self.catalog.as_semantic_model_catalog().alter_semantic_model(
+                identifier, SemanticModelChange.replace_definition(_definition())
+            )
+
     def test_alter_semantic_model_sends_every_change(self):
         identifier = NameIdentifier.of(self.schema_name, self.model_name)
 
@@ -265,20 +317,21 @@ class TestSemanticModelCatalog(unittest.TestCase):
         ) as mock_put:
             model = self.catalog.as_semantic_model_catalog().alter_semantic_model(
                 identifier,
-                SemanticModelChange.rename("renamed_model"),
                 SemanticModelChange.update_comment("new comment"),
                 SemanticModelChange.set_property("owner", "finance"),
                 SemanticModelChange.remove_property("legacy"),
                 SemanticModelChange.replace_definition(_definition()),
+                expected_revision=1,
             )
 
         self.assertEqual(
             f"{self.request_path}/{self.model_name}", mock_put.call_args.args[0]
         )
-        updates = mock_put.call_args.kwargs["json"].to_dict()["updates"]
+        request = mock_put.call_args.kwargs["json"].to_dict()
+        self.assertEqual(1, request["expectedRevision"])
+        updates = request["updates"]
         self.assertEqual(
             [
-                "rename",
                 "updateComment",
                 "setProperty",
                 "removeProperty",
@@ -286,12 +339,11 @@ class TestSemanticModelCatalog(unittest.TestCase):
             ],
             [update["@type"] for update in updates],
         )
-        self.assertEqual("renamed_model", updates[0]["newName"])
-        self.assertEqual("new comment", updates[1]["newComment"])
-        self.assertEqual("owner", updates[2]["property"])
-        self.assertEqual("finance", updates[2]["value"])
-        self.assertEqual("legacy", updates[3]["property"])
-        self.assertIn("datasets", updates[4]["definition"])
+        self.assertEqual("new comment", updates[0]["newComment"])
+        self.assertEqual("owner", updates[1]["property"])
+        self.assertEqual("finance", updates[1]["value"])
+        self.assertEqual("legacy", updates[2]["property"])
+        self.assertIn("datasets", updates[3]["definition"])
         self.assertEqual(self.model_name, model.name())
 
     def test_alter_semantic_model_can_clear_the_comment(self):

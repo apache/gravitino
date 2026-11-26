@@ -76,8 +76,8 @@ dependencies {
     exclude("javax.servlet")
     exclude("javax.ws.rs")
     exclude("org.eclipse.jetty")
-    // Ranger 2.8 depends on hadoop-client-api/runtime 3.4.x. Keep the Hadoop version shared with
-    // the catalogs, which load the authorization libs in the same class loader.
+    // Ranger 2.8 is built on hadoop-client-api/runtime 3.4.2. Use the Hadoop version of the
+    // catalogs, which load the authorization libs in the same class loader.
     exclude("org.apache.hadoop")
     // Use the versions Gravitino ships with the server, which the isolated class loader shares.
     exclude("com.fasterxml.jackson.core")
