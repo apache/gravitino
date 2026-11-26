@@ -97,9 +97,10 @@ class TestGravitinoClientUtils {
 
     Map<String, String> withJdbc = new HashMap<>(urlOnly);
     withJdbc.put(OptimizerConfig.JDBC_METRICS_JDBC_USER, "postgres");
-    withJdbc.put(OptimizerConfig.JDBC_METRICS_JDBC_PASSWORD, "postgres");
     withJdbc.put(OptimizerConfig.JDBC_METRICS_JDBC_DRIVER, "org.postgresql.Driver");
+    // Password may be omitted or blank.
     GravitinoClientUtils.requireJdbcMetricsConfigIfNeeded("metrics", withJdbc);
+    withJdbc.put(OptimizerConfig.JDBC_METRICS_JDBC_PASSWORD, "");
     GravitinoClientUtils.requireJdbcMetricsConfigIfNeeded("all", withJdbc);
   }
 

@@ -152,9 +152,9 @@ public final class GravitinoClientUtils {
   /**
    * When {@code updateMode} is {@code metrics} or {@code all}, requires non-blank JDBC metrics
    * settings in {@code updaterOptions}: {@link OptimizerConfig#JDBC_METRICS_JDBC_URL}, {@link
-   * OptimizerConfig#JDBC_METRICS_JDBC_USER}, {@link OptimizerConfig#JDBC_METRICS_JDBC_PASSWORD},
-   * and {@link OptimizerConfig#JDBC_METRICS_JDBC_DRIVER}. {@code stats} skips this check. Shared by
-   * the built-in update-stats Spark job and {@code submit-update-stats-job}.
+   * OptimizerConfig#JDBC_METRICS_JDBC_USER}, and {@link OptimizerConfig#JDBC_METRICS_JDBC_DRIVER}.
+   * {@link OptimizerConfig#JDBC_METRICS_JDBC_PASSWORD} may be blank. {@code stats} skips this
+   * check. Shared by the built-in update-stats Spark job and {@code submit-update-stats-job}.
    *
    * @param updateMode update-stats mode ({@code stats}, {@code metrics}, or {@code all})
    * @param updaterOptions updater-options map (raw or normalized)
@@ -168,7 +168,6 @@ public final class GravitinoClientUtils {
     }
     requireNonBlankJdbcMetricsProperty(updaterOptions, OptimizerConfig.JDBC_METRICS_JDBC_URL);
     requireNonBlankJdbcMetricsProperty(updaterOptions, OptimizerConfig.JDBC_METRICS_JDBC_USER);
-    requireNonBlankJdbcMetricsProperty(updaterOptions, OptimizerConfig.JDBC_METRICS_JDBC_PASSWORD);
     requireNonBlankJdbcMetricsProperty(updaterOptions, OptimizerConfig.JDBC_METRICS_JDBC_DRIVER);
   }
 
