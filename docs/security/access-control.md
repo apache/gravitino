@@ -252,8 +252,13 @@ policy with tags, provided they also have `APPLY_TAG` on each tag. Granting it o
 covers any policy in that metalake.
 
 Assigning a tag to a metadata object requires `APPLY_TAG` on the tag and access to the object.
+For a tag bound to an access-control policy, adding or removing the tag instead requires an explicit
+`APPLY_TAG` grant on that tag and ownership or `MANAGE_GRANTS` on the object or an ancestor.
+Tag ownership or a metalake-level `APPLY_TAG` grant alone is not sufficient. The metalake owner
+can still assign or remove the tag.
 Associating a policy with a tag requires access to both: `APPLY_POLICY` on the policy and
-`APPLY_TAG` on the tag. Ownership can satisfy either check.
+`APPLY_TAG` on the tag. For descriptive tags and policy association, ownership can satisfy the
+corresponding check.
 
 Reading a tag requires `VIEW_TAG` or `APPLY_TAG`; reading a policy requires `VIEW_POLICY` or
 `APPLY_POLICY`. The view privileges do not allow tag assignment or policy-to-tag association.
