@@ -275,6 +275,35 @@ public class TestReferencedRoleDeletion extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testUpdatesToPoliciesNamingNoRolesDoNotWaitOnEachOther() throws Exception {
+    createAndInsertMakeLake(METALAKE);
+    PolicyEntity first =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE),
+            "first",
+            AUDIT_INFO);
+    PolicyEntity second =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE),
+            "second",
+            AUDIT_INFO);
+    backend.insert(first, false);
+    backend.insert(second, false);
+
+    // Only an update naming roles takes the metalake lock, which H2 takes exclusively.
+    Throwable failure =
+        new TransactionLockWaits(backendType)
+            .whileTransactionOpen(
+                () -> updateComment(first, "edited"), () -> updateComment(second, "edited"));
+
+    Assertions.assertNull(failure);
+    PolicyEntity stored = backend.get(second.nameIdentifier(), Entity.EntityType.POLICY);
+    Assertions.assertEquals("edited", stored.comment());
+  }
+
+  @TestTemplate
   public void testDeletionRefusedAfterWaitingNeverRunsItsCleanup() throws Exception {
     createAndInsertMakeLake(METALAKE);
     createRoles("analyst");
@@ -481,6 +510,23 @@ public class TestReferencedRoleDeletion extends TestJDBCBackend {
         .withContent(accessControl(Arrays.asList(roleNames)))
         .withAuditInfo(AUDIT_INFO)
         .build();
+  }
+
+  private void updateComment(PolicyEntity policy, String comment) throws IOException {
+    backend.update(
+        policy.nameIdentifier(),
+        Entity.EntityType.POLICY,
+        entity ->
+            PolicyEntity.builder()
+                .withId(policy.id())
+                .withNamespace(policy.namespace())
+                .withName(policy.name())
+                .withPolicyType(policy.policyType())
+                .withComment(comment)
+                .withEnabled(policy.enabled())
+                .withContent(policy.content())
+                .withAuditInfo(AUDIT_INFO)
+                .build());
   }
 
   private static PolicyEntity withRoles(PolicyEntity policy, List<String> roleNames) {

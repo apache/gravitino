@@ -183,15 +183,8 @@ public class PolicyMetaService {
     try {
       PolicyPO newPolicyPO =
           POConverters.updatePolicyPOWithVersion(oldPolicyPO, updatedPolicyEntity);
-      // Lock the metalake, then the named roles, then the policy row: the order policy creation,
-      // role deletion and metalake deletion use.
       SessionUtils.doMultipleWithCommit(
-          () ->
-              LiveEndpointService.lockLiveEndpoint(
-                  NameIdentifier.of(metalakeName),
-                  Entity.EntityType.METALAKE,
-                  new NamespacedEntityId(oldPolicyPO.getMetalakeId())),
-          () -> lockNamedRoles(oldPolicyPO.getMetalakeId(), updatedPolicyEntity),
+          () -> lockForUpdate(metalakeName, oldPolicyPO.getMetalakeId(), updatedPolicyEntity),
           () -> beforeUpdate(updatedPolicyEntity),
           () -> updatePolicyRootWithVersion(ident, oldPolicyPO, newPolicyPO),
           () -> insertPolicyVersionIfAllocated(oldPolicyPO, newPolicyPO),
@@ -394,6 +387,23 @@ public class PolicyMetaService {
                     mapper.selectMetalakeMetaByIdForShare(observedMetalakePO.getMetalakeId())),
         null,
         current -> Objects.equals(current.getMetalakeName(), observedMetalakePO.getMetalakeName()));
+  }
+
+  /**
+   * Takes the locks an update needs before it writes the policy row: the metalake row in share
+   * mode, then the roles the updated content names, the order role and metalake deletion use. An
+   * update that names no roles takes neither, so it doesn't wait on edits to other policies in the
+   * metalake; H2 takes the share lock exclusively.
+   */
+  private void lockForUpdate(String metalakeName, Long metalakeId, PolicyEntity policyEntity) {
+    if (POConverters.policyRoleNames(policyEntity).isEmpty()) {
+      return;
+    }
+    LiveEndpointService.lockLiveEndpoint(
+        NameIdentifier.of(metalakeName),
+        Entity.EntityType.METALAKE,
+        new NamespacedEntityId(metalakeId));
+    lockNamedRoles(metalakeId, policyEntity);
   }
 
   /**
