@@ -22,6 +22,8 @@ package org.apache.gravitino.flink.connector.store;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpServer;
@@ -34,20 +36,37 @@ import org.apache.flink.table.factories.TableFactoryUtil;
 import org.apache.gravitino.flink.connector.catalog.GravitinoCatalogManager;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** Tests custom request headers through the Flink catalog store configuration and HTTP client. */
 public class TestGravitinoRequestHeaders {
 
   @ParameterizedTest
-  @CsvSource({"false,false", "false,true", "true,false", "true,true"})
+  @CsvSource({
+    "simple,false",
+    "simple,true",
+    "basic,false",
+    "basic,true",
+    "oauth2,false",
+    "oauth2,true"
+  })
   @SuppressWarnings("deprecation")
-  void testRequestHeaders(boolean basicAuth, boolean customHeaders) throws Exception {
+  void testRequestHeaders(String authType, boolean customHeaders) throws Exception {
     List<Headers> requests = new CopyOnWriteArrayList<>();
     HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
     server.createContext(
         "/",
         exchange -> {
           try {
+            if (exchange.getRequestURI().getPath().equals("/oauth/token")) {
+              byte[] token =
+                  "{\"access_token\":\"test-token\",\"token_type\":\"bearer\",\"expires_in\":3600}"
+                      .getBytes(StandardCharsets.UTF_8);
+              exchange.getResponseHeaders().set("Content-Type", "application/json");
+              exchange.sendResponseHeaders(200, token.length);
+              exchange.getResponseBody().write(token);
+              return;
+            }
             requests.add(exchange.getRequestHeaders());
             String body =
                 exchange.getRequestURI().getPath().equals("/api/version")
@@ -72,12 +91,20 @@ public class TestGravitinoRequestHeaders {
       conf.setString(prefix + "uri", uri);
       conf.setString(prefix + "metalake", "test");
       conf.setString(prefix + "client.socketTimeoutMs", "3000");
-      if (basicAuth) {
+      if ("basic".equals(authType)) {
         conf.setString(prefix + "client.auth.type", "basic");
         conf.setString(prefix + "client.basic.username", "alice");
         conf.setString(prefix + "client.basic.password", "secret");
       }
+      if ("oauth2".equals(authType)) {
+        conf.setString(prefix + "client.auth.type", "oauth2");
+        conf.setString(prefix + "client.oauth2.serverUri", uri);
+        conf.setString(prefix + "client.oauth2.credential", "client:secret");
+        conf.setString(prefix + "client.oauth2.tokenPath", "oauth/token");
+        conf.setString(prefix + "client.oauth2.scope", "test");
+      }
       if (customHeaders) {
+        conf.setString(prefix + "client.request.header.Authorization", "custom-auth");
         conf.setString(prefix + "client.request.header.X-Job-Id", "job-123");
         conf.setString(prefix + "client.request.header.X-Execution-Id", "run:456");
       }
@@ -97,13 +124,39 @@ public class TestGravitinoRequestHeaders {
           assertNull(headers.getFirst("X-Job-Id"));
           assertNull(headers.getFirst("X-Execution-Id"));
         }
-        if (basicAuth) {
+        if ("basic".equals(authType)) {
           assertEquals("Basic YWxpY2U6c2VjcmV0", headers.getFirst("Authorization"));
+        } else if ("oauth2".equals(authType)) {
+          assertEquals("Bearer test-token", headers.getFirst("Authorization"));
         }
       }
     } finally {
       factory.close();
       server.stop(0);
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", " "})
+  void testBlankHeaderName(String name) {
+    Configuration conf = new Configuration();
+    conf.setString("table.catalog-store.kind", "gravitino");
+    conf.setString("table.catalog-store.gravitino.gravitino.uri", "http://127.0.0.1:1");
+    conf.setString("table.catalog-store.gravitino.gravitino.metalake", "test");
+    conf.setString(
+        "table.catalog-store.gravitino.gravitino.client.request.header." + name, "value");
+    GravitinoCatalogStoreFactory factory = new GravitinoCatalogStoreFactory();
+    try {
+      IllegalArgumentException error =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  factory.open(
+                      TableFactoryUtil.buildCatalogStoreFactoryContext(
+                          conf, getClass().getClassLoader())));
+      assertTrue(error.getMessage().contains("header name must not be blank"));
+    } finally {
+      factory.close();
     }
   }
 }

@@ -62,15 +62,17 @@ public class GravitinoCatalogManager {
     this.gravitinoUri = gravitinoUri;
     this.metalakeName = metalakeName;
     this.gravitinoClientConfig = gravitinoClientConfig;
+    Map<String, String> requestHeaders = extractRequestHeaders(gravitinoClientConfig);
+    Map<String, String> clientConfig = withoutRequestHeaders(gravitinoClientConfig);
 
     String authType = gravitinoClientConfig.get(GravitinoCatalogStoreFactoryOptions.AUTH_TYPE);
 
     // Only OAuth is explicitly configured; otherwise follow Flink security (Kerberos if enabled,
     // simple auth otherwise).
     if (GravitinoCatalogStoreFactoryOptions.OAUTH2.equalsIgnoreCase(authType)) {
-      this.gravitinoClient = buildOAuthClient(gravitinoUri, gravitinoClientConfig);
+      this.gravitinoClient = buildOAuthClient(gravitinoUri, clientConfig, requestHeaders);
     } else if (GravitinoCatalogStoreFactoryOptions.BASIC.equalsIgnoreCase(authType)) {
-      this.gravitinoClient = buildBasicClient(gravitinoUri, gravitinoClientConfig);
+      this.gravitinoClient = buildBasicClient(gravitinoUri, clientConfig, requestHeaders);
     } else {
       if (authType != null) {
         throw new IllegalArgumentException(
@@ -93,9 +95,9 @@ public class GravitinoCatalogManager {
                   "Flink security is enabled, but current user authentication method is %s rather than KERBEROS",
                   getUgi().getAuthenticationMethod()));
         }
-        this.gravitinoClient = buildKerberosClient(gravitinoUri, gravitinoClientConfig);
+        this.gravitinoClient = buildKerberosClient(gravitinoUri, clientConfig, requestHeaders);
       } else {
-        this.gravitinoClient = buildSimpleClient(gravitinoUri, gravitinoClientConfig);
+        this.gravitinoClient = buildSimpleClient(gravitinoUri, clientConfig, requestHeaders);
       }
     }
 
@@ -262,7 +264,7 @@ public class GravitinoCatalogManager {
   }
 
   private static GravitinoAdminClient buildBasicClient(
-      String gravitinoUri, Map<String, String> config) {
+      String gravitinoUri, Map<String, String> config, Map<String, String> requestHeaders) {
     String username = config.get(GravitinoCatalogStoreFactoryOptions.BASIC_USERNAME);
     String password = config.get(GravitinoCatalogStoreFactoryOptions.BASIC_PASSWORD);
     Preconditions.checkArgument(
@@ -287,13 +289,13 @@ public class GravitinoCatalogManager {
     }
     return GravitinoAdminClient.builder(gravitinoUri)
         .withBasicAuth(username, password)
-        .withHeaders(extractRequestHeaders(config))
-        .withClientConfig(withoutRequestHeaders(clientConfig))
+        .withHeaders(requestHeaders)
+        .withClientConfig(clientConfig)
         .build();
   }
 
   private static GravitinoAdminClient buildOAuthClient(
-      String gravitinoUri, Map<String, String> config) {
+      String gravitinoUri, Map<String, String> config, Map<String, String> requestHeaders) {
     String serverUri = config.get(GravitinoCatalogStoreFactoryOptions.OAUTH2_SERVER_URI);
     String credential = config.get(GravitinoCatalogStoreFactoryOptions.OAUTH2_CREDENTIAL);
     String path = config.get(GravitinoCatalogStoreFactoryOptions.OAUTH2_TOKEN_PATH);
@@ -326,13 +328,13 @@ public class GravitinoCatalogManager {
 
     return GravitinoAdminClient.builder(gravitinoUri)
         .withOAuth(provider)
-        .withHeaders(extractRequestHeaders(config))
-        .withClientConfig(withoutRequestHeaders(clientConfig))
+        .withHeaders(requestHeaders)
+        .withClientConfig(clientConfig)
         .build();
   }
 
   private static GravitinoAdminClient buildKerberosClient(
-      String gravitinoUri, Map<String, String> config) {
+      String gravitinoUri, Map<String, String> config, Map<String, String> requestHeaders) {
 
     return getUgi()
         .doAs(
@@ -340,18 +342,18 @@ public class GravitinoCatalogManager {
                 () ->
                     GravitinoAdminClient.builder(gravitinoUri)
                         .withKerberosAuth(KerberosTokenProvider.builder().build())
-                        .withHeaders(extractRequestHeaders(config))
-                        .withClientConfig(withoutRequestHeaders(config))
+                        .withHeaders(requestHeaders)
+                        .withClientConfig(config)
                         .build());
   }
 
   private static GravitinoAdminClient buildSimpleClient(
-      String gravitinoUri, Map<String, String> config) {
+      String gravitinoUri, Map<String, String> config, Map<String, String> requestHeaders) {
     String userName = getUgi().getUserName();
     return GravitinoAdminClient.builder(gravitinoUri)
         .withSimpleAuth(userName)
-        .withHeaders(extractRequestHeaders(config))
-        .withClientConfig(withoutRequestHeaders(config))
+        .withHeaders(requestHeaders)
+        .withClientConfig(config)
         .build();
   }
 
@@ -359,6 +361,12 @@ public class GravitinoCatalogManager {
     String prefix = GravitinoCatalogStoreFactoryOptions.GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX;
     return config.entrySet().stream()
         .filter(entry -> entry.getKey().startsWith(prefix))
+        .peek(
+            entry ->
+                Preconditions.checkArgument(
+                    StringUtils.isNotBlank(entry.getKey().substring(prefix.length())),
+                    "Custom HTTP request header name must not be blank: %s",
+                    entry.getKey()))
         .collect(
             Collectors.toMap(
                 entry -> entry.getKey().substring(prefix.length()), Map.Entry::getValue));

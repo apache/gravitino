@@ -78,19 +78,6 @@ To configure the Gravitino client, use properties prefixed with `table.catalog-s
 
 **Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](../how-to-use-gravitino-client.md#java-client-configuration) for more support client configuration.
 
-To send custom HTTP headers to the Gravitino server, configure
-`table.catalog-store.gravitino.gravitino.client.request.header.<header-name>`:
-
-```yaml
-table.catalog-store.gravitino.gravitino.client.request.header.X-Job-Id: job-123
-table.catalog-store.gravitino.gravitino.client.request.header.X-Execution-Id: run-456
-```
-
-These entries are extracted as request headers rather than Java client configuration properties.
-Headers are fixed when the catalog store's client is created and are reused for its requests;
-they do not provide per-statement context in a shared session. They are not forwarded to
-underlying catalog services. Use the connector's authentication settings for authentication headers.
-
 Set the flink configuration in flink-conf.yaml.
 ```yaml
 table.catalog-store.kind: gravitino
@@ -100,6 +87,7 @@ table.catalog-store.gravitino.gravitino.enableSessionCatalogSupport: true
 table.catalog-store.gravitino.gravitino.client.socketTimeoutMs: 60000
 table.catalog-store.gravitino.gravitino.client.connectionTimeoutMs: 60000
 ```
+
 Or you can set the flink configuration in the `TableEnvironment`.
 ```java
 final Configuration configuration = new Configuration();
@@ -112,6 +100,22 @@ configuration.setString("table.catalog-store.gravitino.gravitino.client.connecti
 EnvironmentSettings.Builder builder = EnvironmentSettings.newInstance().withConfiguration(configuration);
 TableEnvironment tableEnv = TableEnvironment.create(builder.inBatchMode().build());
 ```
+
+### Custom HTTP request headers
+
+To send custom HTTP headers to the Gravitino server, configure
+`table.catalog-store.gravitino.gravitino.client.request.header.<header-name>`:
+
+```yaml
+table.catalog-store.gravitino.gravitino.client.request.header.X-Job-Id: job-123
+table.catalog-store.gravitino.gravitino.client.request.header.X-Execution-Id: run-456
+```
+
+These entries are extracted as request headers rather than Java client configuration properties.
+Headers are fixed when the catalog store's client is created and are reused for its requests;
+they do not provide per-statement context in a shared session. They are not forwarded to
+underlying catalog services. Use the connector's authentication settings for authentication headers. Configured headers cannot override the client-managed
+`Authorization`, `Content-Type`, `Accept`, or client version headers.
 
 3. Add necessary jar files to Flink's classpath.
 

@@ -22,6 +22,8 @@ package org.apache.gravitino.spark.connector.plugin;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
 import com.sun.net.httpserver.Headers;
@@ -35,6 +37,7 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.spark.SparkConf;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** Tests custom request headers through the Spark connector's real HTTP client. */
 public class TestGravitinoRequestHeaders {
@@ -75,6 +78,7 @@ public class TestGravitinoRequestHeaders {
         conf.set("spark.sql.gravitino.basic.password", "secret");
       }
       if (customHeaders) {
+        conf.set("spark.sql.gravitino.client.request.header.Authorization", "custom-auth");
         conf.set("spark.sql.gravitino.client.request.header.X-Job-Id", "job-123");
         conf.set("spark.sql.gravitino.client.request.header.X-Execution-Id", "run:456");
       }
@@ -83,6 +87,7 @@ public class TestGravitinoRequestHeaders {
       try (GravitinoClient client =
           GravitinoDriverPlugin.createGravitinoClient(uri, "test", conf, "alice", clientConfig)) {
         assertEquals(0, client.listCatalogsInfo(false).length);
+        // Repeat the request to verify that the client reuses the configured headers.
         assertEquals(0, client.listCatalogsInfo(false).length);
       }
       assertFalse(requests.isEmpty());
@@ -101,5 +106,23 @@ public class TestGravitinoRequestHeaders {
     } finally {
       server.stop(0);
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", " "})
+  void testBlankHeaderName(String name) {
+    SparkConf conf = new SparkConf(false);
+    conf.set("spark.sql.gravitino.client.request.header." + name, "value");
+    IllegalArgumentException error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                GravitinoDriverPlugin.createGravitinoClient(
+                    "http://127.0.0.1:1",
+                    "test",
+                    conf,
+                    "alice",
+                    GravitinoDriverPlugin.extractGravitinoClientConfig(conf)));
+    assertTrue(error.getMessage().contains("header name must not be blank"));
   }
 }

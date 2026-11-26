@@ -76,7 +76,8 @@ spark.sql.gravitino.client.request.header.X-Execution-Id=run-456
 Headers are read from the application configuration when a client is created and are reused for
 that client's requests. They do not provide per-statement context in a shared Spark application.
 They are not forwarded to underlying catalog services or GVFS clients. Use the connector's
-authentication settings for authentication headers.
+authentication settings for authentication headers. Configured headers cannot override the client-managed
+`Authorization`, `Content-Type`, `Accept`, or client version headers.
 
 ### Per-user identity in `token` mode
 
