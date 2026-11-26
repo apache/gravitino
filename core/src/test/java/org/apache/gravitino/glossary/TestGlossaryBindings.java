@@ -2390,6 +2390,26 @@ class TestGlossaryBindings extends TestJDBCBackend {
             () -> manager.listTermBindings(LAKE, "Paged", null, null, null, 1, first.next()));
     assertEquals(List.of(TermBinding.usedBy(model, "net_revenue")), last.bindings());
     assertNull(last.next());
+    // Changing the status filter on a visible root is a bad continuation even when the new
+    // filter would exclude it. A caller that cannot see the root still gets a not-found result.
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            as(
+                "metricReader",
+                () ->
+                    manager.listTermBindings(
+                        LAKE, "Paged", null, null, GlossaryTerm.Status.DRAFT, 1, first.next())));
+    GlossaryManager hidden = manager.withTermVisibility(ignored -> false);
+    assertThrows(
+        NoSuchTermException.class,
+        () ->
+            as(
+                "metricReader",
+                () ->
+                    hidden.listTermBindings(
+                        LAKE, "Paged", null, null, GlossaryTerm.Status.DRAFT, 1, first.next())));
+
     assertThrows(
         IllegalArgumentException.class,
         () ->
@@ -2493,7 +2513,7 @@ class TestGlossaryBindings extends TestJDBCBackend {
         for (MetadataObject target : List.of(table, model)) {
           assertThrows(
               ForbiddenException.class,
-              () -> as(user, () -> views.listTargetTerms(LAKE, target, null, true, null)));
+              () -> as(user, () -> views.listTargetTermsWithChildren(LAKE, target, null)));
         }
         assertThrows(
             ForbiddenException.class,
@@ -2507,7 +2527,7 @@ class TestGlossaryBindings extends TestJDBCBackend {
             as(
                 "limited",
                 () ->
-                    views.listTargetTerms(LAKE, target, null, true, GlossaryTerm.Status.APPROVED));
+                    views.listTargetTermsWithChildren(LAKE, target, GlossaryTerm.Status.APPROVED));
         assertEquals(
             isTable ? List.of("customer_id", "email") : List.of("one", "two"),
             result.getChildren().stream().map(ObjectTermsResponse.Child::getName).toList());
@@ -2526,7 +2546,7 @@ class TestGlossaryBindings extends TestJDBCBackend {
             calls);
         assertEquals(
             3,
-            as("limited", () -> views.listTargetTerms(LAKE, target, null, true, null))
+            as("limited", () -> views.listTargetTermsWithChildren(LAKE, target, null))
                 .getChildren()
                 .size());
       }
@@ -2538,14 +2558,12 @@ class TestGlossaryBindings extends TestJDBCBackend {
             () -> views.listTargetTermNames(LAKE, view, null, GlossaryTerm.Status.APPROVED)));
     assertThrows(
         IllegalArgumentException.class,
-        () -> as("limited", () -> views.listTargetTerms(LAKE, view, null, true, null)));
+        () -> as("limited", () -> views.listTargetTermsWithChildren(LAKE, view, null)));
     assertArrayEquals(
         new String[0], as("limited", () -> views.listTargetTermNames(LAKE, model, null, null)));
     assertArrayEquals(
         new String[] {"Visible"},
-        as("limited", () -> views.listTargetTerms(LAKE, model, "one", false, null))
-            .getTerms()[0]
-            .getDomains());
+        as("limited", () -> views.listDirectTargetTerms(LAKE, model, "one", null))[0].getDomains());
     assertThrows(
         NoSuchMetadataObjectException.class,
         () -> as("limited", () -> views.listTargetTermNames(LAKE, model, "absent", null)));

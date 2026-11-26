@@ -546,11 +546,27 @@ public class TestTermOperations extends BaseOperationsTest {
             new TermDTO[] {term}, List.of(new ObjectTermsResponse.Child("amount", List.of(term))));
     when(dispatcher.listTargetTermNames("test", table, null, null)).thenReturn(names);
     when(dispatcher.listTargetTermNames("test", model, "revenue net", null)).thenReturn(names);
-    when(dispatcher.listTargetTerms("test", table, null, true, GlossaryTerm.Status.APPROVED))
+    when(dispatcher.listTargetTermsWithChildren("test", table, GlossaryTerm.Status.APPROVED))
         .thenReturn(detail);
-    when(dispatcher.listTargetTerms("test", model, "revenue net", false, null)).thenReturn(detail);
+    when(dispatcher.listDirectTargetTerms("test", model, "revenue net", null))
+        .thenReturn(new TermDTO[] {term});
     when(dispatcher.associateTerms("test", table, null, names, null)).thenReturn(names);
     when(dispatcher.associateTerms("test", model, "revenue net", names, null)).thenReturn(names);
+    when(dispatcher.listDirectTargetTerms("test", table, null, null))
+        .thenReturn(new TermDTO[] {term});
+    try (Response r =
+        target(TABLE_TERMS)
+            .request()
+            .post(Entity.json("{\"termsToAdd\":[\"Revenue\"],\"termsToRemove\":null}"))) {
+      assertEquals(200, r.getStatus());
+      assertArrayEquals(names, r.readEntity(NameListResponse.class).getNames());
+    }
+    try (Response r = target(TABLE_TERMS).queryParam("details", true).request().get()) {
+      assertEquals(200, r.getStatus());
+      ObjectTermsResponse direct = r.readEntity(ObjectTermsResponse.class);
+      assertEquals("Revenue", direct.getTerms()[0].getName());
+      assertTrue(direct.getChildren().isEmpty());
+    }
     for (String path : List.of(TABLE_TERMS, METRIC_TERMS)) {
       for (String accept : List.of(MediaType.APPLICATION_JSON, ACCEPT_V1, NORMALIZED_JSON_ACCEPT)) {
         MediaType expected =
@@ -638,7 +654,7 @@ public class TestTermOperations extends BaseOperationsTest {
     when(dispatcher.listTermBindings(
             "test", "Private", null, Set.of(), GlossaryTerm.Status.APPROVED, 100, null))
         .thenThrow(new NoSuchTermException("missing"));
-    when(dispatcher.listTargetTerms("test", table, null, true, null))
+    when(dispatcher.listTargetTermsWithChildren("test", table, null))
         .thenThrow(new ForbiddenException("denied"));
     when(dispatcher.listTargetTermNames("test", model, "revenue net", null))
         .thenThrow(new NoSuchMetadataObjectException("missing metric"));
@@ -660,7 +676,6 @@ public class TestTermOperations extends BaseOperationsTest {
     for (Response r :
         List.of(
             target(BASE + "/T/objects").queryParam("pageToken", "broken").request().get(),
-            target(BASE + "/T/objects").queryParam("pageSize", "abc").request().get(),
             target(BASE + "/T/objects").queryParam("types", "unknown").request().get(),
             target("/metalakes/test/objects/view/dw.sales.v/terms")
                 .queryParam("children", true)
@@ -668,10 +683,23 @@ public class TestTermOperations extends BaseOperationsTest {
                 .get(),
             target(table).queryParam("details", "sometimes").request().get(),
             target(table).request().post(Entity.json("{}")),
+            target(table)
+                .request()
+                .post(Entity.json("{\"termsToAdd\":null,\"termsToRemove\":null}")),
+            target(table).request().post(Entity.json("{\"termsToRemove\":[\"   \"]}")),
             target(table).request().post(Entity.json("{\"termsToAdd\":[null]}")))) {
       try (r) {
         assertEquals(400, r.getStatus());
       }
+    }
+    try (Response r = target(BASE + "/T/objects").queryParam("pageSize", "abc").request().get()) {
+      assertEquals(400, r.getStatus());
+      assertTrue(r.readEntity(ErrorResponse.class).getMessage().contains("pageSize"));
+    }
+    try (Response r = target(BASE + "/T/objects").queryParam("kind", "other").request().get()) {
+      assertEquals(400, r.getStatus());
+      assertTrue(
+          r.readEntity(ErrorResponse.class).getMessage().contains("IMPLEMENTED_BY or USED_BY"));
     }
     verifyNoInteractions(dispatcher);
   }

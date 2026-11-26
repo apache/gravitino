@@ -136,26 +136,39 @@ public final class GlossaryTermViews {
         bound -> bound.direct().stream().map(GlossaryTermEntity::name).toArray(String[]::new));
   }
 
-  /**
-   * Returns visible direct terms and, when requested, the matching children of a table or semantic
-   * model. A semantic model has no direct terms. Target authorization, status and nested domain
-   * visibility are evaluated within the binding read snapshot.
-   *
-   * @throws IllegalArgumentException when the target does not support the requested expansion
-   * @throws ForbiddenException when the caller cannot read the target
-   * @throws NoSuchMetadataObjectException when the authorized target or metric is missing
-   */
-  public ObjectTermsResponse listTargetTerms(
+  /** Returns the visible direct definitions for an object or metric in a single read snapshot. */
+  public TermDTO[] listDirectTargetTerms(
       String metalake,
       MetadataObject object,
       @Nullable String metric,
-      boolean children,
       @Nullable GlossaryTerm.Status status) {
     return manager.readTargetTerms(
         metalake,
         object,
         metric,
-        children,
+        false,
+        true,
+        status,
+        bound ->
+            projectTermSnapshots(metalake, bound.lake(), bound.access(), bound.direct(), status));
+  }
+
+  /**
+   * Returns visible direct terms and the matching children of a table or semantic model. A semantic
+   * model has no direct terms. Target authorization, status and nested domain visibility are
+   * evaluated within the binding read snapshot.
+   *
+   * @throws IllegalArgumentException when the target does not support the requested expansion
+   * @throws ForbiddenException when the caller cannot read the target
+   * @throws NoSuchMetadataObjectException when the authorized target is missing
+   */
+  public ObjectTermsResponse listTargetTermsWithChildren(
+      String metalake, MetadataObject object, @Nullable GlossaryTerm.Status status) {
+    return manager.readTargetTerms(
+        metalake,
+        object,
+        null,
+        true,
         true,
         status,
         bound -> {

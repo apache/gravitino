@@ -112,7 +112,6 @@ public final class GlossaryManager {
   private static final GlossaryTermDomainService DOMAINS = GlossaryTermDomainService.getInstance();
   private static final GlossaryTermBindingService BINDINGS =
       GlossaryTermBindingService.getInstance();
-  private static final int MAX_BINDING_PAGE_SIZE = 100;
   private static final int MAX_BINDING_CANDIDATES = 1000;
   private static final Predicate<GlossaryTermEntity> ALL_TERMS = Predicates.alwaysTrue();
   static final int MAX_HIERARCHY_DEPTH = 20;
@@ -704,7 +703,8 @@ public final class GlossaryManager {
       @Nullable TermBinding.Kind kind,
       @Nullable Set<MetadataObject.Type> types,
       @Nullable GlossaryTerm.Status status) {
-    return listTermBindings(metalake, termName, kind, types, status, MAX_BINDING_PAGE_SIZE, null);
+    return listTermBindings(
+        metalake, termName, kind, types, status, TermBindingPage.DEFAULT_PAGE_SIZE, null);
   }
 
   /**
@@ -726,9 +726,9 @@ public final class GlossaryManager {
       int pageSize,
       @Nullable BindingCursor cursor) {
     Preconditions.checkArgument(
-        pageSize > 0 && pageSize <= MAX_BINDING_PAGE_SIZE,
+        pageSize > 0 && pageSize <= TermBindingPage.MAX_PAGE_SIZE,
         "Page size must be between 1 and %s",
-        MAX_BINDING_PAGE_SIZE);
+        TermBindingPage.MAX_PAGE_SIZE);
     Set<TargetType> targetTypes = resolveBindingFilterTypes(kind, types);
     Set<MetadataObject.Type> requestedTypes = types == null ? Set.of() : Set.copyOf(types);
     return SqlSessions.readSnapshot(
@@ -737,20 +737,24 @@ public final class GlossaryManager {
           long lake = termReadMetalakeId(ident);
           GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
           GlossaryTermEntity root = loadRootForView(ident, lake, access);
-          if (!isTermVisible(root, access, status)) {
+          boolean sameFilters =
+              cursor == null
+                  || (kind == cursor.kind()
+                      && requestedTypes.equals(cursor.types())
+                      && status == cursor.status());
+          // A changed filter is a bad continuation for a visible root. Applying that filter first
+          // could disguise the client error as a missing term. A hidden root always stays hidden.
+          if (!isTermVisible(root, access, sameFilters ? status : null)) {
             throw missingRelationRoot(ident);
           }
-          if (cursor != null) {
-            Preconditions.checkArgument(
-                kind == cursor.kind()
-                    && requestedTypes.equals(cursor.types())
-                    && status == cursor.status(),
-                "Binding filters have changed");
-            if (lake != cursor.metalakeId()
-                || root.id() != cursor.termId()
-                || root.version() != cursor.version()) {
-              throw new TermVersionConflictException("Term %s has changed", ident);
-            }
+          Preconditions.checkArgument(
+              sameFilters, "Binding filters have changed; restart without pageToken");
+          if (cursor != null
+              && (lake != cursor.metalakeId()
+                  || root.id() != cursor.termId()
+                  || root.version() != cursor.version())) {
+            throw new TermVersionConflictException(
+                "Term %s has changed; restart without pageToken", ident);
           }
           GlossaryBindingAccess objectAccess =
               GlossaryBindingAccess.forBindingPage(metalake, authorizationEnabled, lake);
@@ -798,7 +802,7 @@ public final class GlossaryManager {
               break;
             }
             // Grow only when missing or unauthorized targets leave the page short.
-            fetchSize = Math.min(MAX_BINDING_PAGE_SIZE, fetchSize * 2);
+            fetchSize = Math.min(TermBindingPage.MAX_PAGE_SIZE, fetchSize * 2);
           }
           return new BindingPage(visible, null);
         });

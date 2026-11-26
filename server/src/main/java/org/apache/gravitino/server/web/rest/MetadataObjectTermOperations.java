@@ -21,6 +21,7 @@ package org.apache.gravitino.server.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.base.Preconditions;
+import java.util.List;
 import java.util.Locale;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -38,6 +39,7 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.dto.glossary.TermDTO;
 import org.apache.gravitino.dto.requests.TermsAssociateRequest;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.ObjectTermsResponse;
@@ -153,15 +155,20 @@ public class MetadataObjectTermOperations {
                           || object.type() == MetadataObject.Type.SEMANTIC_MODEL),
               "children requires a table or semantic model");
           GlossaryTerm.Status filter = TermOperations.parseStatus(status);
-          if (!detailed && !expand) {
+          if (expand) {
+            return Response.ok(views.listTargetTermsWithChildren(metalake, object, filter)).build();
+          }
+          if (!detailed) {
             return Response.ok(
                     new NameListResponse(
                         views.listTargetTermNames(metalake, object, metric, filter)))
                 .build();
           }
-          ObjectTermsResponse terms =
-              views.listTargetTerms(metalake, object, metric, expand, filter);
-          return Response.ok(metric == null ? terms : new TermListResponse(terms.getTerms()))
+          TermDTO[] terms = views.listDirectTargetTerms(metalake, object, metric, filter);
+          return Response.ok(
+                  metric == null
+                      ? new ObjectTermsResponse(terms, List.of())
+                      : new TermListResponse(terms))
               .build();
         });
   }

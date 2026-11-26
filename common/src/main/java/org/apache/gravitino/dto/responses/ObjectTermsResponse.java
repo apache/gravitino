@@ -22,11 +22,13 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import java.util.Collections;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dto.glossary.TermDTO;
 
 /** A metadata object's visible direct terms and requested child terms. */
-public class ObjectTermsResponse extends BaseResponse {
+public class ObjectTermsResponse extends TermListResponse {
   /** Terms of one table column or semantic-model metric. */
   public static final class Child {
     private final String name;
@@ -35,21 +37,23 @@ public class ObjectTermsResponse extends BaseResponse {
     /** Creates a named child with its visible terms. */
     @JsonCreator
     public Child(@JsonProperty("name") String name, @JsonProperty("terms") List<TermDTO> terms) {
+      Preconditions.checkArgument(StringUtils.isNotBlank(name), "Child name must not be blank");
+      Preconditions.checkArgument(
+          terms != null && !terms.isEmpty(), "A child must have visible terms");
       this.name = name;
       this.terms = ImmutableList.copyOf(terms);
     }
+
     /** Returns the column or metric name. */
     public String getName() {
       return name;
     }
+
     /** Returns the visible terms bound to this child. */
     public List<TermDTO> getTerms() {
       return terms;
     }
   }
-
-  @JsonProperty("terms")
-  private TermDTO[] terms;
 
   @JsonProperty("children")
   private List<Child> children;
@@ -59,23 +63,22 @@ public class ObjectTermsResponse extends BaseResponse {
 
   /** Creates the direct and child term response. */
   public ObjectTermsResponse(TermDTO[] terms, List<Child> children) {
-    super(0);
-    this.terms = terms.clone();
+    super(terms);
     this.children = ImmutableList.copyOf(children);
   }
-  /** Returns terms bound directly to the requested object. */
-  public TermDTO[] getTerms() {
-    return terms == null ? null : terms.clone();
-  }
+
   /** Returns only children with visible matching terms. */
   public List<Child> getChildren() {
-    return children;
+    return children == null ? null : Collections.unmodifiableList(children);
   }
+
   /** Validates the response envelope and its result collections. */
   @Override
   public void validate() {
     super.validate();
-    Preconditions.checkArgument(
-        terms != null && children != null, "terms and children are required");
+    Preconditions.checkArgument(children != null, "children are required");
+    for (Child child : children) {
+      Preconditions.checkArgument(child != null, "children must not contain null");
+    }
   }
 }

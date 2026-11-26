@@ -63,6 +63,7 @@ import org.apache.gravitino.glossary.GlossaryManager;
 import org.apache.gravitino.glossary.GlossaryTerm;
 import org.apache.gravitino.glossary.GlossaryTermViews;
 import org.apache.gravitino.glossary.TermBinding;
+import org.apache.gravitino.glossary.TermBindingPage;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
@@ -287,27 +288,21 @@ public class TermOperations {
       @QueryParam("kind") String kind,
       @QueryParam("types") List<String> types,
       @QueryParam("status") String status,
-      @QueryParam("pageSize") @DefaultValue("100") String size,
+      @QueryParam("pageSize") @DefaultValue("" + TermBindingPage.DEFAULT_PAGE_SIZE) String size,
       @QueryParam("pageToken") String token) {
     return execute(
         OperationType.LIST,
         metalake,
         term,
         () -> {
-          Set<MetadataObject.Type> filter = EnumSet.noneOf(MetadataObject.Type.class);
-          for (String values : types) {
-            for (String type : values.split(",", -1)) {
-              filter.add(MetadataObject.Type.valueOf(type.trim().toUpperCase(Locale.ROOT)));
-            }
-          }
           GlossaryManager.BindingPage page =
               views.listTermBindings(
                   metalake,
                   term,
-                  kind == null ? null : TermBinding.Kind.valueOf(kind.toUpperCase(Locale.ROOT)),
-                  filter,
+                  parseBindingKind(kind),
+                  parseBindingTypes(types),
                   parseStatus(status),
-                  Integer.parseInt(size),
+                  parseBindingPageSize(size),
                   token == null ? null : tokens.decode(token));
           TermBindingDTO[] bindings =
               page.bindings().stream()
@@ -321,6 +316,42 @@ public class TermOperations {
                       bindings, page.next() == null ? null : tokens.encode(page.next())))
               .build();
         });
+  }
+
+  @Nullable
+  private static TermBinding.Kind parseBindingKind(@Nullable String value) {
+    if (value == null) {
+      return null;
+    }
+    try {
+      return TermBinding.Kind.valueOf(value.toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException invalid) {
+      throw new IllegalArgumentException("kind must be IMPLEMENTED_BY or USED_BY", invalid);
+    }
+  }
+
+  private static Set<MetadataObject.Type> parseBindingTypes(List<String> values) {
+    Set<MetadataObject.Type> types = EnumSet.noneOf(MetadataObject.Type.class);
+    for (String value : values) {
+      for (String type : value.split(",", -1)) {
+        try {
+          types.add(MetadataObject.Type.valueOf(type.trim().toUpperCase(Locale.ROOT)));
+        } catch (IllegalArgumentException invalid) {
+          throw new IllegalArgumentException(
+              "Unknown metadata object type in types: " + type, invalid);
+        }
+      }
+    }
+    return types;
+  }
+
+  private static int parseBindingPageSize(String value) {
+    try {
+      return Integer.parseInt(value);
+    } catch (NumberFormatException invalid) {
+      throw new IllegalArgumentException(
+          "pageSize must be an integer between 1 and " + TermBindingPage.MAX_PAGE_SIZE, invalid);
+    }
   }
 
   /** Optional query parameters for browsing glossary terms. Combine filters to narrow the list. */

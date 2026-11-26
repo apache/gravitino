@@ -23,7 +23,9 @@ import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Base64;
+import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -31,14 +33,16 @@ import org.apache.gravitino.glossary.GlossaryManager.BindingCursor;
 import org.apache.gravitino.json.JsonUtils;
 
 /**
- * Authenticated, opaque continuations for glossary binding scans. Shared by all requests on a
- * server.
+ * Encodes the scan position produced by {@code GET /terms/{term}/objects} as a client-facing page
+ * token. A position can refer to an object hidden from the caller, even on an empty page. Encrypt
+ * and authenticate it before returning it. The manager rechecks authorization on every request.
  */
 public final class BindingPageTokens {
   private static final int IV_SIZE = 12;
   private static final int KEY_SIZE = 32;
   private static final int TAG_BITS = 128;
   private static final String PREFIX = "b1.";
+  private static final int MAX_TOKEN_LENGTH = 4096;
   private final SecureRandom random = new SecureRandom();
   private final SecretKey key;
 
@@ -79,7 +83,7 @@ public final class BindingPageTokens {
   }
 
   BindingCursor decode(String token) {
-    if (!token.startsWith(PREFIX) || token.length() > 4096) {
+    if (!token.startsWith(PREFIX) || token.length() > MAX_TOKEN_LENGTH) {
       throw invalidToken();
     }
     try {
@@ -93,8 +97,13 @@ public final class BindingPageTokens {
           cipher(Cipher.DECRYPT_MODE, Arrays.copyOf(bytes, IV_SIZE))
               .doFinal(bytes, IV_SIZE, bytes.length - IV_SIZE);
       return JsonUtils.objectMapper().readValue(content, BindingCursor.class);
-    } catch (GeneralSecurityException | IOException | IllegalArgumentException e) {
+    } catch (BadPaddingException
+        | IllegalBlockSizeException
+        | IOException
+        | IllegalArgumentException invalid) {
       throw invalidToken();
+    } catch (GeneralSecurityException failure) {
+      throw new IllegalStateException("Cannot decode glossary binding continuation", failure);
     }
   }
 
@@ -105,6 +114,7 @@ public final class BindingPageTokens {
   }
 
   private static IllegalArgumentException invalidToken() {
-    return new IllegalArgumentException("Invalid glossary binding pageToken");
+    return new IllegalArgumentException(
+        "Invalid glossary binding pageToken; restart without pageToken");
   }
 }

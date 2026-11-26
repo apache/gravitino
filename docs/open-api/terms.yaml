@@ -292,7 +292,8 @@ paths:
           description: >-
             Continue with the same filters even after an empty page. Each request examines at
             most 1,000 candidates. Changed filters or an invalid token return 400. A changed
-            visible term identity or revision returns 409 and requires restarting the scan.
+            visible term identity or revision returns 409. Restart without pageToken after a
+            conflict or after the server's token key changes.
           schema:
             type: string
         - in: query
@@ -326,7 +327,10 @@ paths:
       - in: path
         name: type
         required: true
-        description: Metadata object type, ignoring case.
+        description: >-
+          Accepts CATALOG, SCHEMA, TABLE, VIEW, COLUMN, FILESET, TOPIC and MODEL, ignoring case.
+          GET also accepts SEMANTIC_MODEL. A semantic model has no direct terms; use children=true
+          to read its metrics or the named metric endpoint to change their bindings.
         schema:
           type: string
       - in: path
@@ -509,20 +513,27 @@ components:
           required: [code, names]
     TermsAssociateRequest:
       type: object
+      description: Supply at least one array. An omitted or null side requests no changes on that side.
       anyOf:
         - required: [termsToAdd]
+          properties:
+            termsToAdd:
+              type: array
         - required: [termsToRemove]
+          properties:
+            termsToRemove:
+              type: array
       properties:
         termsToAdd:
-          type: array
-          items:
-            type: string
-            minLength: 1
+          $ref: "#/components/schemas/OptionalTermNames"
         termsToRemove:
-          type: array
-          items:
-            type: string
-            minLength: 1
+          $ref: "#/components/schemas/OptionalTermNames"
+    OptionalTermNames:
+      type: array
+      nullable: true
+      items:
+        type: string
+        pattern: '\S'
     TermBindingListResponse:
       type: object
       required: [code, bindings]
@@ -532,23 +543,53 @@ components:
           enum: [0]
         bindings:
           type: array
+          maxItems: 100
           items:
             $ref: "#/components/schemas/TermBinding"
         nextPageToken:
           type: string
+          minLength: 1
+          pattern: '\S'
           description: Present while more candidates remain. Bound to the term, its revision and the filters.
     TermBinding:
       type: object
       required: [kind, object]
       properties:
-        kind:
-          type: string
-          enum: [IMPLEMENTED_BY, USED_BY]
         object:
-          $ref: ./tags.yaml#/components/schemas/MetadataObject
-        metric:
-          type: string
-          description: Exact metric name for USED_BY bindings.
+          allOf:
+            - $ref: ./tags.yaml#/components/schemas/MetadataObject
+            - type: object
+              required: [fullName, type]
+      oneOf:
+        - type: object
+          properties:
+            kind:
+              type: string
+              enum: [IMPLEMENTED_BY]
+            object:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [CATALOG, SCHEMA, TABLE, VIEW, COLUMN, FILESET, TOPIC, MODEL]
+          not:
+            required: [metric]
+        - type: object
+          required: [metric]
+          properties:
+            kind:
+              type: string
+              enum: [USED_BY]
+            object:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [SEMANTIC_MODEL]
+            metric:
+              type: string
+              pattern: '\S'
+              description: Exact metric name in the containing semantic model.
     ObjectTermsResponse:
       type: object
       required: [code, terms, children]
@@ -568,8 +609,10 @@ components:
             properties:
               name:
                 type: string
+                pattern: '\S'
               terms:
                 type: array
+                minItems: 1
                 items:
                   $ref: "#/components/schemas/Term"
     TermStatusInput:
