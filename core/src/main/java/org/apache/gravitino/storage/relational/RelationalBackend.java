@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
@@ -39,6 +40,8 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelRevision;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 
 /** Interface defining the operations for a Relation Backend. */
 public interface RelationalBackend
@@ -57,8 +60,6 @@ public interface RelationalBackend
     return get(identifier, Entity.EntityType.TABLE).id();
   }
 
-<<<<<<< HEAD
-=======
   /** Loads a retained Semantic Model snapshot or the latest saved revision. */
   default SemanticModelEntity loadSemanticModelRevision(
       NameIdentifier ident, SemanticModelRevisionSelector selector) throws IOException {
@@ -77,7 +78,6 @@ public interface RelationalBackend
     throw new UnsupportedOperationException("Publishing Semantic Model revisions is not supported");
   }
 
->>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
   /** Lists model identities for governance, irrespective of publication state. */
   default List<NameIdentifier> listSemanticModelIdentifiers(Namespace namespace)
       throws IOException {
@@ -85,6 +85,16 @@ public interface RelationalBackend
         .stream()
         .map(SemanticModelEntity::nameIdentifier)
         .toList();
+  }
+
+  /** Applies a Semantic Model update with an optional revision precondition. */
+  default SemanticModelEntity updateSemanticModel(
+      NameIdentifier ident,
+      @Nullable Integer expectedRevision,
+      boolean rename,
+      Function<SemanticModelEntity, SemanticModelEntity> updater)
+      throws IOException {
+    return update(ident, Entity.EntityType.SEMANTIC_MODEL, updater);
   }
 
   /**

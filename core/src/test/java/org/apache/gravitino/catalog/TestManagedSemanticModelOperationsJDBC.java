@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -47,12 +48,9 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
-<<<<<<< HEAD
-=======
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelRevisionException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
->>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.meta.TableEntity;
@@ -66,6 +64,8 @@ import org.apache.gravitino.semantic.Relationship;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelRevision;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.semantic.SemanticModelSource;
 import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -149,10 +149,6 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
 
     assertNotSame(created, loaded);
     assertEquals(created, loaded);
-    assertEquals(1, loaded.revision());
-    assertEquals(SemanticModel.Status.PUBLISHED, loaded.status());
-    assertEquals(loaded.auditInfo().creator(), loaded.publishedBy());
-    assertEquals(loaded.auditInfo().createTime(), loaded.publishedAt());
     assertEquals(definition, loaded.definition());
     assertEquals(1, writeValidationCount.get());
     assertTrue(backend.exists(modelIdent, Entity.EntityType.SEMANTIC_MODEL));
@@ -176,18 +172,20 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
     NameIdentifier renamedIdent = NameIdentifier.of(modelIdent.namespace(), "renamed_sales_model");
     SemanticModelDefinition replacement = definition("invoices");
 
+    operations.alterSemanticModel(
+        modelIdent,
+        SemanticModelSourceUpdate.preserve(),
+        SemanticModelChange.rename(renamedIdent.name()));
     SemanticModel altered =
         operations.alterSemanticModel(
-            modelIdent,
+            renamedIdent,
             sources(replacement),
-            SemanticModelChange.rename(renamedIdent.name()),
+            1,
             SemanticModelChange.updateComment("Updated"),
             SemanticModelChange.removeProperty("domain"),
             SemanticModelChange.setProperty("tier", "gold"),
             SemanticModelChange.replaceDefinition(replacement));
 
-    assertEquals(2, altered.revision());
-    assertEquals(SemanticModel.Status.PUBLISHED, altered.status());
     assertEquals(renamedIdent.name(), altered.name());
     assertEquals("Updated", altered.comment());
     assertEquals(replacement, altered.definition());
@@ -239,6 +237,7 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
             operations.alterSemanticModel(
                 modelIdent,
                 sources(duplicateDatasets),
+                1,
                 SemanticModelChange.updateComment("Must not persist"),
                 SemanticModelChange.setProperty("owner", "changed"),
                 SemanticModelChange.replaceDefinition(duplicateDatasets)));
@@ -293,7 +292,10 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
     operations.alterSemanticModel(
         modelIdent,
         SemanticModelSourceUpdate.preserve(),
-        SemanticModelChange.rename(renamedIdent.name()),
+        SemanticModelChange.rename(renamedIdent.name()));
+    operations.alterSemanticModel(
+        renamedIdent,
+        SemanticModelSourceUpdate.preserve(),
         SemanticModelChange.updateComment("updated after deletion"),
         SemanticModelChange.setProperty("owner", "analytics"));
     assertEquals(original, liveAssociations(created.id()));
@@ -309,6 +311,7 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
             operations.alterSemanticModel(
                 renamedIdent,
                 SemanticModelSourceUpdate.preserve(),
+                1,
                 SemanticModelChange.replaceDefinition(definition)));
     assertThrows(
         IllegalArgumentException.class,
@@ -319,7 +322,7 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
 
     // Explicit replacement rebinds the source even though the definition is unchanged.
     operations.alterSemanticModel(
-        renamedIdent, rebound, SemanticModelChange.replaceDefinition(definition));
+        renamedIdent, rebound, 2, SemanticModelChange.replaceDefinition(definition));
     assertEquals(
         rebound.sources(),
         liveAssociations(created.id()).stream().map(Association::source).toList());
@@ -363,7 +366,10 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
     assertNotEquals(source.id(), recreated.id());
 
     operations.alterSemanticModel(
-        modelIdent, resolvedUpdate, SemanticModelChange.replaceDefinition(replacementDefinition));
+        modelIdent,
+        resolvedUpdate,
+        1,
+        SemanticModelChange.replaceDefinition(replacementDefinition));
 
     assertEquals(replacementDefinition, operations.loadSemanticModel(modelIdent).definition());
     assertEquals(
@@ -372,8 +378,6 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
     assertEquals(2, writeValidationCount.get());
   }
 
-<<<<<<< HEAD
-=======
   @TestTemplate
   void testRevisionHistoryAndConditionalAlter() {
     SemanticModelDefinition original = definition("orders");
@@ -578,7 +582,6 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
         .toArray();
   }
 
->>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
   private static Set<String> metricIdentities(long modelId) {
     return SessionUtils.getWithoutCommit(
             SemanticModelMetricMapper.class,

@@ -72,6 +72,7 @@ import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.SemanticModelResponse;
+import org.apache.gravitino.dto.responses.SemanticModelRevisionListResponse;
 import org.apache.gravitino.dto.semantic.DatasetDTO;
 import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
@@ -116,6 +117,8 @@ import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelRevision;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.semantic.SemanticModelSource;
 import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
@@ -219,12 +222,9 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     Table table = registeredTable();
     when(tables.loadTable(any())).thenReturn(table);
     when(dispatcher.loadSemanticModel(any())).thenReturn(semanticModel("sales", null));
-<<<<<<< HEAD
-=======
     when(dispatcher.loadSemanticModelRevision(
             any(), eq(SemanticModelRevisionSelector.LATEST), any()))
         .thenReturn(semanticModel("sales", null));
->>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
     doCallRealMethod().when(dispatcher).importOssieDocument(any(), any(), any());
   }
 
@@ -629,13 +629,13 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     SemanticModelUpdatesRequest request =
         new SemanticModelUpdatesRequest(
             List.of(
-                new SemanticModelUpdateRequest.RenameSemanticModelRequest("sales_v2"),
                 new SemanticModelUpdateRequest.UpdateSemanticModelCommentRequest("Updated"),
                 new SemanticModelUpdateRequest.SetSemanticModelPropertyRequest("owner", "finance"),
                 new SemanticModelUpdateRequest.RemoveSemanticModelPropertyRequest("legacy"),
                 new SemanticModelUpdateRequest.ReplaceSemanticModelDefinitionRequest(
-                    SemanticModelDefinitionDTO.fromDefinition(replacement))));
-    when(dispatcher.alterSemanticModel(eq(ident), any(), any(SemanticModelChange[].class)))
+                    SemanticModelDefinitionDTO.fromDefinition(replacement))),
+            1);
+    when(dispatcher.alterSemanticModel(eq(ident), any(), any(), any(SemanticModelChange[].class)))
         .thenReturn(semanticModel("sales_v2", "Updated"));
 
     Response response = put(semanticModelPath() + "/sales", request);
@@ -647,16 +647,15 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
 
     ArgumentCaptor<SemanticModelChange[]> changesCaptor =
         ArgumentCaptor.forClass(SemanticModelChange[].class);
-    verify(dispatcher).alterSemanticModel(eq(ident), any(), changesCaptor.capture());
+    verify(dispatcher).alterSemanticModel(eq(ident), eq(1), any(), changesCaptor.capture());
     SemanticModelChange[] changes = changesCaptor.getValue();
-    Assertions.assertEquals(5, changes.length);
-    Assertions.assertInstanceOf(SemanticModelChange.RenameSemanticModel.class, changes[0]);
-    Assertions.assertInstanceOf(SemanticModelChange.UpdateComment.class, changes[1]);
-    Assertions.assertInstanceOf(SemanticModelChange.SetProperty.class, changes[2]);
-    Assertions.assertInstanceOf(SemanticModelChange.RemoveProperty.class, changes[3]);
-    Assertions.assertInstanceOf(SemanticModelChange.ReplaceDefinition.class, changes[4]);
+    Assertions.assertEquals(4, changes.length);
+    Assertions.assertInstanceOf(SemanticModelChange.UpdateComment.class, changes[0]);
+    Assertions.assertInstanceOf(SemanticModelChange.SetProperty.class, changes[1]);
+    Assertions.assertInstanceOf(SemanticModelChange.RemoveProperty.class, changes[2]);
+    Assertions.assertInstanceOf(SemanticModelChange.ReplaceDefinition.class, changes[3]);
     Assertions.assertEquals(
-        replacement, ((SemanticModelChange.ReplaceDefinition) changes[4]).getDefinition());
+        replacement, ((SemanticModelChange.ReplaceDefinition) changes[3]).getDefinition());
   }
 
   @Test
@@ -668,7 +667,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             List.of(
                 new SemanticModelUpdateRequest.UpdateSemanticModelCommentRequest("Updated"),
                 new SemanticModelUpdateRequest.ReplaceSemanticModelDefinitionRequest(
-                    invalidDefinition)));
+                    invalidDefinition)),
+            1);
 
     assertError(
         put(semanticModelPath() + "/sales", request),
@@ -682,12 +682,11 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   @Test
   void testMetadataOnlyAlterPreservesSourcesWithoutResolving() {
     sourceAuthorizer = mock(GravitinoAuthorizer.class);
-    when(dispatcher.alterSemanticModel(any(), any(), any(SemanticModelChange[].class)))
+    when(dispatcher.alterSemanticModel(any(), any(), any(), any(SemanticModelChange[].class)))
         .thenReturn(semanticModel("renamed", "Updated"));
     SemanticModelUpdatesRequest request =
         new SemanticModelUpdatesRequest(
             List.of(
-                new SemanticModelUpdateRequest.RenameSemanticModelRequest("renamed"),
                 new SemanticModelUpdateRequest.UpdateSemanticModelCommentRequest("Updated"),
                 new SemanticModelUpdateRequest.SetSemanticModelPropertyRequest("owner", "sales"),
                 new SemanticModelUpdateRequest.RemoveSemanticModelPropertyRequest("legacy")));
@@ -698,6 +697,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     verify(dispatcher)
         .alterSemanticModel(
             eq(semanticModelIdentifier("sales")),
+            eq(null),
             eq(SemanticModelSourceUpdate.preserve()),
             any(SemanticModelChange[].class));
     verifyNoInteractions(tables, views, sourceAuthorizer);
@@ -713,7 +713,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             .build();
     when(dispatcher.createSemanticModel(any(), any(), any(), any(), any()))
         .thenReturn(semanticModel("sales", null));
-    when(dispatcher.alterSemanticModel(any(), any(), any(SemanticModelChange[].class)))
+    when(dispatcher.alterSemanticModel(any(), any(), any(), any(SemanticModelChange[].class)))
         .thenReturn(semanticModel("sales", null));
     Assertions.assertEquals(
         Response.Status.OK.getStatusCode(), writeDefinition(false, original).getStatus());
@@ -750,6 +750,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     verify(dispatcher)
         .alterSemanticModel(
             any(),
+            eq(1),
             eq(
                 SemanticModelSourceUpdate.replace(
                     List.of(new SemanticModelSource("orders", EntityType.TABLE, 202L)))),
@@ -759,7 +760,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
 
   @Test
   void testBatchReplacementUsesFinalDefinitionAssociations() {
-    when(dispatcher.alterSemanticModel(any(), any(), any(SemanticModelChange[].class)))
+    when(dispatcher.alterSemanticModel(any(), any(), any(), any(SemanticModelChange[].class)))
         .thenReturn(semanticModel("sales", null));
     SemanticModelDefinition finalDefinition =
         SemanticModelDefinition.builder()
@@ -779,7 +780,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
                 new SemanticModelUpdateRequest.UpdateSemanticModelCommentRequest("Updated"),
                 new SemanticModelUpdateRequest.ReplaceSemanticModelDefinitionRequest(
                     SemanticModelDefinitionDTO.fromDefinition(finalDefinition)),
-                new SemanticModelUpdateRequest.SetSemanticModelPropertyRequest("owner", "sales")));
+                new SemanticModelUpdateRequest.SetSemanticModelPropertyRequest("owner", "sales")),
+            1);
 
     Assertions.assertEquals(
         Response.Status.OK.getStatusCode(),
@@ -787,6 +789,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     verify(dispatcher)
         .alterSemanticModel(
             any(),
+            eq(1),
             eq(
                 SemanticModelSourceUpdate.replace(
                     List.of(new SemanticModelSource("Final.Alias", EntityType.TABLE, 101L)))),
@@ -794,8 +797,6 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   }
 
   @Test
-<<<<<<< HEAD
-=======
   void testRevisionEndpointsReturnSnapshotMetadata() {
     NameIdentifier ident = semanticModelIdentifier("sales");
     SemanticModel published = semanticModel("sales", "First save");
@@ -977,7 +978,6 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   }
 
   @Test
->>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
   void testAlterSemanticModelRejectsNullBody() {
     assertError(
         putJson(semanticModelPath() + "/sales", "null"),
@@ -997,7 +997,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
 
     doThrow(new NoSuchSemanticModelException("sales does not exist"))
         .when(dispatcher)
-        .alterSemanticModel(eq(ident), any(), any(SemanticModelChange[].class));
+        .alterSemanticModel(eq(ident), any(), any(), any(SemanticModelChange[].class));
     assertError(
         put(semanticModelPath() + "/sales", request),
         Response.Status.NOT_FOUND,
@@ -1007,7 +1007,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
 
     doThrow(new OptimisticLockException("sales changed in this transaction"))
         .when(dispatcher)
-        .alterSemanticModel(eq(ident), any(), any(SemanticModelChange[].class));
+        .alterSemanticModel(eq(ident), any(), any(), any(SemanticModelChange[].class));
     assertError(
         put(semanticModelPath() + "/sales", request),
         Response.Status.CONFLICT,
@@ -1178,12 +1178,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void testMissingModelBeforeSourceValidation(boolean unavailableSource) {
-<<<<<<< HEAD
-    when(dispatcher.loadSemanticModel(semanticModelIdentifier("sales")))
-=======
     when(dispatcher.loadSemanticModelRevision(
             eq(semanticModelIdentifier("sales")), eq(SemanticModelRevisionSelector.LATEST), any()))
->>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
         .thenThrow(new NoSuchSemanticModelException("sales does not exist"));
     when(tables.loadTable(any()))
         .thenThrow(
@@ -1211,7 +1207,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     when(tables.loadTable(any())).thenReturn(table);
     when(dispatcher.createSemanticModel(any(), any(), any(), any(), any()))
         .thenReturn(semanticModel("sales", null));
-    when(dispatcher.alterSemanticModel(any(), any(), any(SemanticModelChange[].class)))
+    when(dispatcher.alterSemanticModel(any(), any(), any(), any(SemanticModelChange[].class)))
         .thenReturn(semanticModel("sales", null));
     Assertions.assertEquals(
         Response.Status.OK.getStatusCode(),
@@ -1277,7 +1273,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     }
     when(dispatcher.createSemanticModel(any(), any(), any(), any(), any()))
         .thenReturn(semanticModel("sales", null));
-    when(dispatcher.alterSemanticModel(any(), any(), any(SemanticModelChange[].class)))
+    when(dispatcher.alterSemanticModel(any(), any(), any(), any(SemanticModelChange[].class)))
         .thenReturn(semanticModel("sales", null));
     Response response = writeDefinition(replaceDefinition, definition);
     if (segment == 0) {
@@ -1295,7 +1291,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
       // Characterize existing behavior: resolvable names are not rejected solely for whitespace.
       Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
       if (replaceDefinition) {
-        verify(dispatcher).alterSemanticModel(any(), any(), any(SemanticModelChange[].class));
+        verify(dispatcher)
+            .alterSemanticModel(any(), any(), any(), any(SemanticModelChange[].class));
       } else {
         verify(dispatcher).createSemanticModel(any(), any(), eq(definition), any(), any());
       }
@@ -1334,7 +1331,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   private void verifyNoModelWrites() {
     verify(dispatcher, never()).createSemanticModel(any(), any(), any(), any(), any());
     verify(dispatcher, never()).importSemanticModel(any(), any(), any(), any(), any());
-    verify(dispatcher, never()).alterSemanticModel(any(), any(), any(SemanticModelChange[].class));
+    verify(dispatcher, never())
+        .alterSemanticModel(any(), any(), any(), any(SemanticModelChange[].class));
   }
 
   private Response writeDefinition(boolean replaceDefinition, SemanticModelDefinition definition) {
@@ -1344,7 +1342,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             new SemanticModelUpdatesRequest(
                 List.of(
                     new SemanticModelUpdateRequest.ReplaceSemanticModelDefinitionRequest(
-                        SemanticModelDefinitionDTO.fromDefinition(definition)))))
+                        SemanticModelDefinitionDTO.fromDefinition(definition))),
+                1))
         : post(semanticModelPath(), createRequest("sales", null, definition));
   }
 
@@ -1537,17 +1536,12 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   @Test
   void testExportOssieYamlAndJsonDocuments() {
     NameIdentifier ident = semanticModelIdentifier("sales");
-<<<<<<< HEAD
-    when(dispatcher.exportOssieDocument(ident, OssieFormat.YAML)).thenReturn(EXPORTED_YAML);
-    when(dispatcher.exportOssieDocument(ident, OssieFormat.JSON)).thenReturn(EXPORTED_JSON);
-=======
     when(dispatcher.exportSemanticModel(
             eq(ident), eq(SemanticModelRevisionSelector.ACTIVE), eq(OssieFormat.YAML), any()))
         .thenReturn(new SemanticModelDispatcher.SemanticModelExport(EXPORTED_YAML, 1));
     when(dispatcher.exportSemanticModel(
             eq(ident), eq(SemanticModelRevisionSelector.ACTIVE), eq(OssieFormat.JSON), any()))
         .thenReturn(new SemanticModelDispatcher.SemanticModelExport(EXPORTED_JSON, 1));
->>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
 
     Response yamlResponse = getOssie(semanticModelPath() + "/sales/ossie");
 
@@ -1570,17 +1564,12 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         "attachment; filename=\"sales.ossie.json\"",
         jsonResponse.getHeaderString("Content-Disposition"));
     Assertions.assertEquals(EXPORTED_JSON.content(), jsonResponse.readEntity(String.class));
-<<<<<<< HEAD
-    verify(dispatcher).exportOssieDocument(ident, OssieFormat.YAML);
-    verify(dispatcher).exportOssieDocument(ident, OssieFormat.JSON);
-=======
     verify(dispatcher)
         .exportSemanticModel(
             eq(ident), eq(SemanticModelRevisionSelector.ACTIVE), eq(OssieFormat.YAML), any());
     verify(dispatcher)
         .exportSemanticModel(
             eq(ident), eq(SemanticModelRevisionSelector.ACTIVE), eq(OssieFormat.JSON), any());
->>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
     verifyNoMoreInteractions(dispatcher);
   }
 
@@ -1676,31 +1665,23 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   void testOssieExportPropagatesDispatcherErrors() {
     doThrow(new NoSuchSemanticModelException("sales does not exist"))
         .when(dispatcher)
-<<<<<<< HEAD
-        .exportOssieDocument(semanticModelIdentifier("sales"), OssieFormat.YAML);
-=======
         .exportSemanticModel(
             eq(semanticModelIdentifier("sales")),
             eq(SemanticModelRevisionSelector.ACTIVE),
             eq(OssieFormat.YAML),
             any());
->>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
     assertError(
         getOssie(semanticModelPath() + "/sales/ossie"),
         Response.Status.NOT_FOUND,
         ErrorConstants.NOT_FOUND_CODE,
         NoSuchSemanticModelException.class.getSimpleName(),
         "sales does not exist");
-<<<<<<< HEAD
-    verify(dispatcher).exportOssieDocument(semanticModelIdentifier("sales"), OssieFormat.YAML);
-=======
     verify(dispatcher)
         .exportSemanticModel(
             eq(semanticModelIdentifier("sales")),
             eq(SemanticModelRevisionSelector.ACTIVE),
             eq(OssieFormat.YAML),
             any());
->>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
     verifyNoMoreInteractions(dispatcher);
   }
 
@@ -1765,12 +1746,6 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   void testExportEmitsDedicatedEventsWithoutSourceLookup(boolean missing) {
     NameIdentifier ident = semanticModelIdentifier("sales");
     if (missing) {
-<<<<<<< HEAD
-      when(dispatcher.exportOssieDocument(ident, OssieFormat.YAML))
-          .thenThrow(new NoSuchSemanticModelException("missing model"));
-    } else {
-      when(dispatcher.exportOssieDocument(ident, OssieFormat.YAML)).thenReturn(EXPORTED_YAML);
-=======
       when(dispatcher.exportSemanticModel(
               eq(ident), eq(SemanticModelRevisionSelector.ACTIVE), eq(OssieFormat.YAML), any()))
           .thenThrow(new NoSuchSemanticModelException("missing model"));
@@ -1778,7 +1753,6 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
       when(dispatcher.exportSemanticModel(
               eq(ident), eq(SemanticModelRevisionSelector.ACTIVE), eq(OssieFormat.YAML), any()))
           .thenReturn(new SemanticModelDispatcher.SemanticModelExport(EXPORTED_YAML, 1));
->>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
     }
     try (Response response = getOssie(semanticModelPath() + "/sales/ossie")) {
       Assertions.assertEquals(missing ? 404 : 200, response.getStatus());
@@ -1791,13 +1765,9 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         events.getAllValues().get(1).getClass());
     verifyNoInteractions(tables, views);
     verifyNoModelWrites();
-<<<<<<< HEAD
-    verify(dispatcher).exportOssieDocument(ident, OssieFormat.YAML);
-=======
     verify(dispatcher)
         .exportSemanticModel(
             eq(ident), eq(SemanticModelRevisionSelector.ACTIVE), eq(OssieFormat.YAML), any());
->>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
     verifyNoMoreInteractions(dispatcher);
   }
 
@@ -1811,8 +1781,14 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   }
 
   private SemanticModel semanticModel(String name, String comment) {
+    return semanticModel(name, comment, 1, SemanticModel.Status.PUBLISHED);
+  }
+
+  private SemanticModel semanticModel(
+      String name, String comment, int revision, SemanticModel.Status status) {
     return SemanticModelEntity.builder()
         .withId(1L)
+        .withRevision(revision, status, null, null)
         .withName(name)
         .withNamespace(namespace)
         .withComment(comment)

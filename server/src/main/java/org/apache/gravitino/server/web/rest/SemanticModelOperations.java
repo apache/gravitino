@@ -52,19 +52,20 @@ import org.apache.gravitino.dto.requests.SemanticModelUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.SemanticModelResponse;
+import org.apache.gravitino.dto.responses.SemanticModelRevisionListResponse;
+import org.apache.gravitino.dto.semantic.SemanticModelRevisionDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
-<<<<<<< HEAD
-=======
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelRevisionException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
->>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.semantic.OssieDocument;
 import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelRevision;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
@@ -359,9 +360,16 @@ public class SemanticModelOperations {
                 request.getUpdates().stream()
                     .map(SemanticModelUpdateRequest::semanticModelChange)
                     .toArray(SemanticModelChange[]::new);
+            Integer expectedRevision = request.getExpectedRevision();
             if (Arrays.stream(changes)
                 .anyMatch(change -> change instanceof SemanticModelChange.ReplaceDefinition)) {
-              dispatcher.loadSemanticModel(ident);
+              SemanticModel latest =
+                  dispatcher.loadSemanticModelRevision(ident, SemanticModelRevisionSelector.LATEST);
+              if (latest.revision() != expectedRevision) {
+                throw new OptimisticLockException(
+                    "Semantic Model %s is at revision %s, expected %s",
+                    ident, latest.revision(), expectedRevision);
+              }
             }
             SemanticModelSourceUpdate sourceUpdate = SemanticModelSourceUpdate.preserve();
             for (SemanticModelChange change : changes) {
@@ -371,7 +379,8 @@ public class SemanticModelOperations {
                         metalake, ((SemanticModelChange.ReplaceDefinition) change).getDefinition());
               }
             }
-            SemanticModel altered = dispatcher.alterSemanticModel(ident, sourceUpdate, changes);
+            SemanticModel altered =
+                dispatcher.alterSemanticModel(ident, expectedRevision, sourceUpdate, changes);
             LOG.info(
                 "Semantic Model altered: {}.{}.{}.{}", metalake, catalog, schema, altered.name());
             return Utils.ok(new SemanticModelResponse(DTOConverters.toDTO(altered)));
@@ -474,15 +483,7 @@ public class SemanticModelOperations {
             NameIdentifier ident =
                 NameIdentifierUtil.ofSemanticModel(metalake, catalog, schema, semanticModel);
             OssieDocument document = dispatcher.exportOssieDocument(ident, outputFormat);
-            String mediaType =
-                document.format() == OssieFormat.JSON
-                    ? MediaType.APPLICATION_JSON
-                    : OSSIE_YAML_MEDIA_TYPE;
-            return Response.ok(document.content(), mediaType)
-                .header(
-                    "Content-Disposition",
-                    ossieContentDisposition(semanticModel, document.format()))
-                .build();
+            return ossieExportResponse(semanticModel, document);
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleSemanticModelException(
@@ -490,8 +491,6 @@ public class SemanticModelOperations {
     }
   }
 
-<<<<<<< HEAD
-=======
   /** Lists the model's retained revisions visible to the current caller. */
   @GET
   @Path("{semanticModel}/revisions")
@@ -638,7 +637,6 @@ public class SemanticModelOperations {
         .build();
   }
 
->>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
   private SemanticModel createSemanticModelEntity(
       String metalake, String catalog, String schema, SemanticModelCreateRequest request) {
     request.validate();

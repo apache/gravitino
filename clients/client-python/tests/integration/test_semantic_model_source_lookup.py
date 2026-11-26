@@ -153,7 +153,9 @@ class TestSemanticModelSourceLookup(IntegrationTestEnv):
         self.assertEqual(expected, self._lookup(renamed))
         replacement = self._definition("orders_v2", "orders.raw")
         self.models.alter_semantic_model(
-            identifier, SemanticModelChange.replace_definition(replacement)
+            identifier,
+            SemanticModelChange.replace_definition(replacement),
+            expected_revision=self.models.load_semantic_model(identifier).revision(),
         )
         tables.drop_table(NameIdentifier.of("raw", "orders_v2"))
         with self.assertRaises(NoSuchMetadataObjectException):
@@ -165,7 +167,9 @@ class TestSemanticModelSourceLookup(IntegrationTestEnv):
         )
         self.assertEqual([], self._lookup(recreated))
         self.models.alter_semantic_model(
-            identifier, SemanticModelChange.replace_definition(replacement)
+            identifier,
+            SemanticModelChange.replace_definition(replacement),
+            expected_revision=self.models.load_semantic_model(identifier).revision(),
         )
         self.assertEqual(expected, self._lookup(recreated))
         self.models.drop_semantic_model(identifier)

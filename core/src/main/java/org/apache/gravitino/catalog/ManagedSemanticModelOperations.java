@@ -42,6 +42,7 @@ import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SemanticModelEntity;
@@ -50,12 +51,9 @@ import org.apache.gravitino.semantic.SemanticModel.Status;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
-<<<<<<< HEAD
-=======
 import org.apache.gravitino.semantic.SemanticModelPublicationPolicy;
 import org.apache.gravitino.semantic.SemanticModelRevision;
 import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
->>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
 import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -187,6 +185,18 @@ public class ManagedSemanticModelOperations {
     }
   }
 
+  /** Loads the requested retained snapshot. */
+  public SemanticModel loadSemanticModelRevision(
+      NameIdentifier ident, SemanticModelRevisionSelector selector) {
+    try {
+      return store.loadSemanticModelRevision(ident, selector);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchSemanticModelException(e, "Semantic Model %s does not exist", ident);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to load Semantic Model revision for " + ident, e);
+    }
+  }
+
   /** Returns whether the identity exists, even when the model has no active revision. */
   public boolean semanticModelExists(NameIdentifier ident) {
     try {
@@ -196,8 +206,6 @@ public class ManagedSemanticModelOperations {
     }
   }
 
-<<<<<<< HEAD
-=======
   /** Lists retained revision summaries for the requested model. */
   public SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident) {
     try {
@@ -221,7 +229,6 @@ public class ManagedSemanticModelOperations {
     }
   }
 
->>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
   /**
    * Creates a model with its validated source associations.
    *
@@ -297,20 +304,32 @@ public class ManagedSemanticModelOperations {
       NameIdentifier ident, SemanticModelSourceUpdate sourceUpdate, SemanticModelChange... changes)
       throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
+    return alterSemanticModel(ident, sourceUpdate, null, changes);
+  }
+
+  /** Applies changes to latest, optionally requiring the caller's expected revision. */
+  public SemanticModel alterSemanticModel(
+      NameIdentifier ident,
+      SemanticModelSourceUpdate sourceUpdate,
+      @Nullable Integer expectedRevision,
+      SemanticModelChange... changes) {
     boolean validateForWrite = requiresWriteValidation(changes);
+    Preconditions.checkArgument(
+        expectedRevision == null || expectedRevision > 0, "expectedRevision must be positive");
+    Preconditions.checkArgument(
+        !validateForWrite || expectedRevision != null,
+        "expectedRevision is required when replacing the definition");
+    boolean rename = changes[0] instanceof SemanticModelChange.RenameSemanticModel;
     Preconditions.checkArgument(
         validateForWrite == sourceUpdate.replacesSources(),
         "Definition replacement must replace sources; metadata-only changes must preserve sources");
 
     try {
-      return store.update(
+      return store.updateSemanticModel(
           ident,
-          SemanticModelEntity.class,
-          Entity.EntityType.SEMANTIC_MODEL,
+          expectedRevision,
+          rename,
           oldEntity -> {
-<<<<<<< HEAD
-            SemanticModelEntity candidate = applyChanges(oldEntity, sourceUpdate, changes);
-=======
             if (expectedRevision != null && oldEntity.revision() != expectedRevision) {
               throw new OptimisticLockException(
                   "Semantic Model %s is at revision %s, expected %s",
@@ -323,7 +342,6 @@ public class ManagedSemanticModelOperations {
                     rename,
                     !rename && publicationPolicy.publishOnSave(ident),
                     changes);
->>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
             if (validateForWrite) {
               NameIdentifier candidateIdent =
                   NameIdentifier.of(candidate.namespace(), candidate.name());
@@ -379,8 +397,10 @@ public class ManagedSemanticModelOperations {
 
       if (change instanceof SemanticModelChange.ReplaceDefinition) {
         requiresWriteValidation = true;
-      } else if (change instanceof SemanticModelChange.RenameSemanticModel
-          || change instanceof SemanticModelChange.UpdateComment
+      } else if (change instanceof SemanticModelChange.RenameSemanticModel) {
+        Preconditions.checkArgument(
+            changes.length == 1, "Rename must be the only Semantic Model change");
+      } else if (change instanceof SemanticModelChange.UpdateComment
           || change instanceof SemanticModelChange.SetProperty
           || change instanceof SemanticModelChange.RemoveProperty) {
         // These changes do not modify the definition and must not revisit its sources.
@@ -395,11 +415,8 @@ public class ManagedSemanticModelOperations {
   private static SemanticModelEntity applyChanges(
       SemanticModelEntity oldEntity,
       SemanticModelSourceUpdate sourceUpdate,
-<<<<<<< HEAD
-=======
       boolean rename,
       boolean publish,
->>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
       SemanticModelChange[] changes) {
     String newName = oldEntity.name();
     String newComment = oldEntity.comment();
@@ -424,25 +441,6 @@ public class ManagedSemanticModelOperations {
     AuditInfo oldAudit = oldEntity.auditInfo();
     Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
     String writer = PrincipalUtils.getCurrentUserName();
-<<<<<<< HEAD
-    return SemanticModelEntity.builder()
-        .withId(oldEntity.id())
-        .withName(newName)
-        .withNamespace(oldEntity.namespace())
-        .withComment(newComment)
-        .withDefinition(newDefinition)
-        .withSourceUpdate(sourceUpdate)
-        .withProperties(newProperties)
-        .withRevision(Math.incrementExact(oldEntity.revision()), Status.PUBLISHED, writer, now)
-        .withAuditInfo(
-            AuditInfo.builder()
-                .withCreator(oldAudit.creator())
-                .withCreateTime(oldAudit.createTime())
-                .withLastModifier(writer)
-                .withLastModifiedTime(now)
-                .build())
-        .build();
-=======
     SemanticModelEntity.Builder builder =
         SemanticModelEntity.builder()
             .withId(oldEntity.id())
@@ -473,7 +471,6 @@ public class ManagedSemanticModelOperations {
           publish ? now : null);
     }
     return builder.build();
->>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
   }
 
   private static SemanticModelPublicationPolicy loadPublicationPolicy() {

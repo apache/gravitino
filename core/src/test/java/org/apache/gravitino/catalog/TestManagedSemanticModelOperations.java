@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -188,6 +189,7 @@ public class TestManagedSemanticModelOperations {
             operations.alterSemanticModel(
                 IDENT,
                 missing,
+                1,
                 SemanticModelChange.updateComment("Must not persist"),
                 SemanticModelChange.replaceDefinition(definition)));
     assertSame(original, operations.loadSemanticModel(IDENT));
@@ -285,11 +287,15 @@ public class TestManagedSemanticModelOperations {
 
     NameIdentifier renamedIdent = NameIdentifier.of(NAMESPACE, "renamed_sales_model");
     SemanticModelDefinition replacement = definition("invoices");
+    operations.alterSemanticModel(
+        IDENT,
+        SemanticModelSourceUpdate.preserve(),
+        SemanticModelChange.rename(renamedIdent.name()));
     SemanticModel altered =
         operations.alterSemanticModel(
-            IDENT,
+            renamedIdent,
             sources(replacement),
-            SemanticModelChange.rename(renamedIdent.name()),
+            1,
             SemanticModelChange.updateComment("Updated"),
             SemanticModelChange.setProperty("tier", "gold"),
             SemanticModelChange.removeProperty("domain"),
@@ -345,7 +351,7 @@ public class TestManagedSemanticModelOperations {
 
     SemanticModelDefinition accepted = definition("accepted");
     operations.alterSemanticModel(
-        IDENT, sources(accepted), SemanticModelChange.replaceDefinition(accepted));
+        IDENT, sources(accepted), 3, SemanticModelChange.replaceDefinition(accepted));
     assertEquals(2, writeValidationCount.get());
 
     SemanticModelDefinition duplicateDatasets =
@@ -358,6 +364,7 @@ public class TestManagedSemanticModelOperations {
             operations.alterSemanticModel(
                 IDENT,
                 sources(duplicateDatasets),
+                4,
                 SemanticModelChange.replaceDefinition(duplicateDatasets)));
     assertEquals(2, writeValidationCount.get());
     assertEquals(accepted, operations.loadSemanticModel(IDENT).definition());
@@ -370,6 +377,7 @@ public class TestManagedSemanticModelOperations {
                 operations.alterSemanticModel(
                     IDENT,
                     sources(definition("blocked")),
+                    4,
                     SemanticModelChange.replaceDefinition(definition("blocked")))));
     assertEquals(3, writeValidationCount.get());
     assertEquals(accepted, operations.loadSemanticModel(IDENT).definition());
@@ -449,6 +457,7 @@ public class TestManagedSemanticModelOperations {
         operations.alterSemanticModel(
             IDENT,
             sources(second),
+            1,
             SemanticModelChange.replaceDefinition(first),
             SemanticModelChange.replaceDefinition(second));
     assertEquals(second, altered.definition());
@@ -466,6 +475,7 @@ public class TestManagedSemanticModelOperations {
             operations.alterSemanticModel(
                 IDENT,
                 sources(second),
+                altered.revision(),
                 SemanticModelChange.replaceDefinition(invalid),
                 SemanticModelChange.replaceDefinition(definition("orders"))));
     assertEquals(3, writeValidationCount.get());
@@ -491,14 +501,18 @@ public class TestManagedSemanticModelOperations {
     SemanticModelDefinition replacement = definition("invoices");
     NameIdentifier renamedIdent = NameIdentifier.of(NAMESPACE, "validated_after_replace");
 
+    operations.alterSemanticModel(
+        IDENT,
+        SemanticModelSourceUpdate.preserve(),
+        SemanticModelChange.rename(renamedIdent.name()));
     SemanticModel altered =
         operations.alterSemanticModel(
-            IDENT,
+            renamedIdent,
             sources(replacement),
+            1,
             SemanticModelChange.replaceDefinition(replacement),
             SemanticModelChange.setProperty("owner", "analytics"),
-            SemanticModelChange.updateComment("Updated after replacement"),
-            SemanticModelChange.rename(renamedIdent.name()));
+            SemanticModelChange.updateComment("Updated after replacement"));
 
     assertEquals(2, writeValidationCount.get());
     assertEquals(renamedIdent, validatedIdent.get());
@@ -618,8 +632,7 @@ public class TestManagedSemanticModelOperations {
 
     doThrow(new NoSuchEntityException("Missing model"))
         .when(store)
-        .update(
-            eq(IDENT), eq(SemanticModelEntity.class), eq(Entity.EntityType.SEMANTIC_MODEL), any());
+        .updateSemanticModel(eq(IDENT), eq(null), anyBoolean(), any());
     assertThrows(
         NoSuchSemanticModelException.class,
         () ->
@@ -629,8 +642,7 @@ public class TestManagedSemanticModelOperations {
                 SemanticModelChange.setProperty("key", "value")));
     doThrow(new EntityAlreadyExistsException("Rename conflict"))
         .when(store)
-        .update(
-            eq(IDENT), eq(SemanticModelEntity.class), eq(Entity.EntityType.SEMANTIC_MODEL), any());
+        .updateSemanticModel(eq(IDENT), eq(null), anyBoolean(), any());
     assertThrows(
         SemanticModelAlreadyExistsException.class,
         () ->
@@ -641,8 +653,7 @@ public class TestManagedSemanticModelOperations {
     IOException updateFailure = new IOException("Update failed");
     doThrow(updateFailure)
         .when(store)
-        .update(
-            eq(IDENT), eq(SemanticModelEntity.class), eq(Entity.EntityType.SEMANTIC_MODEL), any());
+        .updateSemanticModel(eq(IDENT), eq(null), anyBoolean(), any());
     assertSame(
         updateFailure,
         assertThrows(

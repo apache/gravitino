@@ -52,6 +52,7 @@ import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -176,14 +177,14 @@ public class TestSemanticModelNormalizeDispatcher {
     SemanticModel model = mock(SemanticModel.class);
     SemanticModelChange rename = SemanticModelChange.rename("RevenueModel");
     when(delegate.alterSemanticModel(
-            NORMALIZED_IDENT, SemanticModelSourceUpdate.preserve(), rename))
+            NORMALIZED_IDENT, null, SemanticModelSourceUpdate.preserve(), rename))
         .thenReturn(model);
 
     assertEquals(
         model,
         dispatcher.alterSemanticModel(INPUT_IDENT, SemanticModelSourceUpdate.preserve(), rename));
     verify(delegate)
-        .alterSemanticModel(NORMALIZED_IDENT, SemanticModelSourceUpdate.preserve(), rename);
+        .alterSemanticModel(NORMALIZED_IDENT, null, SemanticModelSourceUpdate.preserve(), rename);
 
     NameIdentifier invalidIdent = NameIdentifier.of(INPUT_NAMESPACE, "invalid model");
     assertThrows(
@@ -248,13 +249,6 @@ public class TestSemanticModelNormalizeDispatcher {
   @Test
   public void testOssieExportNormalizesAndForwardsWithoutLoading() {
     OssieDocument document = OssieDocument.json("{}");
-<<<<<<< HEAD
-    when(delegate.exportOssieDocument(NORMALIZED_IDENT, OssieFormat.JSON)).thenReturn(document);
-
-    assertSame(document, dispatcher.exportOssieDocument(INPUT_IDENT, OssieFormat.JSON));
-
-    verify(delegate).exportOssieDocument(NORMALIZED_IDENT, OssieFormat.JSON);
-=======
     when(delegate.exportSemanticModel(
             eq(NORMALIZED_IDENT),
             eq(SemanticModelRevisionSelector.ACTIVE),
@@ -270,7 +264,6 @@ public class TestSemanticModelNormalizeDispatcher {
             eq(SemanticModelRevisionSelector.ACTIVE),
             eq(OssieFormat.JSON),
             any());
->>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
     verifyNoMoreInteractions(delegate);
   }
 

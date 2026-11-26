@@ -26,18 +26,19 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelRevision;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.utils.Executable;
 
 public interface EntityStore extends Closeable {
 
-<<<<<<< HEAD
-=======
   /** Loads a retained Semantic Model snapshot or the latest saved revision. */
   default SemanticModelEntity loadSemanticModelRevision(
       NameIdentifier ident, SemanticModelRevisionSelector selector) throws IOException {
@@ -56,13 +57,22 @@ public interface EntityStore extends Closeable {
     throw new UnsupportedOperationException("Publishing Semantic Model revisions is not supported");
   }
 
->>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
   /** Lists model identities for governance, irrespective of publication state. */
   default List<NameIdentifier> listSemanticModelIdentifiers(Namespace namespace)
       throws IOException {
     return list(namespace, SemanticModelEntity.class, EntityType.SEMANTIC_MODEL).stream()
         .map(SemanticModelEntity::nameIdentifier)
         .toList();
+  }
+
+  /** Applies a Semantic Model update with an optional revision precondition. */
+  default SemanticModelEntity updateSemanticModel(
+      NameIdentifier ident,
+      @Nullable Integer expectedRevision,
+      boolean rename,
+      Function<SemanticModelEntity, SemanticModelEntity> updater)
+      throws IOException {
+    return update(ident, SemanticModelEntity.class, EntityType.SEMANTIC_MODEL, updater);
   }
 
   /**

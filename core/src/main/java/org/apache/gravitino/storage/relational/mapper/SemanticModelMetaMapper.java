@@ -32,6 +32,7 @@ import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
+import org.apache.ibatis.annotations.Update;
 import org.apache.ibatis.annotations.UpdateProvider;
 
 /** A MyBatis mapper for Semantic Model identity metadata operations. */
@@ -194,8 +195,6 @@ public interface SemanticModelMetaMapper {
       @Param("newSemanticModelMeta") SemanticModelPO newSemanticModelPO,
       @Param("oldSemanticModelMeta") SemanticModelPO oldSemanticModelPO);
 
-<<<<<<< HEAD
-=======
   /** Renames an identity that still has the observed name and optional expected revision. */
   @Update(
       """
@@ -220,7 +219,6 @@ public interface SemanticModelMetaMapper {
       """)
   int activateRevision(@Param("modelId") long modelId, @Param("revision") int revision);
 
->>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
   /** Soft-deletes a Semantic Model identity by stable ID and observed name. */
   @UpdateProvider(
       type = SemanticModelMetaSQLProviderFactory.class,
