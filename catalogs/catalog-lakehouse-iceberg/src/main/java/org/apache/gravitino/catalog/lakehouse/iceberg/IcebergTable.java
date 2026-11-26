@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.ArrayUtils;
@@ -86,9 +87,11 @@ public class IcebergTable extends BaseTable implements SupportsPartitionSpecs {
    * #fromIcebergTable}, or from the current {@code partitioning} (spec {@code 0}) in {@link
    * Builder#internalBuild()}.
    */
+  @Getter(AccessLevel.NONE)
   private Map<Integer, Transform[]> icebergPartitionSpecs = ImmutableMap.of();
 
   /** Iceberg default partition spec ID for this table metadata. */
+  @Getter(AccessLevel.NONE)
   private int icebergDefaultSpecId;
 
   private IcebergTable() {}
@@ -263,12 +266,15 @@ public class IcebergTable extends BaseTable implements SupportsPartitionSpecs {
       } else {
         icebergTable.location = icebergTable.properties.get(PROP_LOCATION);
       }
-      icebergTable.partitioning = partitioning;
+      Transform[] normalizedPartitioning =
+          partitioning != null ? partitioning : Transforms.EMPTY_TRANSFORM;
+      icebergTable.partitioning = normalizedPartitioning;
       icebergTable.distribution = distribution;
       icebergTable.sortOrders = sortOrders;
       // Iceberg always retains at least spec 0 (unpartitioned has empty fields). Hydrate a
       // matching default until fromIcebergTable replaces this with full metadata.
-      icebergTable.icebergPartitionSpecs = ImmutableMap.of(0, copyTransforms(partitioning));
+      icebergTable.icebergPartitionSpecs =
+          ImmutableMap.of(0, copyTransforms(normalizedPartitioning));
       icebergTable.icebergDefaultSpecId = 0;
       if (null != comment) {
         icebergTable.properties.putIfAbsent(ICEBERG_COMMENT_FIELD_NAME, comment);

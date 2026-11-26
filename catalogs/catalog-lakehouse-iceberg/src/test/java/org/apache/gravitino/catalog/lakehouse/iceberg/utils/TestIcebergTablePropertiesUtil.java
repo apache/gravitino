@@ -78,6 +78,21 @@ class TestIcebergTablePropertiesUtil {
   }
 
   @Test
+  void testBuilderNormalizesNullPartitioning() {
+    IcebergTable built =
+        IcebergTable.builder()
+            .withName("events")
+            .withColumns(new IcebergColumn[0])
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+    Assertions.assertArrayEquals(Transforms.EMPTY_TRANSFORM, built.partitioning());
+    SupportsPartitionSpecs specs = built.supportsPartitionSpecs();
+    Assertions.assertEquals(0, specs.defaultPartitionSpecId());
+    Assertions.assertArrayEquals(
+        Transforms.EMPTY_TRANSFORM, specs.partitionSpecs().get(specs.defaultPartitionSpecId()));
+  }
+
+  @Test
   void testFromIcebergTableExposesAllPartitionSpecs() {
     Schema schema = new Schema(Types.NestedField.required(1, "id", Types.LongType.get()));
     TableMetadata metadata =
