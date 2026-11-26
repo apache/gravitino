@@ -38,6 +38,7 @@ import org.apache.gravitino.spark.connector.integration.test.util.SparkUtilIT;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
+import org.apache.spark.sql.catalyst.analysis.TableAlreadyExistsException;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
@@ -134,6 +135,11 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   /** Returns whether this catalog supports Iceberg time-based partition transforms. */
   protected boolean supportsIcebergPartitionTransforms() {
     return false;
+  }
+
+  /** Returns the exception a rename onto an existing table name raises in this catalog. */
+  protected Class<? extends Exception> renameToExistingTableException() {
+    return TableAlreadyExistsException.class;
   }
 
   protected SparkTableInfoChecker getTableInfoChecker() {
@@ -405,7 +411,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     // rename to an existing table
     createSimpleTable(tableName);
     Assertions.assertThrows(
-        RuntimeException.class,
+        renameToExistingTableException(),
         () -> sql(String.format("ALTER TABLE %s RENAME TO %s", tableName, newTableName)));
 
     // rename a not existing tables
