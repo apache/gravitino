@@ -287,17 +287,18 @@ public class GlossaryTermBindingBaseSQLProvider {
         .formatted(GlossaryTermMetaMapper.TABLE_NAME, TABLE);
   }
 
-  /** Fetches binding candidates for a lookup preview in stable target order. */
+  /** Fetches binding candidates for a lookup preview in stable term and target order. */
   public String listBindingCandidates() {
     return """
         <script>
-        SELECT target_type AS targetType, target_id AS targetId FROM %s
-        WHERE metalake_id=#{metalakeId} AND term_id=#{termId} AND deleted_at=0
+        SELECT term_id AS termId, target_type AS targetType, target_id AS targetId FROM %s
+        WHERE metalake_id=#{metalakeId} AND deleted_at=0 AND term_id IN
+        <foreach collection="termIds" item="id" open="(" separator="," close=")">#{id}</foreach>
         <if test="after != null">
           AND (target_type &gt; #{after.targetType}
             OR (target_type=#{after.targetType} AND target_id &gt; #{after.targetId}))
         </if>
-        ORDER BY target_type, target_id LIMIT #{limit}
+        ORDER BY term_id, target_type, target_id LIMIT #{limit}
         </script>
         """
         .formatted(TABLE);

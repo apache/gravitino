@@ -667,7 +667,8 @@ public final class GlossaryManager {
           List<GlossaryTermBindingPO> rows = BINDINGS.listByTerm(lake, root.id(), targetTypes);
           List<TermBinding> visible = new ArrayList<>();
           for (List<GlossaryTermBindingPO> batch : Lists.partition(rows, TARGET_ID_BATCH_SIZE)) {
-            for (TermBinding binding : resolveBindings(batch, objectAccess)) {
+            for (ResolvedBinding resolved : resolveBindings(batch, objectAccess)) {
+              TermBinding binding = resolved.binding();
               if (objectAccess.canReadTarget(binding.object())) {
                 visible.add(binding);
               }
@@ -1021,7 +1022,9 @@ public final class GlossaryManager {
     return allowed;
   }
 
-  static List<TermBinding> resolveBindings(
+  record ResolvedBinding(long termId, TermBinding binding) {}
+
+  static List<ResolvedBinding> resolveBindings(
       List<GlossaryTermBindingPO> rows, GlossaryBindingAccess objectAccess) {
     Map<TargetType, List<Long>> idsByType = new EnumMap<>(TargetType.class);
     for (GlossaryTermBindingPO row : rows) {
@@ -1059,7 +1062,7 @@ public final class GlossaryManager {
       }
     }
 
-    List<TermBinding> result = new ArrayList<>(rows.size());
+    List<ResolvedBinding> result = new ArrayList<>(rows.size());
     for (GlossaryTermBindingPO row : rows) {
       TargetType type = TargetType.valueOf(row.getTargetType());
       if (type == TargetType.METRIC) {
@@ -1078,7 +1081,9 @@ public final class GlossaryManager {
               objectAccess.registerTarget(catalogObj, metricPO.catalogId());
             }
           }
-          result.add(TermBinding.usedBy(modelObj, metricPO.metricName()));
+          result.add(
+              new ResolvedBinding(
+                  row.getTermId(), TermBinding.usedBy(modelObj, metricPO.metricName())));
         }
       } else {
         MetadataObject obj = objectsByType.getOrDefault(type, Map.of()).get(row.getTargetId());
@@ -1086,7 +1091,7 @@ public final class GlossaryManager {
           if (type != TargetType.COLUMN) {
             objectAccess.registerTarget(obj, row.getTargetId());
           }
-          result.add(TermBinding.implementedBy(obj));
+          result.add(new ResolvedBinding(row.getTermId(), TermBinding.implementedBy(obj)));
         }
       }
     }

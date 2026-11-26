@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -208,89 +209,133 @@ final class GlossaryTermQuery {
     return rows;
   }
 
-  record Preview(List<TermBindingDTO> bindings, boolean truncated) {
-    private static final Preview EMPTY = new Preview(List.of(), false);
+  static final class Preview {
+    private final List<TermBindingDTO> bindings = new ArrayList<>();
+    private boolean truncated;
+
+    List<TermBindingDTO> bindings() {
+      return bindings;
+    }
+
+    boolean truncated() {
+      return truncated;
+    }
+
+    void add(TermBinding binding) {
+      if (bindings.size() == MAX_VISIBLE_BINDINGS) {
+        truncated = true;
+      } else {
+        bindings.add(TermBindingDTO.from(binding));
+      }
+    }
   }
 
   Map<Long, Preview> previews(Set<Long> ids) {
     // The full binding list requires the same capability even for a term with no bindings.
-    GlossaryBindingAccess bindingAccess = manager.bindingAccess(metalake, lake);
+    GlossaryBindingAccess access = manager.bindingAccess(metalake, lake);
     Map<Long, Preview> results = new HashMap<>();
-    ids.forEach(id -> results.put(id, Preview.EMPTY));
+    ids.forEach(id -> results.put(id, new Preview()));
     List<Long> bound = new ArrayList<>();
     if (ids.size() == 1) {
       bound.addAll(ids);
     } else {
-      for (List<Long> batch : Lists.partition(List.copyOf(ids), ID_BATCH_SIZE)) {
+      for (List<Long> batch : Lists.partition(ids.stream().sorted().toList(), ID_BATCH_SIZE)) {
         bound.addAll(
             SessionUtils.getWithoutCommit(
                 GlossaryTermBindingMapper.class,
                 mapper -> mapper.listTermsWithBindings(lake, batch)));
       }
     }
-    for (int i = 0; i < bound.size(); i++) {
-      long id = bound.get(i);
-      // Spare capacity permits full batches even when only one more visible binding is needed.
-      // Otherwise preserve the remaining roots' budget by resolving only what can affect this
-      // preview.
-      int pending = bound.size() - i;
-      boolean readAhead =
-          pending == 1 || (long) pending * MAX_BINDING_CANDIDATES <= budget.remaining();
-      results.put(id, preview(id, bindingAccess, readAhead));
+
+    for (int start = 0; start < bound.size(); ) {
+      List<Long> roots = bound.subList(start, Math.min(start + ID_BATCH_SIZE, bound.size()));
+      int limit = Math.min(MAX_VISIBLE_BINDINGS + 1, budget.remaining() + 1);
+      List<GlossaryTermBindingPO> page = bindingCandidates(roots, null, limit);
+      // Every row on this first page is needed. Even a single root can contribute at most its
+      // first 21 candidates. Resolve all targets together, preserving each row's owning term.
+      int available = Math.min(page.size(), budget.remaining());
+      appendVisibleBindings(page.subList(0, available), access, results);
+      if (available < page.size()) {
+        throw TermLookupBudget.exceeded();
+      }
+      if (page.size() < limit) {
+        start += roots.size();
+        continue;
+      }
+
+      // The term order proves exhaustion for every root before the final row's term. Only that
+      // term can continue on the next page.
+      GlossaryTermBindingPO last = page.get(page.size() - 1);
+      long id = last.getTermId();
+      start += Collections.binarySearch(roots, id) + 1;
+      if (!results.get(id).truncated()) {
+        int scanned = 0;
+        for (int i = page.size() - 1; i >= 0 && page.get(i).getTermId() == id; i--) {
+          scanned++;
+        }
+        int pending = bound.size() - start + 1;
+        boolean readAhead =
+            pending == 1 || (long) pending * MAX_BINDING_CANDIDATES <= budget.remaining();
+        finishPreview(last, scanned, readAhead, access, results);
+      }
     }
     return results;
   }
 
-  private Preview preview(long termId, GlossaryBindingAccess bindingAccess, boolean readAhead) {
-    List<TermBindingDTO> visibleBindings = new ArrayList<>();
-    GlossaryTermBindingPO last = null;
-    int remaining = Math.min(MAX_BINDING_CANDIDATES, budget.remaining());
+  private List<GlossaryTermBindingPO> bindingCandidates(
+      List<Long> ids, @Nullable GlossaryTermBindingPO after, int limit) {
+    return SessionUtils.getWithoutCommit(
+        GlossaryTermBindingMapper.class,
+        mapper -> mapper.listBindingCandidates(lake, ids, after, limit));
+  }
+
+  private void finishPreview(
+      GlossaryTermBindingPO last,
+      int scanned,
+      boolean readAhead,
+      GlossaryBindingAccess access,
+      Map<Long, Preview> results) {
+    long id = last.getTermId();
+    Preview preview = results.get(id);
+    int remaining = Math.min(MAX_BINDING_CANDIDATES - scanned, budget.remaining());
     while (true) {
-      int pageSize = Math.min(MAX_VISIBLE_BINDINGS + 1, remaining + 1);
-      GlossaryTermBindingPO after = last;
-      List<GlossaryTermBindingPO> rows =
-          SessionUtils.getWithoutCommit(
-              GlossaryTermBindingMapper.class,
-              mapper -> mapper.listBindingCandidates(lake, termId, after, pageSize));
-      // An overflow row proves there is more work, but must never be resolved or authorized.
+      int limit = Math.min(MAX_VISIBLE_BINDINGS + 1, remaining + 1);
+      List<GlossaryTermBindingPO> rows = bindingCandidates(List.of(id), last, limit);
       int available = Math.min(rows.size(), remaining);
-      int offset = 0;
-      while (offset < available) {
-        int needed = MAX_VISIBLE_BINDINGS + 1 - visibleBindings.size();
+      for (int offset = 0; offset < available; ) {
+        // When other roots still need the shared budget, resolve only as far as the next
+        // potentially decisive visible binding.
+        int needed = MAX_VISIBLE_BINDINGS + 1 - preview.bindings().size();
         int end = readAhead ? available : Math.min(available, offset + needed);
-        List<GlossaryTermBindingPO> batch = rows.subList(offset, end);
-        budget.consume(batch.size());
-        if (appendVisibleBindings(batch, bindingAccess, visibleBindings)) {
-          return new Preview(visibleBindings, true);
+        appendVisibleBindings(rows.subList(offset, end), access, results);
+        if (preview.truncated()) {
+          return;
         }
         offset = end;
       }
-      remaining -= available;
       if (rows.size() > available) {
         throw TermLookupBudget.exceeded();
       }
-      if (rows.size() < pageSize) {
-        return new Preview(visibleBindings, false);
+      if (rows.size() < limit) {
+        return;
       }
+      remaining -= available;
       last = rows.get(rows.size() - 1);
     }
   }
 
-  /** Appends readable bindings and reports whether the first omitted binding was found. */
-  private boolean appendVisibleBindings(
-      List<GlossaryTermBindingPO> batch,
-      GlossaryBindingAccess access,
-      List<TermBindingDTO> visibleBindings) {
-    for (TermBinding binding : GlossaryManager.resolveBindings(batch, access)) {
-      if (readableTargets.computeIfAbsent(
-          GlossaryBindingAccess.normalizeTarget(binding.object()), access::canReadTarget)) {
-        if (visibleBindings.size() == MAX_VISIBLE_BINDINGS) {
-          return true;
-        }
-        visibleBindings.add(TermBindingDTO.from(binding));
+  private void appendVisibleBindings(
+      List<GlossaryTermBindingPO> rows, GlossaryBindingAccess access, Map<Long, Preview> results) {
+    budget.consume(rows.size());
+    for (GlossaryManager.ResolvedBinding resolved : GlossaryManager.resolveBindings(rows, access)) {
+      TermBinding binding = resolved.binding();
+      Preview preview = results.get(resolved.termId());
+      if (!preview.truncated()
+          && readableTargets.computeIfAbsent(
+              GlossaryBindingAccess.normalizeTarget(binding.object()), access::canReadTarget)) {
+        preview.add(binding);
       }
     }
-    return false;
   }
 
   private List<GlossaryTermEntity> loadDefinitions(Set<Long> ids, boolean projectDomains) {

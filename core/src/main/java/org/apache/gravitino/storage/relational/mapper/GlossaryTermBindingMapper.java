@@ -147,11 +147,11 @@ public interface GlossaryTermBindingMapper {
       @Param("metalakeId") long metalakeId, @Param("termIds") Collection<Long> termIds);
 
   /**
-   * Fetches binding candidates for a lookup preview in stable target order.
+   * Fetches binding candidates for a lookup preview in stable term and target order.
    *
    * @param metalakeId the metalake ID
-   * @param termId the root term ID
-   * @param after exclusive binding cursor, or null for the first page
+   * @param termIds the root term IDs
+   * @param after exclusive target cursor for a single term, or null for a first page
    * @param limit the maximum number of candidates to return
    * @return live candidates in target order
    */
@@ -160,7 +160,7 @@ public interface GlossaryTermBindingMapper {
       method = "listBindingCandidates")
   List<GlossaryTermBindingPO> listBindingCandidates(
       @Param("metalakeId") long metalakeId,
-      @Param("termId") long termId,
+      @Param("termIds") Collection<Long> termIds,
       @Param("after") @Nullable GlossaryTermBindingPO after,
       @Param("limit") int limit);
 }

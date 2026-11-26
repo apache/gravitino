@@ -2440,6 +2440,75 @@ class TestGlossaryBindings extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testLookupBatchesCandidatesAndTargetsAcrossTerms() throws Exception {
+    List<ColumnEntity> columns = IntStream.range(0, 43).mapToObj(i -> col("col_" + i, i)).toList();
+    insertTable("preview_targets", columns);
+    long lake = MetalakeMetaService.getInstance().getMetalakeIdByName(LAKE);
+    List<Long> termIds = new ArrayList<>();
+    for (ColumnEntity column : columns) {
+      GlossaryTermEntity term =
+          openManager.createTerm(
+              LAKE, TermSpec.builder(column.name()).withSynonyms("shared").build());
+      termIds.add(term.id());
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              GlossaryTermBindingService.getInstance()
+                  .add(lake, term.id(), TargetType.COLUMN, column.id()));
+    }
+    List<Integer> fetched = new ArrayList<>();
+    List<Integer> probes = new ArrayList<>();
+    List<Integer> resolved = new ArrayList<>();
+    try (MockedStatic<SqlSessions> reads = observeBindingReads(fetched, probes);
+        MockedStatic<MetadataObjectService> objects =
+            Mockito.mockStatic(
+                MetadataObjectService.class,
+                call -> {
+                  if (call.getMethod().getName().equals("resolveMetadataObjects")) {
+                    resolved.add(call.<List<Long>>getArgument(1).size());
+                  }
+                  return call.callRealMethod();
+                })) {
+      TermDTO[] terms =
+          new GlossaryTermViews(openManager)
+              .listTerms(LAKE, null, null, null, List.of("shared"), true);
+      assertEquals(columns.size(), terms.length);
+      for (TermDTO term : terms) {
+        assertEquals(1, term.getBindings().size());
+        assertEquals(term.getName(), term.getBindings().get(0).getObject().name());
+        assertEquals(Boolean.FALSE, term.getBindingsTruncated());
+      }
+      assertEquals(List.of(43), probes);
+      assertTrue(fetched.size() <= 5, fetched::toString);
+      assertEquals(columns.size(), fetched.stream().mapToInt(Integer::intValue).sum());
+      assertTrue(resolved.size() <= 3, resolved::toString);
+      assertEquals(columns.size(), resolved.stream().mapToInt(Integer::intValue).sum());
+    }
+
+    // The first page ends on the first binding of the 21st term. Its 20 additional bindings
+    // cross the cursor boundary. Its neighbors must still receive only their own targets.
+    SessionUtils.doMultipleWithCommit(
+        () -> {
+          for (ColumnEntity column : columns.subList(0, 20)) {
+            GlossaryTermBindingService.getInstance()
+                .add(lake, termIds.get(20), TargetType.COLUMN, column.id());
+          }
+        });
+    TermDTO[] mixed =
+        new GlossaryTermViews(openManager)
+            .listTerms(LAKE, null, null, null, List.of("shared"), true);
+    assertEquals(columns.size(), mixed.length);
+    for (TermDTO term : mixed) {
+      boolean spansPages = term.getName().equals(columns.get(20).name());
+      List<String> expected =
+          spansPages
+              ? columns.subList(0, 20).stream().map(ColumnEntity::name).toList()
+              : List.of(term.getName());
+      assertEquals(expected, term.getBindings().stream().map(b -> b.getObject().name()).toList());
+      assertEquals(spansPages, term.getBindingsTruncated());
+    }
+  }
+
+  @TestTemplate
   void testLookupPreviewCountsVisibleBindingsAcrossBatches() throws Exception {
     List<ColumnEntity> hidden = new ArrayList<>();
     List<ColumnEntity> visible = new ArrayList<>();
