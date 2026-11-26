@@ -2370,27 +2370,7 @@ class TestGlossaryBindings extends TestJDBCBackend {
     openManager.createTerm(LAKE, TermSpec.builder("EmptyTwo").build());
     List<Integer> fetched = new ArrayList<>();
     List<Integer> probes = new ArrayList<>();
-    try (MockedStatic<SqlSessions> ignored =
-        Mockito.mockStatic(
-            SqlSessions.class,
-            lookup -> {
-              Object mapper = lookup.callRealMethod();
-              if (lookup.getMethod().getName().equals("getMapper")
-                  && lookup.getArgument(0) == GlossaryTermLookupMapper.class) {
-                return Mockito.mock(
-                    GlossaryTermLookupMapper.class,
-                    call -> {
-                      Object result = AdditionalAnswers.delegatesTo(mapper).answer(call);
-                      if (call.getMethod().getName().equals("bindingCandidates")) {
-                        fetched.add(((List<?>) result).size());
-                      } else if (call.getMethod().getName().equals("termsWithBindings")) {
-                        probes.add(((List<?>) result).size());
-                      }
-                      return result;
-                    });
-              }
-              return mapper;
-            })) {
+    try (MockedStatic<SqlSessions> ignored = observeBindingReads(fetched, probes)) {
       TermDTO preview =
           new GlossaryTermViews(openManager).listTerms(LAKE, null, null, null, match, true)[0];
       assertEquals(20, preview.getBindings().size());
@@ -2524,8 +2504,10 @@ class TestGlossaryBindings extends TestJDBCBackend {
     openManager.associateMetricTerms(LAKE, model, "net_revenue", new String[] {"Second"}, null);
     // Two roots, all columns through the 21st visible one, then the second root's hidden metric.
     // The first root's trailing metric must not consume the second root's budget.
+    List<Integer> fetched = new ArrayList<>();
     try (MockedConstruction<TermLookupBudget> ignored =
-        limitLookupTo(2 + hidden.size() + visible.size() + 1)) {
+            limitLookupTo(2 + hidden.size() + visible.size() + 1);
+        MockedStatic<SqlSessions> reads = observeBindingReads(fetched, new ArrayList<>())) {
       TermDTO[] both =
           as(
               "limitedColumns",
@@ -2535,6 +2517,7 @@ class TestGlossaryBindings extends TestJDBCBackend {
       assertEquals(20, both[0].getBindings().size());
       assertEquals(List.of(), both[1].getBindings());
       assertEquals(Boolean.FALSE, both[1].getBindingsTruncated());
+      assertEquals(List.of(21, 21, 21, 21, 18, 1), fetched);
     }
   }
 
@@ -2963,6 +2946,30 @@ class TestGlossaryBindings extends TestJDBCBackend {
       Mockito.verify(tableService, Mockito.never())
           .getTableIdBySchemaIdAndName(Mockito.anyLong(), Mockito.anyString());
     }
+  }
+
+  private static MockedStatic<SqlSessions> observeBindingReads(
+      List<Integer> fetched, List<Integer> probes) {
+    return Mockito.mockStatic(
+        SqlSessions.class,
+        lookup -> {
+          Object mapper = lookup.callRealMethod();
+          if (lookup.getMethod().getName().equals("getMapper")
+              && lookup.getArgument(0) == GlossaryTermLookupMapper.class) {
+            return Mockito.mock(
+                GlossaryTermLookupMapper.class,
+                call -> {
+                  Object result = AdditionalAnswers.delegatesTo(mapper).answer(call);
+                  if (call.getMethod().getName().equals("bindingCandidates")) {
+                    fetched.add(((List<?>) result).size());
+                  } else if (call.getMethod().getName().equals("termsWithBindings")) {
+                    probes.add(((List<?>) result).size());
+                  }
+                  return result;
+                });
+          }
+          return mapper;
+        });
   }
 
   private static MockedConstruction<TermLookupBudget> limitLookupTo(int remaining) {

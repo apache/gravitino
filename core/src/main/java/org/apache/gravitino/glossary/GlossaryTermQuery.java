@@ -246,30 +246,27 @@ final class GlossaryTermQuery {
     GlossaryTermBindingPO last = null;
     int remaining = Math.min(MAX_BINDING_CANDIDATES, budget.remaining());
     while (true) {
-      int needed = MAX_VISIBLE_BINDINGS + 1 - (readAhead ? 0 : visibleBindings.size());
-      int pageSize = Math.min(needed, remaining + 1);
+      int pageSize = Math.min(MAX_VISIBLE_BINDINGS + 1, remaining + 1);
       GlossaryTermBindingPO after = last;
       List<GlossaryTermBindingPO> rows =
           SessionUtils.getWithoutCommit(
               GlossaryTermLookupMapper.class,
               mapper -> mapper.bindingCandidates(lake, termId, after, pageSize));
       // An overflow row proves there is more work, but must never be resolved or authorized.
-      List<GlossaryTermBindingPO> batch = rows.subList(0, Math.min(rows.size(), remaining));
-      if (!batch.isEmpty()) {
+      int available = Math.min(rows.size(), remaining);
+      int offset = 0;
+      while (offset < available) {
+        int needed = MAX_VISIBLE_BINDINGS + 1 - visibleBindings.size();
+        int end = readAhead ? available : Math.min(available, offset + needed);
+        List<GlossaryTermBindingPO> batch = rows.subList(offset, end);
         budget.consume(batch.size());
-        remaining -= batch.size();
-        for (TermBinding binding : GlossaryManager.resolveBindings(batch, bindingAccess)) {
-          if (readableTargets.computeIfAbsent(
-              GlossaryBindingAccess.normalizeTarget(binding.object()),
-              bindingAccess::canReadTarget)) {
-            if (visibleBindings.size() == MAX_VISIBLE_BINDINGS) {
-              return new Preview(visibleBindings, true);
-            }
-            visibleBindings.add(TermBindingDTO.from(binding));
-          }
+        if (appendVisibleBindings(batch, bindingAccess, visibleBindings)) {
+          return new Preview(visibleBindings, true);
         }
+        offset = end;
       }
-      if (rows.size() > batch.size()) {
+      remaining -= available;
+      if (rows.size() > available) {
         throw TermLookupBudget.exceeded();
       }
       if (rows.size() < pageSize) {
@@ -277,6 +274,23 @@ final class GlossaryTermQuery {
       }
       last = rows.get(rows.size() - 1);
     }
+  }
+
+  /** Appends readable bindings and reports whether the first omitted binding was found. */
+  private boolean appendVisibleBindings(
+      List<GlossaryTermBindingPO> batch,
+      GlossaryBindingAccess access,
+      List<TermBindingDTO> visibleBindings) {
+    for (TermBinding binding : GlossaryManager.resolveBindings(batch, access)) {
+      if (readableTargets.computeIfAbsent(
+          GlossaryBindingAccess.normalizeTarget(binding.object()), access::canReadTarget)) {
+        if (visibleBindings.size() == MAX_VISIBLE_BINDINGS) {
+          return true;
+        }
+        visibleBindings.add(TermBindingDTO.from(binding));
+      }
+    }
+    return false;
   }
 
   private List<GlossaryTermEntity> loadDefinitions(Set<Long> ids, boolean projectDomains) {
