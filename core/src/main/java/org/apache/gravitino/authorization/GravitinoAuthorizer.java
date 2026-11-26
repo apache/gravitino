@@ -119,6 +119,27 @@ public interface GravitinoAuthorizer extends Closeable {
     return false;
   }
 
+  /** Stable user and group IDs whose direct Article ownership the caller can exercise. */
+  record ArticleOwnerIds(@Nullable Long userId, Set<Long> groupIds) {
+    /** An ownership scope that grants no access to drafts. */
+    public static final ArticleOwnerIds NONE = new ArticleOwnerIds(null, Set.of());
+
+    /** Creates an immutable ownership scope. */
+    public ArticleOwnerIds {
+      groupIds = Set.copyOf(groupIds);
+    }
+  }
+
+  /**
+   * Resolves the direct owner identities used to filter readable drafts before list pagination. IDs
+   * must identify the same user and groups as {@link #isArticleOwner} for this request. Providers
+   * that do not supply identities grant no ownership-based access through Article lists.
+   */
+  default ArticleOwnerIds articleOwnerIds(
+      Principal principal, String metalake, AuthorizationRequestContext context) {
+    return ArticleOwnerIds.NONE;
+  }
+
   boolean deny(
       Principal principal,
       String metalake,

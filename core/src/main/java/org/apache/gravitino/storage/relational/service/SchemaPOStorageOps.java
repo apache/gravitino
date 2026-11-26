@@ -139,7 +139,7 @@ public class SchemaPOStorageOps extends BasePOStorageOps<SchemaPO, SchemaMetaMap
    * H2, and PostgreSQL, and must stay in sync with the {@code ESCAPE} clause in {@link
    * org.apache.gravitino.storage.relational.mapper.provider.base.SchemaMetaBaseSQLProvider#listSchemaPOsByCatalogIdAndNamePrefix}.
    */
-  private static String escapeLikeMetacharacters(String value) {
+  static String escapeLikeMetacharacters(String value) {
     return value
         .replace(LIKE_ESCAPE_CHAR, LIKE_ESCAPE_CHAR + LIKE_ESCAPE_CHAR)
         .replace("%", LIKE_ESCAPE_CHAR + "%")

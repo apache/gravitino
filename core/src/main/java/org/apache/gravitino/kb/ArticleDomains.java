@@ -21,6 +21,7 @@ package org.apache.gravitino.kb;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -38,6 +39,8 @@ import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.meta.DomainEntity;
+import org.apache.gravitino.storage.relational.mapper.ArticleSummaryMapper;
+import org.apache.gravitino.storage.relational.mapper.ArticleSummaryMapper.MemberDomain;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
 import org.apache.gravitino.storage.relational.po.DomainPO;
 import org.apache.gravitino.storage.relational.service.DomainRelService;
@@ -152,6 +155,37 @@ final class ArticleDomains {
         result.put(id, visible.get());
       }
     }
+    return result;
+  }
+
+  Map<Long, List<String>> pageNames(long lake, Set<Long> articleIds) {
+    var memberships =
+        SessionUtils.getWithoutCommit(
+            ArticleSummaryMapper.class, mapper -> mapper.domains(lake, articleIds));
+    Set<String> readableNames = new HashSet<>();
+    if (authorization) {
+      var names = memberships.stream().map(MemberDomain::name).distinct().toList();
+      for (var batch : Lists.partition(names, 128)) {
+        var rows =
+            SessionUtils.getWithoutCommit(
+                DomainMetaMapper.class,
+                mapper -> mapper.listDomainPOsByMetalakeAndDomainNames(metalake, batch));
+        for (var row : rows) {
+          if (readable(entity(row))) {
+            readableNames.add(row.domainName());
+          }
+        }
+      }
+    }
+    Map<Long, List<String>> result = new HashMap<>();
+    for (var membership : memberships) {
+      if (!authorization || readableNames.contains(membership.name())) {
+        result
+            .computeIfAbsent(membership.articleId(), unused -> new ArrayList<>())
+            .add(membership.name());
+      }
+    }
+    result.values().forEach(names -> names.sort(String::compareTo));
     return result;
   }
 

@@ -96,6 +96,7 @@ import org.apache.gravitino.storage.relational.service.DomainRelService;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
 import org.apache.gravitino.storage.relational.service.OrphanedMetadataObjectRelationService;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.tag.TagManager;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -184,6 +185,196 @@ class TestArticleAuthorization extends TestJDBCBackend {
       FieldUtils.writeField(env, "catalogManager", previousCatalogs, true);
       Mockito.verifyNoInteractions(catalogs);
     }
+  }
+
+  @TestTemplate
+  void summaryPagesApplyDraftVisibilityAndTypedOwnershipBeforeOffset() throws Exception {
+    var publicArticle =
+        as("writer", () -> manager.createArticle(LAKE, article("a", ArticleStatus.PUBLISHED)));
+    var draft = as("writer", () -> manager.createArticle(LAKE, article("b", ArticleStatus.DRAFT)));
+    as("writer2", () -> manager.createArticle(LAKE, article("c", ArticleStatus.DEPRECATED)));
+    as("writer", () -> manager.createArticle(LAKE, article("d", ArticleStatus.DRAFT)));
+    var page = ArticleListFilter.builder().withLimit(1);
+    assertTrue(as("viewer", () -> manager.listArticleSummaries(LAKE, page.build())).hasMore());
+    var last = as("viewer", () -> manager.listArticleSummaries(LAKE, page.withOffset(1).build()));
+    assertEquals(List.of("c"), summaryNames(last));
+    assertFalse(last.hasMore());
+    assertTrue(
+        as("denied", () -> manager.listArticleSummaries(LAKE, page.withOffset(0).build()))
+            .articles()
+            .isEmpty());
+
+    var drafts = ArticleListFilter.builder().withStatus(ArticleStatus.DRAFT);
+    assertEquals(
+        List.of("b", "d"),
+        summaryNames(as("admin", () -> manager.listArticleSummaries(LAKE, drafts.build()))));
+    backend.insert(
+        createGroupEntity(
+            ids.incrementAndGet(),
+            AuthorizationUtils.ofGroupNamespace(LAKE),
+            "writer",
+            AUDIT_INFO,
+            List.of(),
+            List.of()),
+        false);
+    as(
+        "writer",
+        () -> {
+          owners.setOwner(
+              LAKE,
+              MetadataObjects.of(null, "b", MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE),
+              "writer",
+              Owner.Type.GROUP);
+          return null;
+        });
+    var userOwner = publicArticle.article().owner();
+    assertEquals(
+        List.of("d"),
+        summaryNames(
+            as(
+                "writer",
+                () -> manager.listArticleSummaries(LAKE, drafts.withOwner(userOwner).build()))));
+    var group = as("admin", () -> manager.loadArticle(LAKE, "b")).article().owner();
+    assertEquals("writer", group.name());
+    assertEquals(Owner.Type.GROUP, group.type());
+    assertTrue(
+        as("writer2", () -> manager.listArticleSummaries(LAKE, drafts.withOwner(group).build()))
+            .articles()
+            .isEmpty());
+    var member = new UserPrincipal("writer2", List.of(new UserGroup(Optional.empty(), "writer")));
+    var memberDrafts =
+        PrincipalUtils.doAs(member, () -> manager.listArticleSummaries(LAKE, drafts.build()));
+    assertEquals(List.of("b"), summaryNames(memberDrafts));
+    assertEquals(group.type(), memberDrafts.articles().get(0).owner().type());
+    assertEquals(draft.article().auditInfo(), memberDrafts.articles().get(0).auditInfo());
+    assertTrue(
+        PrincipalUtils.doAs(
+                member,
+                () -> manager.listArticleSummaries(LAKE, drafts.withOwner(userOwner).build()))
+            .articles()
+            .isEmpty());
+  }
+
+  @TestTemplate
+  void summaryUsesTheNewestLiveOwnerForBothFilteringAndDisplay() throws Exception {
+    var guide =
+        as("writer", () -> manager.createArticle(LAKE, article("guide", ArticleStatus.DRAFT)));
+    long oldGroup = ids.incrementAndGet();
+    backend.insert(
+        createGroupEntity(
+            oldGroup,
+            AuthorizationUtils.ofGroupNamespace(LAKE),
+            "former",
+            AUDIT_INFO,
+            List.of(),
+            List.of()),
+        false);
+    // Older stores can contain two live owner rows for one object. The later timestamp wins,
+    // even when the stale row has the higher relation ID.
+    try (var session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        var statement =
+            session
+                .getConnection()
+                .prepareStatement(
+                    "INSERT INTO owner_meta (metalake_id, owner_id, owner_type, metadata_object_id, metadata_object_type,"
+                        + " audit_info, current_version, last_version, deleted_at, updated_at)"
+                        + " SELECT metalake_id, ?, 'GROUP', metadata_object_id, metadata_object_type,"
+                        + " audit_info, current_version, last_version, 0, 0 FROM owner_meta"
+                        + " WHERE metadata_object_id=? AND metadata_object_type='KNOWLEDGE_BASE_ARTICLE' AND deleted_at=0")) {
+      statement.setLong(1, oldGroup);
+      statement.setLong(2, guide.article().id());
+      assertEquals(1, statement.executeUpdate());
+    }
+    var page =
+        as(
+            "writer",
+            () ->
+                manager.listArticleSummaries(
+                    LAKE, ArticleListFilter.builder().withOwner(guide.article().owner()).build()));
+    assertEquals(List.of("guide"), summaryNames(page));
+    assertEquals("writer", page.articles().get(0).owner().name());
+    assertEquals(Owner.Type.USER, page.articles().get(0).owner().type());
+    var former = new UserPrincipal("writer2", List.of(new UserGroup(Optional.empty(), "former")));
+    assertTrue(
+        PrincipalUtils.doAs(
+                former,
+                () -> manager.listArticleSummaries(LAKE, ArticleListFilter.builder().build()))
+            .articles()
+            .isEmpty());
+  }
+
+  @TestTemplate
+  void domainAndTermSearchProjectsOnlyReadableMembershipsAndChecksHiddenTargets() throws Exception {
+    insertDomain(LAKE, "Finance", Domain.Status.PUBLISHED, null, AUDIT_INFO);
+    insertDomain(LAKE, "Billing", Domain.Status.PUBLISHED, "Finance", AUDIT_INFO);
+    insertDomain(LAKE, "Private", Domain.Status.DRAFT, "Finance", AUDIT_INFO);
+    role(
+        "financeReader",
+        SecurableObjects.parse(
+            "Finance", MetadataObject.Type.DOMAIN, List.of(Privileges.allow("USE_DOMAIN"))));
+    user("analyst", "view", "financeReader");
+    var glossary = new GlossaryManager(ids::incrementAndGet, true);
+    as("writer", () -> glossary.createTerm(LAKE, TermSpec.builder("Revenue").build()));
+    as("writer", () -> glossary.createTerm(LAKE, TermSpec.builder("Internal").build()));
+    as(
+        "lakeOwner",
+        () -> {
+          var refund =
+              ArticleCreate.builder()
+                  .withTitle("Refund")
+                  .addTerms("Revenue", "Internal")
+                  .addDomains("Private")
+                  .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "body"));
+          manager.createArticle(LAKE, refund.withName("hidden-domain").build());
+          manager.createArticle(LAKE, refund.withName("visible").addDomains("Billing").build());
+          manager.createArticle(
+              LAKE, refund.withName("draft").withStatus(ArticleStatus.DRAFT).build());
+          return glossary.alterTerm(
+              LAKE, "Internal", TermChange.setStatus(GlossaryTerm.Status.DRAFT));
+        });
+
+    var filter =
+        ArticleListFilter.builder()
+            .withDomain("Finance")
+            .withTerm("Revenue")
+            .withQuery("REFUND")
+            .withLimit(1);
+    var page = as("analyst", () -> manager.listArticleSummaries(LAKE, filter.build()));
+    assertEquals(List.of("visible"), summaryNames(page));
+    assertFalse(page.hasMore());
+    var summary = page.articles().get(0);
+    assertEquals(List.of("Billing"), List.of(summary.domains()));
+    assertEquals(1, summary.terms().length);
+    assertEquals("Revenue", summary.terms()[0].name());
+    assertFalse(summary.termsHasMore());
+    assertThrows(
+        NoSuchTermException.class,
+        () ->
+            as(
+                "analyst",
+                () ->
+                    manager.listArticleSummaries(
+                        LAKE, filter.withTerm("Internal").withQuery("absent").build())));
+    assertThrows(
+        NoSuchDomainException.class,
+        () ->
+            as(
+                "analyst",
+                () ->
+                    manager.listArticleSummaries(
+                        LAKE, filter.withTerm("Revenue").withDomain("Private").build())));
+    createAndInsertCatalog(LAKE, "warehouse");
+    var hiddenAsset =
+        ArticleObjectIdentifier.of(MetadataObject.Type.CATALOG, List.of(), "warehouse");
+    assertThrows(
+        NoSuchMetadataObjectException.class,
+        () ->
+            as(
+                "analyst",
+                () ->
+                    manager.listArticleSummaries(
+                        LAKE, filter.withDomain("Finance").withObject(hiddenAsset).build())));
   }
 
   @TestTemplate
@@ -1211,6 +1402,10 @@ class TestArticleAuthorization extends TestJDBCBackend {
 
   private static KnowledgeBaseArticleChange domains(String... names) {
     return KnowledgeBaseArticleChange.updateDomains(names);
+  }
+
+  private static List<String> summaryNames(ArticlePage page) {
+    return page.articles().stream().map(ArticleSummary::name).toList();
   }
 
   private static ArticleCreate article(String name, ArticleStatus status, String... domains) {

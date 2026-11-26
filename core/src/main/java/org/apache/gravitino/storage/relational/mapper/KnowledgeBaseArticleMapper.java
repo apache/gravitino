@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.authorization.GravitinoAuthorizer.ArticleOwnerIds;
+import org.apache.gravitino.kb.ArticleListFilter;
 import org.apache.gravitino.kb.KnowledgeBaseArticleEntity.Binding;
 import org.apache.gravitino.storage.relational.po.GlossaryTermPO;
 import org.apache.gravitino.storage.relational.po.KnowledgeBaseArticlePO;
@@ -116,24 +118,17 @@ public interface KnowledgeBaseArticleMapper {
       @Param("after") @Nullable Long after,
       @Param("limit") int limit);
 
-  /** Selects the readable Article status window for a live, authorized binding target. */
-  @Select(
-      """
-      <script>
-      SELECT a.article_id AS articleId, a.article_name AS articleName, a.title, a.status, a.audit_info AS auditInfo
-      FROM kb_article_relation_meta r
-      JOIN kb_article_meta a ON a.article_id=r.article_id AND a.metalake_id=r.metalake_id AND a.deleted_at=0
-      WHERE r.metalake_id=#{lake} AND r.target_id=#{target.targetId} AND r.target_type=#{target.targetType} AND r.deleted_at=0
-        AND (a.status='PUBLISHED' <if test='deprecated'>OR a.status='DEPRECATED'</if>)
-      ORDER BY a.title, a.article_name LIMIT #{limit} OFFSET #{offset}
-      </script>
-      """)
-  List<KnowledgeBaseArticlePO> articlesForTarget(
+  /** Selects the readable summary window after applying all resolved filters. */
+  @SelectProvider(type = ArticleSearchSQLProvider.class, method = "search")
+  List<KnowledgeBaseArticlePO> search(
       @Param("lake") long lake,
-      @Param("target") Binding target,
-      @Param("deprecated") boolean deprecated,
-      @Param("limit") int limit,
-      @Param("offset") int offset);
+      @Param("filter") ArticleListFilter filter,
+      @Param("domains") @Nullable Set<Long> domains,
+      @Param("targets") List<Binding> targets,
+      @Param("allDrafts") boolean allDrafts,
+      @Param("ownerIds") ArticleOwnerIds ownerIds,
+      @Param("pattern") @Nullable String pattern,
+      @Param("nulPatternParts") @Nullable String nulPatternParts);
 
   /** Reads metadata and relations together in a caller's transaction. */
   @Select(

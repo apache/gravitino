@@ -22,8 +22,6 @@ package org.apache.gravitino.kb;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.Lists;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -31,25 +29,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
-import org.apache.gravitino.Entity.EntityType;
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.apache.gravitino.exceptions.UnapprovedTermException;
 import org.apache.gravitino.glossary.GlossaryAccess;
 import org.apache.gravitino.glossary.GlossaryTerm;
-import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.kb.KnowledgeBaseArticleEntity.Binding;
-import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GlossaryTermNames;
-import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper;
-import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper.MemberType;
+import org.apache.gravitino.storage.relational.mapper.ArticleSummaryMapper;
+import org.apache.gravitino.storage.relational.mapper.ArticleSummaryMapper.BoundTerm;
 import org.apache.gravitino.storage.relational.mapper.KnowledgeBaseArticleMapper;
 import org.apache.gravitino.storage.relational.po.GlossaryTermPO;
 import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
-import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
 /** Resolves and authorizes Term bindings using the Glossary's name and visibility rules. */
@@ -192,73 +183,33 @@ final class ArticleTerms {
         .build();
   }
 
-  record Summary(
-      String name,
-      String title,
-      ArticleStatus status,
-      List<String> domainNames,
-      @Nullable Owner owner,
-      AuditInfo auditInfo,
-      TermBindingPage preview)
-      implements ArticleSummary {
-    @Override
-    public String[] domains() {
-      return domainNames.toArray(String[]::new);
-    }
-
-    @Override
-    public ArticleTermBinding[] terms() {
-      return preview.terms().toArray(ArticleTermBinding[]::new);
-    }
-
-    @Override
-    public boolean termsHasMore() {
-      return preview.hasMore();
-    }
-  }
-
-  record DirectOwner(String name, Owner.Type type) implements Owner {}
-
-  ArticlePage articles(long lake, Binding target, boolean deprecated, int limit, int offset) {
-    var rows =
-        SessionUtils.getWithoutCommit(
-            KnowledgeBaseArticleMapper.class,
-            mapper -> mapper.articlesForTarget(lake, target, deprecated, limit + 1, offset));
-    boolean more = rows.size() > limit;
-    var page = rows.subList(0, Math.min(limit, rows.size()));
-    var names =
-        page.stream().map(row -> NameIdentifier.of(metalake, row.getArticleName())).toList();
-    Map<String, Owner> owners = new HashMap<>();
-    for (var relation :
-        OwnerMetaService.getInstance().batchGetOwner(names, EntityType.KNOWLEDGE_BASE_ARTICLE)) {
-      var entity = relation.targetEntity();
-      owners.put(
-          relation.source().name(),
-          new DirectOwner(entity.name(), Owner.Type.valueOf(entity.type().name())));
-    }
-    var domains = new ArticleDomains(metalake, authorization);
-    List<ArticleSummary> result = new ArrayList<>();
-    for (var row : page) {
-      long id = row.getArticleId();
-      var memberships =
+  Map<Long, List<ArticleTermBinding>> previews(long lake, Set<Long> articles) {
+    var access = Suppliers.memoize(() -> GlossaryAccess.forRequest(metalake, authorization));
+    Map<Long, List<ArticleTermBinding>> previews = new HashMap<>();
+    Set<Long> pending = new HashSet<>(articles);
+    BoundTerm cursor = null;
+    while (!pending.isEmpty()) {
+      BoundTerm after = cursor;
+      var rows =
           SessionUtils.getWithoutCommit(
-              DomainMemberMapper.class,
-              mapper -> mapper.domains(lake, MemberType.KNOWLEDGE_BASE_ARTICLE, id));
-      try {
-        result.add(
-            new Summary(
-                row.getArticleName(),
-                row.getTitle(),
-                ArticleStatus.valueOf(row.getStatus()),
-                domains.visibleNames(memberships).values().stream().sorted().toList(),
-                owners.get(row.getArticleName()),
-                JsonUtils.anyFieldMapper().readValue(row.getAuditInfo(), AuditInfo.class),
-                page(lake, id, ArticleListFilter.DEFAULT_LIMIT, 0)));
-      } catch (IOException failure) {
-        throw new UncheckedIOException(failure);
+              ArticleSummaryMapper.class,
+              mapper -> mapper.pageTerms(lake, pending, after, BATCH_SIZE));
+      for (BoundTerm row : rows) {
+        if (pending.contains(row.articleId()) && access.get().canRead(row.termId(), row.status())) {
+          var preview = previews.computeIfAbsent(row.articleId(), unused -> new ArrayList<>());
+          preview.add(new Term(row.name(), ArticleTermBinding.Status.valueOf(row.status().name())));
+          if (preview.size() > ArticleListFilter.DEFAULT_LIMIT) {
+            // Keep the extra readable Term for hasMore and skip all later bindings of this Article.
+            pending.remove(row.articleId());
+          }
+        }
       }
+      if (rows.size() < BATCH_SIZE) {
+        break;
+      }
+      cursor = rows.get(rows.size() - 1);
     }
-    return ArticlePage.of(result, more);
+    return previews;
   }
 
   private Window window(long lake, long article, int limit, int offset) {

@@ -32,10 +32,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
-import java.util.function.LongFunction;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -262,6 +262,24 @@ public final class ArticleManager {
   }
 
   /**
+   * Lists readable Article summaries in title and name order using all supplied filters.
+   *
+   * @param metalake the Article metalake
+   * @param filter the search criteria and requested window
+   * @return the matching page and whether another readable match follows it
+   */
+  public ArticlePage listArticleSummaries(String metalake, ArticleListFilter filter) {
+    Preconditions.checkNotNull(filter, "filter");
+    Owner owner = filter.owner();
+    if (owner != null) {
+      Preconditions.checkArgument(owner.type() != null, "Owner type must be set");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(owner.name()), "Owner name must not be blank");
+    }
+    return readSnapshot(() -> new ArticleSearch(metalake, authorizationEnabled).list(filter));
+  }
+
+  /**
    * Lists live, readable Term bindings in stable ID order.
    *
    * @param metalake the Article's metalake
@@ -330,13 +348,14 @@ public final class ArticleManager {
    */
   public ArticlePage listArticlesForTerm(
       String metalake, String term, boolean includeDeprecated, int limit, int offset) {
-    var terms = new ArticleTerms(metalake, authorizationEnabled);
-    return articlesForTarget(
+    return listArticleSummaries(
         metalake,
-        includeDeprecated,
-        limit,
-        offset,
-        lake -> new Binding("GLOSSARY_TERM", terms.readableTarget(lake, term)));
+        ArticleListFilter.builder()
+            .withTerm(term)
+            .withIncludeDeprecated(includeDeprecated)
+            .withLimit(limit)
+            .withOffset(offset)
+            .build());
   }
 
   /** Lists Article summaries directly bound to a readable asset. */
@@ -346,36 +365,14 @@ public final class ArticleManager {
       boolean includeDeprecated,
       int limit,
       int offset) {
-    return articlesForTarget(
+    return listArticleSummaries(
         metalake,
-        includeDeprecated,
-        limit,
-        offset,
-        lake -> new ArticleAssets(metalake, authorizationEnabled).readableTarget(lake, object));
-  }
-
-  private ArticlePage articlesForTarget(
-      String metalake,
-      boolean includeDeprecated,
-      int limit,
-      int offset,
-      LongFunction<Binding> resolve) {
-    ArticleTerms.checkPage(limit, offset);
-    return readSnapshot(
-        () -> {
-          var terms = new ArticleTerms(metalake, authorizationEnabled);
-          long lake;
-          try {
-            lake = terms.lake();
-          } catch (NoSuchEntityException missing) {
-            throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", metalake);
-          }
-          Binding target = resolve.apply(lake);
-          if (authorizationEnabled && !ArticleAccess.forRequest(metalake).canView()) {
-            return ArticlePage.of(List.of(), false);
-          }
-          return terms.articles(lake, target, includeDeprecated, limit, offset);
-        });
+        ArticleListFilter.builder()
+            .withObject(object)
+            .withIncludeDeprecated(includeDeprecated)
+            .withLimit(limit)
+            .withOffset(offset)
+            .build());
   }
 
   /** Applies the changes atomically, optionally checking the editing token before any change. */
@@ -514,7 +511,7 @@ public final class ArticleManager {
     var owner = relations.get(0).targetEntity();
     return article.toBuilder()
         .withOwner(
-            new ArticleTerms.DirectOwner(owner.name(), Owner.Type.valueOf(owner.type().name())))
+            new ArticleSearch.DirectOwner(owner.name(), Owner.Type.valueOf(owner.type().name())))
         .build();
   }
 

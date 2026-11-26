@@ -22,13 +22,43 @@ package org.apache.gravitino.storage.relational.mapper;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import org.apache.gravitino.authorization.GravitinoAuthorizer.ArticleOwnerIds;
+import org.apache.gravitino.kb.ArticleListFilter;
 import org.apache.gravitino.storage.relational.po.KnowledgeBaseArticlePO;
 import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.Test;
 
 class TestKnowledgeBaseArticleMapper {
+  @Test
+  void searchReadsBodyOnlyInTheKeywordPredicate() {
+    for (String dialect : List.of("h2", "mysql", "postgresql")) {
+      Configuration configuration = new Configuration();
+      configuration.setDatabaseId(dialect);
+      configuration.addMapper(KnowledgeBaseArticleMapper.class);
+      var statement =
+          configuration.getMappedStatement(KnowledgeBaseArticleMapper.class.getName() + ".search");
+      var params = new HashMap<String, Object>();
+      params.put("lake", 1L);
+      params.put("filter", ArticleListFilter.builder().build());
+      params.put("targets", List.of());
+      params.put("allDrafts", true);
+      params.put("ownerIds", ArticleOwnerIds.NONE);
+      String listSql = statement.getBoundSql(params).getSql().toLowerCase(Locale.ROOT);
+      assertFalse(listSql.contains("body_content"), dialect);
+      params.put("filter", ArticleListFilter.builder().withQuery("refund").build());
+      params.put("pattern", "%refund%");
+      String searchSql = statement.getBoundSql(params).getSql().toLowerCase(Locale.ROOT);
+      assertTrue(searchSql.contains("body_content"), dialect);
+      assertFalse(
+          searchSql.substring(0, searchSql.indexOf("from")).contains("body_content"), dialect);
+      assertFalse(searchSql.contains("body_format"), dialect);
+    }
+  }
+
   @Test
   void metadataQueriesExcludeContent() {
     Configuration configuration = new Configuration();
