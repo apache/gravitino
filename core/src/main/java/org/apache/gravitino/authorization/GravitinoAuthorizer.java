@@ -43,7 +43,7 @@ public interface GravitinoAuthorizer extends Closeable {
    * AuthorizationRequestContext#targetIdResolver(String)}. Implementations that opt in must use
    * those identities for the target and its ancestors whenever a resolver is present, including
    * when a name has been reused. An authorizer granting unconditional access can also opt in.
-   * Article asset bindings require this capability.
+   * Glossary Term and Article asset binding operations require this capability.
    *
    * @return whether this provider can authorize a resolved binding target
    */

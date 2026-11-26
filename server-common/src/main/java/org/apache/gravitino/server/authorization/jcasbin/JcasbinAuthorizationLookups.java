@@ -115,7 +115,10 @@ public class JcasbinAuthorizationLookups {
     if (resolver != null) {
       return new MetadataIdResolution(resolver.apply(object), false);
     }
-    return resolveMetadataIdResult(object, metalake, context);
+    Long observed = context.observedTargetId(metalake, object);
+    return observed == null
+        ? resolveMetadataIdResult(object, metalake, context)
+        : new MetadataIdResolution(Optional.of(observed), false);
   }
 
   // Preserve normalization failures as distinct from missing objects for DENY-policy consumers.
