@@ -26,6 +26,7 @@ import java.security.PrivilegedAction;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
@@ -286,7 +287,8 @@ public class GravitinoCatalogManager {
     }
     return GravitinoAdminClient.builder(gravitinoUri)
         .withBasicAuth(username, password)
-        .withClientConfig(clientConfig)
+        .withHeaders(extractRequestHeaders(config))
+        .withClientConfig(withoutRequestHeaders(clientConfig))
         .build();
   }
 
@@ -324,7 +326,8 @@ public class GravitinoCatalogManager {
 
     return GravitinoAdminClient.builder(gravitinoUri)
         .withOAuth(provider)
-        .withClientConfig(clientConfig)
+        .withHeaders(extractRequestHeaders(config))
+        .withClientConfig(withoutRequestHeaders(clientConfig))
         .build();
   }
 
@@ -337,7 +340,8 @@ public class GravitinoCatalogManager {
                 () ->
                     GravitinoAdminClient.builder(gravitinoUri)
                         .withKerberosAuth(KerberosTokenProvider.builder().build())
-                        .withClientConfig(config)
+                        .withHeaders(extractRequestHeaders(config))
+                        .withClientConfig(withoutRequestHeaders(config))
                         .build());
   }
 
@@ -346,8 +350,25 @@ public class GravitinoCatalogManager {
     String userName = getUgi().getUserName();
     return GravitinoAdminClient.builder(gravitinoUri)
         .withSimpleAuth(userName)
-        .withClientConfig(config)
+        .withHeaders(extractRequestHeaders(config))
+        .withClientConfig(withoutRequestHeaders(config))
         .build();
+  }
+
+  private static Map<String, String> extractRequestHeaders(Map<String, String> config) {
+    String prefix = GravitinoCatalogStoreFactoryOptions.GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX;
+    return config.entrySet().stream()
+        .filter(entry -> entry.getKey().startsWith(prefix))
+        .collect(
+            Collectors.toMap(
+                entry -> entry.getKey().substring(prefix.length()), Map.Entry::getValue));
+  }
+
+  private static Map<String, String> withoutRequestHeaders(Map<String, String> config) {
+    String prefix = GravitinoCatalogStoreFactoryOptions.GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX;
+    return config.entrySet().stream()
+        .filter(entry -> !entry.getKey().startsWith(prefix))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   private static UserGroupInformation getUgi() {

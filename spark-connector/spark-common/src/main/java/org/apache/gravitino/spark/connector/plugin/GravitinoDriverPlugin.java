@@ -318,6 +318,11 @@ public class GravitinoDriverPlugin implements DriverPlugin {
       Map<String, String> clientConfig) {
     ClientBuilder builder = GravitinoClient.builder(uri).withMetalake(metalake);
     builder.withClientConfig(clientConfig);
+    builder.withHeaders(
+        Arrays.stream(
+                sparkConf.getAllWithPrefix(
+                    GravitinoSparkConfig.GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX))
+            .collect(Collectors.toMap(t -> t._1, t -> t._2)));
     String authType =
         sparkConf.get(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.SIMPLE_AUTH_TYPE);
     if (AuthProperties.isSimple(authType)) {
@@ -507,6 +512,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         .map(
             arr ->
                 Stream.of(arr)
+                    .filter(t -> !t._1.startsWith("request.header."))
                     .collect(
                         Collectors.toMap(
                             t -> GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + t._1,

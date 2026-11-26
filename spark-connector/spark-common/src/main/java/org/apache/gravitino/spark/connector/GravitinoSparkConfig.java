@@ -40,6 +40,10 @@ public class GravitinoSparkConfig {
 
   public static final String GRAVITINO_CLIENT_CONFIG_PREFIX = GRAVITINO_PREFIX + "client.";
 
+  /** Prefix for custom HTTP headers sent to the Gravitino server. */
+  public static final String GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX =
+      GRAVITINO_CLIENT_CONFIG_PREFIX + "request.header.";
+
   /**
    * Manually overrides the Gravitino Iceberg REST server endpoint that hive/jdbc backed
    * lakehouse-iceberg catalogs are routed through; takes precedence over auto-discovery.
