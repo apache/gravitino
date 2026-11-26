@@ -96,20 +96,20 @@ for local convenience.)
 
 ### Connect
 
-| Field          | Value                                    |
-|----------------|------------------------------------------|
-| Transport Type | `Streamable HTTP`                        |
-| URL            | `http://127.0.0.1:8000/mcp`              |
-| Header Name    | `Authorization`                          |
+| Field          | Value                                       |
+|----------------|---------------------------------------------|
+| Transport Type | `Streamable HTTP`                           |
+| URL            | `http://127.0.0.1:8000/mcp`                 |
+| Header Name    | `Authorization`                             |
 | Header Value   | `Basic YWRtaW46ZHVtbXk=`  (this is `admin`) |
 
 The two principal tokens (these are Gravitino simple-auth headers, i.e.
 `Basic base64("<user>:dummy")`):
 
-| Principal | Authorization header value     |
-|-----------|--------------------------------|
-| `admin`   | `Basic YWRtaW46ZHVtbXk=`       |
-| `bob`     | `Basic Ym9iOmR1bW15`           |
+| Principal | Authorization header value |
+|-----------|----------------------------|
+| `admin`   | `Basic YWRtaW46ZHVtbXk=`   |
+| `bob`     | `Basic Ym9iOmR1bW15`       |
 
 Click **Connect**, then **List Tools** — you should see the full read + write
 tool surface (catalogs, schemas, tables, filesets, topics, models, tags, …).
@@ -160,9 +160,9 @@ Look at the audit log you've been tailing. You should see discrete, correctly
 attributed records, for example:
 
 ```json
-{"timestamp": "...", "principal": "admin", "tool": "get_list_of_catalogs", "outcome": "allow"}
-{"timestamp": "...", "principal": "bob",   "tool": "get_list_of_catalogs", "outcome": "allow"}
-{"timestamp": "...", "principal": "bob",   "tool": "create_tag", "outcome": "deny", "error_type": "McpError"}
+{"timestamp": "...", "principal": "admin", "tool": "get_list_of_catalogs", "outcome": "allow", "metalake": "mcp_authz_it"}
+{"timestamp": "...", "principal": "bob",   "tool": "get_list_of_catalogs", "outcome": "allow", "metalake": "mcp_authz_it"}
+{"timestamp": "...", "principal": "bob",   "tool": "create_tag", "outcome": "deny", "metalake": "mcp_authz_it", "target_type": "tag", "target_name": "mcp_authz_it.test_tag", "error_type": "ForbiddenException", "error_category": "permission_denied"}
 ```
 
 `admin`'s reads attributed to `admin`, `bob`'s reads to `bob`, and `bob`'s denied

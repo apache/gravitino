@@ -101,7 +101,8 @@ class _GravitinoAsyncClient(httpx.AsyncClient):
                 f"The MCP server stopped waiting for Gravitino ({request.method} "
                 f"{resource}) after a response read "
                 f"timeout of {self.timeout.read:g} seconds. The operation may still "
-                "complete on the server; check its result before retrying."
+                "complete on the server; check its result before retrying.",
+                error_type="ReadTimeout",
             ) from exc
 
 

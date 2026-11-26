@@ -16,7 +16,21 @@
 # under the License.
 
 
+from typing import Optional
+
+
 class GravitinoException(Exception):
     """Custom exception for Gravitino-related errors."""
 
-    pass
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: Optional[int] = None,
+        error_code: Optional[int] = None,
+        error_type: str = "",
+    ):
+        super().__init__(message)
+        self.status_code = status_code
+        self.error_code = error_code
+        self.error_type = error_type
