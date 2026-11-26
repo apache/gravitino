@@ -132,6 +132,7 @@ public class TestOntologyMetaService extends TestJDBCBackend {
         Map.of(),
         ignored -> {});
     assertEquals(sales.id(), STORE.getId(NameIdentifierUtil.ofOntology(METALAKE, ONTOLOGY)));
+    assertTrue(STORE.namesById(List.of()).isEmpty());
     assertThrows(
         NoSuchEntityException.class,
         () -> STORE.getId(NameIdentifierUtil.ofOntology(METALAKE, "Missing")));
