@@ -763,7 +763,7 @@ TermDTO               { name, definition, synonyms, status, domains, broader, na
                         matchedBy?: [{word, field: NAME | SYNONYM}],
                         bindings?: [TermBindingDTO], bindingsTruncated? }
 TermBindingListResponse { bindings: [TermBindingDTO] }
-TermBindingDTO        { kind: IMPLEMENTED_BY | USED_BY, object: MetadataObjectDTO, metric? }
+TermBindingDTO        { kind: implemented_by | used_by, object: MetadataObjectDTO, metric? }
 ObjectTermsResponse   { terms: [TermDTO], children: [{ name, terms: [TermDTO] }] }
 TermsAssociateRequest { termsToAdd: [name], termsToRemove: [name] }
 ```
