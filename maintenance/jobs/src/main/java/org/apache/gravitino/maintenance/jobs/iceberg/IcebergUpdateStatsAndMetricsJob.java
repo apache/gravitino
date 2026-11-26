@@ -120,6 +120,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
       Map<String, String> optimizerProperties =
           GravitinoClientUtils.normalizeUpdaterConnectionOptions(updaterOptions);
       GravitinoClientUtils.requireGravitinoUri(optimizerProperties);
+      GravitinoClientUtils.requireJdbcMetricsUrlIfNeeded(updateMode.modeName, optimizerProperties);
       String schemaSeparator =
           GravitinoClientUtils.fetchSchemaSeparator(
               optimizerProperties.get(OptimizerConfig.GRAVITINO_URI));

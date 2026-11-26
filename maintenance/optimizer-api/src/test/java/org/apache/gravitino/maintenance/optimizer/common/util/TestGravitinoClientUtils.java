@@ -73,6 +73,29 @@ class TestGravitinoClientUtils {
   }
 
   @Test
+  void testRequireJdbcMetricsUrlIfNeeded() {
+    Map<String, String> withoutUrl = new HashMap<>();
+    withoutUrl.put("gravitino_uri", "http://localhost:8090");
+    GravitinoClientUtils.requireJdbcMetricsUrlIfNeeded("stats", withoutUrl);
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> GravitinoClientUtils.requireJdbcMetricsUrlIfNeeded("metrics", withoutUrl));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> GravitinoClientUtils.requireJdbcMetricsUrlIfNeeded("all", withoutUrl));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> GravitinoClientUtils.requireJdbcMetricsUrlIfNeeded("ALL", withoutUrl));
+
+    Map<String, String> withUrl = new HashMap<>(withoutUrl);
+    withUrl.put(
+        OptimizerConfig.JDBC_METRICS_JDBC_URL, "jdbc:postgresql://localhost:5432/optimizer");
+    GravitinoClientUtils.requireJdbcMetricsUrlIfNeeded("metrics", withUrl);
+    GravitinoClientUtils.requireJdbcMetricsUrlIfNeeded("all", withUrl);
+  }
+
+  @Test
   void testFetchSchemaSeparatorRejectsMissingKey() throws Exception {
     HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
     server.createContext(

@@ -65,6 +65,13 @@ public class OptimizerConfig extends Config {
   public static final String UPDATER_PREFIX = OPTIMIZER_PREFIX + "updater.";
   private static final String STATISTICS_UPDATER = UPDATER_PREFIX + "statisticsUpdater";
   private static final String METRICS_UPDATER = UPDATER_PREFIX + "metricsUpdater";
+
+  /**
+   * Canonical JDBC URL for metrics storage under {@code updater-options} / optimizer config. Must
+   * match {@code GenericJdbcMetricsRepository}'s {@code jdbcMetrics.jdbcUrl} property.
+   */
+  public static final String JDBC_METRICS_JDBC_URL = OPTIMIZER_PREFIX + "jdbcMetrics.jdbcUrl";
+
   public static final String MONITOR_PREFIX = OPTIMIZER_PREFIX + "monitor.";
   private static final String METRICS_PROVIDER = MONITOR_PREFIX + "metricsProvider";
   private static final String TABLE_JOB_RELATION_PROVIDER =

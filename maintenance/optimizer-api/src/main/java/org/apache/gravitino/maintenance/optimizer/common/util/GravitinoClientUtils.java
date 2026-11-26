@@ -28,6 +28,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
@@ -146,6 +147,40 @@ public final class GravitinoClientUtils {
     String gravitinoUri = optimizerProperties.get(OptimizerConfig.GRAVITINO_URI);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(gravitinoUri), "updater_options must contain 'gravitino_uri'");
+  }
+
+  /**
+   * When {@code updateMode} is {@code metrics} or {@code all}, requires a non-blank {@link
+   * OptimizerConfig#JDBC_METRICS_JDBC_URL} in {@code updaterOptions}. {@code stats} skips this
+   * check. Shared by the built-in update-stats Spark job and {@code submit-update-stats-job}.
+   *
+   * @param updateMode update-stats mode ({@code stats}, {@code metrics}, or {@code all})
+   * @param updaterOptions updater-options map (raw or normalized)
+   */
+  public static void requireJdbcMetricsUrlIfNeeded(
+      String updateMode, Map<String, String> updaterOptions) {
+    Preconditions.checkArgument(updaterOptions != null, "updaterOptions must not be null");
+    String mode = updateMode == null ? "" : updateMode.trim().toLowerCase(Locale.ROOT);
+    if (!"metrics".equals(mode) && !"all".equals(mode)) {
+      return;
+    }
+    requireJdbcMetricsUrl(updaterOptions);
+  }
+
+  /**
+   * Requires a non-blank {@link OptimizerConfig#JDBC_METRICS_JDBC_URL} so metrics updates do not
+   * silently fall back to the embedded H2 default.
+   *
+   * @param updaterOptions updater-options map carrying jdbcMetrics settings
+   */
+  public static void requireJdbcMetricsUrl(Map<String, String> updaterOptions) {
+    Preconditions.checkArgument(updaterOptions != null, "updaterOptions must not be null");
+    String jdbcUrl = updaterOptions.get(OptimizerConfig.JDBC_METRICS_JDBC_URL);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(jdbcUrl),
+        "updater_options must contain '"
+            + OptimizerConfig.JDBC_METRICS_JDBC_URL
+            + "' when update_mode is metrics or all");
   }
 
   private static Optional<String> firstNonEmpty(String... candidates) {
