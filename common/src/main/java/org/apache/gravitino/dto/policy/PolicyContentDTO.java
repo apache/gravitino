@@ -42,7 +42,7 @@ import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Privilege;
-import org.apache.gravitino.json.StrictJsonStringDeserializer;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.policy.ColumnMaskContent;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
@@ -176,7 +176,7 @@ public interface PolicyContentDTO extends PolicyContent {
    * <p>Shared by Iceberg maintenance policy string fields ({@code rewriteStrategy}, {@code
    * sortOrder}, orphan {@code location}, peer {@code timeTrigger}).
    */
-  class StrictStringDeserializer extends StrictJsonStringDeserializer {}
+  class StrictStringDeserializer extends JsonUtils.StrictStringDeserializer {}
 
   /**
    * Reads a string-to-string map without silently coercing numeric or boolean entry values.
