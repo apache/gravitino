@@ -41,6 +41,26 @@ val kyuubiVersion: String = libs.versions.kyuubi4spark.get()
 val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 val artifactName = "${rootProject.name}-spark-${sparkMajorVersion}_$scalaVersion"
+val dorisConnector = "org.apache.doris:spark-doris-connector-spark-3.5:26.1.0"
+
+// The published Doris connector targets Scala 2.12. Keep its classes for Scala 2.13 unit tests,
+// but do not let Spark's service loader initialize its incompatible DataSource implementation.
+val scala213DorisTestJar = if (scalaVersion == "2.13") {
+  val dorisJar = configurations.create("dorisScala213TestJarInput") {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    isTransitive = false
+  }
+  dependencies.add(dorisJar.name, dorisConnector)
+  tasks.register<Zip>("scala213DorisTestJar") {
+    archiveFileName.set("doris-spark-test-no-datasource.jar")
+    destinationDirectory.set(layout.buildDirectory.dir("doris-test"))
+    from({ zipTree(dorisJar.singleFile) })
+    exclude("META-INF/services/org.apache.spark.sql.sources.DataSourceRegister")
+  }
+} else {
+  null
+}
 
 // The connector's shared sources are compiled here rather than consumed as a jar, so that every
 // supported Spark version builds them against its own API. `spark35` holds the one thing a Spark 4
@@ -114,7 +134,7 @@ dependencies {
   }
   compileOnly("org.apache.spark:spark-core_$scalaVersion:$sparkVersion")
   compileOnly("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion")
-  compileOnly("org.apache.doris:spark-doris-connector-spark-3.5:26.1.0")
+  compileOnly(dorisConnector)
   compileOnly("org.scala-lang.modules:scala-java8-compat_$scalaVersion:$scalaJava8CompatVersion")
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
   compileOnly("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
@@ -232,7 +252,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.lance.namespace.apache.client)
   testImplementation(libs.mysql.driver)
-  testImplementation("org.apache.doris:spark-doris-connector-spark-3.5:26.1.0")
+  testImplementation(dorisConnector)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
   testImplementation(libs.aws.policy)
@@ -267,6 +287,9 @@ dependencies {
 }
 
 tasks.test {
+  if (scala213DorisTestJar != null) {
+    classpath = classpath.filter { it.name != "spark-doris-connector-spark-3.5-26.1.0.jar" } + files(scala213DorisTestJar)
+  }
   val dorisStandaloneIT = project.hasProperty("dorisStandaloneIT")
   useJUnitPlatform {
     if (dorisStandaloneIT) {
