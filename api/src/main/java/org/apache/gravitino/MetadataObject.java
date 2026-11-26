@@ -88,7 +88,9 @@ public interface MetadataObject {
      * A glossary term defines a business word in a metalake, and can be bound to the metadata
      * objects and metrics behind it.
      */
-    GLOSSARY_TERM;
+    GLOSSARY_TERM,
+    /** A metalake-scoped Knowledge Base Article. */
+    KNOWLEDGE_BASE_ARTICLE;
   }
 
   /**
