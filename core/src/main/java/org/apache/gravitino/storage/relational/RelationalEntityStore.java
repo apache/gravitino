@@ -81,6 +81,7 @@ import org.apache.gravitino.semantic.SemanticModelRevision;
 import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
@@ -982,6 +983,15 @@ public class RelationalEntityStore
       // Uncached entities still invoke the cache's related-invalidation hook. There is no stale
       // value to publish, and taking this entity's key lock can nest locks inside that hook.
       cache.put(entity);
+      return;
+    }
+    // put, get, and batchGet all publish here, after the backend call has released its own
+    // session reference. A still-open session is the caller's outer transaction: this connection
+    // can read a row that other connections must not see until commit, and must not see at all if
+    // the transaction rolls back. Skip the write. The caller still receives the entity, and the
+    // next read after the transaction closes fills the cache. A standalone put runs this only
+    // after its own commit, so it still warms the cache.
+    if (SessionUtils.isInTransaction()) {
       return;
     }
     NameIdentifier ident = entity.nameIdentifier();
