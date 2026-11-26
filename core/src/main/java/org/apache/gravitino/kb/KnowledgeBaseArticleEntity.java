@@ -42,7 +42,16 @@ import org.apache.gravitino.meta.AuditInfo;
  */
 @Getter
 @Accessors(fluent = true)
-@EqualsAndHashCode(exclude = {"auditInfo", "bodyUpdate", "domains", "terms", "termsHasMore"})
+@EqualsAndHashCode(
+    exclude = {
+      "auditInfo",
+      "bodyUpdate",
+      "domains",
+      "terms",
+      "termsHasMore",
+      "objects",
+      "objectsHasMore"
+    })
 public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, Auditable {
   /** Stable identity of a bound Term or asset. */
   public record Binding(String targetType, long targetId) {
@@ -107,6 +116,11 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
 
   private final boolean termsHasMore;
 
+  /** Readable asset binding window in manager responses. */
+  private final List<ArticleObjectIdentifier> objects;
+
+  private final boolean objectsHasMore;
+
   private final Set<Binding> bindings;
   private final AuditInfo auditInfo;
 
@@ -127,6 +141,8 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
       List<String> domains,
       List<ArticleTermBinding> terms,
       boolean termsHasMore,
+      List<ArticleObjectIdentifier> objects,
+      boolean objectsHasMore,
       Set<Binding> bindings,
       AuditInfo auditInfo) {
     Preconditions.checkArgument(
@@ -152,6 +168,8 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
     this.domains = domains == null ? List.of() : List.copyOf(domains);
     this.terms = terms == null ? List.of() : List.copyOf(terms);
     this.termsHasMore = termsHasMore;
+    this.objects = objects == null ? List.of() : List.copyOf(objects);
+    this.objectsHasMore = objectsHasMore;
     this.bindings = bindings == null ? Set.of() : Set.copyOf(bindings);
     this.auditInfo = Preconditions.checkNotNull(auditInfo, "auditInfo");
   }

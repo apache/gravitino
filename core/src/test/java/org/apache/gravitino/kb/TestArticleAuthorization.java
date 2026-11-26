@@ -45,6 +45,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.UserGroup;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
@@ -57,12 +58,15 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchKnowledgeBaseArticleException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.apache.gravitino.exceptions.UnapprovedTermException;
@@ -70,10 +74,13 @@ import org.apache.gravitino.glossary.GlossaryManager;
 import org.apache.gravitino.glossary.GlossaryTerm;
 import org.apache.gravitino.glossary.TermChange;
 import org.apache.gravitino.glossary.TermSpec;
+import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.policy.PolicyManager;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
@@ -88,6 +95,7 @@ import org.apache.gravitino.tag.TagManager;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
@@ -887,6 +895,169 @@ class TestArticleAuthorization extends TestJDBCBackend {
       assertEquals(
           "body", as("lakeOwner", () -> manager.getArticleContent(LAKE, name)).body().content());
     }
+  }
+
+  @TestTemplate
+  void assetPrivilegesFilterBindingsBeforeOffsetAndRecheckNoOps() throws Exception {
+    installAssetCatalog();
+    createAndInsertCatalog(LAKE, "warehouse");
+    createAndInsertSchema(LAKE, "warehouse", "sales");
+    var ns = Namespace.of(LAKE, "warehouse", "sales");
+    var names = List.of("first", "hidden", "last");
+    List<ArticleObjectIdentifier> targets = new ArrayList<>();
+    for (String name : names) {
+      backend.insert(createTableEntity(ids.incrementAndGet(), ns, name, AUDIT_INFO), false);
+      targets.add(
+          ArticleObjectIdentifier.of(
+              MetadataObject.Type.TABLE, List.of("warehouse", "sales"), name));
+    }
+    role("useCatalog", Privileges.allow("USE_CATALOG"));
+    role("useSchema", Privileges.allow("USE_SCHEMA"));
+    role("allTables", Privileges.allow("SELECT_TABLE"));
+    role(
+        "hideTable",
+        SecurableObjects.parse(
+            "warehouse.sales.hidden",
+            MetadataObject.Type.TABLE,
+            List.of(Privileges.deny("SELECT_TABLE"))));
+    user("assetEditor", "manage", "useCatalog", "useSchema", "allTables", "hideTable");
+    var created =
+        as(
+            "lakeOwner",
+            () ->
+                manager.createArticle(
+                    LAKE,
+                    ArticleCreate.builder()
+                        .withTitle("Guide")
+                        .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "body"))
+                        .addObjects(targets.toArray(ArticleObjectIdentifier[]::new))
+                        .build()));
+    as(
+        "assetEditor",
+        () -> {
+          var first = manager.listAssetBindings(LAKE, "guide", 1, 0);
+          assertEquals(List.of(targets.get(0)), first.objects());
+          assertTrue(first.hasMore());
+          var last = manager.loadArticle(LAKE, "guide", 1, 1).article();
+          assertEquals(List.of(targets.get(2)), last.objects());
+          assertFalse(last.objectsHasMore());
+          assertThrows(
+              NoSuchMetadataObjectException.class,
+              () -> manager.listArticlesForObject(LAKE, targets.get(1), true, 1, 0));
+          assertThrows(
+              NoSuchMetadataObjectException.class,
+              () ->
+                  manager.alterArticle(
+                      LAKE,
+                      "guide",
+                      null,
+                      KnowledgeBaseArticleChange.updateTitle("Changed"),
+                      KnowledgeBaseArticleChange.addObjects(targets.get(1))));
+          assertThrows(
+              NoSuchMetadataObjectException.class,
+              () ->
+                  manager.alterArticle(
+                      LAKE,
+                      "guide",
+                      null,
+                      KnowledgeBaseArticleChange.removeObjects(targets.get(1))));
+          assertEquals(created.revisionToken(), manager.loadArticle(LAKE, "guide").revisionToken());
+          return null;
+        });
+    assertTrue(
+        as("viewer", () -> manager.listAssetBindings(LAKE, "guide", 1, 0)).objects().isEmpty());
+  }
+
+  @TestTemplate
+  void columnUsesTableReadPermissionAndChecksTheCurrentTableId() throws Exception {
+    installAssetCatalog();
+    createAndInsertCatalog(LAKE, "warehouse");
+    createAndInsertSchema(LAKE, "warehouse", "sales");
+    var ns = Namespace.of(LAKE, "warehouse", "sales");
+    var table =
+        TableEntity.builder()
+            .withId(ids.incrementAndGet())
+            .withNamespace(ns)
+            .withName("orders")
+            .withColumns(
+                List.of(
+                    ColumnEntity.builder()
+                        .withId(ids.incrementAndGet())
+                        .withName("total.amount")
+                        .withDataType(Types.IntegerType.get())
+                        .withPosition(0)
+                        .withNullable(true)
+                        .withAutoIncrement(false)
+                        .withAuditInfo(AUDIT_INFO)
+                        .build()))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    backend.insert(table, false);
+    role("useCatalog", Privileges.allow("USE_CATALOG"));
+    role("useSchema", Privileges.allow("USE_SCHEMA"));
+    role(
+        "ordersReader",
+        SecurableObjects.parse(
+            "warehouse.sales.orders",
+            MetadataObject.Type.TABLE,
+            List.of(Privileges.allow("SELECT_TABLE"))));
+    user("ordersReaderUser", "view", "useCatalog", "useSchema", "ordersReader");
+    var column =
+        ArticleObjectIdentifier.of(
+            MetadataObject.Type.COLUMN, List.of("warehouse", "sales", "orders"), "total.amount");
+    as(
+        "lakeOwner",
+        () ->
+            manager.createArticle(
+                LAKE,
+                ArticleCreate.builder()
+                    .withTitle("Guide")
+                    .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "body"))
+                    .addObjects(column)
+                    .build()));
+    assertEquals(
+        List.of(column),
+        as("ordersReaderUser", () -> manager.loadArticle(LAKE, "guide")).article().objects());
+    assertEquals(
+        "guide",
+        as("ordersReaderUser", () -> manager.listArticlesForObject(LAKE, column, false, 1, 0))
+            .articles()
+            .get(0)
+            .name());
+    backend.delete(table.nameIdentifier(), Entity.EntityType.TABLE, false);
+    createAndInsertTableEntity(ns, "orders");
+    var replacement =
+        ArticleObjectIdentifier.of(
+            MetadataObject.Type.TABLE, List.of("warehouse", "sales"), "orders");
+    as(
+        "lakeOwner",
+        () ->
+            manager.alterArticle(
+                LAKE, "guide", null, KnowledgeBaseArticleChange.addObjects(replacement)));
+    as(
+        "ordersReaderUser",
+        () -> {
+          assertTrue(manager.loadArticle(LAKE, "guide").article().objects().isEmpty());
+          assertThrows(
+              NoSuchMetadataObjectException.class,
+              () -> manager.listArticlesForObject(LAKE, replacement, false, 1, 0));
+          return null;
+        });
+  }
+
+  private void installAssetCatalog() throws Exception {
+    // Role loading resolves the catalog's case and table-name rules for its securable objects.
+    var manager = Mockito.mock(CatalogManager.class);
+    var catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability()).thenReturn(new Capability() {});
+    Mockito.doAnswer(
+            call -> {
+              ThrowableFunction<BaseCatalog<?>, Object> operation = call.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(manager)
+        .doWithCatalog(Mockito.any(), Mockito.any());
+    FieldUtils.writeField(env, "catalogManager", manager, true);
   }
 
   private static KnowledgeBaseArticleChange domains(String... names) {

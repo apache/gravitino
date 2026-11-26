@@ -161,7 +161,7 @@ public final class KnowledgeBaseArticleMetaService {
     return listByDomains(namespace, domains, true);
   }
 
-  /** Loads list candidates without collecting Term IDs, which are paged in the same snapshot. */
+  /** Loads list candidates without collecting binding IDs, which are paged in the same snapshot. */
   public List<KnowledgeBaseArticleEntity> listForPreview(
       Namespace namespace, @Nullable Set<Long> domains) {
     return domains == null
@@ -170,7 +170,7 @@ public final class KnowledgeBaseArticleMetaService {
   }
 
   private List<KnowledgeBaseArticleEntity> listByDomains(
-      Namespace namespace, Set<Long> domains, boolean includeTerms) {
+      Namespace namespace, Set<Long> domains, boolean includeBindings) {
     String lake = metalakeName(namespace);
     Map<Long, KnowledgeBaseArticleEntity> matches = new TreeMap<>();
     return SessionUtils.getWithoutCommit(
@@ -178,7 +178,7 @@ public final class KnowledgeBaseArticleMetaService {
         mapper -> {
           for (List<Long> batch : Lists.partition(List.copyOf(domains), LOOKUP_BATCH_SIZE)) {
             for (var article :
-                aggregate(namespace, mapper.joined(lake, null, batch, includeTerms))) {
+                aggregate(namespace, mapper.joined(lake, null, batch, includeBindings))) {
               matches.put(article.id(), article);
             }
           }
@@ -186,7 +186,7 @@ public final class KnowledgeBaseArticleMetaService {
         });
   }
 
-  /** Reads Article metadata for a separately paged Term preview in the caller's snapshot. */
+  /** Reads Article metadata for separately paged binding previews in the caller's snapshot. */
   public ScopedArticle getForPreview(NameIdentifier ident) {
     ScopedArticle result =
         joinedArticle(ident.namespace(), KnowledgeBaseArticle.normalizeName(ident.name()), false);
@@ -438,9 +438,23 @@ public final class KnowledgeBaseArticleMetaService {
       Function<ScopedArticle, KnowledgeBaseArticleEntity> edit,
       TransactionHook hook,
       UnaryOperator<KnowledgeBaseArticleEntity> project) {
+    return editScoped(
+        ident, requestedDomains, requestedTerms, lake -> Set.of(), edit, hook, project);
+  }
+
+  /** Fences the planned assets before Terms, Domains and the Article. */
+  public ScopedArticle editScoped(
+      NameIdentifier ident,
+      @Nullable Set<Long> requestedDomains,
+      Set<Binding> requestedTerms,
+      LongFunction<Set<Binding>> lockAssets,
+      Function<ScopedArticle, KnowledgeBaseArticleEntity> edit,
+      TransactionHook hook,
+      UnaryOperator<KnowledgeBaseArticleEntity> project) {
     return write(
         ident.namespace(),
         (mapper, lake) -> {
+          Set<Binding> locked = Sets.union(lockAssets.apply(lake), requestedTerms);
           lockTermTargets(lake, requestedTerms);
           KnowledgeBaseArticleEntity before;
           KnowledgeBaseArticlePO row;
@@ -466,8 +480,7 @@ public final class KnowledgeBaseArticleMetaService {
           }
           KnowledgeBaseArticleEntity after = edit.apply(new ScopedArticle(lake, before));
           Preconditions.checkArgument(
-              requestedTerms.containsAll(
-                      Sets.symmetricDifference(before.bindings(), after.bindings()))
+              locked.containsAll(Sets.symmetricDifference(before.bindings(), after.bindings()))
                   && (requestedDomains == null
                       ? before.domainIds().equals(after.domainIds())
                       : Sets.union(before.domainIds(), requestedDomains)
@@ -705,12 +718,12 @@ public final class KnowledgeBaseArticleMetaService {
     return id;
   }
 
-  private List<KnowledgeBaseArticleEntity> joinedList(Namespace ns, boolean includeTerms) {
+  private List<KnowledgeBaseArticleEntity> joinedList(Namespace ns, boolean includeBindings) {
     String metalake = metalakeName(ns);
     return SessionUtils.getWithoutCommitFresh(
         KnowledgeBaseArticleMapper.class,
         m -> {
-          List<KnowledgeBaseArticlePO> rows = m.joined(metalake, null, null, includeTerms);
+          List<KnowledgeBaseArticlePO> rows = m.joined(metalake, null, null, includeBindings);
           if (rows.isEmpty()) {
             throw new NoSuchEntityException(
                 NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, "metalake", metalake);
@@ -817,11 +830,11 @@ public final class KnowledgeBaseArticleMetaService {
   }
 
   @Nullable
-  private ScopedArticle joinedArticle(Namespace namespace, String name, boolean includeTerms) {
+  private ScopedArticle joinedArticle(Namespace namespace, String name, boolean includeBindings) {
     List<KnowledgeBaseArticlePO> rows =
         SessionUtils.getWithoutCommitFresh(
             KnowledgeBaseArticleMapper.class,
-            mapper -> mapper.joined(metalakeName(namespace), name, null, includeTerms));
+            mapper -> mapper.joined(metalakeName(namespace), name, null, includeBindings));
     return rows.isEmpty()
         ? null
         : new ScopedArticle(rows.get(0).getMetalakeId(), aggregate(namespace, rows).get(0));

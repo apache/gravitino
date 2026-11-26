@@ -39,6 +39,19 @@ public interface GravitinoAuthorizer extends Closeable {
   void initialize();
 
   /**
+   * Whether target privilege and ownership checks honor the identities supplied by {@link
+   * AuthorizationRequestContext#targetIdResolver(String)}. Implementations that opt in must use
+   * those identities for the target and its ancestors whenever a resolver is present, including
+   * when a name has been reused. An authorizer granting unconditional access can also opt in.
+   * Article asset bindings require this capability.
+   *
+   * @return whether this provider can authorize a resolved binding target
+   */
+  default boolean supportsResolvedTargetAuthorization() {
+    return false;
+  }
+
+  /**
    * Perform authorization and return the authorization result. For metalake glossary privileges,
    * expand allowed MANAGE_DEFINITIONS into CREATE_DEFINITION and VIEW_DEFINITION, and allowed
    * CREATE_DEFINITION into VIEW_DEFINITION, before applying explicit denies to each capability.

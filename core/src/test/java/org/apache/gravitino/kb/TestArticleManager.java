@@ -290,7 +290,13 @@ class TestArticleManager extends TestJDBCBackend {
     var edited =
         manager.alterArticle(
             LAKE, "guide", null, KnowledgeBaseArticleChange.updateStatus(ArticleStatus.DEPRECATED));
-    assertEquals(bindings, edited.article().bindings());
+    assertEquals(Set.of(), edited.article().bindings());
+    assertEquals(
+        bindings,
+        KnowledgeBaseArticleMetaService.getInstance()
+            .getScoped(edited.article().nameIdentifier())
+            .article()
+            .bindings());
     assertEquals(3, edited.article().revision());
   }
 

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.authorization;
 
+import com.google.common.base.Preconditions;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -134,6 +135,28 @@ public class AuthorizationRequestContext {
    * caller declared none.
    */
   private volatile ActiveRoles activeRoles = currentPrincipalActiveRoles();
+
+  @Nullable private final String resolvedMetalake;
+  @Nullable private final Function<MetadataObject, Optional<Long>> targetIdResolver;
+
+  /** Creates a context for ordinary name-based authorization. */
+  public AuthorizationRequestContext() {
+    resolvedMetalake = null;
+    targetIdResolver = null;
+  }
+
+  /** Uses the operation's observed identities when authorizing targets in this metalake. */
+  public AuthorizationRequestContext(
+      String metalake, Function<MetadataObject, Optional<Long>> targetIdResolver) {
+    this.resolvedMetalake = Preconditions.checkNotNull(metalake, "metalake");
+    this.targetIdResolver = Preconditions.checkNotNull(targetIdResolver, "targetIdResolver");
+  }
+
+  /** Returns the operation's resolver for this metalake, or null for ordinary name resolution. */
+  @Nullable
+  public Function<MetadataObject, Optional<Long>> targetIdResolver(String metalake) {
+    return metalake.equals(resolvedMetalake) ? targetIdResolver : null;
+  }
 
   private static ActiveRoles currentPrincipalActiveRoles() {
     Principal principal = PrincipalUtils.getCurrentPrincipal();

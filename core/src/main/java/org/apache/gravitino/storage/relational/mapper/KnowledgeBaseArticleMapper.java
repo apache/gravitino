@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.kb.KnowledgeBaseArticleEntity.Binding;
 import org.apache.gravitino.storage.relational.po.GlossaryTermPO;
 import org.apache.gravitino.storage.relational.po.KnowledgeBaseArticlePO;
@@ -30,6 +31,7 @@ import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.Update;
 
 /** Article row and binding operations on the caller's SQL session. */
@@ -114,21 +116,21 @@ public interface KnowledgeBaseArticleMapper {
       @Param("after") @Nullable Long after,
       @Param("limit") int limit);
 
-  /** Selects the readable Article status window for a live, authorized Term. */
+  /** Selects the readable Article status window for a live, authorized binding target. */
   @Select(
       """
       <script>
       SELECT a.article_id AS articleId, a.article_name AS articleName, a.title, a.status, a.audit_info AS auditInfo
       FROM kb_article_relation_meta r
       JOIN kb_article_meta a ON a.article_id=r.article_id AND a.metalake_id=r.metalake_id AND a.deleted_at=0
-      WHERE r.metalake_id=#{lake} AND r.target_id=#{term} AND r.target_type='GLOSSARY_TERM' AND r.deleted_at=0
+      WHERE r.metalake_id=#{lake} AND r.target_id=#{target.targetId} AND r.target_type=#{target.targetType} AND r.deleted_at=0
         AND (a.status='PUBLISHED' <if test='deprecated'>OR a.status='DEPRECATED'</if>)
       ORDER BY a.title, a.article_name LIMIT #{limit} OFFSET #{offset}
       </script>
       """)
-  List<KnowledgeBaseArticlePO> articlesForTerm(
+  List<KnowledgeBaseArticlePO> articlesForTarget(
       @Param("lake") long lake,
-      @Param("term") long term,
+      @Param("target") Binding target,
       @Param("deprecated") boolean deprecated,
       @Param("limit") int limit,
       @Param("offset") int offset);
@@ -144,11 +146,12 @@ public interface KnowledgeBaseArticleMapper {
       FROM metalake_meta m
       LEFT JOIN kb_article_meta a ON a.metalake_id=m.metalake_id AND a.deleted_at=0
       LEFT JOIN (
-        SELECT article_id, target_type, target_id, NULL AS domain_id
-        FROM kb_article_relation_meta WHERE deleted_at=0
-        <if test='!includeTerms'>AND target_type != 'GLOSSARY_TERM'</if>
-        UNION ALL
-        SELECT member_id, NULL, NULL, domain_id FROM domain_member_rel
+        <if test='includeBindings'>
+          SELECT article_id, target_type, target_id, NULL AS domain_id
+          FROM kb_article_relation_meta WHERE deleted_at=0
+          UNION ALL
+        </if>
+        SELECT member_id AS article_id, NULL AS target_type, NULL AS target_id, domain_id FROM domain_member_rel
         WHERE member_type='KNOWLEDGE_BASE_ARTICLE' AND deleted_at=0
       ) b ON b.article_id=a.article_id
       WHERE m.metalake_name=#{metalake} AND m.deleted_at=0
@@ -166,7 +169,7 @@ public interface KnowledgeBaseArticleMapper {
       @Param("metalake") String metalake,
       @Param("name") @Nullable String name,
       @Param("domains") @Nullable List<Long> domains,
-      @Param("includeTerms") boolean includeTerms);
+      @Param("includeBindings") boolean includeBindings);
 
   /** Reads metadata and relations for a batch of Articles from the same snapshot. */
   @Select(
@@ -211,6 +214,58 @@ public interface KnowledgeBaseArticleMapper {
           + LIVE
           + " ORDER BY article_id")
   List<KnowledgeBaseArticlePO> summaries(@Param("metalakeId") long metalakeId);
+
+  /** Current name and ancestor IDs for a live asset in a binding page. */
+  record AssetRow(
+      long id,
+      String name,
+      @Nullable Long catalogId,
+      @Nullable String catalogName,
+      @Nullable Long schemaId,
+      @Nullable String schemaName,
+      @Nullable Long tableId,
+      @Nullable String tableName) {}
+
+  /** Resolves live targets in the lake, including the current version of table columns. */
+  @SelectProvider(type = ArticleAssetSQLProvider.class, method = "liveAssets")
+  @ConstructorArgs({
+    @Arg(column = "id", javaType = long.class),
+    @Arg(column = "name", javaType = String.class),
+    @Arg(column = "catalogId", javaType = Long.class),
+    @Arg(column = "catalogName", javaType = String.class),
+    @Arg(column = "schemaId", javaType = Long.class),
+    @Arg(column = "schemaName", javaType = String.class),
+    @Arg(column = "tableId", javaType = Long.class),
+    @Arg(column = "tableName", javaType = String.class)
+  })
+  List<AssetRow> liveAssets(
+      @Param("lake") long lake,
+      @Param("type") MetadataObject.Type type,
+      @Param("ids") List<Long> ids);
+
+  /** Scans a bounded batch of asset bindings after a stable composite key. */
+  @Select(
+      """
+      <script>
+      SELECT target_type, target_id FROM kb_article_relation_meta
+      WHERE metalake_id=#{lake} AND article_id=#{article} AND deleted_at=0
+        AND target_type != 'GLOSSARY_TERM'
+      <if test='after != null'>
+        AND (target_id &gt; #{after.targetId} OR
+          (target_id=#{after.targetId} AND target_type &gt; #{after.targetType}))
+      </if>
+      ORDER BY target_id, target_type LIMIT #{limit}
+      </script>
+      """)
+  @ConstructorArgs({
+    @Arg(column = "target_type", javaType = String.class),
+    @Arg(column = "target_id", javaType = long.class)
+  })
+  List<Binding> boundAssets(
+      @Param("lake") long lake,
+      @Param("article") long article,
+      @Param("after") @Nullable Binding after,
+      @Param("limit") int limit);
 
   /** Returns complete binding identities for one Article. */
   @Select(

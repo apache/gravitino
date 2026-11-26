@@ -219,11 +219,11 @@ final class ArticleTerms {
 
   record DirectOwner(String name, Owner.Type type) implements Owner {}
 
-  ArticlePage articles(long lake, long target, boolean deprecated, int limit, int offset) {
+  ArticlePage articles(long lake, Binding target, boolean deprecated, int limit, int offset) {
     var rows =
         SessionUtils.getWithoutCommit(
             KnowledgeBaseArticleMapper.class,
-            mapper -> mapper.articlesForTerm(lake, target, deprecated, limit + 1, offset));
+            mapper -> mapper.articlesForTarget(lake, target, deprecated, limit + 1, offset));
     boolean more = rows.size() > limit;
     var page = rows.subList(0, Math.min(limit, rows.size()));
     var names =
