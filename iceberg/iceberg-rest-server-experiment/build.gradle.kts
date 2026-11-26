@@ -123,7 +123,8 @@ dependencies {
   // Resolve the SDK bundle through the same experimental Iceberg substitution as iceberg-aws.
   // The stable bundle does not provide the Apache 5 HTTP client used by the experimental runtime.
   runtimeOnly(libs.iceberg.aws.bundle)
-  // Gravitino's S3 credential generators also need the policy builder, which the SDK bundle omits.
+  // Match the policy-builder version used to compile :bundles:aws; its SDK types come from
+  // the matching Iceberg bundle. Exclude transitives to avoid introducing a second AWS SDK.
   runtimeOnly(libs.aws.policy) {
     exclude("*")
   }
@@ -174,11 +175,19 @@ dependencies {
   add(experimentalTestSources.runtimeOnlyConfigurationName, libs.junit.jupiter.engine)
 }
 
+val serverRuntimeClasspath = files(
+  project(":server").configurations.named("runtimeClasspath"),
+  project(":server").tasks.named("jar")
+)
+
 tasks {
   test {
+    dependsOn(serverRuntimeClasspath)
+    inputs.files(serverRuntimeClasspath).withPropertyName("serverRuntimeClasspath")
     doFirst {
       // Exercise the production dependencies without the test fixtures' cloud bundles.
       systemProperty("experimentalRuntimeClasspath", configurations.runtimeClasspath.get().asPath)
+      systemProperty("serverRuntimeClasspath", serverRuntimeClasspath.asPath)
     }
   }
 
