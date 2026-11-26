@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.iceberg.common.idempotency;
+package org.apache.gravitino.iceberg.service.idempotency;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
