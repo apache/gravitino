@@ -60,6 +60,7 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.plugin.DriverPlugin;
 import org.apache.spark.api.plugin.PluginContext;
+import org.apache.spark.sql.RuntimeConfig;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.internal.StaticSQLConf;
 import org.slf4j.Logger;
@@ -121,8 +122,13 @@ public class GravitinoDriverPlugin implements DriverPlugin {
       handleInitializationFailure(e, failFast);
       return Collections.emptyMap();
     }
-    registerGravitinoCatalogs(conf, catalogManager.getCatalogs());
-    registerSqlExtensions(conf);
+    try {
+      registerGravitinoCatalogs(conf, catalogManager.getCatalogs());
+      registerSqlExtensions(conf);
+    } catch (RuntimeException e) {
+      closeAfterInitializationFailure(e);
+      throw e;
+    }
     return Collections.emptyMap();
   }
 
@@ -148,12 +154,36 @@ public class GravitinoDriverPlugin implements DriverPlugin {
                 LOG.warn("Skip registering {} because catalog provider is empty.", catalogName);
                 return;
               }
+              String sparkCatalogConfigName = "spark.sql.catalog." + catalogName;
+              if (sparkConf.contains(sparkCatalogConfigName)) {
+                LOG.info(
+                    "Skip registering catalog {} because it is already configured in Spark.",
+                    catalogName);
+                return;
+              }
+              String extensionCatalogClassName = bindings.extensionCatalogClassName(provider);
+              if (extensionCatalogClassName != null) {
+                try {
+                  registerCatalogClass(sparkConf, catalogName, extensionCatalogClassName);
+                } catch (RuntimeException e) {
+                  LOG.warn("Register catalog {} failed.", catalogName, e);
+                }
+                return;
+              }
               // Resolve the default kind from the provider. Opt-in settings below may select a
               // specialized kind for the same provider.
               SparkCatalogKind kind = SparkCatalogKind.fromProvider(provider);
               if (kind == null) {
+                Preconditions.checkArgument(
+                    !provider.regionMatches(true, 0, "jdbc-", 0, 5),
+                    "Catalog %s has unsupported JDBC provider %s. It may be served by a separate extension jar.",
+                    catalogName,
+                    provider);
                 LOG.warn(
-                    "Skip registering {} because {} is not supported yet.", catalogName, provider);
+                    "Skip registering {} because {} is not supported yet. "
+                        + "It may be served by a separate extension jar.",
+                    catalogName,
+                    provider);
                 return;
               }
               if (SparkCatalogKind.LAKEHOUSE_ICEBERG.equals(kind) && !enableIcebergSupport) {
@@ -168,13 +198,6 @@ public class GravitinoDriverPlugin implements DriverPlugin {
                       "Specialized Doris Spark support is unavailable in this Spark build");
                 }
                 kind = SparkCatalogKind.DORIS;
-              }
-              String sparkCatalogConfigName = "spark.sql.catalog." + catalogName;
-              if (sparkConf.contains(sparkCatalogConfigName)) {
-                LOG.info(
-                    "Skip registering catalog {} because it is already configured in Spark.",
-                    catalogName);
-                return;
               }
               try {
                 registerCatalog(sparkConf, catalogName, kind);
@@ -202,12 +225,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
       return;
     }
 
-    String sparkCatalogConfigName = "spark.sql.catalog." + catalogName;
-    Preconditions.checkArgument(
-        !sparkConf.contains(sparkCatalogConfigName),
-        catalogName + " is already registered to SparkCatalogManager");
-    sparkConf.set(sparkCatalogConfigName, catalogClassName);
-    LOG.info("Register {} catalog to Spark catalog manager.", catalogName);
+    registerCatalogClass(sparkConf, catalogName, catalogClassName);
   }
 
   /**
@@ -344,6 +362,16 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     return builder.build();
   }
 
+  private void registerCatalogClass(
+      SparkConf sparkConf, String catalogName, String catalogClassName) {
+    String sparkCatalogConfigName = "spark.sql.catalog." + catalogName;
+    Preconditions.checkArgument(
+        !sparkConf.contains(sparkCatalogConfigName),
+        catalogName + " is already registered to SparkCatalogManager");
+    sparkConf.set(sparkCatalogConfigName, catalogClassName);
+    LOG.info("Register {} catalog to Spark catalog manager.", catalogName);
+  }
+
   private static String getRequiredConfig(SparkConf sparkConf, String configKey) {
     String configValue = sparkConf.get(configKey, null);
     Preconditions.checkArgument(
@@ -360,23 +388,28 @@ public class GravitinoDriverPlugin implements DriverPlugin {
    * Resolves the bearer token to present to Gravitino for the operation running on the current
    * thread.
    *
-   * <p>The active Spark session's configuration wins over the application configuration, so a
-   * shared driver can carry a different end user's token per session, and {@code tokenFile} wins
-   * over {@code token}, so a token refreshed on disk is picked up without touching the
-   * configuration. Neither the token nor any prefix of it is ever logged.
+   * <p>The active Spark session's own token, from either property, wins over the application's, so
+   * a shared driver can carry a different end user's token per session even when the application
+   * configures a token file of its own. Within one scope, {@code token.file} wins over {@code
+   * token.value}, so a token refreshed on disk is picked up without touching the configuration.
+   * Neither the token nor any prefix of it is ever logged.
    *
-   * @param sparkConf the application Spark configuration, used when no session supplies a token
+   * <p>A session starts with a copy of the application's configuration, so a session value equal to
+   * the application's is treated as inherited rather than set by the session.
+   *
+   * @param sparkConf the application Spark configuration, used when no session sets a token
    * @return the bearer token, never blank
-   * @throws IllegalArgumentException if neither token property is set
+   * @throws IllegalArgumentException if neither token property is set, or the token that applies is
+   *     blank
    * @throws UncheckedIOException if the configured token file cannot be read
    */
   public static String resolveToken(SparkConf sparkConf) {
-    String tokenFile =
-        getSessionOrApplicationConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_TOKEN_FILE);
+    Option<SparkSession> activeSession = SparkSession.getActiveSession();
     String token =
-        StringUtils.isNotBlank(tokenFile)
-            ? readTokenFile(tokenFile)
-            : getSessionOrApplicationConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE);
+        activeSession.isDefined() ? tokenFromSession(activeSession.get(), sparkConf) : null;
+    if (token == null) {
+      token = tokenFromApplication(sparkConf);
+    }
     Preconditions.checkArgument(
         StringUtils.isNotBlank(token),
         String.format(
@@ -396,16 +429,56 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     }
   }
 
+  /**
+   * Resolves the token from one configuration scope, applying the within-scope rule that {@code
+   * token.file} wins over {@code token.value}.
+   *
+   * @param tokenFile the token file configured in this scope, nullable
+   * @param tokenValue the literal token configured in this scope, nullable
+   * @return the token for this scope, or null when the scope configures neither
+   */
   @Nullable
-  private static String getSessionOrApplicationConfig(SparkConf sparkConf, String configKey) {
-    Option<SparkSession> activeSession = SparkSession.getActiveSession();
-    if (activeSession.isDefined()) {
-      Option<String> sessionValue = activeSession.get().conf().getOption(configKey);
-      if (sessionValue.isDefined() && StringUtils.isNotBlank(sessionValue.get())) {
-        return sessionValue.get();
-      }
+  private static String resolveScopedToken(
+      @Nullable String tokenFile, @Nullable String tokenValue) {
+    return StringUtils.isNotBlank(tokenFile) ? readTokenFile(tokenFile) : tokenValue;
+  }
+
+  @Nullable
+  private static String tokenFromSession(SparkSession session, SparkConf sparkConf) {
+    RuntimeConfig sessionConf = session.conf();
+    return resolveScopedToken(
+        sessionConfig(sessionConf, sparkConf, GravitinoSparkConfig.GRAVITINO_TOKEN_FILE),
+        sessionConfig(sessionConf, sparkConf, GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE));
+  }
+
+  @Nullable
+  private static String tokenFromApplication(SparkConf sparkConf) {
+    return resolveScopedToken(
+        getOptionalConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_TOKEN_FILE),
+        getOptionalConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE));
+  }
+
+  /**
+   * Returns the value the session itself set for the key, or null when the session did not set it.
+   *
+   * <p>Spark copies the application's configuration into every session's configuration at session
+   * creation, and only comparison with the application configuration tells an inherited value from
+   * one the session set. A session value equal to the application's is therefore treated as
+   * inherited, even when the session set it deliberately.
+   *
+   * @param sessionConf the active session's configuration
+   * @param sparkConf the application Spark configuration
+   * @param configKey the configuration key to look up
+   * @return the session-set value, or null when blank, unset, or inherited from the application
+   */
+  @Nullable
+  private static String sessionConfig(
+      RuntimeConfig sessionConf, SparkConf sparkConf, String configKey) {
+    Option<String> value = sessionConf.getOption(configKey);
+    if (!value.isDefined() || StringUtils.isBlank(value.get())) {
+      return null;
     }
-    return getOptionalConfig(sparkConf, configKey);
+    return value.get().equals(getOptionalConfig(sparkConf, configKey)) ? null : value.get();
   }
 
   /**
@@ -458,16 +531,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   }
 
   private void handleInitializationFailure(RuntimeException failure, boolean failFast) {
-    try {
-      shutdown();
-    } catch (RuntimeException closeFailure) {
-      if (closeFailure != failure) {
-        failure.addSuppressed(closeFailure);
-      }
-      LOG.warn(
-          "Failed to close the Gravitino catalog manager after initialization failed ({}).",
-          closeFailure.getClass().getSimpleName());
-    }
+    closeAfterInitializationFailure(failure);
     if (failFast) {
       throw failure;
     }
@@ -478,6 +542,19 @@ public class GravitinoDriverPlugin implements DriverPlugin {
             + "settings. Set {}=true to fail Spark startup instead.",
         failure.getClass().getSimpleName(),
         GravitinoSparkConfig.GRAVITINO_FAIL_FAST);
+  }
+
+  private void closeAfterInitializationFailure(RuntimeException failure) {
+    try {
+      shutdown();
+    } catch (RuntimeException closeFailure) {
+      if (closeFailure != failure) {
+        failure.addSuppressed(closeFailure);
+      }
+      LOG.warn(
+          "Failed to close the Gravitino catalog manager after initialization failed ({}).",
+          closeFailure.getClass().getSimpleName());
+    }
   }
 
   private static void validateConnectionSettings(String gravitinoUri, String metalake) {

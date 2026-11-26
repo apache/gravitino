@@ -68,6 +68,7 @@ import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
+import org.apache.gravitino.exceptions.NoSuchSemanticModelRevisionException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
@@ -1596,6 +1597,11 @@ public class ErrorHandlers {
               .getSimpleName()
               .equals(errorResponse.getType())) {
             throw new NoSuchSemanticModelException(errorMessage);
+          }
+          if (NoSuchSemanticModelRevisionException.class
+              .getSimpleName()
+              .equals(errorResponse.getType())) {
+            throw new NoSuchSemanticModelRevisionException(errorMessage);
           }
           throw new NotFoundException(errorMessage);
 

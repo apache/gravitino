@@ -22,7 +22,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { LockOutlined, PlusOutlined } from '@ant-design/icons'
-import { Flex, Select, Space, Tag, Tooltip, theme } from 'antd'
+import { Cascader, Flex, Input, Space, Tag, Tooltip, theme } from 'antd'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import { associateTag } from '@/lib/store/tags'
 import { getCurrentEntityTags } from '@/lib/store/metalakes'
@@ -40,6 +40,9 @@ export default function Tags({ ...props }) {
   const { token } = theme.useToken()
   const [inputVisible, setInputVisible] = useState(false)
   const [optionList, setOptionList] = useState([])
+  const [selectedTag, setSelectedTag] = useState(null)
+  const [selectedValue, setSelectedValue] = useState(undefined)
+  const associatingRef = useRef(false)
   const inputRef = useRef(null)
   const router = useRouter()
   const store = useAppSelector(state => state.tags)
@@ -69,7 +72,16 @@ export default function Tags({ ...props }) {
   useEffect(() => {
     if (inputVisible) {
       const options =
-        store.tagsData?.filter(tagOption => !tagsForEntity?.map(tag => tag.name)?.includes(tagOption.name)) || []
+        store.tagsData?.filter(tagOption => {
+          const associatedTag = tagsForEntity.find(tag => tag.name === tagOption.name)
+
+          return (
+            !associatedTag ||
+            tagOption.allowedValues == null ||
+            (tagOption.allowedValues?.length &&
+              tagOption.allowedValues.some(value => !associatedTag.assignmentValues?.includes(value)))
+          )
+        }) || []
       setOptionList(options)
       inputRef.current?.focus()
     }
@@ -79,59 +91,62 @@ export default function Tags({ ...props }) {
     setInputVisible(true)
   }
 
-  const tagRender = props => {
-    const { value, closable, onClose } = props
+  const handleChange = path => {
+    const tag = store.tagsData?.find(item => item.name === path[0])
 
-    const onPreventMouseDown = event => {
-      event.preventDefault()
-      event.stopPropagation()
+    if (tag?.allowedValues == null && path[1] === '__no_value__') {
+      associateSelectedTag(tag, undefined)
+
+      return
     }
-    const tagColor = store.tagsData?.find(tag => tag.name === value)?.properties?.color
 
-    return (
-      <Tag
-        color={tagColor}
-        onMouseDown={onPreventMouseDown}
-        closable={closable}
-        onClose={onClose}
-        style={{ marginInlineEnd: 4 }}
-      >
-        {value}
-      </Tag>
+    setSelectedTag(tag)
+    setSelectedValue(
+      tag?.allowedValues == null && path[1] === '__custom_value__'
+        ? ''
+        : (path[1] ?? (tag?.allowedValues == null ? '' : undefined))
     )
   }
 
-  const handleChange = async value => {
-    if (value && !tagsForEntity?.map(tag => tag.name)?.includes(value)) {
-      await dispatch(
-        associateTag({
-          metalake: currentMetalake,
-          metadataObjectType,
-          metadataObjectFullName,
-          data: { tagsToAdd: [value] }
-        })
-      )
-    }
-    const tags = await getTagsForEntity()
-    setTagsForEntity(tags)
-    setInputVisible(false)
-  }
+  const associateSelectedTag = async (tag, value) => {
+    if (!tag || associatingRef.current) return
+    if (tagsForEntity.some(item => item.name === tag.name && (!value || item.assignmentValues?.includes(value)))) {
+      setSelectedTag(null)
+      setSelectedValue(undefined)
+      setInputVisible(false)
 
-  const handleClose = async removedTag => {
+      return
+    }
+    associatingRef.current = true
     await dispatch(
       associateTag({
         metalake: currentMetalake,
         metadataObjectType,
         metadataObjectFullName,
-        data: { tagsToRemove: [removedTag] }
+        data: { tagsToAdd: [{ name: tag.name, ...(value !== undefined ? { value } : {}) }] }
+      })
+    )
+    setSelectedTag(null)
+    setSelectedValue(undefined)
+    const tags = await getTagsForEntity()
+    setTagsForEntity(tags)
+    setInputVisible(false)
+    associatingRef.current = false
+  }
+
+  const handleClose = async (tag, value) => {
+    await dispatch(
+      associateTag({
+        metalake: currentMetalake,
+        metadataObjectType,
+        metadataObjectFullName,
+        data: {
+          tagsToRemove: [{ name: tag.name, ...(value !== undefined ? { value } : {}) }]
+        }
       })
     )
     const tags = await getTagsForEntity()
     setTagsForEntity(tags)
-  }
-
-  const handleBlur = () => {
-    setInputVisible(false)
   }
 
   const handleClick = name => () => {
@@ -146,52 +161,103 @@ export default function Tags({ ...props }) {
 
   return (
     <Flex gap='4px 0' wrap>
-      {tagsForEntity?.map((tag, index) => {
-        const isLongTag = tag.name.length > 20
-        let color = tag.properties['color'] || 'grey'
+      {tagsForEntity?.flatMap(tag =>
+        (tag.assignmentValues?.length ? tag.assignmentValues : [undefined]).map((value, index) => {
+          const label = value === undefined ? tag.name : `${tag.name}=${value}`
+          const isLongTag = label.length > 20
+          const color = tag.properties['color'] || 'grey'
 
-        const tagElem = (
-          <Tag
-            key={tag.name + index}
-            color={color}
-            closable={!readOnly && !tag.inherited}
-            icon={tag.inherited ? <LockOutlined /> : null}
-            onClick={handleClick(tag.name)}
-            className='cursor-pointer'
-            style={{ userSelect: 'none' }}
-            onClose={() => handleClose(tag.name)}
-          >
-            <span>{isLongTag ? `${tag.name.slice(0, 20)}...` : tag.name}</span>
-          </Tag>
-        )
+          const tagElem = (
+            <Tag
+              key={`${tag.name}:${value ?? index}`}
+              color={color}
+              closable={!readOnly && !tag.inherited}
+              icon={tag.inherited ? <LockOutlined /> : null}
+              onClick={handleClick(tag.name)}
+              className='cursor-pointer'
+              style={{ userSelect: 'none' }}
+              onClose={() => handleClose(tag, value)}
+            >
+              <span>{isLongTag ? `${label.slice(0, 20)}...` : label}</span>
+            </Tag>
+          )
 
-        return isLongTag ? (
-          <Tooltip title={tag.name} key={tag.name}>
-            {tagElem}
-          </Tooltip>
-        ) : (
-          tagElem
-        )
-      })}
+          return isLongTag ? (
+            <Tooltip title={label} key={`${tag.name}:${value}`}>
+              {tagElem}
+            </Tooltip>
+          ) : (
+            tagElem
+          )
+        })
+      )}
       {tagsForEntity?.length === 0 && <span>No Tags </span>}
       {inputVisible && !readOnly && (
-        <Select
+        <Cascader
           size='small'
-          tagRender={tagRender}
           ref={inputRef}
+          open={inputVisible}
           style={tagInputStyle}
-          onChange={handleChange}
-          onBlur={handleBlur}
-        >
-          {optionList.map(tag => (
-            <Select.Option value={tag.name} key={tag.name}>
+          options={optionList.map(tag => ({
+            value: tag.name,
+            label: (
               <Space>
                 <span className='tag-swatch' style={{ backgroundColor: tag.properties?.color }}></span>
                 <span>{tag.name}</span>
               </Space>
-            </Select.Option>
-          ))}
-        </Select>
+            ),
+            ...(tag.allowedValues?.length
+              ? { children: tag.allowedValues.map(value => ({ value, label: value })) }
+              : tag.allowedValues == null
+                ? {
+                    children: [
+                      { value: '__no_value__', label: 'Assign without a value' },
+                      {
+                        value: '__custom_value__',
+                        label: (
+                          <Input
+                            size='small'
+                            placeholder='Enter value'
+                            maxLength={256}
+                            value={selectedTag?.name === tag.name ? selectedValue || '' : ''}
+                            onFocus={() => setSelectedTag(tag)}
+                            onMouseDown={event => {
+                              event.stopPropagation()
+                              setSelectedTag(tag)
+                            }}
+                            onChange={event => {
+                              setSelectedTag(tag)
+                              setSelectedValue(event.target.value)
+                            }}
+                            onBlur={() => {
+                              if (selectedValue?.trim()) {
+                                associateSelectedTag(tag, selectedValue.trim())
+                              } else {
+                                setSelectedTag(null)
+                                setInputVisible(false)
+                              }
+                            }}
+                            onKeyDown={event => event.stopPropagation()}
+                          />
+                        )
+                      }
+                    ]
+                  }
+                : {})
+          }))}
+          onChange={handleChange}
+          onBlur={() => {
+            if (selectedTag && selectedTag.allowedValues == null) return
+            if (selectedTag && selectedValue !== undefined && selectedValue !== '') {
+              associateSelectedTag(selectedTag, selectedValue || undefined)
+            } else if (selectedTag?.allowedValues?.length === 0) {
+              associateSelectedTag(selectedTag, undefined)
+            } else if (!selectedTag) {
+              setInputVisible(false)
+            }
+          }}
+          placeholder='Associate Tag'
+        />
       )}
       {!inputVisible && !readOnly && (
         <Tag style={tagPlusStyle} icon={<PlusOutlined />} onClick={showInput}>

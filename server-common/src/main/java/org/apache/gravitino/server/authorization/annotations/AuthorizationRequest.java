@@ -37,6 +37,8 @@ public @interface AuthorizationRequest {
     /** Loads a view with authorized existence probing. */
     LOAD_VIEW,
     CREATE_SCHEMA,
-    TEST_CATALOG_CONNECTION
+    TEST_CATALOG_CONNECTION,
+    /** Retrieves credentials with provider-specific authorization. */
+    GET_CREDENTIALS
   }
 }

@@ -42,7 +42,7 @@ dependencies {
   testImplementation(libs.bundles.jwt)
   testImplementation(libs.nimbus.jose.jwt)
   testImplementation(libs.bundles.log4j)
-  testImplementation(libs.commons.cli)
+  testImplementation(libs.commons.cli.new)
   testImplementation(libs.commons.lang3)
   testImplementation(libs.commons.io)
   testImplementation(libs.guava)

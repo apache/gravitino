@@ -98,10 +98,10 @@ export default function CreateSemanticModelDialog({ ...props }) {
       const initLoad = async () => {
         setIsLoading(true)
         try {
-          const { payload } = await dispatch(
-            getSemanticModelDetails({ metalake, catalog, schema, semanticModel: editSemanticModel })
-          )
-          const loaded = payload?.semanticModel
+          const { semanticModel: loaded } = await dispatch(
+            getSemanticModelDetails({ metalake, catalog, schema, semanticModel: editSemanticModel, revision: 'latest' })
+          ).unwrap()
+          if (!loaded?.revision) throw new Error('The latest Semantic Model revision is unavailable.')
           setCacheData(loaded)
           form.setFieldValue('name', loaded?.name)
           form.setFieldValue('comment', loaded?.comment)
@@ -112,8 +112,10 @@ export default function CreateSemanticModelDialog({ ...props }) {
             form.setFieldValue(['properties', index, 'value'], value)
             index++
           })
-          setIsLoading(false)
         } catch (e) {
+          setCacheData(undefined)
+          setSaveError(e.message || 'Unable to load the latest Semantic Model revision.')
+        } finally {
           setIsLoading(false)
         }
       }
@@ -160,6 +162,11 @@ export default function CreateSemanticModelDialog({ ...props }) {
         let result
         if (editSemanticModel) {
           const updates = genSemanticModelUpdates(cacheData, submitData)
+          if (updates.length > 1 && updates.some(update => update['@type'] === 'rename')) {
+            setSaveError('Save the rename and other changes separately.')
+
+            return
+          }
           if (updates.length) {
             result = await dispatch(
               updateSemanticModel({
@@ -167,8 +174,7 @@ export default function CreateSemanticModelDialog({ ...props }) {
                 catalog,
                 schema,
                 semanticModel: editSemanticModel,
-                expectedDefinition: cacheData.definition,
-                data: { updates }
+                data: { updates, expectedRevision: cacheData.revision }
               })
             )
           }

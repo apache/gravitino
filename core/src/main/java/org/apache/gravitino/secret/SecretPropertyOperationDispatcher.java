@@ -80,13 +80,27 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
   /**
    * Returns plaintext secret properties for the given metadata object.
    *
+   * <p>When {@code includeStaticCredentials} is {@code false}, static credential keys that apply to
+   * this object (declared in its {@link PropertiesMetadata} and/or used by an enabled static {@code
+   * credential-providers} entry, including providers inferred by the catalog) are omitted. Other
+   * secrets remain.
+   *
    * @param identifier The entity name identifier.
    * @param entityType The entity type.
+   * @param includeStaticCredentials whether to keep object-scoped static credential secrets
    * @return secret plaintext properties; never null
    */
-  public Map<String, String> getSecrets(NameIdentifier identifier, Entity.EntityType entityType) {
+  public Map<String, String> getSecrets(
+      NameIdentifier identifier, Entity.EntityType entityType, boolean includeStaticCredentials) {
     RawPropertiesAndMetadata loaded = loadRawPropertiesAndMetadata(identifier, entityType);
-    return SecretPropertyUtils.buildSecrets(secretManager, loaded.rawProperties, loaded.metadata);
+    Map<String, String> secrets =
+        SecretPropertyUtils.buildSecrets(secretManager, loaded.rawProperties, loaded.metadata);
+    if (!includeStaticCredentials) {
+      secrets =
+          SecretPropertyUtils.omitStaticCredentialSecrets(
+              secrets, loaded.metadata, loaded.propertiesForStaticCredentialOmit);
+    }
+    return secrets;
   }
 
   /**
@@ -108,10 +122,15 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
             identifier,
             wrapper -> {
               wrapper.catalog().checkMetalakeInUse();
+              // buildSecrets uses entity raw properties (URNs intact). Omit uses the effective
+              // provider list so inferred static providers (e.g. s3-secret-key when
+              // credential-providers is absent) are covered even if PropertiesMetadata omits
+              // those keys.
               return new RawPropertiesAndMetadata(
                   wrapper.catalog().entity().getProperties(),
                   resolvePropertiesMetadata(
-                      wrapper, HasPropertyMetadata::catalogPropertiesMetadata));
+                      wrapper, HasPropertyMetadata::catalogPropertiesMetadata),
+                  wrapper.catalog().propertiesWithCredentialProviders());
             },
             NoSuchCatalogException.class);
       case SCHEMA:
@@ -275,11 +294,26 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
   private static final class RawPropertiesAndMetadata {
     private final Map<String, String> rawProperties;
     private final PropertiesMetadata metadata;
+    /**
+     * Properties used to resolve static credential keys to omit (effective providers for catalogs).
+     */
+    private final Map<String, String> propertiesForStaticCredentialOmit;
 
     private RawPropertiesAndMetadata(
         @Nullable Map<String, String> rawProperties, PropertiesMetadata metadata) {
+      this(rawProperties, metadata, rawProperties);
+    }
+
+    private RawPropertiesAndMetadata(
+        @Nullable Map<String, String> rawProperties,
+        PropertiesMetadata metadata,
+        @Nullable Map<String, String> propertiesForStaticCredentialOmit) {
       this.rawProperties = rawProperties == null ? Map.of() : rawProperties;
       this.metadata = metadata;
+      this.propertiesForStaticCredentialOmit =
+          propertiesForStaticCredentialOmit == null
+              ? this.rawProperties
+              : propertiesForStaticCredentialOmit;
     }
   }
 }

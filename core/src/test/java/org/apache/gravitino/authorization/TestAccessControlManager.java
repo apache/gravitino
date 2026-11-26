@@ -37,6 +37,7 @@ import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_M
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_STORE;
 import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
+import static org.apache.gravitino.Configs.SEMANTIC_MODEL_VERSION_RETENTION_COUNT;
 import static org.apache.gravitino.Configs.SERVICE_ADMINS;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static org.apache.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
@@ -180,6 +181,7 @@ public class TestAccessControlManager {
     Mockito.when(config.get(ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
+    Mockito.when(config.get(SEMANTIC_MODEL_VERSION_RETENTION_COUNT)).thenReturn(100L);
     Mockito.when(config.get(CATALOG_CACHE_EVICTION_INTERVAL_MS)).thenReturn(1000L);
     // Fix cache for testing.
     Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(true);

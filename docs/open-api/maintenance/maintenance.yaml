@@ -182,7 +182,10 @@ components:
           description: Iceberg snapshot id stored on the new table_snapshot_metrics row
         metricsJson:
           type: string
-          description: Serialized metrics JSON for table_snapshot_metrics.metrics_value
+          description: >
+            Serialized metrics JSON for table_snapshot_metrics.metrics_value. Contains only
+            metric fields (for example custom-* keys); policy type and snapshot id are not
+            embedded here. Key sets differ by maintenance policy type.
     MaintenanceActionFinishRequest:
       type: object
       required:
@@ -204,14 +207,14 @@ components:
         "tableId": 10,
         "policyId": 20,
         "snapshotId": 9001,
-        "metricsJson": "{\"maintenanceType\":\"rewrite_data_files\",\"snapshotId\":9001,\"custom-data-file-mse\":1.5}"
+        "metricsJson": "{\"custom-data-file-mse\":1.5,\"custom-delete-file-number\":0,\"custom-avg-file-size\":1048576,\"custom-total-file-size\":3145728,\"custom-file-number\":3,\"custom-small-file-number\":3,\"custom-data-mse-ratio\":3.7}"
       }
     MaintenanceActionAfterMetricsRequest:
       value: {
         "tableId": 10,
         "policyId": 20,
         "snapshotId": 9002,
-        "metricsJson": "{\"maintenanceType\":\"rewrite_data_files\",\"snapshotId\":9002,\"custom-data-file-mse\":0.2}"
+        "metricsJson": "{\"custom-data-file-mse\":0.2,\"custom-delete-file-number\":0,\"custom-avg-file-size\":134217728,\"custom-total-file-size\":134217728,\"custom-file-number\":1,\"custom-small-file-number\":0,\"custom-data-mse-ratio\":0.49}"
       }
     MaintenanceActionFinishRequest:
       value: {

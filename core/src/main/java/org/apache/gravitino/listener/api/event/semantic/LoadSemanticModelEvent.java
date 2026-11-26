@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.event.semantic;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.event.OperationType;
@@ -49,6 +50,11 @@ public final class LoadSemanticModelEvent extends SemanticModelEvent {
    */
   public SemanticModelInfo loadedSemanticModelInfo() {
     return loadedSemanticModelInfo;
+  }
+
+  @Override
+  protected Map<String, String> ownCustomInfo() {
+    return Map.of("revision", Integer.toString(loadedSemanticModelInfo.revision()));
   }
 
   @Override

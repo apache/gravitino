@@ -20,6 +20,7 @@
 package org.apache.gravitino.gcs.credential;
 
 import org.apache.gravitino.credential.GCSTokenCredential;
+import org.apache.gravitino.credential.SupportsDynamicCredential;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -28,6 +29,7 @@ public class TestCredentialProvider {
   @Test
   void testCredentialProviderType() {
     GCSTokenProvider gcsTokenProvider = new GCSTokenProvider();
+    Assertions.assertInstanceOf(SupportsDynamicCredential.class, gcsTokenProvider);
     Assertions.assertEquals(
         GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE, gcsTokenProvider.credentialType());
   }

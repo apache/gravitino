@@ -57,10 +57,12 @@ import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.MetricInfoListResponse;
 import org.apache.gravitino.dto.responses.SemanticModelResponse;
+import org.apache.gravitino.dto.responses.SemanticModelRevisionListResponse;
 import org.apache.gravitino.dto.semantic.MetricDTO;
 import org.apache.gravitino.dto.semantic.SemanticModelDTO;
 import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
 import org.apache.gravitino.dto.semantic.SemanticModelMetricDTO;
+import org.apache.gravitino.dto.semantic.SemanticModelRevisionDTO;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
@@ -71,6 +73,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
+import org.apache.gravitino.exceptions.NoSuchSemanticModelRevisionException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
@@ -95,6 +98,7 @@ import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelRevision;
 import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.BeforeAll;
@@ -418,18 +422,71 @@ public class TestSemanticModelCatalog extends TestBase {
   }
 
   @Test
+  void testRevisionReadsAndMissingRevisionMapping() throws JsonProcessingException {
+    NameIdentifier ident = NameIdentifier.of(SCHEMA_NAME, MODEL_NAME);
+    String entityPath = withSlash(semanticModelPath() + "/" + RESTUtils.encodeString(MODEL_NAME));
+    SemanticModelDTO source = semanticModelDTO(MODEL_NAME);
+    Instant publishedAt = Instant.parse("2026-01-02T00:00:00Z");
+    SemanticModelRevisionDTO summary =
+        new SemanticModelRevisionDTO(
+            2, SemanticModel.Status.PUBLISHED, "reviewer", publishedAt, source.auditInfo());
+    SemanticModelDTO snapshot =
+        SemanticModelDTO.builder()
+            .withName(source.name())
+            .withDefinition(SemanticModelDefinitionDTO.fromDefinition(source.definition()))
+            .withAudit(source.auditInfo())
+            .withRevision(summary)
+            .build();
+
+    buildMockResource(
+        Method.GET,
+        entityPath + "/revisions",
+        null,
+        new SemanticModelRevisionListResponse(new SemanticModelRevisionDTO[] {summary}),
+        SC_OK);
+    buildMockResource(
+        Method.GET, entityPath + "/revisions/2", null, new SemanticModelResponse(snapshot), SC_OK);
+    buildMockResource(
+        Method.GET,
+        entityPath + "/revisions/latest",
+        null,
+        new SemanticModelResponse(snapshot),
+        SC_OK);
+    buildMockResource(
+        Method.GET,
+        entityPath + "/revisions/9",
+        null,
+        ErrorResponse.notFound(
+            NoSuchSemanticModelRevisionException.class.getSimpleName(), "No revision 9"),
+        SC_NOT_FOUND);
+
+    SemanticModelCatalog models = catalog.asSemanticModelCatalog();
+    SemanticModelRevision[] history = models.listSemanticModelRevisions(ident);
+    assertArrayEquals(new SemanticModelRevision[] {summary}, history);
+    SemanticModel numbered = models.loadSemanticModel(ident, 2);
+    assertEquals(2, numbered.revision());
+    assertEquals("reviewer", numbered.publishedBy());
+    assertEquals(publishedAt, numbered.publishedAt());
+    assertEquals(numbered, models.loadSemanticModel(ident, SemanticModelCatalog.LATEST_REVISION));
+    assertThrows(
+        NoSuchSemanticModelRevisionException.class, () -> models.loadSemanticModel(ident, 9));
+    assertThrows(IllegalArgumentException.class, () -> models.loadSemanticModel(ident, 0));
+    assertThrows(IllegalArgumentException.class, () -> models.loadSemanticModel(ident, "active"));
+  }
+
+  @Test
   public void testAlterSemanticModelConvertsAllChangeTypes() throws JsonProcessingException {
     SemanticModelDefinition replacement = definition();
     SemanticModelUpdatesRequest request =
         new SemanticModelUpdatesRequest(
             List.of(
-                new SemanticModelUpdateRequest.RenameSemanticModelRequest("renamed_model"),
                 new SemanticModelUpdateRequest.UpdateSemanticModelCommentRequest(""),
                 new SemanticModelUpdateRequest.SetSemanticModelPropertyRequest(
                     "owner", "analytics"),
                 new SemanticModelUpdateRequest.RemoveSemanticModelPropertyRequest("deprecated"),
                 new SemanticModelUpdateRequest.ReplaceSemanticModelDefinitionRequest(
-                    SemanticModelDefinitionDTO.fromDefinition(replacement))));
+                    SemanticModelDefinitionDTO.fromDefinition(replacement))),
+            1);
     SemanticModelDTO responseDTO = semanticModelDTO("renamed_model");
     String path = withSlash(semanticModelPath() + "/" + RESTUtils.encodeString(MODEL_NAME));
     buildMockResource(Method.PUT, path, request, new SemanticModelResponse(responseDTO), SC_OK);
@@ -439,7 +496,7 @@ public class TestSemanticModelCatalog extends TestBase {
             .asSemanticModelCatalog()
             .alterSemanticModel(
                 NameIdentifier.of(SCHEMA_NAME, MODEL_NAME),
-                SemanticModelChange.rename("renamed_model"),
+                1,
                 SemanticModelChange.updateComment(""),
                 SemanticModelChange.setProperty("owner", "analytics"),
                 SemanticModelChange.removeProperty("deprecated"),
@@ -447,15 +504,14 @@ public class TestSemanticModelCatalog extends TestBase {
 
     JsonNode serializedUpdates = MAPPER.valueToTree(request).path("updates");
     assertEquals(
-        List.of("rename", "updateComment", "setProperty", "removeProperty", "replaceDefinition"),
+        List.of("updateComment", "setProperty", "removeProperty", "replaceDefinition"),
         Arrays.asList(
             serializedUpdates.get(0).path("@type").asText(),
             serializedUpdates.get(1).path("@type").asText(),
             serializedUpdates.get(2).path("@type").asText(),
-            serializedUpdates.get(3).path("@type").asText(),
-            serializedUpdates.get(4).path("@type").asText()));
-    assertEquals("", serializedUpdates.get(1).path("newComment").asText());
-    assertTrue(serializedUpdates.get(4).path("definition").has("datasets"));
+            serializedUpdates.get(3).path("@type").asText()));
+    assertEquals("", serializedUpdates.get(0).path("newComment").asText());
+    assertTrue(serializedUpdates.get(3).path("definition").has("datasets"));
     assertSemanticModel(responseDTO, altered);
   }
 

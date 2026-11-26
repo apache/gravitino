@@ -146,7 +146,7 @@ const renderDetails = async (definition, details = {}) => {
   store.dispatch(getSemanticModelDetails.pending('load', args))
   store.dispatch(
     getSemanticModelDetails.fulfilled(
-      { semanticModel: { name: navigation.name, definition, properties: {}, ...details }, init: true },
+      { semanticModel: { name: navigation.name, revision: 7, definition, properties: {}, ...details }, init: true },
       'load',
       args
     )
@@ -366,12 +366,12 @@ describe('editing from Semantic Model details', () => {
     async rename => {
       navigation.name = 'orders'
       const definition = { datasets: [{ name: 'orders', source: { namespace: ['sales', 'mart'], name: 'orders' } }] }
-      let model = { name: 'orders', definition, properties: {}, comment: 'original' }
+      let model = { name: 'orders', revision: 7, definition, properties: {}, comment: 'original' }
 
       const updated = {
         ...model,
         name: rename ? 'orders_v2' : 'orders',
-        comment: 'saved comment',
+        comment: rename ? 'original' : 'saved comment',
         audit: { lastModifier: 'editor' }
       }
       defHttp.get.mockImplementation(({ url }) =>
@@ -385,16 +385,19 @@ describe('editing from Semantic Model details', () => {
       await renderDetails(definition, model)
       await click(document.querySelector('[aria-label="Edit Semantic Model"]'))
       await act(async () => {
-        Simulate.change(document.querySelector('[data-refer="semantic-model-comment-field"]'), {
-          target: { value: 'saved comment' }
-        })
         if (rename)
           Simulate.change(document.querySelector('[data-refer="semantic-model-name-field"]'), {
             target: { value: 'orders_v2' }
           })
+        else
+          Simulate.change(document.querySelector('[data-refer="semantic-model-comment-field"]'), {
+            target: { value: 'saved comment' }
+          })
       })
       await click(document.querySelector('[data-refer="handle-submit-semantic-model"]'))
-      expect(document.querySelector('[data-refer="semantic-model-comment-field"]').value).toBe('saved comment')
+      expect(document.querySelector('[data-refer="semantic-model-comment-field"]').value).toBe(
+        rename ? 'original' : 'saved comment'
+      )
       expect(navigation.replace).not.toHaveBeenCalled()
       expect(store.getState().metalakes.activatedDetails.comment).toBe('original')
       await click(document.querySelector('[data-refer="handle-submit-semantic-model"]'))
@@ -462,17 +465,17 @@ describe('focused semantic metadata editing', () => {
     defHttp.put.mockRejectedValueOnce(new Error('Save rejected'))
     await click(findText('.ant-modal button', 'Save'))
     expect(defHttp.put.mock.lastCall[0].data).toEqual({
+      expectedRevision: 7,
       updates: [{ '@type': 'replaceDefinition', definition: expected }]
     })
     await act(async () => Simulate.mouseDown(selector.querySelector('.ant-select-clear')))
     updatedEntity.datatype = null
     const model = { name: navigation.name, definition: expected, properties: {} }
     defHttp.put.mockResolvedValue({ semanticModel: model })
-    defHttp.get
-      .mockResolvedValue({ semanticModel: model, identifiers: [] })
-      .mockResolvedValueOnce({ semanticModel: { ...model, definition } })
+    defHttp.get.mockResolvedValue({ semanticModel: model, identifiers: [] })
     await click(findText('.ant-modal button', 'Save'))
     expect(defHttp.put.mock.lastCall[0].data).toEqual({
+      expectedRevision: 7,
       updates: [{ '@type': 'replaceDefinition', definition: expected }]
     })
     expect(document.querySelector('.ant-modal')).toBeNull()
@@ -515,11 +518,10 @@ describe('focused semantic metadata editing', () => {
     }
     const model = { name: navigation.name, definition: expected, properties: {} }
     defHttp.put.mockResolvedValue({ semanticModel: model })
-    defHttp.get
-      .mockResolvedValue({ semanticModel: model, identifiers: [] })
-      .mockResolvedValueOnce({ semanticModel: { ...model, definition } })
+    defHttp.get.mockResolvedValue({ semanticModel: model, identifiers: [] })
     await click(findText('.ant-modal button', 'Save'))
     expect(defHttp.put.mock.lastCall[0].data).toEqual({
+      expectedRevision: 7,
       updates: [{ '@type': 'replaceDefinition', definition: expected }]
     })
     expect(document.querySelector('.ant-modal')).toBeNull()
@@ -533,7 +535,7 @@ describe('focused semantic metadata editing', () => {
       const extension = [{ vendorName: 'vendor', data: '{"keep":true}' }]
       definition.customExtensions = extension
       definition.datasets[0].fields[0].customExtensions = extension
-      let model = { name: 'orders', definition, properties: {} }
+      let model = { name: 'orders', revision: 7, definition, properties: {} }
       defHttp.get.mockImplementation(({ url }) =>
         Promise.resolve(url.endsWith('/semantic-models') ? { identifiers: [] } : { semanticModel: model })
       )
@@ -597,6 +599,7 @@ describe('focused semantic metadata editing', () => {
       }
       await click(findText('.ant-modal button', 'Save'))
       expect(defHttp.put.mock.lastCall[0].data).toEqual({
+        expectedRevision: 7,
         updates: [{ '@type': 'replaceDefinition', definition: expected }]
       })
       expect(store.getState().metalakes.activatedDetails.definition).toEqual(expected)
@@ -908,7 +911,7 @@ it.each([false, true])(
       Promise.resolve(
         url.endsWith('/semantic-models')
           ? { identifiers: [] }
-          : { semanticModel: { name: navigation.name, definition, properties: {} } }
+          : { semanticModel: { name: navigation.name, revision: 7, definition, properties: {} } }
       )
     )
     await renderDetails(definition)
@@ -983,10 +986,20 @@ it.each([
   [{ datasets: [{ name: 'orders', fields: [] }] }, { kind: 'field', datasetName: 'orders', name: 'amount' }]
 ])('renders a closable error when the editor mounts with unavailable metadata', async (definition, target) => {
   const close = vi.fn()
+  defHttp.get.mockResolvedValueOnce({
+    semanticModel: { name: navigation.name, revision: 8, status: 'DRAFT', definition }
+  })
   await act(async () =>
     root.render(
       <Provider store={store}>
-        <SemanticMetadataEditor definition={definition} target={target} onClose={close} />
+        <SemanticMetadataEditor
+          metalake='demo'
+          catalog='sales'
+          schema='mart'
+          semanticModel={navigation.name}
+          target={target}
+          onClose={close}
+        />
       </Provider>
     )
   )
@@ -1027,7 +1040,7 @@ it.each(['focused', 'JSON'])(
   async editor => {
     navigation.name = 'orders'
     const definition = definitionWith(() => null)
-    let serverModel = { name: navigation.name, definition, properties: {} }
+    let serverModel = { name: navigation.name, revision: 7, definition, properties: {} }
     defHttp.get.mockImplementation(() => Promise.resolve({ semanticModel: serverModel }))
     await renderDetails(definition)
     let input
@@ -1042,9 +1055,10 @@ it.each(['focused', 'JSON'])(
         Simulate.change(input, { target: { value: JSON.stringify({ ...definition, aiContext: 'My draft' }) } })
       )
     }
-    serverModel = { ...serverModel, definition: { ...definition, aiContext: 'Concurrent edit' } }
+    serverModel = { ...serverModel, revision: 8, definition: { ...definition, aiContext: 'Concurrent edit' } }
+    defHttp.put.mockRejectedValueOnce({ response: { status: 409 } })
     await click(findText('.ant-modal button', editor === 'focused' ? 'Save' : 'Submit'))
-    expect(defHttp.put).not.toHaveBeenCalled()
+    expect(defHttp.put.mock.lastCall[0].data.expectedRevision).toBe(7)
     expect(document.querySelector('.ant-modal .ant-alert').textContent).toContain('changed since')
     expect(input.value).toContain('My draft')
     expect(store.getState().metalakes.activatedDetails.definition).toEqual(definition)
@@ -1052,7 +1066,7 @@ it.each(['focused', 'JSON'])(
 )
 
 it('edits the time dimension through the field form', async () => {
-  let model = { name: navigation.name, definition: definitionWith(() => null), properties: {} }
+  let model = { name: navigation.name, revision: 7, definition: definitionWith(() => null), properties: {} }
   model.definition.datasets[0].fields[0].dimension = { isTime: true }
   defHttp.get.mockImplementation(() => Promise.resolve({ semanticModel: model, identifiers: [] }))
   defHttp.put.mockImplementation(({ data }) => {
