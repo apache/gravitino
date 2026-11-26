@@ -187,8 +187,16 @@ public class IcebergIdempotencyManager {
       return response;
     } finally {
       if (release) {
-        // Release only when the action throws or returns a retryable/auth response.
-        idempotencyStore.release(key);
+        // Release only when the action throws or returns a retryable/auth response. Swallow store
+        // failures so they cannot replace the mutation response or the thrown exception.
+        try {
+          idempotencyStore.release(key);
+        } catch (RuntimeException e) {
+          LOG.warn(
+              "Failed to release Idempotency-Key: {}; leaving any reservation until expiry",
+              key,
+              e);
+        }
       }
     }
   }

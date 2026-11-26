@@ -149,6 +149,23 @@ public class TestIcebergIdempotencyManager {
   }
 
   @Test
+  void testReleaseFailureKeepsMutationResponse() {
+    IdempotencyStore store = Mockito.mock(IdempotencyStore.class);
+    Mockito.when(store.reserve(Mockito.eq(KEY), Mockito.anyString(), Mockito.anyLong()))
+        .thenReturn(true);
+    Mockito.doThrow(new IllegalStateException("release unavailable"))
+        .when(store)
+        .release(Mockito.anyString());
+    IcebergIdempotencyManager manager =
+        new IcebergIdempotencyManager(enabledConfig(ImmutableMap.of()), Optional.of(store));
+
+    Response response = respondWith(manager, 500, new AtomicInteger());
+
+    Assertions.assertEquals(500, response.getStatus());
+    Mockito.verify(store).release(KEY);
+  }
+
+  @Test
   void testUnauthorizedResponseReleasesTheKey() {
     IcebergIdempotencyManager manager = newManager(ImmutableMap.of());
     AtomicInteger executions = new AtomicInteger();
