@@ -418,17 +418,17 @@ public class CatalogMetaService {
                       mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
                           catalogId, MetadataObject.Type.CATALOG.name())),
           () ->
+              SessionUtils.doWithoutCommit(
+                  StatisticMetaMapper.class,
+                  mapper -> mapper.softDeleteStatisticsByEntityId(catalogId)),
+          () ->
               GlossaryTermBindingService.getInstance()
                   .cleanupObjectBindings(
                       catalogPO.getMetalakeId(),
                       GlossaryTermBindingService.TargetType.CATALOG,
                       catalogId,
                       catalogPO.getCatalogName(),
-                      "DROP_CATALOG"),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  StatisticMetaMapper.class,
-                  mapper -> mapper.softDeleteStatisticsByEntityId(catalogId)));
+                      "DROP_CATALOG"));
     }
 
     return true;

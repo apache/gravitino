@@ -31,6 +31,34 @@ class TestRoleDTO(unittest.TestCase):
     def _audit(self) -> AuditDTO:
         return AuditDTO(_creator="admin", _create_time="2024-01-01T00:00:00Z")
 
+    def test_decode_definition_grants(self):
+        for name, bit in (
+            ("VIEW_DEFINITION", 44),
+            ("CREATE_DEFINITION", 45),
+            ("MANAGE_DEFINITIONS", 46),
+        ):
+            for condition in Privilege.Condition:
+                with self.subTest(name=name, condition=condition):
+                    grant = {"name": name.lower(), "condition": condition.value.lower()}
+                    role = RoleDTO.from_dict(
+                        {
+                            "name": "editor",
+                            "securableObjects": [
+                                {
+                                    "type": "metalake",
+                                    "fullName": "lake",
+                                    "privileges": [grant],
+                                }
+                            ],
+                        }
+                    )
+                    privilege = role.securable_objects()[0].privileges()[0]
+                    self.assertEqual(name, privilege.name().name)
+                    self.assertEqual(1 << bit, privilege.name().low_bits)
+                    self.assertEqual(condition, privilege.condition())
+                    self.assertTrue(privilege.can_bind_to(MetadataObject.Type.METALAKE))
+                    self.assertFalse(privilege.can_bind_to(MetadataObject.Type.CATALOG))
+
     def test_create_role_dto(self):
         sec_objs = [
             SecurableObjectDTO(

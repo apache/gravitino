@@ -45,6 +45,7 @@ import org.apache.gravitino.catalog.SemanticModelDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
+import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.job.JobOperationDispatcher;
@@ -135,6 +136,28 @@ public class TestMetadataObjectUtil {
   }
 
   @Test
+  public void testArticleIdentifierRoundTrip() {
+    MetadataObject.Type type = MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE;
+    MetadataObjectDTO dto = MetadataObjectDTO.builder().withType(type).build();
+    dto.setFullName("café");
+    NameIdentifier ident = MetadataObjectUtil.toEntityIdent("lake", dto);
+    Assertions.assertEquals(NameIdentifier.of("lake", "café"), ident);
+    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(dto);
+    Assertions.assertEquals(
+        MetadataObjects.of(null, "café", type),
+        NameIdentifierUtil.toMetadataObjectForRead(ident, entityType));
+    for (NameIdentifier invalid :
+        List.of(NameIdentifier.of("guide"), NameIdentifier.of("lake", "prefix", "guide"))) {
+      Assertions.assertThrows(
+          IllegalNamespaceException.class,
+          () -> NameIdentifierUtil.toMetadataObjectForRead(invalid, entityType));
+    }
+    dto.setFullName("prefix.guide");
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> MetadataObjectUtil.toEntityIdent("lake", dto));
+  }
+
+  @Test
   public void testToEntityIdent() {
     Assertions.assertThrows(
         IllegalArgumentException.class,
@@ -150,6 +173,12 @@ public class TestMetadataObjectUtil {
         NameIdentifier.of("metalake"),
         MetadataObjectUtil.toEntityIdent(
             "metalake", MetadataObjects.of(null, "metalake", MetadataObject.Type.METALAKE)));
+
+    Assertions.assertEquals(
+        NameIdentifier.of("metalake", "guide"),
+        MetadataObjectUtil.toEntityIdent(
+            "metalake",
+            MetadataObjects.of(null, "guide", MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE)));
 
     // Verify that toEntityIdent uses the metadata object's name, not the context metalakeName
     Assertions.assertEquals(

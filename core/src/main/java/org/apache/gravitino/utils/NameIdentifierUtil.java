@@ -775,6 +775,13 @@ public class NameIdentifierUtil {
         checkJobTemplate(ident);
         return MetadataObjects.of(null, ident.name(), MetadataObject.Type.JOB_TEMPLATE);
 
+      case KNOWLEDGE_BASE_ARTICLE:
+        Namespace.check(
+            ident.namespace().length() == 1,
+            "Article identifier must contain a metalake and article name: %s",
+            ident);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE);
+
       case DOMAIN:
         checkDomain(ident);
         return MetadataObjects.of(null, ident.name(), MetadataObject.Type.DOMAIN);

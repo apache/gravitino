@@ -258,21 +258,6 @@ public final class GlossaryTermBindingService {
   }
 
   /**
-   * Cleans up live bindings for a dropped table and all of its live columns in the caller's table
-   * deletion transaction, before column rows are soft-deleted.
-   */
-  public void cleanupTableBindings(
-      long metalakeId, long tableId, @Nullable String tableName, String triggeringOperation) {
-    List<GlossaryTermBindingPO> live =
-        collectTableBindings(metalakeId, tableId, triggeringOperation);
-    if (live.isEmpty()) {
-      return;
-    }
-    retireCollectedBindings(
-        metalakeId, live, tableBindingMetadata(tableId, tableName, live), triggeringOperation);
-  }
-
-  /**
    * Collects live bindings for a table and all of its live columns without acquiring glossary term
    * locks, so callers that must still acquire additional table/column locks can defer term locking
    * until all endpoint locks are held.
@@ -356,14 +341,11 @@ public final class GlossaryTermBindingService {
       if (live.isEmpty()) {
         return;
       }
-      Map<String, LostBinding> metadata = new LinkedHashMap<>();
-      for (Map.Entry<Long, String> entry : removedColumnNamesById.entrySet()) {
-        metadata.put(
-            bindingKey(TargetType.COLUMN.name(), entry.getKey()),
-            new LostBinding(
-                TargetType.COLUMN, entry.getKey(), entry.getValue(), tableId, tableName));
-      }
-      cleanupBindings(metalakeId, live, metadata, triggeringOperation);
+      cleanupBindings(
+          metalakeId,
+          live,
+          columnBindingMetadata(tableId, tableName, removedColumnNamesById),
+          triggeringOperation);
     } catch (RuntimeException e) {
       logCleanupFailure(
           triggeringOperation,
@@ -375,7 +357,8 @@ public final class GlossaryTermBindingService {
   }
 
   /**
-   * Cleans up live bindings for retired metrics of a semantic model inside the alter transaction.
+   * Cleans up live bindings for retired metrics of a semantic model inside the alter or overwrite
+   * transaction.
    */
   public void cleanupMetricBindings(
       long metalakeId,
@@ -415,34 +398,34 @@ public final class GlossaryTermBindingService {
   }
 
   /**
-   * Cleans up live bindings for all live metrics of a dropped semantic model, before metric rows
-   * are soft-deleted.
+   * Collects live bindings for all live metrics of a semantic model without acquiring glossary term
+   * locks, so callers can soft-delete metric and source rows before acquiring term locks.
    */
-  public void cleanupSemanticModelBindings(
-      long metalakeId,
-      long semanticModelId,
-      @Nullable String semanticModelName,
-      String triggeringOperation) {
+  public List<GlossaryTermBindingPO> collectSemanticModelBindings(
+      long metalakeId, long semanticModelId, String triggeringOperation) {
     try {
-      List<GlossaryTermBindingPO> live =
-          SessionUtils.getWithoutCommit(
-              GlossaryTermBindingMapper.class,
-              mapper -> mapper.listBySemanticModel(metalakeId, semanticModelId));
-      if (live.isEmpty()) {
-        return;
-      }
-      Map<String, LostBinding> metadata = new LinkedHashMap<>();
-      for (GlossaryTermBindingPO row : live) {
-        metadata.putIfAbsent(
-            bindingKey(row.getTargetType(), row.getTargetId()),
-            new LostBinding(
-                TargetType.METRIC, row.getTargetId(), null, semanticModelId, semanticModelName));
-      }
-      cleanupBindings(metalakeId, live, metadata, triggeringOperation);
+      return SessionUtils.getWithoutCommit(
+          GlossaryTermBindingMapper.class,
+          mapper -> mapper.listBySemanticModel(metalakeId, semanticModelId));
     } catch (RuntimeException e) {
       logCleanupFailure(triggeringOperation, metalakeId, "SEMANTIC_MODEL:" + semanticModelId, e);
       throw e;
     }
+  }
+
+  /** Builds {@link LostBinding} metadata keyed by target type and ID for semantic-model metrics. */
+  public Map<String, LostBinding> semanticModelBindingMetadata(
+      long semanticModelId,
+      @Nullable String semanticModelName,
+      List<GlossaryTermBindingPO> bindings) {
+    Map<String, LostBinding> metadata = new LinkedHashMap<>();
+    for (GlossaryTermBindingPO row : bindings) {
+      metadata.putIfAbsent(
+          bindingKey(row.getTargetType(), row.getTargetId()),
+          new LostBinding(
+              TargetType.METRIC, row.getTargetId(), null, semanticModelId, semanticModelName));
+    }
+    return metadata;
   }
 
   /**

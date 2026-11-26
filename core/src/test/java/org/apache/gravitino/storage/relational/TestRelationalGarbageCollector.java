@@ -27,13 +27,24 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
 
+import java.io.IOException;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /** Tests relational garbage collector orchestration. */
 public class TestRelationalGarbageCollector {
+
+  @Test
+  public void testArticleCleanupWithoutStoredArticles() throws IOException {
+    JDBCBackend backend = new JDBCBackend();
+    Assertions.assertEquals(
+        0, backend.hardDeleteLegacyData(Entity.EntityType.KNOWLEDGE_BASE_ARTICLE, Long.MAX_VALUE));
+    Assertions.assertEquals(
+        0, backend.deleteOldVersionData(Entity.EntityType.KNOWLEDGE_BASE_ARTICLE, 1));
+  }
 
   @Test
   public void testCollectOrphanedRelationsUntilBatchIsEmpty() throws Exception {

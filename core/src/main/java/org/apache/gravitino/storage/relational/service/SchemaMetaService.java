@@ -479,17 +479,17 @@ public class SchemaMetaService {
                       mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
                           schemaId, MetadataObject.Type.SCHEMA.name())),
           () ->
+              SessionUtils.doWithoutCommit(
+                  StatisticMetaMapper.class,
+                  mapper -> mapper.softDeleteStatisticsByEntityId(schemaId)),
+          () ->
               GlossaryTermBindingService.getInstance()
                   .cleanupObjectBindings(
                       schemaPO.getMetalakeId(),
                       GlossaryTermBindingService.TargetType.SCHEMA,
                       schemaId,
                       schemaPO.getSchemaName(),
-                      "DROP_SCHEMA"),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  StatisticMetaMapper.class,
-                  mapper -> mapper.softDeleteStatisticsByEntityId(schemaId)));
+                      "DROP_SCHEMA"));
     }
     return deletedSchema;
   }

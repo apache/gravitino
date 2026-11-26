@@ -31,7 +31,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -147,7 +146,9 @@ public class TableColumnMetaService {
 
   /**
    * Gives each column the id of the stored live column with the same name, if there is one, and
-   * removes the relations of the stored columns that are gone.
+   * removes the non-glossary relations of the stored columns that are gone, returning those removed
+   * columns in {@code deletedColumnsOut} so the caller can retire glossary bindings after all
+   * table/column locks are held.
    *
    * <p>Tags, owners and privileges are attached to a column by id, so a table that is written again
    * as a whole, e.g. re-imported, must keep the ids of the columns it still has. Columns with no
@@ -158,42 +159,13 @@ public class TableColumnMetaService {
    *
    * @param tablePO the stored table whose column identities are reused
    * @param columns the columns to write
+   * @param deletedColumnsOut receives the IDs and names of dropped stored columns
    * @return the columns, with the stored ids where the names match
    */
-  List<ColumnEntity> reuseStoredColumnIds(TablePO tablePO, List<ColumnEntity> columns) {
-    return reuseStoredColumnIds(
-        tablePO.getMetalakeId(),
-        tablePO.getTableId(),
-        tablePO.getTableName(),
-        tablePO.getCurrentVersion(),
-        columns,
-        null);
-  }
-
   List<ColumnEntity> reuseStoredColumnIds(
       TablePO tablePO, List<ColumnEntity> columns, Map<Long, String> deletedColumnsOut) {
-    return reuseStoredColumnIds(
-        tablePO.getMetalakeId(),
-        tablePO.getTableId(),
-        tablePO.getTableName(),
-        tablePO.getCurrentVersion(),
-        columns,
-        deletedColumnsOut);
-  }
-
-  List<ColumnEntity> reuseStoredColumnIds(
-      Long tableId, Long tableVersion, List<ColumnEntity> columns) {
-    return reuseStoredColumnIds(null, tableId, null, tableVersion, columns, null);
-  }
-
-  private List<ColumnEntity> reuseStoredColumnIds(
-      Long metalakeId,
-      Long tableId,
-      String tableName,
-      Long tableVersion,
-      List<ColumnEntity> columns,
-      @Nullable Map<Long, String> deletedColumnsOut) {
-    List<ColumnPO> storedColumns = getColumnsByTableIdAndVersion(tableId, tableVersion);
+    List<ColumnPO> storedColumns =
+        getColumnsByTableIdAndVersion(tablePO.getTableId(), tablePO.getCurrentVersion());
     if (storedColumns.isEmpty()) {
       return columns;
     }
@@ -223,24 +195,14 @@ public class TableColumnMetaService {
 
     Set<Long> keptIds = result.stream().map(ColumnEntity::id).collect(Collectors.toSet());
     Map<Long, String> deletedColumns = new LinkedHashMap<>();
-    Long resolvedMetalakeId = metalakeId;
     for (ColumnPO storedColumn : storedColumns) {
-      if (resolvedMetalakeId == null) {
-        resolvedMetalakeId = storedColumn.getMetalakeId();
-      }
       if (!keptIds.contains(storedColumn.getColumnId())) {
         deletedColumns.putIfAbsent(storedColumn.getColumnId(), storedColumn.getColumnName());
       }
     }
     deleteColumnRelations(Lists.newArrayList(deletedColumns.keySet()));
     if (!deletedColumns.isEmpty()) {
-      if (deletedColumnsOut != null) {
-        deletedColumnsOut.putAll(deletedColumns);
-      } else if (resolvedMetalakeId != null) {
-        GlossaryTermBindingService.getInstance()
-            .cleanupColumnBindings(
-                resolvedMetalakeId, tableId, tableName, deletedColumns, "RECONCILE_TABLE_COLUMNS");
-      }
+      deletedColumnsOut.putAll(deletedColumns);
     }
     return result;
   }

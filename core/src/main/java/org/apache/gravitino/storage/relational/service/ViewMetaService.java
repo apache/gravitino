@@ -416,13 +416,6 @@ public class ViewMetaService {
 
   private void deleteViewDependents(ViewPO viewPO) {
     Long viewId = viewPO.getViewId();
-    GlossaryTermBindingService.getInstance()
-        .cleanupObjectBindings(
-            viewPO.getMetalakeId(),
-            GlossaryTermBindingService.TargetType.VIEW,
-            viewId,
-            viewPO.getViewName(),
-            "DROP_VIEW");
     SessionUtils.doWithoutCommit(
         ViewVersionInfoMapper.class, mapper -> mapper.softDeleteViewVersionsByViewId(viewId));
     SessionUtils.doWithoutCommit(
@@ -439,6 +432,13 @@ public class ViewMetaService {
         mapper ->
             mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
                 viewId, MetadataObject.Type.VIEW.name()));
+    GlossaryTermBindingService.getInstance()
+        .cleanupObjectBindings(
+            viewPO.getMetalakeId(),
+            GlossaryTermBindingService.TargetType.VIEW,
+            viewId,
+            viewPO.getViewName(),
+            "DROP_VIEW");
   }
 
   private RuntimeException viewWriteFailure(NameIdentifier identifier, ViewPO observedViewPO) {
