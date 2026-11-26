@@ -59,10 +59,7 @@ paths:
             application/vnd.gravitino.v1+json:
               schema:
                 oneOf:
-                  - allOf:
-                      - $ref: ./openapi.yaml#/components/schemas/NameListResponse
-                      - type: object
-                        required: [code, names]
+                  - $ref: "#/components/schemas/TermNamesResponse"
                   - $ref: "#/components/schemas/TermListResponse"
         "400":
           $ref: "#/components/responses/InvalidRequest"
@@ -255,8 +252,363 @@ paths:
           $ref: "#/components/responses/MetalakeNotInUse"
         5XX:
           $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+  "/metalakes/{metalake}/terms/{term}/objects":
+    parameters:
+      - $ref: ./openapi.yaml#/components/parameters/metalake
+      - in: path
+        name: term
+        required: true
+        description: Glossary term name.
+        schema:
+          type: string
+    get:
+      operationId: listTermBindings
+      tags: [glossary]
+      summary: List all visible glossary bindings matching the filters
+      parameters:
+        - in: query
+          name: kind
+          description: Restrict the binding kind (case-insensitive).
+          schema:
+            type: string
+            pattern: "^([Ii][Mm][Pp][Ll][Ee][Mm][Ee][Nn][Tt][Ee][Dd]_[Bb][Yy]|[Uu][Ss][Ee][Dd]_[Bb][Yy])$"
+            example: IMPLEMENTED_BY
+        - in: query
+          name: types
+          description: Filter by metadata object types. Use SEMANTIC_MODEL for metrics.
+          schema:
+            type: array
+            items:
+              type: string
+        - in: query
+          name: status
+          description: Restrict term visibility to this status.
+          schema:
+            $ref: "#/components/schemas/TermStatusInput"
+      responses:
+        "200":
+          description: Successful glossary binding operation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TermBindingListResponse"
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/TermBindingListResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "406":
+          $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
+        "409":
+          $ref: "#/components/responses/MetalakeNotInUse"
+        5XX:
+          $ref: "#/components/responses/BindingServerError"
+  "/metalakes/{metalake}/objects/{type}/{fullName}/terms":
+    parameters:
+      - $ref: ./openapi.yaml#/components/parameters/metalake
+      - in: path
+        name: type
+        required: true
+        description: >-
+          Accepts CATALOG, SCHEMA, TABLE, VIEW, COLUMN, FILESET, TOPIC and MODEL, ignoring case.
+          GET also accepts SEMANTIC_MODEL. A semantic model has no direct terms; use children=true
+          to read its metrics or the named metric endpoint to change their bindings.
+        schema:
+          type: string
+      - in: path
+        name: fullName
+        required: true
+        description: Fully qualified metadata object name.
+        schema:
+          type: string
+    get:
+      operationId: listObjectTerms
+      tags: [glossary]
+      summary: List visible glossary terms of a metadata object
+      parameters:
+        - in: query
+          name: details
+          description: Return term definitions in place of names.
+          schema:
+            type: boolean
+            default: false
+        - in: query
+          name: children
+          description: Include matching columns or metrics and return details. Supported on tables and semantic models.
+          schema:
+            type: boolean
+            default: false
+        - in: query
+          name: status
+          description: Restrict term visibility to this status.
+          schema:
+            $ref: "#/components/schemas/TermStatusInput"
+      responses:
+        "200":
+          description: Successful glossary binding operation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ObjectTermsReadResponse"
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/ObjectTermsReadResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "406":
+          $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
+        "409":
+          $ref: "#/components/responses/Conflict"
+        5XX:
+          $ref: "#/components/responses/BindingServerError"
+    post:
+      operationId: associateObjectTerms
+      tags: [glossary]
+      summary: Update the glossary terms of a metadata object
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TermsAssociateRequest"
+      responses:
+        "200":
+          description: Successful glossary binding operation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TermNamesResponse"
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/TermNamesResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "406":
+          $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        5XX:
+          $ref: "#/components/responses/BindingServerError"
+  "/metalakes/{metalake}/objects/semantic_model/{fullName}/metrics/{metric}/terms":
+    parameters:
+      - $ref: ./openapi.yaml#/components/parameters/metalake
+      - in: path
+        name: fullName
+        required: true
+        description: Fully qualified metadata object name.
+        schema:
+          type: string
+      - in: path
+        name: metric
+        required: true
+        description: Exact metric name within the semantic model.
+        schema:
+          type: string
+    get:
+      operationId: listMetricTerms
+      tags: [glossary]
+      summary: List visible glossary terms of a semantic-model metric
+      parameters:
+        - in: query
+          name: details
+          description: Return term definitions in place of names.
+          schema:
+            type: boolean
+            default: false
+        - in: query
+          name: status
+          description: Restrict term visibility to this status.
+          schema:
+            $ref: "#/components/schemas/TermStatusInput"
+      responses:
+        "200":
+          description: Successful glossary binding operation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetricTermsReadResponse"
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/MetricTermsReadResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "406":
+          $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
+        "409":
+          $ref: "#/components/responses/Conflict"
+        5XX:
+          $ref: "#/components/responses/BindingServerError"
+    post:
+      operationId: associateMetricTerms
+      tags: [glossary]
+      summary: Update the glossary terms of a semantic-model metric
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TermsAssociateRequest"
+      responses:
+        "200":
+          description: Successful glossary binding operation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TermNamesResponse"
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/TermNamesResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "406":
+          $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        5XX:
+          $ref: "#/components/responses/BindingServerError"
 components:
   schemas:
+    ObjectTermsReadResponse:
+      oneOf:
+        - $ref: "#/components/schemas/TermNamesResponse"
+        - $ref: "#/components/schemas/ObjectTermsResponse"
+    MetricTermsReadResponse:
+      oneOf:
+        - $ref: "#/components/schemas/TermNamesResponse"
+        - $ref: "#/components/schemas/TermListResponse"
+    TermNamesResponse:
+      allOf:
+        - $ref: ./openapi.yaml#/components/schemas/NameListResponse
+        - type: object
+          required: [code, names]
+    TermsAssociateRequest:
+      type: object
+      description: Supply at least one array. An omitted or null side requests no changes on that side.
+      anyOf:
+        - required: [termsToAdd]
+          properties:
+            termsToAdd:
+              type: array
+              items: {}
+        - required: [termsToRemove]
+          properties:
+            termsToRemove:
+              type: array
+              items: {}
+      properties:
+        termsToAdd:
+          $ref: "#/components/schemas/OptionalTermNames"
+        termsToRemove:
+          $ref: "#/components/schemas/OptionalTermNames"
+    OptionalTermNames:
+      type: array
+      nullable: true
+      items:
+        type: string
+        pattern: '\S'
+    TermBindingListResponse:
+      type: object
+      required: [code, bindings]
+      properties:
+        code:
+          type: integer
+          enum: [0]
+        bindings:
+          type: array
+          items:
+            $ref: "#/components/schemas/TermBinding"
+    TermBinding:
+      type: object
+      required: [kind, object]
+      properties:
+        object:
+          type: object
+          required: [fullName, type]
+          properties:
+            fullName:
+              type: string
+              description: Fully qualified name of the object or containing semantic model.
+            type:
+              type: string
+      oneOf:
+        - type: object
+          properties:
+            kind:
+              type: string
+              enum: [implemented_by]
+            object:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [catalog, schema, table, view, column, fileset, topic, model]
+          not:
+            required: [metric]
+        - type: object
+          required: [metric]
+          properties:
+            kind:
+              type: string
+              enum: [used_by]
+            object:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [semantic_model]
+            metric:
+              type: string
+              pattern: '\S'
+              description: Exact metric name in the containing semantic model.
+    ObjectTermsResponse:
+      type: object
+      required: [code, terms, children]
+      properties:
+        code:
+          type: integer
+          enum: [0]
+        terms:
+          type: array
+          items:
+            $ref: "#/components/schemas/Term"
+        children:
+          type: array
+          items:
+            type: object
+            required: [name, terms]
+            properties:
+              name:
+                type: string
+                pattern: '\S'
+              terms:
+                type: array
+                minItems: 1
+                items:
+                  $ref: "#/components/schemas/Term"
     TermStatusInput:
       type: string
       description: Case-insensitive term status.
@@ -618,6 +970,12 @@ components:
                     type: string
           minItems: 1
   responses:
+    BindingServerError:
+      description: The server could not complete the binding operation.
+      content:
+        application/json:
+          schema:
+            $ref: ./openapi.yaml#/components/schemas/ErrorModel
     InvalidRequest:
       description: Invalid request, filter, hierarchy direction or glossary change.
       content:

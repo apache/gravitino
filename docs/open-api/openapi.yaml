@@ -75,6 +75,15 @@ paths:
   /metalakes/{metalake}/terms/{term}:
     $ref: "./terms.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1terms~1%7Bterm%7D"
 
+  /metalakes/{metalake}/terms/{term}/objects:
+    $ref: "./terms.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1terms~1%7Bterm%7D~1objects"
+
+  /metalakes/{metalake}/objects/{type}/{fullName}/terms:
+    $ref: "./terms.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7Btype%7D~1%7BfullName%7D~1terms"
+
+  /metalakes/{metalake}/objects/semantic_model/{fullName}/metrics/{metric}/terms:
+    $ref: "./terms.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1semantic_model~1%7BfullName%7D~1metrics~1%7Bmetric%7D~1terms"
+
   /metalakes/{metalake}/terms/{term}/hierarchy:
     $ref: "./terms.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1terms~1%7Bterm%7D~1hierarchy"
 

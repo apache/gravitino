@@ -18,19 +18,5 @@
  */
 package org.apache.gravitino.json;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonToken;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import java.io.IOException;
-
 /** Reads a JSON string without coercing numeric or boolean values to text. */
-public class StrictJsonStringDeserializer extends JsonDeserializer<String> {
-  @Override
-  public String deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-    if (!parser.hasToken(JsonToken.VALUE_STRING)) {
-      return context.reportInputMismatch(String.class, "Value must be a string");
-    }
-    return parser.getText();
-  }
-}
+public class StrictJsonStringDeserializer extends JsonUtils.StrictStringDeserializer {}
