@@ -86,6 +86,11 @@ Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-
 
 - Only support read operations: listSchema, loadSchema, and schemaExists.
 
+When a Hive catalog and a Hudi catalog share an HMS, use one Gravitino catalog to manage each
+schema. A schema registered through the Hive catalog can still appear in Hudi listings, but loading
+it or one of its tables through the Hudi catalog can fail with HTTP 501 because its external
+identifier already belongs to the Hive registration.
+
 ### Schema Properties
 
 - The `Location` is an optional property that shows the storage path to the Hudi database
@@ -123,7 +128,8 @@ Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-o
 
 ### Table Column Types
 
-The following table shows the mapping between Gravitino and [Apache Hudi column types](https://hudi.apache.org/docs/sql_ddl#supported-types):
+The table maps the Gravitino type names returned by the REST API to
+[Apache Hudi SQL types](https://hudi.apache.org/docs/sql_ddl#supported-types).
 
 | Gravitino Type | Apache Hudi Type |
 |----------------|------------------|
@@ -135,11 +141,17 @@ The following table shows the mapping between Gravitino and [Apache Hudi column 
 | `float`        | `float`          |
 | `double`       | `double`         |
 | `string`       | `string`         |
-| `decimal`      | `decimal`        |
+| `decimal(p,s)` | `decimal(p,s)`   |
 | `binary`       | `bytes`          |
-| `array`        | `array`          |
+| `list`         | `array`          |
 | `map`          | `map`            |
 | `struct`       | `struct`         |
+
+The HMS backend reads column types through the Hive converter, so tables can also expose
+`byte`, `short`, `varchar(n)`, and `char(n)`. For `decimal(p,s)`, precision ranges from 1 to 38
+and scale from 0 through precision. An HMS `timestamp` is returned without a time zone.
+See the [Hive type mapping](./apache-hive-catalog.md#table-column-types) for length limits and the
+types available when creating tables through the Hive catalog.
 
 ### Table Operations
 
