@@ -65,6 +65,8 @@ paths:
           name: bindings
           description: >-
             Include up to 20 readable bindings per matching term. Requires match and details=true.
+            With authorization enabled, previewing a visible term requires an authorizer that
+            supports resolved target IDs, including when the term has no bindings.
             A lookup can examine up to 1,000 binding candidates per term and 10,000 authorization
             candidates across all results, including terms, domains, relations, and bindings.
           schema:

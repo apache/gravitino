@@ -40,6 +40,7 @@ import org.apache.gravitino.dto.glossary.TermLinkDTO;
 import org.apache.gravitino.dto.responses.ObjectTermsResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.LookupTooBroadException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
@@ -81,6 +82,9 @@ public final class GlossaryTermViews {
    * @param words original lookup words, or an empty list for browsing
    * @param bindings whether to include a binding preview
    * @return the visible term snapshots
+   * @throws ForbiddenException if previews are requested for visible terms and the configured
+   *     authorizer cannot check resolved target IDs
+   * @throws LookupTooBroadException if the exact lookup exceeds its work budget
    */
   public TermDTO[] listTerms(
       String metalake,
@@ -124,6 +128,7 @@ public final class GlossaryTermViews {
    * @param status optional term status
    * @param words original lookup words, or an empty list for browsing
    * @return the matching names
+   * @throws LookupTooBroadException if the exact lookup exceeds its work budget
    */
   public String[] listTermNames(
       String metalake,
@@ -404,11 +409,12 @@ public final class GlossaryTermViews {
                         .withName(rel.targetEntity().name())
                         .withType(Owner.Type.valueOf(rel.targetEntity().type().name()))
                         .build()));
+    Map<Long, GlossaryTermQuery.Preview> previews =
+        includeBindings ? lookup.previews(ids) : Map.of();
     return roots.stream()
         .map(
             term -> {
-              GlossaryTermQuery.Preview preview =
-                  includeBindings ? lookup.preview(term.id()) : null;
+              GlossaryTermQuery.Preview preview = previews.get(term.id());
               return new TermDTO(
                   term.name(),
                   term.definition(),

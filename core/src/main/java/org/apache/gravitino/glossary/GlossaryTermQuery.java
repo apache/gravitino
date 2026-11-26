@@ -66,7 +66,6 @@ final class GlossaryTermQuery {
   private final List<GlossaryTermPO> visible;
   // Column permissions follow the containing table, and metric permissions follow the model.
   private final Map<MetadataObject, Boolean> readableTargets = new HashMap<>();
-  @Nullable private GlossaryBindingAccess bindingAccess;
 
   GlossaryTermQuery(
       GlossaryManager manager,
@@ -104,14 +103,11 @@ final class GlossaryTermQuery {
     List<GlossaryTermPO> rows;
     if (scope == null || scope.size() <= ID_BATCH_SIZE || budget != null) {
       // A lookup's domain scope already fits the request budget. One query counts each root once.
-      rows = candidates(scope, pattern, state, keys);
-      if (budget != null) {
-        budget.consume(rows.size());
-      }
+      rows = candidates(scope, pattern, literal, state, keys);
     } else {
       Map<Long, GlossaryTermPO> distinct = new TreeMap<>();
       for (List<Long> batch : Lists.partition(List.copyOf(scope), ID_BATCH_SIZE)) {
-        for (GlossaryTermPO row : candidates(batch, pattern, state, keys)) {
+        for (GlossaryTermPO row : candidates(batch, pattern, literal, state, keys)) {
           distinct.put(row.getTermId(), row);
         }
       }
@@ -119,8 +115,6 @@ final class GlossaryTermQuery {
     }
     visible =
         rows.stream()
-            .filter(
-                row -> literal == null || row.getName().toLowerCase(Locale.ROOT).contains(literal))
             .filter(
                 row ->
                     access.canRead(row.getTermId(), GlossaryTerm.Status.valueOf(row.getStatus())))
@@ -215,14 +209,45 @@ final class GlossaryTermQuery {
     return rows;
   }
 
-  record Preview(List<TermBindingDTO> bindings, boolean truncated) {}
+  record Preview(List<TermBindingDTO> bindings, boolean truncated) {
+    private static final Preview EMPTY = new Preview(List.of(), false);
+  }
 
-  Preview preview(long termId) {
+  Map<Long, Preview> previews(Set<Long> ids) {
+    // The full binding list requires the same capability even for a term with no bindings.
+    GlossaryBindingAccess bindingAccess = manager.bindingAccess(metalake, lake);
+    Map<Long, Preview> results = new HashMap<>();
+    ids.forEach(id -> results.put(id, Preview.EMPTY));
+    List<Long> bound = new ArrayList<>();
+    if (ids.size() == 1) {
+      bound.addAll(ids);
+    } else {
+      for (List<Long> batch : Lists.partition(List.copyOf(ids), ID_BATCH_SIZE)) {
+        bound.addAll(
+            SessionUtils.getWithoutCommit(
+                GlossaryTermLookupMapper.class, mapper -> mapper.termsWithBindings(lake, batch)));
+      }
+    }
+    for (int i = 0; i < bound.size(); i++) {
+      long id = bound.get(i);
+      // Spare capacity permits full batches even when only one more visible binding is needed.
+      // Otherwise preserve the remaining roots' budget by resolving only what can affect this
+      // preview.
+      int pending = bound.size() - i;
+      boolean readAhead =
+          pending == 1 || (long) pending * MAX_BINDING_CANDIDATES <= budget.remaining();
+      results.put(id, preview(id, bindingAccess, readAhead));
+    }
+    return results;
+  }
+
+  private Preview preview(long termId, GlossaryBindingAccess bindingAccess, boolean readAhead) {
     List<TermBindingDTO> visibleBindings = new ArrayList<>();
     GlossaryTermBindingPO last = null;
     int remaining = Math.min(MAX_BINDING_CANDIDATES, budget.remaining());
     while (true) {
-      int pageSize = Math.min(MAX_VISIBLE_BINDINGS + 1, remaining + 1);
+      int needed = MAX_VISIBLE_BINDINGS + 1 - (readAhead ? 0 : visibleBindings.size());
+      int pageSize = Math.min(needed, remaining + 1);
       GlossaryTermBindingPO after = last;
       List<GlossaryTermBindingPO> rows =
           SessionUtils.getWithoutCommit(
@@ -231,9 +256,6 @@ final class GlossaryTermQuery {
       // An overflow row proves there is more work, but must never be resolved or authorized.
       List<GlossaryTermBindingPO> batch = rows.subList(0, Math.min(rows.size(), remaining));
       if (!batch.isEmpty()) {
-        if (bindingAccess == null) {
-          bindingAccess = manager.bindingAccess(metalake, lake);
-        }
         budget.consume(batch.size());
         remaining -= batch.size();
         for (TermBinding binding : GlossaryManager.resolveBindings(batch, bindingAccess)) {
@@ -277,11 +299,41 @@ final class GlossaryTermQuery {
   private List<GlossaryTermPO> candidates(
       @Nullable Collection<Long> domains,
       @Nullable String pattern,
+      @Nullable String literal,
       @Nullable String status,
       Set<String> keys) {
-    Integer limit = budget == null ? null : budget.remaining() + 1;
-    return SessionUtils.getWithoutCommit(
-        GlossaryTermLookupMapper.class,
-        mapper -> mapper.candidates(lake, domains, pattern, status, keys, limit));
+    Integer firstPageSize =
+        budget == null
+            ? null
+            : Math.min(budget.remaining() + 1, literal == null ? Integer.MAX_VALUE : ID_BATCH_SIZE);
+    List<GlossaryTermPO> matches = new ArrayList<>();
+    Long cursor = null;
+    while (true) {
+      Long after = cursor;
+      // A nearly exhausted budget can still have many SQL rows with different literal spacing.
+      // Continue in batches after the first probe without charging those false positives.
+      Integer limit = after == null ? firstPageSize : Integer.valueOf(ID_BATCH_SIZE);
+      List<GlossaryTermPO> page =
+          SessionUtils.getWithoutCommit(
+              GlossaryTermLookupMapper.class,
+              mapper -> mapper.candidates(lake, domains, pattern, status, keys, after, limit));
+      List<GlossaryTermPO> eligible =
+          literal == null
+              ? page
+              : page.stream()
+                  .filter(row -> row.getName().toLowerCase(Locale.ROOT).contains(literal))
+                  .toList();
+      if (budget != null) {
+        budget.consume(eligible.size());
+      }
+      if (literal == null) {
+        return page;
+      }
+      matches.addAll(eligible);
+      if (limit == null || page.size() < limit) {
+        return matches;
+      }
+      cursor = page.get(page.size() - 1).getTermId();
+    }
   }
 }

@@ -37,7 +37,8 @@ public interface GlossaryTermLookupMapper {
    * @param pattern optional escaped substring pattern on the normalized name key
    * @param status optional root status
    * @param keys normalized names and synonyms, empty when browsing
-   * @param limit optional lookup candidate bound including one overflow row
+   * @param after exclusive term ID from the previous page, or null for the first page
+   * @param limit optional page size for lookup candidates
    * @return matching root candidates in stable ID order
    */
   @Select(
@@ -45,6 +46,7 @@ public interface GlossaryTermLookupMapper {
       <script>
       SELECT t.term_id AS termId, t.name, t.status FROM glossary_term_meta t
       WHERE t.metalake_id=#{lake} AND t.deleted_at=0
+      <if test="after != null">AND t.term_id &gt; #{after}</if>
       <if test="status != null">AND t.status=#{status}</if>
       <if test="pattern != null">AND t.name_key LIKE #{pattern} ESCAPE '!'</if>
       <if test="!keys.isEmpty()">AND (t.name_key IN
@@ -68,6 +70,7 @@ public interface GlossaryTermLookupMapper {
       @Param("pattern") @Nullable String pattern,
       @Param("status") @Nullable String status,
       @Param("keys") Collection<String> keys,
+      @Param("after") @Nullable Long after,
       @Param("limit") @Nullable Integer limit);
 
   /**
@@ -130,6 +133,26 @@ public interface GlossaryTermLookupMapper {
       """)
   int countChildren(
       @Param("lake") long lake, @Param("parent") long parent, @Param("limit") int limit);
+
+  /**
+   * Identifies roots with live bindings before expanding a multi-term preview.
+   *
+   * @param lake the metalake ID
+   * @param ids the IDs of visible terms
+   * @return IDs with at least one binding candidate in this snapshot
+   */
+  @Select(
+      """
+      <script>
+      SELECT t.term_id FROM glossary_term_meta t
+      WHERE t.metalake_id=#{lake} AND t.deleted_at=0 AND t.term_id IN
+      <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+      AND EXISTS (SELECT 1 FROM glossary_term_binding b WHERE b.term_id=t.term_id
+        AND b.metalake_id=t.metalake_id AND b.deleted_at=0)
+      ORDER BY t.term_id
+      </script>
+      """)
+  List<Long> termsWithBindings(@Param("lake") long lake, @Param("ids") Collection<Long> ids);
 
   /**
    * Fetches binding candidates for a lookup preview in stable target order.
