@@ -128,12 +128,13 @@ public class GlossaryTermRelBaseSQLProvider {
         + " WHERE metalake_id=#{metalakeId}";
   }
 
-  /** Reads one frontier batch, excluding deleted endpoints, without recursive SQL or locks. */
+  /** Reads one live frontier batch, applying any endpoint status filter before the lookup limit. */
   public String listEdges(
       @Param("metalakeId") long metalakeId,
       @Param("ids") Collection<Long> ids,
       @Param("type") String type,
       @Param("reverse") boolean reverse,
+      @Param("status") @Nullable String status,
       @Param("limit") @Nullable Integer limit) {
     return "<script>SELECT "
         + COLUMNS
@@ -148,7 +149,8 @@ public class GlossaryTermRelBaseSQLProvider {
         + "JOIN "
         + MetalakeMetaMapper.TABLE_NAME
         + " m ON m.metalake_id=r.metalake_id AND m.deleted_at=0 "
-        + "WHERE r.metalake_id=#{metalakeId} AND r.deleted_at=0 AND r.rel_type=#{type} AND ("
+        + "WHERE r.metalake_id=#{metalakeId} AND r.deleted_at=0 AND r.rel_type=#{type} "
+        + "<if test='status != null'>AND f.status=#{status} AND t.status=#{status} </if>AND ("
         + "<choose><when test='reverse'>r.to_term_id</when><otherwise>r.from_term_id</otherwise></choose> IN "
         + "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
         + "<if test='type == &quot;RELATED&quot;'> OR r.to_term_id IN "

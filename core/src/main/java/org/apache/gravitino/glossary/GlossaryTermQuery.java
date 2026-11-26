@@ -61,6 +61,7 @@ final class GlossaryTermQuery {
   final GlossaryAccess access;
   private final GlossaryManager manager;
   private final String metalake;
+  @Nullable private final String status;
   private final Map<String, String> wordKeys;
   @Nullable private final TermLookupBudget budget;
   private final List<GlossaryTermPO> visible;
@@ -76,6 +77,7 @@ final class GlossaryTermQuery {
       Map<String, String> wordKeys) {
     this.manager = manager;
     this.metalake = metalake;
+    this.status = status == null ? null : status.name();
     this.wordKeys = wordKeys;
     budget = wordKeys.isEmpty() ? null : new TermLookupBudget();
     lake = GlossaryManager.resolveMetalakeId(metalake);
@@ -97,17 +99,16 @@ final class GlossaryTermQuery {
                     .replace("%", "!%")
                     .replace("_", "!_")
                 + "%";
-    String state = status == null ? null : status.name();
     Set<Long> scope =
         domain == null ? null : manager.domainScope(metalake, lake, domain, access, budget);
     List<GlossaryTermPO> rows;
     if (scope == null || scope.size() <= ID_BATCH_SIZE || budget != null) {
       // A lookup's domain scope already fits the request budget. One query counts each root once.
-      rows = candidates(scope, pattern, literal, state, keys);
+      rows = candidates(scope, pattern, literal, keys);
     } else {
       Map<Long, GlossaryTermPO> distinct = new TreeMap<>();
       for (List<Long> batch : Lists.partition(List.copyOf(scope), ID_BATCH_SIZE)) {
-        for (GlossaryTermPO row : candidates(batch, pattern, literal, state, keys)) {
+        for (GlossaryTermPO row : candidates(batch, pattern, literal, keys)) {
           distinct.put(row.getTermId(), row);
         }
       }
@@ -150,13 +151,11 @@ final class GlossaryTermQuery {
     return loadDefinitions(ids, projectDomains);
   }
 
-  void addEndpointNames(
-      Set<Long> ids, @Nullable GlossaryTerm.Status status, Map<Long, String> names) {
+  void addEndpointNames(Set<Long> ids, Map<Long, String> names) {
     for (List<Long> batch : Lists.partition(List.copyOf(ids), ID_BATCH_SIZE)) {
       List<GlossaryTermPO> endpoints =
           SessionUtils.getWithoutCommit(
-              GlossaryTermLookupMapper.class,
-              mapper -> mapper.endpoints(lake, batch, status == null ? null : status.name()));
+              GlossaryTermLookupMapper.class, mapper -> mapper.endpoints(lake, batch));
       Set<Long> custom = new LinkedHashSet<>();
       for (GlossaryTermPO row : endpoints) {
         if (access.canRead(row.getTermId(), GlossaryTerm.Status.valueOf(row.getStatus()))) {
@@ -196,7 +195,8 @@ final class GlossaryTermQuery {
     List<GlossaryTermRelPO> rows =
         SessionUtils.getWithoutCommit(
             GlossaryTermRelMapper.class,
-            mapper -> mapper.listEdges(lake, ids, type.name(), reverse, budget.remaining() + 1));
+            mapper ->
+                mapper.listEdges(lake, ids, type.name(), reverse, status, budget.remaining() + 1));
     budget.consume(rows.size());
     if (type == RelationType.RELATED) {
       // A symmetric edge between two roots is projected once for each root.
@@ -314,7 +314,6 @@ final class GlossaryTermQuery {
       @Nullable Collection<Long> domains,
       @Nullable String pattern,
       @Nullable String literal,
-      @Nullable String status,
       Set<String> keys) {
     Integer firstPageSize =
         budget == null

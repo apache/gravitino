@@ -275,7 +275,7 @@ public final class GlossaryTermRelService {
         GlossaryTermRelMapper.class,
         mapper -> {
           if (ids.size() <= FRONTIER_BATCH_SIZE) {
-            return mapper.listEdges(metalakeId, ids, type.name(), reverse, null);
+            return mapper.listEdges(metalakeId, ids, type.name(), reverse, null, null);
           }
           // A symmetric pair can match one endpoint in each of two batches.
           Set<GlossaryTermRelPO> edges =
@@ -283,7 +283,7 @@ public final class GlossaryTermRelService {
                   Comparator.comparing(GlossaryTermRelPO::getFromTermId)
                       .thenComparing(GlossaryTermRelPO::getToTermId));
           for (List<Long> batch : Lists.partition(List.copyOf(ids), FRONTIER_BATCH_SIZE)) {
-            edges.addAll(mapper.listEdges(metalakeId, batch, type.name(), reverse, null));
+            edges.addAll(mapper.listEdges(metalakeId, batch, type.name(), reverse, null, null));
           }
           return new ArrayList<>(edges);
         });

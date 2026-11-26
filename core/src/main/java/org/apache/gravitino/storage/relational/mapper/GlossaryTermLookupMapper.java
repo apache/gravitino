@@ -78,7 +78,6 @@ public interface GlossaryTermLookupMapper {
    *
    * @param lake the metalake ID
    * @param ids the endpoint IDs
-   * @param status optional status filter
    * @return the endpoint candidates
    */
   @Select(
@@ -87,13 +86,9 @@ public interface GlossaryTermLookupMapper {
       SELECT term_id AS termId, name, status FROM glossary_term_meta
       WHERE metalake_id=#{lake} AND deleted_at=0 AND term_id IN
       <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
-      <if test="status != null">AND status=#{status}</if>
       </script>
       """)
-  List<GlossaryTermPO> endpoints(
-      @Param("lake") long lake,
-      @Param("ids") Collection<Long> ids,
-      @Param("status") @Nullable String status);
+  List<GlossaryTermPO> endpoints(@Param("lake") long lake, @Param("ids") Collection<Long> ids);
 
   /**
    * Counts at most the remaining membership budget and one overflow row before hydrating roots.

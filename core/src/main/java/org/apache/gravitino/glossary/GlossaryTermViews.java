@@ -386,7 +386,7 @@ public final class GlossaryTermViews {
       }
     }
     if (lookup != null) {
-      lookup.addEndpointNames(endpoints, status, names);
+      lookup.addEndpointNames(endpoints, names);
     } else if (!endpoints.isEmpty()) {
       GlossaryAccess access =
           resolvedAccess != null ? resolvedAccess : manager.accessForMetalake(metalake);

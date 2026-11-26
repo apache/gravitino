@@ -112,8 +112,9 @@ public class GlossaryTermRelSQLProviderFactory {
       @Param("ids") Collection<Long> ids,
       @Param("type") String type,
       @Param("reverse") boolean reverse,
+      @Param("status") @Nullable String status,
       @Param("limit") @Nullable Integer limit) {
-    return getProvider().listEdges(metalakeId, ids, type, reverse, limit);
+    return getProvider().listEdges(metalakeId, ids, type, reverse, status, limit);
   }
 
   /** Delegates {@link GlossaryTermRelBaseSQLProvider#expired}. */

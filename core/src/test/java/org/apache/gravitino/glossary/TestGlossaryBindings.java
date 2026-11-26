@@ -2540,6 +2540,36 @@ class TestGlossaryBindings extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testStatusFilteredRelationsUseOnlyTheEligibleLookupBudget() {
+    GlossaryTerm.Status old = GlossaryTerm.Status.DEPRECATED;
+    openManager.createTerm(LAKE, TermSpec.builder("Parent").build());
+    openManager.createTerm(LAKE, TermSpec.builder("OldParent").withStatus(old).build());
+    openManager.createTerm(LAKE, TermSpec.builder("Peer").build());
+    openManager.createTerm(
+        LAKE,
+        TermSpec.builder("Root").withBroader("Parent", "OldParent").withRelated("Peer").build());
+    openManager.createTerm(LAKE, TermSpec.builder("Child").withBroader("Root").build());
+    openManager.createTerm(
+        LAKE, TermSpec.builder("OldChild").withStatus(old).withBroader("Root").build());
+    openManager.createTerm(
+        LAKE, TermSpec.builder("OldPeer").withStatus(old).withRelated("Root").build());
+    GlossaryTermViews views = new GlossaryTermViews(openManager);
+    try (MockedConstruction<TermLookupBudget> ignored = limitLookupTo(4)) {
+      TermDTO root =
+          views
+              .listTerms(LAKE, null, null, GlossaryTerm.Status.APPROVED, List.of("Root"), false)[0];
+      assertArrayEquals(new String[] {"Parent"}, root.getBroader());
+      assertArrayEquals(new String[] {"Child"}, root.getNarrower());
+      assertArrayEquals(new String[] {"Peer"}, root.getRelated());
+    }
+    try (MockedConstruction<TermLookupBudget> ignored = limitLookupTo(4)) {
+      assertThrows(
+          LookupTooBroadException.class,
+          () -> views.listTerms(LAKE, null, null, null, List.of("Root"), false));
+    }
+  }
+
+  @TestTemplate
   void testReverseBindingChildrenAndDomainVisibility() throws Exception {
     String modelName = "three_metrics";
     SemanticModelMetaService.getInstance()
