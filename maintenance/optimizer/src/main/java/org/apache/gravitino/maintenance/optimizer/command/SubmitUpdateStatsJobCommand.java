@@ -24,12 +24,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
@@ -39,6 +37,7 @@ import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoClientUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
+import org.apache.gravitino.secret.SecretPropertyUtils;
 
 /**
  * Handles CLI command {@code submit-update-stats-job} for submitting built-in Iceberg update stats
@@ -53,14 +52,6 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
   private static final String SPARK_SQL_CATALOG_PREFIX = "spark.sql.catalog.";
   private static final String ICEBERG_SPARK_CATALOG_IMPL = "org.apache.iceberg.spark.SparkCatalog";
   private static final String REDACTED = "******";
-  private static final Set<String> SENSITIVE_UPDATER_OPTION_KEYS =
-      new HashSet<>(
-          List.of(
-              "password",
-              "oauth_credential",
-              "oauth_token",
-              OptimizerConfig.AUTH_PASSWORD,
-              OptimizerConfig.AUTH_OAUTH_CREDENTIAL));
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -187,7 +178,8 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
 
   /**
    * Returns a copy of {@code jobConfig} safe for logging. Sensitive fields inside {@code
-   * updater_options} and {@code spark_conf} JSON maps are replaced with {@code ***}.
+   * updater_options} and {@code spark_conf} JSON maps are replaced with {@code ******}, using the
+   * same keyword substring matching as {@link SecretPropertyUtils#isSensitivePropertyKey}.
    */
   static Map<String, String> redactJobConfigForLog(Map<String, String> jobConfig) {
     if (jobConfig == null || jobConfig.isEmpty()) {
@@ -209,7 +201,7 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
           MAPPER.readValue(json, new TypeReference<Map<String, String>>() {});
       Map<String, String> safe = new LinkedHashMap<>();
       for (Map.Entry<String, String> entry : parsed.entrySet()) {
-        if (isSensitiveConfigKey(entry.getKey())) {
+        if (SecretPropertyUtils.isSensitivePropertyKey(entry.getKey())) {
           safe.put(entry.getKey(), REDACTED);
         } else {
           safe.put(entry.getKey(), entry.getValue());
@@ -219,15 +211,6 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     } catch (Exception ignored) {
       // Keep the original value if JSON cannot be parsed for display.
     }
-  }
-
-  private static boolean isSensitiveConfigKey(String key) {
-    if (StringUtils.isBlank(key)) {
-      return false;
-    }
-    String normalized = key.trim().toLowerCase(Locale.ROOT);
-    return SENSITIVE_UPDATER_OPTION_KEYS.contains(key)
-        || SENSITIVE_UPDATER_OPTION_KEYS.contains(normalized);
   }
 
   private static String resolveScalarOption(String cliValue, String confValue) {
