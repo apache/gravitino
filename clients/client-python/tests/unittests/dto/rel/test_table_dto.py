@@ -338,6 +338,22 @@ class TestTableDTO(unittest.TestCase):
         with self.assertRaises(UnsupportedOperationException):
             dto.supports_partition_specs()
 
+    def test_table_dto_rejects_default_spec_id_missing_from_specs(self):
+        dto = TableDTO(
+            "example_table",
+            [
+                ColumnDTO.builder()
+                .with_name("id")
+                .with_data_type(Types.IntegerType.get())
+                .build()
+            ],
+            AuditDTO("Apache Gravitino"),
+            _default_partition_spec_id=1,
+            _partition_specs={0: []},
+        )
+        with self.assertRaises(IllegalArgumentException):
+            dto.supports_partition_specs()
+
     def test_table_dto_serialize_with_sort_order(self):
         """Tests the sort order field is serialized correctly."""
 

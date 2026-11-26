@@ -210,6 +210,11 @@ public class TableDTO implements Table, SupportsPartitionSpecs {
     if (partitionSpecs == null || defaultPartitionSpecId == null) {
       throw new UnsupportedOperationException("Table does not support partition specs.");
     }
+    Preconditions.checkArgument(
+        partitionSpecs.containsKey(defaultPartitionSpecId),
+        "defaultPartitionSpecId %s is missing from partitionSpecs %s",
+        defaultPartitionSpecId,
+        partitionSpecs.keySet());
     return this;
   }
 
@@ -407,6 +412,18 @@ public class TableDTO implements Table, SupportsPartitionSpecs {
     public TableDTO build() {
       Preconditions.checkArgument(name != null && !name.isEmpty(), "name cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
+      boolean hasDefaultSpecId = defaultPartitionSpecId != null;
+      boolean hasPartitionSpecs = partitionSpecs != null;
+      Preconditions.checkArgument(
+          hasDefaultSpecId == hasPartitionSpecs,
+          "defaultPartitionSpecId and partitionSpecs must both be set or both be null");
+      if (hasPartitionSpecs) {
+        Preconditions.checkArgument(
+            partitionSpecs.containsKey(defaultPartitionSpecId),
+            "defaultPartitionSpecId %s is missing from partitionSpecs %s",
+            defaultPartitionSpecId,
+            partitionSpecs.keySet());
+      }
 
       return new TableDTO(
           name,

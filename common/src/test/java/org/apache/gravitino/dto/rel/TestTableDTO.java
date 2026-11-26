@@ -110,6 +110,37 @@ public class TestTableDTO {
   }
 
   @Test
+  public void testBuildRejectsDefaultSpecIdMissingFromPartitionSpecs() {
+    AuditDTO audit =
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            TableDTO.builder()
+                .withName("events")
+                .withAudit(audit)
+                .withColumns(new ColumnDTO[0])
+                .withDefaultPartitionSpecId(1)
+                .withPartitionSpecs(ImmutableMap.of(0, new Partitioning[0]))
+                .build());
+  }
+
+  @Test
+  public void testBuildRejectsPartialPartitionSpecFields() {
+    AuditDTO audit =
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            TableDTO.builder()
+                .withName("events")
+                .withAudit(audit)
+                .withColumns(new ColumnDTO[0])
+                .withDefaultPartitionSpecId(1)
+                .build());
+  }
+
+  @Test
   public void testFromDTOPreservesPartitionSpecs() {
     AuditDTO audit =
         AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();

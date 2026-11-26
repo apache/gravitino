@@ -184,6 +184,11 @@ class TableDTO(
             raise UnsupportedOperationException(
                 "Table does not support partition specs."
             )
+        Precondition.check_argument(
+            self._default_partition_spec_id in self._partition_specs,
+            f"defaultPartitionSpecId {self._default_partition_spec_id} is missing "
+            f"from partitionSpecs {list(self._partition_specs.keys())}",
+        )
         return self
 
     def default_partition_spec_id(self) -> int:

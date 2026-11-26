@@ -352,6 +352,50 @@ public class TestDTOJsonSerDe {
   }
 
   @Test
+  public void testTableDTOPartitionSpecsSerDe() throws Exception {
+    Instant now = Instant.now();
+    AuditDTO audit = AuditDTO.builder().withCreator("creator").withCreateTime(now).build();
+    ColumnDTO column =
+        ColumnDTO.builder()
+            .withName("id")
+            .withDataType(Types.LongType.get())
+            .withComment("id")
+            .withNullable(false)
+            .build();
+    Partitioning[] identity = new Partitioning[] {IdentityPartitioningDTO.of("id")};
+    TableDTO table =
+        TableDTO.builder()
+            .withName("events")
+            .withComment("comment")
+            .withColumns(new ColumnDTO[] {column})
+            .withProperties(ImmutableMap.of())
+            .withPartitioning(identity)
+            .withDefaultPartitionSpecId(1)
+            .withPartitionSpecs(ImmutableMap.of(0, new Partitioning[0], 1, identity))
+            .withAudit(audit)
+            .build();
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(table);
+    TableDTO restored = JsonUtils.objectMapper().readValue(serJson, TableDTO.class);
+
+    Assertions.assertEquals(1, restored.supportsPartitionSpecs().defaultPartitionSpecId());
+    Assertions.assertEquals(2, restored.supportsPartitionSpecs().partitionSpecs().size());
+    Assertions.assertEquals(0, restored.supportsPartitionSpecs().partitionSpecs().get(0).length);
+    Assertions.assertInstanceOf(
+        IdentityPartitioningDTO.class,
+        restored.supportsPartitionSpecs().partitionSpecs().get(1)[0]);
+    Assertions.assertArrayEquals(
+        new String[] {"id"},
+        ((IdentityPartitioningDTO) restored.supportsPartitionSpecs().partitionSpecs().get(1)[0])
+            .fieldName());
+    // Integer map keys round-trip through JSON string keys ("0"/"1").
+    Assertions.assertTrue(serJson.contains("\"defaultPartitionSpecId\":1"));
+    Assertions.assertTrue(serJson.contains("\"partitionSpecs\":{"));
+    Assertions.assertTrue(serJson.contains("\"0\":[]"));
+    Assertions.assertTrue(serJson.contains("\"1\":["));
+  }
+
+  @Test
   public void testPartitioningDTOSerDe() throws Exception {
 
     String[] field1 = new String[] {"dt"};
