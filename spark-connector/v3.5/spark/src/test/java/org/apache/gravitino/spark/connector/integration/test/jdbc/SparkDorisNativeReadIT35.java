@@ -41,7 +41,6 @@ import java.util.TimeZone;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import org.apache.doris.spark.read.DorisInputPartition;
 import org.apache.doris.spark.read.DorisScanV2;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.credential.JdbcCredential;
@@ -281,13 +280,16 @@ public class SparkDorisNativeReadIT35 extends SparkEnvIT {
     InputPartition[] partitions = scan.toBatch().planInputPartitions();
     Assertions.assertTrue(partitions.length > 1);
     for (InputPartition partition : partitions) {
-      DorisInputPartition doris = Assertions.assertInstanceOf(DorisInputPartition.class, partition);
-      Assertions.assertArrayEquals(new String[] {"`id`", "`name`"}, doris.readCols());
+      Assertions.assertEquals(
+          "org.apache.doris.spark.read.DorisInputPartition", partition.getClass().getName());
+      Assertions.assertArrayEquals(
+          new String[] {"`id`", "`name`"}, partitionValues(partition, "readCols"));
+      String[] predicates = partitionValues(partition, "predicates");
       Assertions.assertTrue(
-          Arrays.stream(doris.predicates())
+          Arrays.stream(predicates)
               .anyMatch(p -> p.contains("id") && p.contains(">=") && p.contains("3")));
       Assertions.assertTrue(
-          Arrays.stream(doris.predicates())
+          Arrays.stream(predicates)
               .anyMatch(p -> p.contains("id") && p.contains("<=") && p.contains("8")));
     }
     Set<String> executors = ConcurrentHashMap.newKeySet();
@@ -341,6 +343,11 @@ public class SparkDorisNativeReadIT35 extends SparkEnvIT {
     Field mode = factory.getClass().getDeclaredField("mode");
     mode.setAccessible(true);
     Assertions.assertEquals(readMode().toUpperCase(Locale.ROOT), mode.get(factory).toString());
+  }
+
+  private String[] partitionValues(InputPartition partition, String method)
+      throws ReflectiveOperationException {
+    return (String[]) partition.getClass().getMethod(method).invoke(partition);
   }
 
   private static Scan getScan(Dataset<Row> data) {
