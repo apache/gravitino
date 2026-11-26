@@ -22,6 +22,7 @@ package org.apache.gravitino.storage.relational.session;
 import com.google.common.annotations.VisibleForTesting;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.TransactionIsolationLevel;
@@ -38,6 +39,11 @@ public final class SqlSessions {
   private static final ThreadLocal<SqlSession> sessions = new ThreadLocal<>();
   private static final ThreadLocal<AtomicInteger> sessionCount =
       ThreadLocal.withInitial(() -> new AtomicInteger(0));
+
+  // Run after the outermost session commits, rolls back, or closes. An inner close only
+  // decrements the count and must not run these.
+  private static final CopyOnWriteArrayList<Runnable> OUTERMOST_SESSION_CLOSED_LISTENERS =
+      new CopyOnWriteArrayList<>();
 
   private SqlSessions() {}
 
@@ -90,6 +96,45 @@ public final class SqlSessions {
   /** Close the SqlSession object and remove it from the thread local storage. */
   public static void closeSqlSession() {
     handleSessionClose(false /* commit */, false /* rollback */);
+  }
+
+  /**
+   * Registers work that must run only when this thread's outermost SQL session has finished.
+   *
+   * <p>The listener runs after the commit, rollback, or close, including when the session count was
+   * already wrong and had to be reset. It does not run for an inner close that only decrements the
+   * count. Listeners must not throw; a failure is logged and the remaining listeners still run.
+   *
+   * @param listener work to run on the thread that closed the outermost session
+   */
+  public static void addOutermostSessionClosedListener(Runnable listener) {
+    OUTERMOST_SESSION_CLOSED_LISTENERS.addIfAbsent(listener);
+  }
+
+  /**
+   * Removes a listener registered with {@link #addOutermostSessionClosedListener}.
+   *
+   * @param listener the listener to remove
+   */
+  public static void removeOutermostSessionClosedListener(Runnable listener) {
+    OUTERMOST_SESSION_CLOSED_LISTENERS.remove(listener);
+  }
+
+  /**
+   * Rolls back and closes every SQL session reference still open on this thread.
+   *
+   * <p>A finished request must not leave its transaction, or cache blocks held until that
+   * transaction ends, on a pooled thread. Each call drops one reference. The real rollback and
+   * close happen when the count reaches zero.
+   */
+  public static void rollbackIfSessionStillOpen() {
+    if (sessions.get() == null) {
+      return;
+    }
+    LOG.warn("Rolling back an SQL session that was still open after the caller finished");
+    while (sessions.get() != null) {
+      rollbackAndCloseSqlSession();
+    }
   }
 
   /**
@@ -157,6 +202,7 @@ public final class SqlSessions {
           // Ensure ThreadLocal is always cleaned up
           sessions.remove();
           sessionCount.remove();
+          notifyOutermostSessionClosed();
         }
       }
     } else if (count < 0) {
@@ -164,8 +210,28 @@ public final class SqlSessions {
       // Reset the count and remove the session to avoid further issues.
       LOG.warn(
           "Session count is negative: {}. Resetting session count and removing session.", count);
-      sessions.remove();
-      sessionCount.remove();
+      try {
+        // Do not let close() turn auto-commit back on and commit the unbalanced work.
+        sqlSession.rollback(true);
+      } finally {
+        try {
+          sqlSession.close();
+        } finally {
+          sessions.remove();
+          sessionCount.remove();
+          notifyOutermostSessionClosed();
+        }
+      }
+    }
+  }
+
+  private static void notifyOutermostSessionClosed() {
+    for (Runnable listener : OUTERMOST_SESSION_CLOSED_LISTENERS) {
+      try {
+        listener.run();
+      } catch (RuntimeException | Error e) {
+        LOG.warn("Failed to finish work deferred until the outermost SQL session closed", e);
+      }
     }
   }
 }

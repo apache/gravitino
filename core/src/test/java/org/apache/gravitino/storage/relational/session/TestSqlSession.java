@@ -260,4 +260,21 @@ public class TestSqlSession {
     assertNull(SqlSessions.getSessions().get());
     assertEquals(0, SqlSessions.getSessionCount());
   }
+
+  @Test
+  public void testRollbackIfSessionStillOpenClosesEveryNestedReference() {
+    SqlSessions.getSqlSession();
+    SqlSessions.getSqlSession();
+    assertEquals(2, SqlSessions.getSessionCount());
+    SqlSessions.rollbackIfSessionStillOpen();
+    assertFalse(SqlSessions.hasActiveSession());
+    assertEquals(0, SqlSessions.getSessionCount());
+  }
+
+  @Test
+  public void testRollbackIfSessionStillOpenDoesNothingWithoutASession() {
+    SqlSessions.rollbackIfSessionStillOpen();
+    assertFalse(SqlSessions.hasActiveSession());
+    assertEquals(0, SqlSessions.getSessionCount());
+  }
 }

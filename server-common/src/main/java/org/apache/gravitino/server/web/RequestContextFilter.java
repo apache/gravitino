@@ -40,7 +40,10 @@ import javax.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.audit.AuditLogRedactor;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.utils.RequestContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A servlet filter that captures the client remote address and (raw, unredacted) query parameters
@@ -74,6 +77,10 @@ import org.apache.gravitino.utils.RequestContext;
  * audit line written for it, by attaching an arbitrarily large query string.
  *
  * <p>The stored values are always cleared in a {@code finally} block to prevent thread-pool leaks.
+ *
+ * <p>An SQL session still open after the request returns is rolled back and closed on this thread.
+ * The request finished, so that session is leaked. Leaving it open would keep its transaction and
+ * any cache blocks held until the transaction ends on a pooled thread.
  */
 public class RequestContextFilter implements Filter {
 
@@ -85,6 +92,8 @@ public class RequestContextFilter implements Filter {
 
   /** Appended to a value that was cut short at {@link #MAX_VALUE_LENGTH}. */
   static final String TRUNCATED_SUFFIX = "...(truncated)";
+
+  private static final Logger LOG = LoggerFactory.getLogger(RequestContextFilter.class);
 
   private final Optional<EventBus> eventBus;
   private final ClientAddressResolver clientAddressResolver;
@@ -138,7 +147,13 @@ public class RequestContextFilter implements Filter {
       }
       chain.doFilter(request, response);
     } finally {
-      RequestContext.clear();
+      try {
+        SqlSessions.rollbackIfSessionStillOpen();
+      } catch (RuntimeException | Error e) {
+        LOG.warn("Failed to roll back an SQL session left open by the request", e);
+      } finally {
+        RequestContext.clear();
+      }
     }
   }
 

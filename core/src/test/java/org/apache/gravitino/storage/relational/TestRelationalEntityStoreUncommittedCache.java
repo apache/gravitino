@@ -23,11 +23,14 @@ import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
@@ -45,6 +48,7 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.AfterEach;
@@ -53,9 +57,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * A cacheable insert must stay invisible to other SQL sessions until the outer transaction commits,
- * including when the writer reads the row back through {@code get} or {@code batchGet} before the
- * transaction ends.
+ * A cacheable write inside an outer SQL transaction must stay invisible to other sessions until
+ * that transaction commits, and must not be cached at all if it rolls back. Update and delete keep
+ * the previous cache entry blocked until the outermost session closes, so a peer cannot refill it
+ * in the gap between the backend call and the outer commit.
  */
 public class TestRelationalEntityStoreUncommittedCache {
 
@@ -168,6 +173,197 @@ public class TestRelationalEntityStoreUncommittedCache {
     Assertions.assertTrue(peerCanRead(ident));
   }
 
+  @Test
+  void testNestedUpdateDoesNotRepublishTheOldRowBeforeCommit() throws Exception {
+    NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "nested_update");
+    store.put(policy(ident), false);
+    Assertions.assertTrue(peerCanRead(ident));
+    Assertions.assertTrue(cached(ident));
+
+    SessionUtils.beginTransaction();
+    try {
+      store.update(
+          ident,
+          PolicyEntity.class,
+          Entity.EntityType.POLICY,
+          current -> withComment(current, "changed"));
+      Assertions.assertFalse(cached(ident));
+      Assertions.assertTrue(writeBlocked(ident));
+      PolicyEntity during = peerGet(ident);
+      Assertions.assertEquals("", during.comment());
+      Assertions.assertFalse(cached(ident), "a peer must not cache the pre-commit row");
+
+      SessionUtils.beginTransaction();
+      SessionUtils.commitTransaction();
+      Assertions.assertTrue(writeBlocked(ident), "an inner commit must not release the block");
+      Assertions.assertEquals("", peerGet(ident).comment());
+      Assertions.assertFalse(cached(ident));
+
+      SessionUtils.commitTransaction();
+    } finally {
+      rollbackIfOpen();
+    }
+
+    Assertions.assertFalse(cached(ident));
+    Assertions.assertFalse(writeBlocked(ident));
+    Assertions.assertEquals("changed", peerGet(ident).comment());
+    Assertions.assertTrue(cached(ident));
+  }
+
+  @Test
+  void testNestedUpdateRollbackKeepsTheCommittedRow() throws Exception {
+    NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "nested_update_rollback");
+    store.put(policy(ident), false);
+    Assertions.assertTrue(peerCanRead(ident));
+
+    SessionUtils.beginTransaction();
+    try {
+      store.update(
+          ident,
+          PolicyEntity.class,
+          Entity.EntityType.POLICY,
+          current -> withComment(current, "rolled-back"));
+      Assertions.assertFalse(cached(ident));
+      SessionUtils.rollbackTransaction();
+    } finally {
+      rollbackIfOpen();
+    }
+
+    Assertions.assertEquals("", peerGet(ident).comment());
+    Assertions.assertTrue(cached(ident));
+  }
+
+  @Test
+  void testNestedRenameStaysBlockedUntilTheOuterSessionCloses() throws Exception {
+    NameIdentifier oldIdent = NameIdentifierUtil.ofPolicy(METALAKE, "rename_old");
+    NameIdentifier newIdent = NameIdentifierUtil.ofPolicy(METALAKE, "rename_new");
+    store.put(policy(oldIdent), false);
+    Assertions.assertTrue(peerCanRead(oldIdent));
+
+    SessionUtils.beginTransaction();
+    try {
+      store.update(
+          oldIdent,
+          PolicyEntity.class,
+          Entity.EntityType.POLICY,
+          current -> withName(current, newIdent.name()));
+      Assertions.assertTrue(writeBlocked(oldIdent));
+      Assertions.assertTrue(writeBlocked(newIdent));
+      Assertions.assertEquals("", peerGet(oldIdent).comment());
+      Assertions.assertFalse(cached(oldIdent));
+      Assertions.assertFalse(peerCanRead(newIdent));
+      SessionUtils.rollbackTransaction();
+    } finally {
+      rollbackIfOpen();
+    }
+
+    Assertions.assertFalse(writeBlocked(oldIdent));
+    Assertions.assertFalse(writeBlocked(newIdent));
+    Assertions.assertTrue(peerCanRead(oldIdent));
+    Assertions.assertFalse(peerCanRead(newIdent));
+  }
+
+  @Test
+  void testNestedDeleteDoesNotRepublishTheRowBeforeCommit() throws Exception {
+    NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "nested_delete");
+    store.put(policy(ident), false);
+    Assertions.assertTrue(peerCanRead(ident));
+
+    SessionUtils.beginTransaction();
+    try {
+      Assertions.assertTrue(store.delete(ident, Entity.EntityType.POLICY, false));
+      Assertions.assertFalse(cached(ident));
+      Assertions.assertTrue(peerExists(ident));
+      Assertions.assertFalse(cached(ident));
+      SessionUtils.commitTransaction();
+    } finally {
+      rollbackIfOpen();
+    }
+
+    Assertions.assertFalse(peerExists(ident));
+    Assertions.assertFalse(cached(ident));
+    Assertions.assertFalse(peerCanRead(ident));
+  }
+
+  @Test
+  void testNestedDeleteRollbackLeavesTheRowCacheable() throws Exception {
+    NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "nested_delete_rollback");
+    store.put(policy(ident), false);
+    Assertions.assertTrue(peerCanRead(ident));
+
+    SessionUtils.beginTransaction();
+    try {
+      Assertions.assertTrue(store.delete(ident, Entity.EntityType.POLICY, false));
+      Assertions.assertTrue(peerExists(ident));
+      Assertions.assertFalse(cached(ident));
+      SessionUtils.rollbackTransaction();
+    } finally {
+      rollbackIfOpen();
+    }
+
+    Assertions.assertTrue(peerCanRead(ident));
+    Assertions.assertTrue(cached(ident));
+  }
+
+  @Test
+  void testStandaloneUpdateReleasesTheBlockWhenItReturns() throws Exception {
+    NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "standalone_update");
+    store.put(policy(ident), false);
+    store.update(
+        ident,
+        PolicyEntity.class,
+        Entity.EntityType.POLICY,
+        current -> withComment(current, "now"));
+    Assertions.assertFalse(writeBlocked(ident));
+    Assertions.assertFalse(cached(ident));
+    Assertions.assertEquals("now", peerGet(ident).comment());
+    Assertions.assertTrue(cached(ident));
+  }
+
+  @Test
+  void testRequestEndRollbackDropsAnUncommittedInsert() throws Exception {
+    NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "request_end_rollback");
+    SessionUtils.beginTransaction();
+    store.put(policy(ident), false);
+    Assertions.assertTrue(writeBlocked(ident));
+    SqlSessions.rollbackIfSessionStillOpen();
+    Assertions.assertFalse(SessionUtils.isInTransaction());
+    Assertions.assertFalse(writeBlocked(ident));
+    assertInvisible(ident);
+  }
+
+  @Test
+  void testDeadOwnerReleasesTheBlockOnTheNextRead() throws Exception {
+    NameIdentifier ident = NameIdentifierUtil.ofPolicy(METALAKE, "dead_owner");
+    store.put(policy(ident), false);
+    Assertions.assertTrue(peerCanRead(ident));
+
+    Thread owner =
+        new Thread(
+            () -> {
+              SessionUtils.beginTransaction();
+              try {
+                store.update(
+                    ident,
+                    PolicyEntity.class,
+                    Entity.EntityType.POLICY,
+                    current -> withComment(current, "committed-without-close"));
+                SqlSessions.currentConnection().commit();
+              } catch (IOException | SQLException e) {
+                throw new IllegalStateException(e);
+              }
+            },
+            "dead-pending-owner");
+    owner.start();
+    owner.join();
+    Assertions.assertFalse(owner.isAlive());
+    Assertions.assertTrue(writeBlocked(ident), "the dead thread never reached session close");
+
+    Assertions.assertEquals("committed-without-close", peerGet(ident).comment());
+    Assertions.assertFalse(writeBlocked(ident));
+    Assertions.assertTrue(cached(ident));
+  }
+
   private void assertInvisible(NameIdentifier ident) throws Exception {
     Assertions.assertFalse(cached(ident));
     Assertions.assertFalse(peerExists(ident));
@@ -180,6 +376,11 @@ public class TestRelationalEntityStoreUncommittedCache {
 
   private boolean peerExists(NameIdentifier ident) throws Exception {
     return peer.submit(() -> store.exists(ident, Entity.EntityType.POLICY))
+        .get(30, TimeUnit.SECONDS);
+  }
+
+  private PolicyEntity peerGet(NameIdentifier ident) throws Exception {
+    return peer.submit(() -> store.get(ident, Entity.EntityType.POLICY, PolicyEntity.class))
         .get(30, TimeUnit.SECONDS);
   }
 
@@ -200,6 +401,35 @@ public class TestRelationalEntityStoreUncommittedCache {
     if (SessionUtils.isInTransaction()) {
       SessionUtils.rollbackTransaction();
     }
+  }
+
+  @SuppressWarnings("unchecked")
+  private boolean writeBlocked(NameIdentifier ident) throws IllegalAccessException {
+    Map<String, AtomicInteger> blocks =
+        (Map<String, AtomicInteger>) FieldUtils.readField(store, "cacheBlocks", true);
+    AtomicInteger count = blocks.get("w\0" + Entity.EntityType.POLICY.name() + "\0" + ident);
+    return count != null && count.get() > 0;
+  }
+
+  private static PolicyEntity withComment(PolicyEntity current, String comment) {
+    return copy(current, current.name(), comment);
+  }
+
+  private static PolicyEntity withName(PolicyEntity current, String name) {
+    return copy(current, name, current.comment());
+  }
+
+  private static PolicyEntity copy(PolicyEntity current, String name, String comment) {
+    return PolicyEntity.builder()
+        .withId(current.id())
+        .withNamespace(current.namespace())
+        .withName(name)
+        .withPolicyType(current.policyType())
+        .withComment(comment)
+        .withEnabled(current.enabled())
+        .withContent(current.content())
+        .withAuditInfo((AuditInfo) current.auditInfo())
+        .build();
   }
 
   private void initH2Store() throws IOException, IllegalAccessException {

@@ -20,6 +20,7 @@
 package org.apache.gravitino.server.web;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
@@ -34,10 +35,12 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.utils.RequestContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 public class TestRequestContextFilter {
 
@@ -50,6 +53,26 @@ public class TestRequestContextFilter {
   @AfterEach
   public void cleanup() {
     RequestContext.clear();
+  }
+
+  @Test
+  public void testRollsBackSqlSessionLeftOpenByTheRequest() throws IOException, ServletException {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse resp = mock(HttpServletResponse.class);
+    when(req.getHeader("X-Forwarded-For")).thenReturn(null);
+    when(req.getRemoteAddr()).thenReturn("192.168.1.1");
+    AtomicReference<Boolean> sawOpenSession = new AtomicReference<>(false);
+
+    try (MockedStatic<SqlSessions> sessions = mockStatic(SqlSessions.class)) {
+      sessions.when(SqlSessions::rollbackIfSessionStillOpen).thenAnswer(invocation -> null);
+      FilterChain chain =
+          (request, response) -> sawOpenSession.set(RequestContext.getRemoteAddress() != null);
+      filter.doFilter(req, resp, chain);
+      sessions.verify(SqlSessions::rollbackIfSessionStillOpen);
+    }
+
+    Assertions.assertEquals(Boolean.TRUE, sawOpenSession.get());
+    Assertions.assertNull(RequestContext.getRemoteAddress());
   }
 
   @Test
