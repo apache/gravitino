@@ -21,7 +21,7 @@ package org.apache.gravitino.catalog.lakehouse.iceberg.utils;
 import java.nio.file.Path;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTable;
-import org.apache.gravitino.rel.SupportsIcebergPartitionSpecs;
+import org.apache.gravitino.rel.SupportsPartitionSpecs;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.iceberg.PartitionSpec;
@@ -64,8 +64,7 @@ class TestIcebergTablePropertiesUtil {
         TableMetadata.newTableMetadata(
             schema, PartitionSpec.unpartitioned(), temporaryDirectory.toUri().toString(), Map.of());
     IcebergTable unpartitioned = IcebergTable.fromIcebergTable(metadata, "events");
-    SupportsIcebergPartitionSpecs unpartitionedSpecs =
-        unpartitioned.supportsIcebergPartitionSpecs();
+    SupportsPartitionSpecs unpartitionedSpecs = unpartitioned.supportsPartitionSpecs();
     Assertions.assertEquals(0, unpartitionedSpecs.defaultPartitionSpecId());
     Assertions.assertEquals(1, unpartitionedSpecs.partitionSpecs().size());
     Assertions.assertArrayEquals(
@@ -76,7 +75,7 @@ class TestIcebergTablePropertiesUtil {
             .setDefaultPartitionSpec(PartitionSpec.builderFor(schema).identity("id").build())
             .build();
     IcebergTable partitioned = IcebergTable.fromIcebergTable(evolved, "events");
-    SupportsIcebergPartitionSpecs specs = partitioned.supportsIcebergPartitionSpecs();
+    SupportsPartitionSpecs specs = partitioned.supportsPartitionSpecs();
     Assertions.assertEquals(1, specs.defaultPartitionSpecId());
     Assertions.assertEquals(2, specs.partitionSpecs().size());
     Assertions.assertArrayEquals(Transforms.EMPTY_TRANSFORM, specs.partitionSpecs().get(0));
