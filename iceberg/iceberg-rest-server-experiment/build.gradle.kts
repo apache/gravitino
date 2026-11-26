@@ -120,6 +120,14 @@ dependencies {
   implementation(project(":iceberg:iceberg-rest-server"))
   implementation(libs.bundles.iceberg)
 
+  // Resolve the SDK bundle through the same experimental Iceberg substitution as iceberg-aws.
+  // The stable bundle does not provide the Apache 5 HTTP client used by the experimental runtime.
+  runtimeOnly(libs.iceberg.aws.bundle)
+  // Gravitino's S3 credential generators also need the policy builder, which the SDK bundle omits.
+  runtimeOnly(libs.aws.policy) {
+    exclude("*")
+  }
+
   testImplementation(testFixturesSources.output)
   testImplementation(project(":iceberg:iceberg-rest-server", "testArtifacts"))
   testImplementation(project(":server-common"))
@@ -167,6 +175,13 @@ dependencies {
 }
 
 tasks {
+  test {
+    doFirst {
+      // Exercise the production dependencies without the test fixtures' cloud bundles.
+      systemProperty("experimentalRuntimeClasspath", configurations.runtimeClasspath.get().asPath)
+    }
+  }
+
   compileJava {
     dependsOn(":iceberg:iceberg-rest-server:copyDepends")
   }
