@@ -21,6 +21,7 @@ package org.apache.gravitino.glossary;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
@@ -36,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.function.BiFunction;
@@ -76,6 +78,7 @@ import org.apache.gravitino.storage.relational.mapper.GlossaryTermVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermVersionMapper.Head;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermVersionMapper.Version;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper;
+import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.po.DomainPO;
 import org.apache.gravitino.storage.relational.po.GlossaryTermBindingPO;
@@ -109,8 +112,7 @@ public final class GlossaryManager {
   private static final GlossaryTermDomainService DOMAINS = GlossaryTermDomainService.getInstance();
   private static final GlossaryTermBindingService BINDINGS =
       GlossaryTermBindingService.getInstance();
-  private static final int MAX_BINDING_PAGE_SIZE = 100;
-  private static final int MAX_BINDING_CANDIDATES = 1000;
+  private static final int TARGET_ID_BATCH_SIZE = 500;
   private static final Predicate<GlossaryTermEntity> ALL_TERMS = Predicates.alwaysTrue();
   static final int MAX_HIERARCHY_DEPTH = 20;
   private final GlossaryTermRelService edges = GlossaryTermRelService.getInstance();
@@ -635,8 +637,8 @@ public final class GlossaryManager {
   public List<GlossaryTermEntity> listObjectTerms(
       String metalake, MetadataObject object, @Nullable GlossaryTerm.Status status) {
     Preconditions.checkArgument(object != null, "Bound object cannot be null");
-    TargetType targetType = TargetType.fromMetadataObjectType(object.type());
-    return listTargetTerms(metalake, object, targetType, null, status);
+    TargetType.fromMetadataObjectType(object.type());
+    return readTargetTerms(metalake, object, null, false, true, status, BoundTerms::direct);
   }
 
   /**
@@ -660,73 +662,26 @@ public final class GlossaryManager {
         "Expected a SEMANTIC_MODEL object, got %s",
         semanticModel.type());
     Preconditions.checkArgument(StringUtils.isNotBlank(metricName), "Metric name cannot be blank");
-    return listTargetTerms(metalake, semanticModel, TargetType.METRIC, metricName, status);
+    return readTargetTerms(
+        metalake, semanticModel, metricName, false, true, status, BoundTerms::direct);
   }
 
-  /** A bounded page of authorized bindings and the position of the next scan. */
-  public record BindingPage(List<TermBinding> bindings, @Nullable BindingCursor next) {
-    /** Takes an immutable copy of the results. */
-    public BindingPage {
-      bindings = List.copyOf(bindings);
-    }
-  }
-
-  /** Internal scan position. Transport adapters must authenticate and conceal this state. */
-  public record BindingCursor(
-      long metalakeId,
-      long termId,
-      long version,
-      @Nullable TermBinding.Kind kind,
-      Set<MetadataObject.Type> types,
-      @Nullable GlossaryTerm.Status status,
-      String afterType,
-      long afterId) {
-    /** Captures and validates the filters and keyset position used to resume a binding scan. */
-    public BindingCursor {
-      Preconditions.checkArgument(types != null, "Binding cursor types cannot be null");
-      for (MetadataObject.Type type : types) {
-        Preconditions.checkArgument(type != null, "Binding cursor type cannot be null");
-      }
-      types = Set.copyOf(types);
-      Preconditions.checkArgument(afterType != null, "Binding cursor afterType cannot be null");
-      TargetType.valueOf(afterType);
-    }
-  }
-
-  /** Lists the first page of up to 100 authorized bindings of a visible glossary term. */
-  public BindingPage listTermBindings(
+  /**
+   * Lists all matching bindings of a visible term in stable target order. The root status and
+   * target permissions are evaluated in the same read snapshot.
+   *
+   * @throws IllegalArgumentException if a requested target type is unsupported
+   * @throws ForbiddenException if the configured authorizer cannot evaluate resolved target IDs
+   * @throws NoSuchTermException if the term is missing, hidden, or excluded by the status filter
+   * @throws IllegalStateException if an SQL session is already active on the calling thread
+   */
+  public List<TermBinding> listTermBindings(
       String metalake,
       String termName,
       @Nullable TermBinding.Kind kind,
       @Nullable Set<MetadataObject.Type> types,
       @Nullable GlossaryTerm.Status status) {
-    return listTermBindings(metalake, termName, kind, types, status, MAX_BINDING_PAGE_SIZE, null);
-  }
-
-  /**
-   * Lists one page in keyset order. A continuation can follow an empty page when hidden bindings
-   * exhaust the scan budget. Every call rechecks visibility in its own snapshot.
-   *
-   * @throws IllegalArgumentException if the page size, filters or cursor filters are invalid
-   * @throws ForbiddenException if the configured authorizer cannot evaluate resolved target IDs
-   * @throws NoSuchTermException if the term is missing, hidden, or excluded by the status filter
-   * @throws TermVersionConflictException if the root identity or revision changed between pages
-   * @throws IllegalStateException if an SQL session is already active on the calling thread
-   */
-  public BindingPage listTermBindings(
-      String metalake,
-      String termName,
-      @Nullable TermBinding.Kind kind,
-      @Nullable Set<MetadataObject.Type> types,
-      @Nullable GlossaryTerm.Status status,
-      int pageSize,
-      @Nullable BindingCursor cursor) {
-    Preconditions.checkArgument(
-        pageSize > 0 && pageSize <= MAX_BINDING_PAGE_SIZE,
-        "Page size must be between 1 and %s",
-        MAX_BINDING_PAGE_SIZE);
     Set<TargetType> targetTypes = resolveBindingFilterTypes(kind, types);
-    Set<MetadataObject.Type> requestedTypes = types == null ? Set.of() : Set.copyOf(types);
     return SqlSessions.readSnapshot(
         () -> {
           NameIdentifier ident = NameIdentifierUtil.ofGlossaryTerm(metalake, termName);
@@ -736,67 +691,18 @@ public final class GlossaryManager {
           if (!isTermVisible(root, access, status)) {
             throw missingRelationRoot(ident);
           }
-          if (cursor != null) {
-            Preconditions.checkArgument(
-                kind == cursor.kind()
-                    && requestedTypes.equals(cursor.types())
-                    && status == cursor.status(),
-                "Binding filters have changed");
-            if (lake != cursor.metalakeId()
-                || root.id() != cursor.termId()
-                || root.version() != cursor.version()) {
-              throw new TermVersionConflictException("Term %s has changed", ident);
-            }
-          }
           GlossaryBindingAccess objectAccess =
-              GlossaryBindingAccess.forBindingPage(metalake, authorizationEnabled, lake);
-          if (targetTypes != null && targetTypes.isEmpty()) {
-            return new BindingPage(List.of(), null);
-          }
-          String afterType = cursor == null ? null : cursor.afterType();
-          long afterId = cursor == null ? 0 : cursor.afterId();
-          List<TermBinding> visible = new ArrayList<>(pageSize);
-          int fetchSize = pageSize;
-          for (int examined = 0; examined < MAX_BINDING_CANDIDATES; ) {
-            int batchSize = Math.min(fetchSize, MAX_BINDING_CANDIDATES - examined);
-            List<GlossaryTermBindingPO> rows =
-                BINDINGS.listByTerm(
-                    lake, root.id(), targetTypes, afterType, afterId, batchSize + 1);
-            int batchEnd = Math.min(rows.size(), batchSize);
-            Map<GlossaryTermBindingPO, TermBinding> resolved =
-                resolveBindings(rows.subList(0, batchEnd), objectAccess);
-            for (int i = 0; i < batchEnd; i++) {
-              GlossaryTermBindingPO row = rows.get(i);
-              examined++;
-              afterType = row.getTargetType();
-              afterId = row.getTargetId();
-              TermBinding binding = resolved.get(row);
-              if (binding != null && objectAccess.canReadTarget(binding.object())) {
+              GlossaryBindingAccess.forBindingList(metalake, authorizationEnabled, lake);
+          List<GlossaryTermBindingPO> rows = BINDINGS.listByTerm(lake, root.id(), targetTypes);
+          List<TermBinding> visible = new ArrayList<>();
+          for (List<GlossaryTermBindingPO> batch : Lists.partition(rows, TARGET_ID_BATCH_SIZE)) {
+            for (TermBinding binding : resolveBindings(batch, objectAccess)) {
+              if (objectAccess.canReadTarget(binding.object())) {
                 visible.add(binding);
               }
-              if (visible.size() == pageSize || examined == MAX_BINDING_CANDIDATES) {
-                BindingCursor next =
-                    i + 1 == rows.size()
-                        ? null
-                        : new BindingCursor(
-                            lake,
-                            root.id(),
-                            root.version(),
-                            kind,
-                            requestedTypes,
-                            status,
-                            afterType,
-                            afterId);
-                return new BindingPage(visible, next);
-              }
             }
-            if (rows.size() <= batchSize) {
-              break;
-            }
-            // Grow only when missing or unauthorized targets leave the page short.
-            fetchSize = Math.min(MAX_BINDING_PAGE_SIZE, fetchSize * 2);
           }
-          return new BindingPage(visible, null);
+          return List.copyOf(visible);
         });
   }
 
@@ -953,12 +859,30 @@ public final class GlossaryManager {
         });
   }
 
-  private List<GlossaryTermEntity> listTargetTerms(
+  record BoundTerms(
+      long lake,
+      GlossaryAccess access,
+      List<GlossaryTermEntity> direct,
+      Map<String, List<GlossaryTermEntity>> children) {}
+
+  <R> R readTargetTerms(
       String metalake,
       MetadataObject targetObject,
-      TargetType targetType,
       @Nullable String metricName,
-      @Nullable GlossaryTerm.Status status) {
+      boolean children,
+      boolean includeDomains,
+      @Nullable GlossaryTerm.Status status,
+      Function<BoundTerms, R> project) {
+    boolean model = targetObject.type() == MetadataObject.Type.SEMANTIC_MODEL;
+    Preconditions.checkArgument(
+        metricName == null || (model && StringUtils.isNotBlank(metricName)),
+        "Expected a semantic model and a nonblank metric name");
+    Preconditions.checkArgument(
+        !children
+            || (metricName == null && (model || targetObject.type() == MetadataObject.Type.TABLE)),
+        "Only tables and semantic models support children");
+    TargetType targetType =
+        model ? TargetType.METRIC : TargetType.fromMetadataObjectType(targetObject.type());
     Preconditions.checkState(
         !SqlSessions.hasActiveSession(),
         "A snapshot read must start outside an active SQL session");
@@ -987,25 +911,114 @@ public final class GlossaryManager {
                 "Caller lacks read access to target %s", targetObject.fullName());
           }
           long metalakeId = ids.namespaceIds()[0];
-          long targetId = resolveTargetId(ids.entityId(), targetObject, targetType, metricName);
-          GlossaryAccess termAccess = GlossaryAccess.forRequest(metalake, authorizationEnabled);
-          if (!termAccess.canView()) {
-            return List.of();
+          long targetId =
+              metricName == null
+                  ? ids.entityId()
+                  : resolveTargetId(ids.entityId(), targetObject, targetType, metricName);
+          GlossaryAccess access = GlossaryAccess.forRequest(metalake, authorizationEnabled);
+          if (!access.canView() || (model && metricName == null && !children)) {
+            return project.apply(new BoundTerms(metalakeId, access, List.of(), Map.of()));
           }
-          Set<Long> boundIds = BINDINGS.listTermIds(metalakeId, targetType, targetId);
-          if (boundIds.isEmpty()) {
-            return List.of();
-          }
-          Namespace ns = NamespaceUtil.ofGlossaryTerm(metalake);
-          List<GlossaryTermEntity> visible = new ArrayList<>();
-          for (GlossaryTermEntity term : terms.listTermsByIds(ns, metalakeId, boundIds)) {
-            if (isTermVisible(term, termAccess, status)) {
-              visible.add(visibleDomains(term, termAccess));
-            }
-          }
-          visible.sort(Comparator.comparing(GlossaryTermEntity::name));
-          return visible;
+          BoundTerms bound =
+              visibleTargetTerms(
+                  metalake,
+                  metalakeId,
+                  targetType,
+                  targetId,
+                  children,
+                  includeDomains,
+                  status,
+                  access);
+          return project.apply(bound);
         });
+  }
+
+  private BoundTerms visibleTargetTerms(
+      String metalake,
+      long metalakeId,
+      TargetType targetType,
+      long targetId,
+      boolean children,
+      boolean includeDomains,
+      @Nullable GlossaryTerm.Status status,
+      GlossaryAccess access) {
+    Set<Long> direct = new HashSet<>();
+    Map<Long, Set<Long>> byChild = new HashMap<>();
+    if (children) {
+      List<GlossaryTermBindingPO> rows =
+          SessionUtils.getWithoutCommit(
+              GlossaryTermBindingMapper.class,
+              mapper ->
+                  targetType == TargetType.METRIC
+                      ? mapper.listBySemanticModel(metalakeId, targetId)
+                      : mapper.listByTable(metalakeId, targetId));
+      for (GlossaryTermBindingPO row : rows) {
+        if (TargetType.TABLE.name().equals(row.getTargetType())) {
+          direct.add(row.getTermId());
+        } else {
+          byChild
+              .computeIfAbsent(row.getTargetId(), ignored -> new HashSet<>())
+              .add(row.getTermId());
+        }
+      }
+    } else {
+      direct.addAll(BINDINGS.listTermIds(metalakeId, targetType, targetId));
+    }
+    Set<Long> termIds = new HashSet<>(direct);
+    byChild.values().forEach(termIds::addAll);
+    Map<Long, GlossaryTermEntity> visible = new HashMap<>();
+    for (GlossaryTermEntity term :
+        terms.listTermsByIds(NamespaceUtil.ofGlossaryTerm(metalake), metalakeId, termIds)) {
+      if (isTermVisible(term, access, status)) {
+        visible.put(term.id(), includeDomains ? visibleDomains(term, access) : term);
+      }
+    }
+    return new BoundTerms(
+        metalakeId,
+        access,
+        sortedVisibleTerms(direct, visible),
+        visibleChildTerms(targetType, byChild, visible));
+  }
+
+  private static Map<String, List<GlossaryTermEntity>> visibleChildTerms(
+      TargetType targetType, Map<Long, Set<Long>> byChild, Map<Long, GlossaryTermEntity> visible) {
+    Map<String, List<GlossaryTermEntity>> childTerms = new TreeMap<>();
+    Map<Long, List<GlossaryTermEntity>> visibleChildren = new HashMap<>();
+    byChild.forEach(
+        (id, bound) -> {
+          List<GlossaryTermEntity> matches = sortedVisibleTerms(bound, visible);
+          if (!matches.isEmpty()) {
+            visibleChildren.put(id, matches);
+          }
+        });
+    for (List<Long> batch :
+        Lists.partition(List.copyOf(visibleChildren.keySet()), TARGET_ID_BATCH_SIZE)) {
+      if (targetType == TargetType.METRIC) {
+        SessionUtils.getWithoutCommit(
+                SemanticModelMetricMapper.class,
+                mapper -> mapper.listSemanticModelMetricsByMetricIds(batch))
+            .forEach(
+                metric ->
+                    childTerms.put(metric.metricName(), visibleChildren.get(metric.metricId())));
+      } else {
+        SessionUtils.getWithoutCommit(
+                TableColumnMapper.class, mapper -> mapper.listColumnPOsByColumnIds(batch))
+            .forEach(
+                column ->
+                    childTerms.put(
+                        column.getColumnName(), visibleChildren.get(column.getColumnId())));
+      }
+    }
+    return childTerms;
+  }
+
+  private static List<GlossaryTermEntity> sortedVisibleTerms(
+      Set<Long> ids, Map<Long, GlossaryTermEntity> visible) {
+    return ids.stream()
+        .map(visible::get)
+        .filter(Objects::nonNull)
+        .sorted(Comparator.comparing(GlossaryTermEntity::name))
+        .toList();
   }
 
   @Nullable
@@ -1037,7 +1050,7 @@ public final class GlossaryManager {
     return allowed;
   }
 
-  private static Map<GlossaryTermBindingPO, TermBinding> resolveBindings(
+  private static List<TermBinding> resolveBindings(
       List<GlossaryTermBindingPO> rows, GlossaryBindingAccess objectAccess) {
     Map<TargetType, List<Long>> idsByType = new EnumMap<>(TargetType.class);
     for (GlossaryTermBindingPO row : rows) {
@@ -1075,7 +1088,7 @@ public final class GlossaryManager {
       }
     }
 
-    Map<GlossaryTermBindingPO, TermBinding> result = new HashMap<>();
+    List<TermBinding> result = new ArrayList<>(rows.size());
     for (GlossaryTermBindingPO row : rows) {
       TargetType type = TargetType.valueOf(row.getTargetType());
       if (type == TargetType.METRIC) {
@@ -1094,7 +1107,7 @@ public final class GlossaryManager {
               objectAccess.registerTarget(catalogObj, metricPO.catalogId());
             }
           }
-          result.put(row, TermBinding.usedBy(modelObj, metricPO.metricName()));
+          result.add(TermBinding.usedBy(modelObj, metricPO.metricName()));
         }
       } else {
         MetadataObject obj = objectsByType.getOrDefault(type, Map.of()).get(row.getTargetId());
@@ -1102,7 +1115,7 @@ public final class GlossaryManager {
           if (type != TargetType.COLUMN) {
             objectAccess.registerTarget(obj, row.getTargetId());
           }
-          result.put(row, TermBinding.implementedBy(obj));
+          result.add(TermBinding.implementedBy(obj));
         }
       }
     }
