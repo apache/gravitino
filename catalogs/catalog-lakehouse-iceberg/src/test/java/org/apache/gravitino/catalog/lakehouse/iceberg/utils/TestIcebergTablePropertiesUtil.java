@@ -61,17 +61,20 @@ class TestIcebergTablePropertiesUtil {
 
   @Test
   void testBuilderHydratesDefaultPartitionSpec() {
+    Transform[] partitioning = new Transform[] {Transforms.identity("id")};
     IcebergTable built =
         IcebergTable.builder()
             .withName("events")
             .withColumns(new IcebergColumn[0])
-            .withPartitioning(new Transform[] {Transforms.identity("id")})
+            .withPartitioning(partitioning)
             .withAuditInfo(AuditInfo.EMPTY)
             .build();
     SupportsPartitionSpecs specs = built.supportsPartitionSpecs();
     Assertions.assertEquals(0, specs.defaultPartitionSpecId());
     Assertions.assertEquals(1, specs.partitionSpecs().size());
     Assertions.assertArrayEquals(built.partitioning(), specs.partitionSpecs().get(0));
+    Assertions.assertNotSame(built.partitioning(), specs.partitionSpecs().get(0));
+    Assertions.assertNotSame(partitioning, specs.partitionSpecs().get(0));
   }
 
   @Test
@@ -86,6 +89,9 @@ class TestIcebergTablePropertiesUtil {
     Assertions.assertEquals(1, unpartitionedSpecs.partitionSpecs().size());
     Assertions.assertArrayEquals(
         Transforms.EMPTY_TRANSFORM, unpartitionedSpecs.partitionSpecs().get(0));
+    Assertions.assertArrayEquals(
+        unpartitioned.partitioning(),
+        unpartitionedSpecs.partitionSpecs().get(unpartitionedSpecs.defaultPartitionSpecId()));
 
     TableMetadata evolved =
         TableMetadata.buildFrom(metadata)
@@ -95,10 +101,15 @@ class TestIcebergTablePropertiesUtil {
     SupportsPartitionSpecs specs = partitioned.supportsPartitionSpecs();
     Assertions.assertEquals(1, specs.defaultPartitionSpecId());
     Assertions.assertEquals(2, specs.partitionSpecs().size());
+    Assertions.assertTrue(specs.partitionSpecs().containsKey(specs.defaultPartitionSpecId()));
     Assertions.assertArrayEquals(Transforms.EMPTY_TRANSFORM, specs.partitionSpecs().get(0));
     Transform[] identity = specs.partitionSpecs().get(1);
     Assertions.assertEquals(1, identity.length);
     Assertions.assertEquals(Transforms.identity("id"), identity[0]);
     Assertions.assertArrayEquals(partitioned.partitioning(), identity);
+    Assertions.assertArrayEquals(
+        partitioned.partitioning(), specs.partitionSpecs().get(specs.defaultPartitionSpecId()));
+    Assertions.assertNotSame(
+        partitioned.partitioning(), specs.partitionSpecs().get(specs.defaultPartitionSpecId()));
   }
 }
