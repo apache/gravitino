@@ -32,6 +32,8 @@ import org.apache.gravitino.annotation.Evolving;
  * The request for creating a Knowledge Base Article with its initial Domains and bindings, matching
  * the single-save create form.
  *
+ * <p>The title, comment and source reference must be free of U+0000.
+ *
  * <p>{@code name} is optional; when it is omitted the server derives it from the title.
  */
 @Evolving
@@ -57,6 +59,9 @@ public class ArticleCreate {
   }
 
   private ArticleCreate(Builder builder) {
+    ArticleValidation.checkNoNullCharacter(builder.title, "Title");
+    ArticleValidation.checkNoNullCharacter(builder.comment, "Comment");
+    ArticleValidation.checkNoNullCharacter(builder.sourceReference, "Source reference");
     this.name = ArticleValidation.name(builder.name);
     this.title = ArticleValidation.title(builder.title);
     this.body = builder.body;

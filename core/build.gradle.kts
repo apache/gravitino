@@ -85,6 +85,7 @@ dependencies {
   annotationProcessor(libs.lombok)
 
   compileOnly(libs.lombok)
+  compileOnly(libs.postgresql.driver)
   compileOnly(libs.servlet) // fix error-prone compile error
 
   testAnnotationProcessor(libs.lombok)

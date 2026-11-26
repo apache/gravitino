@@ -25,9 +25,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.sql.Connection;
 import java.sql.SQLException;
-import java.sql.Savepoint;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -60,6 +58,8 @@ import org.apache.gravitino.kb.KnowledgeBaseArticleEntity;
 import org.apache.gravitino.kb.KnowledgeBaseArticleEntity.Binding;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.NamespacedEntityId;
+import org.apache.gravitino.storage.relational.converters.PostgreSQLExceptionConverter;
+import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper;
 import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper.MemberType;
 import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper.Membership;
@@ -80,15 +80,12 @@ public final class KnowledgeBaseArticleMetaService {
   private static final MemberType ARTICLE = MemberType.KNOWLEDGE_BASE_ARTICLE;
   private static final TransactionHook NO_HOOK = (before, after) -> {};
 
-  // PostgreSQL and H2 report the violated constraint in different diagnostic formats.
-  private static final Pattern NAME_CONSTRAINT =
+  private static final Pattern H2_NAME_CONSTRAINT =
       Pattern.compile(
-          "(?i)(?:^ERROR: +duplicate key value violates unique constraint \"uk_kba_name\""
-              + "|^Unique index or primary key violation: \"(?:[\\w]+\\.)?uk_kba_name_index_[0-9a-f]+ on )");
-  private static final Pattern ID_CONSTRAINT =
+          "(?i)^Unique index or primary key violation: \"(?:[\\w]+\\.)?uk_kba_name_index_[0-9a-f]+ on ");
+  private static final Pattern H2_ID_CONSTRAINT =
       Pattern.compile(
-          "(?i)(?:^ERROR: +duplicate key value violates unique constraint \"kb_article_meta_pkey\""
-              + "|^Unique index or primary key violation: \"PRIMARY KEY ON (?:[\\w]+\\.)?kb_article_meta\\(article_id\\))");
+          "(?i)^Unique index or primary key violation: \"PRIMARY KEY ON (?:[\\w]+\\.)?kb_article_meta\\(article_id\\)");
 
   /** A conflict on the live Article name key during the Article row insert. */
   public static final class NameConflictException extends EntityAlreadyExistsException {
@@ -241,6 +238,7 @@ public final class KnowledgeBaseArticleMetaService {
               replace(mapper, row, before, entity, hook);
               return null;
             }
+            entity.validateTextForWrite(null);
             requireDomainsLive(lockLiveDomains(metalakeId, entity.domainIds()));
             KnowledgeBaseArticleEntity initial =
                 entity.toBuilder().withBodyUpdate(null).withRevision(1).build();
@@ -404,13 +402,11 @@ public final class KnowledgeBaseArticleMetaService {
       mapper.insert(row);
     } catch (RuntimeException failure) {
       for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
-        if (cause instanceof SQLException sql
-            && sql.getMessage() != null
-            && ExceptionUtils.isDuplicateKey(sql)) {
-          if (matchesConstraint(sql, "uk_kba_name", NAME_CONSTRAINT)) {
+        if (cause instanceof SQLException sql && ExceptionUtils.isDuplicateKey(sql)) {
+          if (matchesConstraint(sql, "uk_kba_name", "uk_kba_name", H2_NAME_CONSTRAINT)) {
             throw new NameConflictException(failure, row.getArticleName());
           }
-          if (matchesConstraint(sql, "PRIMARY", ID_CONSTRAINT)) {
+          if (matchesConstraint(sql, "kb_article_meta_pkey", "PRIMARY", H2_ID_CONSTRAINT)) {
             throw new EntityAlreadyExistsException(
                 failure, "Article ID %s already exists", row.getArticleId());
           }
@@ -421,14 +417,21 @@ public final class KnowledgeBaseArticleMetaService {
   }
 
   private static boolean matchesConstraint(
-      SQLException sql, String mysqlKey, Pattern otherBackends) {
+      SQLException sql, String pgKey, String mysqlKey, Pattern h2Constraint) {
+    if (SQLExceptionConverterFactory.getConverter()
+        instanceof PostgreSQLExceptionConverter postgres) {
+      return postgres.violatesUniqueConstraint(sql, pgKey);
+    }
     String message = sql.getMessage();
+    if (message == null) {
+      return false;
+    }
     if (sql.getErrorCode() == 1062) {
       // The final quoted index name is independent of the session's message language.
       return message.endsWith("'" + mysqlKey + "'")
           || message.endsWith("'kb_article_meta." + mysqlKey + "'");
     }
-    return otherBackends.matcher(message).find();
+    return h2Constraint.matcher(message).find();
   }
 
   private static String metalakeName(Namespace ns) {
@@ -451,7 +454,8 @@ public final class KnowledgeBaseArticleMetaService {
     if (SqlSessions.hasActiveSession()) {
       // Only the owner can release its locks and retry in a fresh transaction.
       return SessionUtils.doWithCommitAndFetchResult(
-          KnowledgeBaseArticleMapper.class, mapper -> withSavepoint(() -> operation.apply(mapper)));
+          KnowledgeBaseArticleMapper.class,
+          mapper -> SqlSessions.withSavepoint(() -> operation.apply(mapper)));
     }
     for (int attempt = 1; ; attempt++) {
       try {
@@ -461,32 +465,6 @@ public final class KnowledgeBaseArticleMetaService {
           throw stale;
         }
       }
-    }
-  }
-
-  private <T> T withSavepoint(Supplier<T> operation) {
-    try {
-      Connection connection = SqlSessions.currentConnection();
-      Savepoint savepoint = connection.setSavepoint();
-      try {
-        T result = operation.get();
-        connection.releaseSavepoint(savepoint);
-        return result;
-      } catch (RuntimeException | Error failure) {
-        try {
-          connection.rollback(savepoint);
-          connection.releaseSavepoint(savepoint);
-        } catch (SQLException rollbackFailure) {
-          failure.addSuppressed(rollbackFailure);
-          SqlSessions.markRollbackOnly(failure);
-        } finally {
-          SessionUtils.clearSessionCache();
-        }
-        throw failure;
-      }
-    } catch (SQLException e) {
-      SqlSessions.markRollbackOnly(e);
-      throw new IllegalStateException("Cannot manage nested Article write", e);
     }
   }
 
@@ -727,6 +705,7 @@ public final class KnowledgeBaseArticleMetaService {
         before.id().equals(proposed.id())
             && before.nameIdentifier().equals(proposed.nameIdentifier()),
         "An Article edit must retain its ID, name and metalake");
+    proposed.validateTextForWrite(before);
     ArticleBody body = proposed.bodyUpdate();
     boolean bodyChanged =
         body != null

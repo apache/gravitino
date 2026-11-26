@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.storage.relational.service;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -46,6 +47,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.UnaryOperator;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -54,6 +56,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.kb.ArticleBody;
 import org.apache.gravitino.kb.KnowledgeBaseArticleEntity;
@@ -124,6 +127,71 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
         List.of(second, entity),
         backend.batchGet(
             List.of(second.nameIdentifier(), NameIdentifier.of("lake", "absent"), nfd), TYPE));
+  }
+
+  @TestTemplate
+  void testNullCharacterMetadataRejectedOnInsertAndUpdate() throws IOException {
+    createAndInsertMakeLake("lake");
+    var original = article(31, "guide");
+    var fresh = article(32, "other");
+    STORE.insert(original, false);
+    String invalid = "a\0b";
+    for (var edit :
+        List.<UnaryOperator<KnowledgeBaseArticleEntity>>of(
+            a -> a.toBuilder().withTitle(invalid).build(),
+            a -> a.toBuilder().withComment(invalid).build(),
+            a -> a.toBuilder().withSourceReference(invalid).build())) {
+      var createError =
+          assertThrows(
+              IllegalArgumentException.class, () -> STORE.insert(edit.apply(fresh), false));
+      assertTrue(createError.getMessage().contains("U+0000"));
+      var editError =
+          assertThrows(
+              IllegalArgumentException.class, () -> STORE.update(original.nameIdentifier(), edit));
+      assertEquals(createError.getMessage(), editError.getMessage());
+    }
+    assertFalse(backend.exists(fresh.nameIdentifier(), TYPE));
+    assertEquals(original, STORE.get(original.nameIdentifier()));
+  }
+
+  @TestTemplate
+  void testStoredNullCharacterMetadataCanBeRepaired() throws Exception {
+    assumeFalse("postgresql".equals(backendType), "PostgreSQL text columns cannot store U+0000");
+    createAndInsertMakeLake("lake");
+    var original = article(31, "guide");
+    STORE.insert(original, false);
+    String legacy = "a\0b";
+    try (var session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        var statement =
+            session
+                .getConnection()
+                .prepareStatement(
+                    "UPDATE kb_article_meta SET title=?, article_comment=?, source_reference=? WHERE article_id=?")) {
+      statement.setString(1, legacy);
+      statement.setString(2, legacy);
+      statement.setString(3, legacy);
+      statement.setLong(4, original.id());
+      assertEquals(1, statement.executeUpdate());
+    }
+    var name = original.nameIdentifier();
+    var stored = STORE.get(name);
+    assertEquals(legacy, stored.title());
+    assertEquals(legacy, stored.comment());
+    assertEquals(legacy, stored.sourceReference());
+    STORE.update(
+        name,
+        (KnowledgeBaseArticleEntity current) -> current.toBuilder().withTitle("Guide").build());
+    String reference = "literal \\u0000";
+    STORE.update(
+        name,
+        (KnowledgeBaseArticleEntity current) ->
+            current.toBuilder().withComment(null).withSourceReference(reference).build());
+    var repaired = STORE.get(name);
+    assertEquals("Guide", repaired.title());
+    assertNull(repaired.comment());
+    assertEquals(reference, repaired.sourceReference());
+    assertEquals(3, repaired.revision());
   }
 
   @TestTemplate
@@ -281,6 +349,37 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
       } finally {
         sql.execute("SET SESSION lc_messages = @original_locale");
       }
+    } finally {
+      SessionUtils.rollbackTransaction();
+    }
+  }
+
+  @TestTemplate
+  void testLocalizedPostgreSQLInsertConflicts() throws Exception {
+    assumeTrue("postgresql".equals(backendType));
+    // The PostgreSQL 13 image includes German translations but only generates the English locale.
+    var locale =
+        ContainerSuite.getInstance()
+            .getPostgreSQLContainer()
+            .executeInContainer(
+                "localedef", "--no-archive", "-i", "de_DE", "-f", "UTF-8", "de_DE.utf8");
+    assertEquals(0, locale.getExitCode(), locale.getStderr());
+    createAndInsertMakeLake("lake");
+    STORE.insert(article(71, "guide"), false);
+    SessionUtils.beginTransaction();
+    try (Statement sql = SqlSessions.currentConnection().createStatement()) {
+      sql.execute("SET LOCAL lc_messages = 'de_DE.utf8'");
+      assertAll(
+          () ->
+              assertThrowsExactly(
+                  NameConflictException.class, () -> STORE.insert(article(72, "guide"), false)),
+          () ->
+              assertThrowsExactly(
+                  EntityAlreadyExistsException.class,
+                  () -> STORE.insert(article(71, "other"), false)));
+      sql.execute("CREATE UNIQUE INDEX test_unique_title ON kb_article_meta (title)");
+      assertThrowsExactly(
+          PersistenceException.class, () -> STORE.insert(article(73, "third"), false));
     } finally {
       SessionUtils.rollbackTransaction();
     }
@@ -547,6 +646,75 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
             KnowledgeBaseArticleMapper.class, m -> m.summaries(lake).get(0));
     assertEquals("New title", summary.getTitle());
     assertNull(summary.getBodyContent());
+  }
+
+  @TestTemplate
+  void testFailedEditDiscardsOnlyItsAfterCommitCallbacks() throws IOException {
+    createAndInsertMakeLake("lake");
+    var article = article(11, "guide");
+    STORE.insert(article, false);
+    List<String> events = new ArrayList<>();
+    var failure = new IllegalStateException("extension failed");
+    SessionUtils.doMultipleWithCommit(
+        () -> {
+          SqlSessions.afterCommit(() -> events.add("before edit"));
+          assertSame(
+              failure,
+              assertThrows(
+                  IllegalStateException.class,
+                  () ->
+                      STORE.update(
+                          article.nameIdentifier(),
+                          null,
+                          current -> current.toBuilder().withTitle("new title").build(),
+                          (before, after) -> {
+                            SqlSessions.afterCommit(() -> events.add("failed edit"));
+                            throw failure;
+                          })));
+          SqlSessions.afterCommit(() -> events.add("after edit"));
+          assertTrue(events.isEmpty());
+        });
+    var stored = STORE.get(article.nameIdentifier());
+    assertEquals(article.title(), stored.title());
+    assertEquals(1, stored.revision());
+    assertEquals(List.of("before edit", "after edit"), events);
+  }
+
+  @TestTemplate
+  void testOuterSavepointRollbackDiscardsSuccessfulNestedEditCallback() throws IOException {
+    createAndInsertMakeLake("lake");
+    var article = article(11, "guide");
+    STORE.insert(article, false);
+    var name = article.nameIdentifier();
+    List<String> events = new ArrayList<>();
+    var failure = new IllegalStateException("outer operation failed");
+    SessionUtils.doMultipleWithCommit(
+        () -> {
+          assertSame(
+              failure,
+              assertThrows(
+                  IllegalStateException.class,
+                  () ->
+                      SqlSessions.withSavepoint(
+                          () -> {
+                            STORE.update(
+                                name,
+                                null,
+                                current -> current.toBuilder().withTitle("discarded").build(),
+                                (before, after) ->
+                                    SqlSessions.afterCommit(() -> events.add(after.title())));
+                            throw failure;
+                          })));
+          assertEquals(article.title(), STORE.get(name).title());
+          STORE.update(
+              name,
+              null,
+              current -> current.toBuilder().withTitle("retained").build(),
+              (before, after) -> SqlSessions.afterCommit(() -> events.add(after.title())));
+          assertTrue(events.isEmpty());
+        });
+    assertEquals(List.of("retained"), events);
+    assertEquals(2, STORE.get(name).revision());
   }
 
   @TestTemplate

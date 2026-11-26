@@ -73,6 +73,29 @@ public class TestKnowledgeBaseArticleContract {
   }
 
   @Test
+  public void testCreateAndEditRejectNullCharacterInMetadata() {
+    String invalid = "a\0b";
+    var builder =
+        ArticleCreate.builder()
+            .withTitle("Guide")
+            .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "# Guide"));
+    assertThrows(IllegalArgumentException.class, () -> builder.withTitle(invalid).build());
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> builder.withTitle("Guide").withComment(invalid).build());
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> builder.withComment(null).withSourceReference(invalid).build());
+    assertThrows(
+        IllegalArgumentException.class, () -> KnowledgeBaseArticleChange.updateTitle(invalid));
+    assertThrows(
+        IllegalArgumentException.class, () -> KnowledgeBaseArticleChange.updateComment(invalid));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> KnowledgeBaseArticleChange.updateSourceReference(invalid));
+  }
+
+  @Test
   public void testArticleCreateRequiresTitleAndBody() {
     assertThrows(
         IllegalArgumentException.class,

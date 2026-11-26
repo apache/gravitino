@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.Savepoint;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -194,6 +195,48 @@ public final class SqlSessions {
       afterCommitCallbacks.set(callbacks);
     }
     callbacks.add(callback);
+  }
+
+  /**
+   * Runs work at a savepoint in the active session. Rolling back to the savepoint also discards
+   * after-commit callbacks registered within it. Successful work and its callbacks remain part of
+   * the outer transaction.
+   *
+   * @param operation the work to run
+   * @param <T> the result type
+   * @return the result of the operation
+   */
+  public static <T> T withSavepoint(Supplier<T> operation) {
+    try {
+      Connection connection = currentConnection();
+      Savepoint savepoint = connection.setSavepoint();
+      List<Runnable> callbacks = afterCommitCallbacks.get();
+      int callbackCount = callbacks == null ? 0 : callbacks.size();
+      try {
+        T result = operation.get();
+        connection.releaseSavepoint(savepoint);
+        return result;
+      } catch (RuntimeException | Error failure) {
+        try {
+          connection.rollback(savepoint);
+          connection.releaseSavepoint(savepoint);
+        } catch (SQLException rollbackFailure) {
+          failure.addSuppressed(rollbackFailure);
+          markRollbackOnly(failure);
+        } finally {
+          // The first callback may have been registered after the savepoint was created.
+          callbacks = afterCommitCallbacks.get();
+          if (callbacks != null) {
+            callbacks.subList(callbackCount, callbacks.size()).clear();
+          }
+          sessions.get().clearCache();
+        }
+        throw failure;
+      }
+    } catch (SQLException e) {
+      markRollbackOnly(e);
+      throw new IllegalStateException("Cannot manage transaction savepoint", e);
+    }
   }
 
   private static void handleSessionClose(boolean commit, boolean rollback) {
