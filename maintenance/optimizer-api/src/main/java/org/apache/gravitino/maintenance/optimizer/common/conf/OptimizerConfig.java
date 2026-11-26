@@ -81,6 +81,19 @@ public class OptimizerConfig extends Config {
   /** Canonical JDBC driver class for metrics storage ({@code jdbcMetrics.jdbcDriver}). */
   public static final String JDBC_METRICS_JDBC_DRIVER = JDBC_METRICS_PREFIX + "jdbcDriver";
 
+  /** Canonical JDBC pool max size ({@code jdbcMetrics.poolMaxSize}). */
+  public static final String JDBC_METRICS_POOL_MAX_SIZE = JDBC_METRICS_PREFIX + "poolMaxSize";
+
+  /** Canonical JDBC pool min idle ({@code jdbcMetrics.poolMinIdle}). */
+  public static final String JDBC_METRICS_POOL_MIN_IDLE = JDBC_METRICS_PREFIX + "poolMinIdle";
+
+  /** Canonical JDBC connection timeout in ms ({@code jdbcMetrics.connectionTimeoutMs}). */
+  public static final String JDBC_METRICS_CONNECTION_TIMEOUT_MS =
+      JDBC_METRICS_PREFIX + "connectionTimeoutMs";
+
+  /** Canonical JDBC test-on-borrow flag ({@code jdbcMetrics.testOnBorrow}). */
+  public static final String JDBC_METRICS_TEST_ON_BORROW = JDBC_METRICS_PREFIX + "testOnBorrow";
+
   public static final String MONITOR_PREFIX = OPTIMIZER_PREFIX + "monitor.";
   private static final String METRICS_PROVIDER = MONITOR_PREFIX + "metricsProvider";
   private static final String TABLE_JOB_RELATION_PROVIDER =
