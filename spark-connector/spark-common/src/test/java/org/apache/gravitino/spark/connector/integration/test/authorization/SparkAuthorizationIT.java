@@ -40,7 +40,9 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
@@ -158,7 +160,7 @@ public abstract class SparkAuthorizationIT extends BaseIT {
                 Privileges.UseSchema.allow(),
                 Privileges.SelectTable.allow(),
                 Privileges.CreateTable.allow(),
-                // Spark JDBC needs both secret privileges to receive catalog credentials.
+                // Spark JDBC needs both secret privileges to vend static catalog credentials.
                 Privileges.UseSecrets.allow(),
                 Privileges.IncludeCredentialSecrets.allow()));
     gravitinoMetalake.createRole(ROLE, new HashMap<>(), ImmutableList.of(securableObject));
@@ -185,29 +187,41 @@ public abstract class SparkAuthorizationIT extends BaseIT {
             .getOrCreate();
   }
 
-  /** Verifies Spark cannot initialize a JDBC catalog with either secret privilege missing. */
+  /**
+   * Catalog {@code getCredentials} omits static JDBC credentials unless the caller holds both
+   * secret privileges (metadata access alone is not forbidden).
+   */
   @Test
   @Order(0)
   public void testCatalogRequiresBothCredentialPrivileges() {
     GravitinoMetalake metalake = client.loadMetalake(METALAKE);
-    MetadataObject catalog =
+    MetadataObject catalogObject =
         MetadataObjects.of(ImmutableList.of(JDBC_CATALOG), MetadataObject.Type.CATALOG);
+    GravitinoAdminClient normalUserClient =
+        GravitinoAdminClient.builder(gravitinoUri).withSimpleAuth(NORMAL_USER).build();
     try {
       metalake.revokePrivilegesFromRole(
-          ROLE, catalog, ImmutableSet.of(Privileges.UseSecrets.allow()));
-      assertThrows(
-          ForbiddenException.class, () -> normalUserSparkSession.sql("USE " + JDBC_CATALOG));
+          ROLE, catalogObject, ImmutableSet.of(Privileges.UseSecrets.allow()));
+      Catalog withoutUseSecrets = normalUserClient.loadMetalake(METALAKE).loadCatalog(JDBC_CATALOG);
+      Assertions.assertEquals(0, withoutUseSecrets.supportsCredentials().getCredentials().length);
 
       metalake.grantPrivilegesToRole(
-          ROLE, catalog, ImmutableList.of(Privileges.UseSecrets.allow()));
+          ROLE, catalogObject, ImmutableList.of(Privileges.UseSecrets.allow()));
       metalake.revokePrivilegesFromRole(
-          ROLE, catalog, ImmutableSet.of(Privileges.IncludeCredentialSecrets.allow()));
-      assertThrows(
-          ForbiddenException.class, () -> normalUserSparkSession.sql("USE " + JDBC_CATALOG));
+          ROLE, catalogObject, ImmutableSet.of(Privileges.IncludeCredentialSecrets.allow()));
+      Catalog withoutInclude = normalUserClient.loadMetalake(METALAKE).loadCatalog(JDBC_CATALOG);
+      Assertions.assertEquals(0, withoutInclude.supportsCredentials().getCredentials().length);
+
+      metalake.grantPrivilegesToRole(
+          ROLE, catalogObject, ImmutableList.of(Privileges.IncludeCredentialSecrets.allow()));
+      Catalog withBoth = normalUserClient.loadMetalake(METALAKE).loadCatalog(JDBC_CATALOG);
+      Assertions.assertEquals(1, withBoth.supportsCredentials().getCredentials().length);
+      Assertions.assertInstanceOf(
+          JdbcCredential.class, withBoth.supportsCredentials().getCredentials()[0]);
     } finally {
       metalake.grantPrivilegesToRole(
           ROLE,
-          catalog,
+          catalogObject,
           ImmutableList.of(
               Privileges.UseSecrets.allow(), Privileges.IncludeCredentialSecrets.allow()));
     }

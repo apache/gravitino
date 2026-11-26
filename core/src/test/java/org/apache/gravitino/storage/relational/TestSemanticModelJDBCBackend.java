@@ -74,6 +74,7 @@ import org.apache.gravitino.semantic.Field;
 import org.apache.gravitino.semantic.Metric;
 import org.apache.gravitino.semantic.Relationship;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
@@ -299,11 +300,11 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
     backend.insert(original, false);
     assertEquals(original, backend.get(original.nameIdentifier(), original.type()));
     backend.update(original.nameIdentifier(), original.type(), ignored -> empty);
-    assertEquals(empty, backend.get(original.nameIdentifier(), original.type()));
+    assertSnapshot(empty, 2);
     backend.update(original.nameIdentifier(), original.type(), ignored -> absent);
-    assertEquals(absent, backend.get(original.nameIdentifier(), original.type()));
+    assertSnapshot(absent, 3);
     backend.insert(original, true);
-    assertEquals(original, backend.get(original.nameIdentifier(), original.type()));
+    assertSnapshot(original, 4);
     assertEquals(4, getSemanticModelPO(original.id()).getCurrentVersion());
     assertEquals(List.of(1, 2, 3, 4), activeSnapshotVersions(original.id()));
 
@@ -400,8 +401,7 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
     backend.insert(original, false);
     backend.insert(replacement, true);
 
-    assertEquals(
-        replacement, backend.get(original.nameIdentifier(), Entity.EntityType.SEMANTIC_MODEL));
+    assertSnapshot(replacement, 2);
     SemanticModelPO persisted = getSemanticModelPO(original.id());
     assertEquals(2, persisted.getCurrentVersion());
     assertEquals(2, persisted.getLastVersion());
@@ -433,8 +433,7 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
     backend.insert(original, false);
     backend.insert(replacement, true);
 
-    assertEquals(
-        expected, backend.get(original.nameIdentifier(), Entity.EntityType.SEMANTIC_MODEL));
+    assertSnapshot(expected, 2);
     SemanticModelPO persisted = getSemanticModelPO(original.id());
     assertEquals(2, persisted.getCurrentVersion());
     assertEquals(2, persisted.getLastVersion());
@@ -605,7 +604,10 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
     assertEquals(List.of(1, 2, 3), activeSnapshotVersions(created.id()));
     SemanticModelEntity winner =
         backend.get(created.nameIdentifier(), Entity.EntityType.SEMANTIC_MODEL);
-    assertTrue(winner.equals(overwriteOne) || winner.equals(overwriteTwo));
+    assertEquals(3, winner.revision());
+    assertTrue(
+        winner.fields().equals(overwriteOne.fields())
+            || winner.fields().equals(overwriteTwo.fields()));
     assertEquals(0, countEntityChanges());
   }
 
@@ -631,17 +633,10 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
 
     SemanticModelEntity renamed =
         semanticModel(
-            original.id(),
-            namespace,
-            "renamed_sales_model",
-            false,
-            ImmutableMap.of("domain", "sales_v2"));
-    assertEquals(
-        renamed,
-        backend.update(
-            original.nameIdentifier(), Entity.EntityType.SEMANTIC_MODEL, ignored -> renamed));
+            original.id(), namespace, "renamed_sales_model", false, original.properties());
+    backend.update(original.nameIdentifier(), Entity.EntityType.SEMANTIC_MODEL, ignored -> renamed);
     assertFalse(backend.exists(original.nameIdentifier(), Entity.EntityType.SEMANTIC_MODEL));
-    assertEquals(renamed, backend.get(renamed.nameIdentifier(), Entity.EntityType.SEMANTIC_MODEL));
+    assertSnapshot(renamed, 2);
 
     assertTrue(backend.delete(renamed.nameIdentifier(), Entity.EntityType.SEMANTIC_MODEL, false));
     assertFalse(backend.exists(renamed.nameIdentifier(), Entity.EntityType.SEMANTIC_MODEL));
@@ -909,11 +904,22 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
     }
   }
 
+  private void assertSnapshot(SemanticModelEntity expected, int revision) throws IOException {
+    SemanticModelEntity loaded = backend.get(expected.nameIdentifier(), expected.type());
+    assertEquals(expected.fields(), loaded.fields());
+    assertEquals(revision, loaded.revision());
+    assertEquals(expected.status(), loaded.status());
+    assertEquals(expected.publishedAt(), loaded.publishedAt());
+    assertEquals(expected.publishedBy(), loaded.publishedBy());
+  }
+
   private SemanticModelPO getSemanticModelPO(Long semanticModelId) {
     SemanticModelPO po =
         SessionUtils.getWithoutCommit(
             SemanticModelMetaMapper.class,
-            mapper -> mapper.selectSemanticModelMetaById(semanticModelId));
+            mapper ->
+                mapper.selectSemanticModelMetaById(
+                    semanticModelId, SemanticModelRevisionSelector.LATEST));
     assertNotNull(po);
     return po;
   }

@@ -517,7 +517,7 @@ tests:
         jdbcUser: gravitino_app
     asserts:
       - failedTemplate:
-          errorMessage: "entity.jdbcUrl authority is IPv6 or multi-host; set postgresql.init.host and postgresql.init.port explicitly (JDBC URL host/port fallback supports only a single host:port)"
+          errorMessage: "entity.jdbcUrl authority is IPv6 or multi-host; set postgresql.init.host/port or schema.dbHost/dbPort explicitly (JDBC URL host/port fallback supports only a single host:port)"
 
   - it: fails when entity.jdbcUrl authority is multi-host and host/port are derived from the URL
     template: deployment.yaml
@@ -535,7 +535,7 @@ tests:
         jdbcUser: gravitino_app
     asserts:
       - failedTemplate:
-          errorMessage: "entity.jdbcUrl authority is IPv6 or multi-host; set postgresql.init.host and postgresql.init.port explicitly (JDBC URL host/port fallback supports only a single host:port)"
+          errorMessage: "entity.jdbcUrl authority is IPv6 or multi-host; set postgresql.init.host/port or schema.dbHost/dbPort explicitly (JDBC URL host/port fallback supports only a single host:port)"
 
   - it: renders when IPv6 entity.jdbcUrl has explicit postgresql.init.host and port
     template: deployment.yaml

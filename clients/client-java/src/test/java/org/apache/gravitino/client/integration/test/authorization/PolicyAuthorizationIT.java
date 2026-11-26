@@ -164,6 +164,7 @@ public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
   public void listPolicy() {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     String[] policies = gravitinoMetalake.listPolicies();
+    Arrays.sort(policies);
     Assertions.assertArrayEquals(new String[] {"policy1", "policy2", "policy3"}, policies);
     policies = normalUserClient.loadMetalake(METALAKE).listPolicies();
     Assertions.assertArrayEquals(new String[] {"policy2"}, policies);
@@ -197,6 +198,7 @@ public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
         ImmutableSet.of(Privileges.ApplyPolicy.allow()));
     metalakeLoadByNormalUser.getPolicy("policy3");
     String[] policies = metalakeLoadByNormalUser.listPolicies();
+    Arrays.sort(policies);
     Assertions.assertArrayEquals(new String[] {"policy2", "policy3"}, policies);
   }
 

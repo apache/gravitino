@@ -161,11 +161,15 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
 
   @Override
   public SemanticModel loadSemanticModel(NameIdentifier ident) throws NoSuchSemanticModelException {
-    checkRelationalCatalog(ident.namespace());
-    if (!schemaDispatcher.schemaExists(schemaIdentifier(ident))) {
-      throw new NoSuchSemanticModelException("Semantic Model %s does not exist", ident);
-    }
+    checkModelParent(ident);
     return managedOperations.loadSemanticModel(ident);
+  }
+
+  @Override
+  public boolean semanticModelExists(NameIdentifier ident) {
+    checkRelationalCatalog(ident.namespace());
+    return schemaDispatcher.schemaExists(schemaIdentifier(ident))
+        && managedOperations.semanticModelExists(ident);
   }
 
   @Override
@@ -231,6 +235,13 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
       return false;
     }
     return managedOperations.dropSemanticModel(ident);
+  }
+
+  private void checkModelParent(NameIdentifier ident) {
+    checkRelationalCatalog(ident.namespace());
+    if (!schemaDispatcher.schemaExists(schemaIdentifier(ident))) {
+      throw new NoSuchSemanticModelException("Semantic Model %s does not exist", ident);
+    }
   }
 
   private void checkRelationalCatalog(Namespace namespace) {

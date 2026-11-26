@@ -39,6 +39,11 @@ import org.testcontainers.containers.Container;
 public class CatalogHiveS3IT extends CatalogHive3IT {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CatalogHiveS3IT.class);
+  // The Hive Metastore in the test image runs an S3A client without directory marker support. It
+  // takes a directory with a marker for an empty one and only deletes the marker when it drops a
+  // table. Hadoop 3.4 keeps the markers by default, so delete them like Hadoop 3.3 does.
+  private static final String DIRECTORY_MARKER_RETENTION = "fs.s3a.directory.marker.retention";
+  private static final String DIRECTORY_MARKER_RETENTION_DELETE = "delete";
 
   private static final String S3_BUCKET_NAME = "my-test-bucket";
   private GravitinoLocalStackContainer gravitinoLocalStackContainer;
@@ -140,6 +145,7 @@ public class CatalogHiveS3IT extends CatalogHive3IT {
         "fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
     conf.set("fs.s3a.path.style.access", "true");
     conf.set("fs.s3a.connection.ssl.enabled", "false");
+    conf.set(DIRECTORY_MARKER_RETENTION, DIRECTORY_MARKER_RETENTION_DELETE);
     fileSystem = FileSystem.get(URI.create("s3a://" + S3_BUCKET_NAME), conf);
   }
 
@@ -162,6 +168,7 @@ public class CatalogHiveS3IT extends CatalogHive3IT {
             .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
             .config("spark.hadoop.fs.s3a.path.style.access", "true")
             .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
+            .config("spark.hadoop." + DIRECTORY_MARKER_RETENTION, DIRECTORY_MARKER_RETENTION_DELETE)
             .config(
                 "spark.hadoop.fs.s3a.aws.credentials.provider",
                 "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider")

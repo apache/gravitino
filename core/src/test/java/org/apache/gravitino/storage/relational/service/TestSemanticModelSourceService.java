@@ -112,6 +112,7 @@ public class TestSemanticModelSourceService extends TestJDBCBackend {
             mapper.insertSources(
                 metalakeId,
                 first.id(),
+                1,
                 List.of(new SemanticModelSource("employee", source.type(), source.id()))));
     Map<Long, List<String>> found =
         lookup(source.nameIdentifier(), source.type()).stream()
@@ -198,9 +199,17 @@ public class TestSemanticModelSourceService extends TestJDBCBackend {
     TableEntity renamed =
         createTableEntity(source.id(), sourceNamespace, "employees_v2", AUDIT_INFO);
     backend.update(source.nameIdentifier(), source.type(), old -> renamed);
-    SemanticModelEntity renamedModel =
+    SemanticModelEntity updated =
         copy(
             original,
+            original.name(),
+            original.definition(),
+            SemanticModelSourceUpdate.preserve(),
+            original.id());
+    backend.update(original.nameIdentifier(), original.type(), old -> updated);
+    SemanticModelEntity renamedModel =
+        copy(
+            updated,
             "staff_v2",
             original.definition(),
             SemanticModelSourceUpdate.preserve(),

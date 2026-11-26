@@ -19,6 +19,8 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import javax.annotation.Nullable;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.storage.relational.po.SemanticModelPO;
 import org.apache.gravitino.storage.relational.po.SemanticModelVersionInfoPO;
 import org.apache.ibatis.annotations.DeleteProvider;
@@ -51,7 +53,9 @@ public interface SemanticModelMetaMapper {
         @Result(property = "schemaId", column = "version_schema_id"),
         @Result(property = "semanticModelId", column = "version_semantic_model_id"),
         @Result(property = "version", column = "version"),
-        @Result(property = "semanticModelName", column = "version_semantic_model_name"),
+        @Result(property = "publicationStatus", column = "publication_status"),
+        @Result(property = "publishedBy", column = "published_by"),
+        @Result(property = "publishedAt", column = "published_at"),
         @Result(property = "semanticModelComment", column = "semantic_model_comment"),
         @Result(property = "datasets", column = "datasets"),
         @Result(property = "relationships", column = "relationships"),
@@ -75,6 +79,7 @@ public interface SemanticModelMetaMapper {
         @Result(property = "catalogId", column = "catalog_id"),
         @Result(property = "schemaId", column = "schema_id"),
         @Result(property = "currentVersion", column = "current_version"),
+        @Result(property = "activeVersion", column = "active_version"),
         @Result(property = "lastVersion", column = "last_version"),
         @Result(property = "auditInfo", column = "audit_info"),
         @Result(property = "deletedAt", column = "deleted_at"),
@@ -83,7 +88,7 @@ public interface SemanticModelMetaMapper {
             javaType = SemanticModelVersionInfoPO.class,
             column =
                 "{id,version_metalake_id,version_catalog_id,version_schema_id,"
-                    + "version_semantic_model_id,version,version_semantic_model_name,"
+                    + "version_semantic_model_id,version,publication_status,published_by,published_at,"
                     + "semantic_model_comment,datasets,relationships,metrics,ai_context,"
                     + "custom_extensions,properties,"
                     + "version_audit_info,version_deleted_at}",
@@ -92,7 +97,9 @@ public interface SemanticModelMetaMapper {
   @SelectProvider(
       type = SemanticModelMetaSQLProviderFactory.class,
       method = "listSemanticModelPOsBySchemaId")
-  List<SemanticModelPO> listSemanticModelPOsBySchemaId(@Param("schemaId") Long schemaId);
+  List<SemanticModelPO> listSemanticModelPOsBySchemaId(
+      @Param("schemaId") Long schemaId,
+      @Param("selector") @Nullable SemanticModelRevisionSelector selector);
 
   /**
    * Lists active Semantic Model identities by stable IDs without loading definition snapshots.
@@ -118,7 +125,8 @@ public interface SemanticModelMetaMapper {
   List<SemanticModelPO> listSemanticModelPOsByFullQualifiedName(
       @Param("metalakeName") String metalakeName,
       @Param("catalogName") String catalogName,
-      @Param("schemaName") String schemaName);
+      @Param("schemaName") String schemaName,
+      @Param("selector") @Nullable SemanticModelRevisionSelector selector);
 
   /** Selects an active Semantic Model ID by schema ID and name. */
   @SelectProvider(
@@ -133,7 +141,9 @@ public interface SemanticModelMetaMapper {
       type = SemanticModelMetaSQLProviderFactory.class,
       method = "selectSemanticModelMetaBySchemaIdAndName")
   SemanticModelPO selectSemanticModelMetaBySchemaIdAndName(
-      @Param("schemaId") Long schemaId, @Param("semanticModelName") String semanticModelName);
+      @Param("schemaId") Long schemaId,
+      @Param("semanticModelName") String semanticModelName,
+      @Param("selector") @Nullable SemanticModelRevisionSelector selector);
 
   /** Selects and locks an active Semantic Model identity by schema ID and name. */
   @SelectProvider(
@@ -147,7 +157,9 @@ public interface SemanticModelMetaMapper {
   @SelectProvider(
       type = SemanticModelMetaSQLProviderFactory.class,
       method = "selectSemanticModelMetaById")
-  SemanticModelPO selectSemanticModelMetaById(@Param("semanticModelId") Long semanticModelId);
+  SemanticModelPO selectSemanticModelMetaById(
+      @Param("semanticModelId") Long semanticModelId,
+      @Param("selector") SemanticModelRevisionSelector selector);
 
   /** Selects and locks a Semantic Model identity by stable ID. */
   @SelectProvider(
@@ -165,7 +177,8 @@ public interface SemanticModelMetaMapper {
       @Param("metalakeName") String metalakeName,
       @Param("catalogName") String catalogName,
       @Param("schemaName") String schemaName,
-      @Param("semanticModelName") String semanticModelName);
+      @Param("semanticModelName") String semanticModelName,
+      @Param("selector") @Nullable SemanticModelRevisionSelector selector);
 
   /** Inserts a Semantic Model identity row. */
   @InsertProvider(
@@ -181,13 +194,13 @@ public interface SemanticModelMetaMapper {
       @Param("newSemanticModelMeta") SemanticModelPO newSemanticModelPO,
       @Param("oldSemanticModelMeta") SemanticModelPO oldSemanticModelPO);
 
-  /** Soft-deletes a Semantic Model identity by stable ID and expected current version. */
+  /** Soft-deletes a Semantic Model identity by stable ID and observed name. */
   @UpdateProvider(
       type = SemanticModelMetaSQLProviderFactory.class,
       method = "softDeleteSemanticModelMetasBySemanticModelId")
   Integer softDeleteSemanticModelMetasBySemanticModelId(
       @Param("semanticModelId") Long semanticModelId,
-      @Param("currentVersion") Integer currentVersion);
+      @Param("semanticModelName") String semanticModelName);
 
   /** Soft-deletes Semantic Model identities under a metalake. */
   @UpdateProvider(

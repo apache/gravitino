@@ -21,12 +21,14 @@ package org.apache.gravitino.abs.credential;
 
 import org.apache.gravitino.credential.ADLSTokenCredential;
 import org.apache.gravitino.credential.CredentialProviderDelegator;
+import org.apache.gravitino.credential.SupportsDynamicCredential;
 
 /**
  * A lightweight credential provider for ADLS. It delegates the actual credential generation to
  * {@link ADLSTokenGenerator} which is loaded via reflection to avoid classpath issues.
  */
-public class ADLSTokenProvider extends CredentialProviderDelegator<ADLSTokenCredential> {
+public class ADLSTokenProvider extends CredentialProviderDelegator<ADLSTokenCredential>
+    implements SupportsDynamicCredential {
 
   @Override
   public boolean supportsScheme(String scheme) {
