@@ -115,6 +115,7 @@ import org.apache.gravitino.server.web.rest.MetadataObjectDomainOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectPolicyOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectSemanticModelOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
+import org.apache.gravitino.server.web.rest.MetadataObjectTermOperations;
 import org.apache.gravitino.server.web.rest.OwnerOperations;
 import org.apache.gravitino.server.web.rest.PermissionOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
@@ -274,6 +275,7 @@ public class TestGravitinoInterceptionService {
           Arrays.asList(
               DomainOperations.class,
               TermOperations.class,
+              MetadataObjectTermOperations.class,
               ArticleOperations.class,
               DomainMembershipOperations.class,
               MetadataObjectDomainOperations.class)) {
