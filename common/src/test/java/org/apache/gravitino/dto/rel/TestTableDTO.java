@@ -108,4 +108,29 @@ public class TestTableDTO {
         TableDTO.builder().withName("t1").withAudit(audit).withColumns(new ColumnDTO[0]).build();
     Assertions.assertThrows(UnsupportedOperationException.class, table::supportsPartitionSpecs);
   }
+
+  @Test
+  public void testFromDTOPreservesPartitionSpecs() {
+    AuditDTO audit =
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    Partitioning[] identity = new Partitioning[] {IdentityPartitioningDTO.of("id")};
+    TableDTO source =
+        TableDTO.builder()
+            .withName("events")
+            .withAudit(audit)
+            .withColumns(new ColumnDTO[0])
+            .withPartitioning(identity)
+            .withDefaultPartitionSpecId(1)
+            .withPartitionSpecs(ImmutableMap.of(0, new Partitioning[0], 1, identity))
+            .build();
+
+    Table converted = DTOConverters.fromDTO(source);
+    SupportsPartitionSpecs specs = converted.supportsPartitionSpecs();
+    Assertions.assertEquals(1, specs.defaultPartitionSpecId());
+    Assertions.assertEquals(2, specs.partitionSpecs().size());
+    Assertions.assertArrayEquals(Transforms.EMPTY_TRANSFORM, specs.partitionSpecs().get(0));
+    Transform[] defaultSpec = specs.partitionSpecs().get(1);
+    Assertions.assertEquals(1, defaultSpec.length);
+    Assertions.assertInstanceOf(IdentityPartitioningDTO.class, defaultSpec[0]);
+  }
 }

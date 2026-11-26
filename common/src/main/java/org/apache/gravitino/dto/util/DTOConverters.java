@@ -1444,6 +1444,11 @@ public class DTOConverters {
       public Audit auditInfo() {
         return tableDTO.auditInfo();
       }
+
+      @Override
+      public SupportsPartitionSpecs supportsPartitionSpecs() {
+        return tableDTO.supportsPartitionSpecs();
+      }
     };
   }
 

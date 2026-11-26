@@ -52,6 +52,7 @@ import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyList;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.SupportsPartitionSpecs;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -183,6 +184,18 @@ class RelationalTable
   @Override
   public Transform[] partitioning() {
     return table.partitioning();
+  }
+
+  /**
+   * Returns historical partition-spec listing when the loaded table response carries it (for
+   * example Iceberg tables after partition evolution).
+   *
+   * @return The partition-spec support for the table.
+   * @throws UnsupportedOperationException If the table response does not include partition specs.
+   */
+  @Override
+  public SupportsPartitionSpecs supportsPartitionSpecs() {
+    return table.supportsPartitionSpecs();
   }
 
   /**
