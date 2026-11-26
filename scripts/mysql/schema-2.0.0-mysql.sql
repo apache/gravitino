@@ -910,3 +910,40 @@ CREATE TABLE IF NOT EXISTS glossary_term_binding (
     KEY idx_glossary_binding_metalake (metalake_id, deleted_at),
     KEY idx_glossary_binding_deleted (deleted_at, term_id, target_type, target_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'glossary term bindings to metadata objects and semantic-model metrics';
+
+CREATE TABLE IF NOT EXISTS kb_article_meta (
+    article_id BIGINT PRIMARY KEY COMMENT 'Stable Article ID',
+    metalake_id BIGINT NOT NULL COMMENT 'Owning metalake ID',
+    article_name VARCHAR(128) NOT NULL COMMENT 'Immutable NFC Article name',
+    title VARCHAR(512) NOT NULL COMMENT 'Display title',
+    body_format VARCHAR(32) NOT NULL COMMENT 'MARKDOWN or HTML',
+    body_content MEDIUMTEXT NOT NULL COMMENT 'Current body',
+    status VARCHAR(32) NOT NULL COMMENT 'Article status',
+    article_comment VARCHAR(256) COMMENT 'Optional short comment',
+    synonyms TEXT NOT NULL COMMENT 'JSON list of synonyms',
+    source_reference VARCHAR(1024) COMMENT 'Optional source reference',
+    properties MEDIUMTEXT NOT NULL COMMENT 'JSON properties',
+    revision BIGINT NOT NULL DEFAULT 1 COMMENT 'Current editing revision',
+    audit_info MEDIUMTEXT NOT NULL COMMENT 'Audit information',
+    deleted_at BIGINT NOT NULL DEFAULT 0 COMMENT 'Soft deletion time in milliseconds, zero for live rows',
+    live_key INT GENERATED ALWAYS AS (CASE WHEN deleted_at = 0 THEN 1 ELSE NULL END) STORED COMMENT 'Only live rows reserve the unique key',
+    CONSTRAINT uk_kba_name UNIQUE (metalake_id, article_name, live_key),
+    INDEX idx_kba_deleted (deleted_at, article_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Current Knowledge Base Article';
+
+CREATE TABLE IF NOT EXISTS kb_article_relation_meta (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT 'Binding row ID',
+    metalake_id BIGINT NOT NULL COMMENT 'Owning metalake ID',
+    article_id BIGINT NOT NULL COMMENT 'Owning Article ID',
+    target_type VARCHAR(64) NOT NULL COMMENT 'Bound object type',
+    target_id BIGINT NOT NULL COMMENT 'Stable bound object ID',
+    current_version INT NOT NULL DEFAULT 1 COMMENT 'Current row version',
+    last_version INT NOT NULL DEFAULT 1 COMMENT 'Last row version',
+    audit_info MEDIUMTEXT NOT NULL COMMENT 'Audit information',
+    deleted_at BIGINT NOT NULL DEFAULT 0 COMMENT 'Soft deletion time in milliseconds, zero for live rows',
+    live_key INT GENERATED ALWAYS AS (CASE WHEN deleted_at = 0 THEN 1 ELSE NULL END) STORED COMMENT 'Only live rows reserve the unique key',
+    CONSTRAINT uk_kba_binding UNIQUE (article_id, target_id, target_type, live_key),
+    INDEX idx_kba_target (target_id, target_type, deleted_at),
+    INDEX idx_kba_relation_metalake (metalake_id, deleted_at),
+    INDEX idx_kba_relation_deleted (deleted_at, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Current Article bindings';

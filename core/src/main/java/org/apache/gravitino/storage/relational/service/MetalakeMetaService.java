@@ -301,6 +301,7 @@ public class MetalakeMetaService {
                 SessionUtils.doWithoutCommit(
                     TagMetaMapper.class,
                     mapper -> mapper.softDeleteTagMetasByMetalakeId(metalakeId)),
+            () -> KnowledgeBaseArticleMetaService.getInstance().dropMetalake(metalakeId),
             () ->
                 SessionUtils.doWithoutCommit(
                     PolicyTagRelMapper.class, mapper -> mapper.softDeleteByMetalakeId(metalakeId)),
@@ -429,6 +430,7 @@ public class MetalakeMetaService {
                 SessionUtils.doWithoutCommit(
                     TagMetaMapper.class,
                     mapper -> mapper.softDeleteTagMetasByMetalakeId(metalakeId)),
+            () -> KnowledgeBaseArticleMetaService.getInstance().dropMetalake(metalakeId),
             () ->
                 SessionUtils.doWithoutCommit(
                     PolicyTagRelMapper.class, mapper -> mapper.softDeleteByMetalakeId(metalakeId)),

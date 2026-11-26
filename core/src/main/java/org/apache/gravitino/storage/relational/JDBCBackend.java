@@ -54,6 +54,7 @@ import org.apache.gravitino.UnsupportedEntityTypeException;
 import org.apache.gravitino.cache.BaseEntityCache;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.kb.KnowledgeBaseArticleEntity;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -90,6 +91,7 @@ import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
 import org.apache.gravitino.storage.relational.service.JobMetaService;
 import org.apache.gravitino.storage.relational.service.JobTemplateMetaService;
+import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.ModelMetaService;
 import org.apache.gravitino.storage.relational.service.ModelVersionMetaService;
@@ -178,6 +180,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (List<E>) TopicMetaService.getInstance().listTopicsByNamespace(namespace);
       case GLOSSARY_TERM:
         return (List<E>) GlossaryTermMetaService.getInstance().list(namespace);
+      case KNOWLEDGE_BASE_ARTICLE:
+        return (List<E>) KnowledgeBaseArticleMetaService.getInstance().list(namespace);
       case TAG:
         return (List<E>) TagMetaService.getInstance().listTagsByNamespace(namespace);
       case USER:
@@ -216,6 +220,10 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   @Override
   public boolean exists(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
     try {
+      if (entityType == Entity.EntityType.KNOWLEDGE_BASE_ARTICLE) {
+        KnowledgeBaseArticleMetaService.getInstance().getIds(ident);
+        return true;
+      }
       Entity entity = get(ident, entityType);
       return entity != null;
     } catch (NoSuchEntityException ne) {
@@ -303,6 +311,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (E) RoleMetaService.getInstance().getRoleByIdentifier(ident);
       case GLOSSARY_TERM:
         return (E) GlossaryTermMetaService.getInstance().get(ident);
+      case KNOWLEDGE_BASE_ARTICLE:
+        return (E) KnowledgeBaseArticleMetaService.getInstance().get(ident);
       case TAG:
         return (E) TagMetaService.getInstance().getTagByIdentifier(ident);
       case MODEL:
@@ -360,6 +370,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (List<E>) ModelMetaService.getInstance().batchGetModelByIdentifier(identifiers);
       case GLOSSARY_TERM:
         return (List<E>) GlossaryTermMetaService.getInstance().batchGet(identifiers);
+      case KNOWLEDGE_BASE_ARTICLE:
+        return (List<E>) KnowledgeBaseArticleMetaService.getInstance().batchGet(identifiers);
       case TAG:
         return (List<E>) TagMetaService.getInstance().batchGetTagByIdentifier(identifiers);
       case POLICY:
@@ -459,6 +471,11 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       Class<E> clazz,
       Consumer<E> postDeleteAction)
       throws IOException {
+    if (entityType == Entity.EntityType.KNOWLEDGE_BASE_ARTICLE) {
+      return KnowledgeBaseArticleMetaService.getInstance()
+          .deleteAndGet(ident, (before, after) -> postDeleteAction.accept(clazz.cast(before)))
+          .map(clazz::cast);
+    }
     if (entityType != Entity.EntityType.FILESET) {
       return RelationalBackend.super.deleteAndGet(ident, entityType, clazz, postDeleteAction);
     }
@@ -570,6 +587,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
             .deleteDomainMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case KNOWLEDGE_BASE_ARTICLE:
+        return KnowledgeBaseArticleMetaService.getInstance()
+            .collect(legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case AUDIT:
         return 0;
         // TODO: Implement hard delete logic for these entity types.
@@ -1176,6 +1195,9 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       GroupMetaService.getInstance().insertGroup((GroupEntity) e, overwritten);
     } else if (e instanceof GlossaryTermEntity) {
       GlossaryTermMetaService.getInstance().insert((GlossaryTermEntity) e, overwritten);
+    } else if (e instanceof KnowledgeBaseArticleEntity) {
+      KnowledgeBaseArticleMetaService.getInstance()
+          .insert((KnowledgeBaseArticleEntity) e, overwritten);
     } else if (e instanceof TagEntity) {
       TagMetaService.getInstance().insertTag((TagEntity) e, overwritten);
     } else if (e instanceof ModelEntity) {
@@ -1236,6 +1258,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (E) RoleMetaService.getInstance().updateRole(ident, updater);
       case GLOSSARY_TERM:
         return (E) GlossaryTermMetaService.getInstance().update(ident, updater);
+      case KNOWLEDGE_BASE_ARTICLE:
+        return (E) KnowledgeBaseArticleMetaService.getInstance().update(ident, updater);
       case TAG:
         return (E) TagMetaService.getInstance().updateTag(ident, updater);
       case MODEL:
@@ -1285,6 +1309,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return RoleMetaService.getInstance().deleteRole(ident);
       case GLOSSARY_TERM:
         return GlossaryTermMetaService.getInstance().delete(ident);
+      case KNOWLEDGE_BASE_ARTICLE:
+        return KnowledgeBaseArticleMetaService.getInstance().delete(ident);
       case TAG:
         return TagMetaService.getInstance().deleteTag(ident);
       case MODEL:

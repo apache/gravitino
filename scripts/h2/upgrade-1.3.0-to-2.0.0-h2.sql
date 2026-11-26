@@ -535,3 +535,40 @@ COMMENT ON COLUMN glossary_term_binding.term_id IS 'bound glossary term id';
 COMMENT ON COLUMN glossary_term_binding.target_type IS 'binding target type (CATALOG, SCHEMA, TABLE, VIEW, COLUMN, FILESET, TOPIC, MODEL, or METRIC)';
 COMMENT ON COLUMN glossary_term_binding.target_id IS 'stable id of the bound metadata object, table column, or semantic-model metric';
 COMMENT ON COLUMN glossary_term_binding.deleted_at IS 'retirement time in epoch milliseconds, advanced past retained generations to avoid collisions, 0 means live';
+
+CREATE TABLE IF NOT EXISTS kb_article_meta (
+    article_id BIGINT PRIMARY KEY COMMENT 'Stable Article ID',
+    metalake_id BIGINT NOT NULL COMMENT 'Owning metalake ID',
+    article_name VARCHAR(256) NOT NULL COMMENT 'Immutable NFC Article name',
+    title VARCHAR(1024) NOT NULL COMMENT 'Display title',
+    body_format VARCHAR(32) NOT NULL COMMENT 'MARKDOWN or HTML',
+    body_content CLOB NOT NULL COMMENT 'Current body',
+    status VARCHAR(32) NOT NULL COMMENT 'Article status',
+    article_comment VARCHAR(512) COMMENT 'Optional short comment',
+    synonyms CLOB NOT NULL COMMENT 'JSON list of synonyms',
+    source_reference VARCHAR(2048) COMMENT 'Optional source reference',
+    properties CLOB NOT NULL COMMENT 'JSON properties',
+    revision BIGINT NOT NULL DEFAULT 1 COMMENT 'Current editing revision',
+    audit_info CLOB NOT NULL COMMENT 'Audit information',
+    deleted_at BIGINT NOT NULL DEFAULT 0 COMMENT 'Soft deletion time in milliseconds, zero for live rows',
+    live_key INT GENERATED ALWAYS AS (CASE WHEN deleted_at = 0 THEN 1 ELSE NULL END) COMMENT 'Only live rows reserve the unique key',
+    CONSTRAINT uk_kba_name UNIQUE (metalake_id, article_name, live_key)
+) COMMENT='Current Knowledge Base Article';
+CREATE INDEX IF NOT EXISTS idx_kba_deleted ON kb_article_meta (deleted_at, article_id);
+
+CREATE TABLE IF NOT EXISTS kb_article_relation_meta (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT 'Binding row ID',
+    metalake_id BIGINT NOT NULL COMMENT 'Owning metalake ID',
+    article_id BIGINT NOT NULL COMMENT 'Owning Article ID',
+    target_type VARCHAR(64) NOT NULL COMMENT 'Bound object type',
+    target_id BIGINT NOT NULL COMMENT 'Stable bound object ID',
+    current_version INT NOT NULL DEFAULT 1 COMMENT 'Current row version',
+    last_version INT NOT NULL DEFAULT 1 COMMENT 'Last row version',
+    audit_info CLOB NOT NULL COMMENT 'Audit information',
+    deleted_at BIGINT NOT NULL DEFAULT 0 COMMENT 'Soft deletion time in milliseconds, zero for live rows',
+    live_key INT GENERATED ALWAYS AS (CASE WHEN deleted_at = 0 THEN 1 ELSE NULL END) COMMENT 'Only live rows reserve the unique key',
+    CONSTRAINT uk_kba_binding UNIQUE (article_id, target_id, target_type, live_key)
+) COMMENT='Current Article bindings';
+CREATE INDEX IF NOT EXISTS idx_kba_target ON kb_article_relation_meta (target_id, target_type, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_kba_relation_metalake ON kb_article_relation_meta (metalake_id, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_kba_relation_deleted ON kb_article_relation_meta (deleted_at, id);

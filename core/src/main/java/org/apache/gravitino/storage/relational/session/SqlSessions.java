@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.Savepoint;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -43,6 +44,7 @@ public final class SqlSessions {
   private static final ThreadLocal<SqlSession> sessions = new ThreadLocal<>();
   private static final ThreadLocal<AtomicInteger> sessionCount =
       ThreadLocal.withInitial(() -> new AtomicInteger(0));
+  private static final ThreadLocal<Throwable> rollbackCause = new ThreadLocal<>();
   private static final ThreadLocal<List<Runnable>> afterCommitCallbacks = new ThreadLocal<>();
 
   private SqlSessions() {}
@@ -146,6 +148,18 @@ public final class SqlSessions {
   }
 
   /**
+   * Requires the session owner to roll back, even if it catches the failing operation's exception.
+   *
+   * @param cause the failure that invalidated the transaction
+   */
+  public static void markRollbackOnly(Throwable cause) {
+    Preconditions.checkState(hasActiveSession(), "No active SQL session on the current thread");
+    if (rollbackCause.get() == null) {
+      rollbackCause.set(Preconditions.checkNotNull(cause, "Missing rollback cause"));
+    }
+  }
+
+  /**
    * Returns the connection of the current thread's open session without changing the session count.
    *
    * <p>Callers must not commit, roll back, or close the connection. The session owner commits it.
@@ -183,6 +197,48 @@ public final class SqlSessions {
     callbacks.add(callback);
   }
 
+  /**
+   * Runs work at a savepoint in the active session. Rolling back to the savepoint also discards
+   * after-commit callbacks registered within it. Successful work and its callbacks remain part of
+   * the outer transaction.
+   *
+   * @param operation the work to run
+   * @param <T> the result type
+   * @return the result of the operation
+   */
+  public static <T> T withSavepoint(Supplier<T> operation) {
+    try {
+      Connection connection = currentConnection();
+      Savepoint savepoint = connection.setSavepoint();
+      List<Runnable> callbacks = afterCommitCallbacks.get();
+      int callbackCount = callbacks == null ? 0 : callbacks.size();
+      try {
+        T result = operation.get();
+        connection.releaseSavepoint(savepoint);
+        return result;
+      } catch (RuntimeException | Error failure) {
+        try {
+          connection.rollback(savepoint);
+          connection.releaseSavepoint(savepoint);
+        } catch (SQLException rollbackFailure) {
+          failure.addSuppressed(rollbackFailure);
+          markRollbackOnly(failure);
+        } finally {
+          // The first callback may have been registered after the savepoint was created.
+          callbacks = afterCommitCallbacks.get();
+          if (callbacks != null) {
+            callbacks.subList(callbackCount, callbacks.size()).clear();
+          }
+          sessions.get().clearCache();
+        }
+        throw failure;
+      }
+    } catch (SQLException e) {
+      markRollbackOnly(e);
+      throw new IllegalStateException("Cannot manage transaction savepoint", e);
+    }
+  }
+
   private static void handleSessionClose(boolean commit, boolean rollback) {
     SqlSession sqlSession = sessions.get();
     if (sqlSession == null) {
@@ -194,15 +250,20 @@ public final class SqlSessions {
       List<Runnable> callbacks = afterCommitCallbacks.get();
       boolean committed = false;
       try {
-        if (commit) {
-          sqlSession.commit();
-          committed = true;
-        } else if (rollback) {
+        Throwable cause = rollbackCause.get();
+        if (rollback || cause != null) {
           // Force the JDBC rollback. A policy lifecycle hook can write on this connection without
           // going
           // through a mapped statement, and MyBatis skips rollback when the session looks clean.
           // Closing that session then turns auto-commit back on, which would commit the hook write.
           sqlSession.rollback(true);
+          if (commit) {
+            throw new IllegalStateException(
+                "Cannot commit a transaction marked for rollback", cause);
+          }
+        } else if (commit) {
+          sqlSession.commit();
+          committed = true;
         }
       } finally {
         try {
@@ -212,6 +273,7 @@ public final class SqlSessions {
           // Ensure ThreadLocal is always cleaned up
           sessions.remove();
           sessionCount.remove();
+          rollbackCause.remove();
           afterCommitCallbacks.remove();
         }
       }
@@ -231,6 +293,7 @@ public final class SqlSessions {
           "Session count is negative: {}. Resetting session count and removing session.", count);
       sessions.remove();
       sessionCount.remove();
+      rollbackCause.remove();
       afterCommitCallbacks.remove();
     }
   }
