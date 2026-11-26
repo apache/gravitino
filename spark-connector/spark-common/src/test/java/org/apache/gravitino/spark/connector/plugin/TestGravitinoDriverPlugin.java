@@ -32,8 +32,10 @@ import java.net.ConnectException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Catalog;
@@ -47,6 +49,11 @@ import org.apache.gravitino.spark.connector.catalog.SparkCatalogKind;
 import org.apache.gravitino.spark.connector.iceberg.extensions.GravitinoIcebergSparkSessionExtensions;
 import org.apache.gravitino.spark.connector.plugin.GravitinoDriverPlugin.DynamicBearerTokenProvider;
 import org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.plugin.PluginContext;
@@ -577,6 +584,105 @@ public class TestGravitinoDriverPlugin {
       plugin.shutdown();
 
       Mockito.verify(catalogManager, Mockito.times(1)).close();
+    }
+  }
+
+  /**
+   * In a build that binds both catalogs, with the opt-in flags off, each skipped Iceberg or Paimon
+   * catalog gets a warning that names the catalog and the flag to set.
+   */
+  @Test
+  void testSkippingAnOptInCatalogLogsTheFlagToSet() {
+    SparkConf sparkConf = new SparkConf(false);
+    GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withPaimon());
+
+    List<String> warnings =
+        warningsDuring(
+            () ->
+                plugin.registerGravitinoCatalogs(
+                    sparkConf,
+                    ImmutableMap.of(
+                        "my_iceberg", catalogWithProvider("lakehouse-iceberg"),
+                        "my_paimon", catalogWithProvider("lakehouse-paimon"))));
+
+    assertFalse(sparkConf.contains("spark.sql.catalog.my_iceberg"));
+    assertFalse(sparkConf.contains("spark.sql.catalog.my_paimon"));
+    assertTrue(
+        warnings.stream()
+            .anyMatch(
+                m ->
+                    m.contains("my_iceberg")
+                        && m.contains(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT)),
+        warnings.toString());
+    assertTrue(
+        warnings.stream()
+            .anyMatch(
+                m ->
+                    m.contains("my_paimon")
+                        && m.contains(GravitinoSparkConfig.GRAVITINO_ENABLE_PAIMON_SUPPORT)),
+        warnings.toString());
+  }
+
+  /**
+   * A build without a Paimon catalog does not point at the Paimon flag, since setting it would not
+   * register the catalog.
+   */
+  @Test
+  void testSkippedPaimonCatalogInBuildWithoutPaimonDoesNotNameTheFlag() {
+    SparkConf sparkConf = new SparkConf(false);
+    GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withoutPaimon());
+
+    List<String> warnings =
+        warningsDuring(
+            () ->
+                plugin.registerGravitinoCatalogs(
+                    sparkConf,
+                    ImmutableMap.of("my_paimon", catalogWithProvider("lakehouse-paimon"))));
+
+    assertFalse(sparkConf.contains("spark.sql.catalog.my_paimon"));
+    assertTrue(
+        warnings.stream()
+            .anyMatch(
+                m ->
+                    m.contains("my_paimon")
+                        && m.contains("no LAKEHOUSE_PAIMON catalog is available")),
+        warnings.toString());
+    assertTrue(
+        warnings.stream()
+            .noneMatch(m -> m.contains(GravitinoSparkConfig.GRAVITINO_ENABLE_PAIMON_SUPPORT)),
+        warnings.toString());
+  }
+
+  /** Runs {@code action} and returns the WARN messages the plugin logger emits meanwhile. */
+  private static List<String> warningsDuring(Runnable action) {
+    LoggerContext loggerContext =
+        (LoggerContext) LogManager.getContext(GravitinoDriverPlugin.class.getClassLoader(), false);
+    CapturingAppender appender = new CapturingAppender();
+    appender.start();
+    loggerContext.getLogger(GravitinoDriverPlugin.class.getName()).addAppender(appender);
+    try {
+      action.run();
+    } finally {
+      loggerContext.getLogger(GravitinoDriverPlugin.class.getName()).removeAppender(appender);
+      appender.stop();
+    }
+    return new ArrayList<>(appender.warnings);
+  }
+
+  /** Collects the WARN messages the plugin logs. */
+  private static final class CapturingAppender extends AbstractAppender {
+
+    private final List<String> warnings = Collections.synchronizedList(new ArrayList<>());
+
+    private CapturingAppender() {
+      super("capturing", null, null, true, null);
+    }
+
+    @Override
+    public void append(LogEvent event) {
+      if (Level.WARN.equals(event.getLevel())) {
+        warnings.add(event.getMessage().getFormattedMessage());
+      }
     }
   }
 
