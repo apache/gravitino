@@ -18,7 +18,8 @@
 #
 
 # THE CONFIGURATION FOR Paimon REST SERVER
-# Keep gravitino.authorization.enable disabled for this service.
+# Standalone mode uses its configured service account for Gravitino catalog lookups.
+# Use auxiliary mode with dynamic-config-provider for per-request metadata authorization.
 # THE CONFIGURATION FOR Paimon REST WEB SERVER
 # The host name of the built-in web server
 gravitino.paimon-rest.host = 0.0.0.0
@@ -59,6 +60,29 @@ gravitino.paimon-rest.warehouse = /tmp/paimon-warehouse
 # Forward catalog-wide static storage keys for every table, with a synthetic 2h refresh time.
 # Use long-lived keys, without S3/OSS session tokens.
 # gravitino.paimon-rest.data-token.enabled = true
+
+# Serve catalogs already registered in a Gravitino metalake.
+# gravitino.paimon-rest.catalog-config-provider = dynamic-config-provider
+# gravitino.paimon-rest.gravitino-metalake = production
+# Dynamic configurations expire after this fixed lifetime, including under continuous traffic.
+# gravitino.paimon-rest.catalog-cache-ttl-ms = 30000
+# Auxiliary mode uses the in-process CatalogManager and supports Gravitino authorization.
+# Standalone mode resolves catalogs as the configured Gravitino service account.
+# gravitino.paimon-rest.gravitino-uri = http://127.0.0.1:8090
+# gravitino.paimon-rest.gravitino-auth-type = simple
+# gravitino.paimon-rest.gravitino-simple.user-name = paimon-rest-server
+# OAuth client credentials for the outgoing Gravitino client.
+# gravitino.paimon-rest.gravitino-auth-type = oauth2
+# gravitino.paimon-rest.gravitino-oauth2.server-uri = https://identity.example.com
+# gravitino.paimon-rest.gravitino-oauth2.credential = <client-id>:<client-secret>
+# gravitino.paimon-rest.gravitino-oauth2.token-path = oauth/token
+# gravitino.paimon-rest.gravitino-oauth2.scope = <scope>
+# S3/OSS token providers issue read/write STS credentials scoped to the catalog warehouse.
+# STS failures fail catalog resolution. Standalone mode uses the resolved catalog secrets.
+# Dynamic data-token catalogs need credentials with well over one hour remaining.
+# Set s3-token-expire-in-secs / oss-token-expire-in-secs on the Gravitino catalog, e.g. 7200.
+# S3 role chaining is limited to 3600s and cannot satisfy this data-token refresh window.
+# A 7200s S3 session requires a caller and role that permit at least a two-hour session.
 
 # THE CONFIGURATION EXAMPLE FOR JDBC CATALOG BACKEND
 # gravitino.paimon-rest.catalog-backend = jdbc

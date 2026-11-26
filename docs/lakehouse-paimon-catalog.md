@@ -366,3 +366,10 @@ Place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-paimon/conf
 :::caution
 When reading and writing to HDFS, the Gravitino server can only operate as the specified Kerberos user and doesn't support proxying to other Kerberos users now.
 :::
+
+## Paimon REST service
+
+The [Paimon REST service](./paimon-rest-service.md#registered-gravitino-catalogs) can serve
+registered `lakehouse-paimon` catalogs through the dynamic provider. Flink and Spark then
+use the native Paimon REST client with the registered catalog name as `warehouse`.
+Auxiliary mode applies Gravitino metadata permissions and synchronizes creation ownership.
