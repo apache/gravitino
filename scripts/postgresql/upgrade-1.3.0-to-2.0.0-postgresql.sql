@@ -617,6 +617,14 @@ CREATE TABLE IF NOT EXISTS ontology_meta (
 );
 
 CREATE INDEX IF NOT EXISTS idx_onm_deleted ON ontology_meta (deleted_at);
+COMMENT ON TABLE ontology_meta IS 'ontology identity';
+COMMENT ON COLUMN ontology_meta.ontology_id IS 'ontology id';
+COMMENT ON COLUMN ontology_meta.ontology_name IS 'ontology name';
+COMMENT ON COLUMN ontology_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN ontology_meta.audit_info IS 'ontology identity audit info';
+COMMENT ON COLUMN ontology_meta.current_version IS 'current version';
+COMMENT ON COLUMN ontology_meta.last_version IS 'last allocated version';
+COMMENT ON COLUMN ontology_meta.deleted_at IS 'ontology deleted at';
 
 CREATE TABLE IF NOT EXISTS ontology_version_info (
     id BIGSERIAL,
@@ -635,3 +643,13 @@ CREATE TABLE IF NOT EXISTS ontology_version_info (
 CREATE INDEX IF NOT EXISTS idx_onvi_mid ON ontology_version_info (metalake_id) WHERE deleted_at = 0;
 
 CREATE INDEX IF NOT EXISTS idx_onvi_deleted ON ontology_version_info (deleted_at);
+COMMENT ON TABLE ontology_version_info IS 'ontology versions';
+COMMENT ON COLUMN ontology_version_info.id IS 'auto increment id';
+COMMENT ON COLUMN ontology_version_info.metalake_id IS 'metalake id';
+COMMENT ON COLUMN ontology_version_info.ontology_id IS 'ontology id';
+COMMENT ON COLUMN ontology_version_info.version IS 'version';
+COMMENT ON COLUMN ontology_version_info.ontology_comment IS 'comment snapshot';
+COMMENT ON COLUMN ontology_version_info.definition IS 'normalized OntologyDefinition (JSON)';
+COMMENT ON COLUMN ontology_version_info.properties IS 'properties snapshot (JSON)';
+COMMENT ON COLUMN ontology_version_info.audit_info IS 'version audit info';
+COMMENT ON COLUMN ontology_version_info.deleted_at IS 'version deleted at';
