@@ -22,6 +22,7 @@ package org.apache.gravitino.spark.connector.plugin;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -92,6 +93,7 @@ public class TestGravitinoRequestHeaders {
       }
       assertFalse(requests.isEmpty());
       for (Headers headers : requests) {
+        assertNotEquals("custom-auth", headers.getFirst("Authorization"));
         if (customHeaders) {
           assertEquals("job-123", headers.getFirst("X-Job-Id"));
           assertEquals("run:456", headers.getFirst("X-Execution-Id"));
@@ -124,5 +126,6 @@ public class TestGravitinoRequestHeaders {
                     "alice",
                     GravitinoDriverPlugin.extractGravitinoClientConfig(conf)));
     assertTrue(error.getMessage().contains("header name must not be blank"));
+    assertTrue(error.getMessage().contains("spark.sql.gravitino.client.request.header." + name));
   }
 }

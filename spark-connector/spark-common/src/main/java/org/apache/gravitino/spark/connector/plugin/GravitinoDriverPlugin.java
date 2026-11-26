@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -65,6 +66,7 @@ import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.internal.StaticSQLConf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import scala.Tuple2;
 import scala.Option;
 
 /**
@@ -319,16 +321,16 @@ public class GravitinoDriverPlugin implements DriverPlugin {
       Map<String, String> clientConfig) {
     ClientBuilder builder = GravitinoClient.builder(uri).withMetalake(metalake);
     builder.withClientConfig(clientConfig);
-    builder.withHeaders(
-        Arrays.stream(
-                sparkConf.getAllWithPrefix(
-                    GravitinoSparkConfig.GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX))
-            .peek(
-                t ->
-                    Preconditions.checkArgument(
-                        !t._1.trim().isEmpty(),
-                        "Custom HTTP request header name must not be blank"))
-            .collect(Collectors.toMap(t -> t._1, t -> t._2)));
+    Map<String, String> requestHeaders = new HashMap<>();
+    String headerPrefix = GravitinoSparkConfig.GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX;
+    for (Tuple2<String, String> header : sparkConf.getAllWithPrefix(headerPrefix)) {
+      Preconditions.checkArgument(
+          !header._1.trim().isEmpty(),
+          "Custom HTTP request header name must not be blank: %s",
+          headerPrefix + header._1);
+      requestHeaders.put(header._1, header._2);
+    }
+    builder.withHeaders(requestHeaders);
     String authType =
         sparkConf.get(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.SIMPLE_AUTH_TYPE);
     if (AuthProperties.isSimple(authType)) {

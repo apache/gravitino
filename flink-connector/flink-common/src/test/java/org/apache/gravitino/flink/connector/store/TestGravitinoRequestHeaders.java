@@ -21,6 +21,7 @@ package org.apache.gravitino.flink.connector.store;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -117,6 +118,7 @@ public class TestGravitinoRequestHeaders {
               .get("gravitino.client.socketTimeoutMs"));
       assertFalse(requests.isEmpty());
       for (Headers headers : requests) {
+        assertNotEquals("custom-auth", headers.getFirst("Authorization"));
         if (customHeaders) {
           assertEquals("job-123", headers.getFirst("X-Job-Id"));
           assertEquals("run:456", headers.getFirst("X-Execution-Id"));

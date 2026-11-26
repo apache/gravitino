@@ -359,17 +359,18 @@ public class GravitinoCatalogManager {
 
   private static Map<String, String> extractRequestHeaders(Map<String, String> config) {
     String prefix = GravitinoCatalogStoreFactoryOptions.GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX;
-    return config.entrySet().stream()
-        .filter(entry -> entry.getKey().startsWith(prefix))
-        .peek(
-            entry ->
-                Preconditions.checkArgument(
-                    StringUtils.isNotBlank(entry.getKey().substring(prefix.length())),
-                    "Custom HTTP request header name must not be blank: %s",
-                    entry.getKey()))
-        .collect(
-            Collectors.toMap(
-                entry -> entry.getKey().substring(prefix.length()), Map.Entry::getValue));
+    Map<String, String> headers = Maps.newHashMap();
+    for (Map.Entry<String, String> entry : config.entrySet()) {
+      if (entry.getKey().startsWith(prefix)) {
+        String name = entry.getKey().substring(prefix.length());
+        Preconditions.checkArgument(
+            StringUtils.isNotBlank(name),
+            "Custom HTTP request header name must not be blank: %s",
+            entry.getKey());
+        headers.put(name, entry.getValue());
+      }
+    }
+    return headers;
   }
 
   private static Map<String, String> withoutRequestHeaders(Map<String, String> config) {
