@@ -38,6 +38,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.policy.AccessControlContent;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 
 /**
@@ -90,6 +92,7 @@ public class AuthorizationExpressionConverter {
         authorizationExpression,
         (expression) -> {
           String replacedExpression = replaceCanAccessMetadataPrivilege(expression);
+          replacedExpression = replaceTagPrivilegeChecks(replacedExpression);
           replacedExpression = replaceAnyPrivilege(replacedExpression);
           replacedExpression = replaceAnyExpressions(replacedExpression);
           Matcher matcher = PATTERN.matcher(replacedExpression);
@@ -404,6 +407,39 @@ public class AuthorizationExpressionConverter {
         expression.replaceAll(
             CAN_OPERATE_METADATA_PRIVILEGE,
             "authorizer.hasMetadataPrivilegePermission(p_metalake,p_type,p_fullName,authorizationContext)");
+    return expression;
+  }
+
+  /**
+   * Routes tag-conferrable {@code ANY_*} checks through the RBAC and tag-policy adapter.
+   *
+   * @param expression the authorization expression
+   * @return the expression with supported privilege checks routed through the adapter
+   */
+  private static String replaceTagPrivilegeChecks(String expression) {
+    for (Privilege.Name privilege : AccessControlContent.PERMITTED_PRIVILEGES) {
+      String target =
+          switch (privilege) {
+            case SELECT_TABLE, MODIFY_TABLE -> "TABLE";
+            case PROBE_TABLE_LIKE -> "(TABLE != null ? TABLE : VIEW)";
+            case SELECT_VIEW -> "VIEW";
+            case READ_FILESET, WRITE_FILESET -> "FILESET";
+            case CONSUME_TOPIC, PRODUCE_TOPIC -> "TOPIC";
+            case USE_MODEL -> "MODEL";
+            case EXECUTE_FUNCTION -> "FUNCTION";
+            case USE_SEMANTIC_MODEL -> "SEMANTIC_MODEL";
+            default -> throw new IllegalArgumentException(
+                "Missing tag privilege scope: " + privilege);
+          };
+      expression =
+          expression.replace(
+              "ANY_" + privilege.name(),
+              "tagAuthorization.authorize(principal,METALAKE_NAME,{METALAKE,CATALOG,SCHEMA,"
+                  + target
+                  + "},@org.apache.gravitino.authorization.Privilege$Name@"
+                  + privilege.name()
+                  + ",authorizationContext)");
+    }
     return expression;
   }
 }
