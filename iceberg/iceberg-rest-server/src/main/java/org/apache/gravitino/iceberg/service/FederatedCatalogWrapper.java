@@ -214,6 +214,8 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
   @Override
   public LoadTableResponse createTable(
       Namespace namespace, CreateTableRequest request, boolean requestCredential) {
+    request.validate();
+    validateCreateRequest(request);
     if (!vendCredentialsLocally) {
       return createTableViaREST(namespace, request, requestCredential);
     }
@@ -700,6 +702,7 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
    */
   private LoadTableResponse tableUpdateInternal(TableIdentifier ident, UpdateTableRequest request) {
     if (isCreate(request)) {
+      validateStagedCreateUpdates(request);
       // this is a hacky way to get TableOperations for an uncommitted table
       Optional<Integer> formatVersion =
           request.updates().stream()
@@ -740,6 +743,7 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
       }
 
     } else {
+      validateSchemaUpdates(ident, request);
       return CatalogHandlers.updateTable(getCatalog(), ident, request);
     }
   }
