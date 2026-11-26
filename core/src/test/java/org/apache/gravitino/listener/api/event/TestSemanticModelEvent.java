@@ -556,7 +556,11 @@ public class TestSemanticModelEvent {
             new NameIdentifier[] {
               NameIdentifier.of(NAMESPACE, "model1"), NameIdentifier.of(NAMESPACE, "model2")
             });
-    when(d.alterSemanticModel(any(NameIdentifier.class), any(), any(SemanticModelChange.class)))
+    when(d.alterSemanticModel(
+            any(NameIdentifier.class),
+            any(),
+            any(SemanticModelSourceUpdate.class),
+            any(SemanticModelChange.class)))
         .thenReturn(semanticModel);
     return d;
   }

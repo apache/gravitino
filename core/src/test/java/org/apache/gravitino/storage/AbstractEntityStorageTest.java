@@ -40,6 +40,7 @@ import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_M
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_STORE;
 import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
+import static org.apache.gravitino.Configs.SEMANTIC_MODEL_VERSION_RETENTION_COUNT;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
@@ -166,6 +167,7 @@ abstract class AbstractEntityStorageTest {
     Mockito.when(config.get(ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
+    Mockito.when(config.get(SEMANTIC_MODEL_VERSION_RETENTION_COUNT)).thenReturn(100L);
     // Fix cache config for test
     Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(true);
     Mockito.when(config.get(Configs.CACHE_MAX_ENTRIES)).thenReturn(10_000);

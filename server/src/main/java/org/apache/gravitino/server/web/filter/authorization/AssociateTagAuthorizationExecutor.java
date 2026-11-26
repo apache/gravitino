@@ -17,23 +17,49 @@
 
 package org.apache.gravitino.server.web.filter.authorization;
 
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.APPLY_ACCESS_TAG_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.web.filter.ParameterUtil.buildNameIdentifierForBatchAuthorization;
 import static org.apache.gravitino.server.web.filter.ParameterUtil.extractFromParameters;
 
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Parameter;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.BiPredicate;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.dto.requests.TagValuesAssociateRequest;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
+import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.policy.HiddenPolicyTag;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
+import org.apache.gravitino.server.authorization.MetadataIdConverter;
+import org.apache.gravitino.server.authorization.PassThroughAuthorizer;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
+import org.apache.gravitino.storage.relational.service.EntityIdService;
+import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagAssignmentAuthorization;
+import org.apache.gravitino.tag.TagManager;
 import org.apache.gravitino.tag.TagValue;
+import org.apache.gravitino.utils.MetadataObjectUtil;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /**
  * Metadata object authorization for {@link
@@ -44,6 +70,15 @@ public class AssociateTagAuthorizationExecutor extends CommonAuthorizerExecutor
 
   private final Parameter[] parameters;
   private final Object[] args;
+  AuthorizationExpressionEvaluator accessTagEvaluator;
+  boolean authorizationDisabled;
+  private boolean targetCaptured;
+  BiPredicate<String, String> accessTagClassifier =
+      (metalake, tag) ->
+          isAccessTag(
+              GravitinoEnv.getInstance()
+                  .tagDispatcher()
+                  .listPolicyAssociationsForTag(metalake, tag));
 
   public AssociateTagAuthorizationExecutor(
       String expression,
@@ -55,6 +90,11 @@ public class AssociateTagAuthorizationExecutor extends CommonAuthorizerExecutor
     super(expression, metadataContext, pathParams, entityType);
     this.parameters = parameters;
     this.args = args;
+    this.accessTagEvaluator =
+        new AuthorizationExpressionEvaluator(APPLY_ACCESS_TAG_AUTHORIZATION_EXPRESSION);
+    this.authorizationDisabled =
+        GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer()
+            instanceof PassThroughAuthorizer;
   }
 
   @Override
@@ -72,6 +112,18 @@ public class AssociateTagAuthorizationExecutor extends CommonAuthorizerExecutor
         request instanceof TagsAssociateRequest || request instanceof TagValuesAssociateRequest,
         "Only tag can use AssociateTagAuthorizationExecutor, please contact the administrator.");
 
+    boolean validRequest = true;
+    try {
+      if (request instanceof TagsAssociateRequest) {
+        ((TagsAssociateRequest) request).validate();
+      } else {
+        ((TagValuesAssociateRequest) request).validate();
+      }
+    } catch (IllegalArgumentException e) {
+      // The resource rejects invalid requests before mutation; preserve its normal error response.
+      validRequest = false;
+    }
+
     TagValue[] tagsToAdd;
     TagValue[] tagsToRemove;
     if (request instanceof TagsAssociateRequest) {
@@ -85,8 +137,16 @@ public class AssociateTagAuthorizationExecutor extends CommonAuthorizerExecutor
     }
 
     // Authorize both 'tagsToAdd' and 'tagsToRemove' fields.
-    return authorizeTag(tagsToAdd, context, targetType)
-        && authorizeTag(tagsToRemove, context, targetType);
+    return authorizeTag(tagsToAdd, context, targetType, validRequest)
+        && authorizeTag(tagsToRemove, context, targetType, validRequest);
+  }
+
+  static boolean isAccessTag(RelationalEntity<?>[] associations) {
+    return Arrays.stream(associations)
+        .anyMatch(
+            association ->
+                ((PolicyEntity) association.targetEntity()).policyType()
+                    == Policy.BuiltInType.ACCESS_CONTROL);
   }
 
   /**
@@ -99,7 +159,10 @@ public class AssociateTagAuthorizationExecutor extends CommonAuthorizerExecutor
    * @return {@code true} if all tags in the field pass authorization; {@code false} otherwise.
    */
   private boolean authorizeTag(
-      TagValue[] tagValues, AuthorizationRequestContext context, Entity.EntityType targetType) {
+      TagValue[] tagValues,
+      AuthorizationRequestContext context,
+      Entity.EntityType targetType,
+      boolean validRequest) {
 
     // Treat null or empty arrays as no-op (implicitly authorized)
     if (tagValues == null) {
@@ -111,15 +174,128 @@ public class AssociateTagAuthorizationExecutor extends CommonAuthorizerExecutor
       Map<Entity.EntityType, NameIdentifier> currentContext = new HashMap<>(this.metadataContext);
       buildNameIdentifierForBatchAuthorization(currentContext, tagValue.name(), targetType);
 
-      boolean authorized =
-          authorizationExpressionEvaluator.evaluate(
-              currentContext, pathParams, context, entityType);
+      String metalake = currentContext.get(Entity.EntityType.METALAKE).name();
+      if (validRequest
+          && !authorizationDisabled
+          && HiddenPolicyTag.isReservedName(tagValue.name())) {
+        throw new NoSuchTagException(
+            "Tag with name %s under metalake %s does not exist", tagValue.name(), metalake);
+      }
+      boolean accessTag = false;
+      if (validRequest && !authorizationDisabled) {
+        try {
+          if (TagAssignmentAuthorization.isActive()) {
+            captureTargetIdentity();
+            Tag tag =
+                GravitinoEnv.getInstance()
+                    .internalTagDispatcher()
+                    .getTag(metalake, tagValue.name());
+            Preconditions.checkState(tag instanceof HasIdentifier, "Tag identity is unavailable");
+            TagAssignmentAuthorization.recordIdentity(
+                NameIdentifierUtil.ofTag(metalake, tagValue.name()),
+                ((HasIdentifier) tag).id(),
+                tag.name());
+          }
+          accessTag = accessTagClassifier.test(metalake, tagValue.name());
+        } catch (NoSuchTagException missing) {
+          // Missing tags use the original authorization and are rechecked during the write.
+        }
+      }
+      if (validRequest && !authorizationDisabled && !accessTag) {
+        TagAssignmentAuthorization.requireDescriptive(
+            NameIdentifierUtil.ofTag(metalake, tagValue.name()));
+      }
+      context.setOriginalAuthorizationExpression(
+          accessTag ? APPLY_ACCESS_TAG_AUTHORIZATION_EXPRESSION : expression);
+      AuthorizationExpressionEvaluator evaluator =
+          accessTag ? accessTagEvaluator : authorizationExpressionEvaluator;
+      Map<String, Object> evaluationPath = pathParams;
+      if (accessTag && entityType.isPresent() && entityType.get().equalsIgnoreCase("column")) {
+        MetadataObject column =
+            MetadataObjects.parse(
+                (String) pathParams.get("p_fullName"), MetadataObject.Type.COLUMN);
+        MetadataObject table = MetadataObjects.parent(column);
+        evaluationPath = new HashMap<>(pathParams);
+        evaluationPath.put("p_type", table.type().name());
+        evaluationPath.put("p_fullName", table.fullName());
+      }
+      boolean authorized = evaluator.evaluate(currentContext, evaluationPath, context, entityType);
 
       if (!authorized) {
         return false; // Fail fast on first unauthorized tag
       }
     }
     return true;
+  }
+
+  private void captureTargetIdentity() {
+    if (targetCaptured || entityType.isEmpty()) {
+      return;
+    }
+    targetCaptured = true;
+    MetadataObject.Type objectType = MetadataObject.Type.valueOf(entityType.get());
+    if (!TagManager.SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS.contains(objectType)) {
+      return;
+    }
+    Entity.EntityType type = MetadataObjectUtil.toEntityType(objectType);
+    NameIdentifier identifier = metadataContext.get(type);
+    String metalake = metadataContext.get(Entity.EntityType.METALAKE).name();
+    MetadataObject original = NameIdentifierUtil.toMetadataObject(identifier, type);
+    MetadataObject normalized = original;
+    try {
+      normalized = MetadataIdConverter.normalizeMetadataObject(normalized, metalake);
+      NameIdentifier normalizedIdentifier = MetadataObjectUtil.toEntityIdent(metalake, normalized);
+      TagAssignmentAuthorization.recordTarget(
+          normalizedIdentifier, type, EntityIdService.getEntityIds(normalizedIdentifier, type));
+    } catch (NotFoundException missing) {
+      TagAssignmentAuthorization.recordTarget(
+          MetadataObjectUtil.toEntityIdent(metalake, normalized), type, null);
+      captureClosestExistingAncestor(normalized, metalake);
+    }
+    captureSchemaAncestors(original, metalake);
+  }
+
+  private void captureSchemaAncestors(MetadataObject target, String metalake) {
+    List<MetadataObject> parents =
+        new ArrayList<>(MetadataObjectUtil.getParentMetadataObjects(target));
+    Collections.reverse(parents);
+    for (MetadataObject parent : parents) {
+      if (parent.type() != MetadataObject.Type.SCHEMA) {
+        continue;
+      }
+      MetadataObject normalized = parent;
+      try {
+        normalized = MetadataIdConverter.normalizeMetadataObject(parent, metalake);
+        NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, normalized);
+        TagAssignmentAuthorization.recordSchemaAncestor(
+            identifier, EntityIdService.getEntityIds(identifier, Entity.EntityType.SCHEMA));
+      } catch (NotFoundException missing) {
+        TagAssignmentAuthorization.recordSchemaAncestor(
+            MetadataObjectUtil.toEntityIdent(metalake, normalized), null);
+      }
+    }
+  }
+
+  private void captureClosestExistingAncestor(MetadataObject target, String metalake) {
+    List<MetadataObject> parents =
+        new ArrayList<>(MetadataObjectUtil.getParentMetadataObjects(target));
+    parents.add(MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE));
+    EnumSet<MetadataObject.Type> seen = EnumSet.of(target.type());
+    for (MetadataObject parent : parents) {
+      if (!seen.add(parent.type())) {
+        continue;
+      }
+      try {
+        MetadataObject normalized = MetadataIdConverter.normalizeMetadataObject(parent, metalake);
+        Entity.EntityType type = MetadataObjectUtil.toEntityType(normalized.type());
+        TagAssignmentAuthorization.recordMissingTargetAncestor(
+            EntityIdService.getEntityIds(
+                MetadataObjectUtil.toEntityIdent(metalake, normalized), type));
+        return;
+      } catch (NotFoundException missing) {
+        // Try the next physical ancestor. A missing target must not reuse an old target grant.
+      }
+    }
   }
 
   private static TagValue[] toNoValue(String[] tags) {

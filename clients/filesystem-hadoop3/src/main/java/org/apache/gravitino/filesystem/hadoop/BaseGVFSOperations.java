@@ -86,7 +86,6 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.storage.AzureProperties;
-import org.apache.gravitino.storage.CloudStorageCredentialPropertyKeys;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
 import org.apache.gravitino.utils.FilesetUtil;
@@ -120,6 +119,10 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class BaseGVFSOperations implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(BaseGVFSOperations.class);
+
+  /** Placeholder returned for masked hidden properties in REST responses. */
+  private static final String MASKED_PROPERTY_VALUE = "******";
+
   private static final String SLASH = "/";
   private static final Set<String> CATALOG_NECESSARY_PROPERTIES_TO_KEEP =
       Sets.newHashSet(
@@ -1115,11 +1118,34 @@ public abstract class BaseGVFSOperations implements Closeable {
   private static void putPropsAndSecrets(
       Map<String, String> target, Map<String, String> props, SupportsSecrets secrets) {
     if (props != null) {
-      target.putAll(CloudStorageCredentialPropertyKeys.omitStaticCredentialProperties(props));
+      // Masked placeholders must not enter HCFS conf or overwrite later getSecrets/getCredentials
+      // plaintext (same as Python GVFS). Static-credential key filtering is server-side only.
+      target.putAll(omitMaskedProperties(props));
     }
     if (secrets != null) {
       target.putAll(secrets.getSecrets());
     }
+  }
+
+  /**
+   * Returns a copy of {@code properties} with masked placeholders removed. Aligns with Python GVFS
+   * {@code _omit_masked_properties}.
+   */
+  private static Map<String, String> omitMaskedProperties(
+      @Nullable Map<String, String> properties) {
+    if (properties == null || properties.isEmpty()) {
+      return ImmutableMap.of();
+    }
+    Map<String, String> filtered = new HashMap<>();
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+      if (key == null || value == null || MASKED_PROPERTY_VALUE.equals(value)) {
+        continue;
+      }
+      filtered.put(key, value);
+    }
+    return ImmutableMap.copyOf(filtered);
   }
 
   /**

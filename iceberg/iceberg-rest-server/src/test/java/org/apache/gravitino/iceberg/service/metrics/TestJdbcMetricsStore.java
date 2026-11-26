@@ -192,7 +192,21 @@ public class TestJdbcMetricsStore {
       String selectScanReportSql = "SELECT * FROM scan_metrics_report";
       metricsStore.connections.run(validateScanReport(selectScanReportSql, scanReport));
 
-      metricsStore.clean(Instant.now());
+      // Use fixed timestamps so cleanup does not depend on operations crossing a millisecond.
+      Instant expireTime = Instant.parse("2025-01-01T00:00:00Z");
+      metricsStore.execute(
+          "UPDATE commit_metrics_report SET timestamp = ?", expireTime.toEpochMilli());
+      metricsStore.execute(
+          "UPDATE scan_metrics_report SET timestamp = ?", expireTime.toEpochMilli());
+
+      // Reports at the expiration boundary must be retained.
+      metricsStore.clean(expireTime);
+      count = metricsStore.connections.run(getTotal(countSql));
+      Assertions.assertEquals(1, count);
+      count = metricsStore.connections.run(getTotal(countSql2));
+      Assertions.assertEquals(1, count);
+
+      metricsStore.clean(expireTime.plusMillis(1));
 
       count = metricsStore.connections.run(getTotal(countSql));
       Assertions.assertEquals(0, count);

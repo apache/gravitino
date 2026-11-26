@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.storage.relational.po.SemanticModelMetricListingPO;
 import org.apache.gravitino.storage.relational.po.SemanticModelMetricPO;
 import org.apache.ibatis.annotations.DeleteProvider;
@@ -32,13 +33,6 @@ public interface SemanticModelMetricMapper {
   /** The metric identity table name. */
   String TABLE_NAME = "semantic_model_metric_meta";
 
-  /** Lists live metric and model names in one statement without reading snapshots. */
-  @SelectProvider(type = SemanticModelMetricSQLProviderFactory.class, method = "listMetricNames")
-  List<SemanticModelMetricListingPO> listMetricNames(
-      @Param("metalakeName") String metalakeName,
-      @Param("catalogName") String catalogName,
-      @Param("schemaName") String schemaName);
-
   /** Lists model names and current metric arrays in one statement without reading identities. */
   @SelectProvider(
       type = SemanticModelMetricSQLProviderFactory.class,
@@ -46,7 +40,8 @@ public interface SemanticModelMetricMapper {
   List<SemanticModelMetricListingPO> listMetricSnapshots(
       @Param("metalakeName") String metalakeName,
       @Param("catalogName") String catalogName,
-      @Param("schemaName") String schemaName);
+      @Param("schemaName") String schemaName,
+      @Param("selector") SemanticModelRevisionSelector selector);
 
   /** Inserts new metric identities in one statement. */
   @InsertProvider(

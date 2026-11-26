@@ -66,6 +66,9 @@ dependencies {
   testImplementation(libs.hadoop3.client.runtime)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(project(":core"))
+  testImplementation(libs.mockito.core)
+  testImplementation(libs.mockito.inline)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 

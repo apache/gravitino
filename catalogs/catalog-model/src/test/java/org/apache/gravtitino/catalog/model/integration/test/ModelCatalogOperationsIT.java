@@ -1266,7 +1266,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
     gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
 
-    String tooLongName = StringUtils.repeat("m", 129);
+    String tooLongName = "m".repeat(65);
     IllegalArgumentException e =
         Assertions.assertThrows(
             IllegalArgumentException.class,
@@ -1274,7 +1274,9 @@ public class ModelCatalogOperationsIT extends BaseIT {
                 gravitinoCatalog
                     .asModelCatalog()
                     .alterModel(modelIdent, ModelChange.rename(tooLongName)));
-    Assertions.assertTrue(e.getMessage().contains("is illegal"), e.getMessage());
+    String expectedMessage =
+        "The MODEL name must not exceed 64 characters. Illegal name: " + tooLongName;
+    Assertions.assertTrue(e.getMessage().contains(expectedMessage), e.getMessage());
     Assertions.assertTrue(gravitinoCatalog.asModelCatalog().modelExists(modelIdent));
   }
 

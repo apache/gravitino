@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational;
 
 import static org.apache.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT;
+import static org.apache.gravitino.Configs.SEMANTIC_MODEL_VERSION_RETENTION_COUNT;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 
@@ -43,6 +44,7 @@ public final class RelationalGarbageCollector implements Closeable {
 
   private final long storeDeleteAfterTimeMillis;
   private final long versionRetentionCount;
+  private final long semanticModelVersionRetentionCount;
 
   @VisibleForTesting
   final ScheduledExecutorService garbageCollectorPool =
@@ -59,6 +61,7 @@ public final class RelationalGarbageCollector implements Closeable {
     this.backend = backend;
     storeDeleteAfterTimeMillis = config.get(STORE_DELETE_AFTER_TIME);
     versionRetentionCount = config.get(VERSION_RETENTION_COUNT);
+    semanticModelVersionRetentionCount = config.get(SEMANTIC_MODEL_VERSION_RETENTION_COUNT);
   }
 
   public void start() {
@@ -114,13 +117,17 @@ public final class RelationalGarbageCollector implements Closeable {
       LOG.info("Start to collect and delete old version data by thread {}", threadId);
       for (Entity.EntityType entityType : Entity.EntityType.values()) {
         long deletedCount = Long.MAX_VALUE;
+        long retentionCount =
+            entityType == Entity.EntityType.SEMANTIC_MODEL
+                ? semanticModelVersionRetentionCount
+                : versionRetentionCount;
         LOG.debug(
             "Try to softly delete {} old version data that has been over retention count {}",
             entityType,
-            versionRetentionCount);
+            retentionCount);
         try {
           while (deletedCount > 0) {
-            deletedCount = backend.deleteOldVersionData(entityType, versionRetentionCount);
+            deletedCount = backend.deleteOldVersionData(entityType, retentionCount);
           }
         } catch (RuntimeException e) {
           LOG.error(

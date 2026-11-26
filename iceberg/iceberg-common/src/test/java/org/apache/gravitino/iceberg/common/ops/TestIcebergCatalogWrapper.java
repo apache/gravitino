@@ -50,6 +50,7 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.Transaction;
+import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -369,11 +370,267 @@ public class TestIcebergCatalogWrapper {
             .setProperties(ImmutableMap.of("format-version", "3"))
             .build();
     Assertions.assertDoesNotThrow(() -> IcebergCatalogWrapper.validateTableDefinition(v3));
+  }
 
-    // Without an explicit version the catalog defaults decide; nothing is rejected up front.
+  @Test
+  public void testCreateTableWithV3TypeAndDefaultFormatVersionIsBadRequest(
+      @TempDir Path warehouseDir) throws Exception {
+    Schema variantSchema =
+        new Schema(Types.NestedField.optional(1, "payload", Types.VariantType.get()));
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Namespace namespace = Namespace.of("db");
+      wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+      CreateTableRequest request =
+          CreateTableRequest.builder().withName("t_variant").withSchema(variantSchema).build();
+      BadRequestException failure =
+          Assertions.assertThrows(
+              BadRequestException.class, () -> wrapper.createTable(namespace, request));
+      Assertions.assertTrue(
+          failure.getMessage().contains("variant is not supported until v3"), failure.getMessage());
+    }
+  }
+
+  @Test
+  public void testAddV3ColumnToV2TableIsBadRequest(@TempDir Path warehouseDir) throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Namespace namespace = Namespace.of("db");
+      TableIdentifier identifier = TableIdentifier.of(namespace, "t_v2");
+      wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+      wrapper.createTable(
+          namespace,
+          CreateTableRequest.builder()
+              .withName("t_v2")
+              .withSchema(new Schema(Types.NestedField.required(1, "id", Types.LongType.get())))
+              .setProperties(ImmutableMap.of("format-version", "2"))
+              .build());
+
+      // Commit without pre-validate: buildAndUpdateTable safety net maps ISE → BadRequestException.
+      BadRequestException failure =
+          Assertions.assertThrows(
+              BadRequestException.class,
+              () ->
+                  wrapper.buildAndUpdateTable(
+                      catalog -> {
+                        Transaction transaction = catalog.loadTable(identifier).newTransaction();
+                        transaction
+                            .updateSchema()
+                            .addColumn("payload", Types.VariantType.get())
+                            .commit();
+                        return new IcebergTableChange(identifier, transaction);
+                      }));
+      Assertions.assertTrue(
+          failure.getMessage().contains("variant is not supported until v3"), failure.getMessage());
+    }
+  }
+
+  @Test
+  public void testUpdateTableAddV3SchemaToV2IsBadRequest(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Namespace namespace = Namespace.of("db");
+      TableIdentifier identifier = TableIdentifier.of(namespace, "t_v2_rest");
+      wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+      wrapper.createTable(
+          namespace,
+          CreateTableRequest.builder()
+              .withName("t_v2_rest")
+              .withSchema(new Schema(Types.NestedField.required(1, "id", Types.LongType.get())))
+              .setProperties(ImmutableMap.of("format-version", "2"))
+              .build());
+
+      Schema evolved =
+          new Schema(
+              Types.NestedField.required(1, "id", Types.LongType.get()),
+              Types.NestedField.optional(2, "payload", Types.VariantType.get()));
+      UpdateTableRequest request =
+          new UpdateTableRequest(
+              Collections.emptyList(),
+              Arrays.asList(
+                  new MetadataUpdate.AddSchema(evolved), new MetadataUpdate.SetCurrentSchema(-1)));
+      BadRequestException failure =
+          Assertions.assertThrows(
+              BadRequestException.class, () -> wrapper.updateTable(identifier, request));
+      Assertions.assertTrue(
+          failure.getMessage().contains("variant is not supported until v3"), failure.getMessage());
+    }
+  }
+
+  @Test
+  public void testValidateStagedCreateAllowsAddSchemaBeforeUpgradeFormatVersion() {
+    Schema variantSchema =
+        new Schema(Types.NestedField.optional(1, "payload", Types.VariantType.get()));
+    // AddSchema before UpgradeFormatVersion: still validates against v3 (CatalogHandlers.create).
+    UpdateTableRequest request =
+        new UpdateTableRequest(
+            Collections.emptyList(),
+            Arrays.asList(
+                new MetadataUpdate.AddSchema(variantSchema),
+                new MetadataUpdate.UpgradeFormatVersion(3)));
+    Assertions.assertDoesNotThrow(() -> IcebergCatalogWrapper.validateStagedCreateUpdates(request));
+  }
+
+  @Test
+  public void testStagedCreateCommitDoesNotLoadMissingTable(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Namespace namespace = Namespace.of("db");
+      TableIdentifier identifier = TableIdentifier.of(namespace, "staged_t");
+      wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+
+      // Trino CREATE TABLE: stage-create then commit with AssertTableDoesNotExist. Must not call
+      // validateSchemaUpdates (loadTable) or NoSuchTableException leaks as a failed create.
+      LoadTableResponse staged =
+          wrapper.createTable(
+              namespace,
+              CreateTableRequest.builder()
+                  .withName("staged_t")
+                  .withSchema(new Schema(Types.NestedField.required(1, "id", Types.LongType.get())))
+                  .setProperties(ImmutableMap.of("format-version", "2"))
+                  .stageCreate()
+                  .build());
+      UpdateTableRequest commit =
+          new UpdateTableRequest(
+              Collections.singletonList(new UpdateRequirement.AssertTableDoesNotExist()),
+              staged.tableMetadata().changes());
+      Assertions.assertDoesNotThrow(() -> wrapper.updateTable(identifier, commit));
+      Assertions.assertTrue(wrapper.tableExists(identifier));
+    }
+  }
+
+  @Test
+  public void testStagedCreateCommitRejectsV3TypeWithoutFormatVersion3(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Namespace namespace = Namespace.of("db");
+      TableIdentifier identifier = TableIdentifier.of(namespace, "staged_variant");
+      wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+
+      Schema variantSchema =
+          new Schema(Types.NestedField.optional(1, "payload", Types.VariantType.get()));
+      LoadTableResponse staged =
+          wrapper.createTable(
+              namespace,
+              CreateTableRequest.builder()
+                  .withName("staged_variant")
+                  .withSchema(variantSchema)
+                  .setProperties(ImmutableMap.of("format-version", "3"))
+                  .stageCreate()
+                  .build());
+      // Drop format upgrade from the staged changes so commit would default to v2 — should 400.
+      java.util.List<MetadataUpdate> updatesWithoutUpgrade =
+          staged.tableMetadata().changes().stream()
+              .filter(update -> !(update instanceof MetadataUpdate.UpgradeFormatVersion))
+              .collect(java.util.stream.Collectors.toList());
+      UpdateTableRequest commit =
+          new UpdateTableRequest(
+              Collections.singletonList(new UpdateRequirement.AssertTableDoesNotExist()),
+              updatesWithoutUpgrade);
+      BadRequestException failure =
+          Assertions.assertThrows(
+              BadRequestException.class, () -> wrapper.updateTable(identifier, commit));
+      Assertions.assertTrue(
+          failure.getMessage().contains("variant is not supported until v3"), failure.getMessage());
+      Assertions.assertFalse(wrapper.tableExists(identifier));
+    }
+  }
+
+  @Test
+  public void testUpdateTableUpgradeThenAddV3SchemaSucceeds(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Namespace namespace = Namespace.of("db");
+      TableIdentifier identifier = TableIdentifier.of(namespace, "t_v2_upgrade_add");
+      wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+      wrapper.createTable(
+          namespace,
+          CreateTableRequest.builder()
+              .withName("t_v2_upgrade_add")
+              .withSchema(new Schema(Types.NestedField.required(1, "id", Types.LongType.get())))
+              .setProperties(ImmutableMap.of("format-version", "2"))
+              .build());
+
+      Schema evolved =
+          new Schema(
+              Types.NestedField.required(1, "id", Types.LongType.get()),
+              Types.NestedField.optional(2, "payload", Types.VariantType.get()));
+      UpdateTableRequest request =
+          new UpdateTableRequest(
+              Collections.emptyList(),
+              Arrays.asList(
+                  new MetadataUpdate.UpgradeFormatVersion(3),
+                  new MetadataUpdate.AddSchema(evolved),
+                  new MetadataUpdate.SetCurrentSchema(-1)));
+      Assertions.assertDoesNotThrow(() -> wrapper.updateTable(identifier, request));
+      Assertions.assertEquals(
+          3,
+          ((HasTableOperations) wrapper.getCatalog().loadTable(identifier))
+              .operations()
+              .current()
+              .formatVersion());
+    }
+  }
+
+  @Test
+  public void testUpdateTableAddV3SchemaBeforeUpgradeIsBadRequest(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Namespace namespace = Namespace.of("db");
+      TableIdentifier identifier = TableIdentifier.of(namespace, "t_v2_add_before_upgrade");
+      wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+      wrapper.createTable(
+          namespace,
+          CreateTableRequest.builder()
+              .withName("t_v2_add_before_upgrade")
+              .withSchema(new Schema(Types.NestedField.required(1, "id", Types.LongType.get())))
+              .setProperties(ImmutableMap.of("format-version", "2"))
+              .build());
+
+      Schema evolved =
+          new Schema(
+              Types.NestedField.required(1, "id", Types.LongType.get()),
+              Types.NestedField.optional(2, "payload", Types.VariantType.get()));
+      // Same order Iceberg commit would reject: AddSchema still sees format-version 2.
+      UpdateTableRequest request =
+          new UpdateTableRequest(
+              Collections.emptyList(),
+              Arrays.asList(
+                  new MetadataUpdate.AddSchema(evolved),
+                  new MetadataUpdate.UpgradeFormatVersion(3),
+                  new MetadataUpdate.SetCurrentSchema(-1)));
+      BadRequestException failure =
+          Assertions.assertThrows(
+              BadRequestException.class, () -> wrapper.updateTable(identifier, request));
+      Assertions.assertTrue(
+          failure.getMessage().contains("variant is not supported until v3"), failure.getMessage());
+    }
+  }
+
+  @Test
+  public void testValidateTableDefinitionRejectsTypesWhenFormatVersionUsesCatalogDefault() {
+    Schema nanos =
+        new Schema(Types.NestedField.required(1, "ts", Types.TimestampNanoType.withZone()));
     CreateTableRequest unspecified =
         CreateTableRequest.builder().withName("t").withSchema(nanos).build();
-    Assertions.assertDoesNotThrow(() -> IcebergCatalogWrapper.validateTableDefinition(unspecified));
+    Assertions.assertThrows(
+        BadRequestException.class,
+        () -> IcebergCatalogWrapper.validateTableDefinition(unspecified));
+
+    // Blank matches catalog decodeFormatVersion: treat as unset and default to v2.
+    CreateTableRequest blank =
+        CreateTableRequest.builder()
+            .withName("t")
+            .withSchema(nanos)
+            .setProperties(ImmutableMap.of("format-version", ""))
+            .build();
+    Assertions.assertThrows(
+        BadRequestException.class, () -> IcebergCatalogWrapper.validateTableDefinition(blank));
   }
 
   @Test

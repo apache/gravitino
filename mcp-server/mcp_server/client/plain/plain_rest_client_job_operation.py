@@ -18,7 +18,6 @@
 from httpx import AsyncClient
 
 from mcp_server.client.job_operation import JobOperation
-from mcp_server.client.plain.exception import GravitinoException
 from mcp_server.client.plain.utils import (
     encode_path_segment,
     extract_content_from_response,
@@ -73,9 +72,4 @@ class PlainRESTClientJobOperation(JobOperation):
         response = await self.rest_client.post(
             f"/api/metalakes/{encode_path_segment(self.metalake_name)}/jobs/runs/{encode_path_segment(job_id)}"
         )
-        if response.status_code != 200:
-            raise GravitinoException(
-                f"Failed to cancel job {job_id}: {response.text}"
-            )
-
         return extract_content_from_response(response, "job", {})

@@ -14,7 +14,11 @@ import TabItem from '@theme/TabItem';
 spec and submits `builtin-iceberg-rewrite-manifests`. The strategy type is
 `iceberg-rewrite-manifests`; its handler and job adapter are built in.
 
-This policy supports `CATALOG`, `SCHEMA`, and `TABLE` metadata objects.
+The optimizer treats `CATALOG`, `SCHEMA`, and `TABLE` as the applicable object types for this
+policy. That list is not an association reject list: associating a policy does not check
+`supportedObjectTypes`, and object policy lookup does not filter by it. Consumers decide whether
+the policy type applies to the object they are processing. See
+[Policies](./policies.md) and the OpenAPI description of `supportedObjectTypes`.
 
 ## Policy Content
 
@@ -33,14 +37,24 @@ trigger regardless of average manifest size.
 
 ## Generated Rules and Properties
 
-The policy content is converted to:
+Typed content fields on CREATE/GET are the REST payload. The optimizer (and other consumers)
+derive stable properties and evaluation rules from those fields. The derived keys below are
+**not** serialized as `strategy.type`, `trigger-expr`, or `job.options.*` entries on the policy
+REST `content` object.
 
-- Properties:
-  - `strategy.type=iceberg-rewrite-manifests`
-  - `job.template-name=builtin-iceberg-rewrite-manifests`
-- Rules:
-  - `trigger-expr=custom-manifest-number >= manifest_count_threshold`
-  - optional `spec_id` and `use_caching` job options when set
+After a GET (or create) through the Java or Python client, inspect them with
+`policy.content().properties()` and `policy.content().rules()` (for example
+`metalake.getPolicy(name).content().rules()`).
+
+Derived properties:
+
+- `strategy.type=iceberg-rewrite-manifests`
+- `job.template-name=builtin-iceberg-rewrite-manifests`
+
+Derived rules:
+
+- `trigger-expr=custom-manifest-number >= manifest_count_threshold`
+- optional `spec_id` and `use_caching` job options when set
 
 ## Collect, evaluate, and submit
 
