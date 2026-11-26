@@ -41,9 +41,15 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.kb.ArticleBody;
+import org.apache.gravitino.kb.KnowledgeBaseArticleEntity;
+import org.apache.gravitino.kb.KnowledgeBaseArticleEntity.Binding;
 import org.apache.gravitino.storage.relational.DatabaseFixture;
 import org.apache.gravitino.storage.relational.ResetStrategy;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
+import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.NameConflictException;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
@@ -347,6 +353,7 @@ public class TestSQLScripts extends TestJDBCBackend {
         assertGlossaryLiveUniqueness();
         assertCleanupIndexes(upgradeScript.getName());
         assertNameColumnWidths(upgradeScript.getName());
+        assertUpgradedArticleStorage();
       }
     }
   }
@@ -1242,6 +1249,30 @@ public class TestSQLScripts extends TestJDBCBackend {
     for (String table : tableList) {
       connection.createStatement().execute("DROP TABLE " + table);
     }
+  }
+
+  private void assertUpgradedArticleStorage() throws IOException {
+    createAndInsertMakeLake("article_lake");
+    var store = KnowledgeBaseArticleMetaService.getInstance();
+    var article =
+        KnowledgeBaseArticleEntity.builder()
+            .withNamespace(Namespace.of("article_lake"))
+            .withId(31L)
+            .withName("guide")
+            .withTitle("Guide")
+            .withBodyUpdate(ArticleBody.of(ArticleBody.Format.MARKDOWN, "# Guide"))
+            .withBindings(Set.of(new Binding("TABLE", 123L)))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    store.insert(article, false);
+    var stored = store.get(article.nameIdentifier());
+    Assertions.assertEquals(article.id(), stored.id());
+    Assertions.assertEquals(article.bindings(), stored.bindings());
+    Assertions.assertEquals(
+        article.bodyUpdate(), store.getContent(article.nameIdentifier()).body());
+    Assertions.assertThrows(
+        NameConflictException.class,
+        () -> store.insert(article.toBuilder().withId(32L).build(), false));
   }
 
   private void assertGlossaryLiveUniqueness() throws SQLException {

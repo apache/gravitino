@@ -788,7 +788,9 @@ public class RelationalEntityStore
   // Definitions always require a store read. A transaction can see an older snapshot or its
   // own uncommitted changes, so its reads must neither consume nor populate the shared cache.
   private static boolean requiresUncachedRead(Entity.EntityType type) {
-    return type == Entity.EntityType.GLOSSARY_TERM || SqlSessions.hasActiveSession();
+    return type == Entity.EntityType.GLOSSARY_TERM
+        || type == Entity.EntityType.KNOWLEDGE_BASE_ARTICLE
+        || SqlSessions.hasActiveSession();
   }
 
   /** Describes a batch write by its size and its first entity, for a conflict message. */
@@ -852,7 +854,8 @@ public class RelationalEntityStore
   }
 
   private <E extends Entity & HasIdentifier> void cacheIfEpochUnchanged(E entity, long epoch) {
-    if (entity.type() == Entity.EntityType.GLOSSARY_TERM) {
+    if (entity.type() == Entity.EntityType.GLOSSARY_TERM
+        || entity.type() == Entity.EntityType.KNOWLEDGE_BASE_ARTICLE) {
       return;
     }
     if (cache instanceof BaseEntityCache && !BaseEntityCache.isCacheable(entity.type())) {
@@ -868,7 +871,8 @@ public class RelationalEntityStore
 
   // The caller holds the entry's cache lock; do not acquire it again here.
   private <E extends Entity & HasIdentifier> void publishIfEpochUnchanged(E entity, long epoch) {
-    if (entity.type() == Entity.EntityType.GLOSSARY_TERM) {
+    if (entity.type() == Entity.EntityType.GLOSSARY_TERM
+        || entity.type() == Entity.EntityType.KNOWLEDGE_BASE_ARTICLE) {
       return;
     }
     if (cache instanceof BaseEntityCache && !BaseEntityCache.isCacheable(entity.type())) {

@@ -28,6 +28,7 @@ import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.KnowledgeBaseArticleMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OrphanedMetadataObjectRelationMapper;
@@ -85,6 +86,9 @@ public class OrphanedMetadataObjectRelationService {
           .put(
               MetadataObject.Type.DOMAIN,
               new EntityTable(DomainMetaMapper.DOMAIN_TABLE_NAME, "domain_id"))
+          .put(
+              MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE,
+              new EntityTable(KnowledgeBaseArticleMapper.TABLE_NAME, "article_id"))
           .build();
 
   private OrphanedMetadataObjectRelationService() {}

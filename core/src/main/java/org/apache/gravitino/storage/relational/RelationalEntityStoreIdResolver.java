@@ -34,6 +34,7 @@ import org.apache.gravitino.storage.relational.service.FunctionMetaService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
 import org.apache.gravitino.storage.relational.service.JobTemplateMetaService;
+import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.ModelMetaService;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
@@ -60,7 +61,8 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
           Entity.EntityType.JOB,
           Entity.EntityType.JOB_TEMPLATE,
           Entity.EntityType.DOMAIN,
-          Entity.EntityType.GLOSSARY_TERM);
+          Entity.EntityType.GLOSSARY_TERM,
+          Entity.EntityType.KNOWLEDGE_BASE_ARTICLE);
 
   private static final Set<Entity.EntityType> ENTITY_TYPES_REQUIRING_CATALOG_IDS =
       ImmutableSet.of(Entity.EntityType.CATALOG);
@@ -122,6 +124,9 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
       NameIdentifier nameIdentifier, Entity.EntityType type) {
     if (type == Entity.EntityType.GLOSSARY_TERM) {
       return GlossaryTermMetaService.getInstance().getIds(nameIdentifier);
+    }
+    if (type == Entity.EntityType.KNOWLEDGE_BASE_ARTICLE) {
+      return KnowledgeBaseArticleMetaService.getInstance().getIds(nameIdentifier);
     }
     long metalakeId =
         MetalakeMetaService.getInstance()

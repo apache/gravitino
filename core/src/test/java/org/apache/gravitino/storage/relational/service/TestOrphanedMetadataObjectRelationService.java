@@ -26,6 +26,8 @@ import java.sql.Statement;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.kb.ArticleBody;
+import org.apache.gravitino.kb.KnowledgeBaseArticleEntity;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
@@ -203,6 +205,28 @@ public class TestOrphanedMetadataObjectRelationService extends TestJDBCBackend {
         OrphanedMetadataObjectRelationService.getInstance()
             .softDeleteOrphanedRelations(MetadataObject.Type.DOMAIN, 10));
     Assertions.assertEquals(4, countActiveRelations(liveDomain.id()));
+    Assertions.assertEquals(0, countActiveRelations(ORPHAN_ID));
+  }
+
+  @TestTemplate
+  void testArticleOrphanCleanupRetainsLiveOwner() throws Exception {
+    createAndInsertMakeLake("articles");
+    KnowledgeBaseArticleEntity article =
+        KnowledgeBaseArticleEntity.builder()
+            .withNamespace(Namespace.of("articles"))
+            .withId(123L)
+            .withName("guide")
+            .withTitle("Guide")
+            .withBodyUpdate(ArticleBody.of(ArticleBody.Format.MARKDOWN, "Guide"))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    backend.insert(article, false);
+    MetadataObject.Type type = MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE;
+    insertRelations(type.name(), article.id(), ORPHAN_ID);
+    Assertions.assertEquals(
+        4,
+        OrphanedMetadataObjectRelationService.getInstance().softDeleteOrphanedRelations(type, 10));
+    Assertions.assertEquals(4, countActiveRelations(article.id()));
     Assertions.assertEquals(0, countActiveRelations(ORPHAN_ID));
   }
 

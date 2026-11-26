@@ -45,6 +45,8 @@ import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
+import org.apache.gravitino.kb.ArticleBody;
+import org.apache.gravitino.kb.KnowledgeBaseArticleEntity;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.EntityIdResolver;
@@ -133,6 +135,32 @@ public class TestRelationalEntityStore {
     Assertions.assertTrue(store.exists(ident, type));
     Assertions.assertEquals(
         List.of(entity), store.batchGet(List.of(ident), type, GlossaryTermEntity.class));
+    Mockito.verifyNoInteractions(cache);
+  }
+
+  @Test
+  void testArticleReadsBypassEntityCache() throws Exception {
+    EntityCache cache = Mockito.mock(EntityCache.class);
+    FieldUtils.writeField(store, "cache", cache, true);
+    Entity.EntityType type = Entity.EntityType.KNOWLEDGE_BASE_ARTICLE;
+    NameIdentifier ident = NameIdentifier.of("lake", "article");
+    KnowledgeBaseArticleEntity article =
+        KnowledgeBaseArticleEntity.builder()
+            .withId(1L)
+            .withNamespace(ident.namespace())
+            .withName(ident.name())
+            .withTitle("Article")
+            .withBodyUpdate(ArticleBody.of(ArticleBody.Format.MARKDOWN, "Body"))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    Mockito.when(backend.exists(ident, type)).thenReturn(true);
+    Mockito.when(backend.get(ident, type)).thenReturn(article);
+    Mockito.when(backend.batchGet(List.of(ident), type)).thenReturn(List.of(article));
+    store.put(article, false);
+    Assertions.assertTrue(store.exists(ident, type));
+    Assertions.assertSame(article, store.get(ident, type, KnowledgeBaseArticleEntity.class));
+    Assertions.assertEquals(
+        List.of(article), store.batchGet(List.of(ident), type, KnowledgeBaseArticleEntity.class));
     Mockito.verifyNoInteractions(cache);
   }
 

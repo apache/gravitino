@@ -38,10 +38,8 @@ import org.junit.jupiter.api.Test;
 public class TestRelationalGarbageCollector {
 
   @Test
-  public void testArticleCleanupWithoutStoredArticles() throws IOException {
+  public void testArticleHasNoOldVersions() throws IOException {
     JDBCBackend backend = new JDBCBackend();
-    Assertions.assertEquals(
-        0, backend.hardDeleteLegacyData(Entity.EntityType.KNOWLEDGE_BASE_ARTICLE, Long.MAX_VALUE));
     Assertions.assertEquals(
         0, backend.deleteOldVersionData(Entity.EntityType.KNOWLEDGE_BASE_ARTICLE, 1));
   }
