@@ -96,6 +96,10 @@ public class LiveEndpointSQLProvider {
         table = JobTemplateMetaMapper.TABLE_NAME;
         idColumn = "job_template_id";
         break;
+      case ONTOLOGY:
+        table = OntologyMapper.ONTOLOGY_TABLE;
+        idColumn = "ontology_id";
+        break;
       case DOMAIN:
         table = DomainMetaMapper.DOMAIN_TABLE_NAME;
         idColumn = "domain_id";

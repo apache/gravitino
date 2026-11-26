@@ -231,6 +231,13 @@ public class CompatibilityUtils {
           .put(
               OperationType.PUBLISH_SEMANTIC_MODEL_REVISION,
               Operation.PUBLISH_SEMANTIC_MODEL_REVISION)
+          .put(OperationType.CREATE_ONTOLOGY, Operation.CREATE_ONTOLOGY)
+          .put(OperationType.LOAD_ONTOLOGY, Operation.LOAD_ONTOLOGY)
+          .put(OperationType.ALTER_ONTOLOGY, Operation.ALTER_ONTOLOGY)
+          .put(OperationType.DROP_ONTOLOGY, Operation.DROP_ONTOLOGY)
+          .put(OperationType.LIST_ONTOLOGY, Operation.LIST_ONTOLOGY)
+          .put(OperationType.IMPORT_ONTOLOGY, Operation.IMPORT_ONTOLOGY)
+          .put(OperationType.EXPORT_ONTOLOGY, Operation.EXPORT_ONTOLOGY)
           .put(OperationType.REGISTER_FUNCTION, Operation.REGISTER_FUNCTION)
           .put(OperationType.GET_FUNCTION, Operation.GET_FUNCTION)
           .put(OperationType.ALTER_FUNCTION, Operation.ALTER_FUNCTION)

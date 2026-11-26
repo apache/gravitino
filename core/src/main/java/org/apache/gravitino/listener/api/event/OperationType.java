@@ -261,6 +261,20 @@ public enum OperationType {
   EXPORT_SEMANTIC_MODEL,
   /** Publish a saved Semantic Model revision. */
   PUBLISH_SEMANTIC_MODEL_REVISION,
+  /** Create an ontology. */
+  CREATE_ONTOLOGY,
+  /** Load an ontology. */
+  LOAD_ONTOLOGY,
+  /** Alter an ontology. */
+  ALTER_ONTOLOGY,
+  /** Drop an ontology. */
+  DROP_ONTOLOGY,
+  /** List ontologies. */
+  LIST_ONTOLOGY,
+  /** Import an ontology. */
+  IMPORT_ONTOLOGY,
+  /** Export an ontology. */
+  EXPORT_ONTOLOGY,
 
   // Function operations
   REGISTER_FUNCTION,

@@ -34,6 +34,7 @@ import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
+import org.apache.gravitino.meta.OntologyEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -70,6 +71,7 @@ public class EntityClassMapper {
           .put(Entity.EntityType.POLICY, PolicyEntity.class)
           .put(Entity.EntityType.JOB_TEMPLATE, JobTemplateEntity.class)
           .put(Entity.EntityType.DOMAIN, DomainEntity.class)
+          .put(Entity.EntityType.ONTOLOGY, OntologyEntity.class)
           .put(Entity.EntityType.JOB, JobEntity.class)
           .put(Entity.EntityType.SEMANTIC_MODEL, SemanticModelEntity.class)
           .build();

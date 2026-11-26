@@ -103,6 +103,9 @@ public class MetadataObjectService {
                   MetadataObject.Type.JOB_TEMPLATE,
                   MetadataObjectService::getJobTemplateObjectsFullName)
               .put(MetadataObject.Type.DOMAIN, MetadataObjectService::getDomainObjectsFullName)
+              .put(
+                  MetadataObject.Type.ONTOLOGY,
+                  ids -> OntologyMetaService.getInstance().namesById(ids))
               .build();
 
   static final Map<MetadataObject.Type, BasePOStorageOps<?, ?>> TYPE_TO_STORAGE_OPS_MAP =

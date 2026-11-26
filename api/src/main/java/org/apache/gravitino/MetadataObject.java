@@ -83,7 +83,9 @@ public interface MetadataObject {
      * as a table, belongs to a domain when its effective tags, its own or those inherited from its
      * schema and catalog, match the domain's backing tag. A domain cannot be tagged itself.
      */
-    DOMAIN;
+    DOMAIN,
+    /** A metalake-wide vocabulary of concepts and relationships. */
+    ONTOLOGY;
   }
 
   /**

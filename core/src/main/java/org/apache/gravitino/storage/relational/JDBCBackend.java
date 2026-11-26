@@ -93,6 +93,7 @@ import org.apache.gravitino.storage.relational.service.JobTemplateMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.ModelMetaService;
 import org.apache.gravitino.storage.relational.service.ModelVersionMetaService;
+import org.apache.gravitino.storage.relational.service.OntologyMetaService;
 import org.apache.gravitino.storage.relational.service.OrphanedMetadataObjectRelationService;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
@@ -324,6 +325,11 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   }
 
   @Override
+  public long getOntologyId(NameIdentifier identifier) {
+    return OntologyMetaService.getInstance().getId(identifier);
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> E get(
       NameIdentifier ident, Entity.EntityType entityType)
       throws NoSuchEntityException, IOException {
@@ -366,6 +372,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (E) ViewMetaService.getInstance().getViewByIdentifier(ident);
       case SEMANTIC_MODEL:
         return (E) SemanticModelMetaService.getInstance().getSemanticModelByIdentifier(ident);
+      case ONTOLOGY:
+        return (E) OntologyMetaService.getInstance().getEntity(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for get operation", entityType);
@@ -611,6 +619,9 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return SemanticModelMetaService.getInstance()
             .deleteSemanticModelMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case ONTOLOGY:
+        return OntologyMetaService.getInstance()
+            .purge(legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case DOMAIN:
         return DomainMetaService.getInstance()
             .deleteDomainMetasByLegacyTimeline(
@@ -660,6 +671,10 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return SemanticModelMetaService.getInstance()
             .deleteSemanticModelVersionsByRetentionCount(
                 versionRetentionCount, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+
+      case ONTOLOGY:
+        return OntologyMetaService.getInstance()
+            .retireVersions(versionRetentionCount, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
 
       case FILESET:
         return FilesetMetaService.getInstance()

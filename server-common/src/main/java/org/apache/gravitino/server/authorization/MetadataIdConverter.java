@@ -32,6 +32,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.SupportsOntologyIdLookup;
 import org.apache.gravitino.SupportsTableIdLookup;
 import org.apache.gravitino.catalog.CapabilityHelpers;
 import org.apache.gravitino.catalog.CatalogManager;
@@ -168,6 +169,10 @@ public class MetadataIdConverter {
       }
       if (entityType == Entity.EntityType.SEMANTIC_MODEL) {
         return Optional.of(entityStore.getSemanticModelId(ident));
+      }
+      if (entityType == Entity.EntityType.ONTOLOGY
+          && entityStore instanceof SupportsOntologyIdLookup) {
+        return Optional.of(((SupportsOntologyIdLookup) entityStore).getOntologyId(ident));
       }
       entity = entityStore.get(ident, entityType, EntityClassMapper.getEntityClass(entityType));
     } catch (NoSuchEntityException e) {

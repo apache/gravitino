@@ -40,29 +40,31 @@ public class TestAuthorizationExpressionConverter {
   /** Tests that every supported tag privilege uses the composition adapter. */
   @Test
   public void testTagConferrableMacrosUseComposition() {
-    Map<String, String> targetTypes =
+    String schemaScopes = "METALAKE,CATALOG,SCHEMA,";
+    Map<String, String> expectedScopes =
         Map.ofEntries(
-            Map.entry("SELECT_TABLE", "TABLE"),
-            Map.entry("MODIFY_TABLE", "TABLE"),
-            Map.entry("PROBE_TABLE_LIKE", "(TABLE != null ? TABLE : VIEW)"),
-            Map.entry("SELECT_VIEW", "VIEW"),
-            Map.entry("READ_FILESET", "FILESET"),
-            Map.entry("WRITE_FILESET", "FILESET"),
-            Map.entry("CONSUME_TOPIC", "TOPIC"),
-            Map.entry("PRODUCE_TOPIC", "TOPIC"),
-            Map.entry("USE_MODEL", "MODEL"),
-            Map.entry("EXECUTE_FUNCTION", "FUNCTION"),
-            Map.entry("USE_SEMANTIC_MODEL", "SEMANTIC_MODEL"));
+            Map.entry("SELECT_TABLE", schemaScopes + "TABLE"),
+            Map.entry("MODIFY_TABLE", schemaScopes + "TABLE"),
+            Map.entry("PROBE_TABLE_LIKE", schemaScopes + "(TABLE != null ? TABLE : VIEW)"),
+            Map.entry("SELECT_VIEW", schemaScopes + "VIEW"),
+            Map.entry("READ_FILESET", schemaScopes + "FILESET"),
+            Map.entry("WRITE_FILESET", schemaScopes + "FILESET"),
+            Map.entry("CONSUME_TOPIC", schemaScopes + "TOPIC"),
+            Map.entry("PRODUCE_TOPIC", schemaScopes + "TOPIC"),
+            Map.entry("USE_MODEL", schemaScopes + "MODEL"),
+            Map.entry("EXECUTE_FUNCTION", schemaScopes + "FUNCTION"),
+            Map.entry("USE_SEMANTIC_MODEL", schemaScopes + "SEMANTIC_MODEL"),
+            Map.entry("USE_ONTOLOGY", "METALAKE,ONTOLOGY"));
     Assertions.assertEquals(
         AccessControlContent.PERMITTED_PRIVILEGES.stream()
             .map(Enum::name)
             .collect(Collectors.toSet()),
-        targetTypes.keySet());
-    targetTypes.forEach(
-        (privilege, type) ->
+        expectedScopes.keySet());
+    expectedScopes.forEach(
+        (privilege, scopes) ->
             Assertions.assertEquals(
-                "tagAuthorization.authorize(principal,METALAKE_NAME,{METALAKE,CATALOG,SCHEMA,"
-                    + type
+                "tagAuthorization.authorize(principal,METALAKE_NAME,{"
+                    + scopes
                     + "},@org.apache.gravitino.authorization.Privilege$Name@"
                     + privilege
                     + ",authorizationContext)",
@@ -202,6 +204,24 @@ public class TestAuthorizationExpressionConverter {
         "((ANY(CREATE_SCHEMA, METALAKE, CATALOG, SCHEMA)) "
             + "&& !(ANY(DENY_CREATE_SCHEMA, METALAKE, CATALOG, SCHEMA)))",
         replaced);
+  }
+
+  @Test
+  public void testReplaceAnyPrivilegeForOntologyPrivileges() {
+    Assertions.assertEquals(
+        "((ANY(USE_ONTOLOGY, METALAKE, ONTOLOGY)) && !(ANY(DENY_USE_ONTOLOGY, METALAKE, ONTOLOGY)))",
+        AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_USE_ONTOLOGY"));
+    Assertions.assertEquals(
+        "((ANY(MODIFY_ONTOLOGY, METALAKE, ONTOLOGY))"
+            + " && !(ANY(DENY_MODIFY_ONTOLOGY, METALAKE, ONTOLOGY)))",
+        AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_MODIFY_ONTOLOGY"));
+    Assertions.assertTrue(
+        AuthorizationExpressionConverter.replaceCanAccessMetadataPrivilege(
+                AuthorizationExpressionConstants.CAN_ACCESS_METADATA)
+            .contains(
+                "( entityType == 'ONTOLOGY' && ("
+                    + AuthorizationExpressionConstants.LOAD_ONTOLOGY_AUTHORIZATION_EXPRESSION
+                    + "))"));
   }
 
   @Test
