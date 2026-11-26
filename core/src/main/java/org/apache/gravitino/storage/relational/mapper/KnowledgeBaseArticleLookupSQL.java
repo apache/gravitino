@@ -89,7 +89,7 @@ public final class KnowledgeBaseArticleLookupSQL {
           %1$s
           UNION ALL
           </if>
-          SELECT a.article_id, a.metalake_id, NULL, NULL, d.domain_id
+          SELECT a.article_id, a.metalake_id, NULL AS target_type, NULL AS target_id, d.domain_id
           %2$s
           JOIN domain_member_rel d %4$s ON d.metalake_id=a.metalake_id AND d.member_id=a.article_id
               AND d.member_type='KNOWLEDGE_BASE_ARTICLE' AND d.deleted_at=0
