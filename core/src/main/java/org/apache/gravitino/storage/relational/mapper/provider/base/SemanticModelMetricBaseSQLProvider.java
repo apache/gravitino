@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper.TABLE_NAME;
 
+import java.util.Collection;
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
@@ -79,6 +80,30 @@ public class SemanticModelMetricBaseSQLProvider {
         + " deleted_at as deletedAt FROM "
         + TABLE_NAME
         + " WHERE semantic_model_id = #{semanticModelId} AND deleted_at = 0 FOR UPDATE";
+  }
+
+  /** Returns SQL for resolving a live metric identity by model ID and exact metric name. */
+  public String selectSemanticModelMetricByModelIdAndName(
+      @Param("semanticModelId") Long semanticModelId, @Param("metricName") String metricName) {
+    // MySQL utf8mb4_bin pads trailing spaces for equality. Metric identity retains them.
+    return "SELECT metric_id as metricId, metalake_id as metalakeId, catalog_id as catalogId,"
+        + " schema_id as schemaId, semantic_model_id as semanticModelId, metric_name as metricName,"
+        + " deleted_at as deletedAt FROM "
+        + TABLE_NAME
+        + " WHERE semantic_model_id = #{semanticModelId} AND metric_name = #{metricName}"
+        + " AND CHAR_LENGTH(metric_name) = CHAR_LENGTH(#{metricName}) AND deleted_at = 0";
+  }
+
+  /** Returns SQL for resolving a batch of live metric identities by metric ID. */
+  public String listSemanticModelMetricsByMetricIds(
+      @Param("metricIds") Collection<Long> metricIds) {
+    return "<script>SELECT metric_id as metricId, metalake_id as metalakeId, catalog_id as catalogId,"
+        + " schema_id as schemaId, semantic_model_id as semanticModelId, metric_name as metricName,"
+        + " deleted_at as deletedAt FROM "
+        + TABLE_NAME
+        + " WHERE deleted_at = 0 AND metric_id IN ("
+        + "<foreach collection='metricIds' item='metricId' separator=','>#{metricId}</foreach>)"
+        + "</script>";
   }
 
   /** Returns SQL for retiring selected live identities of a model. */

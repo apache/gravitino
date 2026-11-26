@@ -47,6 +47,11 @@ final class ArticleValidation {
 
   private ArticleValidation() {}
 
+  static void checkNoNullCharacter(@Nullable String value, String field) {
+    Preconditions.checkArgument(
+        value == null || value.indexOf('\0') < 0, "%s must not contain U+0000", field);
+  }
+
   static String title(String value) {
     String title = value == null ? "" : CharMatcher.whitespace().trimFrom(value);
     Preconditions.checkArgument(!title.isEmpty(), "Article title must not be blank");

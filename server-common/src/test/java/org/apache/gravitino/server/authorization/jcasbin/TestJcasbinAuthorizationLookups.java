@@ -91,6 +91,25 @@ public class TestJcasbinAuthorizationLookups {
   }
 
   @Test
+  void testLoadedDomainIdIsScopedToTheRequestTargetAndMetalake() {
+    MetadataObject domain = MetadataObjects.of(null, "Sales", MetadataObject.Type.DOMAIN);
+    CountingCache<String, Long> sharedIds = new CountingCache<>(100L);
+    JcasbinAuthorizationLookups lookups =
+        new JcasbinAuthorizationLookups(sharedIds, new CountingCache<>());
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    context.rememberTargetId("lake", domain, 200L);
+    Assertions.assertEquals(
+        Optional.of(200L), lookups.resolveTargetId(domain, "lake", context).metadataId());
+    Assertions.assertEquals(0, sharedIds.getCount);
+    Assertions.assertEquals(
+        Optional.of(100L), lookups.resolveTargetId(domain, "other", context).metadataId());
+    Assertions.assertEquals(Optional.of(100L), lookups.resolveMetadataId(domain, "lake", context));
+    Assertions.assertEquals(
+        Optional.of(100L),
+        lookups.resolveTargetId(domain, "lake", new AuthorizationRequestContext()).metadataId());
+  }
+
+  @Test
   void testNormalizedTableUsesAtomicSharedCacheAndRequestDedup() {
     MetadataObject alias = MetadataObjects.parse("cat1.SCH1.TBL1", MetadataObject.Type.TABLE);
     MetadataObject canonical = MetadataObjects.parse("cat1.sch1.tbl1", MetadataObject.Type.TABLE);
