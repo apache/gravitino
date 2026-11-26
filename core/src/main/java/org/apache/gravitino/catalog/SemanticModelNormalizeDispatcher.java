@@ -27,6 +27,7 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.withCapability;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
@@ -107,13 +108,22 @@ public class SemanticModelNormalizeDispatcher implements SemanticModelDispatcher
 
   @Override
   public SemanticModel loadSemanticModelRevision(
-      NameIdentifier ident, SemanticModelRevisionSelector selector) {
-    return dispatcher.loadSemanticModelRevision(normalizeForLookup(ident), selector);
+      NameIdentifier ident,
+      SemanticModelRevisionSelector selector,
+      Consumer<SemanticModelRevision> checkVisibility) {
+    return dispatcher.loadSemanticModelRevision(
+        normalizeForLookup(ident), selector, checkVisibility);
   }
 
   @Override
   public SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident) {
     return dispatcher.listSemanticModelRevisions(normalizeForLookup(ident));
+  }
+
+  @Override
+  public SemanticModel publishSemanticModelRevision(
+      NameIdentifier ident, int revision, String principal) {
+    return dispatcher.publishSemanticModelRevision(normalizeForLookup(ident), revision, principal);
   }
 
   @Override
@@ -142,8 +152,12 @@ public class SemanticModelNormalizeDispatcher implements SemanticModelDispatcher
 
   @Override
   public SemanticModelExport exportSemanticModel(
-      NameIdentifier ident, SemanticModelRevisionSelector selector, OssieFormat format) {
-    return dispatcher.exportSemanticModel(normalizeForLookup(ident), selector, format);
+      NameIdentifier ident,
+      SemanticModelRevisionSelector selector,
+      OssieFormat format,
+      Consumer<SemanticModelRevision> checkVisibility) {
+    return dispatcher.exportSemanticModel(
+        normalizeForLookup(ident), selector, format, checkVisibility);
   }
 
   @Override

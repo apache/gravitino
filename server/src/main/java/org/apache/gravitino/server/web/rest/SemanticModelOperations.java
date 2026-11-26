@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.server.web.rest;
 
+import static org.apache.gravitino.semantic.SemanticModelCatalog.LATEST_REVISION;
+
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import java.util.Arrays;
@@ -53,6 +55,8 @@ import org.apache.gravitino.dto.responses.SemanticModelResponse;
 import org.apache.gravitino.dto.responses.SemanticModelRevisionListResponse;
 import org.apache.gravitino.dto.semantic.SemanticModelRevisionDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
+import org.apache.gravitino.exceptions.NoSuchSemanticModelRevisionException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.semantic.OssieDocument;
@@ -508,11 +512,18 @@ public class SemanticModelOperations {
             NameIdentifier ident =
                 NameIdentifierUtil.ofSemanticModel(metalake, catalog, schema, semanticModel);
             SemanticModelRevision[] history = dispatcher.listSemanticModelRevisions(ident);
-            SemanticModelRevisionDTO[] revisions =
+            boolean showDrafts =
+                Arrays.stream(history).anyMatch(SemanticModelOperations::isDraft)
+                    && canModify(ident);
+            SemanticModelRevisionDTO[] visible =
                 Arrays.stream(history)
+                    .filter(revision -> showDrafts || !isDraft(revision))
                     .map(SemanticModelRevisionDTO::fromRevision)
                     .toArray(SemanticModelRevisionDTO[]::new);
-            return Utils.ok(new SemanticModelRevisionListResponse(revisions));
+            if (visible.length == 0) {
+              throw new NoSuchSemanticModelException("Semantic Model %s does not exist", ident);
+            }
+            return Utils.ok(new SemanticModelRevisionListResponse(visible));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleSemanticModelException(
@@ -542,7 +553,11 @@ public class SemanticModelOperations {
             NameIdentifier ident =
                 NameIdentifierUtil.ofSemanticModel(metalake, catalog, schema, semanticModel);
             SemanticModelRevisionSelector selector = SemanticModelRevisionSelector.parse(revision);
-            SemanticModel loaded = dispatcher.loadSemanticModelRevision(ident, selector);
+            SemanticModel loaded =
+                dispatcher.loadSemanticModelRevision(
+                    ident,
+                    selector,
+                    snapshot -> checkRevisionVisibility(ident, selector, snapshot));
             return Utils.ok(new SemanticModelResponse(DTOConverters.toDTO(loaded)));
           });
     } catch (Exception e) {
@@ -575,7 +590,11 @@ public class SemanticModelOperations {
             SemanticModelRevisionSelector selector = SemanticModelRevisionSelector.parse(revision);
             OssieDocument document =
                 dispatcher
-                    .exportSemanticModel(ident, selector, parseOssieFormat(format))
+                    .exportSemanticModel(
+                        ident,
+                        selector,
+                        parseOssieFormat(format),
+                        snapshot -> checkRevisionVisibility(ident, selector, snapshot))
                     .document();
             return ossieExportResponse(semanticModel, document);
           });
@@ -583,6 +602,31 @@ public class SemanticModelOperations {
       return ExceptionHandlers.handleSemanticModelException(
           OperationType.LOAD, semanticModel, schema, e);
     }
+  }
+
+  private static void checkRevisionVisibility(
+      NameIdentifier ident,
+      SemanticModelRevisionSelector selector,
+      SemanticModelRevision revision) {
+    if (isDraft(revision) && !canModify(ident)) {
+      String requested =
+          selector == SemanticModelRevisionSelector.LATEST
+              ? LATEST_REVISION
+              : Integer.toString(selector.getNumber());
+      throw new NoSuchSemanticModelRevisionException(
+          "Revision %s of Semantic Model %s does not exist", requested, ident);
+    }
+  }
+
+  private static boolean isDraft(SemanticModelRevision revision) {
+    return revision.status() == SemanticModel.Status.DRAFT;
+  }
+
+  private static boolean canModify(NameIdentifier ident) {
+    return MetadataAuthzHelper.checkAccess(
+        ident,
+        Entity.EntityType.SEMANTIC_MODEL,
+        AuthorizationExpressionConstants.MODIFY_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION);
   }
 
   private static Response ossieExportResponse(String semanticModel, OssieDocument document) {

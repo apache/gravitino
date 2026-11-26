@@ -113,7 +113,8 @@ public class SemanticModelVersionInfoBaseSQLProvider {
         + " smvi WHERE smvi.semantic_model_id = smm.semantic_model_id"
         + " AND smvi.version <= smm.current_version"
         + " - LEAST(smm.current_version, #{versionRetentionCount})"
-        + " AND smvi.version <> smm.active_version AND smvi.deleted_at = 0)";
+        + " AND smvi.version <> smm.active_version"
+        + " AND smvi.publication_status <> 'PUBLISHED_EXPLICITLY' AND smvi.deleted_at = 0)";
   }
 
   /** Returns SQL for soft-deleting snapshots through a per-model retention line. */
@@ -128,7 +129,7 @@ public class SemanticModelVersionInfoBaseSQLProvider {
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE semantic_model_id = #{semanticModelId}"
         + " AND version <= #{versionRetentionLine} AND version <> #{activeVersion}"
-        + " AND deleted_at = 0 LIMIT #{limit}";
+        + " AND publication_status <> 'PUBLISHED_EXPLICITLY' AND deleted_at = 0 LIMIT #{limit}";
   }
 
   private String softDeleteBy(String condition) {

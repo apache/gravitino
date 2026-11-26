@@ -20,6 +20,7 @@
 package org.apache.gravitino.hook;
 
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
@@ -99,13 +100,21 @@ public class SemanticModelHookDispatcher implements SemanticModelDispatcher {
 
   @Override
   public SemanticModel loadSemanticModelRevision(
-      NameIdentifier ident, SemanticModelRevisionSelector selector) {
-    return dispatcher.loadSemanticModelRevision(ident, selector);
+      NameIdentifier ident,
+      SemanticModelRevisionSelector selector,
+      Consumer<SemanticModelRevision> checkVisibility) {
+    return dispatcher.loadSemanticModelRevision(ident, selector, checkVisibility);
   }
 
   @Override
   public SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident) {
     return dispatcher.listSemanticModelRevisions(ident);
+  }
+
+  @Override
+  public SemanticModel publishSemanticModelRevision(
+      NameIdentifier ident, int revision, String principal) {
+    return dispatcher.publishSemanticModelRevision(ident, revision, principal);
   }
 
   @Override
@@ -138,8 +147,11 @@ public class SemanticModelHookDispatcher implements SemanticModelDispatcher {
 
   @Override
   public SemanticModelExport exportSemanticModel(
-      NameIdentifier ident, SemanticModelRevisionSelector selector, OssieFormat format) {
-    return dispatcher.exportSemanticModel(ident, selector, format);
+      NameIdentifier ident,
+      SemanticModelRevisionSelector selector,
+      OssieFormat format,
+      Consumer<SemanticModelRevision> checkVisibility) {
+    return dispatcher.exportSemanticModel(ident, selector, format, checkVisibility);
   }
 
   @Override
