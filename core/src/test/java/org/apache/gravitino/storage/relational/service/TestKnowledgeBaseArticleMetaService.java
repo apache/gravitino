@@ -548,9 +548,14 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
     assertEquals(List.of(original.bindings(), Set.of(TERM), Set.of(TABLE)), bindings);
     assertEquals(
         List.of(
-            new StoredContent(original.bodyUpdate(), new ExpectedRevision(lake, original.id(), 1)),
-            new StoredContent(updatedBody, new ExpectedRevision(lake, original.id(), 2)),
-            new StoredContent(overwrittenBody, new ExpectedRevision(lake, original.id(), 3))),
+            new StoredContent(
+                original.bodyUpdate(),
+                new ExpectedRevision(lake, original.id(), 1),
+                original.status()),
+            new StoredContent(
+                updatedBody, new ExpectedRevision(lake, original.id(), 2), original.status()),
+            new StoredContent(
+                overwrittenBody, new ExpectedRevision(lake, original.id(), 3), original.status())),
         captured);
   }
 
