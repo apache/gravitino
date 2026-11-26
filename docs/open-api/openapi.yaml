@@ -186,6 +186,15 @@ paths:
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/{semanticModel}/ossie:
     $ref: "./semantic-models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1semantic-models~1%7BsemanticModel%7D~1ossie"
 
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/{semanticModel}/revisions:
+    $ref: "./semantic-models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1semantic-models~1%7BsemanticModel%7D~1revisions"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/{semanticModel}/revisions/{revision}:
+    $ref: "./semantic-models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1semantic-models~1%7BsemanticModel%7D~1revisions~1%7Brevision%7D"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/{semanticModel}/revisions/{revision}/ossie:
+    $ref: "./semantic-models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1semantic-models~1%7BsemanticModel%7D~1revisions~1%7Brevision%7D~1ossie"
+
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/functions:
     $ref: "./functions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1functions"
 
