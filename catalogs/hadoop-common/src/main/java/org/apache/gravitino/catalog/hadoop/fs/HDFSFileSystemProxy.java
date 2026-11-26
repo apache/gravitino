@@ -29,6 +29,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.ByteStreams;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
@@ -375,6 +376,12 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
         } catch (IllegalStateException e) {
           // The JVM is shutting down, so no hook will hand the files over.
           deleteLiveKeytabFilesOnExit();
+        } catch (RuntimeException e) {
+          // Such as a SecurityException, which a later call would get too.
+          LOG.warn(
+              "Failed to add the shutdown hook that deletes the keytab files at exit. A later JVM "
+                  + "on this host and in this working directory may delete them.",
+              e);
         }
       }
     }
@@ -419,7 +426,9 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
           Files.isSymbolicLink(fetched.toPath())
               ? Files.getLastModifiedTime(fetched.toPath())
               : null;
-      try (InputStream in = Files.newInputStream(fetched.toPath())) {
+      // Unlike Files.newInputStream on Java 8, the stream does not make a thread that interrupts
+      // the reading thread wait for the read to return.
+      try (InputStream in = new FileInputStream(fetched)) {
         byte[] content = ByteStreams.toByteArray(ByteStreams.limit(in, MAX_KEYTAB_NAME_BYTES + 1));
         if (content.length <= MAX_KEYTAB_NAME_BYTES) {
           return KeytabNames.prefix(identifier, keytabUri, content, modified);

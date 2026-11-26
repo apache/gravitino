@@ -58,6 +58,7 @@ import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -207,6 +208,12 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   final AsyncCache<ConfKey, Map<String, String>> hdfsLoginSettingsCache =
       Caffeine.newBuilder().maximumSize(1000).expireAfterWrite(1, TimeUnit.HOURS).buildAsync();
 
+  // The pool threads running a task, which close() interrupts on threads of their own.
+  @VisibleForTesting final Set<Thread> runningWorkers = ConcurrentHashMap.newKeySet();
+
+  // Set first by close(), so that a file system created afterwards is not cached.
+  private volatile boolean closed;
+
   @VisibleForTesting
   final ThreadPoolExecutor fileSystemExecutor =
       new ThreadPoolExecutor(
@@ -222,6 +229,16 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           new ThreadPoolExecutor.AbortPolicy()) {
         {
           allowCoreThreadTimeOut(true);
+        }
+
+        @Override
+        protected void beforeExecute(Thread thread, Runnable task) {
+          startTask(thread);
+        }
+
+        @Override
+        protected void afterExecute(Runnable task, Throwable failure) {
+          runningWorkers.remove(Thread.currentThread());
         }
       };
 
@@ -242,6 +259,16 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           new ThreadPoolExecutor.AbortPolicy()) {
         {
           allowCoreThreadTimeOut(true);
+        }
+
+        @Override
+        protected void beforeExecute(Thread thread, Runnable task) {
+          startTask(thread);
+        }
+
+        @Override
+        protected void afterExecute(Runnable task, Throwable failure) {
+          runningWorkers.remove(Thread.currentThread());
         }
       };
 
@@ -420,8 +447,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       this.deadlineNanos = deadlineNanos;
     }
 
-    // When the deadline passes first, the task leaves the queue or is interrupted, and a result
-    // that it returns later is closed. A login can ignore interrupts.
+    // When the deadline passes first, the task leaves the queue or, if a thread can be started for
+    // that, is interrupted, and a result that it returns later is closed. A login can ignore
+    // interrupts.
     static <T> TimedTask<T> start(ExecutorService executor, Callable<T> task, long deadlineNanos) {
       TimedTask<T> timed = new TimedTask<>(deadlineNanos);
       long timeoutNanos = deadlineNanos - System.nanoTime();
@@ -444,13 +472,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 // close() may have interrupted this thread, and completing runs the stages that
                 // close the result after close().
                 Thread.interrupted();
-                if (!timed.complete(result) && result instanceof Closeable) {
-                  // The interrupt that cancels this task may still come, so the result is closed
-                  // on another thread.
-                  Runnable close = () -> closeQuietly(result);
-                  if (!startThread("gravitino-fileset-late-result-closer", close)) {
-                    close.run();
-                  }
+                if (!timed.complete(result)) {
+                  closeLater(result);
                 }
               });
       timed.orTimeout(timeoutNanos, TimeUnit.NANOSECONDS);
@@ -464,15 +487,26 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 && ((ThreadPoolExecutor) executor).getQueue().remove(running)) {
               return;
             }
-            // Interrupting a thread that reads a file through a channel waits until the read
-            // returns, so neither the caller nor the timer of orTimeout does it. Without a thread,
-            // the task is not interrupted, and its result is closed once it returns.
+            // Interrupting a thread that reads a file through an interruptible channel waits until
+            // the read returns, so neither the caller nor the timer of orTimeout does it. Without a
+            // thread, the task is not interrupted, and its result is closed once it returns.
             startThread("gravitino-fileset-task-canceller", () -> running.cancel(true));
           });
       return timed;
     }
 
-    private static boolean startThread(String name, Runnable action) {
+    // The interrupt that cancels the task that returned the result may still come, so the result is
+    // closed on another thread, or here if none starts.
+    static void closeLater(@Nullable Object result) {
+      if (result instanceof Closeable) {
+        Runnable close = () -> closeQuietly(result);
+        if (!startThread("gravitino-fileset-late-result-closer", close)) {
+          close.run();
+        }
+      }
+    }
+
+    static boolean startThread(String name, Runnable action) {
       try {
         Thread thread = new Thread(action, name);
         thread.setDaemon(true);
@@ -1362,17 +1396,21 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   @Override
   public void close() throws IOException {
-    // do nothing
+    closed = true;
     if (scheduler != null) {
       scheduler.shutdownNow();
     }
 
-    if (!fileSystemExecutor.isShutdown()) {
-      fileSystemExecutor.shutdownNow();
-    }
-
-    if (!loginSettingsExecutor.isShutdown()) {
-      loginSettingsExecutor.shutdownNow();
+    // Interrupting a thread that reads a file through an interruptible channel waits until the read
+    // returns, so the running tasks are interrupted on threads of their own. Queued tasks are
+    // dropped, and a task taken but not started yet is interrupted by its own thread.
+    fileSystemExecutor.shutdown();
+    loginSettingsExecutor.shutdown();
+    fileSystemExecutor.getQueue().clear();
+    loginSettingsExecutor.getQueue().clear();
+    for (Thread worker : runningWorkers) {
+      releaseFromCatalog(worker);
+      TimedTask.startThread("gravitino-fileset-close-interrupter", worker::interrupt);
     }
 
     if (fileSystemCache != null) {
@@ -1381,19 +1419,27 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           .asMap()
           .values()
           .forEach(
-              entry ->
-                  entry.thenAccept(
-                      fs -> {
-                        if (fs == null) {
-                          return;
-                        }
-                        // Runs in a stage that nothing reads, so a failure is only logged here.
-                        try {
-                          fs.close();
-                        } catch (Throwable t) {
-                          LOG.warn("Failed to close FileSystem instance in cache", t);
-                        }
-                      }));
+              entry -> {
+                // A file system created later is closed off the thread that created it, which an
+                // interrupter may still interrupt.
+                boolean created = entry.isDone();
+                entry.thenAccept(
+                    fs -> {
+                      if (fs == null) {
+                        return;
+                      }
+                      if (!created) {
+                        TimedTask.closeLater(fs);
+                        return;
+                      }
+                      // Runs in a stage that nothing reads, so a failure is only logged here.
+                      try {
+                        fs.close();
+                      } catch (Throwable t) {
+                        LOG.warn("Failed to close FileSystem instance in cache", t);
+                      }
+                    });
+              });
       fileSystemCache.synchronous().cleanUp();
     }
     // The keys hold the merged configuration, which may carry resolved secrets.
@@ -1404,6 +1450,27 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     if (metricsSystem != null) {
       metricsSystem.unregister(catalogMetricsSource);
+    }
+  }
+
+  // Either close() sees the thread among the running workers, or the thread sees closed.
+  private void startTask(Thread thread) {
+    runningWorkers.add(thread);
+    if (closed) {
+      releaseFromCatalog(thread);
+      // Interrupting itself waits for no read.
+      thread.interrupt();
+    }
+  }
+
+  // Releasing the catalog class loader interrupts, on the releasing thread, each thread whose
+  // context class loader is the catalog's. A child loader is not, and finds the same classes and
+  // services, such as the file systems that Hadoop looks up once, through the context class loader
+  // of the first thread that needs them.
+  private static void releaseFromCatalog(Thread worker) {
+    ClassLoader loader = worker.getContextClassLoader();
+    if (loader != null) {
+      worker.setContextClassLoader(new ClassLoader(loader) {});
     }
   }
 
@@ -1887,7 +1954,16 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             // Create the file system for the user it is cached under.
             return TimedTask.start(
                 fileSystemExecutor,
-                () -> getFileSystem(path, keptConf, cacheKey.currentUser, expectedSettings),
+                () -> {
+                  FileSystem fs =
+                      getFileSystem(path, keptConf, cacheKey.currentUser, expectedSettings);
+                  if (fs != null && closed) {
+                    // close() may have gone through the cache before this entry was in it.
+                    TimedTask.closeLater(fs);
+                    throw new IOException("The catalog is closed");
+                  }
+                  return fs;
+                },
                 deadlineNanos);
           },
           deadlineNanos);

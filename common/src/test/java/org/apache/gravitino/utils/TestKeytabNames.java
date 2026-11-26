@@ -26,15 +26,18 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
+import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestKeytabNames {
 
@@ -80,45 +83,41 @@ public class TestKeytabNames {
     KeytabNames.release(prefix, 0);
     KeytabNames.release(prefix, 1);
     KeytabNames.release(prefix, 2);
+    Assertions.assertFalse(KeytabNames.hasReservedSlots(prefix));
     Assertions.assertEquals(0, KeytabNames.reserve(prefix));
     KeytabNames.release(prefix, 0);
     // Releasing a slot of a prefix that holds none does nothing.
     KeytabNames.release(prefix, 5);
     Assertions.assertEquals(0, KeytabNames.reserve(prefix));
     KeytabNames.release(prefix, 0);
+    Assertions.assertFalse(KeytabNames.hasReservedSlots(prefix));
   }
 
-  // Holds the channels a sweep in this test JVM keeps open, which must not be closed.
-  private static final List<FileChannel> HELD = new ArrayList<>();
-
-  @Test
-  public void testDirectoryIsLockedAndOthersLeftOnThisHostAreDeleted() throws Exception {
-    // Only the first call in this test JVM locks the directory and deletes the others, unless the
-    // keytabs directory of the working directory is writable by others.
-    // Left in the working directory by another JVM on this host that exited.
-    File exited = new File("keytabs", "gravitino-" + OTHER_JVM + "-" + id());
-    Files.createDirectories(exited.toPath());
-    Files.write(new File(exited, ".lock-" + KeytabNames.host()).toPath(), new byte[0]);
-    Files.write(new File(exited, "gravitino-id-hash-0").toPath(), new byte[] {1});
-
-    File dir = KeytabNames.directory();
-    Assertions.assertEquals("keytabs", dir.getParent());
-    Assertions.assertTrue(
-        dir.getName().matches("gravitino-[0-9a-f]{16}-[0-9a-f]{16}"), dir.getName());
-    Assertions.assertEquals(dir, KeytabNames.directory());
-    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-    while (exited.exists() || !new File(dir, ".lock-" + KeytabNames.host()).exists()) {
-      Assertions.assertTrue(System.nanoTime() < deadline, "the directory was not claimed");
-      Thread.sleep(10);
-    }
-    // The lock stays held: as seen by another JVM id, the directory is locked by this JVM.
-    List<FileChannel> held = new ArrayList<>();
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testDirectoryIsLockedAndOthersLeftOnThisHostAreDeleted(
+      boolean failing, @TempDir File workingDir) throws Exception {
+    // In a JVM of its own, so that the cleanup stays in its working directory.
+    File log = new File(workingDir, "claim-check.log");
+    Process process =
+        new ProcessBuilder(
+                new File(System.getProperty("java.home"), "bin/java").getPath(),
+                "-cp",
+                System.getProperty("java.class.path"),
+                ClaimCheck.class.getName(),
+                String.valueOf(failing))
+            .directory(workingDir)
+            .redirectErrorStream(true)
+            .redirectOutput(log)
+            .start();
     try {
-      KeytabNames.sweep(new File("keytabs"), OTHER_JVM, KeytabNames.host(), held);
-      Assertions.assertTrue(dir.exists());
-      Assertions.assertFalse(held.isEmpty());
+      boolean finished = process.waitFor(60, TimeUnit.SECONDS);
+      String output = new String(Files.readAllBytes(log.toPath()), StandardCharsets.UTF_8);
+      Assertions.assertTrue(finished, "the check did not finish: " + output);
+      Assumptions.assumeFalse(process.exitValue() == ClaimCheck.SKIPPED, output);
+      Assertions.assertEquals(0, process.exitValue(), output);
     } finally {
-      HELD.addAll(held);
+      process.destroyForcibly().waitFor(10, TimeUnit.SECONDS);
     }
   }
 
@@ -133,7 +132,7 @@ public class TestKeytabNames {
     Files.write(new File(exited, "gravitino-id-hash-0").toPath(), new byte[] {2});
     Files.createSymbolicLink(new File(exited, "gravitino-id-hash-1").toPath(), target.toPath());
 
-    List<FileChannel> held = new ArrayList<>();
+    Map<Path, FileChannel> held = new HashMap<>();
     KeytabNames.sweep(root, JVM, "host", held);
 
     Assertions.assertFalse(exited.exists());
@@ -171,7 +170,7 @@ public class TestKeytabNames {
       Files.write(file.toPath(), new byte[] {1});
     }
 
-    List<FileChannel> held = new ArrayList<>();
+    Map<Path, FileChannel> held = new HashMap<>();
     KeytabNames.sweep(root, JVM, "host", held);
 
     for (File file :
@@ -214,7 +213,7 @@ public class TestKeytabNames {
         Assertions.assertTrue(System.nanoTime() < deadline, "the lock holder did not lock");
         Thread.sleep(10);
       }
-      List<FileChannel> held = new ArrayList<>();
+      Map<Path, FileChannel> held = new HashMap<>();
       KeytabNames.sweep(root, JVM, "host", held);
       Assertions.assertTrue(keytab.exists());
       Assertions.assertTrue(held.isEmpty());
@@ -223,7 +222,7 @@ public class TestKeytabNames {
     }
     Assertions.assertTrue(process.waitFor(30, TimeUnit.SECONDS), "the lock holder did not exit");
     // Killing the process frees its lock, and the next sweep deletes what it left.
-    KeytabNames.sweep(root, JVM, "host", new ArrayList<>());
+    KeytabNames.sweep(root, JVM, "host", new HashMap<>());
     Assertions.assertFalse(other.exists());
   }
 
@@ -237,14 +236,19 @@ public class TestKeytabNames {
       File keytab = new File(other, "gravitino-id-hash-0");
       Files.write(keytab.toPath(), new byte[] {1});
 
-      List<FileChannel> held = new ArrayList<>();
+      Map<Path, FileChannel> held = new HashMap<>();
       KeytabNames.sweep(root, JVM, "host", held);
 
       Assertions.assertTrue(keytab.exists());
       // Closing the channel would release the lock of the other copy.
       Assertions.assertEquals(1, held.size());
-      Assertions.assertTrue(held.get(0).isOpen());
-      for (FileChannel channel : held) {
+      FileChannel probe = held.values().iterator().next();
+      Assertions.assertTrue(probe.isOpen());
+      // A later sweep does not open the lock file again.
+      KeytabNames.sweep(root, JVM, "host", held);
+      Assertions.assertEquals(1, held.size());
+      Assertions.assertSame(probe, held.values().iterator().next());
+      for (FileChannel channel : held.values()) {
         channel.close();
       }
     } finally {
@@ -260,9 +264,67 @@ public class TestKeytabNames {
     Files.write(new File(exited, ".lock-host").toPath(), new byte[0]);
     Files.setPosixFilePermissions(root.toPath(), PosixFilePermissions.fromString("rwxrwxrwx"));
 
-    KeytabNames.sweep(root, JVM, "host", new ArrayList<>());
+    KeytabNames.sweep(root, JVM, "host", new HashMap<>());
 
     Assertions.assertTrue(exited.exists());
+  }
+
+  @Test
+  public void testSweepFailsAndRetriesADirectoryItCouldNotDelete(@TempDir File root)
+      throws Exception {
+    Assumptions.assumeTrue(
+        FileSystems.getDefault().supportedFileAttributeViews().contains("posix"), "POSIX only");
+    File exited = directory(root, OTHER_JVM);
+    Files.write(new File(exited, ".lock-host").toPath(), new byte[0]);
+    Files.write(new File(exited, "gravitino-id-hash-0").toPath(), new byte[] {1});
+    Files.setPosixFilePermissions(exited.toPath(), PosixFilePermissions.fromString("r-x------"));
+    try {
+      Assumptions.assumeFalse(Files.isWritable(exited.toPath()), "the user ignores permissions");
+      Assertions.assertThrows(
+          IOException.class, () -> KeytabNames.sweep(root, JVM, "host", new HashMap<>()));
+      // The lock file stays, so that a later sweep deletes the directory.
+      Assertions.assertTrue(new File(exited, ".lock-host").exists());
+    } finally {
+      Files.setPosixFilePermissions(exited.toPath(), PosixFilePermissions.fromString("rwx------"));
+    }
+    KeytabNames.sweep(root, JVM, "host", new HashMap<>());
+    Assertions.assertFalse(exited.exists());
+  }
+
+  @Test
+  public void testSweepSkipsTheDirectoryOfAnotherUser(@TempDir File root) throws Exception {
+    Assumptions.assumeTrue(
+        FileSystems.getDefault().supportedFileAttributeViews().contains("posix"), "POSIX only");
+    File other = directory(root, OTHER_JVM);
+    Path lock = other.toPath().resolve(".lock-host");
+    Files.write(lock, new byte[0]);
+    // Only its owner can open a lock file, which is created 0600.
+    Files.setPosixFilePermissions(lock, PosixFilePermissions.fromString("---------"));
+    try {
+      Assumptions.assumeFalse(Files.isWritable(lock), "the user ignores permissions");
+      // Not a failure: a later sweep could not delete it either.
+      KeytabNames.sweep(root, JVM, "host", new HashMap<>());
+      Assertions.assertTrue(other.exists());
+    } finally {
+      Files.setPosixFilePermissions(lock, PosixFilePermissions.fromString("rw-------"));
+    }
+  }
+
+  @Test
+  public void testSweepSkipsADirectoryItCannotEnter(@TempDir File root) throws Exception {
+    Assumptions.assumeTrue(
+        FileSystems.getDefault().supportedFileAttributeViews().contains("posix"), "POSIX only");
+    File other = directory(root, OTHER_JVM);
+    Files.write(new File(other, ".lock-host").toPath(), new byte[0]);
+    // As a 0700 directory of another user.
+    Files.setPosixFilePermissions(other.toPath(), PosixFilePermissions.fromString("---------"));
+    try {
+      Assumptions.assumeFalse(Files.isReadable(other.toPath()), "the user ignores permissions");
+      KeytabNames.sweep(root, JVM, "host", new HashMap<>());
+      Assertions.assertTrue(other.exists());
+    } finally {
+      Files.setPosixFilePermissions(other.toPath(), PosixFilePermissions.fromString("rwx------"));
+    }
   }
 
   @Test
@@ -280,6 +342,95 @@ public class TestKeytabNames {
 
   private static String id() {
     return UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+  }
+
+  /**
+   * Leaves the directory of an exited JVM in the working directory, then checks that the first
+   * {@link KeytabNames#directory()} locks its own directory and deletes the other one, or, when the
+   * other one cannot be deleted, keeps it and deletes it on a later call.
+   */
+  public static final class ClaimCheck {
+    static final int SKIPPED = 2;
+
+    public static void main(String[] args) throws Exception {
+      boolean failing = Boolean.parseBoolean(args[0]);
+      String host;
+      try {
+        host = KeytabNames.host();
+      } catch (IOException e) {
+        System.out.println("The host name does not resolve: " + e);
+        System.exit(SKIPPED);
+        return;
+      }
+      File exited = new File("keytabs", "gravitino-" + OTHER_JVM + "-" + id());
+      Files.createDirectories(exited.toPath());
+      Files.write(new File(exited, ".lock-" + host).toPath(), new byte[0]);
+      Files.write(new File(exited, "gravitino-id-hash-0").toPath(), new byte[] {1});
+      boolean posix = FileSystems.getDefault().supportedFileAttributeViews().contains("posix");
+      if (posix
+          && Files.getPosixFilePermissions(exited.toPath().getParent())
+              .contains(PosixFilePermission.OTHERS_WRITE)) {
+        System.out.println("Others may write to keytabs, which is then not swept");
+        System.exit(SKIPPED);
+      }
+      if (failing) {
+        if (!posix) {
+          System.out.println("POSIX only");
+          System.exit(SKIPPED);
+        }
+        Files.setPosixFilePermissions(
+            exited.toPath(), PosixFilePermissions.fromString("r-x------"));
+        if (Files.isWritable(exited.toPath())) {
+          System.out.println("The user ignores permissions");
+          System.exit(SKIPPED);
+        }
+      }
+
+      File dir = KeytabNames.directory();
+      try {
+        check("keytabs".equals(dir.getParent()), "directory " + dir);
+        check(dir.getName().matches("gravitino-[0-9a-f]{16}-[0-9a-f]{16}"), "directory " + dir);
+        check(dir.equals(KeytabNames.directory()), "another directory on the second call");
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        awaitClaimed(deadline);
+        check(new File(dir, ".lock-" + host).exists(), "the directory is not locked");
+        if (failing) {
+          check(exited.exists() && !KeytabNames.isSwept(), "a failed sweep counts as done");
+          check(
+              dir.equals(KeytabNames.directory()) && !KeytabNames.isClaiming(),
+              "a failed claim is tried again within a minute");
+          Files.setPosixFilePermissions(
+              exited.toPath(), PosixFilePermissions.fromString("rwx------"));
+          // As if a minute had passed.
+          KeytabNames.retryNow();
+          check(dir.equals(KeytabNames.directory()), "another directory on a later call");
+          awaitClaimed(deadline);
+        }
+        check(!exited.exists() && KeytabNames.isSwept(), "the other directory is not deleted");
+        // The lock stays held: as seen by another JVM id, the directory is locked by this JVM.
+        Map<Path, FileChannel> held = new HashMap<>();
+        KeytabNames.sweep(new File("keytabs"), OTHER_JVM, host, held);
+        check(dir.exists() && !held.isEmpty(), "the lock is not held");
+      } finally {
+        if (failing && exited.exists()) {
+          Files.setPosixFilePermissions(
+              exited.toPath(), PosixFilePermissions.fromString("rwx------"));
+        }
+      }
+    }
+
+    private static void awaitClaimed(long deadline) throws InterruptedException {
+      while (KeytabNames.isClaiming()) {
+        check(System.nanoTime() < deadline, "the directory was not claimed");
+        Thread.sleep(10);
+      }
+    }
+
+    private static void check(boolean condition, String message) {
+      if (!condition) {
+        throw new AssertionError(message);
+      }
+    }
   }
 
   /**

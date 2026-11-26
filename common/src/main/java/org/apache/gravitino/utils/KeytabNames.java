@@ -29,20 +29,20 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.DirectoryNotEmptyException;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 import java.nio.file.attribute.PosixFilePermission;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -67,8 +67,9 @@ import org.slf4j.LoggerFactory;
  * the copy is loaded. A JVM that exits without deleting its files leaves the lock free, and a later
  * JVM on a host with the same name and working directory deletes them. Files stay when the host
  * name changes or cannot be resolved, when the JVM exits before it locks its directory, when the
- * directory cannot be locked, and when {@code keytabs} is a link or others may write to it. Where
- * the file system has no POSIX permissions, as on Windows, the permissions are not checked.
+ * directory cannot be locked, when this user cannot enter it or open its lock file, as for another
+ * user's, and when {@code keytabs} is a link or others may write to it. Where the file system has
+ * no POSIX permissions, as on Windows, the permissions are not checked.
  */
 public final class KeytabNames {
 
@@ -79,8 +80,8 @@ public final class KeytabNames {
   private static final String LOCK_PREFIX = ".lock-";
   private static final long RETRY_NANOS = TimeUnit.MINUTES.toNanos(1);
   // Tells apart the JVMs that share a working directory. The copies of this class in one JVM share
-  // it through a system property, so that none opens the lock file of another: closing a channel
-  // on a file releases every lock the JVM holds on it.
+  // it through a system property, so that none opens the lock file of another, unless the property
+  // holds something else: closing a channel on a file releases every lock the JVM holds on it.
   private static final String JVM = jvmId();
   // Tells apart the copies of this class in a JVM.
   private static final String TOKEN = randomId();
@@ -91,9 +92,9 @@ public final class KeytabNames {
   // The used slots of each prefix, guarded by the map.
   private static final Map<String, BitSet> SLOTS = new HashMap<>();
   // The channels of this copy's lock file and of the lock files that other copies in this JVM
-  // hold. They stay open: closing a channel releases the locks the JVM holds on its file. Guarded
-  // by the list, as are the fields below.
-  private static final List<FileChannel> CHANNELS = new ArrayList<>();
+  // hold, by path. They stay open: closing a channel releases the locks the JVM holds on its file.
+  // Guarded by the map, as are the fields below.
+  private static final Map<Path, FileChannel> CHANNELS = new HashMap<>();
   private static boolean locked;
   private static boolean swept;
   private static boolean claiming;
@@ -198,6 +199,34 @@ public final class KeytabNames {
     }
   }
 
+  @VisibleForTesting
+  static boolean isClaiming() {
+    synchronized (CHANNELS) {
+      return claiming;
+    }
+  }
+
+  @VisibleForTesting
+  static boolean isSwept() {
+    synchronized (CHANNELS) {
+      return swept;
+    }
+  }
+
+  @VisibleForTesting
+  static void retryNow() {
+    synchronized (CHANNELS) {
+      lastClaimNanos = System.nanoTime() - RETRY_NANOS;
+    }
+  }
+
+  @VisibleForTesting
+  static boolean hasReservedSlots(String prefix) {
+    synchronized (SLOTS) {
+      return SLOTS.containsKey(prefix);
+    }
+  }
+
   /**
    * Locks the directory. Its lock file is locked under another name first, so that a lock file that
    * exists is always locked while the JVM that made it runs.
@@ -241,31 +270,66 @@ public final class KeytabNames {
    * @param root the directory that holds the keytab directories
    * @param jvm the id of this JVM, whose directories are never opened
    * @param host the host name of this JVM
-   * @param held receives the channels on the lock files that this JVM holds, which must stay open
-   * @throws IOException if the root cannot be listed
+   * @param held the channels on the lock files that this JVM holds, by path, which are not opened
+   *     again; receives those found, which must stay open
+   * @throws IOException if the root, or the attributes or the files of a directory, could not be
+   *     read, locked or deleted, which a later call may; the others are deleted all the same
    */
   @VisibleForTesting
-  static void sweep(File root, String jvm, String host, List<FileChannel> held) throws IOException {
-    if (!Files.isDirectory(root.toPath(), LinkOption.NOFOLLOW_LINKS) || othersMayWrite(root)) {
-      LOG.debug("Not deleting the keytab directories under {}, a link or writable by others", root);
+  static void sweep(File root, String jvm, String host, Map<Path, FileChannel> held)
+      throws IOException {
+    BasicFileAttributes rootAttributes;
+    try {
+      rootAttributes =
+          Files.readAttributes(root.toPath(), BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+    } catch (NoSuchFileException e) {
       return;
     }
+    if (!rootAttributes.isDirectory() || othersMayWrite(root)) {
+      LOG.warn("Not deleting the keytab directories under {}, a link or writable by others", root);
+      return;
+    }
+    IOException failure = null;
     try (DirectoryStream<Path> dirs = Files.newDirectoryStream(root.toPath())) {
       for (Path dir : dirs) {
         Matcher name = DIRECTORY.matcher(dir.getFileName().toString());
         Path lock = dir.resolve(LOCK_PREFIX + host);
-        if (!name.matches()
-            || name.group(1).equals(jvm)
-            || !Files.isDirectory(dir, LinkOption.NOFOLLOW_LINKS)
-            || !Files.isRegularFile(lock, LinkOption.NOFOLLOW_LINKS)) {
+        if (!name.matches() || name.group(1).equals(jvm) || held.containsKey(lock)) {
           continue;
         }
         try {
-          deleteIfUnlocked(dir, lock, held);
+          if (Files.readAttributes(dir, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS)
+                  .isDirectory()
+              && isLockFile(lock)) {
+            deleteIfUnlocked(dir, lock, held);
+          }
+        } catch (NoSuchFileException e) {
+          // Without a lock file for this host, or deleted by another JVM.
+          LOG.debug("Skipped the keytab directory {}", dir, e);
         } catch (IOException | RuntimeException e) {
           LOG.debug("Failed to delete the keytab directory {}", dir, e);
+          IOException cause = e instanceof IOException ? (IOException) e : new IOException(e);
+          if (failure == null) {
+            failure = cause;
+          } else {
+            failure.addSuppressed(cause);
+          }
         }
       }
+    }
+    if (failure != null) {
+      throw failure;
+    }
+  }
+
+  private static boolean isLockFile(Path lock) throws IOException {
+    try {
+      return Files.readAttributes(lock, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS)
+          .isRegularFile();
+    } catch (AccessDeniedException e) {
+      // This user cannot enter the directory, such as a 0700 one of another user.
+      LOG.debug("Skipped the keytab directory of {}", lock, e);
+      return false;
     }
   }
 
@@ -276,18 +340,22 @@ public final class KeytabNames {
       if (!isLocked()) {
         FileChannel channel = lock(dir, host);
         synchronized (CHANNELS) {
-          CHANNELS.add(channel);
+          CHANNELS.put(dir.getAbsoluteFile().toPath().resolve(LOCK_PREFIX + host), channel);
           locked = true;
         }
         // The lock file stays after the JVM exits, so that the next JVM on this host deletes a
         // keytab file that failed to be deleted at exit, and then the directory.
       }
-      List<FileChannel> held = new ArrayList<>();
+      Map<Path, FileChannel> held;
+      synchronized (CHANNELS) {
+        held = new HashMap<>(CHANNELS);
+      }
       try {
+        // Not marked swept if it fails, so that a later call sweeps again.
         sweep(dir.getAbsoluteFile().getParentFile(), JVM, host, held);
       } finally {
         synchronized (CHANNELS) {
-          CHANNELS.addAll(held);
+          CHANNELS.putAll(held);
         }
       }
       synchronized (CHANNELS) {
@@ -328,7 +396,8 @@ public final class KeytabNames {
   private static String jvmId() {
     String id = randomId();
     Object shared = System.getProperties().putIfAbsent(KeytabNames.class.getName() + ".jvm", id);
-    // A value set by anyone else is not used, so that the directory keeps its name.
+    // A value that is not 16 hex digits is not used, so that the directory name matches DIRECTORY.
+    // The copies then do not share an id.
     return shared instanceof String && ((String) shared).matches("[0-9a-f]{16}")
         ? (String) shared
         : id;
@@ -352,18 +421,25 @@ public final class KeytabNames {
     }
   }
 
-  private static void deleteIfUnlocked(Path dir, Path lock, List<FileChannel> held)
+  private static void deleteIfUnlocked(Path dir, Path lock, Map<Path, FileChannel> held)
       throws IOException {
-    FileChannel channel =
-        FileChannel.open(
-            lock, StandardOpenOption.READ, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
+    FileChannel channel;
+    try {
+      channel =
+          FileChannel.open(
+              lock, StandardOpenOption.READ, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
+    } catch (AccessDeniedException e) {
+      // This user cannot open the lock file, such as one of another user.
+      LOG.debug("Skipped the keytab directory {}", dir, e);
+      return;
+    }
     FileLock acquired;
     try {
       acquired = channel.tryLock();
     } catch (OverlappingFileLockException e) {
       // Another copy of this class in this JVM holds it: one that is deleting the same directory,
       // or one whose id the system property did not give.
-      held.add(channel);
+      held.put(lock, channel);
       return;
     } catch (IOException | RuntimeException e) {
       closeQuietly(channel, e);
@@ -381,14 +457,17 @@ public final class KeytabNames {
           }
         }
       }
-      Files.deleteIfExists(lock);
     } finally {
       channel.close();
     }
+    // Deleted after the channel is closed: NFS renames a file open on this host instead. No JVM
+    // claims this directory again, as it is named after a JVM that has exited.
+    Files.deleteIfExists(lock);
     try {
       Files.deleteIfExists(dir);
-    } catch (DirectoryNotEmptyException e) {
-      LOG.debug("Kept the keytab directory {}, which holds directories", dir);
+    } catch (IOException e) {
+      // Without a lock file, it is not deleted again.
+      LOG.debug("Kept the keytab directory {}", dir, e);
     }
   }
 }

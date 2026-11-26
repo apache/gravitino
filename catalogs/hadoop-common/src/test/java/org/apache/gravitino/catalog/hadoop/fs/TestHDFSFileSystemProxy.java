@@ -77,6 +77,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -95,10 +96,34 @@ public class TestHDFSFileSystemProxy {
           KerberosConfig.PRINCIPAL_KEY, "test@EXAMPLE.COM",
           KerberosConfig.KEY_TAB_URI_KEY, "file:///tmp/test.keytab");
 
+  // The keytab files are fetched into this directory instead of one under the working directory,
+  // whose locking and cleanup KeytabNames would start.
+  @TempDir File keytabRoot;
+
+  private MockedStatic<KeytabNames> keytabNames;
+
+  @BeforeEach
+  void fetchKeytabsIntoTheTestDirectory() {
+    // Stubbing with when() would call the real method once.
+    keytabNames =
+        mockStatic(
+            KeytabNames.class,
+            invocation ->
+                "directory".equals(invocation.getMethod().getName())
+                    ? new File(keytabRoot, "gravitino-test")
+                    : invocation.callRealMethod());
+  }
+
   // Running the shutdown hook hands over every later keytab file. No other test may see that.
   @AfterEach
   void resetKeytabHandOver() {
-    HDFSFileSystemProxy.resetKeytabFilesHandedOver();
+    try {
+      if (keytabNames != null) {
+        keytabNames.close();
+      }
+    } finally {
+      HDFSFileSystemProxy.resetKeytabFilesHandedOver();
+    }
   }
 
   @Test
@@ -334,6 +359,47 @@ public class TestHDFSFileSystemProxy {
           cleaner.set(registered);
         }
       }
+    }
+  }
+
+  @Test
+  public void testLoginsSucceedWhenTheCleanerCannotBeRegistered(@TempDir File keytabDir)
+      throws Exception {
+    // As under a security manager that denies adding shutdown hooks.
+    Runtime runtime = spy(Runtime.getRuntime());
+    Mockito.doThrow(new SecurityException("shutdownHooks"))
+        .when(runtime)
+        .addShutdownHook(
+            argThat(hook -> hook != null && "gravitino-keytab-cleaner".equals(hook.getName())));
+    AtomicReference<Thread> cleaner = keytabCleanerReference();
+    List<File> keytabs = new ArrayList<>();
+    KerberosClient client = mockLoggedInClient(keytabs);
+    Thread registered = cleaner.getAndSet(null);
+    try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
+        MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class);
+        MockedStatic<Runtime> runtimes = mockStatic(Runtime.class, Mockito.CALLS_REAL_METHODS)) {
+      stubKerberosLogin(clients, client);
+      stubKeytabFetch(authUtils, keytabDir);
+      runtimes.when(Runtime::getRuntime).thenReturn(runtime);
+      try (FileSystem first =
+              new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy();
+          FileSystem second =
+              new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy()) {
+        assertTrue(keytabs.get(0).exists());
+        assertTrue(keytabs.get(1).exists());
+        // The files are left to the next JVM, not handed to File.deleteOnExit one by one.
+        assertFalse(isDeletedOnExit(keytabs.get(0)));
+        assertFalse(isDeletedOnExit(keytabs.get(1)));
+      }
+      // Closing still deletes them.
+      assertFalse(keytabs.get(0).exists());
+      assertFalse(keytabs.get(1).exists());
+      // Hadoop may add a hook of its own while the first file system is created.
+      verify(runtime, times(1))
+          .addShutdownHook(
+              argThat(hook -> hook != null && "gravitino-keytab-cleaner".equals(hook.getName())));
+    } finally {
+      cleaner.set(registered);
     }
   }
 
@@ -722,19 +788,13 @@ public class TestHDFSFileSystemProxy {
                 written.set(true);
                 throw new IOException("Connection reset");
               });
-      try {
-        assertThrows(
-            GravitinoRuntimeException.class,
-            () -> new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG));
-        assertTrue(written.get());
-        assertFalse(destination.get().exists());
-        assertFalse(HDFSFileSystemProxy.isLiveKeytabFile(destination.get()));
-      } finally {
-        // The directory belongs to KeytabNames, which may be locking it.
-        if (destination.get() != null) {
-          Files.deleteIfExists(destination.get().toPath());
-        }
-      }
+      assertThrows(
+          GravitinoRuntimeException.class,
+          () -> new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG));
+      assertTrue(written.get());
+      assertFalse(destination.get().exists());
+      assertFalse(HDFSFileSystemProxy.isLiveKeytabFile(destination.get()));
+      assertTrue(destination.get().toPath().startsWith(keytabRoot.toPath()));
     }
   }
 

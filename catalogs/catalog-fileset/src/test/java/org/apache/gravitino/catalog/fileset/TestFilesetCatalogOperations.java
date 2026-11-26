@@ -78,6 +78,7 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.ConnectException;
 import java.nio.channels.spi.AbstractInterruptibleChannel;
 import java.nio.charset.StandardCharsets;
@@ -103,8 +104,11 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -2951,6 +2955,16 @@ public class TestFilesetCatalogOperations {
     }
   }
 
+  // Gives the current thread a context class loader that no other thread has, as the catalog's.
+  private static void runWithALoaderOfItsOwn(
+      AtomicReference<Thread> worker, AtomicReference<ClassLoader> loader) {
+    Thread current = Thread.currentThread();
+    ClassLoader own = new ClassLoader(current.getContextClassLoader()) {};
+    current.setContextClassLoader(own);
+    worker.set(current);
+    loader.set(own);
+  }
+
   // Starts the pool threads before a lookup with a short timeout, so that its tasks do not wait
   // for new threads past its deadline on a slow runner.
   private static void startWorkers(FilesetCatalogOperations ops) {
@@ -3700,8 +3714,11 @@ public class TestFilesetCatalogOperations {
             callers.submit(() -> ops.getFileSystemWithCache(path, second));
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (resolving.getNumberOfDependents() <= waiting) {
-          Assumptions.assumeFalse(
-              resolving.isDone() || secondLookup.isDone(), "the first lookup gave up before");
+          // Read first: once the settings are resolved, the second lookup finishes too.
+          boolean secondDone = secondLookup.isDone();
+          Assumptions.assumeFalse(resolving.isDone(), "the first lookup gave up before");
+          Assertions.assertFalse(
+              secondDone, "the second lookup did not wait for the settings being resolved");
           Assertions.assertTrue(System.nanoTime() < deadline, "the second lookup never waited");
           Thread.sleep(10);
         }
@@ -4080,9 +4097,189 @@ public class TestFilesetCatalogOperations {
 
   @Test
   @Timeout(60)
+  public void testPoolsForgetTheThreadsOfFinishedTasks() throws Exception {
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER)) {
+      Assertions.assertNotNull(
+          ops.getFileSystemWithCache(
+              new Path("hdfs://localhost:8020/cache_key"), filesetConf("svc@A.COM", "1")));
+      // Each pool thread leaves the set once its task returns, which may be just after the result.
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+      while (!ops.runningWorkers.isEmpty()) {
+        Assertions.assertTrue(System.nanoTime() < deadline, ops.runningWorkers.toString());
+        Thread.sleep(10);
+      }
+    }
+  }
+
+  @Test
+  @Timeout(60)
+  public void testClosingTheCatalogDropsTheQueuedTasks() throws Exception {
+    CountDownLatch never = new CountDownLatch(1);
+    AtomicBoolean ran = new AtomicBoolean();
+    FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER);
+    List<ThreadPoolExecutor> pools =
+        Arrays.asList(ops.fileSystemExecutor, ops.loginSettingsExecutor);
+    try {
+      try {
+        for (ThreadPoolExecutor pool : pools) {
+          int threads = pool.getCorePoolSize();
+          CountDownLatch started = new CountDownLatch(threads);
+          for (int i = 0; i < threads; i++) {
+            pool.execute(
+                () -> {
+                  started.countDown();
+                  try {
+                    never.await();
+                  } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                  }
+                });
+          }
+          Assertions.assertTrue(started.await(10, TimeUnit.SECONDS));
+          pool.execute(() -> ran.set(true));
+          Assertions.assertEquals(1, pool.getQueue().size());
+        }
+      } finally {
+        ops.close();
+      }
+      // The running tasks are interrupted and return, and their threads then find no task left.
+      for (ThreadPoolExecutor pool : pools) {
+        Assertions.assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS));
+      }
+      Assertions.assertFalse(ran.get());
+    } finally {
+      // Releases the tasks if they were not interrupted.
+      never.countDown();
+    }
+  }
+
+  @Test
+  @Timeout(60)
+  public void testATaskThatStartsAfterTheCatalogClosesIsInterrupted() throws Exception {
+    CountDownLatch hold = new CountDownLatch(1);
+    AtomicBoolean interrupted = new AtomicBoolean();
+    AtomicReference<ClassLoader> released = new AtomicReference<>();
+    ClassLoader loader = new ClassLoader(getClass().getClassLoader()) {};
+    // Not a spy: the pools would read the closed flag of the object it was copied from.
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
+      // A new thread holds its first task, which close() does not see until the task starts.
+      ThreadFactory threads = ops.fileSystemExecutor.getThreadFactory();
+      ops.fileSystemExecutor.setThreadFactory(
+          worker ->
+              threads.newThread(
+                  () -> {
+                    Uninterruptibles.awaitUninterruptibly(hold);
+                    worker.run();
+                  }));
+      Thread current = Thread.currentThread();
+      ClassLoader previous = current.getContextClassLoader();
+      // The new thread starts with the context class loader of the thread that submits the task.
+      current.setContextClassLoader(loader);
+      Future<?> task;
+      try {
+        task =
+            ops.fileSystemExecutor.submit(
+                () -> {
+                  interrupted.set(Thread.currentThread().isInterrupted());
+                  released.set(Thread.currentThread().getContextClassLoader());
+                });
+      } finally {
+        current.setContextClassLoader(previous);
+      }
+      ops.close();
+      hold.countDown();
+      task.get(10, TimeUnit.SECONDS);
+      Assertions.assertTrue(interrupted.get());
+      Assertions.assertNotSame(loader, released.get());
+      Assertions.assertSame(loader, released.get().getParent());
+    } finally {
+      hold.countDown();
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  @Timeout(60)
+  public void testClosingTheCatalogDoesNotWaitForATaskBlockedInARead(boolean creating)
+      throws Exception {
+    ReadingChannel channel = new ReadingChannel();
+    AtomicReference<Thread> worker = new AtomicReference<>();
+    AtomicReference<ClassLoader> loader = new AtomicReference<>();
+    Path path = new Path("hdfs://localhost:8020/cache_key");
+    ExecutorService caller = Executors.newSingleThreadExecutor();
+    FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER);
+    try {
+      if (creating) {
+        // Like a file system provider reading through a FileChannel on a mount that does not
+        // answer.
+        Mockito.doAnswer(
+                invocation -> {
+                  runWithALoaderOfItsOwn(worker, loader);
+                  return channel.read();
+                })
+            .when(ops)
+            .createFileSystem(any(), any(), any(), any(), any(), any());
+      } else {
+        // Like a read through a FileChannel on a mount that does not answer, while resolving the
+        // login settings.
+        AtomicInteger resolutions = new AtomicInteger();
+        Mockito.doAnswer(
+                invocation -> {
+                  if (resolutions.getAndIncrement() == 0) {
+                    runWithALoaderOfItsOwn(worker, loader);
+                    channel.read();
+                  }
+                  return invocation.callRealMethod();
+                })
+            .when(ops)
+            .resolveHdfsLogin(any());
+      }
+      caller.submit(
+          () ->
+              ops.getFileSystemWithCache(
+                  path,
+                  withSetting(
+                      filesetConf("svc@A.COM", "1"), FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "60")));
+      Assertions.assertTrue(channel.reading.await(10, TimeUnit.SECONDS));
+      CompletableFuture.runAsync(
+              () -> {
+                try {
+                  ops.close();
+                } catch (IOException e) {
+                  throw new UncheckedIOException(e);
+                }
+              })
+          .get(5, TimeUnit.SECONDS);
+      // The task is interrupted on a thread of its own, which waits for the read, without holding
+      // the lock of the pool.
+      Assertions.assertTrue(channel.closing.await(10, TimeUnit.SECONDS));
+      Assertions.assertEquals(
+          "gravitino-fileset-close-interrupter", channel.closer.get().getName());
+      ThreadPoolExecutor pool = creating ? ops.fileSystemExecutor : ops.loginSettingsExecutor;
+      Assertions.assertDoesNotThrow(
+          () -> CompletableFuture.supplyAsync(pool::getPoolSize).get(5, TimeUnit.SECONDS),
+          "the lock of the pool is held while the task is interrupted");
+      // Its context class loader, which the class loader cleaner looks for, is now a child of the
+      // one it ran with.
+      ClassLoader released = worker.get().getContextClassLoader();
+      Assertions.assertNotSame(loader.get(), released);
+      Assertions.assertSame(loader.get(), released.getParent());
+    } finally {
+      channel.release.countDown();
+      caller.shutdownNow();
+      ops.close();
+    }
+  }
+
+  @Test
+  @Timeout(60)
   public void testTaskTimedOutByTheTimerIsInterruptedOnAThreadOfItsOwn() throws Exception {
     ReadingChannel channel = new ReadingChannel();
-    ExecutorService pool = Executors.newSingleThreadExecutor();
+    ThreadPoolExecutor pool =
+        new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
+    // Started before the deadline is set, so that the task runs before it on a slow runner.
+    pool.prestartAllCoreThreads();
     try {
       // Nobody waits for the task, so the timer of orTimeout fails it.
       FilesetCatalogOperations.TimedTask.start(
@@ -4376,16 +4573,26 @@ public class TestFilesetCatalogOperations {
           .when(ops)
           .createFileSystem(any(), any(), any(), any(), any(), any());
       try {
-        caller.submit(
-            () ->
-                ops.getFileSystemWithCache(
-                    path, ImmutableMap.of(FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "60")));
+        Future<FileSystem> lookup =
+            caller.submit(
+                () ->
+                    ops.getFileSystemWithCache(
+                        path, ImmutableMap.of(FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "60")));
         Assertions.assertTrue(started.await(10, TimeUnit.SECONDS));
         // Closing the catalog does not wait for the file system being created.
         long start = System.nanoTime();
         ops.close();
         long closingMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
         Assertions.assertTrue(closingMillis < 5_000, "closed in " + closingMillis + " ms");
+        // The lookup does not get a file system of a closed catalog.
+        release.countDown();
+        ExecutionException e =
+            Assertions.assertThrows(
+                ExecutionException.class, () -> lookup.get(10, TimeUnit.SECONDS));
+        Assertions.assertTrue(
+            Throwables.getCausalChain(e).stream()
+                .anyMatch(t -> String.valueOf(t.getMessage()).contains("The catalog is closed")),
+            Throwables.getStackTraceAsString(e));
       } finally {
         release.countDown();
         caller.shutdownNow();
