@@ -550,6 +550,33 @@ public class TestGravitinoGlueCatalog {
   }
 
   @Test
+  void testMultiColumnBucketStaysBucketingForAHiveFormatTable() throws Exception {
+    // CLUSTERED BY (a, b) reaches the catalog as one bucket over two columns. Iceberg rejects
+    // that; on a Hive-format table it stays bucketing over both columns, as it always was.
+    CreatedTable created =
+        createThroughCatalog(
+            new Transform[] {Expressions.bucket(16, new String[] {"a", "b"})},
+            ImmutableMap.of(),
+            null);
+
+    Assertions.assertEquals(0, created.partitioning.length, "no partitioning may be sent");
+    Assertions.assertEquals(Strategy.HASH, created.distribution.strategy());
+    Assertions.assertEquals(16, created.distribution.number());
+    Assertions.assertEquals(2, created.distribution.expressions().length);
+    Assertions.assertArrayEquals(
+        new String[] {"a"},
+        ((org.apache.gravitino.rel.expressions.NamedReference)
+                created.distribution.expressions()[0])
+            .fieldName());
+    Assertions.assertArrayEquals(
+        new String[] {"b"},
+        ((org.apache.gravitino.rel.expressions.NamedReference)
+                created.distribution.expressions()[1])
+            .fieldName());
+    Assertions.assertEquals(0, created.sortOrders.length, "no sort order may be sent");
+  }
+
+  @Test
   void testExplicitHiveTableFormatBeatsAnIcebergCatalogDefault() throws Exception {
     // The server rejects bucket partitioning for a Hive-format table, so the table's own format
     // has to win over the catalog default.

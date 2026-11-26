@@ -289,9 +289,11 @@ Iceberg tables use the Iceberg type mapping, as with the Iceberg catalog: a Spar
 :::note
 Bucketing depends on the table format too. On an Iceberg-format table, `bucket(N, col)` becomes an
 Iceberg bucket partition. Iceberg buckets take exactly one column and have no sorted bucket, so
-`CLUSTERED BY (a, b) INTO N BUCKETS` is rejected by the catalog and
-`CLUSTERED BY (a) SORTED BY (ts) INTO N BUCKETS` fails when the table is created. On a
-Hive-format table a bucket stays Hive bucketing in both forms.
+`CLUSTERED BY (a, b) INTO N BUCKETS` is rejected by the Gravitino server and
+`CLUSTERED BY (a) SORTED BY (ts) INTO N BUCKETS` is rejected by the connector when the table is
+created. On a Hive-format table a bucket stays Hive bucketing in both forms. A table being created
+is in Iceberg format when its own `table-format` is `ICEBERG`, or when it has none and the catalog's
+`default-table-format` is `ICEBERG`.
 :::
 
 

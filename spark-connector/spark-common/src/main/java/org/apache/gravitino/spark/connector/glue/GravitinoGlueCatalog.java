@@ -241,9 +241,9 @@ public class GravitinoGlueCatalog extends BaseCatalog {
    * {@inheritDoc} Returns the converter for Hive-format tables: a Spark bucket transform becomes
    * bucketing (a hash distribution), which Hive stores, rather than a partition, which the server
    * rejects for them. Every other transform is a partition as usual. It is also the catalog-wide
-   * converter for every Gravitino-to-Spark translation, including the table createTable returns;
-   * only the Spark-to-Gravitino translation of a CREATE TABLE's transforms picks a converter per
-   * table format.
+   * transform converter for every Gravitino-to-Spark translation, including that of the table
+   * createTable returns; only the Spark-to-Gravitino translation of a CREATE TABLE's transforms
+   * picks a transform converter per table format.
    */
   @Override
   protected SparkTransformConverter getSparkTransformConverter() {
