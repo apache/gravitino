@@ -113,4 +113,52 @@ public final class GlossaryInvariants {
       }
     }
   }
+
+  /**
+   * Checks that every live binding row has non-null key fields, unique live keys, a live term in
+   * the same metalake, and a live target of its declared target type.
+   */
+  public static void assertBindings() throws Exception {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession();
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement()) {
+      Set<String> keys = new HashSet<>();
+      try (ResultSet rows =
+          statement.executeQuery(
+              "SELECT b.metalake_id, b.term_id, b.target_type, b.target_id, t.term_id,"
+                  + " CASE b.target_type"
+                  + "   WHEN 'CATALOG' THEN (SELECT c.catalog_id FROM catalog_meta c WHERE c.catalog_id=b.target_id AND c.metalake_id=b.metalake_id AND c.deleted_at=0)"
+                  + "   WHEN 'SCHEMA' THEN (SELECT s.schema_id FROM schema_meta s WHERE s.schema_id=b.target_id AND s.metalake_id=b.metalake_id AND s.deleted_at=0)"
+                  + "   WHEN 'TABLE' THEN (SELECT tb.table_id FROM table_meta tb WHERE tb.table_id=b.target_id AND tb.metalake_id=b.metalake_id AND tb.deleted_at=0)"
+                  + "   WHEN 'VIEW' THEN (SELECT v.view_id FROM view_meta v WHERE v.view_id=b.target_id AND v.metalake_id=b.metalake_id AND v.deleted_at=0)"
+                  + "   WHEN 'COLUMN' THEN (SELECT c.column_id FROM table_column_version_info c"
+                  + "     JOIN table_meta tb ON tb.table_id=c.table_id AND tb.deleted_at=0"
+                  + "     WHERE c.column_id=b.target_id AND c.metalake_id=b.metalake_id AND c.deleted_at=0"
+                  + "     AND c.table_version=(SELECT MAX(c2.table_version) FROM table_column_version_info c2 WHERE c2.column_id=c.column_id AND c2.deleted_at=0)"
+                  + "     AND c.column_op_type<>3 LIMIT 1)"
+                  + "   WHEN 'FILESET' THEN (SELECT f.fileset_id FROM fileset_meta f WHERE f.fileset_id=b.target_id AND f.metalake_id=b.metalake_id AND f.deleted_at=0)"
+                  + "   WHEN 'TOPIC' THEN (SELECT tp.topic_id FROM topic_meta tp WHERE tp.topic_id=b.target_id AND tp.metalake_id=b.metalake_id AND tp.deleted_at=0)"
+                  + "   WHEN 'MODEL' THEN (SELECT m.model_id FROM model_meta m WHERE m.model_id=b.target_id AND m.metalake_id=b.metalake_id AND m.deleted_at=0)"
+                  + "   WHEN 'METRIC' THEN (SELECT sm.metric_id FROM semantic_model_metric_meta sm"
+                  + "     JOIN semantic_model_meta model ON model.semantic_model_id=sm.semantic_model_id AND model.deleted_at=0"
+                  + "     WHERE sm.metric_id=b.target_id AND sm.metalake_id=b.metalake_id AND sm.deleted_at=0)"
+                  + "   ELSE NULL END AS live_target_id"
+                  + " FROM glossary_term_binding b"
+                  + " LEFT JOIN glossary_term_meta t ON t.term_id=b.term_id AND t.metalake_id=b.metalake_id AND t.deleted_at=0"
+                  + " WHERE b.deleted_at=0")) {
+        while (rows.next()) {
+          Assertions.assertNotNull(rows.getObject(2), "term_id must not be null");
+          Assertions.assertNotNull(rows.getObject(3), "target_type must not be null");
+          Assertions.assertNotNull(rows.getObject(4), "target_id must not be null");
+          String key = rows.getLong(2) + ":" + rows.getString(3) + ":" + rows.getLong(4);
+          Assertions.assertTrue(keys.add(key), "Duplicate live binding: " + key);
+          Assertions.assertNotNull(
+              rows.getObject(5), "Live binding must reference a live term: " + key);
+          Assertions.assertNotNull(
+              rows.getObject(6), "Live binding must reference a live target: " + key);
+        }
+      }
+    }
+  }
 }

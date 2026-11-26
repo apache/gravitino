@@ -472,6 +472,11 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       Class<E> clazz,
       Consumer<E> postDeleteAction)
       throws IOException {
+    if (entityType == Entity.EntityType.KNOWLEDGE_BASE_ARTICLE) {
+      return KnowledgeBaseArticleMetaService.getInstance()
+          .deleteAndGet(ident, (before, after) -> postDeleteAction.accept(clazz.cast(before)))
+          .map(clazz::cast);
+    }
     if (entityType != Entity.EntityType.FILESET) {
       return RelationalBackend.super.deleteAndGet(ident, entityType, clazz, postDeleteAction);
     }

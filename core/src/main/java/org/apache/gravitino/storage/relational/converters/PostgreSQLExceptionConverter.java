@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.sql.SQLException;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.postgresql.util.PSQLException;
 
 /**
  * Exception converter to Apache Gravitino exception for PostgreSQL. The definition of error codes
@@ -33,6 +34,16 @@ public class PostgreSQLExceptionConverter implements SQLExceptionConverter {
 
   /** It means a value is too long for its column in PostgreSQL. */
   private static final String STRING_DATA_RIGHT_TRUNCATION_ERROR_CODE = "22001";
+
+  /** Returns whether PostgreSQL reported a duplicate key for the named constraint. */
+  public boolean violatesUniqueConstraint(SQLException exception, String constraintName) {
+    if (exception instanceof PSQLException pg
+        && DUPLICATED_ENTRY_ERROR_CODE.equals(pg.getSQLState())) {
+      var diagnostic = pg.getServerErrorMessage();
+      return diagnostic != null && constraintName.equals(diagnostic.getConstraint());
+    }
+    return false;
+  }
 
   @Override
   @SuppressWarnings("FormatStringAnnotation")

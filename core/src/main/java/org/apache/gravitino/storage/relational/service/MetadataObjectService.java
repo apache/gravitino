@@ -241,6 +241,33 @@ public class MetadataObjectService {
   }
 
   /**
+   * Resolves a list of live entity IDs of one {@link MetadataObject.Type} to their current {@link
+   * MetadataObject} identities. Missing or concurrently deleted IDs are omitted.
+   *
+   * @param type The metadata object type.
+   * @param ids The entity IDs to resolve.
+   * @return A map of live entity ID to parsed {@link MetadataObject}.
+   */
+  public static Map<Long, MetadataObject> resolveMetadataObjects(
+      MetadataObject.Type type, List<Long> ids) {
+    if (ids == null || ids.isEmpty()) {
+      return Maps.newHashMap();
+    }
+    Function<List<Long>, Map<Long, String>> resolver = TYPE_TO_FULLNAME_FUNCTION_MAP.get(type);
+    if (resolver == null) {
+      throw new IllegalArgumentException("Unsupported metadata object type: " + type);
+    }
+    Map<Long, String> names = resolver.apply(ids);
+    Map<Long, MetadataObject> result = new HashMap<>(names.size());
+    for (Map.Entry<Long, String> entry : names.entrySet()) {
+      if (entry.getValue() != null) {
+        result.put(entry.getKey(), MetadataObjects.parse(entry.getValue(), type));
+      }
+    }
+    return result;
+  }
+
+  /**
    * Retrieves a map of Metalake object IDs to their full names.
    *
    * @param metalakeIds A list of Metalake object IDs to fetch names for.

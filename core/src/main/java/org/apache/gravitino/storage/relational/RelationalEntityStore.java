@@ -73,6 +73,7 @@ import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.Executable;
@@ -272,8 +273,7 @@ public class RelationalEntityStore
 
   @Override
   public boolean exists(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
-    if (entityType == Entity.EntityType.GLOSSARY_TERM
-        || entityType == Entity.EntityType.KNOWLEDGE_BASE_ARTICLE) {
+    if (requiresUncachedRead(entityType)) {
       return backend.exists(ident, entityType);
     }
     boolean existsInCache = cache.contains(ident, entityType);
@@ -317,8 +317,7 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> E get(
       NameIdentifier ident, Entity.EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException {
-    if (entityType == Entity.EntityType.GLOSSARY_TERM
-        || entityType == Entity.EntityType.KNOWLEDGE_BASE_ARTICLE) {
+    if (requiresUncachedRead(entityType)) {
       return backend.get(ident, entityType);
     }
     return cache.withCacheLock(
@@ -340,8 +339,7 @@ public class RelationalEntityStore
   @Override
   public <E extends Entity & HasIdentifier> List<E> batchGet(
       List<NameIdentifier> idents, Entity.EntityType entityType, Class<E> clazz) {
-    if (entityType == Entity.EntityType.GLOSSARY_TERM
-        || entityType == Entity.EntityType.KNOWLEDGE_BASE_ARTICLE) {
+    if (requiresUncachedRead(entityType)) {
       return backend.batchGet(idents, entityType);
     }
     List<E> allEntities = new ArrayList<>();
@@ -793,6 +791,14 @@ public class RelationalEntityStore
               entities.isEmpty() ? null : entities.get(0).type(),
               entities.isEmpty() ? null : entities.get(0).nameIdentifier()));
     }
+  }
+
+  // Definitions always require a store read. A transaction can see an older snapshot or its
+  // own uncommitted changes, so its reads must neither consume nor populate the shared cache.
+  private static boolean requiresUncachedRead(Entity.EntityType type) {
+    return type == Entity.EntityType.GLOSSARY_TERM
+        || type == Entity.EntityType.KNOWLEDGE_BASE_ARTICLE
+        || SqlSessions.hasActiveSession();
   }
 
   /** Describes a batch write by its size and its first entity, for a conflict message. */

@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -61,6 +62,7 @@ import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewVersionInfoMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
+import org.apache.gravitino.storage.relational.po.GlossaryTermBindingPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -274,6 +276,8 @@ public class CatalogMetaService {
     long catalogId = catalogPO.getCatalogId();
 
     if (cascade) {
+      AtomicReference<List<GlossaryTermBindingPO>> cascadeBindings =
+          new AtomicReference<>(List.of());
       SessionUtils.doMultipleWithCommit(
           () -> {
             // Delete the parent first, then its children. The parent delete locks the catalog row,
@@ -281,6 +285,13 @@ public class CatalogMetaService {
             // added or removed after this point. Anything that goes wrong later in this
             // transaction rolls this soft delete back with it.
             deleteCatalogWithVersion(identifier, catalogPO);
+            // Collect live bindings before child entity rows are soft-deleted, without locking
+            // glossary terms yet. Term locks are acquired only at the end of the transaction after
+            // all child endpoint locks are held, preserving the global endpoint -> term lock order.
+            cascadeBindings.set(
+                GlossaryTermBindingService.getInstance()
+                    .collectCatalogCascadeBindings(
+                        catalogPO.getMetalakeId(), catalogId, "DROP_CATALOG"));
             deleteSchemasWithVersions(identifier, catalogId);
           },
           () ->
@@ -364,7 +375,11 @@ public class CatalogMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   SemanticModelSourceMapper.class,
-                  mapper -> mapper.softDeleteByCatalogId(catalogId)));
+                  mapper -> mapper.softDeleteByCatalogId(catalogId)),
+          () ->
+              GlossaryTermBindingService.getInstance()
+                  .retireCollectedBindings(
+                      catalogPO.getMetalakeId(), cascadeBindings.get(), "DROP_CATALOG"));
     } else {
       SessionUtils.doMultipleWithCommit(
           () -> {
@@ -405,7 +420,15 @@ public class CatalogMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   StatisticMetaMapper.class,
-                  mapper -> mapper.softDeleteStatisticsByEntityId(catalogId)));
+                  mapper -> mapper.softDeleteStatisticsByEntityId(catalogId)),
+          () ->
+              GlossaryTermBindingService.getInstance()
+                  .cleanupObjectBindings(
+                      catalogPO.getMetalakeId(),
+                      GlossaryTermBindingService.TargetType.CATALOG,
+                      catalogId,
+                      catalogPO.getCatalogName(),
+                      "DROP_CATALOG"));
     }
 
     return true;
