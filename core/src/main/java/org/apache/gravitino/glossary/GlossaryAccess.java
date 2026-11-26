@@ -144,6 +144,10 @@ public final class GlossaryAccess {
               return false;
             }
           }
+          context.rememberTargetId(
+              metalake,
+              MetadataObjects.of(null, domain.name(), MetadataObject.Type.DOMAIN),
+              domain.id());
           return DomainAccess.allowed(
               authorizer,
               principal,

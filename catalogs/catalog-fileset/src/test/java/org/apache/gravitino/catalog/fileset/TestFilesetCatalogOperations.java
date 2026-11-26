@@ -412,17 +412,6 @@ public class TestFilesetCatalogOperations {
                       Mockito.anyString(), Mockito.anyString(), Mockito.eq("s1_" + name));
             });
 
-    multipleLocationsArguments()
-        .forEach(
-            arguments -> {
-              String name = (String) arguments.get()[0];
-              long schemaId = idGenerator.nextId();
-              doReturn(new SchemaIds(1L, 1L, schemaId))
-                  .when(spySchemaMetaService)
-                  .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
-                      Mockito.anyString(), Mockito.anyString(), Mockito.eq("s1_" + name));
-            });
-
     MockedStatic<MetalakeMetaService> metalakeMetaServiceMockedStatic =
         Mockito.mockStatic(MetalakeMetaService.class);
     MockedStatic<CatalogMetaService> catalogMetaServiceMockedStatic =
@@ -3790,7 +3779,7 @@ public class TestFilesetCatalogOperations {
           loadedFileset.storageLocations().get(LOCATION_NAME_UNKNOWN));
 
       // Test drop
-      ops.dropFileset(filesetIdent);
+      Assertions.assertTrue(ops.dropFileset(filesetIdent));
       for (Map.Entry<String, String> location : expect.entrySet()) {
         Path expectedPath = new Path(location.getValue());
         FileSystem fs = expectedPath.getFileSystem(new Configuration());

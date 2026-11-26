@@ -23,6 +23,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.meta.EntityIdResolver;
 import org.apache.gravitino.meta.NamespacedEntityId;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 public class CachedEntityIdResolver implements EntityIdResolver {
@@ -37,6 +38,9 @@ public class CachedEntityIdResolver implements EntityIdResolver {
 
   @Override
   public NamespacedEntityId getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type) {
+    if (SqlSessions.hasActiveSession()) {
+      return underlyingResolver.getEntityIds(nameIdentifier, type);
+    }
     return entityCache
         .getIfPresent(nameIdentifier, type)
         .map(
@@ -56,6 +60,9 @@ public class CachedEntityIdResolver implements EntityIdResolver {
 
   @Override
   public Long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type) {
+    if (SqlSessions.hasActiveSession()) {
+      return underlyingResolver.getEntityId(nameIdentifier, type);
+    }
     return entityCache
         .getIfPresent(nameIdentifier, type)
         .map(HasIdentifier::id)
