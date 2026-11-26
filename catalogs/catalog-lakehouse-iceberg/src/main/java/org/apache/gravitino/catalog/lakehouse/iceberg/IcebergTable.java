@@ -40,7 +40,7 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.utils.IcebergTableProperti
 import org.apache.gravitino.connector.BaseTable;
 import org.apache.gravitino.connector.TableOperations;
 import org.apache.gravitino.meta.AuditInfo;
-import org.apache.gravitino.rel.SupportsIcebergPartitionSpecs;
+import org.apache.gravitino.rel.SupportsPartitionSpecs;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -54,7 +54,7 @@ import org.apache.iceberg.rest.requests.CreateTableRequest;
 /** Represents an Apache Iceberg Table entity in the Iceberg table. */
 @ToString
 @Getter
-public class IcebergTable extends BaseTable implements SupportsIcebergPartitionSpecs {
+public class IcebergTable extends BaseTable implements SupportsPartitionSpecs {
 
   /**
    * A reserved property to specify the location of the table. The files of the table should be
@@ -92,7 +92,7 @@ public class IcebergTable extends BaseTable implements SupportsIcebergPartitionS
 
   /** {@inheritDoc} */
   @Override
-  public SupportsIcebergPartitionSpecs supportsIcebergPartitionSpecs() {
+  public SupportsPartitionSpecs supportsPartitionSpecs() {
     return this;
   }
 

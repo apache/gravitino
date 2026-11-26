@@ -23,14 +23,14 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 
 /**
- * Iceberg tables that expose every registered partition spec, not only the current default.
+ * Tables that expose every registered partition spec, not only the current default.
  *
- * <p>Iceberg keeps historical specs after partition evolution. Maintenance operations such as
- * rewrite manifests select a {@code spec_id}; callers use this capability to list valid IDs and
- * their transforms.
+ * <p>Some table formats keep historical specs after partition evolution (for example Apache
+ * Iceberg). Maintenance operations such as rewrite manifests select a {@code spec_id}; callers use
+ * this capability to list valid IDs and their transforms.
  */
 @Evolving
-public interface SupportsIcebergPartitionSpecs {
+public interface SupportsPartitionSpecs {
 
   /**
    * Returns the current default partition spec ID for the table.
@@ -40,10 +40,11 @@ public interface SupportsIcebergPartitionSpecs {
   int defaultPartitionSpecId();
 
   /**
-   * Returns every partition spec registered on the table, keyed by Iceberg {@code spec-id}.
+   * Returns every partition spec registered on the table, keyed by {@code spec-id}.
    *
-   * <p>Each value is the Gravitino transform list for that spec. The map is never null and never
-   * empty for a loaded Iceberg table (unpartitioned tables still have spec {@code 0}).
+   * <p>Each value is the Gravitino transform list for that spec. The map is never null. For formats
+   * that always retain a default unpartitioned spec (such as Iceberg), the map is also never empty
+   * for a loaded table.
    *
    * @return an unmodifiable map from spec ID to transforms
    */
