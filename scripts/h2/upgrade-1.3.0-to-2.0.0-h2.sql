@@ -518,6 +518,24 @@ CREATE INDEX IF NOT EXISTS idx_domain_members ON domain_member_rel (domain_id, d
 CREATE INDEX IF NOT EXISTS idx_domain_member_metalake ON domain_member_rel (metalake_id, deleted_at);
 CREATE INDEX IF NOT EXISTS idx_domain_member_deleted ON domain_member_rel (deleted_at, id);
 
+CREATE TABLE IF NOT EXISTS glossary_term_binding (
+    metalake_id BIGINT NOT NULL,
+    term_id BIGINT NOT NULL,
+    target_type VARCHAR(64) NOT NULL,
+    target_id BIGINT NOT NULL,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (term_id, target_type, target_id, deleted_at)
+);
+CREATE INDEX IF NOT EXISTS idx_glossary_binding_target ON glossary_term_binding (target_type, target_id, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_glossary_binding_metalake ON glossary_term_binding (metalake_id, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_glossary_binding_deleted ON glossary_term_binding (deleted_at, term_id, target_type, target_id);
+COMMENT ON TABLE glossary_term_binding IS 'glossary term bindings to metadata objects and semantic-model metrics';
+COMMENT ON COLUMN glossary_term_binding.metalake_id IS 'owning metalake id';
+COMMENT ON COLUMN glossary_term_binding.term_id IS 'bound glossary term id';
+COMMENT ON COLUMN glossary_term_binding.target_type IS 'binding target type (CATALOG, SCHEMA, TABLE, VIEW, COLUMN, FILESET, TOPIC, MODEL, or METRIC)';
+COMMENT ON COLUMN glossary_term_binding.target_id IS 'stable id of the bound metadata object, table column, or semantic-model metric';
+COMMENT ON COLUMN glossary_term_binding.deleted_at IS 'retirement time in epoch milliseconds, advanced past retained generations to avoid collisions, 0 means live';
+
 CREATE TABLE IF NOT EXISTS kb_article_meta (
     article_id BIGINT PRIMARY KEY COMMENT 'Stable Article ID',
     metalake_id BIGINT NOT NULL COMMENT 'Owning metalake ID',

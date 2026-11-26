@@ -136,6 +136,8 @@ public class AuthorizationRequestContext {
    */
   private volatile ActiveRoles activeRoles = currentPrincipalActiveRoles();
 
+  private final Map<String, Map<MetadataObject, Long>> observedTargetIds =
+      new ConcurrentHashMap<>();
   @Nullable private final String resolvedMetalake;
   @Nullable private final Function<MetadataObject, Optional<Long>> targetIdResolver;
 
@@ -156,6 +158,22 @@ public class AuthorizationRequestContext {
   @Nullable
   public Function<MetadataObject, Optional<Long>> targetIdResolver(String metalake) {
     return metalake.equals(resolvedMetalake) ? targetIdResolver : null;
+  }
+
+  /**
+   * Records an already loaded target for subsequent ownership and privilege checks in this request.
+   */
+  public void rememberTargetId(String metalake, MetadataObject target, long id) {
+    observedTargetIds
+        .computeIfAbsent(metalake, ignored -> new ConcurrentHashMap<>())
+        .put(target, id);
+  }
+
+  /** Returns a target ID observed by the calling operation in this request, if present. */
+  @Nullable
+  public Long observedTargetId(String metalake, MetadataObject target) {
+    Map<MetadataObject, Long> targets = observedTargetIds.get(metalake);
+    return targets == null ? null : targets.get(target);
   }
 
   private static ActiveRoles currentPrincipalActiveRoles() {
