@@ -5478,10 +5478,12 @@ public class TestFilesetCatalogOperations {
         .thenReturn(ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, LOCATION_NAME_UNKNOWN));
 
     ExecutorService executor = Executors.newFixedThreadPool(1);
+    // The close() of a mock shuts down neither.
+    ScheduledThreadPoolExecutor scheduler = new ScheduledThreadPoolExecutor(1);
     try (FilesetCatalogOperations mockOps = Mockito.mock(FilesetCatalogOperations.class)) {
       mockOps.hadoopConf = new Configuration();
       mockOps.conf = Maps.newHashMap();
-      mockOps.scheduler = new ScheduledThreadPoolExecutor(1);
+      mockOps.scheduler = scheduler;
       mockOps.fileSystemCache =
           Caffeine.newBuilder()
               .expireAfterAccess(1000 * 60 * 60 /* 1 hour */, TimeUnit.MILLISECONDS)
@@ -5529,6 +5531,7 @@ public class TestFilesetCatalogOperations {
       throw new RuntimeException(e);
     } finally {
       executor.shutdownNow();
+      scheduler.shutdownNow();
     }
   }
 
