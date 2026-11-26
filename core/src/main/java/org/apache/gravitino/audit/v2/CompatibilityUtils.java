@@ -228,6 +228,9 @@ public class CompatibilityUtils {
               Operation.LIST_SEMANTIC_MODEL_METRIC_INFOS)
           .put(OperationType.IMPORT_SEMANTIC_MODEL, Operation.IMPORT_SEMANTIC_MODEL)
           .put(OperationType.EXPORT_SEMANTIC_MODEL, Operation.EXPORT_SEMANTIC_MODEL)
+          .put(
+              OperationType.PUBLISH_SEMANTIC_MODEL_REVISION,
+              Operation.PUBLISH_SEMANTIC_MODEL_REVISION)
           .put(OperationType.REGISTER_FUNCTION, Operation.REGISTER_FUNCTION)
           .put(OperationType.GET_FUNCTION, Operation.GET_FUNCTION)
           .put(OperationType.ALTER_FUNCTION, Operation.ALTER_FUNCTION)

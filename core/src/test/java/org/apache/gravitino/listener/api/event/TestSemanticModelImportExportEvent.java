@@ -62,6 +62,7 @@ import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 import org.apache.gravitino.hook.SemanticModelHookDispatcher;
 import org.apache.gravitino.listener.DummyEventListener;
@@ -73,6 +74,9 @@ import org.apache.gravitino.listener.api.event.semantic.ExportSemanticModelPreEv
 import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelPreEvent;
+import org.apache.gravitino.listener.api.event.semantic.PublishSemanticModelRevisionEvent;
+import org.apache.gravitino.listener.api.event.semantic.PublishSemanticModelRevisionFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.PublishSemanticModelRevisionPreEvent;
 import org.apache.gravitino.semantic.Dataset;
 import org.apache.gravitino.semantic.OssieDocument;
 import org.apache.gravitino.semantic.OssieDocumentConverter;
@@ -109,7 +113,11 @@ class TestSemanticModelImportExportEvent {
     owners = mock(OwnerDispatcher.class);
     operation = mock(SemanticModelOperationDispatcher.class);
     doCallRealMethod().when(operation).importSemanticModel(any(), any(), any(), any(), any());
+<<<<<<< HEAD
     doCallRealMethod().when(operation).exportOssieDocument(any(), any());
+=======
+    doCallRealMethod().when(operation).exportSemanticModel(any(), any(), any(), any());
+>>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
     model = mock(SemanticModel.class);
     when(model.name()).thenReturn(IDENT.name());
     when(model.definition()).thenReturn(definition());
@@ -324,6 +332,33 @@ class TestSemanticModelImportExportEvent {
     assertEquals(IDENT, event.identifier());
     assertEquals(format, event.format());
     assertAudit(event, AuditLog.Operation.EXPORT_SEMANTIC_MODEL, OperationStatus.SUCCESS);
+  }
+
+  @Test
+  void testPublicationEventsRecordPublisherAndRevision() {
+    when(operation.publishSemanticModelRevision(NORMALIZED_IDENT, 7, "reviewer")).thenReturn(model);
+    assertEquals(model, dispatcher.publishSemanticModelRevision(IDENT, 7, "reviewer"));
+    PublishSemanticModelRevisionEvent event =
+        assertEvents(
+            PublishSemanticModelRevisionPreEvent.class, PublishSemanticModelRevisionEvent.class);
+    assertEquals("reviewer", event.user());
+    assertEquals("7", event.customInfo().get("revision"));
+    assertAudit(event, AuditLog.Operation.PUBLISH_SEMANTIC_MODEL_REVISION, OperationStatus.SUCCESS);
+  }
+
+  @Test
+  void testStalePublicationEmitsFailureEvent() {
+    when(operation.publishSemanticModelRevision(NORMALIZED_IDENT, 6, "reviewer"))
+        .thenThrow(new OptimisticLockException("Newer revision"));
+    assertThrows(
+        OptimisticLockException.class,
+        () -> dispatcher.publishSemanticModelRevision(IDENT, 6, "reviewer"));
+    PublishSemanticModelRevisionFailureEvent event =
+        assertEvents(
+            PublishSemanticModelRevisionPreEvent.class,
+            PublishSemanticModelRevisionFailureEvent.class);
+    assertEquals("6", event.customInfo().get("revision"));
+    assertAudit(event, AuditLog.Operation.PUBLISH_SEMANTIC_MODEL_REVISION, OperationStatus.FAILURE);
   }
 
   @ParameterizedTest

@@ -27,6 +27,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.Map;
+import java.util.function.Consumer;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
@@ -69,7 +70,16 @@ public class TestSemanticModelDispatcher {
   void testExportRequiresAnExplicitImplementation() throws NoSuchMethodException {
     assertFalse(
         SemanticModelDispatcher.class
+<<<<<<< HEAD
             .getMethod("exportOssieDocument", NameIdentifier.class, OssieFormat.class)
+=======
+            .getMethod(
+                "exportSemanticModel",
+                NameIdentifier.class,
+                SemanticModelRevisionSelector.class,
+                OssieFormat.class,
+                Consumer.class)
+>>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
             .isDefault());
   }
 

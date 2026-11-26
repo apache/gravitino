@@ -34,6 +34,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -43,6 +44,7 @@ import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import javax.servlet.http.HttpServletRequest;
@@ -79,6 +81,7 @@ import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
+import org.apache.gravitino.exceptions.NoSuchSemanticModelRevisionException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
@@ -118,6 +121,7 @@ import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.PassThroughAuthorizer;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
+import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
@@ -215,6 +219,12 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     Table table = registeredTable();
     when(tables.loadTable(any())).thenReturn(table);
     when(dispatcher.loadSemanticModel(any())).thenReturn(semanticModel("sales", null));
+<<<<<<< HEAD
+=======
+    when(dispatcher.loadSemanticModelRevision(
+            any(), eq(SemanticModelRevisionSelector.LATEST), any()))
+        .thenReturn(semanticModel("sales", null));
+>>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
     doCallRealMethod().when(dispatcher).importOssieDocument(any(), any(), any());
   }
 
@@ -784,6 +794,190 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   }
 
   @Test
+<<<<<<< HEAD
+=======
+  void testRevisionEndpointsReturnSnapshotMetadata() {
+    NameIdentifier ident = semanticModelIdentifier("sales");
+    SemanticModel published = semanticModel("sales", "First save");
+    when(dispatcher.listSemanticModelRevisions(ident))
+        .thenReturn(new SemanticModelRevision[] {published});
+    when(dispatcher.loadSemanticModelRevision(
+            eq(ident), eq(SemanticModelRevisionSelector.LATEST), any()))
+        .thenReturn(published);
+    when(dispatcher.exportSemanticModel(eq(ident), any(), eq(OssieFormat.JSON), any()))
+        .thenReturn(new SemanticModelDispatcher.SemanticModelExport(EXPORTED_JSON, 1));
+
+    String path = semanticModelPath() + "/sales/revisions";
+    SemanticModelRevisionListResponse history =
+        target(path).request(VND_V1_JSON).get(SemanticModelRevisionListResponse.class);
+    Assertions.assertEquals(1, history.revisions().length);
+    Assertions.assertEquals("tester", history.revisions()[0].publishedBy());
+    Assertions.assertEquals(SemanticModel.Status.PUBLISHED, history.revisions()[0].status());
+    SemanticModelResponse latest =
+        target(path + "/latest").request(VND_V1_JSON).get(SemanticModelResponse.class);
+    Assertions.assertEquals(1, latest.getSemanticModel().revision());
+    Assertions.assertEquals(
+        EXPORTED_JSON.content(),
+        target(path + "/1/ossie").queryParam("format", "json").request().get(String.class));
+    assertError(
+        target(path + "/0").request(VND_V1_JSON).get(),
+        Response.Status.BAD_REQUEST,
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+        IllegalArgumentException.class.getSimpleName(),
+        "Revision must be positive");
+  }
+
+  @Test
+  void testDraftsRequireModifyAuthorityOnRevisionEndpoints() throws IllegalAccessException {
+    NameIdentifier ident = semanticModelIdentifier("sales");
+    SemanticModel published = semanticModel("sales", "First save");
+    SemanticModel draft = semanticModel("sales", "Next draft", 2, SemanticModel.Status.DRAFT);
+    when(dispatcher.listSemanticModelRevisions(ident))
+        .thenReturn(new SemanticModelRevision[] {draft, published});
+    when(dispatcher.loadSemanticModelRevision(eq(ident), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              Consumer<SemanticModelRevision> check = invocation.getArgument(2);
+              check.accept(draft);
+              return draft;
+            });
+    when(dispatcher.exportSemanticModel(eq(ident), any(), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              Consumer<SemanticModelRevision> check = invocation.getArgument(3);
+              check.accept(draft);
+              return new SemanticModelDispatcher.SemanticModelExport(EXPORTED_YAML, 2);
+            });
+
+    SemanticModelOperations operations =
+        new SemanticModelOperations(
+            dispatcher,
+            new SemanticModelSourceValidator(
+                tables,
+                views,
+                () -> sourceAuthorizer,
+                ignored -> EnumSet.of(EntityType.TABLE, EntityType.VIEW)));
+    FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
+    try (MockedStatic<MetadataAuthzHelper> helper = mockStatic(MetadataAuthzHelper.class)) {
+      helper
+          .when(
+              () ->
+                  MetadataAuthzHelper.checkAccess(
+                      ident,
+                      EntityType.SEMANTIC_MODEL,
+                      AuthorizationExpressionConstants
+                          .MODIFY_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION))
+          .thenReturn(false);
+      Response history = operations.listSemanticModelRevisions(metalake, catalog, schema, "sales");
+      Assertions.assertEquals(
+          1, ((SemanticModelRevisionListResponse) history.getEntity()).revisions().length);
+      JsonNode wireHistory = ObjectMapperProvider.objectMapper().valueToTree(history.getEntity());
+      Assertions.assertEquals(
+          "PUBLISHED", wireHistory.path("revisions").path(0).path("status").asText());
+      Response hidden =
+          operations.loadSemanticModelRevision(metalake, catalog, schema, "sales", "02");
+      Assertions.assertEquals(404, hidden.getStatus());
+      ErrorResponse hiddenError = (ErrorResponse) hidden.getEntity();
+      Assertions.assertNull(hiddenError.getStack());
+      Assertions.assertEquals(
+          NoSuchSemanticModelRevisionException.class.getSimpleName(), hiddenError.getType());
+      Assertions.assertTrue(hiddenError.getMessage().contains("Revision 2"));
+      Assertions.assertEquals(
+          404,
+          operations
+              .exportSemanticModelRevision(metalake, catalog, schema, "sales", "2", "yaml")
+              .getStatus());
+      when(dispatcher.listSemanticModelRevisions(ident))
+          .thenReturn(new SemanticModelRevision[] {draft});
+      Assertions.assertEquals(
+          404,
+          operations.listSemanticModelRevisions(metalake, catalog, schema, "sales").getStatus());
+
+      helper
+          .when(
+              () ->
+                  MetadataAuthzHelper.checkAccess(
+                      ident,
+                      EntityType.SEMANTIC_MODEL,
+                      AuthorizationExpressionConstants
+                          .MODIFY_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION))
+          .thenReturn(true);
+      Response loaded =
+          operations.loadSemanticModelRevision(metalake, catalog, schema, "sales", "latest");
+      Assertions.assertEquals(200, loaded.getStatus());
+      JsonNode wireSnapshot = ObjectMapperProvider.objectMapper().valueToTree(loaded.getEntity());
+      Assertions.assertEquals("DRAFT", wireSnapshot.path("semanticModel").path("status").asText());
+      Assertions.assertEquals(
+          200,
+          operations
+              .exportSemanticModelRevision(metalake, catalog, schema, "sales", "2", "yaml")
+              .getStatus());
+      Response draftHistory =
+          operations.listSemanticModelRevisions(metalake, catalog, schema, "sales");
+      Assertions.assertEquals(
+          2,
+          ((SemanticModelRevisionListResponse) draftHistory.getEntity()).revisions()[0].revision());
+      JsonNode wireDraftHistory =
+          ObjectMapperProvider.objectMapper().valueToTree(draftHistory.getEntity());
+      Assertions.assertEquals(
+          "DRAFT", wireDraftHistory.path("revisions").path(0).path("status").asText());
+    }
+  }
+
+  @Test
+  void testReplacementRequiresExpectedRevisionAndRejectsStaleValue() {
+    SemanticModelUpdateRequest update =
+        new SemanticModelUpdateRequest.ReplaceSemanticModelDefinitionRequest(
+            SemanticModelDefinitionDTO.fromDefinition(semanticModelDefinition()));
+    assertError(
+        put(semanticModelPath() + "/sales", new SemanticModelUpdatesRequest(List.of(update))),
+        Response.Status.BAD_REQUEST,
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+        IllegalArgumentException.class.getSimpleName(),
+        "expectedRevision is required");
+    assertError(
+        put(semanticModelPath() + "/sales", new SemanticModelUpdatesRequest(List.of(update), 2)),
+        Response.Status.CONFLICT,
+        ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE,
+        OptimisticLockException.class.getSimpleName(),
+        "expected 2");
+    verifyNoInteractions(tables, views);
+    verifyNoModelWrites();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"1.9", "\"1\"", "2147483648", "true"})
+  void testExpectedRevisionRejectsInvalidJsonNumbers(String revision) {
+    String json =
+        """
+        {"expectedRevision": %s, "updates": [{"@type": "updateComment", "newComment": "edit"}]}
+        """
+            .formatted(revision);
+    try (Response response =
+        target(semanticModelPath() + "/sales").request(VND_V1_JSON).put(Entity.json(json))) {
+      Assertions.assertEquals(400, response.getStatus());
+    }
+    verifyNoInteractions(dispatcher);
+  }
+
+  @Test
+  void testRenameMustBeTheOnlyChange() {
+    SemanticModelUpdatesRequest request =
+        new SemanticModelUpdatesRequest(
+            List.of(
+                new SemanticModelUpdateRequest.RenameSemanticModelRequest("renamed"),
+                new SemanticModelUpdateRequest.UpdateSemanticModelCommentRequest("Updated")));
+    assertError(
+        put(semanticModelPath() + "/sales", request),
+        Response.Status.BAD_REQUEST,
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+        IllegalArgumentException.class.getSimpleName(),
+        "Rename must be the only");
+    verifyNoModelWrites();
+  }
+
+  @Test
+>>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
   void testAlterSemanticModelRejectsNullBody() {
     assertError(
         putJson(semanticModelPath() + "/sales", "null"),
@@ -984,7 +1178,12 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void testMissingModelBeforeSourceValidation(boolean unavailableSource) {
+<<<<<<< HEAD
     when(dispatcher.loadSemanticModel(semanticModelIdentifier("sales")))
+=======
+    when(dispatcher.loadSemanticModelRevision(
+            eq(semanticModelIdentifier("sales")), eq(SemanticModelRevisionSelector.LATEST), any()))
+>>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
         .thenThrow(new NoSuchSemanticModelException("sales does not exist"));
     when(tables.loadTable(any()))
         .thenThrow(
@@ -1338,8 +1537,17 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   @Test
   void testExportOssieYamlAndJsonDocuments() {
     NameIdentifier ident = semanticModelIdentifier("sales");
+<<<<<<< HEAD
     when(dispatcher.exportOssieDocument(ident, OssieFormat.YAML)).thenReturn(EXPORTED_YAML);
     when(dispatcher.exportOssieDocument(ident, OssieFormat.JSON)).thenReturn(EXPORTED_JSON);
+=======
+    when(dispatcher.exportSemanticModel(
+            eq(ident), eq(SemanticModelRevisionSelector.ACTIVE), eq(OssieFormat.YAML), any()))
+        .thenReturn(new SemanticModelDispatcher.SemanticModelExport(EXPORTED_YAML, 1));
+    when(dispatcher.exportSemanticModel(
+            eq(ident), eq(SemanticModelRevisionSelector.ACTIVE), eq(OssieFormat.JSON), any()))
+        .thenReturn(new SemanticModelDispatcher.SemanticModelExport(EXPORTED_JSON, 1));
+>>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
 
     Response yamlResponse = getOssie(semanticModelPath() + "/sales/ossie");
 
@@ -1362,8 +1570,17 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         "attachment; filename=\"sales.ossie.json\"",
         jsonResponse.getHeaderString("Content-Disposition"));
     Assertions.assertEquals(EXPORTED_JSON.content(), jsonResponse.readEntity(String.class));
+<<<<<<< HEAD
     verify(dispatcher).exportOssieDocument(ident, OssieFormat.YAML);
     verify(dispatcher).exportOssieDocument(ident, OssieFormat.JSON);
+=======
+    verify(dispatcher)
+        .exportSemanticModel(
+            eq(ident), eq(SemanticModelRevisionSelector.ACTIVE), eq(OssieFormat.YAML), any());
+    verify(dispatcher)
+        .exportSemanticModel(
+            eq(ident), eq(SemanticModelRevisionSelector.ACTIVE), eq(OssieFormat.JSON), any());
+>>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
     verifyNoMoreInteractions(dispatcher);
   }
 
@@ -1459,14 +1676,31 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   void testOssieExportPropagatesDispatcherErrors() {
     doThrow(new NoSuchSemanticModelException("sales does not exist"))
         .when(dispatcher)
+<<<<<<< HEAD
         .exportOssieDocument(semanticModelIdentifier("sales"), OssieFormat.YAML);
+=======
+        .exportSemanticModel(
+            eq(semanticModelIdentifier("sales")),
+            eq(SemanticModelRevisionSelector.ACTIVE),
+            eq(OssieFormat.YAML),
+            any());
+>>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
     assertError(
         getOssie(semanticModelPath() + "/sales/ossie"),
         Response.Status.NOT_FOUND,
         ErrorConstants.NOT_FOUND_CODE,
         NoSuchSemanticModelException.class.getSimpleName(),
         "sales does not exist");
+<<<<<<< HEAD
     verify(dispatcher).exportOssieDocument(semanticModelIdentifier("sales"), OssieFormat.YAML);
+=======
+    verify(dispatcher)
+        .exportSemanticModel(
+            eq(semanticModelIdentifier("sales")),
+            eq(SemanticModelRevisionSelector.ACTIVE),
+            eq(OssieFormat.YAML),
+            any());
+>>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
     verifyNoMoreInteractions(dispatcher);
   }
 
@@ -1531,10 +1765,20 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   void testExportEmitsDedicatedEventsWithoutSourceLookup(boolean missing) {
     NameIdentifier ident = semanticModelIdentifier("sales");
     if (missing) {
+<<<<<<< HEAD
       when(dispatcher.exportOssieDocument(ident, OssieFormat.YAML))
           .thenThrow(new NoSuchSemanticModelException("missing model"));
     } else {
       when(dispatcher.exportOssieDocument(ident, OssieFormat.YAML)).thenReturn(EXPORTED_YAML);
+=======
+      when(dispatcher.exportSemanticModel(
+              eq(ident), eq(SemanticModelRevisionSelector.ACTIVE), eq(OssieFormat.YAML), any()))
+          .thenThrow(new NoSuchSemanticModelException("missing model"));
+    } else {
+      when(dispatcher.exportSemanticModel(
+              eq(ident), eq(SemanticModelRevisionSelector.ACTIVE), eq(OssieFormat.YAML), any()))
+          .thenReturn(new SemanticModelDispatcher.SemanticModelExport(EXPORTED_YAML, 1));
+>>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
     }
     try (Response response = getOssie(semanticModelPath() + "/sales/ossie")) {
       Assertions.assertEquals(missing ? 404 : 200, response.getStatus());
@@ -1547,7 +1791,13 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         events.getAllValues().get(1).getClass());
     verifyNoInteractions(tables, views);
     verifyNoModelWrites();
+<<<<<<< HEAD
     verify(dispatcher).exportOssieDocument(ident, OssieFormat.YAML);
+=======
+    verify(dispatcher)
+        .exportSemanticModel(
+            eq(ident), eq(SemanticModelRevisionSelector.ACTIVE), eq(OssieFormat.YAML), any());
+>>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
     verifyNoMoreInteractions(dispatcher);
   }
 

@@ -29,6 +29,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Catalog;
@@ -173,6 +174,33 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
   }
 
   @Override
+<<<<<<< HEAD
+=======
+  public SemanticModel loadSemanticModelRevision(
+      NameIdentifier ident,
+      SemanticModelRevisionSelector selector,
+      Consumer<SemanticModelRevision> checkVisibility) {
+    checkModelParent(ident);
+    SemanticModel model = managedOperations.loadSemanticModelRevision(ident, selector);
+    checkVisibility.accept(model);
+    return model;
+  }
+
+  @Override
+  public SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident) {
+    checkModelParent(ident);
+    return managedOperations.listSemanticModelRevisions(ident);
+  }
+
+  @Override
+  public SemanticModel publishSemanticModelRevision(
+      NameIdentifier ident, int revision, String principal) {
+    checkModelParent(ident);
+    return managedOperations.publishSemanticModelRevision(ident, revision, principal);
+  }
+
+  @Override
+>>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
   public SemanticModel createSemanticModel(
       NameIdentifier ident,
       @Nullable String comment,
@@ -207,8 +235,25 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
 
   /** {@inheritDoc} */
   @Override
+<<<<<<< HEAD
   public OssieDocument exportOssieDocument(NameIdentifier ident, OssieFormat format) {
     return OssieDocumentConverter.exportDocument(loadSemanticModel(ident), format);
+=======
+  public SemanticModelExport exportSemanticModel(
+      NameIdentifier ident,
+      SemanticModelRevisionSelector selector,
+      OssieFormat format,
+      Consumer<SemanticModelRevision> checkVisibility) {
+    SemanticModel model;
+    if (selector == SemanticModelRevisionSelector.ACTIVE) {
+      model = loadSemanticModel(ident);
+      checkVisibility.accept(model);
+    } else {
+      model = loadSemanticModelRevision(ident, selector, checkVisibility);
+    }
+    return new SemanticModelExport(
+        OssieDocumentConverter.exportDocument(model, format), model.revision());
+>>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
   }
 
   @Override

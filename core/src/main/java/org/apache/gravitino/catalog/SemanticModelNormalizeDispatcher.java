@@ -27,6 +27,7 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.withCapability;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
@@ -105,6 +106,29 @@ public class SemanticModelNormalizeDispatcher implements SemanticModelDispatcher
   }
 
   @Override
+<<<<<<< HEAD
+=======
+  public SemanticModel loadSemanticModelRevision(
+      NameIdentifier ident,
+      SemanticModelRevisionSelector selector,
+      Consumer<SemanticModelRevision> checkVisibility) {
+    return dispatcher.loadSemanticModelRevision(
+        normalizeForLookup(ident), selector, checkVisibility);
+  }
+
+  @Override
+  public SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident) {
+    return dispatcher.listSemanticModelRevisions(normalizeForLookup(ident));
+  }
+
+  @Override
+  public SemanticModel publishSemanticModelRevision(
+      NameIdentifier ident, int revision, String principal) {
+    return dispatcher.publishSemanticModelRevision(normalizeForLookup(ident), revision, principal);
+  }
+
+  @Override
+>>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
   public SemanticModel createSemanticModel(
       NameIdentifier ident,
       @Nullable String comment,
@@ -129,8 +153,18 @@ public class SemanticModelNormalizeDispatcher implements SemanticModelDispatcher
   }
 
   @Override
+<<<<<<< HEAD
   public OssieDocument exportOssieDocument(NameIdentifier ident, OssieFormat format) {
     return dispatcher.exportOssieDocument(normalizeForLookup(ident), format);
+=======
+  public SemanticModelExport exportSemanticModel(
+      NameIdentifier ident,
+      SemanticModelRevisionSelector selector,
+      OssieFormat format,
+      Consumer<SemanticModelRevision> checkVisibility) {
+    return dispatcher.exportSemanticModel(
+        normalizeForLookup(ident), selector, format, checkVisibility);
+>>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
   }
 
   @Override

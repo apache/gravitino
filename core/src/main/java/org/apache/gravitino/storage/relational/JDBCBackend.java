@@ -143,6 +143,27 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   }
 
   @Override
+<<<<<<< HEAD
+=======
+  public SemanticModelEntity loadSemanticModelRevision(
+      NameIdentifier ident, SemanticModelRevisionSelector selector) throws IOException {
+    return SemanticModelMetaService.getInstance().getSemanticModelByIdentifier(ident, selector);
+  }
+
+  @Override
+  public SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident)
+      throws IOException {
+    return SemanticModelMetaService.getInstance().listSemanticModelRevisions(ident);
+  }
+
+  @Override
+  public SemanticModelEntity publishSemanticModelRevision(
+      NameIdentifier ident, int revision, String principal) throws IOException {
+    return SemanticModelMetaService.getInstance().publishRevision(ident, revision, principal);
+  }
+
+  @Override
+>>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
   public List<NameIdentifier> listSemanticModelIdentifiers(Namespace namespace) throws IOException {
     return SemanticModelMetaService.getInstance().listSemanticModelIdentifiers(namespace);
   }

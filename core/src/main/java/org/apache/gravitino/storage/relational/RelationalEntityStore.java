@@ -249,6 +249,31 @@ public class RelationalEntityStore
   }
 
   @Override
+<<<<<<< HEAD
+=======
+  public SemanticModelEntity loadSemanticModelRevision(
+      NameIdentifier ident, SemanticModelRevisionSelector selector) throws IOException {
+    return backend.loadSemanticModelRevision(ident, selector);
+  }
+
+  @Override
+  public SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident)
+      throws IOException {
+    return backend.listSemanticModelRevisions(ident);
+  }
+
+  @Override
+  public SemanticModelEntity publishSemanticModelRevision(
+      NameIdentifier ident, int revision, String principal) throws IOException {
+    try {
+      return backend.publishSemanticModelRevision(ident, revision, principal);
+    } catch (RuntimeException e) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(e, Entity.EntityType.SEMANTIC_MODEL, ident);
+    }
+  }
+
+  @Override
+>>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
   public List<NameIdentifier> listSemanticModelIdentifiers(Namespace namespace) throws IOException {
     return backend.listSemanticModelIdentifiers(namespace);
   }

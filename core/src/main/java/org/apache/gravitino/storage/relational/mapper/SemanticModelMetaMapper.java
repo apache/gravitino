@@ -194,6 +194,33 @@ public interface SemanticModelMetaMapper {
       @Param("newSemanticModelMeta") SemanticModelPO newSemanticModelPO,
       @Param("oldSemanticModelMeta") SemanticModelPO oldSemanticModelPO);
 
+<<<<<<< HEAD
+=======
+  /** Renames an identity that still has the observed name and optional expected revision. */
+  @Update(
+      """
+      <script>
+      UPDATE semantic_model_meta SET semantic_model_name = #{newName}, audit_info = #{auditInfo}
+      WHERE semantic_model_id = #{observed.semanticModelId}
+        AND semantic_model_name = #{observed.semanticModelName} AND deleted_at = 0
+      <if test="expectedRevision != null">AND current_version = #{expectedRevision}</if>
+      </script>
+      """)
+  int renameSemanticModel(
+      @Param("observed") SemanticModelPO observed,
+      @Param("newName") String newName,
+      @Param("auditInfo") String auditInfo,
+      @Param("expectedRevision") @Nullable Integer expectedRevision);
+
+  /** Activates a revision if it is still the latest saved revision. */
+  @Update(
+      """
+      UPDATE semantic_model_meta SET active_version = #{revision}
+      WHERE semantic_model_id = #{modelId} AND current_version = #{revision} AND deleted_at = 0
+      """)
+  int activateRevision(@Param("modelId") long modelId, @Param("revision") int revision);
+
+>>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
   /** Soft-deletes a Semantic Model identity by stable ID and observed name. */
   @UpdateProvider(
       type = SemanticModelMetaSQLProviderFactory.class,

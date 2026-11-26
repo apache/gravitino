@@ -24,6 +24,7 @@ import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.SelectProvider;
+import org.apache.ibatis.annotations.Update;
 import org.apache.ibatis.annotations.UpdateProvider;
 
 /** A MyBatis mapper for Semantic Model version snapshot operations. */
@@ -46,6 +47,35 @@ public interface SemanticModelVersionInfoMapper {
   SemanticModelVersionInfoPO selectSemanticModelVersionInfoBySemanticModelIdAndVersion(
       @Param("semanticModelId") Long semanticModelId, @Param("version") Integer version);
 
+<<<<<<< HEAD
+=======
+  /** Lists the metadata of retained revisions without loading their definitions. */
+  @Select(
+      """
+      SELECT version, publication_status AS publicationStatus, published_by AS publishedBy,
+        published_at AS publishedAt, audit_info AS auditInfo
+      FROM semantic_model_version_info
+      WHERE semantic_model_id = #{modelId} AND deleted_at = 0
+      ORDER BY version DESC
+      """)
+  List<SemanticModelVersionInfoPO> listRevisionInfo(@Param("modelId") long modelId);
+
+  /** Records the publisher for a live draft. */
+  @Update(
+      """
+      UPDATE semantic_model_version_info
+      SET publication_status = 'PUBLISHED_EXPLICITLY', published_by = #{publisher},
+        published_at = #{publishedAt}
+      WHERE semantic_model_id = #{modelId} AND version = #{revision}
+        AND publication_status = 'DRAFT' AND deleted_at = 0
+      """)
+  int publishRevision(
+      @Param("modelId") long modelId,
+      @Param("revision") int revision,
+      @Param("publisher") String publisher,
+      @Param("publishedAt") long publishedAt);
+
+>>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
   /** Soft-deletes all snapshots for a Semantic Model ID. */
   @UpdateProvider(
       type = SemanticModelVersionInfoSQLProviderFactory.class,

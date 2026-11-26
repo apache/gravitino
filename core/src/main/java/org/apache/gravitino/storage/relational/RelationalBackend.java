@@ -57,6 +57,27 @@ public interface RelationalBackend
     return get(identifier, Entity.EntityType.TABLE).id();
   }
 
+<<<<<<< HEAD
+=======
+  /** Loads a retained Semantic Model snapshot or the latest saved revision. */
+  default SemanticModelEntity loadSemanticModelRevision(
+      NameIdentifier ident, SemanticModelRevisionSelector selector) throws IOException {
+    throw new UnsupportedOperationException("Loading Semantic Model revisions is not supported");
+  }
+
+  /** Lists retained Semantic Model revision metadata newest first. */
+  default SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident)
+      throws IOException {
+    throw new UnsupportedOperationException("Listing Semantic Model revisions is not supported");
+  }
+
+  /** Publishes the latest Semantic Model revision. */
+  default SemanticModelEntity publishSemanticModelRevision(
+      NameIdentifier ident, int revision, String principal) throws IOException {
+    throw new UnsupportedOperationException("Publishing Semantic Model revisions is not supported");
+  }
+
+>>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
   /** Lists model identities for governance, irrespective of publication state. */
   default List<NameIdentifier> listSemanticModelIdentifiers(Namespace namespace)
       throws IOException {

@@ -20,6 +20,7 @@
 package org.apache.gravitino.hook;
 
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
@@ -97,6 +98,28 @@ public class SemanticModelHookDispatcher implements SemanticModelDispatcher {
   }
 
   @Override
+<<<<<<< HEAD
+=======
+  public SemanticModel loadSemanticModelRevision(
+      NameIdentifier ident,
+      SemanticModelRevisionSelector selector,
+      Consumer<SemanticModelRevision> checkVisibility) {
+    return dispatcher.loadSemanticModelRevision(ident, selector, checkVisibility);
+  }
+
+  @Override
+  public SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident) {
+    return dispatcher.listSemanticModelRevisions(ident);
+  }
+
+  @Override
+  public SemanticModel publishSemanticModelRevision(
+      NameIdentifier ident, int revision, String principal) {
+    return dispatcher.publishSemanticModelRevision(ident, revision, principal);
+  }
+
+  @Override
+>>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
   public SemanticModel createSemanticModel(
       NameIdentifier ident,
       @Nullable String comment,
@@ -125,8 +148,17 @@ public class SemanticModelHookDispatcher implements SemanticModelDispatcher {
   }
 
   @Override
+<<<<<<< HEAD
   public OssieDocument exportOssieDocument(NameIdentifier ident, OssieFormat format) {
     return dispatcher.exportOssieDocument(ident, format);
+=======
+  public SemanticModelExport exportSemanticModel(
+      NameIdentifier ident,
+      SemanticModelRevisionSelector selector,
+      OssieFormat format,
+      Consumer<SemanticModelRevision> checkVisibility) {
+    return dispatcher.exportSemanticModel(ident, selector, format, checkVisibility);
+>>>>>>> ac461b995 ([#15249] feat: Support deferred Semantic Model publication (#15253))
   }
 
   @Override
