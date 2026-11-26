@@ -317,10 +317,12 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "406":
+          $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
         "409":
           $ref: "#/components/responses/Conflict"
         5XX:
-          $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+          $ref: "#/components/responses/BindingServerError"
   "/metalakes/{metalake}/objects/{type}/{fullName}/terms":
     parameters:
       - $ref: ./openapi.yaml#/components/parameters/metalake
@@ -377,10 +379,12 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "406":
+          $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
         "409":
           $ref: "#/components/responses/Conflict"
         5XX:
-          $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+          $ref: "#/components/responses/BindingServerError"
     post:
       operationId: associateObjectTerms
       tags: [glossary]
@@ -407,12 +411,14 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "406":
+          $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
         "409":
           $ref: "#/components/responses/Conflict"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
         5XX:
-          $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+          $ref: "#/components/responses/BindingServerError"
   "/metalakes/{metalake}/objects/semantic_model/{fullName}/metrics/{metric}/terms":
     parameters:
       - $ref: ./openapi.yaml#/components/parameters/metalake
@@ -460,10 +466,12 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "406":
+          $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
         "409":
           $ref: "#/components/responses/Conflict"
         5XX:
-          $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+          $ref: "#/components/responses/BindingServerError"
     post:
       operationId: associateMetricTerms
       tags: [glossary]
@@ -490,12 +498,14 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "406":
+          $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
         "409":
           $ref: "#/components/responses/Conflict"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
         5XX:
-          $ref: ./openapi.yaml#/components/responses/ServerErrorResponse
+          $ref: "#/components/responses/BindingServerError"
 components:
   schemas:
     ObjectTermsReadResponse:
@@ -519,10 +529,12 @@ components:
           properties:
             termsToAdd:
               type: array
+              items: {}
         - required: [termsToRemove]
           properties:
             termsToRemove:
               type: array
+              items: {}
       properties:
         termsToAdd:
           $ref: "#/components/schemas/OptionalTermNames"
@@ -976,6 +988,12 @@ components:
                     type: string
           minItems: 1
   responses:
+    BindingServerError:
+      description: The server could not complete the binding operation.
+      content:
+        application/json:
+          schema:
+            $ref: ./openapi.yaml#/components/schemas/ErrorModel
     InvalidRequest:
       description: Invalid request, filter, hierarchy direction or glossary change.
       content:

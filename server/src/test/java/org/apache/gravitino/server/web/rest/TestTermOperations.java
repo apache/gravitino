@@ -671,6 +671,24 @@ public class TestTermOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testBindingServerErrorsReturnJsonForVersionedClients() {
+    MetadataObject table = MetadataObjects.parse("dw.sales.table", MetadataObject.Type.TABLE);
+    when(dispatcher.listTermBindings("test", "T", null, Set.of(), null, 100, null))
+        .thenThrow(new IllegalStateException("binding store unavailable"));
+    when(dispatcher.listTargetTermNames("test", table, null, null))
+        .thenThrow(new IllegalStateException("binding store unavailable"));
+    for (String path : List.of(BASE + "/T/objects", TABLE_TERMS)) {
+      try (Response response = target(path).request(ACCEPT_V1).get()) {
+        assertEquals(500, response.getStatus());
+        assertTrue(MediaType.APPLICATION_JSON_TYPE.isCompatible(response.getMediaType()));
+        ErrorResponse error = response.readEntity(ErrorResponse.class);
+        assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, error.getCode());
+        assertTrue(error.getMessage().contains("binding store unavailable"));
+      }
+    }
+  }
+
+  @Test
   void testInvalidBindingParametersAndBodies() {
     String table = "/metalakes/test/objects/table/dw.sales.table/terms";
     for (Response r :
