@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -36,6 +37,7 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
@@ -59,6 +61,7 @@ import org.apache.gravitino.storage.relational.po.GlossaryTermSnapshotPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
  * Transactional persistence of glossary definitions and their synonyms.
@@ -257,6 +260,7 @@ public final class GlossaryTermMetaService {
                       row.getTermId(), Entity.EntityType.GLOSSARY_TERM.name()));
           GlossaryTermRelService.getInstance().removeTerm(metalakeId, row.getTermId());
           GlossaryTermDomainService.getInstance().removeTerm(metalakeId, row.getTermId());
+          GlossaryTermBindingService.getInstance().removeTerm(row.getTermId());
           return true;
         });
   }
@@ -277,6 +281,7 @@ public final class GlossaryTermMetaService {
           mapper.dropMetalakeSynonyms(metalakeId, deletedAt);
           GlossaryTermRelService.getInstance().dropMetalake(metalakeId);
           GlossaryTermDomainService.getInstance().dropMetalake(metalakeId);
+          GlossaryTermBindingService.getInstance().dropMetalake(metalakeId);
         });
   }
 
@@ -289,6 +294,10 @@ public final class GlossaryTermMetaService {
         GlossaryTermMetaMapper.class,
         mapper -> {
           int count = GlossaryTermRelService.getInstance().collect(cutoff, limit);
+          if (count == limit) {
+            return count;
+          }
+          count += GlossaryTermBindingService.getInstance().collect(cutoff, limit - count);
           if (count == limit) {
             return count;
           }
@@ -494,6 +503,29 @@ public final class GlossaryTermMetaService {
     return result;
   }
 
+  /**
+   * Locks live terms in ascending ID order within the caller's transaction and returns their
+   * current definitions keyed by term ID. Missing or concurrently deleted terms are omitted.
+   */
+  public Map<Long, GlossaryTermEntity> lockByIds(Namespace ns, long metalakeId, Set<Long> termIds) {
+    validateNamespace(ns);
+    Map<Long, GlossaryTermEntity> result = new LinkedHashMap<>();
+    if (termIds.isEmpty()) {
+      return result;
+    }
+    SessionUtils.doWithoutCommit(
+        GlossaryTermMetaMapper.class,
+        mapper -> {
+          for (Long id : termIds.stream().sorted().toList()) {
+            GlossaryTermPO row = mapper.getByIdForUpdate(metalakeId, id);
+            if (row != null) {
+              result.put(id, fromPO(row, mapper, ns));
+            }
+          }
+        });
+    return result;
+  }
+
   private List<GlossaryTermEntity> definitions(Namespace ns, List<GlossaryTermSnapshotPO> rows) {
     if (rows.isEmpty()) {
       throw new NoSuchEntityException("Metalake %s no longer exists", ns.level(0));
@@ -611,6 +643,29 @@ public final class GlossaryTermMetaService {
           .build();
     } catch (IOException e) {
       throw new UncheckedIOException("Cannot decode glossary term " + row.getTermId(), e);
+    }
+  }
+
+  /** Advances a locked term after a binding change, preserving its definition and synonyms. */
+  public void advanceBindingRevision(long metalakeId, long termId, long version, Audit audit) {
+    int updated =
+        SessionUtils.getWithoutCommit(
+            GlossaryTermMetaMapper.class,
+            mapper -> mapper.incrementVersion(metalakeId, termId, version, json(audit)));
+    Preconditions.checkState(updated == 1, "Failed to advance revision for locked term %s", termId);
+  }
+
+  static AuditInfo auditAfterBindingLoss(GlossaryTermPO row) {
+    try {
+      AuditInfo old = JsonUtils.anyFieldMapper().readValue(row.getAuditInfo(), AuditInfo.class);
+      return AuditInfo.builder()
+          .withCreator(old.creator())
+          .withCreateTime(old.createTime())
+          .withLastModifier(PrincipalUtils.getCurrentUserName())
+          .withLastModifiedTime(Instant.now())
+          .build();
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
     }
   }
 

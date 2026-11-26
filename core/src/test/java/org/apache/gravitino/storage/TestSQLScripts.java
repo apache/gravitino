@@ -40,9 +40,16 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.kb.ArticleBody;
+import org.apache.gravitino.kb.KnowledgeBaseArticleEntity;
+import org.apache.gravitino.kb.KnowledgeBaseArticleEntity.Binding;
 import org.apache.gravitino.storage.relational.DatabaseFixture;
 import org.apache.gravitino.storage.relational.ResetStrategy;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
+import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.NameConflictException;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
@@ -114,6 +121,19 @@ public class TestSQLScripts extends TestJDBCBackend {
         try (ResultSet rows =
             statement.executeQuery(
                 "SELECT COUNT(*) FROM domain_member_rel WHERE metalake_id=100")) {
+          Assertions.assertTrue(rows.next());
+          Assertions.assertEquals(2, rows.getInt(1));
+        }
+        assertBindingComments(statement);
+        String binding =
+            "INSERT INTO glossary_term_binding (metalake_id,term_id,target_type,target_id,deleted_at) VALUES (100,101,'TABLE',301,0)";
+        statement.executeUpdate(binding);
+        Assertions.assertThrows(SQLException.class, () -> statement.executeUpdate(binding));
+        statement.executeUpdate(
+            "UPDATE glossary_term_binding SET deleted_at=123 WHERE deleted_at=0");
+        statement.executeUpdate(binding);
+        try (ResultSet rows =
+            statement.executeQuery("SELECT COUNT(*) FROM glossary_term_binding")) {
           Assertions.assertTrue(rows.next());
           Assertions.assertEquals(2, rows.getInt(1));
         }
@@ -333,6 +353,7 @@ public class TestSQLScripts extends TestJDBCBackend {
         assertGlossaryLiveUniqueness();
         assertCleanupIndexes(upgradeScript.getName());
         assertNameColumnWidths(upgradeScript.getName());
+        assertUpgradedArticleStorage();
       }
     }
   }
@@ -800,6 +821,47 @@ public class TestSQLScripts extends TestJDBCBackend {
     }
   }
 
+  private void assertBindingComments(Statement statement) throws SQLException {
+    String tableComment;
+    String columnComments;
+    switch (backendType.toLowerCase(Locale.ROOT)) {
+      case "mysql" -> {
+        tableComment =
+            "SELECT table_comment FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='glossary_term_binding'";
+        columnComments =
+            "SELECT column_name, column_comment FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='glossary_term_binding'";
+      }
+      case "postgresql" -> {
+        tableComment = "SELECT obj_description('glossary_term_binding'::regclass, 'pg_class')";
+        columnComments =
+            "SELECT attname, col_description(attrelid, attnum) FROM pg_attribute WHERE attrelid='glossary_term_binding'::regclass AND attnum>0 AND NOT attisdropped";
+      }
+      case "h2" -> {
+        tableComment =
+            "SELECT remarks FROM information_schema.tables WHERE table_schema=CURRENT_SCHEMA AND LOWER(table_name)='glossary_term_binding'";
+        columnComments =
+            "SELECT column_name, remarks FROM information_schema.columns WHERE table_schema=CURRENT_SCHEMA AND LOWER(table_name)='glossary_term_binding'";
+      }
+      default -> throw new AssertionError("Unknown backend " + backendType);
+    }
+    try (ResultSet rows = statement.executeQuery(tableComment)) {
+      Assertions.assertTrue(rows.next());
+      Assertions.assertTrue(
+          StringUtils.isNotBlank(rows.getString(1)), "Missing glossary_term_binding table comment");
+    }
+    Set<String> columns = new TreeSet<>();
+    try (ResultSet rows = statement.executeQuery(columnComments)) {
+      while (rows.next()) {
+        String name = rows.getString(1).toLowerCase(Locale.ROOT);
+        Assertions.assertTrue(
+            StringUtils.isNotBlank(rows.getString(2)), "Missing column comment for " + name);
+        columns.add(name);
+      }
+    }
+    Assertions.assertEquals(
+        Set.of("metalake_id", "term_id", "target_type", "target_id", "deleted_at"), columns);
+  }
+
   private void seedExternalGovernance(int generation) throws SQLException {
     try (SqlSession session =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
@@ -1187,6 +1249,30 @@ public class TestSQLScripts extends TestJDBCBackend {
     for (String table : tableList) {
       connection.createStatement().execute("DROP TABLE " + table);
     }
+  }
+
+  private void assertUpgradedArticleStorage() throws IOException {
+    createAndInsertMakeLake("article_lake");
+    var store = KnowledgeBaseArticleMetaService.getInstance();
+    var article =
+        KnowledgeBaseArticleEntity.builder()
+            .withNamespace(Namespace.of("article_lake"))
+            .withId(31L)
+            .withName("guide")
+            .withTitle("Guide")
+            .withBodyUpdate(ArticleBody.of(ArticleBody.Format.MARKDOWN, "# Guide"))
+            .withBindings(Set.of(new Binding("TABLE", 123L)))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    store.insert(article, false);
+    var stored = store.get(article.nameIdentifier());
+    Assertions.assertEquals(article.id(), stored.id());
+    Assertions.assertEquals(article.bindings(), stored.bindings());
+    Assertions.assertEquals(
+        article.bodyUpdate(), store.getContent(article.nameIdentifier()).body());
+    Assertions.assertThrows(
+        NameConflictException.class,
+        () -> store.insert(article.toBuilder().withId(32L).build(), false));
   }
 
   private void assertGlossaryLiveUniqueness() throws SQLException {

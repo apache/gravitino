@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import lombok.Builder;
@@ -145,6 +146,24 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
     this.domains = domains == null ? List.of() : List.copyOf(domains);
     this.bindings = bindings == null ? Set.of() : Set.copyOf(bindings);
     this.auditInfo = Preconditions.checkNotNull(auditInfo, "auditInfo");
+  }
+
+  /**
+   * Validates the text columns that an insert or update will write. Unchanged columns may contain
+   * values written before this check.
+   *
+   * @param before the stored Article, or null for an insert
+   */
+  public void validateTextForWrite(@Nullable KnowledgeBaseArticleEntity before) {
+    if (before == null || !title.equals(before.title)) {
+      ArticleValidation.checkNoNullCharacter(title, "Title");
+    }
+    if (before == null || !Objects.equals(comment, before.comment)) {
+      ArticleValidation.checkNoNullCharacter(comment, "Comment");
+    }
+    if (before == null || !Objects.equals(sourceReference, before.sourceReference)) {
+      ArticleValidation.checkNoNullCharacter(sourceReference, "Source reference");
+    }
   }
 
   @Override

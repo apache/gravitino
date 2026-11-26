@@ -27,6 +27,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import org.apache.gravitino.GravitinoEnv;
@@ -67,6 +68,45 @@ public class TestJcasbinAuthorizationLookups {
     Assertions.assertEquals(1, metadataIdCache.getCount);
     Assertions.assertEquals(0, metadataIdCache.getIfPresentCount);
     Assertions.assertEquals(0, metadataIdCache.putCount);
+  }
+
+  @Test
+  void testFencedTargetUsesItsResolvedIdWithoutChangingSharedNameResolution() {
+    MetadataObject catalog = MetadataObjects.of(null, "cat", MetadataObject.Type.CATALOG);
+    CountingCache<String, Long> sharedIds = new CountingCache<>(100L);
+    JcasbinAuthorizationLookups lookups =
+        new JcasbinAuthorizationLookups(sharedIds, new CountingCache<>());
+    AuthorizationRequestContext fenced =
+        new AuthorizationRequestContext("lake", Map.of(catalog, Optional.of(200L))::get);
+    Assertions.assertEquals(
+        Optional.of(200L), lookups.resolveTargetId(catalog, "lake", fenced).metadataId());
+    Assertions.assertEquals(0, sharedIds.getCount);
+    // Loading role policies resolves the role's own securable objects independently.
+    Assertions.assertEquals(Optional.of(100L), lookups.resolveMetadataId(catalog, "lake", fenced));
+    Assertions.assertEquals(
+        Optional.of(100L), lookups.resolveTargetId(catalog, "other", fenced).metadataId());
+    Assertions.assertEquals(
+        Optional.of(100L),
+        lookups.resolveMetadataId(catalog, "lake", new AuthorizationRequestContext()));
+  }
+
+  @Test
+  void testLoadedDomainIdIsScopedToTheRequestTargetAndMetalake() {
+    MetadataObject domain = MetadataObjects.of(null, "Sales", MetadataObject.Type.DOMAIN);
+    CountingCache<String, Long> sharedIds = new CountingCache<>(100L);
+    JcasbinAuthorizationLookups lookups =
+        new JcasbinAuthorizationLookups(sharedIds, new CountingCache<>());
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    context.rememberTargetId("lake", domain, 200L);
+    Assertions.assertEquals(
+        Optional.of(200L), lookups.resolveTargetId(domain, "lake", context).metadataId());
+    Assertions.assertEquals(0, sharedIds.getCount);
+    Assertions.assertEquals(
+        Optional.of(100L), lookups.resolveTargetId(domain, "other", context).metadataId());
+    Assertions.assertEquals(Optional.of(100L), lookups.resolveMetadataId(domain, "lake", context));
+    Assertions.assertEquals(
+        Optional.of(100L),
+        lookups.resolveTargetId(domain, "lake", new AuthorizationRequestContext()).metadataId());
   }
 
   @Test

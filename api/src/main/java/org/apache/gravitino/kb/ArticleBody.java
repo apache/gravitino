@@ -20,6 +20,7 @@
 package org.apache.gravitino.kb;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Utf8;
 import java.util.Objects;
 import org.apache.gravitino.annotation.Evolving;
 
@@ -46,8 +47,10 @@ public final class ArticleBody {
    * Creates an article body.
    *
    * @param format the markup format
-   * @param content the non-empty body text
+   * @param content the non-empty, well-formed UTF-16 body text without U+0000
    * @return the article body
+   * @throws IllegalArgumentException if the format or content is null, the content is empty, or it
+   *     contains U+0000 or an unpaired surrogate
    */
   public static ArticleBody of(Format format, String content) {
     return new ArticleBody(format, content);
@@ -57,6 +60,10 @@ public final class ArticleBody {
     Preconditions.checkArgument(format != null, "Article body format must not be null");
     Preconditions.checkArgument(
         content != null && !content.isEmpty(), "Article body content must not be null or empty");
+    Preconditions.checkArgument(
+        content.indexOf('\0') < 0, "Article body content must not contain U+0000");
+    // Computing the UTF-8 length rejects unpaired surrogates without allocating a byte array.
+    Utf8.encodedLength(content);
     this.format = format;
     this.content = content;
   }

@@ -25,9 +25,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.sql.Connection;
 import java.sql.SQLException;
-import java.sql.Savepoint;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -36,6 +34,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -66,6 +65,8 @@ import org.apache.gravitino.kb.KnowledgeBaseArticleEntity;
 import org.apache.gravitino.kb.KnowledgeBaseArticleEntity.Binding;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.NamespacedEntityId;
+import org.apache.gravitino.storage.relational.converters.PostgreSQLExceptionConverter;
+import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper;
 import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper.MemberType;
 import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper.Membership;
@@ -85,17 +86,12 @@ public final class KnowledgeBaseArticleMetaService {
   private static final int LOOKUP_BATCH_SIZE = 500;
   private static final MemberType ARTICLE = MemberType.KNOWLEDGE_BASE_ARTICLE;
   private static final TransactionHook NO_HOOK = (before, after) -> {};
-  // MySQL, PostgreSQL and H2 report the violated constraint in different diagnostic formats.
-  private static final Pattern NAME_CONSTRAINT =
+  private static final Pattern H2_NAME_CONSTRAINT =
       Pattern.compile(
-          "(?i)(?:for key '(?:kb_article_meta\\.)?uk_kba_name'$"
-              + "|^ERROR: +duplicate key value violates unique constraint \"uk_kba_name\""
-              + "|^Unique index or primary key violation: \"(?:[\\w]+\\.)?uk_kba_name_index_[0-9a-f]+ on )");
-  private static final Pattern ID_CONSTRAINT =
+          "(?i)^Unique index or primary key violation: \"(?:[\\w]+\\.)?uk_kba_name_index_[0-9a-f]+ on ");
+  private static final Pattern H2_ID_CONSTRAINT =
       Pattern.compile(
-          "(?i)(?:for key '(?:kb_article_meta\\.)?PRIMARY'$"
-              + "|^ERROR: +duplicate key value violates unique constraint \"kb_article_meta_pkey\""
-              + "|^Unique index or primary key violation: \"PRIMARY KEY ON (?:[\\w]+\\.)?kb_article_meta\\(article_id\\))");
+          "(?i)^Unique index or primary key violation: \"PRIMARY KEY ON (?:[\\w]+\\.)?kb_article_meta\\(article_id\\)");
 
   /** A conflict on the live Article name key during the Article row insert. */
   public static final class NameConflictException extends EntityAlreadyExistsException {
@@ -121,7 +117,20 @@ public final class KnowledgeBaseArticleMetaService {
   /** Storage extension invoked before commit, with the complete old and new binding sets. */
   @FunctionalInterface
   public interface TransactionHook {
-    /** Participates in the caller's transaction. Throwing rolls back the write. */
+    /**
+     * Runs under the Article lock before an effective update or deletion changes the row or its
+     * relations. To read the old body and revision, call {@link
+     * KnowledgeBaseArticleMetaService#getContent(NameIdentifier)} in this callback.
+     *
+     * @param before current Article metadata and relations
+     * @param after proposed Article metadata and relations, or null for deletion
+     */
+    default void beforeChange(
+        KnowledgeBaseArticleEntity before, @Nullable KnowledgeBaseArticleEntity after) {}
+
+    /**
+     * Runs after the changes have been applied and before commit. Throwing rolls back the write.
+     */
     void onChange(
         @Nullable KnowledgeBaseArticleEntity before, @Nullable KnowledgeBaseArticleEntity after);
   }
@@ -268,7 +277,12 @@ public final class KnowledgeBaseArticleMetaService {
     insert(entity, overwrite, NO_HOOK);
   }
 
-  /** Commits the initial Owner or extension data along with the Article and initial bindings. */
+  /**
+   * Commits the initial Owner or extension data along with the Article and initial bindings. If a
+   * peer inserts the same identity during a standalone overwrite, retries in a fresh transaction.
+   * Inside a caller-owned transaction the insert conflict is propagated; the owner can retry the
+   * overwrite after ending its transaction.
+   */
   public void insert(KnowledgeBaseArticleEntity entity, boolean overwrite, TransactionHook hook)
       throws IOException {
     insertScoped(entity, overwrite, hook);
@@ -299,20 +313,31 @@ public final class KnowledgeBaseArticleMetaService {
       TransactionHook hook,
       UnaryOperator<KnowledgeBaseArticleEntity> project)
       throws IOException {
+    record InsertConflict(long metalakeId, EntityAlreadyExistsException failure) {}
+    AtomicReference<InsertConflict> insertConflict = new AtomicReference<>();
+    boolean retryInsert = overwrite && !SqlSessions.hasActiveSession();
     try {
       return write(
-          ident.namespace(),
-          (mapper, metalakeId) -> {
+          mapper -> {
+            long metalakeId = lockMetalake(ident.namespace());
             KnowledgeBaseArticleEntity entity = prepare.get();
             Preconditions.checkArgument(
                 ident.equals(entity.nameIdentifier()), "Expected Article %s", ident);
             KnowledgeBaseArticleEntity before = overwrite ? observe(ident) : null;
+            InsertConflict conflict = insertConflict.get();
+            if (conflict != null
+                && (conflict.metalakeId() != metalakeId
+                    || before == null
+                    || !before.id().equals(entity.id()))) {
+              throw conflict.failure();
+            }
             if (before != null) {
               KnowledgeBaseArticlePO row =
                   lockForChange(mapper, metalakeId, before, entity.domainIds(), null);
               return new ScopedArticle(
                   metalakeId, project.apply(replace(mapper, row, before, entity, hook)));
             }
+            entity.validateTextForWrite(null);
             requireDomainsLive(lockLiveDomains(metalakeId, entity.domainIds()));
             KnowledgeBaseArticleEntity initial =
                 entity.toBuilder().withBodyUpdate(null).withRevision(1).build();
@@ -322,7 +347,16 @@ public final class KnowledgeBaseArticleMetaService {
                     entity.bodyUpdate(), "An initial Article body is required");
             row.setBodyFormat(body.format().name());
             row.setBodyContent(body.content());
-            insertArticleRow(mapper, row);
+            try {
+              insertArticleRow(mapper, row);
+            } catch (EntityAlreadyExistsException e) {
+              if (!retryInsert) {
+                throw e;
+              }
+              // Leave the failed insert transaction before observing the row that won.
+              insertConflict.set(new InsertConflict(metalakeId, e));
+              throw new StaleArticlePlan(entity.nameIdentifier());
+            }
             addBindings(mapper, row, initial.bindings());
             changeMemberships(row, Set.of(), initial.domainIds());
             hook.onChange(null, initial);
@@ -365,12 +399,19 @@ public final class KnowledgeBaseArticleMetaService {
       @Nullable ExpectedRevision expected,
       Function<KnowledgeBaseArticleEntity, KnowledgeBaseArticleEntity> updater,
       TransactionHook hook) {
+    record ArticleIdentity(long metalakeId, long articleId) {}
+    AtomicReference<ArticleIdentity> firstObserved = new AtomicReference<>();
     return write(
-        ident.namespace(),
-        (mapper, metalakeId) -> {
+        mapper -> {
+          long metalakeId = lockMetalake(ident.namespace());
           KnowledgeBaseArticleEntity before = observe(ident);
           if (before == null) {
             throw missing(ident);
+          }
+          ArticleIdentity current = new ArticleIdentity(metalakeId, before.id());
+          ArticleIdentity first = firstObserved.compareAndExchange(null, current);
+          if (first != null && !first.equals(current)) {
+            throw new ArticleRevisionConflictException("Article %s was replaced", ident);
           }
           if (expected != null && !expected.matches(metalakeId, before.id(), before.revision())) {
             // Reject a stale token under lock before evaluating the transformation.
@@ -401,8 +442,8 @@ public final class KnowledgeBaseArticleMetaService {
       TransactionHook hook,
       UnaryOperator<KnowledgeBaseArticleEntity> project) {
     return write(
-        ident.namespace(),
-        (mapper, lake) -> {
+        mapper -> {
+          long lake = lockMetalake(ident.namespace());
           KnowledgeBaseArticleEntity before;
           KnowledgeBaseArticlePO row;
           if (requestedDomains == null) {
@@ -445,8 +486,8 @@ public final class KnowledgeBaseArticleMetaService {
       Function<KnowledgeBaseArticleEntity, AuditInfo> modifiedAudit,
       TransactionHook hook) {
     write(
-        ident.namespace(),
-        (mapper, lake) -> {
+        mapper -> {
+          long lake = lockMetalake(ident.namespace());
           lockDomain.accept(lake);
           KnowledgeBaseArticlePO row = mapper.lock(lake, ident.name());
           if (row != null) {
@@ -484,30 +525,20 @@ public final class KnowledgeBaseArticleMetaService {
   /** Checks deletion authority against the locked Article; a hidden Article is reported absent. */
   public boolean delete(
       NameIdentifier ident, Predicate<KnowledgeBaseArticleEntity> canDelete, TransactionHook hook) {
-    // A revision change can retry the plan. Keep the first identity across those attempts.
-    AtomicReference<Long> targetId = new AtomicReference<>();
-    return write(
-        ident.namespace(),
-        (mapper, metalakeId) -> {
-          KnowledgeBaseArticleEntity old = observe(ident);
-          if (old == null) {
-            return false;
-          }
-          Long firstId = targetId.compareAndExchange(null, old.id());
-          if (firstId != null && !firstId.equals(old.id())) {
-            return false;
-          }
-          KnowledgeBaseArticlePO row = lockObservedArticle(mapper, metalakeId, old, Set.of(), null);
-          if (row == null || !canDelete.test(old)) {
-            return false;
-          }
-          long now = System.currentTimeMillis();
-          mapper.deleteBindings(row.getArticleId(), now);
-          changeMemberships(row, old.domainIds(), Set.of());
-          mapper.delete(row.getArticleId(), now);
-          hook.onChange(old, null);
-          return true;
-        });
+    return deleteSnapshot(ident, canDelete, hook, false).isPresent();
+  }
+
+  /**
+   * Retires an Article and returns the metadata snapshot selected under its row lock.
+   *
+   * @param ident the Article name identifier
+   * @param hook the extension participating in the deletion transaction
+   * @return the deleted snapshot, or empty if the Article or its metalake is absent or the selected
+   *     Article was replaced
+   */
+  public Optional<KnowledgeBaseArticleEntity> deleteAndGet(
+      NameIdentifier ident, TransactionHook hook) {
+    return deleteSnapshot(ident, article -> true, hook, true);
   }
 
   /** Retires all Article rows in the enclosing metalake deletion transaction. */
@@ -536,13 +567,55 @@ public final class KnowledgeBaseArticleMetaService {
       BiFunction<KnowledgeBaseArticleMapper, KnowledgeBaseArticlePO, T> operation) {
     String name = KnowledgeBaseArticle.normalizeName(ident.name());
     return write(
-        ident.namespace(),
-        (mapper, lake) -> {
+        mapper -> {
+          long lake = lockMetalake(ident.namespace());
           KnowledgeBaseArticlePO row = mapper.lock(lake, name);
           if (row == null) {
             throw missing(ident);
           }
           return operation.apply(mapper, row);
+        });
+  }
+
+  private Optional<KnowledgeBaseArticleEntity> deleteSnapshot(
+      NameIdentifier ident,
+      Predicate<KnowledgeBaseArticleEntity> canDelete,
+      TransactionHook hook,
+      boolean allowMissingMetalake) {
+    // A revision change can retry the plan. Keep the first identity across those attempts.
+    AtomicReference<Long> targetId = new AtomicReference<>();
+    return write(
+        mapper -> {
+          long metalakeId;
+          try {
+            metalakeId = lockMetalake(ident.namespace());
+          } catch (NoSuchEntityException e) {
+            if (allowMissingMetalake) {
+              return Optional.empty();
+            }
+            throw e;
+          }
+          KnowledgeBaseArticleEntity old = observe(ident);
+          if (old == null) {
+            return Optional.empty();
+          }
+          Long firstId = targetId.compareAndExchange(null, old.id());
+          if (firstId != null && !firstId.equals(old.id())) {
+            return Optional.empty();
+          }
+          KnowledgeBaseArticlePO row = lockObservedArticle(mapper, metalakeId, old, Set.of(), null);
+          if (row == null || !canDelete.test(old)) {
+            return Optional.empty();
+          }
+          hook.beforeChange(old, null);
+          long now = System.currentTimeMillis();
+          if (mapper.delete(row.getArticleId(), old.revision(), now) != 1) {
+            throw new ArticleRevisionConflictException("Article %s has changed", ident);
+          }
+          mapper.deleteBindings(row.getArticleId(), now);
+          changeMemberships(row, old.domainIds(), Set.of());
+          hook.onChange(old, null);
+          return Optional.of(old);
         });
   }
 
@@ -552,13 +625,11 @@ public final class KnowledgeBaseArticleMetaService {
       mapper.insert(row);
     } catch (RuntimeException failure) {
       for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
-        if (cause instanceof SQLException sql
-            && sql.getMessage() != null
-            && ExceptionUtils.isDuplicateKey(sql)) {
-          if (NAME_CONSTRAINT.matcher(sql.getMessage()).find()) {
+        if (cause instanceof SQLException sql && ExceptionUtils.isDuplicateKey(sql)) {
+          if (matchesConstraint(sql, "uk_kba_name", "uk_kba_name", H2_NAME_CONSTRAINT)) {
             throw new NameConflictException(failure, row.getArticleName());
           }
-          if (ID_CONSTRAINT.matcher(sql.getMessage()).find()) {
+          if (matchesConstraint(sql, "kb_article_meta_pkey", "PRIMARY", H2_ID_CONSTRAINT)) {
             throw new EntityAlreadyExistsException(
                 failure, "Article ID %s already exists", row.getArticleId());
           }
@@ -566,6 +637,24 @@ public final class KnowledgeBaseArticleMetaService {
       }
       throw failure;
     }
+  }
+
+  private static boolean matchesConstraint(
+      SQLException sql, String pgKey, String mysqlKey, Pattern h2Constraint) {
+    if (SQLExceptionConverterFactory.getConverter()
+        instanceof PostgreSQLExceptionConverter postgres) {
+      return postgres.violatesUniqueConstraint(sql, pgKey);
+    }
+    String message = sql.getMessage();
+    if (message == null) {
+      return false;
+    }
+    if (sql.getErrorCode() == 1062) {
+      // The final quoted index name is independent of the session's message language.
+      return message.endsWith("'" + mysqlKey + "'")
+          || message.endsWith("'kb_article_meta." + mysqlKey + "'");
+    }
+    return h2Constraint.matcher(message).find();
   }
 
   private static String metalakeName(Namespace ns) {
@@ -584,56 +673,26 @@ public final class KnowledgeBaseArticleMetaService {
     }
   }
 
-  private <T> T write(Namespace ns, BiFunction<KnowledgeBaseArticleMapper, Long, T> operation) {
-    boolean nested = SqlSessions.hasActiveSession();
+  private <T> T write(Function<KnowledgeBaseArticleMapper, T> operation) {
+    if (SqlSessions.hasActiveSession()) {
+      // Only the owner can release its locks and retry in a fresh transaction.
+      return SessionUtils.doWithCommitAndFetchResult(
+          KnowledgeBaseArticleMapper.class,
+          mapper -> SqlSessions.withSavepoint(() -> operation.apply(mapper)));
+    }
     for (int attempt = 1; ; attempt++) {
       try {
-        return writeOnce(ns, operation);
+        return SessionUtils.doWithCommitAndFetchResult(KnowledgeBaseArticleMapper.class, operation);
       } catch (StaleArticlePlan stale) {
-        // A caller-owned transaction must release its own locks before the plan can be retried.
-        if (nested || attempt >= 5) {
+        if (attempt >= 5) {
           throw stale;
         }
       }
     }
   }
 
-  private <T> T writeOnce(Namespace ns, BiFunction<KnowledgeBaseArticleMapper, Long, T> operation) {
+  private long lockMetalake(Namespace ns) {
     String name = metalakeName(ns);
-    boolean nested = SqlSessions.hasActiveSession();
-    return SessionUtils.doWithCommitAndFetchResult(
-        KnowledgeBaseArticleMapper.class,
-        mapper -> {
-          if (!nested) {
-            return operation.apply(mapper, lockMetalake(name));
-          }
-          // The owner may catch a failed extension and continue using its transaction.
-          // Roll back this Article operation without discarding earlier work by that owner.
-          try {
-            Connection connection = SqlSessions.currentConnection();
-            Savepoint savepoint = connection.setSavepoint();
-            try {
-              T result = operation.apply(mapper, lockMetalake(name));
-              connection.releaseSavepoint(savepoint);
-              return result;
-            } catch (RuntimeException | Error failure) {
-              try {
-                connection.rollback(savepoint);
-                connection.releaseSavepoint(savepoint);
-              } catch (SQLException rollbackFailure) {
-                failure.addSuppressed(rollbackFailure);
-              } finally {
-                SessionUtils.clearSessionCache();
-              }
-              throw failure;
-            }
-          } catch (SQLException e) {
-            throw new IllegalStateException("Cannot manage nested Article write", e);
-          }
-        });
-  }
-
-  private long lockMetalake(String name) {
     SessionUtils.clearSessionCache();
     MetalakeMetaService parents = MetalakeMetaService.getInstance();
     long id;
@@ -659,8 +718,7 @@ public final class KnowledgeBaseArticleMetaService {
               throw new NoSuchEntityException(
                   NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, "metalake", metalake);
             }
-            // The left join returns just the parent when its Article list is empty.
-            return rows.get(0).getArticleName() == null ? List.of() : aggregate(ns, rows);
+            return aggregate(ns, rows);
           });
     }
     return SqlSessions.readSnapshot(
@@ -718,20 +776,20 @@ public final class KnowledgeBaseArticleMetaService {
   /** Folds one joined row per Article, binding and membership into complete entities. */
   private List<KnowledgeBaseArticleEntity> aggregate(
       Namespace ns, List<KnowledgeBaseArticlePO> rows) {
-    Map<Long, Set<Binding>> bindings = new LinkedHashMap<>();
+    Map<Long, Set<Binding>> bindings = new HashMap<>();
     Map<Long, Set<Long>> domains = new HashMap<>();
     Map<Long, KnowledgeBaseArticlePO> articles = new LinkedHashMap<>();
     for (KnowledgeBaseArticlePO row : rows) {
-      articles.putIfAbsent(row.getArticleId(), row);
-      Set<Binding> targets =
-          bindings.computeIfAbsent(row.getArticleId(), unused -> new HashSet<>());
-      if (row.getDomainId() != null) {
+      if (row.getArticleName() != null) {
+        articles.put(row.getArticleId(), row);
+      } else if (row.getDomainId() != null) {
         domains
             .computeIfAbsent(row.getArticleId(), unused -> new HashSet<>())
             .add(row.getDomainId());
-      }
-      if (row.getTargetId() != null) {
-        targets.add(new Binding(row.getTargetType(), row.getTargetId()));
+      } else if (row.getTargetId() != null) {
+        bindings
+            .computeIfAbsent(row.getArticleId(), unused -> new HashSet<>())
+            .add(new Binding(row.getTargetType(), row.getTargetId()));
       }
     }
     return articles.values().stream()
@@ -740,7 +798,7 @@ public final class KnowledgeBaseArticleMetaService {
                 decode(
                     ns,
                     row,
-                    bindings.get(row.getArticleId()),
+                    bindings.getOrDefault(row.getArticleId(), Set.of()),
                     domains.getOrDefault(row.getArticleId(), Set.of())))
         .toList();
   }
@@ -885,6 +943,7 @@ public final class KnowledgeBaseArticleMetaService {
         before.id().equals(proposed.id())
             && before.nameIdentifier().equals(proposed.nameIdentifier()),
         "An Article edit must retain its ID, name and metalake");
+    proposed.validateTextForWrite(before);
     ArticleBody body = proposed.bodyUpdate();
     boolean bodyChanged =
         body != null
@@ -907,7 +966,10 @@ public final class KnowledgeBaseArticleMetaService {
       next.setBodyFormat(body.format().name());
       next.setBodyContent(body.content());
     }
-    mapper.update(encode(before, row.getMetalakeId()), next);
+    hook.beforeChange(before, after);
+    if (mapper.update(encode(before, row.getMetalakeId()), next) != 1) {
+      throw new ArticleRevisionConflictException("Article %s has changed", before.nameIdentifier());
+    }
     long now = System.currentTimeMillis();
     for (Binding removed : Sets.difference(before.bindings(), after.bindings())) {
       mapper.unbind(before.id(), removed, now);
