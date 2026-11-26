@@ -41,6 +41,7 @@ public final class SqlSessions {
   private static final ThreadLocal<SqlSession> sessions = new ThreadLocal<>();
   private static final ThreadLocal<AtomicInteger> sessionCount =
       ThreadLocal.withInitial(() -> new AtomicInteger(0));
+  private static final ThreadLocal<Throwable> rollbackCause = new ThreadLocal<>();
 
   private SqlSessions() {}
 
@@ -143,6 +144,18 @@ public final class SqlSessions {
   }
 
   /**
+   * Requires the session owner to roll back, even if it catches the failing operation's exception.
+   *
+   * @param cause the failure that invalidated the transaction
+   */
+  public static void markRollbackOnly(Throwable cause) {
+    Preconditions.checkState(hasActiveSession(), "No active SQL session on the current thread");
+    if (rollbackCause.get() == null) {
+      rollbackCause.set(Preconditions.checkNotNull(cause, "Missing rollback cause"));
+    }
+  }
+
+  /**
    * Returns the connection of the current thread's open session without changing the session count.
    *
    * <p>Callers must not commit, roll back, or close the connection. The session owner commits it.
@@ -168,14 +181,19 @@ public final class SqlSessions {
     int count = sessionCount.get().decrementAndGet();
     if (count == 0) {
       try {
-        if (commit) {
-          sqlSession.commit();
-        } else if (rollback) {
+        Throwable cause = rollbackCause.get();
+        if (rollback || cause != null) {
           // Force the JDBC rollback. A policy lifecycle hook can write on this connection without
           // going
           // through a mapped statement, and MyBatis skips rollback when the session looks clean.
           // Closing that session then turns auto-commit back on, which would commit the hook write.
           sqlSession.rollback(true);
+          if (commit) {
+            throw new IllegalStateException(
+                "Cannot commit a transaction marked for rollback", cause);
+          }
+        } else if (commit) {
+          sqlSession.commit();
         }
       } finally {
         try {
@@ -185,6 +203,7 @@ public final class SqlSessions {
           // Ensure ThreadLocal is always cleaned up
           sessions.remove();
           sessionCount.remove();
+          rollbackCause.remove();
         }
       }
     } else if (count < 0) {
@@ -194,6 +213,7 @@ public final class SqlSessions {
           "Session count is negative: {}. Resetting session count and removing session.", count);
       sessions.remove();
       sessionCount.remove();
+      rollbackCause.remove();
     }
   }
 

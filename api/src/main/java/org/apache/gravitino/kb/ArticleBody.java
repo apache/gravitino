@@ -46,8 +46,10 @@ public final class ArticleBody {
    * Creates an article body.
    *
    * @param format the markup format
-   * @param content the non-empty body text
+   * @param content the non-empty body text without U+0000
    * @return the article body
+   * @throws IllegalArgumentException if the format or content is null, or the content is empty or
+   *     contains U+0000
    */
   public static ArticleBody of(Format format, String content) {
     return new ArticleBody(format, content);
@@ -57,6 +59,8 @@ public final class ArticleBody {
     Preconditions.checkArgument(format != null, "Article body format must not be null");
     Preconditions.checkArgument(
         content != null && !content.isEmpty(), "Article body content must not be null or empty");
+    Preconditions.checkArgument(
+        content.indexOf('\0') < 0, "Article body content must not contain U+0000");
     this.format = format;
     this.content = content;
   }

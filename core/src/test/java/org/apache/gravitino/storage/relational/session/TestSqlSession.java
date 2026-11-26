@@ -296,6 +296,23 @@ public class TestSqlSession {
   }
 
   @Test
+  public void testRollbackOnlyAppliesToOutermostCommit() {
+    RuntimeException failure = new IllegalStateException("Savepoint recovery failed");
+    SessionUtils.beginTransaction();
+    try {
+      SessionUtils.doMultipleWithCommit(() -> SqlSessions.markRollbackOnly(failure));
+      assertTrue(SessionUtils.isInTransaction());
+      var rejected = assertThrows(IllegalStateException.class, SessionUtils::commitTransaction);
+      assertSame(failure, rejected.getCause());
+    } finally {
+      SessionUtils.rollbackTransaction();
+    }
+    assertFalse(SessionUtils.isInTransaction());
+    SessionUtils.beginTransaction();
+    SessionUtils.commitTransaction();
+  }
+
+  @Test
   public void testOpenAndCommitAndCloseSqlSession() {
     SqlSession session = SqlSessions.getSqlSession();
     assertNotNull(session);

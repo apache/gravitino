@@ -64,6 +64,15 @@ public class TestKnowledgeBaseArticleContract {
   }
 
   @Test
+  public void testArticleBodyRejectsNullCharacter() {
+    for (ArticleBody.Format format : ArticleBody.Format.values()) {
+      assertThrows(IllegalArgumentException.class, () -> ArticleBody.of(format, "a\0b"));
+      String text = "a\n\\u0000\tb";
+      assertEquals(text, ArticleBody.of(format, text).content());
+    }
+  }
+
+  @Test
   public void testArticleCreateRequiresTitleAndBody() {
     assertThrows(
         IllegalArgumentException.class,
