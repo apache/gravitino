@@ -104,7 +104,6 @@ import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermBindingMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermBindingSQLProviderFactory;
-import org.apache.gravitino.storage.relational.mapper.GlossaryTermLookupMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
@@ -2985,14 +2984,14 @@ class TestGlossaryBindings extends TestJDBCBackend {
         lookup -> {
           Object mapper = lookup.callRealMethod();
           if (lookup.getMethod().getName().equals("getMapper")
-              && lookup.getArgument(0) == GlossaryTermLookupMapper.class) {
+              && lookup.getArgument(0) == GlossaryTermBindingMapper.class) {
             return Mockito.mock(
-                GlossaryTermLookupMapper.class,
+                GlossaryTermBindingMapper.class,
                 call -> {
                   Object result = AdditionalAnswers.delegatesTo(mapper).answer(call);
-                  if (call.getMethod().getName().equals("bindingCandidates")) {
+                  if (call.getMethod().getName().equals("listBindingCandidates")) {
                     fetched.add(((List<?>) result).size());
-                  } else if (call.getMethod().getName().equals("termsWithBindings")) {
+                  } else if (call.getMethod().getName().equals("listTermsWithBindings")) {
                     probes.add(((List<?>) result).size());
                   }
                   return result;

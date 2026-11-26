@@ -99,4 +99,9 @@ public class DomainRelSQLProviderFactory {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteDomainRelsByLegacyTimeline(legacyTimeline, limit);
   }
+
+  /** Delegates {@link DomainRelBaseSQLProvider#countLiveChildren}. */
+  public static String countLiveChildren() {
+    return getProvider().countLiveChildren();
+  }
 }

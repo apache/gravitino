@@ -38,7 +38,9 @@ import org.apache.gravitino.dto.glossary.TermBindingDTO;
 import org.apache.gravitino.dto.glossary.TermMatchDTO;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.meta.GlossaryTermNames;
-import org.apache.gravitino.storage.relational.mapper.GlossaryTermLookupMapper;
+import org.apache.gravitino.storage.relational.mapper.GlossaryTermBindingMapper;
+import org.apache.gravitino.storage.relational.mapper.GlossaryTermDomainRelMapper;
+import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermRelMapper;
 import org.apache.gravitino.storage.relational.po.GlossaryTermBindingPO;
 import org.apache.gravitino.storage.relational.po.GlossaryTermPO;
@@ -46,6 +48,7 @@ import org.apache.gravitino.storage.relational.po.GlossaryTermRelPO;
 import org.apache.gravitino.storage.relational.service.GlossaryTermMetaService;
 import org.apache.gravitino.storage.relational.service.GlossaryTermRelService.RelationType;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.storage.relational.utils.SqlLikePattern;
 import org.apache.gravitino.utils.NamespaceUtil;
 
 /**
@@ -93,12 +96,7 @@ final class GlossaryTermQuery {
     String pattern =
         literal == null
             ? null
-            : "%"
-                + GlossaryTermNames.key(literal)
-                    .replace("!", "!!")
-                    .replace("%", "!%")
-                    .replace("_", "!_")
-                + "%";
+            : "%" + SqlLikePattern.escapeLiteral(GlossaryTermNames.key(literal)) + "%";
     Set<Long> scope =
         domain == null ? null : manager.domainScope(metalake, lake, domain, access, budget);
     List<GlossaryTermPO> rows;
@@ -124,7 +122,8 @@ final class GlossaryTermQuery {
 
   static Map<String, String> wordKeys(List<String> words) {
     Map<String, String> wordKeys = new LinkedHashMap<>();
-    Preconditions.checkArgument(words.size() <= MAX_WORDS, "At most 20 match words are supported");
+    Preconditions.checkArgument(
+        words.size() <= MAX_WORDS, "At most %s match words are supported", MAX_WORDS);
     for (String word : words) {
       String key = GlossaryTermNames.key(word);
       Preconditions.checkArgument(!key.isEmpty(), "match words must not be blank");
@@ -155,7 +154,7 @@ final class GlossaryTermQuery {
     for (List<Long> batch : Lists.partition(List.copyOf(ids), ID_BATCH_SIZE)) {
       List<GlossaryTermPO> endpoints =
           SessionUtils.getWithoutCommit(
-              GlossaryTermLookupMapper.class, mapper -> mapper.endpoints(lake, batch));
+              GlossaryTermMetaMapper.class, mapper -> mapper.listLookupEndpoints(lake, batch));
       Set<Long> custom = new LinkedHashSet<>();
       for (GlossaryTermPO row : endpoints) {
         if (access.canRead(row.getTermId(), GlossaryTerm.Status.valueOf(row.getStatus()))) {
@@ -225,7 +224,8 @@ final class GlossaryTermQuery {
       for (List<Long> batch : Lists.partition(List.copyOf(ids), ID_BATCH_SIZE)) {
         bound.addAll(
             SessionUtils.getWithoutCommit(
-                GlossaryTermLookupMapper.class, mapper -> mapper.termsWithBindings(lake, batch)));
+                GlossaryTermBindingMapper.class,
+                mapper -> mapper.listTermsWithBindings(lake, batch)));
       }
     }
     for (int i = 0; i < bound.size(); i++) {
@@ -250,8 +250,8 @@ final class GlossaryTermQuery {
       GlossaryTermBindingPO after = last;
       List<GlossaryTermBindingPO> rows =
           SessionUtils.getWithoutCommit(
-              GlossaryTermLookupMapper.class,
-              mapper -> mapper.bindingCandidates(lake, termId, after, pageSize));
+              GlossaryTermBindingMapper.class,
+              mapper -> mapper.listBindingCandidates(lake, termId, after, pageSize));
       // An overflow row proves there is more work, but must never be resolved or authorized.
       int available = Math.min(rows.size(), remaining);
       int offset = 0;
@@ -298,8 +298,8 @@ final class GlossaryTermQuery {
       for (List<Long> batch : Lists.partition(List.copyOf(ids), ID_BATCH_SIZE)) {
         budget.consume(
             SessionUtils.getWithoutCommit(
-                GlossaryTermLookupMapper.class,
-                mapper -> mapper.countMemberships(lake, batch, budget.remaining() + 1)));
+                GlossaryTermDomainRelMapper.class,
+                mapper -> mapper.countLiveMemberships(lake, batch, budget.remaining() + 1)));
       }
     }
     return GlossaryTermMetaService.getInstance()
@@ -328,8 +328,9 @@ final class GlossaryTermQuery {
       Integer limit = after == null ? firstPageSize : Integer.valueOf(ID_BATCH_SIZE);
       List<GlossaryTermPO> page =
           SessionUtils.getWithoutCommit(
-              GlossaryTermLookupMapper.class,
-              mapper -> mapper.candidates(lake, domains, pattern, status, keys, after, limit));
+              GlossaryTermMetaMapper.class,
+              mapper ->
+                  mapper.listLookupCandidates(lake, domains, pattern, status, keys, after, limit));
       List<GlossaryTermPO> eligible =
           literal == null
               ? page

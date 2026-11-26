@@ -73,8 +73,8 @@ import org.apache.gravitino.meta.GlossaryTermNames;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.RelationalEntityStoreIdResolver;
+import org.apache.gravitino.storage.relational.mapper.DomainRelMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermBindingMapper;
-import org.apache.gravitino.storage.relational.mapper.GlossaryTermLookupMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermVersionMapper.Head;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermVersionMapper.Version;
@@ -2249,9 +2249,9 @@ public final class GlossaryManager {
       budget.consume(1);
       budget.consume(
           SessionUtils.getWithoutCommit(
-              GlossaryTermLookupMapper.class,
+              DomainRelMapper.class,
               mapper ->
-                  mapper.countChildren(metalakeId, domain.domainId(), budget.remaining() + 1)));
+                  mapper.countLiveChildren(metalakeId, domain.domainId(), budget.remaining() + 1)));
     }
     for (DomainEntity child :
         DomainRelService.getInstance()

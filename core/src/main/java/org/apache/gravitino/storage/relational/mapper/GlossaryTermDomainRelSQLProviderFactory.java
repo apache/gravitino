@@ -55,6 +55,11 @@ public class GlossaryTermDomainRelSQLProviderFactory {
     return getProvider().listTermIds(metalakeId, domainIds);
   }
 
+  /** Delegates {@link GlossaryTermDomainRelBaseSQLProvider#countLiveMemberships}. */
+  public static String countLiveMemberships() {
+    return getProvider().countLiveMemberships();
+  }
+
   private static GlossaryTermDomainRelBaseSQLProvider getProvider() {
     String databaseId =
         SqlSessionFactoryHelper.getInstance()
