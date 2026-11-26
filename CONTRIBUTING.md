@@ -103,6 +103,8 @@ Pull request tests run with GitHub Actions in your fork, not in `apache/gravitin
 
 If Fork CI hits Maven Central's HTTP 429 rate limit, **Warm Gradle cache** can populate your fork's default-branch cache for PR branches that use the same Gradle build files as upstream `main`.
 
+Before enabling daily warm-ups, check your fork's cache usage under **Actions → Caches**. A hosted run produced a 4.76 GB Gradle cache. If upstream Gradle changes create a new key, two entries of that size use about 9.52 GB of GitHub's default 10 GB per repository. When a new entry pushes the repository over its limit, GitHub evicts the least recently accessed entries first. These can include caches used by other PR branches. [Measured cache size](https://github.com/yuqi1129/gravitino/actions/runs/45794362869/job/139821766623) · [GitHub's cache limits and eviction policy](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#usage-limits-and-eviction-policy)
+
 Sync your fork's default branch to get the workflow. In your fork, open **Actions → Warm Gradle cache** and select **Enable workflow** if prompted. It checks daily and resolves Gradle dependencies across the repository only on a cache miss. To warm the cache immediately, select **Run workflow** on your fork's default branch. [GitHub's workflow enablement guide](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/disable-and-enable-workflows)
 
 If Fork CI still downloads missing dependencies after a cache hit, compare the full Gradle cache key in the affected job's `actions/setup-java` log with the key in the latest successful **Warm Gradle cache** run.
