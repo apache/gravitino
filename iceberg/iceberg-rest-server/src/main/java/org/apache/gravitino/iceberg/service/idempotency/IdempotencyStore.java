@@ -39,9 +39,9 @@ import javax.annotation.Nullable;
  * under memory pressure, and a purge can remove it once it expires. The key is then free and
  * treated as never seen, so another caller can reserve it while the first is still running. Callers
  * pass the {@code claim} from {@link #reserve} into {@link #finalizeRecord} and {@link #release}.
- * Built-in stores use a fixed claim for every live row; after hard delete they do not allocate a
- * new fencing token, matching common HTTP {@code Idempotency-Key} practice and the Iceberg REST
- * reuse window.
+ * Built-in stores use a fixed claim for every live row; after hard delete the same claim value may
+ * be reused, matching common HTTP {@code Idempotency-Key} practice and the Iceberg REST reuse
+ * window.
  *
  * <p>Keys are compared in the folded form returned by {@link IdempotencyKeys#canonicalize}, so
  * implementations must canonicalize before reading or writing storage rather than trusting the

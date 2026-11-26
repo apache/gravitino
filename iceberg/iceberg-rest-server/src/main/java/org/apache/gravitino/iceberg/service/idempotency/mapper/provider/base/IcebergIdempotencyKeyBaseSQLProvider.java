@@ -76,7 +76,7 @@ public class IcebergIdempotencyKeyBaseSQLProvider {
    * Returns a finalization guarded by the reservation's claim and expiry.
    *
    * @param idempotencyKey canonical UUIDv7 key
-   * @param claim reservation fencing token
+   * @param claim reservation claim
    * @param httpStatus response status
    * @param responseSummary serialized response body, or null for an empty body
    * @param nowMs current time in unix epoch milliseconds
@@ -99,7 +99,7 @@ public class IcebergIdempotencyKeyBaseSQLProvider {
    * Returns a release guarded by the reservation's claim. Finalized responses are retained.
    *
    * @param idempotencyKey canonical UUIDv7 key
-   * @param claim reservation fencing token
+   * @param claim reservation claim
    * @return SQL statement
    */
   public String deleteReservation(

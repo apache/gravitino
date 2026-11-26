@@ -76,7 +76,7 @@ public class IcebergIdempotencyKeySQLProviderFactory {
    * Returns the statement for the configured entity-store database.
    *
    * @param idempotencyKey canonical UUIDv7 key
-   * @param claim reservation fencing token
+   * @param claim reservation claim
    * @param httpStatus response status
    * @param responseSummary serialized response body, or null for an empty body
    * @param nowMs current time in unix epoch milliseconds
@@ -95,7 +95,7 @@ public class IcebergIdempotencyKeySQLProviderFactory {
    * Returns the statement for the configured entity-store database.
    *
    * @param idempotencyKey canonical UUIDv7 key
-   * @param claim reservation fencing token
+   * @param claim reservation claim
    * @return SQL statement
    */
   public static String deleteReservation(

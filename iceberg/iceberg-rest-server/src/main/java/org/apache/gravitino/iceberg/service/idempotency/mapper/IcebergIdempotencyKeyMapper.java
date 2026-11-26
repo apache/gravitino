@@ -72,7 +72,7 @@ public interface IcebergIdempotencyKeyMapper {
    * Finalizes a live reservation owned by the given claim.
    *
    * @param idempotencyKey canonical UUIDv7 key
-   * @param claim reservation fencing token
+   * @param claim reservation claim
    * @param httpStatus response status
    * @param responseSummary serialized response body, or null for an empty body
    * @param nowMs current time in unix epoch milliseconds
@@ -90,7 +90,7 @@ public interface IcebergIdempotencyKeyMapper {
    * Deletes only rows matching the statement's ownership or expiry guard.
    *
    * @param idempotencyKey canonical UUIDv7 key
-   * @param claim reservation fencing token
+   * @param claim reservation claim
    * @return number of affected rows
    */
   @DeleteProvider(

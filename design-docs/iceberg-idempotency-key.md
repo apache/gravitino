@@ -303,9 +303,9 @@ table in `scripts/<backend>/schema-2.0.0-<backend>.sql` and
 Hard-deleted, released, or purged keys are treated as never seen. Each live row
 stores a fixed claim (`generation = 1`). That matches common HTTP
 `Idempotency-Key` stores and the Iceberg REST reuse window (clients SHOULD NOT
-reuse a key after expiry). There is no side counter table: a late finalize or
-release from a previous owner can touch a newer reservation when claims match,
-so the reuse window must outlast the mutation.
+reuse a key after expiry). A late finalize or release from a previous owner can
+touch a newer reservation when claims match, so the reuse window must outlast
+the mutation.
 
 The HTTP method is stored in `http_method`. The `request_uri` column stores
 the encoded path plus the sorted, encoded query string when present. MySQL

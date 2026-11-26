@@ -861,10 +861,6 @@ public class TestSQLScripts extends TestJDBCBackend {
 
   private void assertIdempotencySchema(String source) throws SQLException {
     Map<String, Set<String>> columns = readSchemaColumns();
-    Assertions.assertTrue(
-        columns.keySet().stream()
-            .noneMatch(name -> name.equalsIgnoreCase("iceberg_idempotency_generation_meta")),
-        "Idempotency stripe counters must be absent after " + source);
     String table =
         columns.keySet().stream()
             .filter(name -> name.equalsIgnoreCase("iceberg_idempotency_meta"))

@@ -52,7 +52,7 @@ import org.slf4j.LoggerFactory;
  * That matches common HTTP {@code Idempotency-Key} stores and the Iceberg REST reuse window
  * (clients SHOULD NOT reuse a key after expiry). A late finalize or release from a previous owner
  * can therefore touch the new row when claims match; size the reuse window so mutations finish
- * before expiry, and do not rely on cross-delete fencing. Replicas must synchronize system clocks:
+ * before expiry. Replicas must synchronize system clocks:
  * a fast clock can reclaim a key another replica still considers live. There is no clock-skew grace
  * period and no in-flight renewal: the configured lifetime must exceed the maximum duration from
  * reservation through mutation completion and response persistence, plus maximum clock skew and a
