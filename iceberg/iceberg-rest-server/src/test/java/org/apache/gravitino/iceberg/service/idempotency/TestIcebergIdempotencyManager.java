@@ -23,7 +23,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.OptionalLong;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
@@ -229,7 +228,7 @@ public class TestIcebergIdempotencyManager {
   void testRetryWhileTheFirstRequestIsRunningIsRetryable() {
     IdempotencyStore store = Mockito.mock(IdempotencyStore.class);
     Mockito.when(store.reserve(Mockito.anyString(), Mockito.anyString(), Mockito.anyLong()))
-        .thenReturn(OptionalLong.empty());
+        .thenReturn(false);
     Mockito.when(store.load(KEY)).thenReturn(Optional.empty());
     IcebergIdempotencyManager manager =
         new IcebergIdempotencyManager(enabledConfig(ImmutableMap.of()), Optional.of(store));
@@ -265,12 +264,12 @@ public class TestIcebergIdempotencyManager {
   void testNoOpFinalizeRetainsReservation() {
     IdempotencyStore store = Mockito.mock(IdempotencyStore.class);
     Mockito.when(store.reserve(Mockito.eq(KEY), Mockito.anyString(), Mockito.anyLong()))
-        .thenReturn(OptionalLong.of(1));
+        .thenReturn(true);
     IcebergIdempotencyManager manager =
         new IcebergIdempotencyManager(enabledConfig(ImmutableMap.of()), Optional.of(store));
     Response response = execute(manager, KEY, new AtomicInteger());
     Assertions.assertEquals(200, response.getStatus());
-    Mockito.verify(store, Mockito.never()).release(Mockito.anyString(), Mockito.anyLong());
+    Mockito.verify(store, Mockito.never()).release(Mockito.anyString());
   }
 
   @Test
@@ -282,14 +281,14 @@ public class TestIcebergIdempotencyManager {
               Mockito.when(store.load(KEY))
                   .thenReturn(
                       Optional.of(
-                          IdempotencyRecord.reserved(KEY, BINDING, 2, 0, Long.MAX_VALUE)
+                          IdempotencyRecord.reserved(KEY, BINDING, 0, Long.MAX_VALUE)
                               .withResponse(200, "replacement")));
-              return OptionalLong.of(1);
+              return true;
             });
     IcebergIdempotencyManager manager =
         new IcebergIdempotencyManager(enabledConfig(ImmutableMap.of()), Optional.of(store));
     Assertions.assertEquals(200, execute(manager, KEY, new AtomicInteger()).getStatus());
-    Mockito.verify(store, Mockito.never()).release(Mockito.anyString(), Mockito.anyLong());
+    Mockito.verify(store, Mockito.never()).release(Mockito.anyString());
   }
 
   @Test
@@ -328,7 +327,7 @@ public class TestIcebergIdempotencyManager {
       Assertions.assertEquals(200, first.getStatus());
       Assertions.assertEquals(first.getEntity(), retry.getEntity());
       Assertions.assertEquals(1, executions.get());
-      Mockito.verify(store, Mockito.never()).release(Mockito.anyString(), Mockito.anyLong());
+      Mockito.verify(store, Mockito.never()).release(Mockito.anyString());
     }
   }
 

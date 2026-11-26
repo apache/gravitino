@@ -203,7 +203,7 @@ Limitations:
 
 - Request identity covers the HTTP method, path, and query parameters. It does **not** compare request bodies or behavior-changing headers such as `X-Iceberg-Access-Delegation`. Reusing a key on the same URL with a changed body or header replays the first response; it does not apply the changed request. Always generate a new key for a different logical operation. Request validation runs before replay, so a retry with an invalid body can return `400 Bad Request` even if the key already has a stored success.
 - Replay preserves the status and JSON body but omits response headers such as `ETag`. Load the table again if the client needs its current ETag.
-- The catalog mutation and response persistence are not one transaction. A crash, serialization failure, lost reservation, or post-commit failure can leave a successful mutation without a replayable response. When saving a terminal response fails, the manager keeps any existing reservation until expiry and returns the original mutation response. Retries receive `409` with `Retry-After` while an unfinalized reservation remains. Expiry, eviction, or a released reservation treats the key as never seen and can permit re-execution. A late finalize or release after reclaim can touch the new row; that cannot undo catalog side effects.
+- The catalog mutation and response persistence are not one transaction. A crash, serialization failure, lost reservation, or post-commit failure can leave a successful mutation without a replayable response. When saving a terminal response fails, the manager keeps any existing reservation until expiry and returns the original mutation response. Retries receive `409` with `Retry-After` while an unfinalized reservation remains. Expiry, eviction, or a released reservation treats the key as never seen and can permit re-execution.
 - The in-memory store reclaims expired entries through Caffeine. The JDBC store schedules bounded cleanup as described below. Custom stores must enforce expiry on reads/reservations and arrange their own cleanup.
 
 :::caution
@@ -245,15 +245,13 @@ current `request_uri` column uses `MEDIUMTEXT` to accommodate long request targe
 
 The store interface and record type are in `org.apache.gravitino.iceberg.service.idempotency` in
 the Iceberg REST server JAR. Rebuild custom stores from earlier development versions against this
-package and update `reserve` to return the store's claim, or an empty result for a duplicate key. If
-an earlier configuration names the built-in in-memory store by its old class name, use the
-`in-memory` alias.
+package and update `reserve` to return whether the key was acquired. If an earlier configuration
+names the built-in in-memory store by its old class name, use the `in-memory` alias.
 
 Reservations are atomic across replicas. After release or purge, the same key is treated as never
-seen and reserved again with a fixed claim, matching common HTTP `Idempotency-Key` stores. Clients
-SHOULD NOT reuse a key after the advertised lifetime. The table stores the HTTP method separately
-from `request_uri`, which contains the encoded path followed by the sorted, encoded query string
-when present.
+seen and reserved again, matching common HTTP `Idempotency-Key` stores. Clients SHOULD NOT reuse a
+key after the advertised lifetime. The table stores the HTTP method separately from `request_uri`,
+which contains the encoded path followed by the sorted, encoded query string when present.
 
 Expiry is enforced on reads, finalization, and reservation attempts;
 reusing an expired key does not depend on the cleanup schedule. Each cleanup pass deletes at most

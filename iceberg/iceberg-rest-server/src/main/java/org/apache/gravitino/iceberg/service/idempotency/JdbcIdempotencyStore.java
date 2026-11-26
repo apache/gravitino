@@ -25,7 +25,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
-import java.util.OptionalLong;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -48,24 +47,19 @@ import org.slf4j.LoggerFactory;
  * upgraded before this store is enabled.
  *
  * <p>Reservations commit independently of catalog transactions. Expired, released, or purged keys
- * are treated as never seen: a later {@link #reserve} inserts a new row with the same fixed claim.
- * That matches common HTTP {@code Idempotency-Key} stores and the Iceberg REST reuse window
- * (clients SHOULD NOT reuse a key after expiry). A late finalize or release from a previous owner
- * can therefore touch the new row when claims match; size the reuse window so mutations finish
- * before expiry. Replicas must synchronize system clocks:
- * a fast clock can reclaim a key another replica still considers live. There is no clock-skew grace
- * period and no in-flight renewal: the configured lifetime must exceed the maximum duration from
- * reservation through mutation completion and response persistence, plus maximum clock skew and a
- * safety margin.
+ * are treated as never seen: a later {@link #reserve} inserts a new row. That matches common HTTP
+ * {@code Idempotency-Key} stores and the Iceberg REST reuse window (clients SHOULD NOT reuse a key
+ * after expiry). Size the reuse window so mutations finish before expiry. Replicas must synchronize
+ * system clocks: a fast clock can reclaim a key another replica still considers live. There is no
+ * clock-skew grace period and no in-flight renewal: the configured lifetime must exceed the maximum
+ * duration from reservation through mutation completion and response persistence, plus maximum
+ * clock skew and a safety margin.
  *
  * <p>Share one store per service instance across requests. Each store owns a cleanup scheduler that
  * is stopped by {@link #close()}; the relational entity store owns the shared connection pool.
  */
 public class JdbcIdempotencyStore implements IdempotencyStore {
   private static final Logger LOG = LoggerFactory.getLogger(JdbcIdempotencyStore.class);
-
-  /** Claim written on every live reservation; hard-deleted keys start over with the same value. */
-  @VisibleForTesting static final long CLAIM = 1L;
 
   @VisibleForTesting static final int PURGE_BATCH_SIZE = 1000;
   @VisibleForTesting static final int MAX_PURGE_BATCHES = 100;
@@ -129,40 +123,38 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
   }
 
   @Override
-  public OptionalLong reserve(String idempotencyKey, String operationBinding, long expiresAtMs) {
+  public boolean reserve(String idempotencyKey, String operationBinding, long expiresAtMs) {
     String key = IdempotencyKeys.canonicalize(idempotencyKey);
     Preconditions.checkArgument(operationBinding != null, "operationBinding should not be null");
     for (int attempt = 0; attempt < 2; attempt++) {
       long nowMs = clock.millis();
       try {
-        return execute(
+        execute(
             mapper -> {
               mapper.insert(
-                  IcebergIdempotencyKeyPO.reserved(
-                      key, operationBinding, CLAIM, nowMs, expiresAtMs));
-              return OptionalLong.of(CLAIM);
+                  IcebergIdempotencyKeyPO.reserved(key, operationBinding, nowMs, expiresAtMs));
+              return null;
             });
+        return true;
       } catch (RuntimeException e) {
         if (!ExceptionUtils.isDuplicateKey(e)) {
           throw e;
         }
       }
       // Replace in a separate transaction so a failed INSERT's MySQL locks are not upgraded.
-      OptionalLong replacement =
+      boolean replaced =
           execute(
-              mapper -> {
-                int replaced =
-                    mapper.replaceExpired(
-                        IcebergIdempotencyKeyPO.reserved(
-                            key, operationBinding, CLAIM, nowMs, expiresAtMs));
-                return replaced == 0 ? OptionalLong.empty() : OptionalLong.of(CLAIM);
-              });
-      if (replacement.isPresent()) {
-        return replacement;
+              mapper ->
+                  mapper.replaceExpired(
+                          IcebergIdempotencyKeyPO.reserved(
+                              key, operationBinding, nowMs, expiresAtMs))
+                      > 0);
+      if (replaced) {
+        return true;
       }
       // Purge or release may have removed the row. Retry once with a fresh expiry cutoff.
     }
-    return OptionalLong.empty();
+    return false;
   }
 
   @Override
@@ -174,23 +166,21 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
 
   @Override
   public void finalizeRecord(
-      String idempotencyKey, long claim, int httpStatus, @Nullable String responseSummary) {
+      String idempotencyKey, int httpStatus, @Nullable String responseSummary) {
     String key = IdempotencyKeys.canonicalize(idempotencyKey);
     int updated =
-        execute(
-            mapper ->
-                mapper.finalizeRecord(key, claim, httpStatus, responseSummary, clock.millis()));
+        execute(mapper -> mapper.finalizeRecord(key, httpStatus, responseSummary, clock.millis()));
     if (updated == 0) {
-      LOG.debug("No live unfinalized reservation to finalize for key {} and claim {}", key, claim);
+      LOG.debug("No live unfinalized reservation to finalize for key {}", key);
     }
   }
 
   @Override
-  public void release(String idempotencyKey, long claim) {
+  public void release(String idempotencyKey) {
     String key = IdempotencyKeys.canonicalize(idempotencyKey);
-    int deleted = execute(mapper -> mapper.deleteReservation(key, claim));
+    int deleted = execute(mapper -> mapper.deleteReservation(key));
     if (deleted == 0) {
-      LOG.debug("No unfinalized reservation to release for key {} and claim {}", key, claim);
+      LOG.debug("No unfinalized reservation to release for key {}", key);
     }
   }
 

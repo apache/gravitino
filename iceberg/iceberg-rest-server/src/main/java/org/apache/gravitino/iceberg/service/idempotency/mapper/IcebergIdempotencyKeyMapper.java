@@ -69,10 +69,9 @@ public interface IcebergIdempotencyKeyMapper {
       @Param("idempotencyKey") String idempotencyKey, @Param("nowMs") long nowMs);
 
   /**
-   * Finalizes a live reservation owned by the given claim.
+   * Finalizes a live unfinalized reservation.
    *
    * @param idempotencyKey canonical UUIDv7 key
-   * @param claim reservation claim
    * @param httpStatus response status
    * @param responseSummary serialized response body, or null for an empty body
    * @param nowMs current time in unix epoch milliseconds
@@ -81,22 +80,20 @@ public interface IcebergIdempotencyKeyMapper {
   @UpdateProvider(type = IcebergIdempotencyKeySQLProviderFactory.class, method = "finalizeRecord")
   int finalizeRecord(
       @Param("idempotencyKey") String idempotencyKey,
-      @Param("claim") long claim,
       @Param("httpStatus") int httpStatus,
       @Param("responseSummary") @Nullable String responseSummary,
       @Param("nowMs") long nowMs);
 
   /**
-   * Deletes only rows matching the statement's ownership or expiry guard.
+   * Deletes an unfinalized reservation.
    *
    * @param idempotencyKey canonical UUIDv7 key
-   * @param claim reservation claim
    * @return number of affected rows
    */
   @DeleteProvider(
       type = IcebergIdempotencyKeySQLProviderFactory.class,
       method = "deleteReservation")
-  int deleteReservation(@Param("idempotencyKey") String idempotencyKey, @Param("claim") long claim);
+  int deleteReservation(@Param("idempotencyKey") String idempotencyKey);
 
   /**
    * Deletes only rows matching the statement's ownership or expiry guard.

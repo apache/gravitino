@@ -168,9 +168,9 @@ public interface IdempotencyStore extends Closeable {
    * @param idempotencyKey the client-provided UUIDv7 key
    * @param operationBinding request identity, e.g. "POST /v1/cat1/namespaces/ns1/tables"
    * @param expiresAtMs deadline in Unix epoch milliseconds
-   * @return the reservation claim if acquired, empty if the key is live
+   * @return true if acquired, false if the key is live
    */
-  OptionalLong reserve(String idempotencyKey, String operationBinding, long expiresAtMs);
+  boolean reserve(String idempotencyKey, String operationBinding, long expiresAtMs);
 
   /**
    * Load a finalized record for replay.
@@ -184,20 +184,18 @@ public interface IdempotencyStore extends Closeable {
    * Mark a reserved key as finalized with the response to replay on duplicates.
    *
    * @param idempotencyKey the client-provided key
-   * @param claim the claim returned by reserve
    * @param httpStatus the HTTP status code of the original response
    * @param responseSummary serialized response body (JSON string)
    */
-  void finalizeRecord(String idempotencyKey, long claim, int httpStatus, String responseSummary);
+  void finalizeRecord(String idempotencyKey, int httpStatus, String responseSummary);
 
   /**
    * Release a reservation so the client can retry with the same key.
    * Called when the mutation fails with a retryable error.
    *
    * @param idempotencyKey the client-provided key
-   * @param claim the claim returned by reserve
    */
-  void release(String idempotencyKey, long claim);
+  void release(String idempotencyKey);
 
   /**
    * Purge expired records. Called periodically by a background task.
@@ -215,7 +213,6 @@ public interface IdempotencyStore extends Closeable {
 public class IdempotencyRecord {
   private final String idempotencyKey;     // UUIDv7 (RFC 9562), 36-char canonical form
   private final String operationBinding;   // e.g., "POST /v1/cat1/namespaces/ns1/tables"
-  private final long claim;               // store-issued claim (fixed for built-in stores)
   private final Integer httpStatus;        // null while reserved / in-progress
   private final String responseSummary;    // serialized response body (JSON)
   private final long createdAtMs;          // unix epoch millis (matches BIGINT column)
@@ -285,7 +282,6 @@ CREATE TABLE IF NOT EXISTS `iceberg_idempotency_meta` (
   `idempotency_key`  VARCHAR(36)         NOT NULL     COMMENT 'client-provided UUIDv7 idempotency key',
   `http_method`      VARCHAR(16)         NOT NULL     COMMENT 'HTTP method of the request',
   `request_uri`      MEDIUMTEXT          NOT NULL     COMMENT 'encoded request path and sorted query string',
-  `generation`       BIGINT              NOT NULL     COMMENT 'fixed reservation claim reused after hard delete',
   `http_status`      INT(10) UNSIGNED    DEFAULT NULL COMMENT 'HTTP status of finalized response, NULL while reserved',
   `response_summary` MEDIUMTEXT          DEFAULT NULL COMMENT 'serialized response body (JSON) for replay',
   `audit_info`       MEDIUMTEXT          NOT NULL     COMMENT 'idempotency record audit info',
@@ -300,12 +296,10 @@ The H2 and PostgreSQL variants use the same columns. All three backends ship the
 table in `scripts/<backend>/schema-2.0.0-<backend>.sql` and
 `scripts/<backend>/upgrade-1.3.0-to-2.0.0-<backend>.sql`.
 
-Hard-deleted, released, or purged keys are treated as never seen. Each live row
-stores a fixed claim (`generation = 1`). That matches common HTTP
-`Idempotency-Key` stores and the Iceberg REST reuse window (clients SHOULD NOT
-reuse a key after expiry). A late finalize or release from a previous owner can
-touch a newer reservation when claims match, so the reuse window must outlast
-the mutation.
+Hard-deleted, released, or purged keys are treated as never seen. That matches
+common HTTP `Idempotency-Key` stores and the Iceberg REST reuse window (clients
+SHOULD NOT reuse a key after expiry). Size the reuse window so mutations finish
+before expiry.
 
 The HTTP method is stored in `http_method`. The `request_uri` column stores
 the encoded path plus the sorted, encoded query string when present. MySQL
@@ -321,9 +315,8 @@ longer than MySQL's 64 KiB `TEXT` limit.
 
 ### 4.2 Conflict Handling
 
-`reserve()` attempts a plain `INSERT` with the fixed claim. After a duplicate-key
-rollback, a separate transaction replaces the matching row only if it is
-expired. If no expired row matches, the store retries once with a fresh expiry
+`reserve()` attempts a plain `INSERT`. After a duplicate-key rollback, a separate
+transaction replaces the matching row only if it is expired. If no expired row matches, the store retries once with a fresh expiry
 cutoff in case purge or release freed the key. If neither attempt claims the
 key, it returns empty. Other SQL errors propagate. Only finalized, unexpired
 records can be loaded for replay.
@@ -338,8 +331,8 @@ records can be loaded for replay.
    ignore the `Idempotency-Key` header and execute the mutation directly.
 2. Extract `Idempotency-Key` header; validate UUIDv7 format (400 if invalid).
 3. If header absent, execute mutation directly (no idempotency overhead).
-4. Call `store.reserve(key, binding, now + lifetime)` to acquire the key and receive a claim.
-5. If a claim was returned, execute the mutation and call `store.finalizeRecord(key, claim, status, body)`.
+4. Call `store.reserve(key, binding, now + lifetime)` to acquire the key.
+5. If reserve returns true, execute the mutation and call `store.finalizeRecord(key, status, body)`.
 6. Return response to client.
 
 ### 5.2 Replay Path (Duplicate Key)
@@ -362,11 +355,11 @@ response-persistence failures:
   whose commit acknowledgement may have been lost. Retry with the same key
   within its reuse window; reconcile catalog state before retrying outside it.
 - **Retryable mutation errors** (`5xx`, authentication/authorization outcomes,
-  or a thrown action exception): call `store.release(key, claim)` so the client
+  or a thrown action exception): call `store.release(key)` so the client
   can retry with the same key. A mutation failure can still have an uncertain
   catalog outcome; a `5xx` is not proof that the catalog was unchanged.
 - **Terminal errors** (e.g., `AlreadyExistsException`): call
-  `store.finalizeRecord(key, claim, 409, errorBody)` so retries get the same error response.
+  `store.finalizeRecord(key, 409, errorBody)` so retries get the same error response.
 - **Terminal response cannot be retained** (serialization, write, read-back
   failure, or a no-op finalize): return the original mutation response and leave
   any existing reservation until expiry. This prevents immediate re-execution;
@@ -492,7 +485,7 @@ This design uses a fixed reuse window rather than heartbeat-based ownership.
 It therefore requires the duration and clock-skew bounds in Section 5.4 and
 cannot guarantee at-most-once execution for unbounded mutations. Supporting
 those operations safely would require a separate lease-renewal and
-catalog-side fencing design; record claim tokens alone cannot stop an already
+catalog-side design; the idempotency record alone cannot stop an already
 running catalog mutation.
 
 ---

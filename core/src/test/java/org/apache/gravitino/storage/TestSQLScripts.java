@@ -872,7 +872,6 @@ public class TestSQLScripts extends TestJDBCBackend {
             "idempotency_key",
             "http_method",
             "request_uri",
-            "generation",
             "http_status",
             "response_summary",
             "audit_info",
