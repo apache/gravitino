@@ -206,6 +206,9 @@
    This product bundles various third-party components also under the
    Apache Software License 2.0 from:
 
+   Apache Ossie (ontology schema)
+   NetworkNT JSON Schema Validator
+   Ethlo Time ITU
    Apache Hive
    Apache Paimon
    FastDoubleParser (older Jackson copy shaded in paimon-format 1.2.0)
@@ -416,6 +419,13 @@
    db-scheduler
    cron-utils (shaded into db-scheduler)
    JSpecify
+   Google AutoValue Annotations
+   Failsafe
+   Carrot Search HPPC
+   JPam
+   Micrometer
+   OpenCensus
+   QuestDB jar-jni
 
    This product bundles various third-party components also under the
    Apache Software Foundation License 1.1
@@ -458,6 +468,8 @@
    PostgreSQL JDBC Driver
    SQLLine
    ThreeTen-Extra
+   ANTLR 3 Runtime
+   JDOM
 
    This product bundles various third-party components also under the
    MIT license
@@ -476,6 +488,7 @@
    tkem/cachetools
    gethostname4j
    Bitshuffle (bundled in Snappy Java, see licenses/bitshuffle.txt)
+   Reactive Streams (MIT No Attribution)
 
    This product bundles various third-party components also under the
    Boost Software License 1.0
@@ -569,3 +582,9 @@ For the BSD license of the ZSTD JNI wrapper, see licenses/zstd.txt. For the BSD 
 
 For the license texts of code included in Apache Commons Math 3.1.1,
    see licenses/commons-math3.txt.
+
+For the BSD license of the ANTLR 3 runtime, see licenses/antlr3.txt.
+
+For the JDOM license, see licenses/jdom.txt.
+
+For the MIT No Attribution license of Reactive Streams, see licenses/reactive-streams.txt.

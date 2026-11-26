@@ -78,6 +78,7 @@ import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.junit.jupiter.api.AfterAll;
@@ -185,8 +186,9 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
                 })
             .build();
     NameIdentifier model = NameIdentifier.of(schemaName, "source_lookup_model");
+    SemanticModelCatalog models = catalog.asSemanticModelCatalog();
     try {
-      catalog.asSemanticModelCatalog().createSemanticModel(model, null, definition, Map.of());
+      int revision = models.createSemanticModel(model, null, definition, Map.of()).revision();
       Assertions.assertArrayEquals(
           new NameIdentifier[] {
             NameIdentifier.of(metalakeName, catalogName, schemaName, model.name(), "managed.alias")
@@ -196,9 +198,7 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
               .loadTable(source)
               .supportsSemanticModels()
               .listSemanticModelDatasets());
-      catalog
-          .asSemanticModelCatalog()
-          .alterSemanticModel(model, SemanticModelChange.replaceDefinition(definition));
+      models.alterSemanticModel(model, revision, SemanticModelChange.replaceDefinition(definition));
       Assertions.assertEquals(
           1,
           catalog
@@ -208,7 +208,7 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
               .listSemanticModelDatasets()
               .length);
     } finally {
-      catalog.asSemanticModelCatalog().dropSemanticModel(model);
+      models.dropSemanticModel(model);
     }
   }
 

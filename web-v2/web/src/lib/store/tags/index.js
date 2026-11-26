@@ -90,8 +90,10 @@ export const deleteTag = createAsyncThunk('tags/deleteTag', async ({ metalake, t
 
 export const associateTag = createAsyncThunk(
   'tags/associateTag',
-  async ({ metalake, metadataObjectType, metadataObjectFullName, data }) => {
-    const [err, res] = await to(associateTagApi({ metalake, metadataObjectType, metadataObjectFullName, data }))
+  async ({ metalake, metadataObjectType, metadataObjectFullName, data, apiVersion }) => {
+    const [err, res] = await to(
+      associateTagApi({ metalake, metadataObjectType, metadataObjectFullName, data, apiVersion })
+    )
 
     if (err || !res) {
       throw new Error(err)

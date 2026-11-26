@@ -71,11 +71,14 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelRevision;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.tag.TagValue;
@@ -257,6 +260,37 @@ public class RelationalEntityStore
   @Override
   public List<SchemaEntity> listDescendantSchemas(NameIdentifier identifier) throws IOException {
     return backend.listDescendantSchemas(identifier);
+  }
+
+  @Override
+  public SemanticModelEntity loadSemanticModelRevision(
+      NameIdentifier ident, SemanticModelRevisionSelector selector) throws IOException {
+    return backend.loadSemanticModelRevision(ident, selector);
+  }
+
+  @Override
+  public SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident)
+      throws IOException {
+    return backend.listSemanticModelRevisions(ident);
+  }
+
+  @Override
+  public List<NameIdentifier> listSemanticModelIdentifiers(Namespace namespace) throws IOException {
+    return backend.listSemanticModelIdentifiers(namespace);
+  }
+
+  @Override
+  public SemanticModelEntity updateSemanticModel(
+      NameIdentifier ident,
+      @Nullable Integer expectedRevision,
+      boolean rename,
+      Function<SemanticModelEntity, SemanticModelEntity> updater)
+      throws IOException {
+    try {
+      return backend.updateSemanticModel(ident, expectedRevision, rename, updater);
+    } catch (RuntimeException e) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(e, Entity.EntityType.SEMANTIC_MODEL, ident);
+    }
   }
 
   @Override

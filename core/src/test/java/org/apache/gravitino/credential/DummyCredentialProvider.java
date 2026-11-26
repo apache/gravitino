@@ -27,7 +27,7 @@ import javax.annotation.Nullable;
 import javax.ws.rs.NotSupportedException;
 import lombok.Getter;
 
-public class DummyCredentialProvider implements CredentialProvider {
+public class DummyCredentialProvider implements SupportsDynamicCredential {
   Map<String, String> properties;
   static final String CREDENTIAL_TYPE = "dummy";
 

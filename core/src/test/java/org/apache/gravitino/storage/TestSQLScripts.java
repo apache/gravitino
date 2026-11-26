@@ -232,6 +232,7 @@ public class TestSQLScripts extends TestJDBCBackend {
       }
       if ("2.0.0".equals(versionScripts.getKey())) {
         assertCleanupIndexes("schema " + versionScripts.getKey());
+        assertLiveRowIndexes("schema " + versionScripts.getKey());
         assertNameColumnWidths("schema " + versionScripts.getKey());
         assertIdempotencySchema("schema " + versionScripts.getKey());
       }
@@ -275,6 +276,7 @@ public class TestSQLScripts extends TestJDBCBackend {
       executeScript(upgradeScript);
       if ("2.0.0".equals(upgradeMatcher.group(2))) {
         assertCleanupIndexes(upgradeScript.getName());
+        assertLiveRowIndexes(upgradeScript.getName());
         assertNameColumnWidths(upgradeScript.getName());
         assertIdempotencySchema(upgradeScript.getName());
       }
@@ -924,6 +926,52 @@ public class TestSQLScripts extends TestJDBCBackend {
         }
         Assertions.assertTrue(
             indexed, "No index leading with " + column + " on " + table + " after " + source);
+      }
+    }
+  }
+
+  private void assertLiveRowIndexes(String source) throws SQLException {
+    boolean partialIndex = "postgresql".equals(backendType);
+    Map<String, List<String>> lookupColumns =
+        Map.of(
+            "user_meta", List.of("metalake_id"),
+            "role_meta", List.of("metalake_id"),
+            "tag_meta", List.of("metalake_id"),
+            "policy_meta", List.of("metalake_id"),
+            "role_meta_securable_object", List.of("metadata_object_id", "type"),
+            "tag_relation_meta", List.of("metadata_object_id", "metadata_object_type"),
+            "user_role_rel", List.of("role_id"),
+            "policy_tag_relation_meta", List.of("tag_id"));
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection()) {
+      DatabaseMetaData metaData = connection.getMetaData();
+      for (Map.Entry<String, List<String>> entry : lookupColumns.entrySet()) {
+        String table = entry.getKey();
+        String index = "idx_" + table + "_live";
+        String tableName =
+            metaData.storesUpperCaseIdentifiers() ? table.toUpperCase(Locale.ROOT) : table;
+        List<String> expectedKeys = new ArrayList<>(entry.getValue());
+        if (!partialIndex) {
+          expectedKeys.add("deleted_at");
+        }
+        List<String> keys = new ArrayList<>();
+        try (ResultSet rows =
+            metaData.getIndexInfo(
+                connection.getCatalog(), connection.getSchema(), tableName, false, false)) {
+          while (rows.next()) {
+            if (index.equalsIgnoreCase(rows.getString("INDEX_NAME"))) {
+              if (partialIndex) {
+                Assertions.assertEquals(
+                    "(deleted_at = 0)",
+                    rows.getString("FILTER_CONDITION"),
+                    index + " after " + source);
+              }
+              keys.add(rows.getString("COLUMN_NAME").toLowerCase(Locale.ROOT));
+            }
+          }
+        }
+        Assertions.assertEquals(expectedKeys, keys, index + " after " + source);
       }
     }
   }

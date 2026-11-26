@@ -191,6 +191,7 @@ public class TestSemanticModelOperationDispatcher {
             () ->
                 dispatcher.alterSemanticModel(
                     MODEL_IDENT,
+                    1,
                     sources(definitionWithReservedExtension()),
                     SemanticModelChange.updateComment("Must not persist"),
                     SemanticModelChange.setProperty("owner", "changed"),
@@ -270,17 +271,22 @@ public class TestSemanticModelOperationDispatcher {
         dispatcher.alterSemanticModel(
             MODEL_IDENT,
             SemanticModelSourceUpdate.preserve(),
-            SemanticModelChange.rename("renamed_sales_model"),
-            SemanticModelChange.updateComment("Updated"));
+            SemanticModelChange.rename("renamed_sales_model"));
     NameIdentifier renamedIdent = NameIdentifier.of(NAMESPACE, renamed.name());
+    SemanticModel updated =
+        dispatcher.alterSemanticModel(
+            renamedIdent,
+            SemanticModelSourceUpdate.preserve(),
+            SemanticModelChange.updateComment("Updated"));
     assertEquals(
         Map.of("owner", "analytics", PROPERTY_OSSIE_VERSION, DEFAULT_VERSION),
         propertyUpdated.properties());
-    assertEquals("Updated", renamed.comment());
+    assertEquals("Updated", updated.comment());
 
     SemanticModel replaced =
         dispatcher.alterSemanticModel(
             renamedIdent,
+            updated.revision(),
             sources(validDefinition()),
             SemanticModelChange.replaceDefinition(validDefinition()));
     assertEquals(2, replaced.definition().datasets().length);
@@ -315,8 +321,8 @@ public class TestSemanticModelOperationDispatcher {
         () ->
             dispatcher.alterSemanticModel(
                 MODEL_IDENT,
+                1,
                 sources(invalidReplacement),
-                SemanticModelChange.rename("must_not_persist"),
                 SemanticModelChange.updateComment("Must not persist"),
                 SemanticModelChange.setProperty("owner", "changed"),
                 SemanticModelChange.replaceDefinition(invalidReplacement)));

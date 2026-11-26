@@ -69,90 +69,95 @@ You could start Gravitino MCP server by Docker image, `docker run -p 8000:8000 -
 
 Gravitino MCP server supports the following tools, and you could export tool by tag.
 
-| Tool name                           | Description                                                                    | Tag             |
-|-------------------------------------|--------------------------------------------------------------------------------|-----------------|
-| `list_metalakes`                    | Retrieve the metalakes the caller can access.                                  | `metalake`      |
-| `get_list_of_catalogs`              | Retrieve a list of all catalogs in the system.                                 | `catalog`       |
-| `create_catalog`                    | Create a new catalog.                                                          | `catalog`       |
-| `alter_catalog`                     | Alter an existing catalog.                                                     | `catalog`       |
-| `drop_catalog`                      | Drop a catalog.                                                                | `catalog`       |
-| `set_catalog_in_use`                | Enable or disable a catalog.                                                   | `catalog`       |
-| `get_list_of_schemas`               | Retrieve a list of schemas belonging to a specific catalog.                    | `schema`        |
-| `create_schema`                     | Create a new schema.                                                           | `schema`        |
-| `alter_schema`                      | Alter an existing schema.                                                      | `schema`        |
-| `drop_schema`                       | Drop a schema.                                                                 | `schema`        |
-| `get_list_of_tables`                | Retrieve a list of tables within a specific catalog and schema.                | `table`         |
-| `get_table_metadata_details`        | Retrieve comprehensive metadata details for a specific table.                  | `table`         |
-| `create_table`                      | Create a new table.                                                            | `table`         |
-| `alter_table`                       | Alter an existing table.                                                       | `table`         |
-| `drop_table`                        | Drop a table.                                                                  | `table`         |
-| `list_of_models`                    | Retrieve a list of models within a specific catalog and schema.                | `model`         |
-| `load_model`                        | Retrieve comprehensive metadata details for a specific model.                  | `model`         |
-| `list_model_versions`               | Retrieve a list of versions for a specific model.                              | `model`         |
-| `load_model_version`                | Retrieve comprehensive metadata details for a specific model version.          | `model`         |
-| `load_model_version_by_alias`       | Retrieve comprehensive metadata details for a specific model version by alias. | `model`         |
-| `register_model`                    | Register a new model.                                                          | `model`         |
-| `delete_model`                      | Delete a model.                                                                | `model`         |
-| `link_model_version`                | Link a new version to a model.                                                 | `model`         |
-| `delete_model_version`              | Delete a model version.                                                        | `model`         |
-| `delete_model_version_by_alias`     | Delete a model version by one of its aliases.                                  | `model`         |
-| `alter_model`                       | Alter an existing model.                                                       | `model`         |
-| `alter_model_version`               | Alter a model version.                                                         | `model`         |
-| `alter_model_version_by_alias`      | Alter a model version by one of its aliases.                                   | `model`         |
-| `metadata_type_to_fullname_formats` | Retrieve the metadata type to fullname formats mapping.                        | `metadata`      |
-| `list_of_topics`                    | Retrieve a list of topics within a specific catalog and schema.                | `topic`         |
-| `load_topic`                        | Retrieve comprehensive metadata details for a specific topic.                  | `topic`         |
-| `create_topic`                      | Create a new topic.                                                            | `topic`         |
-| `alter_topic`                       | Alter an existing topic.                                                       | `topic`         |
-| `delete_topic`                      | Delete a topic.                                                                | `topic`         |
-| `list_of_filesets`                  | Retrieve a list of filesets within a specific catalog and schema.              | `fileset`       |
-| `load_fileset`                      | Retrieve comprehensive metadata details for a specific fileset.                | `fileset`       |
-| `list_files_in_fileset`             | Retrieve a list of files within a specific fileset.                            | `fileset`       |
-| `create_fileset`                    | Create a new fileset.                                                          | `fileset`       |
-| `alter_fileset`                     | Alter an existing fileset.                                                     | `fileset`       |
-| `drop_fileset`                      | Drop a fileset.                                                                | `fileset`       |
-| `list_of_jobs`                      | Retrieve a list of jobs                                                        | `job`           |
-| `get_job_by_id`                     | Retrieve a job by its ID.                                                      | `job`           |
-| `list_of_job_templates`             | Retrieve a list of job templates.                                              | `job`           |
-| `get_job_template_by_name`          | Retrieve a job template by its name.                                           | `job`           |
-| `run_job`                           | Run a job with the specified parameters.                                       | `job`           |
-| `cancel_job`                        | Cancel a running job by its ID.                                                | `job`           |
-| `get_tag_by_name`                   | Retrieve a tag by its name.                                                    | `tag`           |
-| `list_of_tags`                      | Retrieve a list of tags.                                                       | `tag`           |
-| `list_tags_for_metadata`            | Retrieve a list of tags associated with a specific metadata item.              | `tag`           |
-| `list_metadata_by_tag`              | Retrieve a list of metadata items associated with a specific tag.              | `tag`           |
-| `associate_tag_with_metadata`       | Associate tags with a specific metadata item.                                  | `tag`           |
-| `disassociate_tag_from_metadata`    | Disassociate tags from a specific metadata item.                               | `tag`           |
-| `create_tag`                        | Create a new tag.                                                              | `tag`           |
-| `alter_tag`                         | Alter an existing tag.                                                         | `tag`           |
-| `delete_tag`                        | Delete a tag.                                                                  | `tag`           |
-| `list_statistics_for_metadata`      | Retrieve a list of statistics associated with a specific metadata item.        | `statistics`    |
-| `list_statistics_for_partition`     | Retrieve a list of statistics associated with a specific partition.            | `statistics`    |
-| `get_list_of_policies`              | Retrieve a list of policies in the system.                                     | `policy`        |
-| `get_policy_detail_information`     | Retrieve detailed information for a specific policy by policy name.            | `policy`        |
-| `list_policies_for_tag`             | List policies directly associated with a tag, including selectors.             | `policy`, `tag` |
-| `associate_policy_with_tag`         | Associate a policy with a tag and selector.                                    | `policy`, `tag` |
-| `disassociate_policy_from_tag`      | Remove a direct policy association from a tag.                                 | `policy`, `tag` |
-| `list_tags_for_policy`              | List tags directly associated with a policy, including selectors.              | `policy`, `tag` |
-| `list_of_partitions`                | Retrieve partitions for a table. Only for catalogs with a partition API.       | `partition`     |
-| `get_partition`                     | Retrieve a partition's metadata. Only for catalogs with a partition API.       | `partition`     |
-| `list_of_views`                     | Retrieve a list of views for a schema. Only for catalogs supporting views.     | `view`          |
-| `load_view`                         | Retrieve a view's metadata. Only for catalogs supporting views.                | `view`          |
+| Tool name                           | Description                                                                    | Tag              |
+|-------------------------------------|--------------------------------------------------------------------------------|------------------|
+| `list_metalakes`                    | Retrieve the metalakes the caller can access.                                  | `metalake`       |
+| `get_list_of_catalogs`              | Retrieve a list of all catalogs in the system.                                 | `catalog`        |
+| `create_catalog`                    | Create a new catalog.                                                          | `catalog`        |
+| `alter_catalog`                     | Alter an existing catalog.                                                     | `catalog`        |
+| `drop_catalog`                      | Drop a catalog.                                                                | `catalog`        |
+| `set_catalog_in_use`                | Enable or disable a catalog.                                                   | `catalog`        |
+| `get_list_of_schemas`               | Retrieve a list of schemas belonging to a specific catalog.                    | `schema`         |
+| `create_schema`                     | Create a new schema.                                                           | `schema`         |
+| `alter_schema`                      | Alter an existing schema.                                                      | `schema`         |
+| `drop_schema`                       | Drop a schema.                                                                 | `schema`         |
+| `get_list_of_tables`                | Retrieve a list of tables within a specific catalog and schema.                | `table`          |
+| `get_table_metadata_details`        | Retrieve comprehensive metadata details for a specific table.                  | `table`          |
+| `create_table`                      | Create a new table.                                                            | `table`          |
+| `alter_table`                       | Alter an existing table.                                                       | `table`          |
+| `drop_table`                        | Drop a table.                                                                  | `table`          |
+| `list_of_models`                    | Retrieve a list of models within a specific catalog and schema.                | `model`          |
+| `load_model`                        | Retrieve comprehensive metadata details for a specific model.                  | `model`          |
+| `list_model_versions`               | Retrieve a list of versions for a specific model.                              | `model`          |
+| `load_model_version`                | Retrieve comprehensive metadata details for a specific model version.          | `model`          |
+| `load_model_version_by_alias`       | Retrieve comprehensive metadata details for a specific model version by alias. | `model`          |
+| `register_model`                    | Register a new model.                                                          | `model`          |
+| `delete_model`                      | Delete a model.                                                                | `model`          |
+| `link_model_version`                | Link a new version to a model.                                                 | `model`          |
+| `delete_model_version`              | Delete a model version.                                                        | `model`          |
+| `delete_model_version_by_alias`     | Delete a model version by one of its aliases.                                  | `model`          |
+| `alter_model`                       | Alter an existing model.                                                       | `model`          |
+| `alter_model_version`               | Alter a model version.                                                         | `model`          |
+| `alter_model_version_by_alias`      | Alter a model version by one of its aliases.                                   | `model`          |
+| `metadata_type_to_fullname_formats` | Retrieve the metadata type to fullname formats mapping.                        | `policy`, `tag`  |
+| `list_of_topics`                    | Retrieve a list of topics within a specific catalog and schema.                | `topic`          |
+| `load_topic`                        | Retrieve comprehensive metadata details for a specific topic.                  | `topic`          |
+| `create_topic`                      | Create a new topic.                                                            | `topic`          |
+| `alter_topic`                       | Alter an existing topic.                                                       | `topic`          |
+| `delete_topic`                      | Delete a topic.                                                                | `topic`          |
+| `list_of_filesets`                  | Retrieve a list of filesets within a specific catalog and schema.              | `fileset`        |
+| `load_fileset`                      | Retrieve comprehensive metadata details for a specific fileset.                | `fileset`        |
+| `list_files_in_fileset`             | Retrieve a list of files within a specific fileset.                            | `fileset`        |
+| `create_fileset`                    | Create a new fileset.                                                          | `fileset`        |
+| `alter_fileset`                     | Alter an existing fileset.                                                     | `fileset`        |
+| `drop_fileset`                      | Drop a fileset.                                                                | `fileset`        |
+| `list_of_jobs`                      | Retrieve a list of jobs                                                        | `job`            |
+| `get_job_by_id`                     | Retrieve a job by its ID.                                                      | `job`            |
+| `list_of_job_templates`             | Retrieve a list of job templates.                                              | `job`            |
+| `get_job_template_by_name`          | Retrieve a job template by its name.                                           | `job`            |
+| `run_job`                           | Run a job with the specified parameters.                                       | `job`            |
+| `cancel_job`                        | Cancel a running job by its ID.                                                | `job`            |
+| `get_tag_by_name`                   | Retrieve a tag by its name.                                                    | `tag`            |
+| `list_of_tags`                      | Retrieve a list of tags.                                                       | `tag`            |
+| `list_tags_for_metadata`            | Retrieve a list of tags associated with a specific metadata item.              | `tag`            |
+| `list_metadata_by_tag`              | Retrieve a list of metadata items associated with a specific tag.              | `tag`            |
+| `associate_tag_with_metadata`       | Associate tags with a specific metadata item.                                  | `tag`            |
+| `disassociate_tag_from_metadata`    | Disassociate tags from a specific metadata item.                               | `tag`            |
+| `create_tag`                        | Create a new tag.                                                              | `tag`            |
+| `alter_tag`                         | Alter an existing tag.                                                         | `tag`            |
+| `delete_tag`                        | Delete a tag.                                                                  | `tag`            |
+| `list_statistics_for_metadata`      | Retrieve a list of statistics associated with a specific metadata item.        | `statistic`      |
+| `list_statistics_for_partition`     | Retrieve a list of statistics associated with a specific partition.            | `statistic`      |
+| `get_list_of_policies`              | Retrieve a list of policies in the system.                                     | `policy`         |
+| `get_policy_detail_information`     | Retrieve detailed information for a specific policy by policy name.            | `policy`         |
+| `list_policies_for_tag`             | List policies directly associated with a tag, including selectors.             | `policy`, `tag`  |
+| `associate_policy_with_tag`         | Associate a policy with a tag and selector.                                    | `policy`, `tag`  |
+| `disassociate_policy_from_tag`      | Remove a direct policy association from a tag.                                 | `policy`, `tag`  |
+| `list_tags_for_policy`              | List tags directly associated with a policy, including selectors.              | `policy`, `tag`  |
+| `list_of_partitions`                | Retrieve partitions for a table. Only for catalogs with a partition API.       | `partition`      |
+| `get_partition`                     | Retrieve a partition's metadata. Only for catalogs with a partition API.       | `partition`      |
+| `list_of_views`                     | Retrieve a list of views for a schema. Only for catalogs supporting views.     | `view`           |
+| `load_view`                         | Retrieve a view's metadata. Only for catalogs supporting views.                | `view`           |
 | `list_of_semantic_models`           | List the Semantic Models the caller can access in a schema.                    | `semantic_model` |
-| `list_metrics`                      | List visible metric identifiers across Semantic Models in a schema.           | `semantic_model` |
-| `list_metric_infos`                 | List complete visible metrics across Semantic Models in a schema.             | `semantic_model` |
+| `list_metrics`                      | List visible metric identifiers across Semantic Models in a schema.            | `semantic_model` |
+| `list_metric_infos`                 | List complete visible metrics across Semantic Models in a schema.              | `semantic_model` |
 | `list_semantic_model_datasets`      | List visible datasets directly associated with a source table or view.         | `semantic_model` |
 | `load_semantic_model`               | Load a Semantic Model's metadata and definition.                               | `semantic_model` |
 | `create_semantic_model`             | Create a Semantic Model from a native REST definition.                         | `semantic_model` |
-| `alter_semantic_model`              | Apply Semantic Model updates atomically.                                      | `semantic_model` |
-| `drop_semantic_model`               | Drop a Semantic Model's metadata.                                             | `semantic_model` |
+| `alter_semantic_model`              | Apply Semantic Model updates atomically.                                       | `semantic_model` |
+| `drop_semantic_model`               | Drop a Semantic Model's metadata.                                              | `semantic_model` |
+| `list_of_domains`                   | Retrieve a list of domains the caller can access.                              | `domain`         |
+| `get_domain_by_name`                | Retrieve a complete domain snapshot by name.                                   | `domain`         |
+| `list_subdomains`                   | Retrieve immediate subdomains of a domain.                                     | `domain`         |
+| `list_domain_members`               | List directly tagged or expanded effective members of a domain.                | `domain`         |
+| `list_domains_for_metadata`         | List domains associated with a metadata leaf object.                           | `domain`         |
 
 ### Semantic Models
 
 Semantic Model tools manage semantic metadata and discover source associations through the Gravitino REST API.
 For concepts and source requirements, see [Semantic Models](./semantic-models.md). For governance
 and Ossie import/export, see [Manage Semantic Model Metadata](./manage-semantic-model-metadata-using-gravitino.md).
-Use the `semantic_model` tag with `--include-tool-tags` to expose these tools.
+These tools are exposed by default and carry the `semantic_model` tag; include `semantic_model` in `--include-tool-tags` when restricting the server to a tag allowlist.
 They use the same per-call `metalake` selection and authentication as other tools;
 Gravitino filters listings by visibility and checks source-table access when creating or
 replacing definitions.
@@ -245,16 +250,16 @@ indicating whether it was dropped. It removes semantic metadata without deleting
 See [Domains](./domains.md) for membership semantics and the
 [Domain guide](./manage-domains-in-gravitino.md) for SDK and REST mutations.
 
-Use `--include-tool-tags domain` to expose the five Domain tools.
+These five Domain tools are exposed by default and carry the `domain` tag; include `domain` in `--include-tool-tags` when restricting the server to a tag allowlist.
 All are annotated as read-only and idempotent and issue only GET requests.
 
-| Tool | Arguments | Result |
-|------|-----------|--------|
-| `list_of_domains` | `details=true` | Domain snapshots, or names when false |
-| `get_domain_by_name` | `domain_name` | A complete domain snapshot |
-| `list_subdomains` | `domain_name`, `details=true` | Immediate subdomain snapshots or names |
-| `list_domain_members` | `domain_name`, optional `types`, `domains`, `name_contains`, `expand` | Directly tagged objects, including catalogs and schemas. Use `expand=true` for accessible recorded leaves whose effective tags match |
-| `list_domains_for_metadata` | `metadata_type`, `metadata_full_name`, `details=true` | Domains of a leaf object, including all relations when details is true |
+| Tool                        | Arguments                                                             | Result                                                                                                                               |
+|-----------------------------|-----------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
+| `list_of_domains`           | `details=true`                                                        | Domain snapshots, or names when false                                                                                                |
+| `get_domain_by_name`        | `domain_name`                                                         | A complete domain snapshot                                                                                                           |
+| `list_subdomains`           | `domain_name`, `details=true`                                         | Immediate subdomain snapshots or names                                                                                               |
+| `list_domain_members`       | `domain_name`, optional `types`, `domains`, `name_contains`, `expand` | Directly tagged objects, including catalogs and schemas. Use `expand=true` for accessible recorded leaves whose effective tags match |
+| `list_domains_for_metadata` | `metadata_type`, `metadata_full_name`, `details=true`                 | Domains of a leaf object, including all relations when details is true                                                               |
 
 Results follow the existing MCP JSON-string convention; empty lists return `[]`.
 Snapshots retain the server's backing tag, status, parent, properties, audit and
@@ -296,21 +301,22 @@ binding changes are exposed. Existing tools in other groups retain their behavio
 
 You could config Gravitino MCP server by arguments, `uv run mcp_server -h` shows the detailed information.
 
-| Argument                         | Description                                                                                                                                                  | Default value               | Required |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------- | -------- |
-| `--metalake`                     | Default metalake, used by any tool call that does not name one. See Selecting a metalake.                                                                    | none                        | No       |
-| `--gravitino-uri`                | The URI of Gravitino server.                                                                                                                                 | `http://127.0.0.1:8090`     | No       |
-| `--gravitino-read-timeout`       | Gravitino response read timeout in seconds; or set `GRAVITINO_READ_TIMEOUT`. Must be finite and positive. Connect, write and pool timeouts remain 5 seconds. | `60`                        | No       |
-| `--transport`                    | Transport protocol: stdio (local), http / streamable-http (Streamable HTTP).                                                                                 | `stdio`                     | No       |
-| `--mcp-url`                      | The URL of MCP server if using HTTP transport.                                                                                                               | `http://127.0.0.1:8000/mcp` | No       |
-| `--token`                        | Static credential for Gravitino; or set `GRAVITINO_TOKEN`. See Authentication. Wins over OAuth client-credentials.                                           | none (anonymous)            | No       |
-| `--oauth-token-endpoint`         | OAuth2 token URL for client-credentials. Or `GRAVITINO_OAUTH_TOKEN_ENDPOINT`.                                                                                | none                        | No       |
-| `--oauth-client-id`              | OAuth2 client id. Or `GRAVITINO_OAUTH_CLIENT_ID`.                                                                                                            | none                        | No       |
-| `--oauth-client-secret`          | OAuth2 client secret. Or `GRAVITINO_OAUTH_CLIENT_SECRET`.                                                                                                    | none                        | No       |
-| `--oauth-scope`                  | Optional OAuth2 scope. Or `GRAVITINO_OAUTH_SCOPE`.                                                                                                           | none                        | No       |
-| `--no-service-identity-fallback` | HTTP only: reject requests with no `Authorization` when OAuth or `--token` is set. Or `GRAVITINO_NO_SERVICE_IDENTITY_FALLBACK`.                              | `false`                     | No       |
-| `--tls-cert`                     | PEM certificate to serve the endpoint over HTTPS. Requires `--tls-key`.                                                                                      | none                        | No       |
-| `--tls-key`                      | PEM private key to serve the endpoint over HTTPS. Requires `--tls-cert`.                                                                                     | none                        | No       |
+| Argument                         | Description                                                                                                                                                                                                                                                                                                    | Default value               | Required |
+|----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|----------|
+| `--metalake`                     | Default metalake, used by any tool call that does not name one. See Selecting a metalake.                                                                                                                                                                                                                      | none                        | No       |
+| `--gravitino-uri`                | The URI of Gravitino server.                                                                                                                                                                                                                                                                                   | `http://127.0.0.1:8090`     | No       |
+| `--gravitino-read-timeout`       | Gravitino response read timeout in seconds; or set `GRAVITINO_READ_TIMEOUT`. Must be finite and positive. Connect, write and pool timeouts remain 5 seconds.                                                                                                                                                   | `60`                        | No       |
+| `--include-tool-tags`            | Comma-separated allowlist of object-type tags from the Supported Tools table (`catalog`, `domain`, `fileset`, `job`, `metalake`, `model`, `partition`, `policy`, `schema`, `semantic_model`, `statistic`, `table`, `tag`, `topic`, `view`). Filters by object type, so it cannot produce a read-only tool set. | empty (all tools)           | No       |
+| `--transport`                    | Transport protocol: stdio (local), http / streamable-http (Streamable HTTP).                                                                                                                                                                                                                                   | `stdio`                     | No       |
+| `--mcp-url`                      | The URL of MCP server if using HTTP transport.                                                                                                                                                                                                                                                                 | `http://127.0.0.1:8000/mcp` | No       |
+| `--token`                        | Static credential for Gravitino; or set `GRAVITINO_TOKEN`. See Authentication. Wins over OAuth client-credentials.                                                                                                                                                                                             | none (anonymous)            | No       |
+| `--oauth-token-endpoint`         | OAuth2 token URL for client-credentials. Or `GRAVITINO_OAUTH_TOKEN_ENDPOINT`.                                                                                                                                                                                                                                  | none                        | No       |
+| `--oauth-client-id`              | OAuth2 client id. Or `GRAVITINO_OAUTH_CLIENT_ID`.                                                                                                                                                                                                                                                              | none                        | No       |
+| `--oauth-client-secret`          | OAuth2 client secret. Or `GRAVITINO_OAUTH_CLIENT_SECRET`.                                                                                                                                                                                                                                                      | none                        | No       |
+| `--oauth-scope`                  | Optional OAuth2 scope. Or `GRAVITINO_OAUTH_SCOPE`.                                                                                                                                                                                                                                                             | none                        | No       |
+| `--no-service-identity-fallback` | HTTP only: reject requests with no `Authorization` when OAuth or `--token` is set. Or `GRAVITINO_NO_SERVICE_IDENTITY_FALLBACK`.                                                                                                                                                                                | `false`                     | No       |
+| `--tls-cert`                     | PEM certificate to serve the endpoint over HTTPS. Requires `--tls-key`.                                                                                                                                                                                                                                        | none                        | No       |
+| `--tls-key`                      | PEM private key to serve the endpoint over HTTPS. Requires `--tls-cert`.                                                                                                                                                                                                                                       | none                        | No       |
 
 A response read timeout means the MCP server stopped waiting for Gravitino. The operation may still complete on the server. Check the result before retrying, especially for writes. This timeout bounds waiting for response data, not the total duration of the server operation.
 
@@ -324,13 +330,13 @@ Pass `--token` (or set the `GRAVITINO_TOKEN` environment variable) to authentica
 
 A bare value is treated as an OAuth2 token and sent as `Authorization: Bearer <token>`. A value that already begins with an HTTP authentication scheme is forwarded with that scheme preserved, so the credential can match whatever `gravitino.authenticators` the server is configured with:
 
-| `--token` value             | `Authorization` header sent    |
-|-----------------------------|--------------------------------|
-| `abc`                       | `Bearer abc`                   |
-| `Bearer abc`                | `Bearer abc`                   |
-| `Basic dXNlcjpwYXNz`        | `Basic dXNlcjpwYXNz`           |
-| `Custom credentials`        | `Custom credentials`           |
-| empty or whitespace only    | none (anonymous)               |
+| `--token` value          | `Authorization` header sent |
+|--------------------------|-----------------------------|
+| `abc`                    | `Bearer abc`                |
+| `Bearer abc`             | `Bearer abc`                |
+| `Basic dXNlcjpwYXNz`     | `Basic dXNlcjpwYXNz`        |
+| `Custom credentials`     | `Custom credentials`        |
+| empty or whitespace only | none (anonymous)            |
 
 The built-in scheme names (`Basic`, `Bearer`, `Negotiate`) are recognized case-insensitively and normalized to the capitalization Gravitino's authenticators expect; a custom scheme name is forwarded unchanged.
 
@@ -454,22 +460,45 @@ No default at all, every call chooses:
 uv run mcp_server --transport http --mcp-url http://0.0.0.0:8000/mcp
 ```
 
+## Tool errors
+
+A tool execution failure handled by the Gravitino middleware returns a `CallToolResult` with `isError: true`. Its text
+includes the error prefix and message. Clients can read the numeric classification
+code and category from `_meta["org.apache.gravitino/error"]`. For example, a
+Gravitino HTTP 409 returns `{"code": -32009, "category": "conflict"}` there.
+Gravitino HTTP 401 and 403 both use code `-32000` and have the respective
+categories `unauthorized` and `permission_denied`. An upstream HTTP 429 has the
+category `rate_limited`.
+If the configured OAuth token endpoint rejects the MCP server's credentials or
+cannot be found, the tool reports `internal_error`. Check the server's OAuth
+configuration.
+
+MCP protocol errors use the usual JSON-RPC error envelope. If strict SDK input
+validation rejects a request before middleware runs, the SDK supplies the error
+text and the call has no Gravitino classification metadata or tool audit record.
+
 ## Audit Logging
 
-Every tool invocation is recorded as one structured JSON line in `gravitino-mcp-audit.log` (written to the server's working directory). Each record is attributed to the incoming HTTP `Authorization` header when present; otherwise to the configured service identity (`--token` or OAuth client id).
+Every tool invocation that reaches the audit middleware is recorded as one structured JSON line in `gravitino-mcp-audit.log` (written to the server's working directory). Each record is attributed to the incoming HTTP `Authorization` header when present; otherwise to the configured service identity (`--token` or OAuth client id).
 
-| Field        | Description                                                                                                                                                                             |
-|--------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `timestamp`  | UTC ISO-8601 time of the call.                                                                                                                                                          |
-| `principal`  | Caller identity: username for `Basic` simple auth, `bearer:<first-16-hex-of-sha256-of-token>` for a Bearer token (a fingerprint of the token, so it changes when the token is refreshed), `oauth:<first-16-hex-of-sha256-of-client-id>` when OAuth client-credentials is the service identity (stdio or HTTP with no caller header), or `anonymous` when no identity is present. |
-| `tool`       | Name of the invoked MCP tool.                                                                                                                                                           |
-| `outcome`    | `allow` for successful calls, `deny` for failed ones. `deny` is emitted for any tool-call exception (authorization denial being the common case); inspect `error_type` to disambiguate. |
-| `error_type` | Exception class name, present only when `outcome` is `deny`.                                                                                                                            |
+| Field            | Description                                                                                                                                                                                                                                                                                                                                                                      |
+|------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `timestamp`      | UTC ISO-8601 time of the call.                                                                                                                                                                                                                                                                                                                                                   |
+| `principal`      | Caller identity: username for `Basic` simple auth, `bearer:<first-16-hex-of-sha256-of-token>` for a Bearer token (a fingerprint of the token, so it changes when the token is refreshed), `oauth:<first-16-hex-of-sha256-of-client-id>` when OAuth client-credentials is the service identity (stdio or HTTP with no caller header), or `anonymous` when no identity is present. |
+| `tool`           | Name of the invoked MCP tool.                                                                                                                                                                                                                                                                                                                                                    |
+| `outcome`        | `allow` for successful calls, `deny` for authentication or authorization denials (Gravitino HTTP 401/403, `PermissionError`, or `--no-service-identity-fallback` rejection), and `error` for other failures.                                                                                                                                                                     |
+| `metalake`       | Resolved metalake from the per-call argument or the `--metalake` default. Omitted when resolution fails or the tool spans tenants, as `list_metalakes` does.                                                                                                                                                                                                                     |
+| `target_type`    | Metadata object type for writes and deletes (for example `schema` or `table`). Omitted for read-only calls and when the full target cannot be determined.                                                                                                                                                                                                                        |
+| `target_name`    | Target object full name for write and delete tools (for example `authz.mcpcat.alice_s`); omitted when `target_type` is omitted.                                                                                                                                                                                                                                                  |
+| `error_type`     | Original Gravitino error type (for example `ForbiddenException`, `NoSuchTableException`, `CatalogInUseException`) or exception class name (for example `ConnectError`, `ValueError`, `ReadTimeout`); present only when `outcome` is `deny` or `error`.                                                                                                                           |
+| `error_category` | Normalized failure category (`unauthorized`, `permission_denied`, `invalid_params`, `not_found`, `conflict`, `timeout`, `rate_limited`, `unavailable`, `internal_error`); present only when `outcome` is `deny` or `error`.                                                                                                                                                      |
 
 For every scheme other than `Basic`, `principal` is a fingerprint of one credential, not a stable user identity. The hash has no key, so the fingerprint suits high-entropy tokens only: a short static credential can be recovered from the log by guessing. To trace what one user did, use the Gravitino server's [audit log](./gravitino-server-config.md#audit-logging).
 
-Example record:
+Example records:
 
 ```json
-{"timestamp": "2026-06-16T03:21:09.123456+00:00", "principal": "alice", "tool": "get_list_of_catalogs", "outcome": "allow"}
+{"timestamp": "2026-06-16T03:21:09.123456+00:00", "principal": "alice", "tool": "drop_schema", "outcome": "allow", "metalake": "authz", "target_type": "schema", "target_name": "authz.mcpcat.alice_s"}
+{"timestamp": "2026-06-16T03:21:10.123456+00:00", "principal": "alice", "tool": "drop_table", "outcome": "deny", "metalake": "authz", "target_type": "table", "target_name": "authz.mcpcat.alice_s.orders", "error_type": "ForbiddenException", "error_category": "permission_denied"}
+{"timestamp": "2026-06-16T03:21:11.123456+00:00", "principal": "admin", "tool": "drop_catalog", "outcome": "error", "metalake": "authz", "target_type": "catalog", "target_name": "authz.mcpcat", "error_type": "CatalogInUseException", "error_category": "conflict"}
 ```

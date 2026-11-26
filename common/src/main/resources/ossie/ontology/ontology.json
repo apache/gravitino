@@ -1,0 +1,364 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/apache/ossie/ontology/ontology.json",
+  "title": "Apache Ossie Ontology Metadata Specification",
+  "description": "JSON Schema for validating Apache Ossie ontology definitions",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Ontology specification version"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique identifier for the ontology"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description"
+    },
+    "ai_context": {
+      "$ref": "https://raw.githubusercontent.com/apache/ossie/main/core-spec/ossie-schema.json#/$defs/AIContext"
+    },
+    "requires": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Expression"
+      },
+      "uniqueItems": true,
+      "description": "Expressions that constrain the population of this ontology"
+    },
+    "ontology": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/OntologyComponent"
+      },
+      "minItems": 1,
+      "description": "Components that define the concepts and relationships in this ontology"
+    },
+    "ontology_mappings": {
+      "type": "array",
+      "description": "Deprecated. Embedded ontology maps, accepted only so existing documents continue to validate; write mappings as standalone documents validated against ontology/mapping.json instead.",
+      "deprecated": true,
+      "items": {
+        "$ref": "#/$defs/OntologyMap"
+      }
+    },
+    "annotations": {
+      "$ref": "#/$defs/Annotations"
+    },
+    "prefixes": {
+      "type": "object",
+      "description": "Maps namespace prefixes to the IRIs they abbreviate, enabling QName expansion (e.g., 'foaf' -> 'http://xmlns.com/foaf/0.1/').",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "format": "iri"
+      }
+    }
+  },
+  "required": ["version", "name", "ontology"],
+  "additionalProperties": false,
+  "$defs": {
+    "Annotations": {
+      "type": "object",
+      "description": "Open set of annotations for carrying data that is not covered by the core ontology spec, for example when importing an ontology from an external format such as OWL/RDF. Keys are free-form and values may be any JSON; the spec does not interpret their structure.",
+      "additionalProperties": true
+    },
+    "OntologyComponent": {
+      "type": "object",
+      "description": "Ontology component that defines a single concept and any relationships that are keyed primarily by that concept",
+      "properties": {
+        "concept": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique name of the concept defined by this component"
+        },
+        "type": {
+          "$ref": "#/$defs/ConceptType"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the concept"
+        },
+        "extends": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "description": "Indicates that this concept extends one or more other concepts"
+        },
+        "derived_by": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Expression"
+          },
+          "uniqueItems": true,
+          "description": "Expressions that define how this concept is derived"
+        },
+        "identify_by": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "description": "Names of relationships to use as the preferred identifier of this concept"
+        },
+        "requires": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Expression"
+          },
+          "uniqueItems": true,
+          "description": "Expressions that constrain the population of this concept"
+        },
+        "relationships": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Relationship"
+          },
+          "description": "Defines relationships that pertain primarily to the concept defined in this component"
+        },
+        "annotations": {
+          "$ref": "#/$defs/Annotations"
+        },
+        "iri": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional global identifier for this concept, expressed as a full IRI or as a QName (prefix:local) resolved against the ontology-level 'prefixes' map."
+        }
+      },
+      "required": ["concept", "type"],
+      "additionalProperties": false
+    },
+    "Expression": {
+      "type": "string",
+      "minLength": 1,
+      "description": "ANSI SQL expression"
+    },
+    "Relationship": {
+      "type": "object",
+      "description": "Relationship between concepts in the ontology",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of the relationship"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the relationship"
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Role"
+          },
+          "description": "Additional roles in this relationship"
+        },
+        "multiplicity": {
+          "$ref": "#/$defs/Multiplicity"
+        },
+        "derived_by": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Expression"
+          },
+          "uniqueItems": true,
+          "description": "Expressions that define how this concept is derived"
+        },
+        "requires": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Expression"
+          },
+          "uniqueItems": true,
+          "description": "Expressions that constrain the population of this relationship"
+        },
+        "verbalizes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "description": "Natural language expressions that verbalize this relationship"
+        },
+        "annotations": {
+          "$ref": "#/$defs/Annotations"
+        },
+        "iri": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional global identifier for this relationship, expressed as a full IRI or as a QName (prefix:local) resolved against the ontology-level 'prefixes' map."
+        }
+      },
+      "required": ["name", "verbalizes"],
+      "additionalProperties": false
+    },
+    "ConceptMapping": {
+      "type": "object",
+      "description": "Mappings from logical model constructs to some ontology component",
+      "properties": {
+        "concept": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of the concept whose part of the ontology we are mapping to"
+        },
+        "object_mappings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/ObjectMapping"
+          },
+          "description": "Mappings from logical constructs that populate the concept in this component. Valid only when the concept is an entity type"
+        },
+        "link_mappings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/LinkMapping"
+          },
+          "description": "Mappings from logical model relationships to ontology relationships pertaining to the mapped concept"
+        }
+      },
+      "required": ["concept"],
+      "anyOf": [{ "required": ["object_mappings"] }, { "required": ["link_mappings"] }],
+      "additionalProperties": false
+    },
+    "ConceptType": {
+      "type": "string",
+      "enum": [ "EntityType", "ValueType" ],
+      "description": "A concept is either an entity type or a value type"
+    },
+    "ReferentMapping": {
+      "type": "object",
+      "description": "Mapping from logical model constructs to a relationship used to references some entity type in the ontology",
+      "properties": {
+        "relationship": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of referent relationship"
+        },
+        "expression": {
+          "$ref": "#/$defs/Expression"
+        },
+        "referent_mappings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/ReferentMapping"
+          }
+        }
+      },
+      "required": ["relationship"],
+      "anyOf": [{ "required": ["expression"] }, { "required": ["referent_mappings"] }],
+      "additionalProperties": false
+    },
+    "Role": {
+      "type": "object",
+      "description": "Role in some relationship (the container)",
+      "properties": {
+        "concept": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of the concept playing this role"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional name of this role, used when the same concept plays multiple roles in the same relationship"
+        },
+        "annotations": {
+          "$ref": "#/$defs/Annotations"
+        }
+      },
+      "required": ["concept"],
+      "additionalProperties": false
+    },
+    "ObjectMapping": {
+      "type": "object",
+      "description": "Pattern of logical-level expressions for identifying objects of some concept using the values in one or more fields",
+      "properties": {
+        "concept": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of the concept whose objects we are mapping to"
+        },
+        "referent_mappings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/ReferentMapping"
+          },
+          "description": "Maps logical-model constructs to referent relationships of this entity type"
+        },
+        "expression": {
+          "$ref": "#/$defs/Expression"
+        }
+      },
+      "anyOf": [{ "required": ["expression"] }, { "required": ["referent_mappings"] }],
+      "additionalProperties": false
+    },
+    "LinkMapping": {
+      "type": "object",
+      "description": "Mapping from logical schema to the links of relationships in the ontology",
+      "properties": {
+        "relationship": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of relationship being populated by this mapping node"
+        },
+        "object_mapping": {
+            "$ref": "#/$defs/ObjectMapping"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LinkMapping"
+          },
+          "description": "Relationship maps at the next level in this hierarchy"
+        }
+      },
+      "required": ["object_mapping"],
+      "additionalProperties": false
+    },
+    "Multiplicity": {
+      "type": "string",
+      "enum": [ "ManyToOne", "OneToOne" ],
+      "description": "Relationship multiplicity"
+    },
+    "OntologyMap": {
+      "type": "object",
+      "description": "Map from the constructs of some logical model to some ontology",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of this ontology map"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of this ontology map"
+        },
+        "semantic_model": {
+          "$ref": "https://raw.githubusercontent.com/apache/ossie/main/core-spec/ossie-schema.json"
+        },
+        "concept_mappings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ConceptMapping"
+          },
+          "description": "Maps logical model constructs to some concept and its relationships in the ontology"
+        }
+      },
+      "required": ["semantic_model", "concept_mappings"],
+      "additionalProperties": false
+    }
+  }
+}

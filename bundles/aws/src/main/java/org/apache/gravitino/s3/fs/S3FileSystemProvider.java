@@ -21,12 +21,13 @@ package org.apache.gravitino.s3.fs;
 
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_CONNECTION_TIMEOUT;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_RETRY_LIMIT;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.S3_DIRECTORY_MARKER_RETENTION;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.S3_DIRECTORY_MARKER_RETENTION_DELETE;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.S3_ESTABLISH_TIMEOUT;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.S3_MAX_ERROR_RETRIES;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.S3_RETRY_LIMIT;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.S3_RETRY_THROTTLE_LIMIT;
 
-import com.amazonaws.auth.AWSCredentialsProvider;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
@@ -66,6 +67,16 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
 
   // We can't use Constants.AWS_CREDENTIALS_PROVIDER directly, as in 2.7, this key does not exist.
   private static final String S3_CREDENTIAL_KEY = "fs.s3a.aws.credentials.provider";
+  // Class names instead of class literals, so that loading this class does not need the AWS SDK
+  // that is not in use. TestS3CredentialsProviderSelection checks that they match the classes.
+  @VisibleForTesting
+  static final String S3_CREDENTIALS_PROVIDER_V1 =
+      "org.apache.gravitino.s3.fs.S3CredentialsProvider";
+
+  @VisibleForTesting
+  static final String S3_CREDENTIALS_PROVIDER_V2 =
+      "org.apache.gravitino.s3.fs.S3CredentialsProviderV2";
+
   private static final String S3_SIMPLE_CREDENTIAL =
       "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider";
 
@@ -94,14 +105,17 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
     if (credential instanceof S3SecretKeyCredential
         || credential instanceof S3TokenCredential
         || credential instanceof AwsIrsaCredential) {
+      // Hadoop 3.4+ is built on the AWS SDK v2 and Hadoop 3.3 on the AWS SDK v1.
       result.put(
-          Constants.AWS_CREDENTIALS_PROVIDER, S3CredentialsProvider.class.getCanonicalName());
+          Constants.AWS_CREDENTIALS_PROVIDER,
+          S3Utils.isHadoopAwsSdkV2() ? S3_CREDENTIALS_PROVIDER_V2 : S3_CREDENTIALS_PROVIDER_V1);
     }
 
     return result;
   }
 
-  private void checkAndSetCredentialProvider(Map<String, String> configs) {
+  @VisibleForTesting
+  void checkAndSetCredentialProvider(Map<String, String> configs) {
     String provides = configs.get(S3_CREDENTIAL_KEY);
     if (provides == null) {
       return;
@@ -114,19 +128,35 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
     List<String> validProviders = Lists.newArrayList();
 
     for (String provider : providers) {
+      if (S3Utils.isRemappedByHadoop(provider)) {
+        // Hadoop maps this AWS SDK v1 provider name to its AWS SDK v2 counterpart by itself.
+        validProviders.add(provider);
+        continue;
+      }
       try {
         Class<?> c = Class.forName(provider);
-        if (AWSCredentialsProvider.class.isAssignableFrom(c)) {
+        if (S3Utils.isCredentialsProvider(c)) {
           validProviders.add(provider);
         } else {
           LOG.warn(
-              "Credential provider {} is not a subclass of AWSCredentialsProvider, skipping",
+              "Credential provider {} is not a credentials provider of the AWS SDK that the S3A "
+                  + "connector uses, skipping",
               provider);
         }
-      } catch (Exception e) {
+      } catch (ClassNotFoundException e) {
         LOG.warn(
             "Credential provider {} not found in the Hadoop runtime, falling back to default",
-            provider);
+            provider,
+            e);
+        configs.put(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
+        return;
+      } catch (Exception | LinkageError e) {
+        // The class exists, but it or a class it depends on cannot be loaded or initialized, for
+        // example because of an incompatible AWS SDK or Hadoop version on the classpath.
+        LOG.warn(
+            "Credential provider {} cannot be loaded in the Hadoop runtime, falling back to default",
+            provider,
+            e);
         configs.put(S3_CREDENTIAL_KEY, S3_SIMPLE_CREDENTIAL);
         return;
       }
@@ -159,7 +189,8 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
    * @param configs Original configurations
    * @return Configurations with additional S3 settings
    */
-  private Map<String, String> additionalS3Config(Map<String, String> configs) {
+  @VisibleForTesting
+  Map<String, String> additionalS3Config(Map<String, String> configs) {
     Map<String, String> additionalConfigs = Maps.newHashMap(configs);
 
     // Avoid multiple retries to speed up failure in test cases.
@@ -179,6 +210,12 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
 
     if (!configs.containsKey(S3_RETRY_THROTTLE_LIMIT)) {
       additionalConfigs.put(S3_RETRY_THROTTLE_LIMIT, DEFAULT_RETRY_LIMIT);
+    }
+
+    // Keep deleting the directory markers like Hadoop 3.3 and earlier do, so that the objects
+    // written by Gravitino stay readable by S3A clients that do not understand kept markers.
+    if (!configs.containsKey(S3_DIRECTORY_MARKER_RETENTION)) {
+      additionalConfigs.put(S3_DIRECTORY_MARKER_RETENTION, S3_DIRECTORY_MARKER_RETENTION_DELETE);
     }
 
     // More tuning can be added here.

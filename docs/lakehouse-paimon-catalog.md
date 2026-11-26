@@ -111,7 +111,9 @@ optional S3A dependencies by default. To enable it, add the following JARs to
 
 - `hadoop-aws-<hadoop-version>.jar`, with the same version as the Hadoop libraries packaged by
   Gravitino.
-- The `aws-java-sdk-bundle` version required by that `hadoop-aws` release.
+- The AWS SDK v2 `bundle` jar (`software.amazon.awssdk:bundle`) required by that `hadoop-aws`
+  release, for example `bundle-2.35.4.jar` for `hadoop-aws-3.4.3.jar`. The older AWS SDK v1
+  `aws-java-sdk-bundle` jar is only needed with Hadoop 3.3 and earlier.
 
 The following example configures static credentials and a custom HTTP S3 endpoint:
 
@@ -161,9 +163,9 @@ Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-
 Sensitive catalog properties such as `jdbc-password` and DLF credential keys are hidden from the default load catalog response (`jdbc-user` is returned in plaintext). Recover JDBC / DLF credential fields via either path:
 
 - `getCredentials` / `JdbcCredential` / `DlfSecretKeyCredential` (requires catalog access plus both `USE_SECRETS` and `INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership)
-- `getSecrets` / `GET .../objects/{type}/{fullName}/secrets` with `USE_SECRETS` (DLF cloud access-key pairs also need `INCLUDE_CREDENTIAL_SECRETS`)
+- `getSecrets` / `GET .../objects/{type}/{fullName}/secrets` with `USE_SECRETS` (declared JDBC login properties and DLF cloud access-key pairs on that catalog also need `INCLUDE_CREDENTIAL_SECRETS`)
 
-Other non-credential secrets (secret-manager URNs, declared `hidden` properties, undeclared sensitive-named keys) use `getSecrets` only.
+Other non-credential secrets (secret-manager URNs, declared `hidden` properties, undeclared sensitive-named keys that are not credential properties for the object) use `getSecrets` only.
 
 :::
 

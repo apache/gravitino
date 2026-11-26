@@ -1147,6 +1147,13 @@ in the Commons Lang library distributed by The Apache Software Foundation:
   * License: Apache License v2.0
   * Homepage: https://commons.apache.org/proper/commons-lang/
 
+This product contains a modified portion of 'JsonUtf8Writer',
+in the Moshi library distributed by Square, Inc:
+
+  * Copyright 2010 Google Inc.
+  * License: Apache License v2.0
+  * Homepage: https://github.com/square/moshi
+
 This product contains a modified portion of the 'org.springframework.lang'
 package in the Spring Framework library, distributed by VMware, Inc:
 
