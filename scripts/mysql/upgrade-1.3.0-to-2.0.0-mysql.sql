@@ -1006,6 +1006,18 @@ CREATE TABLE IF NOT EXISTS domain_member_rel (
     INDEX idx_domain_member_deleted (deleted_at, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Explicit Domain memberships';
 
+CREATE TABLE IF NOT EXISTS glossary_term_binding (
+    metalake_id BIGINT NOT NULL COMMENT 'owning metalake id',
+    term_id BIGINT NOT NULL COMMENT 'bound glossary term id',
+    target_type VARCHAR(64) NOT NULL COMMENT 'binding target type (CATALOG, SCHEMA, TABLE, VIEW, COLUMN, FILESET, TOPIC, MODEL, or METRIC)',
+    target_id BIGINT NOT NULL COMMENT 'stable id of the bound metadata object, table column, or semantic-model metric',
+    deleted_at BIGINT NOT NULL DEFAULT 0 COMMENT 'retirement time in epoch milliseconds, advanced past retained generations to avoid collisions, 0 means live',
+    PRIMARY KEY (term_id, target_type, target_id, deleted_at),
+    KEY idx_glossary_binding_target (target_type, target_id, deleted_at),
+    KEY idx_glossary_binding_metalake (metalake_id, deleted_at),
+    KEY idx_glossary_binding_deleted (deleted_at, term_id, target_type, target_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'glossary term bindings to metadata objects and semantic-model metrics';
+
 CREATE TABLE IF NOT EXISTS kb_article_meta (
     article_id BIGINT PRIMARY KEY COMMENT 'Stable Article ID',
     metalake_id BIGINT NOT NULL COMMENT 'Owning metalake ID',

@@ -18,11 +18,15 @@
  */
 package org.apache.gravitino.storage.relational.mapper;
 
+import java.util.Collection;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.po.SemanticModelMetricListingPO;
 import org.apache.gravitino.storage.relational.po.SemanticModelMetricPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
+import org.apache.ibatis.annotations.Options;
+import org.apache.ibatis.annotations.Options.FlushCachePolicy;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
@@ -60,6 +64,23 @@ public interface SemanticModelMetricMapper {
       method = "selectSemanticModelMetricsByModelIdForUpdate")
   List<SemanticModelMetricPO> selectSemanticModelMetricsByModelIdForUpdate(
       @Param("semanticModelId") Long semanticModelId);
+
+  /** Finds a live metric identity by containing Semantic Model ID and exact metric name. */
+  @Nullable
+  @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
+  @SelectProvider(
+      type = SemanticModelMetricSQLProviderFactory.class,
+      method = "selectSemanticModelMetricByModelIdAndName")
+  SemanticModelMetricPO selectSemanticModelMetricByModelIdAndName(
+      @Param("semanticModelId") Long semanticModelId, @Param("metricName") String metricName);
+
+  /** Lists live metric identities for a nonempty batch of metric IDs. */
+  @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
+  @SelectProvider(
+      type = SemanticModelMetricSQLProviderFactory.class,
+      method = "listSemanticModelMetricsByMetricIds")
+  List<SemanticModelMetricPO> listSemanticModelMetricsByMetricIds(
+      @Param("metricIds") Collection<Long> metricIds);
 
   /** Retires selected live identities belonging to a Semantic Model. */
   @UpdateProvider(
