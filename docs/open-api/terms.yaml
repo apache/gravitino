@@ -268,10 +268,11 @@ paths:
       parameters:
         - in: query
           name: kind
-          description: Restrict the binding kind.
+          description: Restrict the binding kind (case-insensitive).
           schema:
             type: string
-            enum: [IMPLEMENTED_BY, USED_BY]
+            pattern: "^([Ii][Mm][Pp][Ll][Ee][Mm][Ee][Nn][Tt][Ee][Dd]_[Bb][Yy]|[Uu][Ss][Ee][Dd]_[Bb][Yy])$"
+            example: IMPLEMENTED_BY
         - in: query
           name: types
           description: Filter by metadata object types. Use SEMANTIC_MODEL for metrics.
@@ -568,22 +569,26 @@ components:
       required: [kind, object]
       properties:
         object:
-          allOf:
-            - $ref: ./tags.yaml#/components/schemas/MetadataObject
-            - type: object
-              required: [fullName, type]
+          type: object
+          required: [fullName, type]
+          properties:
+            fullName:
+              type: string
+              description: Fully qualified name of the object or containing semantic model.
+            type:
+              type: string
       oneOf:
         - type: object
           properties:
             kind:
               type: string
-              enum: [IMPLEMENTED_BY]
+              enum: [implemented_by]
             object:
               type: object
               properties:
                 type:
                   type: string
-                  enum: [CATALOG, SCHEMA, TABLE, VIEW, COLUMN, FILESET, TOPIC, MODEL]
+                  enum: [catalog, schema, table, view, column, fileset, topic, model]
           not:
             required: [metric]
         - type: object
@@ -591,13 +596,13 @@ components:
           properties:
             kind:
               type: string
-              enum: [USED_BY]
+              enum: [used_by]
             object:
               type: object
               properties:
                 type:
                   type: string
-                  enum: [SEMANTIC_MODEL]
+                  enum: [semantic_model]
             metric:
               type: string
               pattern: '\S'

@@ -19,11 +19,13 @@
 package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.json.JsonUtils.StrictStringDeserializer;
 import org.apache.gravitino.rest.RESTRequest;
 
 /** Represents a request to associate terms. */
@@ -32,10 +34,12 @@ import org.apache.gravitino.rest.RESTRequest;
 public class TermsAssociateRequest implements RESTRequest {
 
   @JsonProperty("termsToAdd")
+  @JsonDeserialize(contentUsing = StrictStringDeserializer.class)
   @Nullable
   private final String[] termsToAdd;
 
   @JsonProperty("termsToRemove")
+  @JsonDeserialize(contentUsing = StrictStringDeserializer.class)
   @Nullable
   private final String[] termsToRemove;
 

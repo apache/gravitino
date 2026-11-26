@@ -33,6 +33,7 @@ import static org.mockito.Mockito.when;
 
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.jersey2.InstrumentedResourceMethodApplicationListener;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Base64;
@@ -644,6 +645,41 @@ public class TestTermOperations extends BaseOperationsTest {
         endpoint.queryParam("pageToken", token).request(NORMALIZED_JSON_ACCEPT).get()) {
       assertError(r, 409, "TermVersionConflictException");
     }
+  }
+
+  @Test
+  void testBindingJsonEnumValues() throws Exception {
+    MetadataObject table = MetadataObjects.parse("dw.sales.table", MetadataObject.Type.TABLE);
+    MetadataObject model =
+        MetadataObjects.parse("dw.sales.model", MetadataObject.Type.SEMANTIC_MODEL);
+    when(dispatcher.listTermBindings("test", "T", null, Set.of(), null, 100, null))
+        .thenReturn(
+            new GlossaryManager.BindingPage(
+                List.of(TermBinding.implementedBy(table), TermBinding.usedBy(model, "revenue")),
+                null));
+    for (String accept : List.of(MediaType.APPLICATION_JSON, ACCEPT_V1)) {
+      try (Response response = target(BASE + "/T/objects").request(accept).get()) {
+        assertEquals(200, response.getStatus());
+        JsonNode bindings =
+            JsonUtils.objectMapper().readTree(response.readEntity(String.class)).get("bindings");
+        assertEquals("implemented_by", bindings.at("/0/kind").textValue());
+        assertEquals("table", bindings.at("/0/object/type").textValue());
+        assertEquals("used_by", bindings.at("/1/kind").textValue());
+        assertEquals("semantic_model", bindings.at("/1/object/type").textValue());
+      }
+    }
+  }
+
+  @Test
+  void testAssociationRequiresJsonStrings() {
+    for (String path : List.of(TABLE_TERMS, METRIC_TERMS)) {
+      for (String body : List.of("{\"termsToAdd\":[5]}", "{\"termsToRemove\":[true]}")) {
+        try (Response response = target(path).request().post(Entity.json(body))) {
+          assertError(response, 400, IllegalArgumentException.class.getSimpleName());
+        }
+      }
+    }
+    verifyNoInteractions(dispatcher);
   }
 
   @Test
