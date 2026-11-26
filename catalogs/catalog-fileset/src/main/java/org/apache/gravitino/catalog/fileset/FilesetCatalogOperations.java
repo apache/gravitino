@@ -68,6 +68,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -276,8 +277,41 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         }
       };
 
+  // Closes the file systems that nobody will use, those that tasks return after their callers
+  // stopped waiting and those created after the catalog closed, off the worker that an interrupt
+  // may still reach. With all its threads busy, the thread that hands one over closes it, mostly
+  // the worker that created it, so that a close that hangs holds that thread rather than a new one;
+  // on a worker, an interrupt may then reach that close.
+  @VisibleForTesting final ThreadPoolExecutor resultCloser = newResultCloser();
+
   FilesetCatalogOperations(EntityStore store, SecretManager secretManager) {
     this(store, secretManager, null);
+  }
+
+  // Static, so that a closer thread does not keep the operations reachable.
+  private static ThreadPoolExecutor newResultCloser() {
+    int threads = Math.max(2, Math.min(Runtime.getRuntime().availableProcessors(), 4));
+    ThreadPoolExecutor closer =
+        new ThreadPoolExecutor(
+            threads,
+            threads,
+            5L,
+            TimeUnit.SECONDS,
+            new SynchronousQueue<>(),
+            new ThreadFactoryBuilder()
+                .setDaemon(true)
+                .setNameFormat("gravitino-fileset-late-result-closer-%d")
+                .setThreadFactory(
+                    task -> {
+                      Thread thread = new Thread(task);
+                      // Not interrupted and waited for when the catalog class loader is released.
+                      releaseFromCatalog(thread);
+                      return thread;
+                    })
+                .build(),
+            (task, executor) -> task.run());
+    closer.allowCoreThreadTimeOut(true);
+    return closer;
   }
 
   FilesetCatalogOperations(
@@ -458,6 +492,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     static <T> TimedTask<T> start(
         ExecutorService executor,
         ScheduledExecutorService timer,
+        Executor closer,
         Callable<T> task,
         long deadlineNanos) {
       TimedTask<T> timed = new TimedTask<>(deadlineNanos);
@@ -467,24 +502,40 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         timed.completeExceptionally(new TimeoutException());
         return timed;
       }
-      Future<?> running =
-          executor.submit(
-              () -> {
-                T result;
-                try {
-                  result = task.call();
-                } catch (Throwable t) {
-                  timed.failure = t;
-                  timed.complete(null);
-                  return;
-                }
-                // close() may have interrupted this thread, and completing runs the stages that
-                // close the result after close().
-                Thread.interrupted();
-                if (!timed.complete(result)) {
-                  closeLater(result);
-                }
-              });
+      // Timed before it is submitted, so that once close() has stopped the timer no task is
+      // submitted.
+      ScheduledFuture<?> timeout =
+          timer.schedule(
+              () -> timed.completeExceptionally(new TimeoutException()),
+              timeoutNanos,
+              TimeUnit.NANOSECONDS);
+      Future<?> running;
+      try {
+        running =
+            executor.submit(
+                () -> {
+                  T result;
+                  try {
+                    result = task.call();
+                  } catch (Throwable t) {
+                    timed.failure = t;
+                    timed.complete(null);
+                    return;
+                  }
+                  // close() may have interrupted this thread, and completing runs the stages that
+                  // close the result after close().
+                  Thread.interrupted();
+                  if (!timed.complete(result)) {
+                    closeLater(closer, result);
+                  }
+                });
+      } catch (RejectedExecutionException | Error e) {
+        // An Error may come after the pool queued the task, which then closes its result once it
+        // returns.
+        timed.completeExceptionally(e);
+        timeout.cancel(false);
+        throw e;
+      }
       timed.whenComplete(
           (result, e) -> {
             if (e == null) {
@@ -500,33 +551,19 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             // task is not interrupted, and its result is closed once it returns.
             startInterrupter("gravitino-fileset-task-canceller", () -> running.cancel(true));
           });
-      ScheduledFuture<?> timeout;
-      try {
-        timeout =
-            timer.schedule(
-                () -> timed.completeExceptionally(new TimeoutException()),
-                timeoutNanos,
-                TimeUnit.NANOSECONDS);
-      } catch (RejectedExecutionException e) {
-        // The catalog is closed. Failing the task also closes a result that it returns later; one
-        // that it has returned already is closed here.
-        if (!timed.completeExceptionally(e)) {
-          closeLater(timed.getNow(null));
-        }
-        throw e;
-      }
       timed.whenComplete((result, e) -> timeout.cancel(false));
       return timed;
     }
 
-    // The interrupt that cancels the task that returned the result may still come, so the result is
-    // closed on another thread, or here if none starts. That thread runs catalog code, which may
-    // fail once the catalog class loader is closed, so it is left to the class loader cleaner to
-    // interrupt and wait for; it starts only once a task has a result.
-    static void closeLater(@Nullable Object result) {
+    // An interrupt may still reach the thread that returned the result, so the result is closed on
+    // a thread of the closer, or on this one if none is free or starts.
+    static void closeLater(Executor closer, @Nullable Object result) {
       if (result instanceof Closeable) {
         Runnable close = () -> closeQuietly(result);
-        if (!startThread("gravitino-fileset-late-result-closer", close)) {
+        try {
+          closer.execute(close);
+        } catch (Throwable t) {
+          LOG.warn("Failed to hand over a result to close", t);
           close.run();
         }
       }
@@ -545,21 +582,10 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               LOG.warn("Failed to interrupt in the thread {}", name, t);
             }
           };
-      return startThread(name, new FutureTask<>(logged, null), true);
-    }
-
-    static boolean startThread(String name, Runnable action) {
-      return startThread(name, action, false);
-    }
-
-    private static boolean startThread(
-        String name, Runnable action, boolean withoutContextClassLoader) {
       try {
-        Thread thread = new Thread(action, name);
+        Thread thread = new Thread(new FutureTask<>(logged, null), name);
         thread.setDaemon(true);
-        if (withoutContextClassLoader) {
-          thread.setContextClassLoader(null);
-        }
+        thread.setContextClassLoader(null);
         thread.start();
         return true;
       } catch (Throwable t) {
@@ -1489,7 +1515,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                         return;
                       }
                       if (!created) {
-                        TimedTask.closeLater(fs);
+                        TimedTask.closeLater(resultCloser, fs);
                         return;
                       }
                       // Runs in a stage that nothing reads, so a failure is only logged here.
@@ -2015,12 +2041,13 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             return TimedTask.start(
                 fileSystemExecutor,
                 scheduler,
+                resultCloser,
                 () -> {
                   FileSystem fs =
                       getFileSystem(path, keptConf, cacheKey.currentUser, expectedSettings);
                   if (fs != null && closed) {
                     // close() may have gone through the cache before this entry was in it.
-                    TimedTask.closeLater(fs);
+                    TimedTask.closeLater(resultCloser, fs);
                     throw new IOException("The catalog is closed");
                   }
                   return fs;
@@ -2091,11 +2118,12 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               TimedTask.start(
                   loginSettingsExecutor,
                   scheduler,
+                  resultCloser,
                   () -> resolve.apply(keptKey.conf),
                   deadlineNanos),
           deadlineNanos);
     } catch (RejectedExecutionException e) {
-      // The pool is full, or closed with the catalog.
+      // The pool is full, or the catalog is closed.
       throw new GravitinoRuntimeException(
           e, "Failed to start resolving the login settings for path: %s", path);
     } catch (TimeoutException e) {
@@ -2247,7 +2275,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       throw ExceptionMessages.wrap("Interrupted when getting FileSystem for path: " + path, e);
     }
     if (e instanceof RejectedExecutionException) {
-      // The pool is full, or closed with the catalog.
+      // The pool is full, or the catalog is closed.
       return new IOException("Failed to start creating FileSystem for path: " + path, e);
     }
     Throwable cause = e.getCause();
@@ -2269,13 +2297,13 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   private <T> T executeFileSystemTask(ExecutorService executor, Callable<T> task, long timeoutNanos)
       throws InterruptedException, ExecutionException, TimeoutException {
     long deadlineNanos = System.nanoTime() + timeoutNanos;
-    TimedTask<T> timed = TimedTask.start(executor, scheduler, task, deadlineNanos);
+    TimedTask<T> timed = TimedTask.start(executor, scheduler, resultCloser, task, deadlineNanos);
     try {
       return TimedTask.await(timed, deadlineNanos);
     } catch (TimeoutException | InterruptedException e) {
       // Nobody else waits for the result. A task that has just returned it hands it over here.
       if (!timed.cancel(false) && !timed.isCompletedExceptionally()) {
-        closeQuietly(timed.join());
+        TimedTask.closeLater(resultCloser, timed.join());
       }
       throw e;
     }

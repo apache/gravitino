@@ -75,7 +75,6 @@ import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.Closeable;
 import java.io.File;
@@ -4301,7 +4300,11 @@ public class TestFilesetCatalogOperations {
     try {
       // Nobody waits for the task, so the timer fails it.
       FilesetCatalogOperations.TimedTask.start(
-          pool, timer, channel::read, System.nanoTime() + TimeUnit.SECONDS.toNanos(3));
+          pool,
+          timer,
+          Runnable::run,
+          channel::read,
+          System.nanoTime() + TimeUnit.SECONDS.toNanos(3));
       Assertions.assertTrue(channel.reading.await(10, TimeUnit.SECONDS));
       Assertions.assertTrue(channel.closing.await(10, TimeUnit.SECONDS));
       Assertions.assertEquals("gravitino-fileset-task-canceller", channel.closer.get().getName());
@@ -4315,30 +4318,15 @@ public class TestFilesetCatalogOperations {
     }
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {false, true})
+  @Test
   @Timeout(60)
-  public void testTaskStartedAsTheCatalogClosesHasItsResultClosed(boolean returned)
-      throws Exception {
-    Closeable result = Mockito.mock(Closeable.class);
-    CountDownLatch started = new CountDownLatch(1);
-    CountDownLatch release = new CountDownLatch(1);
-    // close() stops the timer before the pools, so a task may start without a timer.
+  public void testTaskIsNotStartedOnceTheCatalogClosed() throws Exception {
+    AtomicBoolean ran = new AtomicBoolean();
+    ThreadPoolExecutor pool =
+        new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
+    // close() stops the timer before the pools.
     ScheduledThreadPoolExecutor timer = new ScheduledThreadPoolExecutor(1);
     timer.shutdownNow();
-    // The task either returns before it would be timed, or runs on until after. The pool returns
-    // once the task runs, so that failing it does not cancel it before it starts.
-    ExecutorService pool =
-        returned
-            ? MoreExecutors.newDirectExecutorService()
-            : new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, new LinkedBlockingQueue<>()) {
-              @Override
-              public void execute(Runnable command) {
-                super.execute(command);
-                Assertions.assertTrue(
-                    Uninterruptibles.awaitUninterruptibly(started, 10, TimeUnit.SECONDS));
-              }
-            };
     try {
       Assertions.assertThrows(
           RejectedExecutionException.class,
@@ -4346,20 +4334,95 @@ public class TestFilesetCatalogOperations {
               FilesetCatalogOperations.TimedTask.start(
                   pool,
                   timer,
+                  Runnable::run,
+                  () -> ran.getAndSet(true),
+                  System.nanoTime() + TimeUnit.SECONDS.toNanos(30)));
+      Assertions.assertEquals(0, pool.getLargestPoolSize());
+      Assertions.assertFalse(ran.get());
+    } finally {
+      pool.shutdownNow();
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  @Timeout(60)
+  public void testRejectedTaskCancelsItsTimeout(boolean error) throws Exception {
+    // A pool that is shut down, or that fails to start a thread.
+    ThreadPoolExecutor pool =
+        new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, new LinkedBlockingQueue<>()) {
+          @Override
+          public void execute(Runnable command) {
+            if (error) {
+              throw new OutOfMemoryError("unable to create native thread");
+            }
+            super.execute(command);
+          }
+        };
+    pool.shutdown();
+    ScheduledThreadPoolExecutor timer = new ScheduledThreadPoolExecutor(1);
+    timer.setRemoveOnCancelPolicy(true);
+    try {
+      Class<? extends Throwable> expected =
+          error ? OutOfMemoryError.class : RejectedExecutionException.class;
+      Assertions.assertThrows(
+          expected,
+          () ->
+              FilesetCatalogOperations.TimedTask.start(
+                  pool,
+                  timer,
+                  Runnable::run,
+                  () -> "done",
+                  System.nanoTime() + TimeUnit.SECONDS.toNanos(30)));
+      Assertions.assertTrue(timer.getQueue().isEmpty());
+    } finally {
+      timer.shutdownNow();
+    }
+  }
+
+  @Test
+  @Timeout(60)
+  public void testLateResultsAreClosedByAtMostTheThreadsOfTheCloser() throws Exception {
+    CountDownLatch release = new CountDownLatch(1);
+    Thread test = Thread.currentThread();
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
+      ThreadPoolExecutor closer = ops.resultCloser;
+      int threads = closer.getMaximumPoolSize();
+      Assertions.assertEquals(
+          Math.max(2, Math.min(Runtime.getRuntime().availableProcessors(), 4)), threads);
+      CountDownLatch closing = new CountDownLatch(threads);
+      List<Thread> closers = new CopyOnWriteArrayList<>();
+      try {
+        for (int i = 0; i < threads; i++) {
+          FilesetCatalogOperations.TimedTask.closeLater(
+              closer,
+              (Closeable)
                   () -> {
-                    started.countDown();
-                    // Like a login that ignores the interrupt.
-                    if (!returned) {
+                    closers.add(Thread.currentThread());
+                    closing.countDown();
+                    // Like a close that waits for a backend that does not answer; one on this
+                    // thread returns, so that the checks below fail instead of hanging.
+                    if (Thread.currentThread() != test) {
                       Uninterruptibles.awaitUninterruptibly(release);
                     }
-                    return result;
-                  },
-                  System.nanoTime() + TimeUnit.SECONDS.toNanos(30)));
-      release.countDown();
-      Mockito.verify(result, Mockito.timeout(10_000)).close();
-    } finally {
-      release.countDown();
-      pool.shutdownNow();
+                  });
+        }
+        Assertions.assertTrue(closing.await(10, TimeUnit.SECONDS));
+        for (Thread thread : closers) {
+          Assertions.assertTrue(
+              thread.getName().startsWith("gravitino-fileset-late-result-closer-"),
+              thread.getName());
+          assertNotStoppedWithTheCatalog(thread);
+        }
+        // With all its threads busy, the thread that hands a result over closes it.
+        AtomicReference<Thread> closedBy = new AtomicReference<>();
+        FilesetCatalogOperations.TimedTask.closeLater(
+            closer, (Closeable) () -> closedBy.set(Thread.currentThread()));
+        Assertions.assertSame(Thread.currentThread(), closedBy.get());
+        Assertions.assertEquals(threads, closer.getLargestPoolSize());
+      } finally {
+        release.countDown();
+      }
     }
   }
 
@@ -4457,10 +4520,11 @@ public class TestFilesetCatalogOperations {
       Assertions.assertTrue(stillInterrupted.get());
       Mockito.verify(late, Mockito.timeout(10_000)).close();
       // The interrupt that cancelled the task does not reach the close of its result, which runs
-      // on another thread than the task in case the interrupt comes later.
+      // on a thread of the closer, a free one here, in case the interrupt comes later.
       Assertions.assertTrue(closed.await(10, TimeUnit.SECONDS));
       Assertions.assertFalse(closedInterrupted.get());
-      Assertions.assertEquals("gravitino-fileset-late-result-closer", closer.get());
+      Assertions.assertTrue(
+          closer.get().startsWith("gravitino-fileset-late-result-closer-"), closer.get());
     }
   }
 

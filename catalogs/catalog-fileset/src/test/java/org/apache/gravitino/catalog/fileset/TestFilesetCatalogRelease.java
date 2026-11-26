@@ -116,6 +116,7 @@ public class TestFilesetCatalogRelease {
             FilesetCatalogOperations.TimedTask.start(
                 pool,
                 timer,
+                Runnable::run,
                 () -> {
                   started.await();
                   return "done";
