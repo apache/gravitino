@@ -62,3 +62,7 @@ com.fasterxml.jackson.core:jackson-core:2.18.3=LICENSE.fastdoubleparser-1.0.90,L
 com.fasterxml.jackson.core:jackson-core:2.18.12=
 com.fasterxml.jackson.core:jackson-core:2.21.3=
 com.fasterxml.jackson.core:jackson-core:2.21.8=
+
+# Paimon Format 1.2.0 contains no JTS classes. Preserve its existing legal documents.
+org.apache.paimon:paimon-format:1.2.0=
+org.apache.paimon:paimon-format:2.1.0=LICENSE.jts-edl | Paimon Format (Apache-2.0), including JTS 1.20.0 (EDL-1.0 selected) and GeoTools contributions (OSGeo BSD)

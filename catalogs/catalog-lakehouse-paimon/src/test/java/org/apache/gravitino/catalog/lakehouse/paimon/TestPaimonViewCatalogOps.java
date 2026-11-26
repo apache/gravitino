@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.lakehouse.paimon;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -27,6 +28,8 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.util.Arrays;
+import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonCatalogOps;
@@ -42,6 +45,7 @@ import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Identifier;
+import org.apache.paimon.rest.exceptions.NotImplementedException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -233,6 +237,21 @@ public class TestPaimonViewCatalogOps {
     NameIdentifier[] remainingViews = paimonViewCatalogOps.listViews(Namespace.of(DATABASE));
     assertEquals(1, remainingViews.length);
     assertEquals(secondIdentifier, remainingViews[0]);
+  }
+
+  @Test
+  void testListViewsTranslatesUnsupportedRestOperation() {
+    NotImplementedException backendError =
+        new NotImplementedException("View listing is unsupported");
+    paimonCatalogOps.listViewsFailure = backendError;
+
+    UnsupportedOperationException error =
+        assertThrows(
+            UnsupportedOperationException.class,
+            () -> paimonViewCatalogOps.listViews(Namespace.of(DATABASE)));
+
+    assertEquals(backendError.getMessage(), error.getMessage());
+    assertSame(backendError, error.getCause());
   }
 
   @Test
@@ -470,6 +489,7 @@ public class TestPaimonViewCatalogOps {
 
   private static class TestablePaimonCatalogOps extends PaimonCatalogOps {
 
+    @Nullable private NotImplementedException listViewsFailure;
     private String failLoadViewName;
     private String failCreateViewName;
     private String failCreateViewDatabaseName;
@@ -502,6 +522,14 @@ public class TestPaimonViewCatalogOps {
     void clearFailCreateView() {
       this.failCreateViewName = null;
       this.failCreateViewDatabaseName = null;
+    }
+
+    @Override
+    public List<String> listViews(String databaseName) throws Catalog.DatabaseNotExistException {
+      if (listViewsFailure != null) {
+        throw listViewsFailure;
+      }
+      return super.listViews(databaseName);
     }
 
     @Override

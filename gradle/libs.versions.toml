@@ -93,6 +93,9 @@ iceberg4spark35 = "1.11.0"
 iceberg4spark40 = "1.11.0"
 iceberg4spark41 = "1.11.0"
 paimon = '1.2.0'
+# Paimon line used by the Paimon REST catalog server; kept separate from `paimon`
+# (the lakehouse-paimon catalog proxy) so the two can evolve independently.
+paimonRest = '2.1.0'
 # spark34 is pinned by modules other than the Spark connector for their own tests, so it stays
 # after the connector dropped 3.4; it says nothing about connector support.
 spark34 = "3.4.3"
@@ -122,6 +125,7 @@ clickhouse = "0.7.1"
 lz4 = "1.8.0"
 yawk-lz4-java = "1.11.4"
 snappy-java = "1.1.10.12"
+zstd-jni = "1.5.7-14"
 mysql = "8.0.33"
 postgresql = "42.7.14"
 immutables-value = "2.11.7"
@@ -351,6 +355,11 @@ paimon-hive-catalog = { group = "org.apache.paimon", name = "paimon-hive-catalog
 paimon-s3 = { group = "org.apache.paimon", name = "paimon-s3", version.ref = "paimon" }
 paimon-oss = { group = "org.apache.paimon", name = "paimon-oss", version.ref = "paimon" }
 paimon-spark = { group = "org.apache.paimon", name = "paimon-spark", version.ref = "paimon" }
+paimonRest-api = { group = "org.apache.paimon", name = "paimon-api", version.ref = "paimonRest" }
+paimonRest-core = { group = "org.apache.paimon", name = "paimon-core", version.ref = "paimonRest" }
+paimonRest-format = { group = "org.apache.paimon", name = "paimon-format", version.ref = "paimonRest" }
+paimonRest-hive-catalog = { group = "org.apache.paimon", name = "paimon-hive-catalog", version.ref = "paimonRest" }
+paimonRest-s3 = { group = "org.apache.paimon", name = "paimon-s3", version.ref = "paimonRest" }
 
 trino-spi= { group = "io.trino", name = "trino-spi", version.ref = "trino" }
 trino-testing= { group = "io.trino", name = "trino-testing", version.ref = "trino" }
@@ -386,6 +395,7 @@ clickhouse-driver = { group = "com.clickhouse", name = "clickhouse-jdbc", versio
 lz4-java = { group = "org.lz4", name = "lz4-java", version.ref = "lz4" }
 yawk-lz4-java = { group = "at.yawk.lz4", name = "lz4-java", version.ref = "yawk-lz4-java" }
 snappy-java = { group = "org.xerial.snappy", name = "snappy-java", version.ref = "snappy-java" }
+zstd-jni = { group = "com.github.luben", name = "zstd-jni", version.ref = "zstd-jni" }
 mysql-driver = { group = "mysql", name = "mysql-connector-java", version.ref = "mysql" }
 postgresql-driver = { group = "org.postgresql", name = "postgresql", version.ref = "postgresql" }
 minikdc = { group = "org.apache.hadoop", name = "hadoop-minikdc", version.ref = "hadoop-minikdc"}
@@ -452,6 +462,7 @@ jetty = ["jetty-server", "jetty-servlet", "jetty-webapp", "jetty-servlets"]
 jersey = ["jersey-server", "jersey-container-servlet-core", "jersey-container-jetty-http", "jersey-media-json-jackson", "jersey-hk2"]
 iceberg = ["iceberg-core", "iceberg-api"]
 paimon = ["paimon-core", "paimon-format", "paimon-hive-catalog"]
+paimonRest = ["paimonRest-core", "paimonRest-api"]
 jwt = ["jwt-api", "jwt-impl", "jwt-gson"]
 metrics = ["metrics-core", "metrics-jersey2", "metrics-jvm", "metrics-jmx", "metrics-servlets"]
 prometheus = ["prometheus-servlet", "prometheus-dropwizard", "prometheus-client"]

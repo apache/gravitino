@@ -1,0 +1,69 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+# THE CONFIGURATION FOR Paimon REST SERVER
+# Keep gravitino.authorization.enable disabled for this service.
+# THE CONFIGURATION FOR Paimon REST WEB SERVER
+# The host name of the built-in web server
+gravitino.paimon-rest.host = 0.0.0.0
+# The http port number of the built-in web server
+gravitino.paimon-rest.httpPort = 9002
+# The min thread size of the built-in web server
+gravitino.paimon-rest.minThreads = 24
+# The max thread size of the built-in web server
+gravitino.paimon-rest.maxThreads = 200
+# The stop timeout of the built-in web server
+gravitino.paimon-rest.stopTimeout = 30000
+# The timeout of idle connections
+gravitino.paimon-rest.idleTimeout = 30000
+# The executor thread pool work queue size of the built-in web server
+gravitino.paimon-rest.threadPoolWorkQueueSize = 100
+# The request header size of the built-in web server
+gravitino.paimon-rest.requestHeaderSize = 131072
+# The response header size of the built-in web server
+gravitino.paimon-rest.responseHeaderSize = 131072
+
+# THE CONFIGURATION FOR Paimon catalog backend
+# The Paimon catalog backend, one of filesystem, jdbc or hive
+gravitino.paimon-rest.catalog-backend = filesystem
+# The warehouse directory of the Paimon catalog
+gravitino.paimon-rest.warehouse = /tmp/paimon-warehouse
+
+# Bearer tokens: one token per principal (revocable individually), or one shared token
+# gravitino.paimon-rest.token.<principal> = <token>
+# gravitino.paimon-rest.token = <shared-token>
+
+# OAuth JWT validation with an identity provider's JWKS endpoint. Leave the static tokens unset.
+# gravitino.authenticators = oauth
+# gravitino.authenticator.oauth.tokenValidatorClass = org.apache.gravitino.server.authentication.JwksTokenValidator
+# gravitino.authenticator.oauth.authority = <issuer-url>
+# gravitino.authenticator.oauth.jwksUri = <jwks-url>
+# gravitino.authenticator.oauth.serviceAudience = <token-audience>
+
+# Forward catalog-wide static storage keys for every table, with a synthetic 2h refresh time.
+# Use long-lived keys, without S3/OSS session tokens.
+# gravitino.paimon-rest.data-token.enabled = true
+
+# THE CONFIGURATION EXAMPLE FOR JDBC CATALOG BACKEND
+# gravitino.paimon-rest.catalog-backend = jdbc
+# gravitino.paimon-rest.uri = jdbc:postgresql://127.0.0.1:5432/postgres
+# gravitino.paimon-rest.jdbc-driver = org.postgresql.Driver
+# gravitino.paimon-rest.jdbc-user = postgres
+# gravitino.paimon-rest.jdbc-password = abc123
+# gravitino.paimon-rest.warehouse = /tmp/paimon-warehouse
