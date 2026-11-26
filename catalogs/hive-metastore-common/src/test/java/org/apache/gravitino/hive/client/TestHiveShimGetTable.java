@@ -19,10 +19,13 @@
 
 package org.apache.gravitino.hive.client;
 
+import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
@@ -66,6 +69,37 @@ class TestHiveShimGetTable {
     IMetaStoreClient metaStoreClient() {
       return client;
     }
+  }
+
+  @Test
+  void testIdentifierProbeDoesNotResolveColumns() throws Exception {
+    MockHiveShim shim = new MockHiveShim();
+    IMetaStoreClient client = shim.metaStoreClient();
+    Table table = new Table();
+    table.setTableType("EXTERNAL_TABLE");
+    table.setParameters(Map.of(ID_KEY, "source-identifier"));
+    // No storage descriptor: the probe must not convert columns or initialize a SerDe.
+    when(client.getTable(DB, TABLE)).thenReturn(table);
+    Assertions.assertEquals("source-identifier", shim.getTableIdentifier(CATALOG, DB, TABLE));
+    verify(client).getTable(DB, TABLE);
+    verifyNoMoreInteractions(client);
+    table.setParameters(null);
+    Assertions.assertNull(shim.getTableIdentifier(CATALOG, DB, TABLE));
+    table.setTableType("VIRTUAL_VIEW");
+    Assertions.assertThrows(
+        NoSuchTableException.class, () -> shim.getTableIdentifier(CATALOG, DB, TABLE));
+  }
+
+  @Test
+  void testIdentifierProbePropagatesMetastoreFailures() throws Exception {
+    MockHiveShim shim = new MockHiveShim();
+    IMetaStoreClient client = shim.metaStoreClient();
+    when(client.getTable(DB, TABLE)).thenThrow(new NoSuchObjectException("missing"));
+    Assertions.assertThrows(
+        NoSuchTableException.class, () -> shim.getTableIdentifier(CATALOG, DB, TABLE));
+    doThrow(new MetaException("unavailable")).when(client).getTable(DB, TABLE);
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class, () -> shim.getTableIdentifier(CATALOG, DB, TABLE));
   }
 
   @Test

@@ -22,17 +22,16 @@ from dataclasses_json import config
 
 from gravitino.api.semantic.semantic_model import SemanticModel
 from gravitino.api.semantic.semantic_model_definition import SemanticModelDefinition
-from gravitino.dto.semantic.json_serdes.semantic_json_mixin import SemanticJsonMixin
-from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.semantic.semantic_model_definition_dto import (
     SemanticModelDefinitionDTO,
 )
+from gravitino.dto.semantic.semantic_model_revision_dto import SemanticModelRevisionDTO
 from gravitino.utils.precondition import Precondition
 from gravitino.dto.semantic.semantic_dto_utils import is_none
 
 
 @dataclass
-class SemanticModelDTO(SemanticModel, SemanticJsonMixin):
+class SemanticModelDTO(SemanticModel, SemanticModelRevisionDTO):
     """Represents a schema-scoped Semantic Model DTO."""
 
     _name: Optional[str] = field(
@@ -47,9 +46,6 @@ class SemanticModelDTO(SemanticModel, SemanticJsonMixin):
     )
     _properties: Optional[dict[str, str]] = field(
         default=None, metadata=config(field_name="properties", exclude=is_none)
-    )
-    _audit: Optional[AuditDTO] = field(
-        default=None, metadata=config(field_name="audit", exclude=is_none)
     )
 
     def name(self) -> Optional[str]:
@@ -70,6 +66,3 @@ class SemanticModelDTO(SemanticModel, SemanticJsonMixin):
 
     def properties(self) -> dict[str, str]:
         return self._properties or {}
-
-    def audit_info(self) -> Optional[AuditDTO]:
-        return self._audit

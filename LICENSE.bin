@@ -206,6 +206,9 @@
    This product bundles various third-party components also under the
    Apache Software License 2.0 from:
 
+   Apache Ossie (ontology schema)
+   NetworkNT JSON Schema Validator
+   Ethlo Time ITU
    Apache Hive
    Apache Paimon
    FastDoubleParser (older Jackson copy shaded in paimon-format 1.2.0)

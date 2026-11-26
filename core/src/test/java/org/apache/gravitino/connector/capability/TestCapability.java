@@ -89,21 +89,19 @@ public class TestCapability {
       Assertions.assertFalse(result.supported());
       Assertions.assertTrue(result.unsupportedMessage().contains("is illegal"));
 
-      // test for long name
-      StringBuilder longName = new StringBuilder();
-      for (int i = 0; i < 64; i++) {
-        longName.append("a");
-      }
+      String maxName = "a".repeat(64);
+      Assertions.assertTrue(Capability.DEFAULT.specificationOnName(scope, maxName).supported());
 
-      Assertions.assertEquals(64, longName.length());
-      result = Capability.DEFAULT.specificationOnName(scope, longName.toString());
-      Assertions.assertTrue(result.supported());
-
-      longName.append("a");
-      Assertions.assertEquals(65, longName.length());
-      result = Capability.DEFAULT.specificationOnName(scope, longName.toString());
+      result = Capability.DEFAULT.specificationOnName(scope, maxName + "a");
       Assertions.assertFalse(result.supported());
-      Assertions.assertTrue(result.unsupportedMessage().contains("is illegal"));
+      Assertions.assertEquals(
+          "The " + scope + " name must not exceed 64 characters.", result.unsupportedMessage());
+
+      String illegalName = maxName + "?";
+      result = Capability.DEFAULT.specificationOnName(scope, illegalName);
+      Assertions.assertFalse(result.supported());
+      Assertions.assertEquals(
+          "The " + scope + " name '" + illegalName + "' is illegal.", result.unsupportedMessage());
     }
   }
 

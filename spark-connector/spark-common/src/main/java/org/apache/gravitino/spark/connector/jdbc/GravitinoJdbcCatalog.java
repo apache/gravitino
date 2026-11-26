@@ -129,10 +129,11 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
    * the table, so read the schema again and report the source's own error instead.
    *
    * @param ident the Spark table identifier
+   * @param gravitinoTable the Gravitino table the caller already obtained for this identifier
    * @return the Spark JDBC table
    */
   @Override
-  protected Table loadSparkTable(Identifier ident) {
+  protected Table loadSparkTable(Identifier ident, org.apache.gravitino.rel.Table gravitinoTable) {
     verifyJdbcConnectionUnchanged();
     return loadJdbcTable(ident);
   }
@@ -175,7 +176,12 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
     verifyJdbcConnectionUnchanged();
   }
 
-  private void verifyJdbcConnectionUnchanged() {
+  /**
+   * Checks that the JDBC settings still match the ones resolved when this catalog was initialized.
+   *
+   * @throws IllegalStateException if the connection settings changed or the catalog was recreated
+   */
+  protected final void verifyJdbcConnectionUnchanged() {
     Catalog currentCatalog = refreshGravitinoCatalog();
     Map<String, String> currentOptions =
         jdbcOptions(

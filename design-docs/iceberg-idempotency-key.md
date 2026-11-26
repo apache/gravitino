@@ -130,7 +130,8 @@ timestamp is used only as a defense-in-depth sanity check and for diagnostics.
 - Cross-datacenter replication of idempotency records.
 - Idempotency for read (GET/HEAD) operations.
 - Guaranteed delivery (client-side concern).
-- Heartbeat/liveness tracking (mutations are sub-second).
+- Heartbeat/liveness tracking. Deployments must bound mutation duration and
+  clock skew below the configured reuse window; see Section 5.4.
 
 ---
 
@@ -146,8 +147,8 @@ Client                 Load Balancer            Node A / Node B
   |                         |          +--------------+---------------+
   |                         |          | 1. Validate UUIDv7 format    |
   |                         |          | 2. store.reserve(key)        |
-  |                         |          |    +- RESERVED -> execute    |
-  |                         |          |    +- DUPLICATE -> replay    |
+  |                         |          |    +- Claim -> execute       |
+  |                         |          |    +- Empty -> replay        |
   |                         |          | 3. Execute mutation          |
   |                         |          | 4. store.finalize(key, resp) |
   |                         |          +--------------+---------------+
@@ -161,17 +162,15 @@ A storage-agnostic interface that any backend can implement:
 ```java
 public interface IdempotencyStore extends Closeable {
 
-  enum ReserveResult { RESERVED, DUPLICATE }
-
   /**
-   * Attempt to reserve a key. Returns DUPLICATE if already reserved or finalized.
+   * Attempt to reserve a key. Returns empty if already reserved or finalized.
    *
    * @param idempotencyKey the client-provided UUIDv7 key
    * @param operationBinding request identity, e.g. "POST /v1/cat1/namespaces/ns1/tables"
-   * @param expiresAt instant after which this record may be purged
-   * @return RESERVED if newly claimed, DUPLICATE if already exists
+   * @param expiresAtMs deadline in Unix epoch milliseconds
+   * @return a fresh fencing token if acquired, empty if the key is live
    */
-  ReserveResult reserve(String idempotencyKey, String operationBinding, Instant expiresAt);
+  OptionalLong reserve(String idempotencyKey, String operationBinding, long expiresAtMs);
 
   /**
    * Load a finalized record for replay.
@@ -185,26 +184,28 @@ public interface IdempotencyStore extends Closeable {
    * Mark a reserved key as finalized with the response to replay on duplicates.
    *
    * @param idempotencyKey the client-provided key
+   * @param claim the fencing token returned by reserve
    * @param httpStatus the HTTP status code of the original response
    * @param responseSummary serialized response body (JSON string)
    */
-  void finalize(String idempotencyKey, int httpStatus, String responseSummary);
+  void finalizeRecord(String idempotencyKey, long claim, int httpStatus, String responseSummary);
 
   /**
    * Release a reservation so the client can retry with the same key.
    * Called when the mutation fails with a retryable error.
    *
    * @param idempotencyKey the client-provided key
+   * @param claim the fencing token returned by reserve
    */
-  void release(String idempotencyKey);
+  void release(String idempotencyKey, long claim);
 
   /**
    * Purge expired records. Called periodically by a background task.
    *
-   * @param before cutoff instant; records expiring before this time are removed
+   * @param beforeMs inclusive expiry cutoff in Unix epoch milliseconds
    * @return number of records purged
    */
-  int purgeExpired(Instant before);
+  int purgeExpired(long beforeMs);
 }
 ```
 
@@ -214,6 +215,7 @@ public interface IdempotencyStore extends Closeable {
 public class IdempotencyRecord {
   private final String idempotencyKey;     // UUIDv7 (RFC 9562), 36-char canonical form
   private final String operationBinding;   // e.g., "POST /v1/cat1/namespaces/ns1/tables"
+  private final long claim;               // store-issued fencing token
   private final Integer httpStatus;        // null while reserved / in-progress
   private final String responseSummary;    // serialized response body (JSON)
   private final long createdAtMs;          // unix epoch millis (matches BIGINT column)
@@ -228,10 +230,10 @@ existing metadata tables (e.g., the `deleted_at` / `timestamp` columns in
 
 ### 3.4 Storage Implementations
 
-| Implementation               | Use Case              | Durability | Multi-Node |
-| ---------------------------- | --------------------- | ---------- | ---------- |
-| `InMemoryIdempotencyStore`   | Dev, testing, single  | No         | No         |
-| `JdbcIdempotencyStore`       | Production            | Yes        | Yes        |
+| Implementation             | Use Case             | Durability | Multi-Node |
+| -------------------------- | -------------------- | ---------- | ---------- |
+| `InMemoryIdempotencyStore` | Dev, testing, single | No         | No         |
+| `JdbcIdempotencyStore`     | Production           | Yes        | Yes        |
 
 The JDBC implementation leverages Gravitino's existing relational backend
 (H2 for dev, MySQL or PostgreSQL for production).
@@ -279,39 +281,60 @@ MEDIUMTEXT `audit_info` column, per-column `COMMENT`s, and
 MySQL:
 
 ```sql
-CREATE TABLE IF NOT EXISTS `iceberg_idempotency_key_meta` (
-    `idempotency_key`   VARCHAR(36)         NOT NULL COMMENT 'client-provided UUIDv7 idempotency key',
-    `operation_binding` VARCHAR(512)        NOT NULL COMMENT 'request identity, e.g. POST /v1/{prefix}/namespaces/{ns}/tables',
-    `http_status`       INT UNSIGNED        DEFAULT NULL COMMENT 'HTTP status of finalized response; NULL while reserved',
-    `response_summary`  MEDIUMTEXT          DEFAULT NULL COMMENT 'serialized response body (JSON) for replay',
-    `audit_info`        MEDIUMTEXT          NOT NULL COMMENT 'idempotency record audit info',
-    `created_at`        BIGINT(20) UNSIGNED NOT NULL COMMENT 'record created at (unix epoch millis)',
-    `expires_at`        BIGINT(20) UNSIGNED NOT NULL COMMENT 'record expires at (unix epoch millis)',
-    PRIMARY KEY (`idempotency_key`),
-    KEY `idx_iik_expires` (`expires_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Iceberg REST idempotency key records';
+CREATE TABLE IF NOT EXISTS `iceberg_idempotency_meta` (
+  `idempotency_key`  VARCHAR(36)         NOT NULL     COMMENT 'client-provided UUIDv7 idempotency key',
+  `http_method`      VARCHAR(16)         NOT NULL     COMMENT 'HTTP method of the request',
+  `request_uri`      MEDIUMTEXT          NOT NULL     COMMENT 'encoded request path and sorted query string',
+  `generation`       BIGINT              NOT NULL     COMMENT 'reservation fencing token',
+  `http_status`      INT(10) UNSIGNED    DEFAULT NULL COMMENT 'HTTP status of finalized response, NULL while reserved',
+  `response_summary` MEDIUMTEXT          DEFAULT NULL COMMENT 'serialized response body (JSON) for replay',
+  `audit_info`       MEDIUMTEXT          NOT NULL     COMMENT 'idempotency record audit info',
+  `created_at`       BIGINT(20) UNSIGNED NOT NULL     COMMENT 'record created at (unix epoch millis)',
+  `expires_at`       BIGINT(20) UNSIGNED NOT NULL     COMMENT 'record expires at (unix epoch millis)',
+  PRIMARY KEY (`idempotency_key`),
+  KEY `idx_iim_expires` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Iceberg REST idempotency records';
+
+
+CREATE TABLE IF NOT EXISTS iceberg_idempotency_generation_meta (
+  stripe INT NOT NULL PRIMARY KEY,
+  generation BIGINT NOT NULL
+) ENGINE=InnoDB;
 ```
 
-The H2 and PostgreSQL variants follow the same column names and types (with
-database-specific keywords) and are shipped alongside the existing scripts as
-`scripts/h2/iceberg-idempotency-schema-<version>-h2.sql` and
-`scripts/postgresql/iceberg-idempotency-schema-<version>-postgresql.sql`,
-mirroring the layout of the existing `iceberg-metrics-schema-<version>-*.sql`
-files.
+The H2 and PostgreSQL variants use the same columns. All three backends ship the
+table in `scripts/<backend>/schema-2.0.0-<backend>.sql` and
+`scripts/<backend>/upgrade-1.3.0-to-2.0.0-<backend>.sql`.
+
+A key's final byte selects one of 256 generation counters in
+`iceberg_idempotency_generation_meta`. The database advances that counter in
+the same transaction that acquires the reservation, so a key's generations
+increase across replicas. Release and purge leave the counters in place.
+A per-key counter initialized to 1 would repeat after deletion and let a late
+owner touch the new reservation. The store returns the generation as the claim
+that finalize and release match against the current row.
+
+The HTTP method is stored in `http_method`. The `request_uri` column stores
+the encoded path plus the sorted, encoded query string when present. MySQL
+uses `MEDIUMTEXT` because the default HTTP request limit permits targets
+longer than MySQL's 64 KiB `TEXT` limit.
 
 ### 4.1 Row Lifecycle
 
 1. **RESERVED**: Row inserted with `http_status = NULL`. Mutation is executing.
 2. **FINALIZED**: `http_status` and `response_summary` written. Ready for replay.
-3. **EXPIRED**: `expires_at < now()`. Purged by background cleanup
+3. **EXPIRED**: `expires_at <= now()`. Eligible for reclaim or background cleanup
    (see [Section 5.4](#54-expiry-and-cleanup-of-outdated-data)).
 
 ### 4.2 Conflict Handling
 
-`reserve()` uses `INSERT ... ON CONFLICT DO NOTHING` (PostgreSQL),
-`INSERT IGNORE` (MySQL), or equivalent. If zero rows inserted, the key is
-already reserved or finalized - return `DUPLICATE` and load the existing record
-for replay.
+`reserve()` advances the key's generation counter and attempts a plain
+`INSERT` in one transaction. After a duplicate-key rollback, a separate
+transaction advances the counter and replaces the matching row only if it is
+expired. If no expired row matches, the store retries once with a fresh expiry
+cutoff in case purge or release freed the key. If neither attempt claims the
+key, it returns empty. Other SQL errors propagate. Only finalized, unexpired
+records can be loaded for replay.
 
 ---
 
@@ -323,28 +346,39 @@ for replay.
    ignore the `Idempotency-Key` header and execute the mutation directly.
 2. Extract `Idempotency-Key` header; validate UUIDv7 format (400 if invalid).
 3. If header absent, execute mutation directly (no idempotency overhead).
-4. Call `store.reserve(key, binding, now + lifetime)`.
-5. Result = `RESERVED`: execute mutation, call `store.finalize(key, status, body)`.
+4. Call `store.reserve(key, binding, now + lifetime)` to acquire the key and receive a claim.
+5. If a claim was returned, execute the mutation and call `store.finalizeRecord(key, claim, status, body)`.
 6. Return response to client.
 
 ### 5.2 Replay Path (Duplicate Key)
 
 1. Extract and validate header.
-2. Call `store.reserve(key, binding, expiresAt)` - returns `DUPLICATE`.
+2. Call `store.reserve(key, binding, expiresAt)`. An empty result indicates a duplicate.
 3. Call `store.load(key)`:
    - If finalized: reconstruct and return cached response.
    - If in-progress (not yet finalized): return `409 Conflict` with
-     `Retry-After` header (another node is still executing).
+     `Retry-After` header (the mutation may still be executing, or its response was not retained).
 4. Return cached response.
 
 ### 5.3 Execution Failure
 
-If the mutation throws an exception:
+The manager distinguishes failures before execution, mutation outcomes, and
+response-persistence failures:
 
-- **Retryable errors** (e.g., transient DB failure): call `store.release(key)`
-  so the client can retry with the same key.
+- **Reservation or replay lookup failure**: return `503 Service Unavailable`
+  with `Retry-After` without executing the mutation. Do not release a reservation
+  whose commit acknowledgement may have been lost. Retry with the same key
+  within its reuse window; reconcile catalog state before retrying outside it.
+- **Retryable mutation errors** (`5xx`, authentication/authorization outcomes,
+  or a thrown action exception): call `store.release(key, claim)` so the client
+  can retry with the same key. A mutation failure can still have an uncertain
+  catalog outcome; a `5xx` is not proof that the catalog was unchanged.
 - **Terminal errors** (e.g., `AlreadyExistsException`): call
-  `store.finalize(key, 409, errorBody)` so retries get the same error response.
+  `store.finalizeRecord(key, claim, 409, errorBody)` so retries get the same error response.
+- **Terminal response cannot be retained** (serialization, write, read-back
+  failure, or a no-op finalize): return the original mutation response and leave
+  any existing reservation until expiry. This prevents immediate re-execution;
+  a retry receives an in-flight `409` while the unfinalized reservation remains.
 
 This matches the Iceberg REST spec's finalization rules for the
 `Idempotency-Key` header:
@@ -360,20 +394,33 @@ Every record carries `expires_at = created_at + idempotency-key-lifetime`. The
 spec states catalogs SHOULD NOT expire keys before the advertised lifetime, so
 cleanup only ever removes records whose window has already elapsed.
 
-**JDBC store.** A background task scheduled every
-`idempotency-cleanup-interval` calls `store.purgeExpired(now)`, which runs:
+There is no heartbeat or in-flight renewal. The configured lifetime must exceed
+the maximum reservation-to-response-persistence duration, maximum replica clock
+skew, and a safety margin. This bound includes lock waits, backend retries, and
+JVM pauses; an HTTP timeout alone does not stop a catalog mutation. If those
+bounds cannot be enforced, expiry can allow overlapping execution, so callers
+must not rely on an at-most-once guarantee or blindly retry after the window.
+
+**JDBC store.** Each store owns a background task scheduled every
+`idempotency-cleanup-interval` that calls `store.purgeExpired(now)`. Use one
+store per service instance and close it at service shutdown. MySQL and H2 use:
 
 ```sql
-DELETE FROM iceberg_idempotency_key_meta WHERE expires_at < ? LIMIT ?;
+DELETE FROM iceberg_idempotency_meta WHERE expires_at <= ? LIMIT ?;
 ```
 
-- Deletes are performed in bounded batches (using `LIMIT` / repeated execution)
-  to avoid long-held locks and large transactions.
-- The `idx_iik_expires` index makes the predicate efficient.
-- The delete is safe to run concurrently on multiple nodes: it is idempotent
-  and only targets already-expired rows, so no leader election or distributed
-  lock is required. A small grace period is added to the cutoff to tolerate
-  clock skew between nodes.
+- Deletes are performed in at most 100 batches of 1,000 rows per pass to avoid
+  long-held locks and large transactions. Larger backlogs wait for later passes;
+  expiry is enforced on access independently of cleanup.
+- The `idx_iim_expires` index makes the predicate efficient.
+- PostgreSQL selects a bounded set of candidate keys in a subquery and rechecks
+  expiry on the target row. MySQL and H2 recheck the target-row predicate after
+  a lock wait, preserving reservations concurrently reclaimed with a future
+  deadline.
+- Concurrent cleanup does not require leader election. Replicas must synchronize
+  system clocks: there is no clock-skew grace period, and a fast replica can
+  reclaim or purge a key another replica still considers live. Monitor clock
+  offset and synchronization health as a replay-safety requirement.
 
 **In-memory store.** No separate task is needed: Caffeine's
 `expireAfterWrite(lifetime)` removes expired entries lazily/automatically, and
@@ -389,13 +436,13 @@ server. Only `idempotency-key-lifetime` is defined by the Iceberg REST spec and
 advertised to clients; every other key is Gravitino server-side configuration
 and is **not** exposed via `GET /v1/config`.
 
-| Config Key                                       | Default     | Description                                                                                              |
-| ------------------------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------- |
-| `gravitino.iceberg-rest.idempotency-enabled`     | `false`     | Master switch. Disabled by default (matching Polaris). When `false`, the `Idempotency-Key` header is ignored and no lifetime is advertised. |
-| `gravitino.iceberg-rest.idempotency-key-lifetime`| `PT30M`     | Client reuse window (ISO-8601 duration). Advertised to clients as the spec-defined `idempotency-key-lifetime` in `GET /v1/config`. |
-| `gravitino.iceberg-rest.idempotency-store-type`  | `in-memory` | `in-memory` or `jdbc`.                                                                                   |
-| `gravitino.iceberg-rest.idempotency-max-entries` | `10000`     | Max cached entries (in-memory store only). See [Section 3.5](#35-in-memory-store-capacity-and-eviction).|
-| `gravitino.iceberg-rest.idempotency-cleanup-interval` | `PT5M` | Interval for the background task that purges expired records (jdbc store).                               |
+| Config Key                                            | Default     | Description                                                                                                                                 |
+| ----------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gravitino.iceberg-rest.idempotency-enabled`          | `false`     | Master switch. Disabled by default (matching Polaris). When `false`, the `Idempotency-Key` header is ignored and no lifetime is advertised. |
+| `gravitino.iceberg-rest.idempotency-key-lifetime`     | `PT30M`     | Client reuse window (ISO-8601 duration). Advertised to clients as the spec-defined `idempotency-key-lifetime` in `GET /v1/config`.          |
+| `gravitino.iceberg-rest.idempotency-store-type`       | `in-memory` | `in-memory` or `jdbc`.                                                                                                                      |
+| `gravitino.iceberg-rest.idempotency-max-entries`      | `10000`     | Max cached entries (in-memory store only). See [Section 3.5](#35-in-memory-store-capacity-and-eviction).                                    |
+| `gravitino.iceberg-rest.idempotency-cleanup-interval` | `PT5M`      | Interval for the background task that purges expired records (jdbc store).                                                                  |
 
 ### 6.1 Iceberg Spec Configuration
 
@@ -423,39 +470,38 @@ clients MUST assume idempotency is not supported.
 
 ### 6.2 Database Configuration (`jdbc` store)
 
-When `idempotency-store-type=jdbc`, the store connects to a relational database
-using the following keys, mirroring the JDBC configuration style already used by
-Gravitino's Iceberg REST metrics store:
+When `idempotency-store-type=jdbc`, the store reuses the initialized Gravitino
+relational entity store's connection pool in auxiliary mode. It supports H2,
+MySQL, and PostgreSQL and has no separate `idempotency-jdbc-*` connection
+settings. Multiple replicas must connect to the same shared MySQL or PostgreSQL
+database. The store does not own or close the shared pool.
 
-| Config Key                                              | Default | Description                                                        |
-| ------------------------------------------------------- | ------- | ------------------------------------------------------------------ |
-| `gravitino.iceberg-rest.idempotency-jdbc-url`           | (none)  | JDBC connection URL, e.g. `jdbc:mysql://host:3306/gravitino`.       |
-| `gravitino.iceberg-rest.idempotency-jdbc-driver`        | (none)  | JDBC driver class name.                                            |
-| `gravitino.iceberg-rest.idempotency-jdbc-user`          | (none)  | Database user.                                                     |
-| `gravitino.iceberg-rest.idempotency-jdbc-password`      | (none)  | Database password. Supplied via secret/env; never logged.          |
-| `gravitino.iceberg-rest.idempotency-jdbc-max-pool-size` | `10`    | Maximum JDBC connection pool size.                                |
-
-By default the `jdbc` store reuses the same backend as Gravitino's relational
-entity store; the keys above allow pointing it at a dedicated database when
-needed.
+Standalone Iceberg REST servers cannot use this backend. The Iceberg REST
+server JAR contains the store interface, factory, and both built-in
+implementations. The factory resolves the `in-memory` and `jdbc` aliases to
+those implementations. The configuration keys live in `iceberg-common`.
+Apply the schema or upgrade scripts before enabling the store. See the
+[JDBC operations guidance](../docs/iceberg-rest-service.md#jdbc-idempotency-storage)
+for clock synchronization, cleanup limits, and deployment requirements.
 
 ---
 
 ## 7. Comparison with Polaris
 
-| Aspect              | Polaris (PR #3205)              | This Design                                     |
-| ------------------- | ------------------------------- | ----------------------------------------------- |
-| Storage             | Postgres-specific               | Gravitino relational backend (H2/MySQL/PG)      |
-| Heartbeat           | Yes (long-running ops)          | No (mutations are sub-second)                   |
-| Reconciliation      | Yes (crash recovery)            | Simplified: TTL-based expiry + release on fail  |
-| Executor ownership  | Yes (multi-worker)              | No (single-owner per key via DB constraint)     |
-| Response storage    | Minimal summary + pointer       | Full response body (mutation responses are small)|
+| Aspect             | Polaris (PR #3205)        | This Design                                                       |
+| ------------------ | ------------------------- | ----------------------------------------------------------------- |
+| Storage            | Postgres-specific         | Gravitino relational backend (H2/MySQL/PG)                        |
+| Heartbeat          | Yes (long-running ops)    | No; requires bounded mutation duration and clock skew             |
+| Reconciliation     | Yes (crash recovery)      | TTL-based expiry; retain reservations on response-storage failure |
+| Executor ownership | Yes (multi-worker)        | No (single-owner per key via DB constraint)                       |
+| Response storage   | Minimal summary + pointer | Full response body (mutation responses are small)                 |
 
-Gravitino's Iceberg mutations (create/drop/update) are typically sub-second,
-which makes heartbeat-based liveness and crash reconciliation unnecessary
-complexity. The simpler reserve-execute-finalize model is sufficient. If
-long-running operations are added in the future (e.g., async purge), heartbeat
-support can be added to the SPI without breaking existing implementations.
+This design uses a fixed reuse window rather than heartbeat-based ownership.
+It therefore requires the duration and clock-skew bounds in Section 5.4 and
+cannot guarantee at-most-once execution for unbounded mutations. Supporting
+those operations safely would require a separate lease-renewal and
+catalog-side fencing design; record claim tokens alone cannot stop an already
+running catalog mutation.
 
 ---
 
@@ -463,8 +509,7 @@ support can be added to the SPI without breaking existing implementations.
 
 ### Phase 1: SPI and In-Memory Store
 
-- Define `IdempotencyStore` interface and `IdempotencyRecord` in
-  `iceberg/iceberg-common`.
+- Define the `IdempotencyStore` interface and `IdempotencyRecord`.
 - Implement `InMemoryIdempotencyStore` using Caffeine cache.
 - Wire into endpoint operations with `@HeaderParam("Idempotency-Key")`.
 - Advertise `idempotency-key-lifetime` in `GET /v1/config`.
@@ -472,8 +517,9 @@ support can be added to the SPI without breaking existing implementations.
 
 ### Phase 2: JDBC Store
 
-- Add `iceberg_idempotency_key_meta` table schema for H2, MySQL, and PostgreSQL.
+- Add `iceberg_idempotency_meta` table schema for H2, MySQL, and PostgreSQL.
 - Implement `JdbcIdempotencyStore` using Gravitino's existing connection pool.
+- Package the store interface, implementations, and factory in `iceberg/iceberg-rest-server`.
 - Background cleanup task for expired records.
 - Integration tests with testcontainers.
 

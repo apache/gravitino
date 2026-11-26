@@ -32,6 +32,9 @@ import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 @Evolving
 public interface SemanticModelCatalog {
 
+  /** Alias of the newest saved revision. */
+  String LATEST_REVISION = "latest";
+
   /**
    * Lists the Semantic Models in a schema namespace.
    *
@@ -80,6 +83,38 @@ public interface SemanticModelCatalog {
    * @throws NoSuchSemanticModelException If the Semantic Model does not exist.
    */
   SemanticModel loadSemanticModel(NameIdentifier ident) throws NoSuchSemanticModelException;
+
+  /**
+   * Loads a retained revision by number.
+   *
+   * @param ident The Semantic Model identifier.
+   * @param revision The positive revision number.
+   * @return The requested snapshot.
+   */
+  default SemanticModel loadSemanticModel(NameIdentifier ident, int revision) {
+    throw new UnsupportedOperationException("Loading Semantic Model revisions is not supported");
+  }
+
+  /**
+   * Loads the latest saved revision.
+   *
+   * @param ident The Semantic Model identifier.
+   * @param alias The alias {@link #LATEST_REVISION}.
+   * @return The latest snapshot.
+   */
+  default SemanticModel loadSemanticModel(NameIdentifier ident, String alias) {
+    throw new UnsupportedOperationException("Loading Semantic Model revisions is not supported");
+  }
+
+  /**
+   * Lists the retained revision summaries visible to the caller, newest first.
+   *
+   * @param ident The Semantic Model identifier.
+   * @return The revision summaries.
+   */
+  default SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident) {
+    throw new UnsupportedOperationException("Listing Semantic Model revisions is not supported");
+  }
 
   /**
    * Returns whether a Semantic Model exists.
@@ -166,6 +201,32 @@ public interface SemanticModelCatalog {
   }
 
   /**
+   * Exports a retained revision.
+   *
+   * @param ident The Semantic Model identifier.
+   * @param revision The positive revision number.
+   * @param format The requested document format.
+   * @return The Ossie document for that revision.
+   */
+  default OssieDocument exportOssieDocument(
+      NameIdentifier ident, int revision, OssieFormat format) {
+    throw new UnsupportedOperationException("Exporting Semantic Model revisions is not supported");
+  }
+
+  /**
+   * Exports the latest saved revision.
+   *
+   * @param ident The Semantic Model identifier.
+   * @param alias The alias {@link #LATEST_REVISION}.
+   * @param format The requested document format.
+   * @return The Ossie document for the latest revision.
+   */
+  default OssieDocument exportOssieDocument(
+      NameIdentifier ident, String alias, OssieFormat format) {
+    throw new UnsupportedOperationException("Exporting Semantic Model revisions is not supported");
+  }
+
+  /**
    * Applies changes atomically to a Semantic Model.
    *
    * <p>If any change is rejected or the resulting Semantic Model is invalid, no change is applied.
@@ -181,6 +242,20 @@ public interface SemanticModelCatalog {
   SemanticModel alterSemanticModel(NameIdentifier ident, SemanticModelChange... changes)
       throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException;
+
+  /**
+   * Alters a Semantic Model only if the expected revision is still the latest saved revision.
+   *
+   * @param ident The Semantic Model identifier.
+   * @param expectedRevision The positive revision number from which the changes were prepared.
+   * @param changes The changes to apply.
+   * @return The resulting snapshot.
+   */
+  default SemanticModel alterSemanticModel(
+      NameIdentifier ident, int expectedRevision, SemanticModelChange... changes) {
+    throw new UnsupportedOperationException(
+        "Conditional Semantic Model alteration is not supported");
+  }
 
   /**
    * Drops a Semantic Model.

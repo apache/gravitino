@@ -47,81 +47,39 @@ beforeEach(() => {
   store = configureStore({ reducer: { metalakes: reducer } })
 })
 
-describe('definition replacement conflict checks', () => {
-  const original = { datasets: [], aiContext: 'Original guidance' }
-  const updated = { ...original, aiContext: 'My draft' }
+describe('conditional definition replacement', () => {
+  const definition = { datasets: [], aiContext: 'My edits' }
 
   const args = {
     ...namespace,
     semanticModel: 'orders',
-    expectedDefinition: original,
-    data: { updates: [{ '@type': 'replaceDefinition', definition: updated }] }
+    data: { expectedRevision: 4, updates: [{ '@type': 'replaceDefinition', definition }] }
   }
 
-  it('does not change another page loading state after a delayed verification read', async () => {
-    store.dispatch(setActiveCatalogEntity({ ...namespace, semanticModel: 'orders' }))
-    let verify
-    let finishSave
-    defHttp.get.mockImplementation(({ url }) =>
-      url.endsWith('/orders')
-        ? new Promise(resolve => {
-            verify = resolve
-          })
-        : Promise.resolve({ identifiers: [] })
-    )
-    defHttp.put.mockImplementation(
-      () =>
-        new Promise(resolve => {
-          finishSave = resolve
-        })
-    )
-    const save = store.dispatch(updateSemanticModel(args))
-    store.dispatch(setActiveCatalogEntity({ ...namespace, schema: 'other' }))
-    verify({ semanticModel: { definition: original } })
-    await vi.waitFor(() => expect(finishSave).toBeTypeOf('function'))
-    expect(store.getState().metalakes.tableLoading).toBe(false)
-    finishSave({ semanticModel: { name: 'orders', definition: updated } })
-    await save
-    expect(store.getState().metalakes.tableLoading).toBe(false)
-    expect(store.getState().metalakes.semanticModels).toEqual([])
+  it('sends the revision read by the editor without a verification GET', async () => {
+    defHttp.put.mockResolvedValue({ semanticModel: { name: 'orders', revision: 5, definition } })
+    defHttp.get.mockResolvedValue({ identifiers: [] })
+    const result = await store.dispatch(updateSemanticModel(args))
+    expect(result.payload.revision).toBe(5)
+    expect(defHttp.put.mock.calls[0][0].data).toEqual(args.data)
+    expect(defHttp.put.mock.invocationCallOrder[0]).toBeLessThan(defHttp.get.mock.invocationCallOrder[0])
   })
 
-  it('refuses to overwrite a definition changed since the editor opened', async () => {
-    defHttp.get.mockResolvedValue({ semanticModel: { definition: { ...original, aiContext: 'Other writer' } } })
+  it('reports a conflict and leaves the caller free to reapply its edits', async () => {
+    defHttp.put.mockRejectedValue({ response: { status: 409 } })
     const result = await store.dispatch(updateSemanticModel(args))
     expect(result.payload.err).toBe(true)
     expect(result.payload.message).toContain('changed since')
-    expect(defHttp.put).not.toHaveBeenCalled()
     expect(store.getState().metalakes.tableLoading).toBe(false)
+    expect(defHttp.get).not.toHaveBeenCalled()
   })
 
-  it('compares definitions independently of object key order before saving', async () => {
-    defHttp.get
-      .mockResolvedValueOnce({ semanticModel: { definition: { aiContext: 'Original guidance', datasets: [] } } })
-      .mockResolvedValue({ identifiers: [] })
-    defHttp.put.mockResolvedValue({ semanticModel: { name: 'orders', definition: updated } })
-    const result = await store.dispatch(updateSemanticModel(args))
-    expect(result.payload.definition).toEqual(updated)
-    expect(defHttp.put.mock.calls[0][0].data).toEqual(args.data)
-    expect(defHttp.get.mock.invocationCallOrder[0]).toBeLessThan(defHttp.put.mock.invocationCallOrder[0])
+  it.each([undefined, 0, -1])('requires a positive revision for replacement: %s', async expectedRevision => {
+    const result = await store.dispatch(updateSemanticModel({ ...args, data: { ...args.data, expectedRevision } }))
+    expect(result.payload.err).toBe(true)
+    expect(defHttp.put).not.toHaveBeenCalled()
+    expect(defHttp.get).not.toHaveBeenCalled()
   })
-
-  it.each(['error', 'missing definition', 'missing snapshot'])(
-    'does not save when verification fails: %s',
-    async reason => {
-      if (reason === 'error') defHttp.get.mockRejectedValue(new Error('Read denied'))
-      else
-        defHttp.get.mockResolvedValue({
-          semanticModel: reason === 'missing definition' ? {} : { definition: original }
-        })
-
-      const result = await store.dispatch(
-        updateSemanticModel({ ...args, expectedDefinition: reason === 'missing snapshot' ? undefined : original })
-      )
-      expect(result.payload.err).toBe(true)
-      expect(defHttp.put).not.toHaveBeenCalled()
-    }
-  )
 })
 
 describe('semantic model tree identity', () => {

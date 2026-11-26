@@ -2402,9 +2402,9 @@ export const fetchSemanticModels = createAsyncThunk(
 
 export const getSemanticModelDetails = createAsyncThunk(
   'appMetalakes/getSemanticModelDetails',
-  async ({ init, metalake, catalog, schema, semanticModel }) => {
+  async ({ init, metalake, catalog, schema, semanticModel, revision }) => {
     const [err, res] = await to(
-      getSemanticModelDetailsApi({ metalake, catalog, schema, semanticModel }, { errorMessageMode: 'none' })
+      getSemanticModelDetailsApi({ metalake, catalog, schema, semanticModel, revision }, { errorMessageMode: 'none' })
     )
 
     if (err) {
@@ -2443,36 +2443,26 @@ export const createSemanticModel = createAsyncThunk(
 
 export const updateSemanticModel = createAsyncThunk(
   'appMetalakes/updateSemanticModel',
-  async ({ metalake, catalog, schema, semanticModel, data, expectedDefinition }, { dispatch, getState }) => {
+  async ({ metalake, catalog, schema, semanticModel, data }, { dispatch, getState }) => {
     const activeEntity = getState().metalakes.activeCatalogEntity
-    if (data.updates.some(update => update['@type'] === 'replaceDefinition')) {
-      // Detect intervening edits; atomic protection still requires a server-side version token.
-      const [err, current] = await to(
-        getSemanticModelDetailsApi(
-          { metalake, catalog, schema, semanticModel },
-          { errorMessageMode: 'none', ignoreCancelToken: true }
-        )
-      )
-      if (err || !current?.semanticModel?.definition || !expectedDefinition) {
-        return {
-          err: true,
-          message: semanticModelErrorMessage(
-            err,
-            'Unable to verify the current definition. Reload the model and try again.'
-          )
-        }
-      }
-      if (!_.isEqual(current.semanticModel.definition, expectedDefinition)) {
-        return {
-          err: true,
-          message:
-            'The definition has changed since this editor was opened. Copy your edits, then refresh the page and reapply them to the latest definition.'
-        }
-      }
+    const replacingDefinition = data.updates.some(update => update['@type'] === 'replaceDefinition')
+    if (replacingDefinition && (!Number.isInteger(data.expectedRevision) || data.expectedRevision <= 0)) {
+      return { err: true, message: 'Reload the latest Semantic Model revision before editing its definition.' }
     }
     if (getState().metalakes.activeCatalogEntity === activeEntity) await dispatch(setTableLoading(true))
     const [err, res] = await to(updateSemanticModelApi({ metalake, catalog, schema, semanticModel, data }))
     if (getState().metalakes.activeCatalogEntity === activeEntity) await dispatch(setTableLoading(false))
+
+    if (
+      err?.response?.status === 409 &&
+      (replacingDefinition || err.response.data?.type === 'OptimisticLockException')
+    ) {
+      return {
+        err: true,
+        message:
+          'The Semantic Model has changed since this editor was opened. Copy your edits, reopen the editor, and reapply them to the latest revision.'
+      }
+    }
 
     if (err || !res?.semanticModel) {
       return { err: true, message: semanticModelErrorMessage(err, 'Failed to update the Semantic Model.') }
