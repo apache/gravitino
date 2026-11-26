@@ -30,7 +30,7 @@ public class TestPaimonConfigProvider {
 
   @Test
   public void testUnsupportedProviderFailsExplicitly() {
-    for (String name : new String[] {"dynamic-config-provider", "typo"}) {
+    for (String name : new String[] {"unsupported", "typo"}) {
       IllegalArgumentException error =
           Assertions.assertThrows(
               IllegalArgumentException.class,

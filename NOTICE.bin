@@ -1172,3 +1172,6 @@ Distributed under the Eclipse Distribution License 1.0.
 
 Upstream notices for Paimon 2.1.0 runtime JARs and their shaded dependencies
 are reproduced in licenses/paimon-rest-notices.txt.
+
+The Apache Paimon OSS 2.1.0 plugin and its bundled component notices
+are reproduced in licenses/paimon-rest-thirdparty.txt.

@@ -188,8 +188,57 @@ public class PaimonRESTServiceSparkIT {
     }
   }
 
+  @Test
+  void testDynamicGravitinoCatalogWithFlinkAndSpark(@TempDir Path directory) throws Exception {
+    try (TestGravitinoCatalogServer gravitino =
+        new TestGravitinoCatalogServer(directory.resolve("warehouse"))) {
+      int dynamicPort = findRandomPort();
+      RESTService dynamic = new RESTService();
+      dynamic.serviceInit(
+          Map.of(
+              "host",
+              "127.0.0.1",
+              "httpPort",
+              String.valueOf(dynamicPort),
+              "token.spark-it",
+              TOKEN,
+              "catalog-config-provider",
+              "dynamic-config-provider",
+              "gravitino-uri",
+              gravitino.uri(),
+              "gravitino-metalake",
+              "ml",
+              "gravitino-auth-type",
+              "simple",
+              "gravitino-simple.user-name",
+              "paimon-test"),
+          false);
+      try {
+        dynamic.serviceStart();
+        for (String scenario : List.of("flink-write", "spark-append", "flink-read", "spark-ddl")) {
+          runEngineClient(
+              "2.1.0",
+              scenario,
+              scenario.equals("spark-ddl") ? "dynamic_ddl" : "dynamic_rw",
+              false,
+              directory,
+              "http://127.0.0.1:" + dynamicPort + "/paimon/");
+        }
+        Assertions.assertTrue(gravitino.catalogLoads() > 0);
+      } finally {
+        dynamic.serviceStop();
+      }
+    }
+  }
+
   private static void runEngineClient(
       String version, String scenario, String database, boolean patched, Path directory)
+      throws Exception {
+    runEngineClient(version, scenario, database, patched, directory, restUri());
+  }
+
+  private static void runEngineClient(
+      String version, String scenario, String database, boolean patched, Path directory, String uri)
       throws Exception {
     String engine = scenario.startsWith("flink-") ? "flink" : "spark";
     Path classpath =
@@ -208,7 +257,7 @@ public class PaimonRESTServiceSparkIT {
             "-cp",
             Files.readString(classpath),
             PaimonRESTServiceSparkIT.class.getName(),
-            restUri(),
+            uri,
             version,
             scenario,
             database));

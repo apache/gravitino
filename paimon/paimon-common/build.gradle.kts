@@ -69,6 +69,9 @@ dependencies {
   runtimeOnly(libs.paimonRest.s3) {
     exclude(group = "org.apache.paimon", module = "paimon-format")
   }
+  runtimeOnly("org.apache.paimon:paimon-oss:${libs.versions.paimonRest.get()}") {
+    exclude(group = "org.apache.paimon", module = "paimon-format")
+  }
   runtimeOnly(libs.postgresql.driver)
 
   testImplementation(libs.junit.jupiter.api)

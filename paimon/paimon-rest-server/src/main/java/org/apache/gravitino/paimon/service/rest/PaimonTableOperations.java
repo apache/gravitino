@@ -41,12 +41,15 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.paimon.common.PaimonCatalogWrapper;
 import org.apache.gravitino.paimon.common.PaimonCatalogWrapper.LoadedTable;
 import org.apache.gravitino.paimon.service.PaimonCatalogRequest;
 import org.apache.gravitino.paimon.service.PaimonCatalogWrapperManager.CatalogLease;
+import org.apache.gravitino.paimon.service.PaimonMetadataHooks.Change;
 import org.apache.gravitino.paimon.service.PaimonRESTUtils;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.paimon.Snapshot;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.rest.RESTApi;
@@ -122,12 +125,19 @@ public class PaimonTableOperations {
     database = RESTUtil.decodeString(database);
     Map<String, String> query = queryParameterMap(maxResults, pageToken, pattern);
     Validation.validate(query);
+    catalogs.requireSchema(
+        catalogName(rawPrefix),
+        database,
+        AuthorizationExpressionConstants.LOAD_SCHEMA_AUTHORIZATION_EXPRESSION);
     PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
     int pageSize = PaimonRESTUtils.getMaxResults(query);
+    String databaseName = database;
     List<String> page =
         PaimonRESTUtils.buildPagedEntities(
-            PaimonRESTUtils.filterBySqlLikePattern(
-                wrapper.listTables(database, tableType), pattern),
+            PaimonRESTUtils.filterBySqlLikePattern(wrapper.listTables(database, tableType), pattern)
+                .stream()
+                .filter(name -> catalogs.canReadTable(catalogName(rawPrefix), databaseName, name))
+                .collect(Collectors.toList()),
             name -> name,
             pageSize,
             pageToken);
@@ -153,7 +163,15 @@ public class PaimonTableOperations {
     database = RESTUtil.decodeString(database);
     PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
     CreateTableRequest request = PaimonRESTUtils.fromJson(body, CreateTableRequest.class);
-    wrapper.createTable(request.getIdentifier(), request.getSchema());
+    if (!database.equals(request.getIdentifier().getDatabaseName())) {
+      throw new BadRequestException("Request database differs from the URL database.");
+    }
+    catalogs.requireSchema(
+        catalogName(rawPrefix),
+        database,
+        AuthorizationExpressionConstants.CREATE_TABLE_AUTHORIZATION_EXPRESSION);
+    catalogs.createTable(
+        catalogName(rawPrefix), request.getIdentifier(), wrapper, request.getSchema());
     return Response.ok().build();
   }
 
@@ -175,12 +193,14 @@ public class PaimonTableOperations {
       @Encoded @PathParam("table") String table) {
     database = RESTUtil.decodeString(database);
     table = RESTUtil.decodeString(table);
-    PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
+    PaimonCatalogWrapper wrapper =
+        catalogs.getTableWrapper(catalogName(rawPrefix), identifier(database, table));
     Identifier identifier = identifier(database, table);
     LoadedTable loaded = wrapper.getTable(identifier);
     FileStoreTable nativeTable = loaded.table();
     Map<String, String> options = new HashMap<>(nativeTable.options());
     options.remove("path");
+    options.remove(StringIdentifier.ID_KEY);
     options.remove(PaimonCatalogWrapper.TABLE_UUID_OPTION);
     // Paimon copies the response owner into the table properties that Flink requires to be
     // non-null.
@@ -228,9 +248,14 @@ public class PaimonTableOperations {
       String body) {
     database = RESTUtil.decodeString(database);
     table = RESTUtil.decodeString(table);
+    catalogs.requireTable(
+        catalogName(rawPrefix),
+        identifier(database, table),
+        AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION);
     PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
     AlterTableRequest request = PaimonRESTUtils.fromJson(body, AlterTableRequest.class);
-    wrapper.alterTable(identifier(database, table), request.getChanges());
+    Identifier target = identifier(database, table);
+    catalogs.alterTable(catalogName(rawPrefix), target, wrapper, request.getChanges());
     return Response.ok().build();
   }
 
@@ -252,8 +277,20 @@ public class PaimonTableOperations {
       @Encoded @PathParam("table") String table) {
     database = RESTUtil.decodeString(database);
     table = RESTUtil.decodeString(table);
+    catalogs.requireTable(
+        catalogName(rawPrefix),
+        identifier(database, table),
+        AuthorizationExpressionConstants.DROP_TABLE_AUTHORIZATION_EXPRESSION);
     PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
-    wrapper.dropTable(identifier(database, table));
+    Identifier target = identifier(database, table);
+    catalogs.mutateTable(
+        Change.DROP_TABLE,
+        catalogName(rawPrefix),
+        target,
+        () -> {
+          wrapper.dropTable(target);
+          return null;
+        });
     return Response.ok().build();
   }
 
@@ -278,6 +315,10 @@ public class PaimonTableOperations {
       String body) {
     database = RESTUtil.decodeString(database);
     table = RESTUtil.decodeString(table);
+    catalogs.requireTable(
+        catalogName(rawPrefix),
+        identifier(database, table),
+        AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION);
     PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
     CommitTableRequest request = PaimonRESTUtils.fromJson(body, CommitTableRequest.class);
     boolean success =
@@ -307,6 +348,10 @@ public class PaimonTableOperations {
       @Encoded @PathParam("table") String table) {
     database = RESTUtil.decodeString(database);
     table = RESTUtil.decodeString(table);
+    catalogs.requireTable(
+        catalogName(rawPrefix),
+        identifier(database, table),
+        AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION);
     PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
     Identifier identifier = identifier(database, table);
     TableSnapshot snapshot =
@@ -344,6 +389,10 @@ public class PaimonTableOperations {
     database = RESTUtil.decodeString(database);
     table = RESTUtil.decodeString(table);
     version = RESTUtil.decodeString(version);
+    catalogs.requireTable(
+        catalogName(rawPrefix),
+        identifier(database, table),
+        AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION);
     PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
     Snapshot snapshot = wrapper.loadSnapshot(identifier(database, table), version);
     return PaimonRESTUtils.ok(new GetVersionSnapshotResponse(snapshot));
@@ -371,6 +420,10 @@ public class PaimonTableOperations {
       @QueryParam(PaimonRESTUtils.PAGE_TOKEN) String pageToken) {
     database = RESTUtil.decodeString(database);
     table = RESTUtil.decodeString(table);
+    catalogs.requireTable(
+        catalogName(rawPrefix),
+        identifier(database, table),
+        AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION);
     PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
     List<Snapshot> snapshots = wrapper.listSnapshots(identifier(database, table));
     Map<String, String> query = queryParameterMap(maxResults, pageToken, null);
@@ -405,6 +458,10 @@ public class PaimonTableOperations {
       @Encoded @PathParam("table") String table) {
     database = RESTUtil.decodeString(database);
     table = RESTUtil.decodeString(table);
+    catalogs.requireTable(
+        catalogName(rawPrefix),
+        identifier(database, table),
+        AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION);
     PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
     return PaimonRESTUtils.ok(
         new ListBranchesResponse(wrapper.listBranches(identifier(database, table))));
@@ -430,6 +487,10 @@ public class PaimonTableOperations {
       String body) {
     database = RESTUtil.decodeString(database);
     table = RESTUtil.decodeString(table);
+    catalogs.requireTable(
+        catalogName(rawPrefix),
+        identifier(database, table),
+        AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION);
     PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
     CreateBranchRequest request = PaimonRESTUtils.fromJson(body, CreateBranchRequest.class);
     wrapper.createBranch(identifier(database, table), request.branch(), request.fromTag());
@@ -457,6 +518,10 @@ public class PaimonTableOperations {
     database = RESTUtil.decodeString(database);
     table = RESTUtil.decodeString(table);
     branch = RESTUtil.decodeString(branch);
+    catalogs.requireTable(
+        catalogName(rawPrefix),
+        identifier(database, table),
+        AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION);
     PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
     wrapper.dropBranch(identifier(database, table), branch);
     return Response.ok().build();
@@ -485,6 +550,10 @@ public class PaimonTableOperations {
     database = RESTUtil.decodeString(database);
     table = RESTUtil.decodeString(table);
     branch = RESTUtil.decodeString(branch);
+    catalogs.requireTable(
+        catalogName(rawPrefix),
+        identifier(database, table),
+        AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION);
     PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
     // Paimon 1.x clients use toBranch. Paimon 2.1 no longer ships the request DTO.
     JsonNode request = PaimonRESTUtils.fromJson(body, JsonNode.class);
@@ -517,8 +586,21 @@ public class PaimonTableOperations {
     database = RESTUtil.decodeString(database);
     table = RESTUtil.decodeString(table);
     branch = RESTUtil.decodeString(branch);
+    catalogs.requireTable(
+        catalogName(rawPrefix),
+        identifier(database, table),
+        AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION);
     PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
-    wrapper.fastForwardBranch(identifier(database, table), branch);
+    Identifier target = identifier(database, table);
+    String targetBranch = branch;
+    catalogs.mutateTable(
+        Change.ALTER_TABLE,
+        catalogName(rawPrefix),
+        target,
+        () -> {
+          wrapper.fastForwardBranch(target, targetBranch);
+          return null;
+        });
     return Response.ok().build();
   }
 
@@ -552,6 +634,10 @@ public class PaimonTableOperations {
     table = RESTUtil.decodeString(table);
     Map<String, String> query = queryParameterMap(maxResults, pageToken, null);
     Validation.validate(query);
+    catalogs.requireTable(
+        catalogName(rawPrefix),
+        identifier(database, table),
+        AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION);
     PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
     int pageSize = PaimonRESTUtils.getMaxResults(query);
     List<String> tags = wrapper.listTags(identifier(database, table));
@@ -585,6 +671,10 @@ public class PaimonTableOperations {
     database = RESTUtil.decodeString(database);
     table = RESTUtil.decodeString(table);
     tag = RESTUtil.decodeString(tag);
+    catalogs.requireTable(
+        catalogName(rawPrefix),
+        identifier(database, table),
+        AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION);
     PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
     Tag metadata = wrapper.getTag(identifier(database, table), tag);
     Long createdAt =
@@ -617,6 +707,10 @@ public class PaimonTableOperations {
       String body) {
     database = RESTUtil.decodeString(database);
     table = RESTUtil.decodeString(table);
+    catalogs.requireTable(
+        catalogName(rawPrefix),
+        identifier(database, table),
+        AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION);
     PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
     CreateTagRequest request = PaimonRESTUtils.fromJson(body, CreateTagRequest.class);
     wrapper.createTag(
@@ -648,6 +742,10 @@ public class PaimonTableOperations {
     database = RESTUtil.decodeString(database);
     table = RESTUtil.decodeString(table);
     tag = RESTUtil.decodeString(tag);
+    catalogs.requireTable(
+        catalogName(rawPrefix),
+        identifier(database, table),
+        AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION);
     PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
     wrapper.deleteTag(identifier(database, table), tag);
     return Response.ok().build();
@@ -677,23 +775,34 @@ public class PaimonTableOperations {
       String body) {
     database = RESTUtil.decodeString(database);
     table = RESTUtil.decodeString(table);
+    catalogs.requireTable(
+        catalogName(rawPrefix),
+        identifier(database, table),
+        AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION);
     PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
     RollbackTableRequest request = PaimonRESTUtils.fromJson(body, RollbackTableRequest.class);
     Identifier identifier = identifier(database, table);
     Instant instant = request.getInstant();
-    if (instant instanceof Instant.SnapshotInstant) {
-      wrapper.rollbackTable(
-          identifier,
-          ((Instant.SnapshotInstant) instant).getSnapshotId(),
-          request.getFromSnapshot());
-    } else if (instant instanceof Instant.TagInstant) {
-      wrapper.rollbackTableToTag(
-          identifier, ((Instant.TagInstant) instant).getTagName(), request.getFromSnapshot());
-    } else {
-      throw new BadRequestException(
-          "Unsupported rollback instant type: "
-              + (instant == null ? "null" : instant.getClass().getSimpleName()));
-    }
+    catalogs.mutateTable(
+        Change.ALTER_TABLE,
+        catalogName(rawPrefix),
+        identifier,
+        () -> {
+          if (instant instanceof Instant.SnapshotInstant) {
+            wrapper.rollbackTable(
+                identifier,
+                ((Instant.SnapshotInstant) instant).getSnapshotId(),
+                request.getFromSnapshot());
+          } else if (instant instanceof Instant.TagInstant) {
+            wrapper.rollbackTableToTag(
+                identifier, ((Instant.TagInstant) instant).getTagName(), request.getFromSnapshot());
+          } else {
+            throw new BadRequestException(
+                "Unsupported rollback instant type: "
+                    + (instant == null ? "null" : instant.getClass().getSimpleName()));
+          }
+          return null;
+        });
     return Response.ok().build();
   }
 
@@ -729,6 +838,11 @@ public class PaimonTableOperations {
       @Encoded @PathParam("table") String table) {
     database = RESTUtil.decodeString(database);
     table = RESTUtil.decodeString(table);
+    catalogs.requireTable(
+        catalogName(rawPrefix),
+        identifier(database, table),
+        AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION);
+    catalogs.requireCredentials(catalogName(rawPrefix));
     CatalogLease lease = catalogs.acquire(catalogName(rawPrefix));
     PaimonCatalogWrapper wrapper = lease.wrapper();
     Map<String, String> options = wrapper.catalogOptions().toMap();
@@ -744,8 +858,10 @@ public class PaimonTableOperations {
             storageOptions.put(key, value);
           }
         });
-    long expiresAtMillis =
-        System.currentTimeMillis() + 2 * RESTApi.TOKEN_EXPIRATION_SAFE_TIME_MILLIS;
+    long expiresAtMillis = lease.expiresAtMillis();
+    if (expiresAtMillis == 0) {
+      expiresAtMillis = System.currentTimeMillis() + 2 * RESTApi.TOKEN_EXPIRATION_SAFE_TIME_MILLIS;
+    }
     return PaimonRESTUtils.ok(new GetTableTokenResponse(storageOptions, expiresAtMillis));
   }
 

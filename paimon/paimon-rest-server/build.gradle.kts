@@ -110,6 +110,8 @@ configurations.testImplementation { extendsFrom(engineTestRuntime) }
 
 dependencies {
   implementation(project(":api"))
+  implementation(project(":clients:client-java"))
+  implementation(project(":catalogs:catalog-common"))
   implementation(project(":core")) {
     exclude("*")
   }
@@ -131,6 +133,20 @@ dependencies {
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.metrics.jersey2)
+  runtimeOnly(project(":bundles:aws")) {
+    exclude("*")
+  }
+  runtimeOnly(project(":bundles:aliyun")) {
+    exclude("*")
+  }
+  runtimeOnly(libs.aws.sts)
+  runtimeOnly(libs.aws.policy)
+  runtimeOnly(libs.aliyun.credentials.sdk) {
+    exclude(group = "org.jacoco", module = "org.jacoco.agent")
+    // Aliyun's request signer uses JAXB's API. Its legacy implementation activates Jersey WADL.
+    exclude(group = "com.sun.xml.bind", module = "jaxb-core")
+    exclude(group = "com.sun.xml.bind", module = "jaxb-impl")
+  }
 
   testImplementation(project(":core", "testArtifacts"))
   testCompileOnly("org.apache.paimon:paimon-spark-3.5_$sparkTestScalaVersion:$paimonVersion") {
@@ -159,6 +175,8 @@ dependencies {
   engineTestRuntime(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.inline)
+  testImplementation(libs.aws.sts)
+  testImplementation(libs.aliyun.credentials.sdk)
   testImplementation(libs.sqlite.jdbc)
   testRuntimeOnly(libs.junit.jupiter.engine)
 

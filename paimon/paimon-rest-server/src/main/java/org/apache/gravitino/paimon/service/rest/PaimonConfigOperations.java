@@ -36,6 +36,7 @@ import org.apache.gravitino.paimon.common.PaimonCatalogWrapper;
 import org.apache.gravitino.paimon.service.PaimonCatalogRequest;
 import org.apache.gravitino.paimon.service.PaimonCatalogWrapperManager;
 import org.apache.gravitino.paimon.service.PaimonRESTUtils;
+import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.rest.responses.ConfigResponse;
 
@@ -84,6 +85,14 @@ public class PaimonConfigOperations {
     String warehouseValue = options.get(WAREHOUSE_KEY);
     if (warehouseValue != null) {
       defaults.put(WAREHOUSE_KEY, warehouseValue);
+    }
+    if (options.toMap().keySet().stream()
+        .anyMatch(
+            key ->
+                key.startsWith(CLIENT_CONFIG_PREFIX)
+                    && SecretPropertyUtils.isSensitivePropertyKey(
+                        key.substring(CLIENT_CONFIG_PREFIX.length())))) {
+      catalogs.requireCredentials(catalogName);
     }
     options.toMap().entrySet().stream()
         .filter(entry -> entry.getKey().startsWith(CLIENT_CONFIG_PREFIX))

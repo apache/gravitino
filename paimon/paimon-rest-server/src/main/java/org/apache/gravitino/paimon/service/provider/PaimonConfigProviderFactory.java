@@ -34,13 +34,29 @@ public class PaimonConfigProviderFactory {
    * @return the provider
    */
   public static PaimonConfigProvider create(Map<String, String> properties) {
+    return create(properties, false);
+  }
+
+  /**
+   * Creates a provider for the deployment mode.
+   *
+   * @param properties service configuration
+   * @param auxiliary whether the service runs inside Gravitino
+   * @return initialized provider
+   */
+  public static PaimonConfigProvider create(Map<String, String> properties, boolean auxiliary) {
     String providerName =
         properties.getOrDefault(CATALOG_CONFIG_PROVIDER, "static-config-provider");
+    if ("dynamic-config-provider".equals(providerName)) {
+      PaimonConfigProvider provider = new DynamicPaimonConfigProvider(auxiliary);
+      provider.initialize(properties);
+      return provider;
+    }
     if (!"static-config-provider".equals(providerName)) {
       throw new IllegalArgumentException(
           "Unsupported catalog-config-provider: "
               + providerName
-              + ". This service supports static-config-provider.");
+              + ". Use static-config-provider or dynamic-config-provider.");
     }
     PaimonConfigProvider provider = new StaticPaimonConfigProvider();
     provider.initialize(properties);

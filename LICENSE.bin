@@ -279,6 +279,10 @@
    AWS SDK for Java 2.0 Annotations
    AWS SDK for Java 2.0
    AWS EventStream for Java
+   Alibaba Cloud Credentials Java SDK
+   Alibaba Cloud Tea
+   Kotlin Standard Library
+   JetBrains Annotations
    The Netty Project
    Open Telemetry
    Open Lineage
@@ -514,6 +518,8 @@
    JSR 374 (JSON Processing) Default Provider
    JavaServlet
    Eclipse Jersey
+   JAXB API 2.3.0
+   (see licenses/paimon-rest-thirdparty.txt)
 
    This product bundles various third-party components also under the
    Eclipse Public License 1.0
@@ -559,6 +565,7 @@
    Mozilla Public License
 
    Javassist
+   Public Suffix List (bundled in OkHttp, see licenses/MPL.txt)
 
    This product bundles various third-party components also placed in
    the public domain.
@@ -600,3 +607,9 @@ For the MIT No Attribution license of Reactive Streams, see licenses/reactive-st
 
    Third-party license texts for Paimon REST runtime bundles, including nested
    code generation libraries, are reproduced in licenses/paimon-rest-thirdparty.txt.
+
+Reactive Streams 1.0.4, included in the Paimon REST runtime, is distributed
+under the MIT No Attribution license, reproduced in licenses/paimon-rest-thirdparty.txt.
+
+Apache Paimon OSS 2.1.0 bundles storage dependencies and their license texts.
+See licenses/paimon-rest-thirdparty.txt for the complete upstream attachments.

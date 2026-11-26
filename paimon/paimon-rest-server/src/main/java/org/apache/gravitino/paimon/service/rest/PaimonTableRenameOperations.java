@@ -42,6 +42,7 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.paimon.common.PaimonCatalogWrapper;
 import org.apache.gravitino.paimon.service.PaimonCatalogRequest;
 import org.apache.gravitino.paimon.service.PaimonRESTUtils;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.rest.RESTApi;
 import org.apache.paimon.rest.RESTUtil;
@@ -77,7 +78,19 @@ public class PaimonTableRenameOperations {
       @Encoded @PathParam("prefix") @DefaultValue("") String rawPrefix, String body) {
     PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
     RenameTableRequest request = PaimonRESTUtils.fromJson(body, RenameTableRequest.class);
-    wrapper.renameTable(request.getSource(), request.getDestination());
+    catalogs.requireTable(
+        catalogName(rawPrefix),
+        request.getSource(),
+        AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION);
+    catalogs.requireSchema(
+        catalogName(rawPrefix),
+        request.getDestination().getDatabaseName(),
+        AuthorizationExpressionConstants.CREATE_TABLE_AUTHORIZATION_EXPRESSION);
+    catalogs.renameTable(
+        catalogName(rawPrefix),
+        request.getSource(),
+        request.getDestination(),
+        () -> wrapper.renameTable(request.getSource(), request.getDestination()));
     return Response.ok().build();
   }
 
@@ -110,10 +123,15 @@ public class PaimonTableRenameOperations {
     List<Identifier> allTables = new ArrayList<>();
     for (String databaseName :
         PaimonRESTUtils.filterBySqlLikePattern(wrapper.listDatabases(), databaseNamePattern)) {
+      if (!catalogs.canReadSchema(catalogName(rawPrefix), databaseName)) {
+        continue;
+      }
       for (String tableName :
           PaimonRESTUtils.filterBySqlLikePattern(
               wrapper.listTables(databaseName), tableNamePattern)) {
-        allTables.add(Identifier.create(databaseName, tableName));
+        if (catalogs.canReadTable(catalogName(rawPrefix), databaseName, tableName)) {
+          allTables.add(Identifier.create(databaseName, tableName));
+        }
       }
     }
     int pageSize = PaimonRESTUtils.getMaxResults(query);

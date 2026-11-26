@@ -78,6 +78,14 @@ public class TableHookDispatcher implements TableDispatcher {
     return dispatcher.importTable(ident, auditInfo);
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public Table importTable(
+      NameIdentifier ident, AuditInfo auditInfo, Map<String, String> columnNameChanges)
+      throws NoSuchTableException {
+    return dispatcher.importTable(ident, auditInfo, columnNameChanges);
+  }
+
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
     return dispatcher.listTables(namespace);

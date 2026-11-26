@@ -34,10 +34,12 @@ import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
 import org.apache.gravitino.paimon.service.PaimonAuthenticationFilter;
+import org.apache.gravitino.paimon.service.PaimonAuthorization;
 import org.apache.gravitino.paimon.service.PaimonCatalogRequest;
 import org.apache.gravitino.paimon.service.PaimonCatalogWrapperManager;
 import org.apache.gravitino.paimon.service.PaimonExceptionMapper;
 import org.apache.gravitino.paimon.service.PaimonHealthCheckPathMatcher;
+import org.apache.gravitino.paimon.service.PaimonMetadataHooks;
 import org.apache.gravitino.server.web.ClientAddressResolver;
 import org.apache.gravitino.server.web.HealthAliasServlet;
 import org.apache.gravitino.server.web.HttpAuditFilter;
@@ -72,7 +74,8 @@ public class RESTService implements GravitinoAuxiliaryService {
   private JettyServer server;
   private PaimonCatalogWrapperManager catalogWrapperManager;
 
-  private void initServer(PaimonConfig paimonConfig) {
+  private void initServer(
+      PaimonConfig paimonConfig, boolean auxiliary, boolean authorizationEnabled) {
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(paimonConfig);
     server =
         new JettyServer() {
@@ -89,12 +92,26 @@ public class RESTService implements GravitinoAuxiliaryService {
     config.register(JacksonFeature.withoutExceptionMappers());
     config.register(PaimonExceptionMapper.class);
 
-    this.catalogWrapperManager = new PaimonCatalogWrapperManager(paimonConfig);
+    this.catalogWrapperManager = new PaimonCatalogWrapperManager(paimonConfig, auxiliary);
     config.register(
         new AbstractBinder() {
           @Override
           protected void configure() {
             bind(catalogWrapperManager).to(PaimonCatalogWrapperManager.class).ranked(1);
+            bind(new PaimonAuthorization(
+                    authorizationEnabled,
+                    paimonConfig
+                        .getAllConfig()
+                        .getOrDefault("gravitino-metalake", "default_metalake")))
+                .to(PaimonAuthorization.class);
+            bind(new PaimonMetadataHooks(
+                    auxiliary
+                        && "dynamic-config-provider"
+                            .equals(paimonConfig.getAllConfig().get("catalog-config-provider")),
+                    paimonConfig
+                        .getAllConfig()
+                        .getOrDefault("gravitino-metalake", "default_metalake")))
+                .to(PaimonMetadataHooks.class);
             bindAsContract(PaimonCatalogRequest.class);
           }
         });
@@ -150,14 +167,18 @@ public class RESTService implements GravitinoAuxiliaryService {
 
   @Override
   public void serviceInit(Map<String, String> properties, boolean auxMode) {
+    boolean authorizationEnabled = false;
     if (auxMode) {
       Config config = GravitinoEnv.getInstance().config();
+      Preconditions.checkState(config != null, "Gravitino must be initialized for auxiliary mode");
+      authorizationEnabled = config.get(Configs.ENABLE_AUTHORIZATION);
       Preconditions.checkState(
-          config != null && !config.get(Configs.ENABLE_AUTHORIZATION),
-          "Paimon REST auxiliary service requires Gravitino authorization to be disabled.");
+          !authorizationEnabled
+              || "dynamic-config-provider".equals(properties.get("catalog-config-provider")),
+          "Gravitino authorization requires dynamic-config-provider to resolve registered catalogs.");
     }
     PaimonConfig paimonConfig = new PaimonConfig(properties);
-    initServer(paimonConfig);
+    initServer(paimonConfig, auxMode, authorizationEnabled);
     LOG.info("Paimon REST service init. Running in {} mode", auxMode ? "auxiliary" : "standalone");
   }
 

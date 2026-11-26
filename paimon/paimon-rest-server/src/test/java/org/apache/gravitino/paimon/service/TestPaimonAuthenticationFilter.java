@@ -19,9 +19,11 @@
 package org.apache.gravitino.paimon.service;
 
 import static org.mockito.Mockito.argThat;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -45,11 +47,37 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authentication.OAuthConfig;
 import org.apache.gravitino.server.authentication.ServerAuthenticator;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.paimon.rest.exceptions.NotAuthorizedException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestPaimonAuthenticationFilter {
+
+  @Test
+  void testStaticTokenPreservesActiveRolesAndRejectsMalformedRoles() throws Exception {
+    PaimonAuthenticationFilter filter = new PaimonAuthenticationFilter("local-token");
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    FilterChain chain = mock(FilterChain.class);
+    when(request.getHeader("Authorization")).thenReturn("Bearer local-token");
+    when(request.getHeader(AuthConstants.X_GRAVITINO_ACTIVE_ROLES_HEADER)).thenReturn("NONE");
+    doAnswer(
+            invocation -> {
+              UserPrincipal principal = (UserPrincipal) PrincipalUtils.getCurrentPrincipal();
+              Assertions.assertTrue(principal.getActiveRoles().isNone());
+              return null;
+            })
+        .when(chain)
+        .doFilter(request, response);
+    filter.doFilter(request, response, chain);
+    verify(chain).doFilter(request, response);
+    when(request.getHeader(AuthConstants.X_GRAVITINO_ACTIVE_ROLES_HEADER)).thenReturn("ALL,reader");
+    when(response.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
+    filter.doFilter(request, response, chain);
+    verify(response).setStatus(400);
+    verify(chain, times(1)).doFilter(request, response);
+  }
 
   @Test
   void testDelegatedOAuthValidationAndCallerIdentity() throws Exception {

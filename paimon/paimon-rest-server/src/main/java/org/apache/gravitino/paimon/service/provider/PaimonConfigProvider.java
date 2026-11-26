@@ -22,8 +22,9 @@ import java.io.Closeable;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 
-/** Provides static backend configuration for a REST-visible catalog name. */
+/** Resolves backend configuration for a REST-visible catalog name. */
 public interface PaimonConfigProvider extends Closeable {
 
   /**
@@ -49,9 +50,24 @@ public interface PaimonConfigProvider extends Closeable {
    */
   Set<String> catalogNames();
 
+  /**
+   * @return the Gravitino metalake for a dynamic provider, or empty for static configuration
+   */
+  default Optional<String> getMetalakeName() {
+    return Optional.empty();
+  }
+
+  /**
+   * Registers invalidation of a changed or deleted catalog in auxiliary mode.
+   *
+   * @param listener callback receiving the REST catalog name
+   */
+  default void addInvalidationListener(Consumer<String> listener) {}
+
   /** Backend options for a statically configured catalog. */
   final class CatalogConfig {
     private final Map<String, String> properties;
+    private final long expiresAtMillis;
 
     /**
      * Creates the resolved catalog configuration.
@@ -59,7 +75,25 @@ public interface PaimonConfigProvider extends Closeable {
      * @param properties backend catalog options
      */
     public CatalogConfig(Map<String, String> properties) {
+      this(properties, 0);
+    }
+
+    /**
+     * Creates configuration with the real storage credential expiry.
+     *
+     * @param properties backend options
+     * @param expiresAtMillis earliest expiry in epoch milliseconds, or zero for static keys
+     */
+    public CatalogConfig(Map<String, String> properties, long expiresAtMillis) {
       this.properties = Map.copyOf(properties);
+      this.expiresAtMillis = expiresAtMillis;
+    }
+
+    /**
+     * @return earliest credential expiry in epoch milliseconds, or zero for static keys
+     */
+    public long expiresAtMillis() {
+      return expiresAtMillis;
     }
 
     /**

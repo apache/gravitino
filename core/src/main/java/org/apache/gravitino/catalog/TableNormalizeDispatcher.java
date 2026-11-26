@@ -62,6 +62,17 @@ public class TableNormalizeDispatcher implements TableDispatcher {
         resolvePhysicalTableName(normalizeCaseSensitive(ident), catalogManager), auditInfo);
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public Table importTable(
+      NameIdentifier ident, AuditInfo auditInfo, Map<String, String> columnNameChanges)
+      throws NoSuchTableException {
+    return dispatcher.importTable(
+        resolvePhysicalTableName(normalizeCaseSensitive(ident), catalogManager),
+        auditInfo,
+        columnNameChanges);
+  }
+
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
     // The constraints of the name spec may be more strict than underlying catalog,

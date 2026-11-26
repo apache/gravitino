@@ -20,23 +20,33 @@ package org.apache.gravitino.paimon.service;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.time.Clock;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import javax.annotation.Nullable;
 import org.apache.gravitino.paimon.PaimonConfig;
 import org.apache.gravitino.paimon.common.PaimonCatalogOptions;
 import org.apache.gravitino.paimon.common.PaimonCatalogWrapper;
 import org.apache.gravitino.paimon.service.provider.PaimonConfigProvider;
 import org.apache.gravitino.paimon.service.provider.PaimonConfigProvider.CatalogConfig;
 import org.apache.gravitino.paimon.service.provider.PaimonConfigProviderFactory;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.paimon.options.Options;
+import org.apache.paimon.rest.RESTApi;
 import org.apache.paimon.rest.exceptions.NoSuchResourceException;
+import org.apache.paimon.rest.exceptions.ServiceUnavailableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Resolves static catalog configurations and shares backend catalogs across requests. Active
- * requests retain their backend until they finish, including during service shutdown.
+ * Resolves catalog configurations and shares backend catalogs across requests. Active requests
+ * retain their backend until they finish, including during service shutdown.
  */
 public class PaimonCatalogWrapperManager implements Closeable {
 
@@ -46,7 +56,12 @@ public class PaimonCatalogWrapperManager implements Closeable {
   public static final String DEFAULT_CATALOG_NAME = "default_catalog";
 
   private final PaimonConfigProvider configProvider;
-  private final ConcurrentMap<String, ManagedCatalog> catalogs = new ConcurrentHashMap<>();
+  private final Clock clock;
+  private final long cacheTtlMillis;
+  @Nullable private final ScheduledExecutorService cleaner;
+  private final ReentrantReadWriteLock lifecycle = new ReentrantReadWriteLock();
+  private boolean closed;
+  private final ConcurrentMap<CatalogKey, ManagedCatalog> catalogs = new ConcurrentHashMap<>();
 
   /**
    * Creates the manager with the provider selected by the service configuration.
@@ -54,11 +69,49 @@ public class PaimonCatalogWrapperManager implements Closeable {
    * @param config the service configuration
    */
   public PaimonCatalogWrapperManager(PaimonConfig config) {
-    this(PaimonConfigProviderFactory.create(config.getAllConfig()));
+    this(config, false);
+  }
+
+  /**
+   * Creates a manager for the deployment mode.
+   *
+   * @param config service options
+   * @param auxiliary whether the service runs inside Gravitino
+   */
+  public PaimonCatalogWrapperManager(PaimonConfig config, boolean auxiliary) {
+    this(
+        PaimonConfigProviderFactory.create(config.getAllConfig(), auxiliary),
+        Clock.systemUTC(),
+        Long.parseLong(config.getAllConfig().getOrDefault("catalog-cache-ttl-ms", "30000")));
   }
 
   PaimonCatalogWrapperManager(PaimonConfigProvider configProvider) {
+    this(configProvider, Clock.systemUTC(), 30000);
+  }
+
+  PaimonCatalogWrapperManager(
+      PaimonConfigProvider configProvider, Clock clock, long cacheTtlMillis) {
+    if (cacheTtlMillis <= 0) {
+      throw new IllegalArgumentException("catalog-cache-ttl-ms must be positive");
+    }
     this.configProvider = configProvider;
+    this.clock = clock;
+    this.cacheTtlMillis = cacheTtlMillis;
+    configProvider.addInvalidationListener(this::invalidate);
+    if (configProvider.getMetalakeName().isPresent()) {
+      cleaner =
+          Executors.newSingleThreadScheduledExecutor(
+              task -> {
+                Thread thread = new Thread(task, "paimon-rest-catalog-cleaner");
+                thread.setDaemon(true);
+                return thread;
+              });
+      long interval = Math.min(cacheTtlMillis, TimeUnit.MINUTES.toMillis(1));
+      cleaner.scheduleWithFixedDelay(
+          this::cleanUpExpiredCatalogs, interval, interval, TimeUnit.MILLISECONDS);
+    } else {
+      cleaner = null;
+    }
   }
 
   /**
@@ -68,15 +121,58 @@ public class PaimonCatalogWrapperManager implements Closeable {
    * @return the catalog lease
    */
   public CatalogLease acquire(String catalogName) {
-    ManagedCatalog catalog =
-        catalogs.compute(
-            catalogName,
-            (name, current) -> {
-              ManagedCatalog selected = current == null ? loadCatalog(name) : current;
-              selected.retain();
-              return selected;
-            });
-    return new CatalogLease(catalog);
+    lifecycle.readLock().lock();
+    try {
+      if (closed) {
+        throw new IllegalStateException("Paimon catalog manager is closed");
+      }
+      CatalogKey key =
+          new CatalogKey(
+              catalogName,
+              configProvider.getMetalakeName().isPresent()
+                  ? PrincipalUtils.getCurrentUserName()
+                  : "");
+      ManagedCatalog catalog =
+          catalogs.compute(
+              key,
+              (ignored, current) -> {
+                ManagedCatalog selected = current;
+                if (current == null || clock.millis() >= current.refreshAtMillis) {
+                  selected = loadCatalog(catalogName);
+                  if (current != null) {
+                    current.retire();
+                  }
+                }
+                selected.retain();
+                return selected;
+              });
+      return new CatalogLease(catalog);
+    } finally {
+      lifecycle.readLock().unlock();
+    }
+  }
+
+  /**
+   * Invalidates every caller's cached configuration for a changed or deleted catalog.
+   *
+   * @param catalogName the registered catalog name
+   */
+  public void invalidate(String catalogName) {
+    lifecycle.readLock().lock();
+    try {
+      catalogs.keySet().stream()
+          .filter(key -> key.name.equals(catalogName))
+          .forEach(
+              key ->
+                  catalogs.computeIfPresent(
+                      key,
+                      (ignored, current) -> {
+                        current.retire();
+                        return null;
+                      }));
+    } finally {
+      lifecycle.readLock().unlock();
+    }
   }
 
   /**
@@ -86,9 +182,46 @@ public class PaimonCatalogWrapperManager implements Closeable {
    */
   @Override
   public void close() throws IOException {
-    catalogs.values().forEach(ManagedCatalog::retire);
-    catalogs.clear();
-    configProvider.close();
+    lifecycle.writeLock().lock();
+    try {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      if (cleaner != null) {
+        cleaner.shutdownNow();
+      }
+      catalogs.values().forEach(ManagedCatalog::retire);
+      catalogs.clear();
+      configProvider.close();
+    } finally {
+      lifecycle.writeLock().unlock();
+    }
+  }
+
+  /** Retires idle dynamic backends as their fixed lifetime or credential refresh time elapses. */
+  void cleanUpExpiredCatalogs() {
+    lifecycle.readLock().lock();
+    try {
+      if (closed) {
+        return;
+      }
+      catalogs
+          .keySet()
+          .forEach(
+              key ->
+                  catalogs.computeIfPresent(
+                      key,
+                      (ignored, current) -> {
+                        if (clock.millis() >= current.refreshAtMillis) {
+                          current.retire();
+                          return null;
+                        }
+                        return current;
+                      }));
+    } finally {
+      lifecycle.readLock().unlock();
+    }
   }
 
   private ManagedCatalog loadCatalog(String name) {
@@ -98,14 +231,31 @@ public class PaimonCatalogWrapperManager implements Closeable {
             .orElseThrow(
                 () -> new NoSuchResourceException("catalog", name, "Catalog does not exist."));
     Options options = PaimonCatalogOptions.fromProperties(config.properties());
-    if (options.getBoolean("data-token.enabled", false)
+    boolean dataTokens = options.getBoolean("data-token.enabled", false);
+    if (dataTokens
+        && config.expiresAtMillis() == 0
         && (options.containsKey("s3.session-token")
             || options.containsKey("fs.oss.securityToken"))) {
       throw new IllegalArgumentException(
           "Static data-token catalogs require long-lived storage keys. Temporary S3/OSS session "
               + "credentials require a provider that supplies their actual expiry and refreshes them.");
     }
-    return new ManagedCatalog(new PaimonCatalogWrapper(name, options));
+    long now = clock.millis();
+    long expiry = config.expiresAtMillis();
+    long safetyWindow =
+        TimeUnit.MINUTES.toMillis(1) + (dataTokens ? RESTApi.TOKEN_EXPIRATION_SAFE_TIME_MILLIS : 0);
+    if (expiry != 0 && expiry - now <= safetyWindow) {
+      throw new ServiceUnavailableException(
+          "Paimon catalog credentials have insufficient remaining lifetime. Configure "
+              + "s3-token-expire-in-secs / oss-token-expire-in-secs well above 3600 seconds "
+              + "and allow headroom for the Gravitino credential cache.");
+    }
+    long refreshAt =
+        configProvider.getMetalakeName().isPresent() ? now + cacheTtlMillis : Long.MAX_VALUE;
+    if (expiry != 0) {
+      refreshAt = Math.min(refreshAt, expiry - safetyWindow);
+    }
+    return new ManagedCatalog(new PaimonCatalogWrapper(name, options), expiry, refreshAt);
   }
 
   /** Keeps the resolved backend available during a request. */
@@ -124,6 +274,13 @@ public class PaimonCatalogWrapperManager implements Closeable {
       return catalog.wrapper;
     }
 
+    /**
+     * @return the actual storage credential expiry, or zero for long-lived keys
+     */
+    public long expiresAtMillis() {
+      return catalog.expiresAtMillis;
+    }
+
     /** Releases the request's reference to the backend. */
     @Override
     public void close() {
@@ -133,13 +290,43 @@ public class PaimonCatalogWrapperManager implements Closeable {
     }
   }
 
+  private static final class CatalogKey {
+    private final String name;
+    private final String principal;
+
+    private CatalogKey(String name, String principal) {
+      this.name = name;
+      this.principal = principal;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (!(other instanceof CatalogKey)) {
+        return false;
+      }
+      CatalogKey key = (CatalogKey) other;
+      return name.equals(key.name) && principal.equals(key.principal);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(name, principal);
+    }
+  }
+
   private static final class ManagedCatalog {
     private final PaimonCatalogWrapper wrapper;
+    private final long expiresAtMillis;
+    private final long refreshAtMillis;
     private int references;
+    private boolean backendClosed;
     private boolean retired;
 
-    private ManagedCatalog(PaimonCatalogWrapper wrapper) {
+    private ManagedCatalog(
+        PaimonCatalogWrapper wrapper, long expiresAtMillis, long refreshAtMillis) {
       this.wrapper = wrapper;
+      this.expiresAtMillis = expiresAtMillis;
+      this.refreshAtMillis = refreshAtMillis;
     }
 
     private synchronized void retain() {
@@ -157,7 +344,8 @@ public class PaimonCatalogWrapperManager implements Closeable {
     }
 
     private void closeIfRetired() {
-      if (retired && references == 0) {
+      if (retired && references == 0 && !backendClosed) {
+        backendClosed = true;
         try {
           wrapper.close();
         } catch (Exception e) {

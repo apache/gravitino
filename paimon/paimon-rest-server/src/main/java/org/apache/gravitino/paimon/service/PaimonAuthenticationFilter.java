@@ -32,6 +32,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.ActiveRolesParser;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.auth.IllegalActiveRolesException;
 import org.apache.gravitino.exceptions.ForbiddenException;
@@ -142,9 +143,14 @@ public class PaimonAuthenticationFilter extends AuthenticationFilter {
       String principal =
           tokensByPrincipal.getOrDefault(
               token, expectedBearerToken.isPresent() ? SHARED_PRINCIPAL : token);
-      UserPrincipal userPrincipal = new UserPrincipal(principal);
-      httpRequest.setAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME, userPrincipal);
       try {
+        UserPrincipal userPrincipal =
+            new UserPrincipal(principal)
+                .withActiveRoles(
+                    ActiveRolesParser.parse(
+                        httpRequest.getHeader(AuthConstants.X_GRAVITINO_ACTIVE_ROLES_HEADER)));
+        httpRequest.setAttribute(
+            AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME, userPrincipal);
         PrincipalUtils.doAs(
             userPrincipal,
             () -> {
@@ -154,7 +160,7 @@ public class PaimonAuthenticationFilter extends AuthenticationFilter {
       } catch (IOException | ServletException e) {
         // Failures of the downstream processing are not authentication problems.
         throw e;
-      } catch (UnauthorizedException e) {
+      } catch (UnauthorizedException | IllegalActiveRolesException e) {
         sendAuthErrorResponse(httpResponse, e);
       } catch (Exception e) {
         // Downstream errors are not authentication problems and their messages may contain

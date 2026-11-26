@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.ws.rs.DELETE;
@@ -41,7 +42,9 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.paimon.common.PaimonCatalogWrapper;
 import org.apache.gravitino.paimon.service.PaimonCatalogRequest;
 import org.apache.gravitino.paimon.service.PaimonCatalogWrapperManager;
+import org.apache.gravitino.paimon.service.PaimonMetadataHooks.Change;
 import org.apache.gravitino.paimon.service.PaimonRESTUtils;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.paimon.catalog.Database;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.rest.RESTUtil;
@@ -90,7 +93,9 @@ public class PaimonDatabaseOperations {
     PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
 
     List<String> databases =
-        PaimonRESTUtils.filterBySqlLikePattern(wrapper.listDatabases(), pattern);
+        PaimonRESTUtils.filterBySqlLikePattern(wrapper.listDatabases(), pattern).stream()
+            .filter(database -> catalogs.canReadSchema(catalogName(rawPrefix), database))
+            .collect(Collectors.toList());
     int pageSize = PaimonRESTUtils.getMaxResults(query);
     List<String> page =
         PaimonRESTUtils.buildPagedEntities(databases, name -> name, pageSize, pageToken);
@@ -112,7 +117,18 @@ public class PaimonDatabaseOperations {
       @Encoded @PathParam("prefix") @DefaultValue("") String rawPrefix, String body) {
     PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
     CreateDatabaseRequest request = PaimonRESTUtils.fromJson(body, CreateDatabaseRequest.class);
-    wrapper.createDatabase(request.getName(), request.getOptions());
+    catalogs.requireSchema(
+        catalogName(rawPrefix),
+        request.getName(),
+        "ANY(OWNER, METALAKE, CATALOG, SCHEMA) || ANY_USE_CATALOG && ANY_CREATE_SCHEMA");
+    catalogs.mutateSchema(
+        Change.CREATE_SCHEMA,
+        catalogName(rawPrefix),
+        request.getName(),
+        () -> {
+          wrapper.createDatabase(request.getName(), request.getOptions());
+          return null;
+        });
     return Response.ok().build();
   }
 
@@ -131,7 +147,7 @@ public class PaimonDatabaseOperations {
       @Encoded @PathParam("prefix") @DefaultValue("") String rawPrefix,
       @Encoded @PathParam("database") String database) {
     database = RESTUtil.decodeString(database);
-    PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
+    PaimonCatalogWrapper wrapper = catalogs.getSchemaWrapper(catalogName(rawPrefix), database);
     Database metadata = wrapper.getDatabase(database);
     String id = UUID.nameUUIDFromBytes(database.getBytes(StandardCharsets.UTF_8)).toString();
     return PaimonRESTUtils.ok(
@@ -156,10 +172,19 @@ public class PaimonDatabaseOperations {
       @Encoded @PathParam("database") String database,
       String body) {
     database = RESTUtil.decodeString(database);
+    catalogs.requireSchema(
+        catalogName(rawPrefix),
+        database,
+        "ANY(OWNER, METALAKE, CATALOG) || SCHEMA_OWNER_WITH_USE_CATALOG");
     PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
     AlterDatabaseRequest request = PaimonRESTUtils.fromJson(body, AlterDatabaseRequest.class);
+    String databaseName = database;
     PaimonCatalogWrapper.AlterDatabaseResult result =
-        wrapper.alterDatabase(database, request.getRemovals(), request.getUpdates());
+        catalogs.mutateSchema(
+            Change.ALTER_SCHEMA,
+            catalogName(rawPrefix),
+            databaseName,
+            () -> wrapper.alterDatabase(databaseName, request.getRemovals(), request.getUpdates()));
     return PaimonRESTUtils.ok(
         new AlterDatabaseResponse(result.removed(), result.updated(), result.missing()));
   }
@@ -187,7 +212,22 @@ public class PaimonDatabaseOperations {
     if (identifier.getDatabaseName() == null) {
       identifier = Identifier.create(database, identifier.getObjectName());
     }
-    wrapper.registerTable(identifier, request.getPath());
+    if (!database.equals(identifier.getDatabaseName())) {
+      throw new BadRequestException("Request database differs from the URL database.");
+    }
+    catalogs.requireSchema(
+        catalogName(rawPrefix),
+        database,
+        AuthorizationExpressionConstants.CREATE_TABLE_AUTHORIZATION_EXPRESSION);
+    Identifier target = identifier;
+    catalogs.mutateTable(
+        Change.CREATE_TABLE,
+        catalogName(rawPrefix),
+        target,
+        () -> {
+          wrapper.registerTable(target, request.getPath());
+          return null;
+        });
     return Response.ok().build();
   }
 
@@ -206,8 +246,20 @@ public class PaimonDatabaseOperations {
       @Encoded @PathParam("prefix") @DefaultValue("") String rawPrefix,
       @Encoded @PathParam("database") String database) {
     database = RESTUtil.decodeString(database);
+    catalogs.requireSchema(
+        catalogName(rawPrefix),
+        database,
+        "ANY(OWNER, METALAKE, CATALOG) || SCHEMA_OWNER_WITH_USE_CATALOG");
     PaimonCatalogWrapper wrapper = catalogs.getCatalogWrapper(catalogName(rawPrefix));
-    wrapper.dropDatabase(database);
+    String databaseName = database;
+    catalogs.mutateSchema(
+        Change.DROP_SCHEMA,
+        catalogName(rawPrefix),
+        databaseName,
+        () -> {
+          wrapper.dropDatabase(databaseName);
+          return null;
+        });
     return Response.ok().build();
   }
 
