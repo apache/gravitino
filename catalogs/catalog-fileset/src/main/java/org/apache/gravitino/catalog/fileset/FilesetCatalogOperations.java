@@ -288,32 +288,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     this(store, secretManager, null);
   }
 
-  // Static, so that a closer thread does not keep the operations reachable.
-  private static ThreadPoolExecutor newResultCloser() {
-    int threads = Math.max(2, Math.min(Runtime.getRuntime().availableProcessors(), 4));
-    ThreadPoolExecutor closer =
-        new ThreadPoolExecutor(
-            threads,
-            threads,
-            5L,
-            TimeUnit.SECONDS,
-            new SynchronousQueue<>(),
-            new ThreadFactoryBuilder()
-                .setDaemon(true)
-                .setNameFormat("gravitino-fileset-late-result-closer-%d")
-                .setThreadFactory(
-                    task -> {
-                      Thread thread = new Thread(task);
-                      // Not interrupted and waited for when the catalog class loader is released.
-                      releaseFromCatalog(thread);
-                      return thread;
-                    })
-                .build(),
-            (task, executor) -> task.run());
-    closer.allowCoreThreadTimeOut(true);
-    return closer;
-  }
-
   FilesetCatalogOperations(
       EntityStore store,
       SecretManager secretManager,
@@ -502,8 +476,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         timed.completeExceptionally(new TimeoutException());
         return timed;
       }
-      // Timed before it is submitted, so that once close() has stopped the timer no task is
-      // submitted.
+      // Timed before it is submitted, so that a call made after close() has stopped the timer
+      // submits no task.
       ScheduledFuture<?> timeout =
           timer.schedule(
               () -> timed.completeExceptionally(new TimeoutException()),
@@ -1558,6 +1532,32 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     if (loader != null) {
       worker.setContextClassLoader(new ClassLoader(loader) {});
     }
+  }
+
+  // Static, so that a closer thread does not keep the operations reachable.
+  private static ThreadPoolExecutor newResultCloser() {
+    int threads = Math.max(2, Math.min(Runtime.getRuntime().availableProcessors(), 4));
+    ThreadPoolExecutor closer =
+        new ThreadPoolExecutor(
+            threads,
+            threads,
+            5L,
+            TimeUnit.SECONDS,
+            new SynchronousQueue<>(),
+            new ThreadFactoryBuilder()
+                .setDaemon(true)
+                .setNameFormat("gravitino-fileset-late-result-closer-%d")
+                .setThreadFactory(
+                    task -> {
+                      Thread thread = new Thread(task);
+                      // Not interrupted and waited for when the catalog class loader is released.
+                      releaseFromCatalog(thread);
+                      return thread;
+                    })
+                .build(),
+            (task, executor) -> task.run());
+    closer.allowCoreThreadTimeOut(true);
+    return closer;
   }
 
   private void deleteEmptySchemaLocations(NameIdentifier ident, SchemaEntity schemaEntity)
