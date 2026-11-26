@@ -34,7 +34,7 @@ public interface GlossaryTermLookupMapper {
    *
    * @param lake the metalake ID
    * @param domains optional IDs of the visible domains in scope
-   * @param pattern optional escaped, case-insensitive substring pattern
+   * @param pattern optional escaped substring pattern on the normalized name key
    * @param status optional root status
    * @param keys normalized names and synonyms, empty when browsing
    * @param limit optional lookup candidate bound including one overflow row
@@ -46,7 +46,7 @@ public interface GlossaryTermLookupMapper {
       SELECT t.term_id AS termId, t.name, t.status FROM glossary_term_meta t
       WHERE t.metalake_id=#{lake} AND t.deleted_at=0
       <if test="status != null">AND t.status=#{status}</if>
-      <if test="pattern != null">AND LOWER(t.name) LIKE #{pattern} ESCAPE '!'</if>
+      <if test="pattern != null">AND t.name_key LIKE #{pattern} ESCAPE '!'</if>
       <if test="!keys.isEmpty()">AND (t.name_key IN
         <foreach collection="keys" item="k" open="(" separator="," close=")">#{k}</foreach>
         OR t.term_id IN (SELECT s.term_id FROM glossary_term_synonym s
@@ -136,15 +136,24 @@ public interface GlossaryTermLookupMapper {
    *
    * @param lake the metalake ID
    * @param term the root term ID
-   * @param limit the candidate budget including one overflow row
+   * @param after exclusive binding cursor, or null for the first page
+   * @param limit the maximum number of candidates to return
    * @return live candidates in target order
    */
   @Select(
       """
+      <script>
       SELECT target_type AS targetType, target_id AS targetId FROM glossary_term_binding
       WHERE metalake_id=#{lake} AND term_id=#{term} AND deleted_at=0
+      <if test="after != null">
+        AND (target_type &gt; #{after.targetType} OR (target_type=#{after.targetType} AND target_id &gt; #{after.targetId}))
+      </if>
       ORDER BY target_type, target_id LIMIT #{limit}
+      </script>
       """)
   List<GlossaryTermBindingPO> bindingCandidates(
-      @Param("lake") long lake, @Param("term") long term, @Param("limit") int limit);
+      @Param("lake") long lake,
+      @Param("term") long term,
+      @Param("after") @Nullable GlossaryTermBindingPO after,
+      @Param("limit") int limit);
 }

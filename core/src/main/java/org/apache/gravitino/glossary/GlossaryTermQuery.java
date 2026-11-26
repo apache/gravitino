@@ -86,12 +86,14 @@ final class GlossaryTermQuery {
       return;
     }
     Set<String> keys = new HashSet<>(wordKeys.values());
+    String literal = fragment == null ? null : fragment.toLowerCase(Locale.ROOT);
+    // The stored key uses Java's Unicode case mapping on every backend. Its whitespace is
+    // collapsed, so recheck literal spacing on the lightweight rows before hydrating definitions.
     String pattern =
-        fragment == null
+        literal == null
             ? null
             : "%"
-                + fragment
-                    .toLowerCase(Locale.ROOT)
+                + GlossaryTermNames.key(literal)
                     .replace("!", "!!")
                     .replace("%", "!%")
                     .replace("_", "!_")
@@ -117,6 +119,8 @@ final class GlossaryTermQuery {
     }
     visible =
         rows.stream()
+            .filter(
+                row -> literal == null || row.getName().toLowerCase(Locale.ROOT).contains(literal))
             .filter(
                 row ->
                     access.canRead(row.getTermId(), GlossaryTerm.Status.valueOf(row.getStatus())))
@@ -214,38 +218,43 @@ final class GlossaryTermQuery {
   record Preview(List<TermBindingDTO> bindings, boolean truncated) {}
 
   Preview preview(long termId) {
-    int limit = Math.min(MAX_BINDING_CANDIDATES, budget.remaining());
-    List<GlossaryTermBindingPO> rows =
-        SessionUtils.getWithoutCommit(
-            GlossaryTermLookupMapper.class,
-            mapper -> mapper.bindingCandidates(lake, termId, limit + 1));
     List<TermBindingDTO> visibleBindings = new ArrayList<>();
-    for (List<GlossaryTermBindingPO> batch :
-        Lists.partition(rows.subList(0, Math.min(limit, rows.size())), MAX_VISIBLE_BINDINGS + 1)) {
-      // Missing and hidden targets count too. Only resolve the next batch if the preview needs it.
-      if (bindingAccess == null) {
-        bindingAccess = manager.bindingAccess(metalake, lake);
-      }
-      Map<GlossaryTermBindingPO, TermBinding> resolved =
-          GlossaryManager.resolveBindings(batch, bindingAccess);
-      for (GlossaryTermBindingPO row : batch) {
-        budget.consume(1);
-        TermBinding binding = resolved.get(row);
-        if (binding != null
-            && readableTargets.computeIfAbsent(
-                GlossaryBindingAccess.normalizeTarget(binding.object()),
-                bindingAccess::canReadTarget)) {
-          if (visibleBindings.size() == MAX_VISIBLE_BINDINGS) {
-            return new Preview(visibleBindings, true);
+    GlossaryTermBindingPO last = null;
+    int remaining = Math.min(MAX_BINDING_CANDIDATES, budget.remaining());
+    while (true) {
+      int pageSize = Math.min(MAX_VISIBLE_BINDINGS + 1, remaining + 1);
+      GlossaryTermBindingPO after = last;
+      List<GlossaryTermBindingPO> rows =
+          SessionUtils.getWithoutCommit(
+              GlossaryTermLookupMapper.class,
+              mapper -> mapper.bindingCandidates(lake, termId, after, pageSize));
+      // An overflow row proves there is more work, but must never be resolved or authorized.
+      List<GlossaryTermBindingPO> batch = rows.subList(0, Math.min(rows.size(), remaining));
+      if (!batch.isEmpty()) {
+        if (bindingAccess == null) {
+          bindingAccess = manager.bindingAccess(metalake, lake);
+        }
+        budget.consume(batch.size());
+        remaining -= batch.size();
+        for (TermBinding binding : GlossaryManager.resolveBindings(batch, bindingAccess)) {
+          if (readableTargets.computeIfAbsent(
+              GlossaryBindingAccess.normalizeTarget(binding.object()),
+              bindingAccess::canReadTarget)) {
+            if (visibleBindings.size() == MAX_VISIBLE_BINDINGS) {
+              return new Preview(visibleBindings, true);
+            }
+            visibleBindings.add(TermBindingDTO.from(binding));
           }
-          visibleBindings.add(TermBindingDTO.from(binding));
         }
       }
+      if (rows.size() > batch.size()) {
+        throw TermLookupBudget.exceeded();
+      }
+      if (rows.size() < pageSize) {
+        return new Preview(visibleBindings, false);
+      }
+      last = rows.get(rows.size() - 1);
     }
-    if (rows.size() > limit) {
-      throw TermLookupBudget.exceeded();
-    }
-    return new Preview(visibleBindings, false);
   }
 
   private List<GlossaryTermEntity> loadDefinitions(Set<Long> ids, boolean projectDomains) {

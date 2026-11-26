@@ -73,6 +73,7 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.dto.glossary.TermBindingDTO;
 import org.apache.gravitino.dto.glossary.TermDTO;
 import org.apache.gravitino.dto.responses.ObjectTermsResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
@@ -103,6 +104,7 @@ import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermBindingMapper;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermBindingSQLProviderFactory;
+import org.apache.gravitino.storage.relational.mapper.GlossaryTermLookupMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
@@ -2348,6 +2350,32 @@ class TestGlossaryBindings extends TestJDBCBackend {
                         LAKE, "RestrictedTargets", null, null, GlossaryTerm.Status.DRAFT)));
     GlossaryTermViews views = new GlossaryTermViews(manager);
     List<String> match = List.of("RestrictedTargets");
+    List<Integer> fetched = new ArrayList<>();
+    try (MockedStatic<SqlSessions> ignored =
+        Mockito.mockStatic(
+            SqlSessions.class,
+            lookup -> {
+              Object mapper = lookup.callRealMethod();
+              if (lookup.getMethod().getName().equals("getMapper")
+                  && lookup.getArgument(0) == GlossaryTermLookupMapper.class) {
+                return Mockito.mock(
+                    GlossaryTermLookupMapper.class,
+                    call -> {
+                      Object result = AdditionalAnswers.delegatesTo(mapper).answer(call);
+                      if (call.getMethod().getName().equals("bindingCandidates")) {
+                        fetched.add(((List<?>) result).size());
+                      }
+                      return result;
+                    });
+              }
+              return mapper;
+            })) {
+      TermDTO preview =
+          new GlossaryTermViews(openManager).listTerms(LAKE, null, null, null, match, true)[0];
+      assertEquals(20, preview.getBindings().size());
+      assertEquals(Boolean.TRUE, preview.getBindingsTruncated());
+      assertEquals(List.of(21), fetched);
+    }
     LookupTooBroadException perTerm = assertLookupStopsAtBindingBudget(views, match, 1000);
     assertEquals(
         "Glossary lookup is too broad. Omit embedded bindings or narrow the query.",
@@ -2441,6 +2469,20 @@ class TestGlossaryBindings extends TestJDBCBackend {
       assertEquals(n == 21, result.getBindingsTruncated());
       previous = n;
     }
+
+    // The metric has a lower ID than the columns on the preceding pages.
+    MetadataObject model =
+        MetadataObjects.of(List.of(CAT, SCH, SMODEL), MetadataObject.Type.SEMANTIC_MODEL);
+    openManager.associateMetricTerms(LAKE, model, "net_revenue", new String[] {term.name()}, null);
+    user("onlyMetrics", "viewDef", "readModel");
+    TermDTO metrics =
+        as(
+            "onlyMetrics",
+            () -> views.listTerms(LAKE, null, null, null, List.of(term.name()), true))[0];
+    assertEquals(
+        List.of("net_revenue"),
+        metrics.getBindings().stream().map(TermBindingDTO::getMetric).toList());
+    assertEquals(Boolean.FALSE, metrics.getBindingsTruncated());
   }
 
   @TestTemplate

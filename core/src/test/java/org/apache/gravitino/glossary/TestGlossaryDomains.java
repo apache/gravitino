@@ -367,6 +367,27 @@ class TestGlossaryDomains extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testUnicodeNameFragmentsPreserveLiteralSpacing() throws Exception {
+    GlossaryTermViews views = new GlossaryTermViews(manager);
+    String name = "CAFÉ  İstanbul";
+    create(name);
+    create("Cafe İstanbul");
+    as(
+        "viewer",
+        () -> {
+          assertArrayEquals(new String[] {name}, views.listTermNames(LAKE, null, "fé", null));
+          assertArrayEquals(
+              new String[] {name},
+              Arrays.stream(views.listTerms(LAKE, null, "é  i\u0307", null, List.of(name), false))
+                  .map(TermDTO::getName)
+                  .toArray(String[]::new));
+          assertEquals(0, views.listTermNames(LAKE, null, "é i\u0307", null).length);
+          assertEquals(0, views.listTermNames(LAKE, null, "E  İ", null).length);
+          return null;
+        });
+  }
+
+  @TestTemplate
   void testLookupRelationProjectionExhaustsSharedBudgetWithoutBindings() throws Exception {
     GlossaryTermViews views = new GlossaryTermViews(manager);
     as(

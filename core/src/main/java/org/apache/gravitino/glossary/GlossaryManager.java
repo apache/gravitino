@@ -667,7 +667,7 @@ public final class GlossaryManager {
           List<GlossaryTermBindingPO> rows = BINDINGS.listByTerm(lake, root.id(), targetTypes);
           List<TermBinding> visible = new ArrayList<>();
           for (List<GlossaryTermBindingPO> batch : Lists.partition(rows, TARGET_ID_BATCH_SIZE)) {
-            for (TermBinding binding : resolveBindings(batch, objectAccess).values()) {
+            for (TermBinding binding : resolveBindings(batch, objectAccess)) {
               if (objectAccess.canReadTarget(binding.object())) {
                 visible.add(binding);
               }
@@ -1021,7 +1021,7 @@ public final class GlossaryManager {
     return allowed;
   }
 
-  static Map<GlossaryTermBindingPO, TermBinding> resolveBindings(
+  static List<TermBinding> resolveBindings(
       List<GlossaryTermBindingPO> rows, GlossaryBindingAccess objectAccess) {
     Map<TargetType, List<Long>> idsByType = new EnumMap<>(TargetType.class);
     for (GlossaryTermBindingPO row : rows) {
@@ -1059,7 +1059,7 @@ public final class GlossaryManager {
       }
     }
 
-    Map<GlossaryTermBindingPO, TermBinding> result = new LinkedHashMap<>();
+    List<TermBinding> result = new ArrayList<>(rows.size());
     for (GlossaryTermBindingPO row : rows) {
       TargetType type = TargetType.valueOf(row.getTargetType());
       if (type == TargetType.METRIC) {
@@ -1078,7 +1078,7 @@ public final class GlossaryManager {
               objectAccess.registerTarget(catalogObj, metricPO.catalogId());
             }
           }
-          result.put(row, TermBinding.usedBy(modelObj, metricPO.metricName()));
+          result.add(TermBinding.usedBy(modelObj, metricPO.metricName()));
         }
       } else {
         MetadataObject obj = objectsByType.getOrDefault(type, Map.of()).get(row.getTargetId());
@@ -1086,7 +1086,7 @@ public final class GlossaryManager {
           if (type != TargetType.COLUMN) {
             objectAccess.registerTarget(obj, row.getTargetId());
           }
-          result.put(row, TermBinding.implementedBy(obj));
+          result.add(TermBinding.implementedBy(obj));
         }
       }
     }
