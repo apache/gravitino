@@ -89,6 +89,7 @@ import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.service.DomainMetaService;
 import org.apache.gravitino.storage.relational.service.DomainRelService;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
+import org.apache.gravitino.storage.relational.service.OrphanedMetadataObjectRelationService;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.tag.TagManager;
@@ -1043,6 +1044,42 @@ class TestArticleAuthorization extends TestJDBCBackend {
               () -> manager.listArticlesForObject(LAKE, replacement, false, 1, 0));
           return null;
         });
+  }
+
+  @TestTemplate
+  void sweepPreservesLiveBindingHiddenFromCaller() throws Exception {
+    installAssetCatalog();
+    createAndInsertCatalog(LAKE, "warehouse");
+    createAndInsertSchema(LAKE, "warehouse", "sales");
+    var ns = Namespace.of(LAKE, "warehouse", "sales");
+    backend.insert(createTableEntity(ids.incrementAndGet(), ns, "orders", AUDIT_INFO), false);
+    var orders =
+        ArticleObjectIdentifier.of(
+            MetadataObject.Type.TABLE, List.of("warehouse", "sales"), "orders");
+    var created =
+        as(
+            "lakeOwner",
+            () ->
+                manager.createArticle(
+                    LAKE,
+                    ArticleCreate.builder()
+                        .withTitle("Guide")
+                        .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "body"))
+                        .addObjects(orders)
+                        .build()));
+    as(
+        "viewer",
+        () -> {
+          assertTrue(manager.listAssetBindings(LAKE, "guide", 1, 0).objects().isEmpty());
+          assertEquals(
+              0,
+              OrphanedMetadataObjectRelationService.getInstance()
+                  .softDeleteOrphanedRelations(MetadataObject.Type.TABLE, 10));
+          return null;
+        });
+    var loaded = as("lakeOwner", () -> manager.loadArticle(LAKE, "guide"));
+    assertEquals(List.of(orders), loaded.article().objects());
+    assertEquals(created.revisionToken(), loaded.revisionToken());
   }
 
   private void installAssetCatalog() throws Exception {

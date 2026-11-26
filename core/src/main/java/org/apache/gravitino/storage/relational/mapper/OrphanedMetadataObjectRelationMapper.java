@@ -18,11 +18,34 @@
  */
 package org.apache.gravitino.storage.relational.mapper;
 
+import java.util.List;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
 /** A MyBatis mapper for collecting orphaned metadata-object relations. */
 public interface OrphanedMetadataObjectRelationMapper {
+
+  /** Finds a bounded batch of live Article binding row IDs whose registered targets are gone. */
+  @SelectProvider(
+      type = OrphanedMetadataObjectRelationSQLProvider.class,
+      method = "orphanedArticleBindingIds")
+  List<Long> orphanedArticleBindingIds(
+      @Param("entityTable") String entityTable,
+      @Param("entityIdColumn") String entityIdColumn,
+      @Param("metadataObjectType") String metadataObjectType,
+      @Param("limit") int limit);
+
+  /** Rechecks each candidate row and its target before retiring the binding. */
+  @UpdateProvider(
+      type = OrphanedMetadataObjectRelationSQLProvider.class,
+      method = "retireOrphanedArticleBindings")
+  int retireOrphanedArticleBindings(
+      @Param("entityTable") String entityTable,
+      @Param("entityIdColumn") String entityIdColumn,
+      @Param("metadataObjectType") String metadataObjectType,
+      @Param("ids") List<Long> ids,
+      @Param("deletedAt") long deletedAt);
 
   /** Soft-deletes orphaned owner relations and returns the affected row count. */
   @UpdateProvider(

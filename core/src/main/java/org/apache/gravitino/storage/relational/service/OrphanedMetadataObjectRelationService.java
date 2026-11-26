@@ -20,12 +20,15 @@ package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.kb.KnowledgeBaseArticleEntity.Binding;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.KnowledgeBaseArticleMapper;
@@ -87,6 +90,9 @@ public class OrphanedMetadataObjectRelationService {
               MetadataObject.Type.DOMAIN,
               new EntityTable(DomainMetaMapper.DOMAIN_TABLE_NAME, "domain_id"))
           .put(
+              MetadataObject.Type.GLOSSARY_TERM,
+              new EntityTable(GlossaryTermMetaMapper.TABLE_NAME, "term_id"))
+          .put(
               MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE,
               new EntityTable(KnowledgeBaseArticleMapper.TABLE_NAME, "article_id"))
           .build();
@@ -106,7 +112,8 @@ public class OrphanedMetadataObjectRelationService {
    * Soft-deletes orphaned relation rows for one metadata object type.
    *
    * @param metadataObjectType metadata object type to collect
-   * @param limit maximum number of orphaned object IDs processed per relation table
+   * @param limit maximum number of Article bindings or distinct orphaned object IDs per relation
+   *     table
    * @return number of relation rows soft-deleted
    */
   public int softDeleteOrphanedRelations(MetadataObject.Type metadataObjectType, int limit) {
@@ -120,31 +127,52 @@ public class OrphanedMetadataObjectRelationService {
     long deletedAt = System.currentTimeMillis();
     return SessionUtils.doWithCommitAndFetchResult(
         OrphanedMetadataObjectRelationMapper.class,
-        mapper ->
-            mapper.softDeleteOrphanedOwnerRelations(
-                    entityTable.tableName,
-                    entityTable.idColumn,
-                    metadataObjectType.name(),
-                    deletedAt,
-                    limit)
-                + mapper.softDeleteOrphanedTagRelations(
-                    entityTable.tableName,
-                    entityTable.idColumn,
-                    metadataObjectType.name(),
-                    deletedAt,
-                    limit)
-                + mapper.softDeleteOrphanedStatistics(
-                    entityTable.tableName,
-                    entityTable.idColumn,
-                    metadataObjectType.name(),
-                    deletedAt,
-                    limit)
-                + mapper.softDeleteOrphanedSecurableObjects(
-                    entityTable.tableName,
-                    entityTable.idColumn,
-                    metadataObjectType.name(),
-                    deletedAt,
-                    limit));
+        mapper -> {
+          int bindings = 0;
+          if (Binding.supportsTargetType(metadataObjectType.name())) {
+            List<Long> ids =
+                mapper.orphanedArticleBindingIds(
+                    entityTable.tableName, entityTable.idColumn, metadataObjectType.name(), limit);
+            if (!ids.isEmpty()) {
+              bindings =
+                  mapper.retireOrphanedArticleBindings(
+                      entityTable.tableName,
+                      entityTable.idColumn,
+                      metadataObjectType.name(),
+                      ids,
+                      deletedAt);
+            }
+          }
+          // Term registration here covers Article bindings to Terms.
+          if (metadataObjectType == MetadataObject.Type.GLOSSARY_TERM) {
+            return bindings;
+          }
+          return bindings
+              + mapper.softDeleteOrphanedOwnerRelations(
+                  entityTable.tableName,
+                  entityTable.idColumn,
+                  metadataObjectType.name(),
+                  deletedAt,
+                  limit)
+              + mapper.softDeleteOrphanedTagRelations(
+                  entityTable.tableName,
+                  entityTable.idColumn,
+                  metadataObjectType.name(),
+                  deletedAt,
+                  limit)
+              + mapper.softDeleteOrphanedStatistics(
+                  entityTable.tableName,
+                  entityTable.idColumn,
+                  metadataObjectType.name(),
+                  deletedAt,
+                  limit)
+              + mapper.softDeleteOrphanedSecurableObjects(
+                  entityTable.tableName,
+                  entityTable.idColumn,
+                  metadataObjectType.name(),
+                  deletedAt,
+                  limit);
+        });
   }
 
   private static class EntityTable {

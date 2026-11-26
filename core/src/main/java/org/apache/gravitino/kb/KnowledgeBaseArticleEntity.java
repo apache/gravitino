@@ -68,12 +68,15 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
             "SEMANTIC_MODEL",
             "COLUMN");
 
+    /** Returns whether an Article can bind to this stored target type. */
+    public static boolean supportsTargetType(String type) {
+      return type != null && TYPES.contains(type);
+    }
+
     /** Validates the stored target type. */
     public Binding {
       Preconditions.checkArgument(
-          targetType != null && TYPES.contains(targetType),
-          "Unsupported Article target type: %s",
-          targetType);
+          supportsTargetType(targetType), "Unsupported Article target type: %s", targetType);
     }
   }
 

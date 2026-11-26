@@ -30,6 +30,25 @@ import org.apache.ibatis.annotations.Param;
 /** Provides SQL for collecting orphaned metadata-object relations. */
 public class OrphanedMetadataObjectRelationSQLProvider {
 
+  /**
+   * Selects individual Article binding rows so a frequently bound target cannot exceed the limit.
+   */
+  public static String orphanedArticleBindingIds(
+      @Param("entityTable") String entityTable, @Param("entityIdColumn") String entityIdColumn) {
+    return "SELECT id FROM kb_article_relation_meta WHERE "
+        + orphanedArticleBinding(entityTable, entityIdColumn)
+        + " ORDER BY id LIMIT #{limit}";
+  }
+
+  /** Retires only the original binding rows that still reference a retired target. */
+  public static String retireOrphanedArticleBindings(
+      @Param("entityTable") String entityTable, @Param("entityIdColumn") String entityIdColumn) {
+    return "<script>UPDATE kb_article_relation_meta SET deleted_at=#{deletedAt} WHERE id IN "
+        + "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach> AND "
+        + orphanedArticleBinding(entityTable, entityIdColumn)
+        + "</script>";
+  }
+
   /** Returns SQL that soft-deletes orphaned owner relations. */
   public static String softDeleteOrphanedOwnerRelations(
       @Param("entityTable") String entityTable, @Param("entityIdColumn") String entityIdColumn) {
@@ -59,13 +78,21 @@ public class OrphanedMetadataObjectRelationSQLProvider {
     return softDeleteOrphans(SECURABLE_OBJECT_TABLE_NAME, "type", entityTable, entityIdColumn);
   }
 
+  private static String orphanedArticleBinding(String entityTable, String entityIdColumn) {
+    checkEntityTable(entityTable, entityIdColumn);
+    return "deleted_at=0 AND target_type=#{metadataObjectType} AND NOT EXISTS (SELECT 1 FROM "
+        + entityTable
+        + " entity WHERE entity."
+        + entityIdColumn
+        + "=kb_article_relation_meta.target_id"
+        + " AND entity.metalake_id=kb_article_relation_meta.metalake_id AND entity.deleted_at=0"
+        + liveEntityCondition(entityTable)
+        + ")";
+  }
+
   private static String softDeleteOrphans(
       String relationTable, String typeColumn, String entityTable, String entityIdColumn) {
-    Preconditions.checkArgument(
-        entityTable.matches("[a-z_]+") && entityIdColumn.matches("[a-z_]+"),
-        "Invalid entity table mapping: %s.%s",
-        entityTable,
-        entityIdColumn);
+    checkEntityTable(entityTable, entityIdColumn);
     return "UPDATE "
         + relationTable
         + " SET deleted_at = #{deletedAt}"
@@ -86,6 +113,14 @@ public class OrphanedMetadataObjectRelationSQLProvider {
         + " LIMIT #{limit}) orphan_ids)";
   }
 
+  private static void checkEntityTable(String entityTable, String entityIdColumn) {
+    Preconditions.checkArgument(
+        entityTable.matches("[a-z_]+") && entityIdColumn.matches("[a-z_]+"),
+        "Invalid entity table mapping: %s.%s",
+        entityTable,
+        entityIdColumn);
+  }
+
   private static String liveEntityCondition(String entityTable) {
     if (!TableColumnMapper.COLUMN_TABLE_NAME.equals(entityTable)) {
       return "";
@@ -93,7 +128,7 @@ public class OrphanedMetadataObjectRelationSQLProvider {
 
     // A dropped column keeps its rows and only gets a newer DELETE row, so a column is live only
     // when a non-DELETE row is its latest row.
-    return " AND entity.column_op_type <> "
+    return " AND entity.column_op_type != "
         + ColumnPO.ColumnOpType.DELETE.value()
         + " AND NOT EXISTS (SELECT 1 FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME

@@ -31,7 +31,8 @@ public interface SupportsOrphanedRelationCleanup {
    * Soft-deletes relation rows that reference no live metadata object of the given type.
    *
    * @param metadataObjectType metadata object type to collect
-   * @param limit maximum number of orphaned object IDs processed per relation table
+   * @param limit maximum number of Article bindings or distinct orphaned object IDs per relation
+   *     table
    * @return number of relation rows soft-deleted
    */
   int softDeleteOrphanedRelations(MetadataObject.Type metadataObjectType, int limit);
