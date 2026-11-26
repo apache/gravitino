@@ -37,6 +37,12 @@ loads `gravitino.schema.separator` from the Gravitino server named by `updater-o
 The URI must be reachable even when no Spark job is submitted. Missing `gravitino_uri`, an
 unreachable host, or a `/configs` response without `gravitino.schema.separator` all fail the command.
 
+**`submit-update-stats-job` fails with `updater_options must contain 'gravitino.optimizer.jdbcMetrics.jdbcUrl'` (or `jdbcUser` / `jdbcDriver`)** —
+`update_mode` `metrics` or `all` (the default) requires those three JDBC metrics keys in
+`--updater-options`. `jdbcPassword` may be empty. `stats` does not need them. Point the URL at the
+shared metrics repository; there is no embedded H2 fallback on this path. See
+[Submit Built-In Update Stats Jobs](./optimizer-cli-reference.md#submit-built-in-update-stats-jobs).
+
 **`No StrategyHandler class configured for strategy type ...`** — the strategy handler mapping is missing from the CLI configuration:
 
 ```properties
@@ -69,7 +75,11 @@ These are the hard ones, because success and "the policy decided not to act" loo
 spark.hadoop.fs.defaultFS=file:///
 ```
 
-**`submit-update-stats-job` fails with JDBC metrics errors** — when `--updater-options` includes `gravitino.optimizer.jdbcMetrics.*`, the JDBC driver has to be on the Spark runtime classpath. `ClassNotFoundException` and `No suitable driver` both mean the same thing. With the k8s job executor, add it in `--spark-conf`; with the local job executor, install it into `SPARK_HOME/jars`, as the driver applies `--spark-conf` only after it starts:
+**`submit-update-stats-job` fails with JDBC metrics driver errors** — for `metrics`/`all`,
+`--updater-options` must include `gravitino.optimizer.jdbcMetrics.*`, and the JDBC driver JAR has to
+be on the Spark runtime classpath. `ClassNotFoundException` and `No suitable driver` both mean the
+same thing. With the k8s job executor, add it in `--spark-conf`; with the local job executor,
+install it into `SPARK_HOME/jars`, as the driver applies `--spark-conf` only after it starts:
 
 ```json
 {
