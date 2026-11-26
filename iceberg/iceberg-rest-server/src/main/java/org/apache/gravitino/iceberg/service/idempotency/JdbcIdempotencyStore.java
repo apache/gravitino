@@ -47,22 +47,26 @@ import org.slf4j.LoggerFactory;
  * Requires an initialized entity store, as provided in auxiliary mode. The database schema must be
  * upgraded before this store is enabled.
  *
- * <p>Reservations commit independently of catalog transactions. Claim tokens fence stale finalize
- * and release calls, but cannot undo catalog side effects or make the catalog mutation and response
- * persistence atomic. Expired keys can be reserved again without waiting for background cleanup.
- * Replicas must synchronize system clocks: a fast clock can reclaim a key another replica still
- * considers live. There is no clock-skew grace period. There is also no in-flight renewal: the
- * configured lifetime must exceed the maximum duration from reservation through mutation completion
- * and response persistence, plus maximum clock skew and a safety margin. Expiry can otherwise allow
- * overlapping mutations.
+ * <p>Reservations commit independently of catalog transactions. Expired, released, or purged keys
+ * are treated as never seen: a later {@link #reserve} inserts a new row with the same fixed claim.
+ * That matches common HTTP {@code Idempotency-Key} stores and the Iceberg REST reuse window
+ * (clients SHOULD NOT reuse a key after expiry). A late finalize or release from a previous owner
+ * can therefore touch the new row when claims match; size the reuse window so mutations finish
+ * before expiry, and do not rely on cross-delete fencing. Replicas must synchronize system clocks:
+ * a fast clock can reclaim a key another replica still considers live. There is no clock-skew grace
+ * period and no in-flight renewal: the configured lifetime must exceed the maximum duration from
+ * reservation through mutation completion and response persistence, plus maximum clock skew and a
+ * safety margin.
  *
  * <p>Share one store per service instance across requests. Each store owns a cleanup scheduler that
  * is stopped by {@link #close()}; the relational entity store owns the shared connection pool.
  */
 public class JdbcIdempotencyStore implements IdempotencyStore {
   private static final Logger LOG = LoggerFactory.getLogger(JdbcIdempotencyStore.class);
-  // The UUID tail spreads unrelated keys across 256 independently locked counters.
-  private static final int COUNTER_HEX_DIGITS = 2;
+
+  /** Claim written on every live reservation; hard-deleted keys start over with the same value. */
+  @VisibleForTesting static final long CLAIM = 1L;
+
   @VisibleForTesting static final int PURGE_BATCH_SIZE = 1000;
   @VisibleForTesting static final int MAX_PURGE_BATCHES = 100;
 
@@ -110,7 +114,6 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
     try (SqlSession session = factory.openSession()) {
       IcebergIdempotencyKeyMapper mapper = session.getMapper(IcebergIdempotencyKeyMapper.class);
       mapper.selectRecord("00000000-0000-7000-8000-000000000000", clock.millis());
-      mapper.selectGeneration(0);
       session.commit();
     }
     sessionFactory = factory;
@@ -134,28 +137,25 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
       try {
         return execute(
             mapper -> {
-              long generation = nextGeneration(mapper, key);
               mapper.insert(
                   IcebergIdempotencyKeyPO.reserved(
-                      key, operationBinding, generation, nowMs, expiresAtMs));
-              return OptionalLong.of(generation);
+                      key, operationBinding, CLAIM, nowMs, expiresAtMs));
+              return OptionalLong.of(CLAIM);
             });
       } catch (RuntimeException e) {
         if (!ExceptionUtils.isDuplicateKey(e)) {
           throw e;
         }
       }
-      // Allocate and replace in the same transaction so the next owner cannot obtain an older
-      // generation. The separate transaction avoids upgrading a failed INSERT's MySQL locks.
+      // Replace in a separate transaction so a failed INSERT's MySQL locks are not upgraded.
       OptionalLong replacement =
           execute(
               mapper -> {
-                long generation = nextGeneration(mapper, key);
                 int replaced =
                     mapper.replaceExpired(
                         IcebergIdempotencyKeyPO.reserved(
-                            key, operationBinding, generation, nowMs, expiresAtMs));
-                return replaced == 0 ? OptionalLong.empty() : OptionalLong.of(generation);
+                            key, operationBinding, CLAIM, nowMs, expiresAtMs));
+                return replaced == 0 ? OptionalLong.empty() : OptionalLong.of(CLAIM);
               });
       if (replacement.isPresent()) {
         return replacement;
@@ -231,13 +231,6 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
       // A transient database failure must not cancel all future scheduled cleanup attempts.
       LOG.warn("Purging expired Iceberg idempotency records failed", e);
     }
-  }
-
-  @VisibleForTesting
-  static long nextGeneration(IcebergIdempotencyKeyMapper mapper, String key) {
-    int stripe = Integer.parseInt(key.substring(key.length() - COUNTER_HEX_DIGITS), 16);
-    mapper.advanceGeneration(stripe);
-    return mapper.selectGeneration(stripe);
   }
 
   private <T> T execute(Function<IcebergIdempotencyKeyMapper, T> operation) {

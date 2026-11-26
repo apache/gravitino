@@ -56,17 +56,6 @@ public class IcebergIdempotencyKeyBaseSQLProvider {
   }
 
   /**
-   * Returns the counter advance statement.
-   *
-   * @param stripe counter selected by the key's final byte
-   * @return SQL statement
-   */
-  public String advanceGeneration(@Param("stripe") int stripe) {
-    return "INSERT INTO iceberg_idempotency_generation_meta (stripe, generation) VALUES (#{stripe}, 1)"
-        + " ON DUPLICATE KEY UPDATE generation = generation + 1";
-  }
-
-  /**
    * Returns only a finalized, unexpired response.
    *
    * @param idempotencyKey canonical UUIDv7 key

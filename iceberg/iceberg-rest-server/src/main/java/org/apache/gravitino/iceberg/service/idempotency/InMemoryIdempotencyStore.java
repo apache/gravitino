@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 import javax.annotation.Nullable;
@@ -43,11 +44,11 @@ import org.slf4j.LoggerFactory;
  * node that restarted, finds no record and re-executes the mutation. Its size bound can also evict
  * a record before its reuse window elapses, including an in-flight reservation. A retry can then
  * reserve the same key and run the mutation concurrently with the original request. At-most-once
- * execution therefore depends on the reservation remaining cached; claim fencing prevents stale
- * writes to a replacement record but cannot prevent duplicate mutations after eviction. Size the
- * cache for all keys within the reuse window, including in-flight requests. Production deployments
- * that need durable deduplication or run more than one replica should use a shared, durable store
- * instead.
+ * execution therefore depends on the reservation remaining cached. Hard-deleted or evicted keys are
+ * treated as never seen and reuse a fixed claim, so a late finalize or release can touch a
+ * replacement row; size the cache and reuse window so that does not overlap live work. Production
+ * deployments that need durable deduplication or run more than one replica should use a shared,
+ * durable store instead.
  *
  * <p>Each record's own {@code expiresAtMs} decides whether it still counts, so a record past its
  * deadline reads as absent whether or not the cache has reclaimed it yet. Caffeine's expiry only
@@ -61,7 +62,9 @@ public class InMemoryIdempotencyStore implements IdempotencyStore {
   /** Evictions between two warnings, so an undersized cache is visible without flooding the log. */
   private static final long EVICTION_LOG_INTERVAL = 1000;
 
-  private final AtomicLong generations = new AtomicLong();
+  /** Claim written on every live reservation; evicted or released keys start over with it. */
+  private static final long CLAIM = 1L;
+
   private final AtomicLong sizeEvictions = new AtomicLong();
   private final LongSupplier clock;
 
@@ -127,20 +130,24 @@ public class InMemoryIdempotencyStore implements IdempotencyStore {
   public OptionalLong reserve(String idempotencyKey, String operationBinding, long expiresAtMs) {
     String key = IdempotencyKeys.canonicalize(idempotencyKey);
     IdempotencyRecord reserved =
-        IdempotencyRecord.reserved(
-            key, operationBinding, generations.incrementAndGet(), clock.getAsLong(), expiresAtMs);
+        IdempotencyRecord.reserved(key, operationBinding, CLAIM, clock.getAsLong(), expiresAtMs);
     // A record past its deadline is treated as absent rather than waiting for the cache to reclaim
     // it, so behavior turns on the record's own expiry instead of when maintenance happens to run.
-    IdempotencyRecord actual =
-        cache
-            .asMap()
-            .compute(
-                key,
-                (cacheKey, existing) ->
-                    existing == null || isExpired(existing) ? reserved : existing);
-    return actual.claim() == reserved.claim()
-        ? OptionalLong.of(reserved.claim())
-        : OptionalLong.empty();
+    // Track install success explicitly: every reservation uses the same fixed claim, so claim
+    // equality cannot tell a new row from an existing live one.
+    AtomicBoolean acquired = new AtomicBoolean();
+    cache
+        .asMap()
+        .compute(
+            key,
+            (cacheKey, existing) -> {
+              if (existing == null || isExpired(existing)) {
+                acquired.set(true);
+                return reserved;
+              }
+              return existing;
+            });
+    return acquired.get() ? OptionalLong.of(CLAIM) : OptionalLong.empty();
   }
 
   @Override

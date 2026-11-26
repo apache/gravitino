@@ -601,18 +601,15 @@ COMMENT ON TABLE iceberg_idempotency_meta IS 'Iceberg REST idempotency records';
 COMMENT ON COLUMN iceberg_idempotency_meta.idempotency_key IS 'client-provided UUIDv7 idempotency key';
 COMMENT ON COLUMN iceberg_idempotency_meta.http_method IS 'HTTP method of the request';
 COMMENT ON COLUMN iceberg_idempotency_meta.request_uri IS 'encoded request path and sorted query string';
-COMMENT ON COLUMN iceberg_idempotency_meta.generation IS 'reservation fencing token';
+COMMENT ON COLUMN iceberg_idempotency_meta.generation IS 'fixed reservation claim reused after hard delete';
 COMMENT ON COLUMN iceberg_idempotency_meta.http_status IS 'HTTP status of finalized response, NULL while reserved';
 COMMENT ON COLUMN iceberg_idempotency_meta.response_summary IS 'serialized response body (JSON) for replay';
 COMMENT ON COLUMN iceberg_idempotency_meta.audit_info IS 'idempotency record audit info';
 COMMENT ON COLUMN iceberg_idempotency_meta.created_at IS 'record created at (unix epoch millis)';
 COMMENT ON COLUMN iceberg_idempotency_meta.expires_at IS 'record expires at (unix epoch millis)';
 
-
-CREATE TABLE IF NOT EXISTS iceberg_idempotency_generation_meta (
-  stripe INT NOT NULL PRIMARY KEY,
-  generation BIGINT NOT NULL
-);
+-- Drop the unreleased stripe counter table from earlier development builds.
+DROP TABLE IF EXISTS iceberg_idempotency_generation_meta;
 
 -- Keep retained deletions out of live metadata lists and relationship cleanup scans.
 CREATE INDEX IF NOT EXISTS idx_tag_meta_live ON tag_meta (metalake_id) WHERE deleted_at = 0;

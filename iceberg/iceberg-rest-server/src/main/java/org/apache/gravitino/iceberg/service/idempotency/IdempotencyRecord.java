@@ -63,7 +63,7 @@ public final class IdempotencyRecord {
    * @param idempotencyKey the client-provided UUIDv7 key
    * @param operationBinding request identity, for example {@code POST
    *     /v1/cat1/namespaces/ns1/tables}
-   * @param claim the reserving caller's fencing token
+   * @param claim the reserving caller's claim
    * @param createdAtMs reservation time in unix epoch millis
    * @param expiresAtMs time after which the record may be purged, in unix epoch millis
    * @return a record in the reserved state
@@ -93,7 +93,7 @@ public final class IdempotencyRecord {
   }
 
   /**
-   * Returns the fencing token of the caller that reserved this record.
+   * Returns the claim of the caller that reserved this record.
    *
    * <p>A store accepts a finalize or release only from the caller holding this token, so a caller
    * whose reservation was already dropped cannot disturb the record of whoever reserved the key

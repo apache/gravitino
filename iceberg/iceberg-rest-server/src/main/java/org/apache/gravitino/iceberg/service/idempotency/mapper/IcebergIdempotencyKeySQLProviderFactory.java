@@ -61,16 +61,6 @@ public class IcebergIdempotencyKeySQLProviderFactory {
   }
 
   /**
-   * Returns the counter advance statement for the configured entity store.
-   *
-   * @param stripe counter selected by the key's final byte
-   * @return SQL statement
-   */
-  public static String advanceGeneration(@Param("stripe") int stripe) {
-    return getProvider().advanceGeneration(stripe);
-  }
-
-  /**
    * Returns the statement for the configured entity-store database.
    *
    * @param idempotencyKey canonical UUIDv7 key

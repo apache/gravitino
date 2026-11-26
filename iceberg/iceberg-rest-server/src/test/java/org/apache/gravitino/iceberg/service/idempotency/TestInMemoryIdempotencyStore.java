@@ -135,36 +135,15 @@ public class TestInMemoryIdempotencyStore {
   }
 
   @Test
-  void testStaleFinalizeAfterReReservationIsIgnored() {
-    long staleClaim = store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
-    // The first reservation goes away underneath its owner, as a size eviction or a purge would do,
-    // and a second caller takes the key.
-    store.release(KEY, staleClaim);
-    long currentClaim = store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
+  void testReReserveAfterReleaseReusesFixedClaim() {
+    long oldClaim = store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
+    store.release(KEY, oldClaim);
+    long newClaim = store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
 
-    store.finalizeRecord(KEY, staleClaim, 200, "{\"stale\":true}");
-
-    // The current owner is still mid-flight: nothing to replay, and the key stays taken.
-    Assertions.assertEquals(Optional.empty(), store.load(KEY));
-    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS).isEmpty());
-
-    // And the current owner can still finalize its own response.
-    store.finalizeRecord(KEY, currentClaim, 201, "{\"stale\":false}");
+    Assertions.assertEquals(oldClaim, newClaim);
+    store.finalizeRecord(KEY, newClaim, 201, "{\"ok\":true}");
     Assertions.assertEquals(
-        "{\"stale\":false}", store.load(KEY).orElseThrow(AssertionError::new).responseSummary());
-  }
-
-  @Test
-  void testStaleReleaseAfterReReservationIsIgnored() {
-    long staleClaim = store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
-    store.release(KEY, staleClaim);
-    store.reserve(KEY, BINDING, FAR_FUTURE_MS).orElseThrow();
-
-    store.release(KEY, staleClaim);
-
-    // Releasing on a lost claim must not free a key the current owner is executing under, which
-    // would let a third request run the mutation a second time.
-    Assertions.assertTrue(store.reserve(KEY, BINDING, FAR_FUTURE_MS).isEmpty());
+        "{\"ok\":true}", store.load(KEY).orElseThrow(AssertionError::new).responseSummary());
   }
 
   @Test

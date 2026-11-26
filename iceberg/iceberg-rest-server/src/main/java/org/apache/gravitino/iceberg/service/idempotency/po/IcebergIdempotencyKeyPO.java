@@ -39,7 +39,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * mapped by {@link IcebergIdempotencyKeyMapper}, and converts to the {@link IdempotencyRecord} the
  * store SPI hands back. Instances are created through the generated {@code builder()} (or populated
  * by MyBatis via field reflection through the private no-arg constructor) and expose no setters.
- * The store supplies the fencing token when it inserts or replaces the reservation.
+ * The store supplies the reservation claim when it inserts or replaces the reservation.
  */
 @Getter
 @Builder(setterPrefix = "with")
@@ -63,7 +63,7 @@ public class IcebergIdempotencyKeyPO {
    * @param idempotencyKey the client-provided UUIDv7 key
    * @param operationBinding request identity, for example {@code POST
    *     /v1/cat1/namespaces/ns1/tables}
-   * @param generation the reservation fencing token
+   * @param generation the reservation claim
    * @param createdAtMs reservation time in unix epoch millis
    * @param expiresAtMs time after which the record may be purged, in unix epoch millis
    * @return the persistence object

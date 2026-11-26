@@ -36,11 +36,12 @@ import javax.annotation.Nullable;
  * duplicate mutation.
  *
  * <p>A reservation does not always survive until its owner finishes: a bounded store can drop it
- * under memory pressure, and a purge can remove it once it expires. The key is then free, and
- * another caller can reserve it while the first is still running. Every call that mutates an
- * existing record therefore carries the {@code claim} its caller reserved with, and implementations
- * must ignore the call when the stored claim differs, so a caller that has lost its reservation
- * cannot finalize or release a record that now belongs to someone else.
+ * under memory pressure, and a purge can remove it once it expires. The key is then free and
+ * treated as never seen, so another caller can reserve it while the first is still running. Callers
+ * pass the {@code claim} from {@link #reserve} into {@link #finalizeRecord} and {@link #release}.
+ * Built-in stores use a fixed claim for every live row; after hard delete they do not allocate a
+ * new fencing token, matching common HTTP {@code Idempotency-Key} practice and the Iceberg REST
+ * reuse window.
  *
  * <p>Keys are compared in the folded form returned by {@link IdempotencyKeys#canonicalize}, so
  * implementations must canonicalize before reading or writing storage rather than trusting the
@@ -72,9 +73,9 @@ public interface IdempotencyStore extends Closeable {
    * @param operationBinding request identity, as the HTTP method, a space, and the encoded path. A
    *     query fingerprint may follow the path, separated by a question mark.
    * @param expiresAtMs time after which the record may be purged, in unix epoch millis
-   * @return a fresh fencing token when the reservation is acquired, or empty if the key is live.
-   *     Tokens must not repeat for a key after release, eviction, or purge, and callers must pass
-   *     the returned token to {@link #finalizeRecord} or {@link #release}.
+   * @return the reservation claim when acquired, or empty if the key is live. Callers must pass the
+   *     returned claim to {@link #finalizeRecord} or {@link #release}. Built-in stores may reuse
+   *     the same claim value after release, eviction, or purge.
    */
   OptionalLong reserve(String idempotencyKey, String operationBinding, long expiresAtMs);
 
@@ -91,8 +92,8 @@ public interface IdempotencyStore extends Closeable {
    * Marks a reserved key finalized, storing the response replayed to later retries.
    *
    * <p>The call is a no-op when the record has already expired or been purged, so it is not
-   * resurrected, and when the stored claim differs, so a caller that has lost its reservation
-   * cannot overwrite the record of whoever holds the key now.
+   * resurrected, and when the stored claim differs. Built-in stores reuse a fixed claim after hard
+   * delete, so a late finalize can update a newer reservation for the same key.
    *
    * @param idempotencyKey the client-provided key
    * @param claim the claim this caller reserved with
@@ -106,8 +107,8 @@ public interface IdempotencyStore extends Closeable {
    * Releases a reservation so the client can retry with the same key. Called when the mutation
    * failed in a way the Iceberg REST spec treats as retryable, which is any {@code 5xx} response.
    *
-   * <p>The call is a no-op when the stored claim differs, so a caller that has lost its reservation
-   * cannot free a key another caller is currently executing under.
+   * <p>The call is a no-op when the stored claim differs. Built-in stores reuse a fixed claim after
+   * hard delete, so a late release can free a newer reservation for the same key.
    *
    * @param idempotencyKey the client-provided key
    * @param claim the claim this caller reserved with

@@ -168,7 +168,7 @@ public interface IdempotencyStore extends Closeable {
    * @param idempotencyKey the client-provided UUIDv7 key
    * @param operationBinding request identity, e.g. "POST /v1/cat1/namespaces/ns1/tables"
    * @param expiresAtMs deadline in Unix epoch milliseconds
-   * @return a fresh fencing token if acquired, empty if the key is live
+   * @return the reservation claim if acquired, empty if the key is live
    */
   OptionalLong reserve(String idempotencyKey, String operationBinding, long expiresAtMs);
 
@@ -184,7 +184,7 @@ public interface IdempotencyStore extends Closeable {
    * Mark a reserved key as finalized with the response to replay on duplicates.
    *
    * @param idempotencyKey the client-provided key
-   * @param claim the fencing token returned by reserve
+   * @param claim the claim returned by reserve
    * @param httpStatus the HTTP status code of the original response
    * @param responseSummary serialized response body (JSON string)
    */
@@ -195,7 +195,7 @@ public interface IdempotencyStore extends Closeable {
    * Called when the mutation fails with a retryable error.
    *
    * @param idempotencyKey the client-provided key
-   * @param claim the fencing token returned by reserve
+   * @param claim the claim returned by reserve
    */
   void release(String idempotencyKey, long claim);
 
@@ -215,7 +215,7 @@ public interface IdempotencyStore extends Closeable {
 public class IdempotencyRecord {
   private final String idempotencyKey;     // UUIDv7 (RFC 9562), 36-char canonical form
   private final String operationBinding;   // e.g., "POST /v1/cat1/namespaces/ns1/tables"
-  private final long claim;               // store-issued fencing token
+  private final long claim;               // store-issued claim (fixed for built-in stores)
   private final Integer httpStatus;        // null while reserved / in-progress
   private final String responseSummary;    // serialized response body (JSON)
   private final long createdAtMs;          // unix epoch millis (matches BIGINT column)
@@ -285,7 +285,7 @@ CREATE TABLE IF NOT EXISTS `iceberg_idempotency_meta` (
   `idempotency_key`  VARCHAR(36)         NOT NULL     COMMENT 'client-provided UUIDv7 idempotency key',
   `http_method`      VARCHAR(16)         NOT NULL     COMMENT 'HTTP method of the request',
   `request_uri`      MEDIUMTEXT          NOT NULL     COMMENT 'encoded request path and sorted query string',
-  `generation`       BIGINT              NOT NULL     COMMENT 'reservation fencing token',
+  `generation`       BIGINT              NOT NULL     COMMENT 'fixed reservation claim reused after hard delete',
   `http_status`      INT(10) UNSIGNED    DEFAULT NULL COMMENT 'HTTP status of finalized response, NULL while reserved',
   `response_summary` MEDIUMTEXT          DEFAULT NULL COMMENT 'serialized response body (JSON) for replay',
   `audit_info`       MEDIUMTEXT          NOT NULL     COMMENT 'idempotency record audit info',
@@ -294,25 +294,20 @@ CREATE TABLE IF NOT EXISTS `iceberg_idempotency_meta` (
   PRIMARY KEY (`idempotency_key`),
   KEY `idx_iim_expires` (`expires_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Iceberg REST idempotency records';
-
-
-CREATE TABLE IF NOT EXISTS iceberg_idempotency_generation_meta (
-  stripe INT NOT NULL PRIMARY KEY,
-  generation BIGINT NOT NULL
-) ENGINE=InnoDB;
 ```
 
 The H2 and PostgreSQL variants use the same columns. All three backends ship the
 table in `scripts/<backend>/schema-2.0.0-<backend>.sql` and
-`scripts/<backend>/upgrade-1.3.0-to-2.0.0-<backend>.sql`.
+`scripts/<backend>/upgrade-1.3.0-to-2.0.0-<backend>.sql`. Upgrade scripts also
+`DROP` any leftover `iceberg_idempotency_generation_meta` from earlier
+development builds.
 
-A key's final byte selects one of 256 generation counters in
-`iceberg_idempotency_generation_meta`. The database advances that counter in
-the same transaction that acquires the reservation, so a key's generations
-increase across replicas. Release and purge leave the counters in place.
-A per-key counter initialized to 1 would repeat after deletion and let a late
-owner touch the new reservation. The store returns the generation as the claim
-that finalize and release match against the current row.
+Hard-deleted, released, or purged keys are treated as never seen. Each live row
+stores a fixed claim (`generation = 1`). That matches common HTTP
+`Idempotency-Key` stores and the Iceberg REST reuse window (clients SHOULD NOT
+reuse a key after expiry). There is no side counter table: a late finalize or
+release from a previous owner can touch a newer reservation when claims match,
+so the reuse window must outlast the mutation.
 
 The HTTP method is stored in `http_method`. The `request_uri` column stores
 the encoded path plus the sorted, encoded query string when present. MySQL
@@ -328,9 +323,8 @@ longer than MySQL's 64 KiB `TEXT` limit.
 
 ### 4.2 Conflict Handling
 
-`reserve()` advances the key's generation counter and attempts a plain
-`INSERT` in one transaction. After a duplicate-key rollback, a separate
-transaction advances the counter and replaces the matching row only if it is
+`reserve()` attempts a plain `INSERT` with the fixed claim. After a duplicate-key
+rollback, a separate transaction replaces the matching row only if it is
 expired. If no expired row matches, the store retries once with a fresh expiry
 cutoff in case purge or release freed the key. If neither attempt claims the
 key, it returns empty. Other SQL errors propagate. Only finalized, unexpired
