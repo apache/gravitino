@@ -46,7 +46,7 @@ import org.mockito.Mockito;
 /** Deterministic regression probes for cache invalidation races. */
 public class TestEntityCachePublicationRace {
   @Test
-  void testPointReadDoesNotReacquireSpiLockForPublication() throws Exception {
+  void testPointReadUsesSeparateSpiLocksForLookupAndPublication() throws Exception {
     NonReentrantCache cache = new NonReentrantCache();
     RelationalEntityStore store = new RelationalEntityStore();
     RelationalBackend backend = Mockito.mock(RelationalBackend.class);
@@ -56,7 +56,9 @@ public class TestEntityCachePublicationRace {
     Mockito.when(backend.get(entity.nameIdentifier(), EntityType.TABLE)).thenReturn(entity);
     Assertions.assertSame(
         entity, store.get(entity.nameIdentifier(), EntityType.TABLE, TableEntity.class));
-    Assertions.assertEquals(1, cache.acquisitions);
+    // Cold get looks up under the key lock, drops it for JDBC, then acquires again to publish.
+    // The two acquisitions must be sequential (NonReentrantCache rejects nested reentry).
+    Assertions.assertEquals(2, cache.acquisitions);
     Mockito.verify(backend).get(entity.nameIdentifier(), EntityType.TABLE);
   }
 

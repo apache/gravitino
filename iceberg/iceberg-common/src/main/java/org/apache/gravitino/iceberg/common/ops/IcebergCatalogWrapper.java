@@ -20,6 +20,7 @@ package org.apache.gravitino.iceberg.common.ops;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
@@ -44,6 +45,7 @@ import org.apache.hadoop.fs.UnsupportedFileSystemException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.iceberg.BaseMetadataTable;
 import org.apache.iceberg.BaseTable;
+import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.HasTableOperations;
 import org.apache.iceberg.MetadataUpdate;
@@ -54,6 +56,7 @@ import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.Transaction;
+import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.aws.s3.S3FileIO;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
@@ -88,6 +91,7 @@ import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
+import org.apache.iceberg.util.PropertyUtil;
 import org.apache.iceberg.view.BaseView;
 import org.apache.iceberg.view.View;
 import org.apache.iceberg.view.ViewMetadata;
@@ -287,7 +291,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public LoadTableResponse createTable(Namespace namespace, CreateTableRequest request) {
     request.validate();
-    validateTableDefinition(request);
+    validateCreateRequest(request);
     validateTableLocation(request.location());
     validateStorageProperties(request.properties());
     validateInheritedLocation(namespace, request.location());
@@ -302,13 +306,6 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       // Iceberg reports an invalid table definition, such as a transform the column type does
       // not support, as UnsupportedOperationException. createTable has no 406 response.
       throw new BadRequestException("Invalid table definition: %s", e.getMessage());
-    } catch (IllegalStateException e) {
-      // With the format version taken from the catalog defaults, a column type that version does
-      // not support is only detected while Iceberg builds the table metadata.
-      if (e.getMessage() != null && e.getMessage().startsWith("Invalid schema for v")) {
-        throw new BadRequestException("%s", e.getMessage());
-      }
-      throw e;
     }
     if (loadTableResponse != null) {
       TableIdentifier tableIdentifier = TableIdentifier.of(namespace, request.name());
@@ -508,6 +505,13 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     validateStorageUpdates(updateTableRequest);
     getMetadataCache().invalidate(tableIdentifier);
     validateDefaultSpecAndSortOrder(tableIdentifier, updateTableRequest);
+    // Staged create (AssertTableDoesNotExist) has no table to load yet; use the create-path
+    // validator. Existing-table updates keep validateSchemaUpdates (loads the base).
+    if (isStagedCreate(updateTableRequest)) {
+      validateStagedCreateUpdates(updateTableRequest);
+    } else {
+      validateSchemaUpdates(tableIdentifier, updateTableRequest);
+    }
     LoadTableResponse loadTableResponse;
     try {
       loadTableResponse =
@@ -536,6 +540,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   public LoadTableResponse updateTable(IcebergTableChange icebergTableChange) {
     Transaction transaction = icebergTableChange.getTransaction();
     try {
+      validateSchema(transaction);
       transaction.commitTransaction();
     } finally {
       // A load during the commit can cache old metadata, even if the commit ultimately fails.
@@ -561,8 +566,13 @@ public class IcebergCatalogWrapper implements AutoCloseable {
    * @return the response after committing the table change
    */
   public LoadTableResponse buildAndUpdateTable(Function<Catalog, IcebergTableChange> builder) {
-    IcebergTableChange change = builder.apply(getCatalog());
-    return updateTable(change);
+    try {
+      return updateTable(builder.apply(getCatalog()));
+    } catch (IllegalStateException e) {
+      // Safety net: UpdateSchema.commit runs Schema.checkCompatibility. Prefer validating apply()
+      // with validateSchema before commit (IcebergCatalogWrapperHelper); map stragglers to 400.
+      throw new BadRequestException("%s", e.getMessage());
+    }
   }
 
   public LoadViewResponse createView(Namespace namespace, CreateViewRequest request) {
@@ -738,11 +748,72 @@ public class IcebergCatalogWrapper implements AutoCloseable {
    */
   @VisibleForTesting
   static void validateTableDefinition(CreateTableRequest request) {
-    Map<String, String> properties = request.properties();
-    String value = properties == null ? null : properties.get(TableProperties.FORMAT_VERSION);
-    if (value == null) {
-      // The catalog's table defaults decide the version; Iceberg checks the schema against it.
+    validateTableDefinition(request.schema(), request.properties());
+  }
+
+  @VisibleForTesting
+  static void validateTableDefinition(
+      @Nullable Schema schema, @Nullable Map<String, String> properties) {
+    int formatVersion = formatVersion(properties);
+    if (schema != null) {
+      validateSchema(schema, formatVersion);
+    }
+  }
+
+  /**
+   * Validates create-table schema against the resolved format version, including catalog table
+   * defaults merged with request properties.
+   */
+  protected final void validateCreateRequest(CreateTableRequest request) {
+    Map<String, String> properties = Maps.newHashMap(tableDefaultProperties());
+    properties.putAll(request.properties());
+    validateTableDefinition(request.schema(), properties);
+  }
+
+  private static boolean isStagedCreate(UpdateTableRequest request) {
+    return request != null
+        && request.requirements() != null
+        && request.requirements().stream()
+            .anyMatch(UpdateRequirement.AssertTableDoesNotExist.class::isInstance);
+  }
+
+  /**
+   * Validates schema / format-version compatibility for a staged-create {@link UpdateTableRequest}
+   * (AssertTableDoesNotExist), where the table does not exist yet so {@link #validateSchemaUpdates}
+   * cannot load a base.
+   */
+  protected static void validateStagedCreateUpdates(UpdateTableRequest request) {
+    if (request == null || request.updates() == null) {
       return;
+    }
+    // Match CatalogHandlers.create / FederatedCatalogWrapper: resolve UpgradeFormatVersion first
+    // so AddSchema order relative to the upgrade does not change the effective format version.
+    int formatVersion =
+        request.updates().stream()
+            .filter(MetadataUpdate.UpgradeFormatVersion.class::isInstance)
+            .map(update -> ((MetadataUpdate.UpgradeFormatVersion) update).formatVersion())
+            .findFirst()
+            .orElse(2);
+    for (MetadataUpdate update : request.updates()) {
+      if (update instanceof MetadataUpdate.AddSchema) {
+        validateSchema(((MetadataUpdate.AddSchema) update).schema(), formatVersion);
+      }
+    }
+  }
+
+  private Map<String, String> tableDefaultProperties() {
+    return PropertyUtil.propertiesWithPrefix(
+        icebergConfig.getIcebergCatalogProperties(), CatalogProperties.TABLE_DEFAULT_PREFIX);
+  }
+
+  private static int formatVersion(@Nullable Map<String, String> properties) {
+    // Iceberg TableMetadata defaults to format version 2 when the property is unset or blank.
+    if (properties == null) {
+      return 2;
+    }
+    String value = properties.get(TableProperties.FORMAT_VERSION);
+    if (StringUtils.isBlank(value)) {
+      return 2;
     }
     int formatVersion;
     try {
@@ -756,12 +827,65 @@ public class IcebergCatalogWrapper implements AutoCloseable {
           "Unsupported %s %s: must be between %s and %s",
           TableProperties.FORMAT_VERSION, formatVersion, MIN_FORMAT_VERSION, MAX_FORMAT_VERSION);
     }
-    if (request.schema() != null) {
-      try {
-        Schema.checkCompatibility(request.schema(), formatVersion);
-      } catch (IllegalStateException | IllegalArgumentException e) {
-        throw new BadRequestException("%s", e.getMessage());
+    return formatVersion;
+  }
+
+  /**
+   * Runs {@link Schema#checkCompatibility} and maps failures to {@link BadRequestException}. Call
+   * this on {@link org.apache.iceberg.UpdateSchema#apply()} results before {@code commit()} so
+   * builders do not rely on catching {@link IllegalStateException}.
+   */
+  public static void validateSchema(Schema schema, int formatVersion) {
+    try {
+      Schema.checkCompatibility(schema, formatVersion);
+    } catch (IllegalStateException | IllegalArgumentException e) {
+      throw new BadRequestException("%s", e.getMessage());
+    }
+  }
+
+  private static void validateSchema(Transaction transaction) {
+    Table table = transaction.table();
+    if (!(table instanceof HasTableOperations)) {
+      return;
+    }
+    TableMetadata metadata = ((HasTableOperations) table).operations().current();
+    validateSchema(metadata.schema(), metadata.formatVersion());
+  }
+
+  protected void validateSchemaUpdates(
+      TableIdentifier tableIdentifier, UpdateTableRequest request) {
+    if (request == null || request.updates() == null) {
+      return;
+    }
+    boolean hasSchemaUpdate =
+        request.updates().stream().anyMatch(MetadataUpdate.AddSchema.class::isInstance);
+    boolean hasFormatUpgrade =
+        request.updates().stream().anyMatch(MetadataUpdate.UpgradeFormatVersion.class::isInstance);
+    if (!hasSchemaUpdate && !hasFormatUpgrade) {
+      return;
+    }
+    Table table = getCatalog().loadTable(tableIdentifier);
+    if (!(table instanceof HasTableOperations)) {
+      return;
+    }
+    TableMetadata base = ((HasTableOperations) table).operations().current();
+    // Replay format/schema updates on a builder so checkCompatibility uses the same format version
+    // Iceberg would see at each step (upgrade-before-add succeeds; reverse order fails like
+    // commit).
+    TableMetadata.Builder builder = TableMetadata.buildFrom(base);
+    try {
+      for (MetadataUpdate update : request.updates()) {
+        if (update instanceof MetadataUpdate.UpgradeFormatVersion
+            || update instanceof MetadataUpdate.AddSchema) {
+          update.applyTo(builder);
+        }
       }
+      if (hasFormatUpgrade && !hasSchemaUpdate) {
+        TableMetadata pending = builder.build();
+        validateSchema(pending.schema(), pending.formatVersion());
+      }
+    } catch (IllegalStateException | IllegalArgumentException e) {
+      throw new BadRequestException("%s", e.getMessage());
     }
   }
 

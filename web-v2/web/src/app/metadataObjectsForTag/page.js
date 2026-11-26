@@ -83,6 +83,7 @@ export default function MetadataObjectsForTagPage() {
         metalake: currentMetalake,
         metadataObjectType: object.type,
         metadataObjectFullName: object.fullName,
+        apiVersion: 1,
         data: { tagsToRemove: [tag] }
       })
     )

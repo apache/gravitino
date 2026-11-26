@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.time.Instant;
 import java.util.Collections;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.NameIdentifier;
@@ -154,6 +155,26 @@ public class TestSemanticModelDefinition {
 
   private static SemanticModel semanticModel(SemanticModelDefinition definition) {
     return new SemanticModel() {
+      @Override
+      public int revision() {
+        return 1;
+      }
+
+      @Override
+      public Status status() {
+        return Status.PUBLISHED;
+      }
+
+      @Override
+      public String publishedBy() {
+        return "user";
+      }
+
+      @Override
+      public Instant publishedAt() {
+        return Instant.EPOCH;
+      }
+
       @Override
       public String name() {
         return "sales";

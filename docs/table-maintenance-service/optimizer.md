@@ -122,11 +122,13 @@ plus Iceberg REST on object storage), also set:
 
 3. **Object-store data plane** — Spark must reach table storage through Iceberg REST. On object
    storage that usually means enabling Iceberg vended credentials
-   (`spark.sql.catalog.<catalog>.header.X-Iceberg-Access-Delegation=vended-credentials`) and
-   configuring IRC `rest.auth.*` for your catalog's auth mode in `spark_conf` (or the matching
-   `gravitino.maintenance.ircAuth.*` cluster settings for the in-process service). Do not copy
-   local `file:///` samples as-is. See
-   [Configuration](./optimizer-configuration.md) (IRC / `spark-conf` auth) and
+   (`spark.sql.catalog.<catalog>.header.X-Iceberg-Access-Delegation=vended-credentials`, or
+   `gravitino.maintenance.ircAuth.header.X-Iceberg-Access-Delegation=vended-credentials` for
+   in-process TMS) and configuring IRC `rest.auth.*` for your catalog's auth mode in
+   `spark_conf` (or the matching `gravitino.maintenance.ircAuth.*` cluster settings). Do not
+   copy local `file:///` samples as-is. See
+   [Iceberg REST / Spark auth](./optimizer-configuration.md#iceberg-rest-spark-auth-gravitinomaintenanceircauth-arbitrary-passthrough),
+   [Credential vending](../security/credential-vending.md#requesting-vended-credentials), and
    [Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures).
 
 ### Demo environment
@@ -345,6 +347,8 @@ Compaction and other rewrites create snapshots; without expiry, metadata accumul
 
 - Direct path: `POST .../jobs/runs` with `jobTemplateName` `builtin-iceberg-expire-snapshots`,
   plus `catalog_name`, `table_identifier`, and the shared Spark/catalog `jobConf` keys.
+- Policy path: `system_iceberg_snapshot_expiration`
+  ([Iceberg snapshot expiration policy](../iceberg-snapshot-expiration-policy.md)).
 - Policy handler wiring:
   [Snapshot expiration](./optimizer-configuration.md#snapshot-expiration).
 
@@ -361,8 +365,9 @@ See [Expire Snapshots](./optimizer-cli-reference.md#expire-snapshots).
 
 **Submit**
 
-- Policy path: `system_iceberg_orphan_file_removal` and the handler in
-  [Orphan cleanup](./optimizer-configuration.md#orphan-cleanup).
+- Policy path: `system_iceberg_orphan_file_removal`
+  ([Iceberg orphan file removal policy](../iceberg-orphan-file-removal-policy.md)) and the handler
+  in [Orphan cleanup](./optimizer-configuration.md#orphan-cleanup).
   Each explicit optimizer invocation evaluates the enabled policy at table level; it does not
   require partition statistics or configure a periodic schedule.
 - Direct path: `POST .../jobs/runs` with `jobTemplateName` `builtin-iceberg-remove-orphan-files`.
@@ -384,4 +389,7 @@ See [Remove Orphan Files](./optimizer-cli-reference.md#remove-orphan-files) and
 - [CLI Reference](./optimizer-cli-reference.md) for every command and the built-in job templates
 - [Troubleshooting](./optimizer-troubleshooting.md) when something above does not behave
 - [Extension Guide](./optimizer-extension-guide.md) for custom strategies and providers
-- [Iceberg Compaction Policy](../iceberg-compaction-policy.md) for tuning the built-in strategy
+- [Iceberg Compaction Policy](../iceberg-compaction-policy.md)
+- [Iceberg Manifest Rewrite Policy](../iceberg-rewrite-manifests-policy.md)
+- [Iceberg Snapshot Expiration Policy](../iceberg-snapshot-expiration-policy.md)
+- [Iceberg Orphan File Removal Policy](../iceberg-orphan-file-removal-policy.md)

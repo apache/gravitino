@@ -306,6 +306,17 @@ public class AuthorizationExpressionConstants {
                   ANY_INCLUDE_CREDENTIAL_SECRETS
                   """;
 
+  /**
+   * Soft check: both secret privileges (or metalake ownership) to include static catalog/fileset
+   * credentials; without them static providers are omitted rather than forbidden.
+   */
+  public static final String CATALOG_STATIC_CREDENTIALS_AUTHORIZATION_EXPRESSION =
+      "("
+          + FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION
+          + ") && ("
+          + FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION
+          + ")";
+
   public static final String FILTER_TOPICS_AUTHORIZATION_EXPRESSION =
       """
               ANY(OWNER, METALAKE, CATALOG, SCHEMA, TOPIC) ||
@@ -380,6 +391,11 @@ public class AuthorizationExpressionConstants {
           METALAKE::OWNER ||
           ((CAN_ACCESS_METADATA) && (TAG::OWNER || ANY_APPLY_TAG))
           """;
+
+  /** Authority required to assign or remove a tag carrying an access policy. */
+  public static final String APPLY_ACCESS_TAG_AUTHORIZATION_EXPRESSION =
+      "METALAKE::OWNER || (TAG::APPLY_TAG && !(ANY(DENY_APPLY_TAG, METALAKE, TAG))"
+          + " && CAN_OPERATE_METADATA_PRIVILEGE)";
 
   public static final String LOAD_USER_AUTHORIZATION_EXPRESSION =
       "METALAKE::OWNER || METALAKE::MANAGE_USERS || USER::SELF";

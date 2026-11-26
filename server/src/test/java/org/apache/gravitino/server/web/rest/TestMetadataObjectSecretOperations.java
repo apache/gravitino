@@ -19,6 +19,7 @@
 package org.apache.gravitino.server.web.rest;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -133,7 +134,8 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
   public void testGetSecretsReturnsEmptyWithoutUseSecretss() throws Exception {
     MetadataObject metadataObject =
         MetadataObjects.parse("catalog.schema.fileset", MetadataObject.Type.FILESET);
-    when(secretPropertyOperationDispatcher.getSecrets(any(), any(Entity.EntityType.class)))
+    when(secretPropertyOperationDispatcher.getSecrets(
+            any(), any(Entity.EntityType.class), any(Boolean.class)))
         .thenReturn(Map.of("custom-secret", "plaintext"));
 
     MetadataObjectSecretOperations operations =
@@ -172,25 +174,106 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
       Assertions.assertEquals(0, secretResponse.getCode());
       Assertions.assertTrue(secretResponse.getSecrets().isEmpty());
       verify(secretPropertyOperationDispatcher, never())
-          .getSecrets(any(), any(Entity.EntityType.class));
+          .getSecrets(any(), any(Entity.EntityType.class), any(Boolean.class));
+    }
+  }
+
+  /**
+   * Mixed static + non-static secrets: USE-only gets the omit result; USE+INCLUDE gets the full
+   * map. Dispatcher return values mirror omitStaticCredentialSecrets for the include flag.
+   */
+  @Test
+  public void testGetSecretsMixedStaticAndNonStaticRespectsIncludeFlag() throws Exception {
+    MetadataObject metadataObject =
+        MetadataObjects.parse("catalog.schema.fileset", MetadataObject.Type.FILESET);
+    Map<String, String> withoutStatic = Map.of("custom-secret", "plaintext", "other-token", "tok");
+    Map<String, String> withStatic =
+        Map.of(
+            "custom-secret",
+            "plaintext",
+            "other-token",
+            "tok",
+            "s3-access-key-id",
+            "AKIA",
+            "s3-secret-access-key",
+            "secret");
+    when(secretPropertyOperationDispatcher.getSecrets(
+            any(), any(Entity.EntityType.class), anyBoolean()))
+        .thenAnswer(
+            invocation -> {
+              boolean includeStatic = invocation.getArgument(2);
+              return includeStatic ? withStatic : withoutStatic;
+            });
+
+    MetadataObjectSecretOperations operations =
+        new MetadataObjectSecretOperations(secretPropertyOperationDispatcher);
+    FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
+
+    try (MockedStatic<MetadataAuthzHelper> metadataAuthzHelper =
+        mockStatic(MetadataAuthzHelper.class)) {
+      metadataAuthzHelper
+          .when(
+              () ->
+                  MetadataAuthzHelper.checkAccess(
+                      any(),
+                      any(Entity.EntityType.class),
+                      eq(
+                          AuthorizationExpressionConstants
+                              .FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION)))
+          .thenReturn(true);
+      metadataAuthzHelper
+          .when(
+              () ->
+                  MetadataAuthzHelper.checkAccess(
+                      any(),
+                      any(Entity.EntityType.class),
+                      eq(
+                          AuthorizationExpressionConstants
+                              .FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION)))
+          .thenReturn(false);
+
+      Response withoutInclude =
+          operations.getSecrets(metalake, metadataObject.type().name(), metadataObject.fullName());
+      Assertions.assertEquals(Response.Status.OK.getStatusCode(), withoutInclude.getStatus());
+      SecretsResponse omitted = (SecretsResponse) withoutInclude.getEntity();
+      Assertions.assertEquals("plaintext", omitted.getSecrets().get("custom-secret"));
+      Assertions.assertEquals("tok", omitted.getSecrets().get("other-token"));
+      Assertions.assertFalse(omitted.getSecrets().containsKey("s3-access-key-id"));
+      Assertions.assertFalse(omitted.getSecrets().containsKey("s3-secret-access-key"));
+      verify(secretPropertyOperationDispatcher)
+          .getSecrets(any(), any(Entity.EntityType.class), eq(false));
+
+      metadataAuthzHelper
+          .when(
+              () ->
+                  MetadataAuthzHelper.checkAccess(
+                      any(),
+                      any(Entity.EntityType.class),
+                      eq(
+                          AuthorizationExpressionConstants
+                              .FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION)))
+          .thenReturn(true);
+
+      Response withInclude =
+          operations.getSecrets(metalake, metadataObject.type().name(), metadataObject.fullName());
+      Assertions.assertEquals(Response.Status.OK.getStatusCode(), withInclude.getStatus());
+      SecretsResponse full = (SecretsResponse) withInclude.getEntity();
+      Assertions.assertEquals("plaintext", full.getSecrets().get("custom-secret"));
+      Assertions.assertEquals("tok", full.getSecrets().get("other-token"));
+      Assertions.assertEquals("AKIA", full.getSecrets().get("s3-access-key-id"));
+      Assertions.assertEquals("secret", full.getSecrets().get("s3-secret-access-key"));
+      verify(secretPropertyOperationDispatcher)
+          .getSecrets(any(), any(Entity.EntityType.class), eq(true));
     }
   }
 
   @Test
-  public void testGetSecretsFiltersCloudKeysWithUseSecretsOnly() throws Exception {
+  public void testGetSecretsPassesIncludeFlagFalseWithUseSecretsOnly() throws Exception {
     MetadataObject metadataObject =
         MetadataObjects.parse("catalog.schema.fileset", MetadataObject.Type.FILESET);
-    when(secretPropertyOperationDispatcher.getSecrets(any(), any(Entity.EntityType.class)))
-        .thenReturn(
-            Map.of(
-                "s3-access-key-id",
-                "AKIA",
-                "s3-secret-access-key",
-                "secret",
-                "jdbc-password",
-                "db-pass",
-                "custom-secret",
-                "plaintext"));
+    when(secretPropertyOperationDispatcher.getSecrets(
+            any(), any(Entity.EntityType.class), eq(false)))
+        .thenReturn(Map.of("custom-secret", "plaintext"));
 
     MetadataObjectSecretOperations operations =
         new MetadataObjectSecretOperations(secretPropertyOperationDispatcher);
@@ -225,19 +308,19 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
       Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
       SecretsResponse secretResponse = (SecretsResponse) response.getEntity();
       Assertions.assertEquals(0, secretResponse.getCode());
-      Assertions.assertEquals("db-pass", secretResponse.getSecrets().get("jdbc-password"));
       Assertions.assertEquals("plaintext", secretResponse.getSecrets().get("custom-secret"));
-      Assertions.assertFalse(secretResponse.getSecrets().containsKey("s3-access-key-id"));
-      Assertions.assertFalse(secretResponse.getSecrets().containsKey("s3-secret-access-key"));
+      verify(secretPropertyOperationDispatcher)
+          .getSecrets(any(), any(Entity.EntityType.class), eq(false));
     }
   }
 
   @Test
-  public void testGetSecretsIncludesCloudKeysWithUseSecretsAndIncludeCredentialSecretss()
+  public void testGetSecretsPassesIncludeFlagTrueWithUseSecretsAndIncludeCredentialSecrets()
       throws Exception {
     MetadataObject metadataObject =
         MetadataObjects.parse("catalog.schema.fileset", MetadataObject.Type.FILESET);
-    when(secretPropertyOperationDispatcher.getSecrets(any(), any(Entity.EntityType.class)))
+    when(secretPropertyOperationDispatcher.getSecrets(
+            any(), any(Entity.EntityType.class), eq(true)))
         .thenReturn(
             Map.of(
                 "s3-access-key-id",
@@ -283,11 +366,14 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
       Assertions.assertEquals("AKIA", secretResponse.getSecrets().get("s3-access-key-id"));
       Assertions.assertEquals("secret", secretResponse.getSecrets().get("s3-secret-access-key"));
       Assertions.assertEquals("db-pass", secretResponse.getSecrets().get("jdbc-password"));
+      verify(secretPropertyOperationDispatcher)
+          .getSecrets(any(), any(Entity.EntityType.class), eq(true));
     }
   }
 
   private void testGetSecretsForObject(MetadataObject metadataObject) {
-    when(secretPropertyOperationDispatcher.getSecrets(any(), any(Entity.EntityType.class)))
+    when(secretPropertyOperationDispatcher.getSecrets(
+            any(), any(Entity.EntityType.class), any(Boolean.class)))
         .thenReturn(Map.of("custom-secret", "plaintext"));
 
     Response response =
@@ -304,7 +390,8 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
     Assertions.assertEquals(0, secretResponse.getCode());
     Assertions.assertEquals("plaintext", secretResponse.getSecrets().get("custom-secret"));
 
-    when(secretPropertyOperationDispatcher.getSecrets(any(), any(Entity.EntityType.class)))
+    when(secretPropertyOperationDispatcher.getSecrets(
+            any(), any(Entity.EntityType.class), any(Boolean.class)))
         .thenReturn(Map.of());
     response =
         target(basePath(metalake))

@@ -62,7 +62,7 @@ public class TestMetalakeNormalizeDispatcher {
   @Test
   public void testNameSpec() {
     // Test for valid names
-    String[] legalNames = {"metalake", "_metalake", "1_metalake", "_", "1"};
+    String[] legalNames = {"metalake", "_metalake", "1_metalake", "_", "1", "a".repeat(64)};
     for (String legalName : legalNames) {
       NameIdentifier metalakeIdent = NameIdentifier.of(legalName);
       Metalake metalake = metalakeNormalizeDispatcher.createMetalake(metalakeIdent, null, null);
@@ -106,7 +106,8 @@ public class TestMetalakeNormalizeDispatcher {
       "metalake[xxx",
       "metalake]xxx",
       "metalake{xxx",
-      "metalake}xxx"
+      "metalake}xxx",
+      "a".repeat(64) + "?"
     };
     for (String illegalName : illegalNames) {
       NameIdentifier metalakeIdent = NameIdentifier.of(illegalName);
@@ -117,6 +118,27 @@ public class TestMetalakeNormalizeDispatcher {
       Assertions.assertEquals(
           "The metalake name '" + illegalName + "' is illegal.", exception.getMessage());
     }
+  }
+
+  @Test
+  void testCreateAndRenameReportNameLengthLimit() {
+    String longName = "a".repeat(65);
+    IllegalArgumentException createError =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                metalakeNormalizeDispatcher.createMetalake(
+                    NameIdentifier.of(longName), null, null));
+    Assertions.assertEquals(
+        "The metalake name must not exceed 64 characters.", createError.getMessage());
+
+    IllegalArgumentException renameError =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                metalakeNormalizeDispatcher.alterMetalake(
+                    NameIdentifier.of("metalake"), MetalakeChange.rename(longName)));
+    Assertions.assertEquals(createError.getMessage(), renameError.getMessage());
   }
 
   @Test

@@ -209,6 +209,7 @@ public class TestRelationalEntityStoreHierarchicalCache {
         .thenReturn(Configs.DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLISECONDS);
     Mockito.when(config.get(Configs.STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     Mockito.when(config.get(Configs.VERSION_RETENTION_COUNT)).thenReturn(1L);
+    Mockito.when(config.get(Configs.SEMANTIC_MODEL_VERSION_RETENTION_COUNT)).thenReturn(100L);
     Mockito.when(config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
     Mockito.when(config.get(Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE))
         .thenReturn(Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);

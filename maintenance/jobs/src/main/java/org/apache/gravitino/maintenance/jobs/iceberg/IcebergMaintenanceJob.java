@@ -21,6 +21,7 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -39,7 +40,9 @@ import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionMetricsReq
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
 import org.apache.gravitino.maintenance.jobs.MaintenanceActionHttpClient;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContents;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -264,6 +267,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
               task.policyId);
           return;
         }
+        before = withCompactionDataMseRatio(before, task.policyType, task.rules);
         try {
           client.reportBeforeMetrics(
               task.actionId,
@@ -324,6 +328,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
             task.policyId);
         return;
       }
+      after = withCompactionDataMseRatio(after, task.policyType, task.rules);
       try {
         client.reportAfterMetrics(
             task.actionId,
@@ -441,6 +446,53 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     } catch (JsonProcessingException e) {
       throw new IllegalArgumentException("tasks must be valid JSON: " + e.getMessage(), e);
     }
+  }
+
+  /**
+   * Adds compaction Fragmentation display metric {@code custom-data-mse-ratio} from measured MSE
+   * and policy {@code minDataFileMse}. No-op for other types. Does not persist the threshold
+   * itself.
+   */
+  static TableSnapshotMetrics withCompactionDataMseRatio(
+      TableSnapshotMetrics sample,
+      Policy.BuiltInType policyType,
+      @Nullable Map<String, Object> rules) {
+    if (policyType != Policy.BuiltInType.ICEBERG_COMPACTION
+        || sample == null
+        || sample.metricsJson() == null
+        || sample.metricsJson().trim().isEmpty()) {
+      return sample;
+    }
+    try {
+      Map<String, Object> metrics =
+          JsonUtils.anyFieldMapper()
+              .readValue(sample.metricsJson(), new TypeReference<Map<String, Object>>() {});
+      if (metrics == null) {
+        return sample;
+      }
+      Object mseRaw = metrics.get(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC);
+      if (!(mseRaw instanceof Number)) {
+        return sample;
+      }
+      long threshold = compactionMinDataFileMse(rules);
+      double ratio = threshold > 0L ? ((Number) mseRaw).doubleValue() / (double) threshold : 0D;
+      metrics.put(IcebergDataCompactionContent.DATA_MSE_RATIO_METRIC, ratio);
+      return TableSnapshotMetrics.of(sample.snapshotId(), metrics);
+    } catch (IOException | RuntimeException e) {
+      LOG.warn(
+          "Failed to add {}: {}", IcebergDataCompactionContent.DATA_MSE_RATIO_METRIC, e.toString());
+      return sample;
+    }
+  }
+
+  static long compactionMinDataFileMse(@Nullable Map<String, Object> rules) {
+    Map<String, Object> effective =
+        rules == null || rules.isEmpty() ? PolicyContents.icebergDataCompaction().rules() : rules;
+    Object raw = effective.get(IcebergDataCompactionContent.MIN_DATA_FILE_MSE_KEY);
+    if (raw instanceof Number) {
+      return ((Number) raw).longValue();
+    }
+    return IcebergDataCompactionContent.DEFAULT_MIN_DATA_FILE_MSE;
   }
 
   private static long requirePositiveLong(@Nullable Object value, String field) {

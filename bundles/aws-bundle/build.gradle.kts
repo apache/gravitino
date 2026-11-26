@@ -25,16 +25,40 @@ plugins {
   alias(libs.plugins.shadow)
 }
 
+// Keeps the Netty artifacts brought in by the AWS SDK on the single version of the catalog. The BOM
+// sits in a dedicated configuration so that it only applies to this module.
+val nettyBom: Configuration by configurations.creating {
+  isCanBeConsumed = false
+  isCanBeResolved = false
+}
+
+listOf("compileClasspath", "runtimeClasspath", "testCompileClasspath", "testRuntimeClasspath")
+  .forEach { configurations.named(it) { extendsFrom(nettyBom) } }
+
 dependencies {
+  nettyBom(platform(libs.netty.bom))
+
   implementation(project(":bundles:aws"))
-  implementation(libs.hadoop3.aws)
+  implementation(libs.hadoop3.aws) {
+    exclude("software.amazon.awssdk", "bundle")
+  }
+  implementation(libs.bundles.hadoop.aws.sdk)
+  // S3A client-side encryption (CSE-KMS, CSE-CUSTOM). Hadoop 3.3 used the encryption client of the
+  // AWS SDK v1 bundle. Hadoop 3.4 needs the S3 encryption client, which hadoop-aws declares as
+  // provided, and the KMS module, which the single SDK modules above do not include.
+  implementation(libs.aws.kms)
+  implementation(libs.aws.s3.encryption.client)
   implementation(libs.aws.iam)
   implementation(libs.aws.policy)
   implementation(libs.aws.sts)
+  // hadoop-aws 3.4 uses Commons Collections 4 (copyFromLocalFile), which hadoop-client-runtime
+  // shades for its own use only.
+  implementation(libs.commons.collections4)
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
 
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.slf4j.api)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
@@ -67,6 +91,17 @@ tasks.withType(ShadowJar::class.java) {
   relocate("io.netty", "org.apache.gravitino.aws.shaded.io.netty")
   relocate("org.apache.commons", "org.apache.gravitino.aws.shaded.org.apache.commons")
   relocate("org.apache.http", "org.apache.gravitino.aws.shaded.org.apache.http")
+  // Apache HTTP client 5, brought by the apache5-client module that the AWS SDK v2 service modules
+  // depend on.
+  relocate("org.apache.hc", "org.apache.gravitino.aws.shaded.org.apache.hc")
+  // hadoop-aws links ConfigureShadedAWSSocketFactory against the Apache HTTP client that the
+  // software.amazon.awssdk:bundle shades. The bundle is replaced by the single SDK modules, which use
+  // org.apache.http, so map the shaded name to the same relocated package to keep
+  // fs.s3a.ssl.channel.mode working.
+  relocate(
+    "software.amazon.awssdk.thirdparty.org.apache.http",
+    "org.apache.gravitino.aws.shaded.org.apache.http"
+  )
   relocate("org.checkerframework", "org.apache.gravitino.aws.shaded.org.checkerframework")
   relocate("org.reactivestreams", "org.apache.gravitino.aws.shaded.org.reactivestreams")
 
@@ -86,5 +121,6 @@ tasks.test {
   val bundle = tasks.named<ShadowJar>("shadowJar")
   dependsOn(bundle)
   inputs.file(bundle.flatMap { it.archiveFile })
+  systemProperty("nettyVersion", libs.versions.netty.get())
   doFirst { systemProperty("shadowJarPath", bundle.get().archiveFile.get().asFile.absolutePath) }
 }

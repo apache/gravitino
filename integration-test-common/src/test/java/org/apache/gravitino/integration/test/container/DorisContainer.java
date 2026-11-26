@@ -40,6 +40,8 @@ import org.testcontainers.containers.ComposeContainer;
 import org.testcontainers.containers.ContainerState;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.images.RemoteDockerImage;
+import org.testcontainers.utility.DockerImageName;
 
 /**
  * Docker-compose based Doris container for integration tests. This uses Testcontainers' {@link
@@ -72,6 +74,7 @@ public class DorisContainer extends BaseContainer {
   private static final String DORIS_BE_PATH = "/opt/apache-doris/be/log";
 
   private final ComposeContainer composeContainer;
+  private final Set<String> composeImages;
   private String feIpAddress;
   private int feMysqlPort;
 
@@ -114,9 +117,14 @@ public class DorisContainer extends BaseContainer {
       feImage = base + ":fe-" + version;
       beImage = base + ":be-" + version;
     }
+    composeImages = ImmutableSet.of(feImage, beImage);
 
     composeContainer =
         new ComposeContainer(new File(composeFile))
+            // Images are pulled sequentially in prePullImages() instead. Testcontainers'
+            // preemptive pull cannot parse the nested ${...:-${...}} image references in the
+            // compose file, so it would silently skip and leave the pull to compose.
+            .withPull(false)
             .withEnv("GRAVITINO_CI_DORIS_DOCKER_IMAGE", image)
             .withEnv("GRAVITINO_CI_DORIS_FE_IMAGE", feImage)
             .withEnv("GRAVITINO_CI_DORIS_BE_IMAGE", beImage)
@@ -146,6 +154,7 @@ public class DorisContainer extends BaseContainer {
 
   @Override
   public void start() {
+    prePullImages();
     composeContainer.start();
     resolveFeIpAddress();
     Preconditions.check("Doris container startup failed!", checkContainerStatus(5));
@@ -245,6 +254,20 @@ public class DorisContainer extends BaseContainer {
             });
 
     return true;
+  }
+
+  /**
+   * Pulls the FE/BE images one at a time before {@code docker compose up}. Both services usually
+   * reference the same image, and letting compose pull it for both services in parallel races on
+   * unpacking the same layers in Docker's containerd image store ("failed to extract layer ...
+   * failed to Lchown ... no such file or directory"). Once the images exist locally, compose skips
+   * pulling them.
+   */
+  private void prePullImages() {
+    for (String composeImage : composeImages) {
+      LOG.info("Pre-pulling Doris image {} before starting docker compose", composeImage);
+      new RemoteDockerImage(DockerImageName.parse(composeImage)).get();
+    }
   }
 
   private void resolveFeIpAddress() {

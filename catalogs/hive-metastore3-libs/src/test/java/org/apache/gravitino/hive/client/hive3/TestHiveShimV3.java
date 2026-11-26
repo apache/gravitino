@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.hive.client.hive3;
 
+import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -31,6 +32,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
@@ -41,6 +43,7 @@ import java.util.Map;
 import java.util.Properties;
 import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.hive.converter.HiveTableConverter;
 import org.apache.gravitino.meta.AuditInfo;
@@ -56,6 +59,7 @@ import org.apache.hadoop.hive.metastore.api.NotNullConstraintsRequest;
 import org.apache.hadoop.hive.metastore.api.SQLDefaultConstraint;
 import org.apache.hadoop.hive.metastore.api.SQLNotNullConstraint;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
@@ -91,6 +95,25 @@ class TestHiveShimV3 {
     IMetaStoreClient metaStoreClient() {
       return client;
     }
+  }
+
+  @Test
+  void testIdentifierProbeUsesCatalogAwareGetTableOnly() throws Exception {
+    MockHiveShimV3 shim = new MockHiveShimV3();
+    IMetaStoreClient client = shim.metaStoreClient();
+    Table table = new Table();
+    table.setTableType("MANAGED_TABLE");
+    table.setParameters(Map.of(ID_KEY, "source-identifier"));
+    when(client.getTable(CATALOG, DB, TABLE)).thenReturn(table);
+    Assertions.assertEquals("source-identifier", shim.getTableIdentifier(CATALOG, DB, TABLE));
+    verify(client).getTable(CATALOG, DB, TABLE);
+    // In particular, no column constraint or SerDe field RPC is allowed.
+    verifyNoMoreInteractions(client);
+    table.setParameters(null);
+    Assertions.assertNull(shim.getTableIdentifier(CATALOG, DB, TABLE));
+    table.setTableType("VIRTUAL_VIEW");
+    Assertions.assertThrows(
+        NoSuchTableException.class, () -> shim.getTableIdentifier(CATALOG, DB, TABLE));
   }
 
   private HiveTable testTable(Column... columns) {

@@ -36,6 +36,7 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.MetricInfoListResponse;
 import org.apache.gravitino.dto.responses.SemanticModelResponse;
+import org.apache.gravitino.dto.responses.SemanticModelRevisionListResponse;
 import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -49,6 +50,7 @@ import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelRevision;
 import org.apache.hc.core5.http.HttpHeaders;
 
 /** Implements schema-scoped Semantic Model operations through the Gravitino REST API. */
@@ -127,20 +129,31 @@ class SemanticModelCatalogOperations implements SemanticModelCatalog {
   /** {@inheritDoc} */
   @Override
   public SemanticModel loadSemanticModel(NameIdentifier ident) throws NoSuchSemanticModelException {
-    checkSemanticModelNameIdentifier(ident);
+    return load(ident, "");
+  }
 
+  @Override
+  public SemanticModel loadSemanticModel(NameIdentifier ident, int revision) {
+    return load(ident, revisionPath(revision));
+  }
+
+  @Override
+  public SemanticModel loadSemanticModel(NameIdentifier ident, String alias) {
+    return load(ident, revisionPath(alias));
+  }
+
+  @Override
+  public SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident) {
+    checkSemanticModelNameIdentifier(ident);
     Namespace fullNamespace = getSemanticModelFullNamespace(ident.namespace());
-    SemanticModelResponse response =
+    SemanticModelRevisionListResponse response =
         restClient.get(
-            formatSemanticModelRequestPath(fullNamespace)
-                + "/"
-                + RESTUtils.encodeString(ident.name()),
-            SemanticModelResponse.class,
+            modelPath(fullNamespace, ident) + "/revisions",
+            SemanticModelRevisionListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.semanticModelErrorHandler());
     response.validate();
-
-    return new GenericSemanticModel(response.getSemanticModel(), restClient, fullNamespace);
+    return response.revisions();
   }
 
   /** {@inheritDoc} */
@@ -202,21 +215,17 @@ class SemanticModelCatalogOperations implements SemanticModelCatalog {
   @Override
   public OssieDocument exportOssieDocument(NameIdentifier ident, OssieFormat format)
       throws NoSuchSemanticModelException, IllegalSemanticModelException {
-    checkSemanticModelNameIdentifier(ident);
-    Preconditions.checkArgument(format != null, "Ossie format must not be null");
+    return export(ident, "", format);
+  }
 
-    Namespace fullNamespace = getSemanticModelFullNamespace(ident.namespace());
-    String content =
-        restClient.getRaw(
-            formatSemanticModelRequestPath(fullNamespace)
-                + "/"
-                + RESTUtils.encodeString(ident.name())
-                + "/ossie",
-            Collections.singletonMap("format", format.name().toLowerCase(Locale.ROOT)),
-            Collections.singletonMap(HttpHeaders.ACCEPT, ossieMediaType(format)),
-            ErrorHandlers.semanticModelErrorHandler());
+  @Override
+  public OssieDocument exportOssieDocument(NameIdentifier ident, int revision, OssieFormat format) {
+    return export(ident, revisionPath(revision), format);
+  }
 
-    return format == OssieFormat.JSON ? OssieDocument.json(content) : OssieDocument.yaml(content);
+  @Override
+  public OssieDocument exportOssieDocument(NameIdentifier ident, String alias, OssieFormat format) {
+    return export(ident, revisionPath(alias), format);
   }
 
   /** {@inheritDoc} */
@@ -224,29 +233,13 @@ class SemanticModelCatalogOperations implements SemanticModelCatalog {
   public SemanticModel alterSemanticModel(NameIdentifier ident, SemanticModelChange... changes)
       throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
-    checkSemanticModelNameIdentifier(ident);
-    Preconditions.checkArgument(changes != null, "Semantic Model changes must not be null");
+    return alter(ident, null, changes);
+  }
 
-    List<SemanticModelUpdateRequest> updates =
-        Arrays.stream(changes)
-            .map(DTOConverters::toSemanticModelUpdateRequest)
-            .collect(Collectors.toList());
-    SemanticModelUpdatesRequest request = new SemanticModelUpdatesRequest(updates);
-    request.validate();
-
-    Namespace fullNamespace = getSemanticModelFullNamespace(ident.namespace());
-    SemanticModelResponse response =
-        restClient.put(
-            formatSemanticModelRequestPath(fullNamespace)
-                + "/"
-                + RESTUtils.encodeString(ident.name()),
-            request,
-            SemanticModelResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.semanticModelErrorHandler());
-    response.validate();
-
-    return new GenericSemanticModel(response.getSemanticModel(), restClient, fullNamespace);
+  @Override
+  public SemanticModel alterSemanticModel(
+      NameIdentifier ident, int expectedRevision, SemanticModelChange... changes) {
+    return alter(ident, expectedRevision, changes);
   }
 
   /** {@inheritDoc} */
@@ -257,9 +250,7 @@ class SemanticModelCatalogOperations implements SemanticModelCatalog {
     Namespace fullNamespace = getSemanticModelFullNamespace(ident.namespace());
     DropResponse response =
         restClient.delete(
-            formatSemanticModelRequestPath(fullNamespace)
-                + "/"
-                + RESTUtils.encodeString(ident.name()),
+            modelPath(fullNamespace, ident),
             DropResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.semanticModelErrorHandler());
@@ -295,8 +286,79 @@ class SemanticModelCatalogOperations implements SemanticModelCatalog {
     checkSemanticModelNamespace(ident.namespace());
   }
 
+  private SemanticModel load(NameIdentifier ident, String suffix) {
+    checkSemanticModelNameIdentifier(ident);
+
+    Namespace fullNamespace = getSemanticModelFullNamespace(ident.namespace());
+    SemanticModelResponse response =
+        restClient.get(
+            modelPath(fullNamespace, ident) + suffix,
+            SemanticModelResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.semanticModelErrorHandler());
+    response.validate();
+
+    return new GenericSemanticModel(response.getSemanticModel(), restClient, fullNamespace);
+  }
+
+  private OssieDocument export(NameIdentifier ident, String suffix, OssieFormat format) {
+    checkSemanticModelNameIdentifier(ident);
+    Preconditions.checkArgument(format != null, "Ossie format must not be null");
+
+    Namespace fullNamespace = getSemanticModelFullNamespace(ident.namespace());
+    String content =
+        restClient.getRaw(
+            modelPath(fullNamespace, ident) + suffix + "/ossie",
+            Collections.singletonMap("format", format.name().toLowerCase(Locale.ROOT)),
+            Collections.singletonMap(HttpHeaders.ACCEPT, ossieMediaType(format)),
+            ErrorHandlers.semanticModelErrorHandler());
+
+    return format == OssieFormat.JSON ? OssieDocument.json(content) : OssieDocument.yaml(content);
+  }
+
+  private SemanticModel alter(
+      NameIdentifier ident, @Nullable Integer expectedRevision, SemanticModelChange... changes) {
+    checkSemanticModelNameIdentifier(ident);
+    Preconditions.checkArgument(changes != null, "Semantic Model changes must not be null");
+
+    List<SemanticModelUpdateRequest> updates =
+        Arrays.stream(changes)
+            .map(DTOConverters::toSemanticModelUpdateRequest)
+            .collect(Collectors.toList());
+    SemanticModelUpdatesRequest request =
+        new SemanticModelUpdatesRequest(updates, expectedRevision);
+    request.validate();
+
+    Namespace fullNamespace = getSemanticModelFullNamespace(ident.namespace());
+    SemanticModelResponse response =
+        restClient.put(
+            modelPath(fullNamespace, ident),
+            request,
+            SemanticModelResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.semanticModelErrorHandler());
+    response.validate();
+
+    return new GenericSemanticModel(response.getSemanticModel(), restClient, fullNamespace);
+  }
+
   private Namespace getSemanticModelFullNamespace(Namespace semanticModelNamespace) {
     return Namespace.of(catalogNamespace.level(0), catalogName, semanticModelNamespace.level(0));
+  }
+
+  private static String modelPath(Namespace namespace, NameIdentifier ident) {
+    return formatSemanticModelRequestPath(namespace) + "/" + RESTUtils.encodeString(ident.name());
+  }
+
+  private static String revisionPath(int revision) {
+    Preconditions.checkArgument(revision > 0, "Revision must be positive");
+    return "/revisions/" + revision;
+  }
+
+  private static String revisionPath(String alias) {
+    Preconditions.checkArgument(
+        LATEST_REVISION.equals(alias), "Unsupported revision alias: %s", alias);
+    return "/revisions/" + LATEST_REVISION;
   }
 
   private static String formatMetricRequestPath(Namespace namespace) {

@@ -22,10 +22,12 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
 import org.apache.gravitino.storage.relational.po.SemanticModelPO;
 
@@ -33,8 +35,12 @@ import org.apache.gravitino.storage.relational.po.SemanticModelPO;
 public class SemanticModelPOStorageOps
     extends BasePOStorageOps<SemanticModelPO, SemanticModelMetaMapper> {
 
-  /** Creates Semantic Model persistent-object operations. */
-  public SemanticModelPOStorageOps() {}
+  @Nullable private final SemanticModelRevisionSelector selector;
+
+  /** Creates operations selecting a revision, or only identity when the selector is null. */
+  public SemanticModelPOStorageOps(@Nullable SemanticModelRevisionSelector selector) {
+    this.selector = selector;
+  }
 
   /**
    * {@inheritDoc}
@@ -60,7 +66,7 @@ public class SemanticModelPOStorageOps
   @Override
   public SemanticModelPO getPO(
       SemanticModelMetaMapper mapper, Long parentId, String semanticModelName) {
-    return mapper.selectSemanticModelMetaBySchemaIdAndName(parentId, semanticModelName);
+    return mapper.selectSemanticModelMetaBySchemaIdAndName(parentId, semanticModelName, selector);
   }
 
   @Override
@@ -69,7 +75,11 @@ public class SemanticModelPOStorageOps
     Namespace namespace = identifier.namespace();
     SemanticModelPO po =
         mapper.selectSemanticModelByFullQualifiedName(
-            namespace.level(0), namespace.level(1), namespace.level(2), identifier.name());
+            namespace.level(0),
+            namespace.level(1),
+            namespace.level(2),
+            identifier.name(),
+            selector);
     if (po == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
@@ -90,7 +100,7 @@ public class SemanticModelPOStorageOps
 
   @Override
   public List<SemanticModelPO> listPOs(SemanticModelMetaMapper mapper, Long parentId) {
-    return mapper.listSemanticModelPOsBySchemaId(parentId);
+    return mapper.listSemanticModelPOsBySchemaId(parentId, selector);
   }
 
   @Override
@@ -98,7 +108,7 @@ public class SemanticModelPOStorageOps
       SemanticModelMetaMapper mapper, Namespace namespace) {
     List<SemanticModelPO> pos =
         mapper.listSemanticModelPOsByFullQualifiedName(
-            namespace.level(0), namespace.level(1), namespace.level(2));
+            namespace.level(0), namespace.level(1), namespace.level(2), selector);
     if (pos.isEmpty()) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,

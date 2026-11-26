@@ -33,6 +33,7 @@ vi.mock('react-hot-toast', () => ({ default: { error: vi.fn() } }))
 const definition = { datasets: [{ name: 'orders', source: { namespace: ['sales', 'mart'], name: 'orders' } }] }
 
 const model = {
+  revision: 7,
   name: 'orders',
   comment: 'original',
   definition,
@@ -62,7 +63,7 @@ beforeEach(() => {
     value: vi.fn(() => ({ matches: false, addListener() {}, removeListener() {} }))
   })
   defHttp.get.mockImplementation(({ url }) =>
-    Promise.resolve(url.endsWith('/orders') ? { semanticModel: model } : { identifiers: [] })
+    Promise.resolve(url.endsWith('/orders/revisions/latest') ? { semanticModel: model } : { identifiers: [] })
   )
   container = document.createElement('div')
   document.body.appendChild(container)
@@ -161,6 +162,7 @@ describe('semantic model editor', () => {
     await fill('comment', 'new comment')
     await submit()
     expect(defHttp.put.mock.calls[0][0].data).toEqual({
+      expectedRevision: 7,
       updates: [{ '@type': 'updateComment', newComment: 'new comment' }]
     })
   })
@@ -174,6 +176,7 @@ describe('semantic model editor', () => {
     )
     await submit()
     expect(defHttp.put.mock.calls[0]?.[0].data).toEqual({
+      expectedRevision: 7,
       updates: [{ '@type': 'removeProperty', property: name }]
     })
     expect(close).toHaveBeenCalledWith(false)

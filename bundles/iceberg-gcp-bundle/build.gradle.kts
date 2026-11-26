@@ -25,6 +25,9 @@ plugins {
 }
 
 dependencies {
+  // Align Guava with the version Gravitino uses, instead of the older Android flavor brought by
+  // the Google auth libraries.
+  implementation(libs.guava)
   implementation(libs.google.auth.credentials)
   implementation(libs.google.auth.http)
   implementation(libs.iceberg.gcp.bundle)
