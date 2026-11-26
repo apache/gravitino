@@ -23,7 +23,6 @@ from urllib.parse import urlparse
 
 import mcp.types as mt
 from fastmcp import FastMCP
-from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware
 from fastmcp.server.middleware.logging import (
     LoggingMiddleware,
 )
@@ -42,6 +41,10 @@ from mcp_server.core.context import (
     _get_request_authorization,
     get_request_metalake,
     service_fallback_authorization,
+)
+from mcp_server.core.errors import (
+    GravitinoErrorHandlingMiddleware,
+    classify_error,
 )
 from mcp_server.core.middleware import (
     TOOLS_WITHOUT_METALAKE,
@@ -86,7 +89,7 @@ class AuditMiddleware(Middleware):
         """
         if tool_name in TOOLS_WITHOUT_METALAKE:
             return ""
-        return get_request_metalake() or self._default_metalake
+        return get_request_metalake(self._default_metalake)
 
     async def on_call_tool(
         self,
@@ -94,23 +97,34 @@ class AuditMiddleware(Middleware):
         call_next: CallNext[mt.CallToolRequestParams, ToolResult],
     ) -> ToolResult:
         tool_name = context.message.name if context.message else "unknown"
+        arguments = context.message.arguments if context.message else None
         principal = _get_principal_from_request(self._fallback_authorization)
+        metalake = self._metalake(tool_name)
+        target_type, target_name = audit.extract_write_target(
+            tool_name, arguments, metalake
+        )
         try:
             result = await call_next(context)
             audit.emit(
                 principal=principal,
                 tool=tool_name,
                 outcome="allow",
-                metalake=self._metalake(tool_name),
+                metalake=metalake,
+                target_type=target_type,
+                target_name=target_name,
             )
             return result
         except Exception as exc:
+            classification = classify_error(exc, method=context.method or "")
             audit.emit(
                 principal=principal,
                 tool=tool_name,
-                outcome="deny",
-                error_type=type(exc).__name__,
-                metalake=self._metalake(tool_name),
+                outcome=classification.outcome,
+                error_type=classification.error_type,
+                error_category=classification.category,
+                metalake=metalake,
+                target_type=target_type,
+                target_name=target_name,
             )
             raise
 
@@ -137,6 +151,13 @@ def _create_gravitino_mcp(setting: Setting) -> FastMCP:
     # Added first so it wraps the others: it must publish the call's metalake
     # before AuditMiddleware records it.
     mcp.add_middleware(MetalakeArgumentMiddleware())
+    # Audit the original exception before the error handler returns a tool result.
+    mcp.add_middleware(
+        GravitinoErrorHandlingMiddleware(
+            include_traceback=True,
+            transform_errors=True,
+        )
+    )
     mcp.add_middleware(
         AuditMiddleware(
             service_fallback_authorization(setting), setting.metalake
@@ -146,12 +167,6 @@ def _create_gravitino_mcp(setting: Setting) -> FastMCP:
         LoggingMiddleware(include_payloads=True, max_payload_length=1000)
     )
     mcp.add_middleware(TimingMiddleware())
-    mcp.add_middleware(
-        ErrorHandlingMiddleware(
-            include_traceback=True,
-            transform_errors=True,
-        )
-    )
     return mcp
 
 

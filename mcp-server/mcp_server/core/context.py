@@ -165,14 +165,18 @@ def reset_request_metalake(token) -> None:
     _REQUEST_METALAKE.reset(token)
 
 
-def get_request_metalake() -> str:
-    """The metalake this call named, or "" when it named none or named it badly.
+def get_request_metalake(default: str = "") -> str:
+    """Resolve the requested metalake, returning an empty string for invalid input.
 
-    Never raises: audit logging calls this on the failure path too, where the
-    value may be exactly the malformed input that caused the failure.
+    Omitted, null, and blank arguments select the configured default. Audit
+    logging also calls this after validation fails, before a tenant is selected.
     """
     metalake = _REQUEST_METALAKE.get()
-    return metalake.strip() if isinstance(metalake, str) else ""
+    if metalake is MISSING_METALAKE or metalake is None:
+        return default
+    if isinstance(metalake, str):
+        return metalake.strip() or default
+    return ""
 
 
 def startup_authorization(setting: Setting) -> str:
@@ -361,7 +365,7 @@ class GravitinoContext:
                 f"metalake, but got {type(requested).__name__}."
             )
 
-        metalake = get_request_metalake() or self._setting.metalake
+        metalake = get_request_metalake(self._setting.metalake)
         if not metalake:
             # Only point at the discovery tool when this deployment actually
             # exposes it; a tag filter can hide it, and naming a tool the
