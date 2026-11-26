@@ -81,11 +81,27 @@ public final class GlossaryTermDomainService {
       Set<Long> members,
       Set<String> requestedNames,
       Consumer<DomainPO> checkRequested) {
+    return lockDomains(metalakeId, members, Set.of(), requestedNames, checkRequested);
+  }
+
+  /**
+   * Locks live member domains, optional unpublished candidate domain IDs, and requested domain
+   * names in ascending ID order. Missing live {@code members} fail with {@link
+   * IllegalStateException}, while missing {@code candidateIds} are omitted from the returned map so
+   * callers can report {@link NoSuchDomainException} or drop stale draft references.
+   */
+  public Map<Long, DomainPO> lockDomains(
+      long metalakeId,
+      Set<Long> members,
+      Set<Long> candidateIds,
+      Set<String> requestedNames,
+      Consumer<DomainPO> checkRequested) {
     return SessionUtils.getWithoutCommit(
         DomainMetaMapper.class,
         mapper -> {
           Map<String, Long> observedIds = new HashMap<>();
           Set<Long> ids = new TreeSet<>(members);
+          ids.addAll(candidateIds);
           for (String name : requestedNames) {
             DomainPO row = mapper.selectDomainMetaByMetalakeIdAndName(metalakeId, name);
             if (row != null && name.equals(row.domainName())) {

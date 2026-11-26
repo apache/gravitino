@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.glossary;
 
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
@@ -45,6 +46,18 @@ import org.apache.gravitino.exceptions.TermVersionConflictException;
 @Evolving
 public interface GlossaryTerm extends Auditable {
 
+  /**
+   * Identifies the returned business version and its publication outcome on a version-aware write
+   * or history read. A submitted or saved candidate is private and uses DRAFT in the legacy status
+   * field.
+   *
+   * @return the publication metadata, or null for an unversioned result
+   */
+  @Nullable
+  default TermPublication publication() {
+    return null;
+  }
+
   /** The status of a term. */
   enum Status {
     /**
@@ -60,7 +73,25 @@ public interface GlossaryTerm extends Auditable {
      */
     APPROVED,
     /** The term is replaced. It stays readable, but lookups for agents leave it out. */
-    DEPRECATED
+    DEPRECATED;
+
+    /**
+     * Parses a term status by name, ignoring case.
+     *
+     * @param value The status name to parse.
+     * @return The matching term status.
+     * @throws IllegalArgumentException If the value does not match a status name.
+     */
+    public static Status fromString(String value) {
+      for (Status status : values()) {
+        if (status.name().equalsIgnoreCase(value)) {
+          return status;
+        }
+      }
+      throw new IllegalArgumentException(
+          String.format(
+              "Invalid term status '%s', expected one of %s", value, Arrays.toString(values())));
+    }
   }
 
   /**
