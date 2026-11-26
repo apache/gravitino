@@ -46,6 +46,8 @@ paths:
                   $ref: "#/components/examples/CatalogInfoListResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -73,9 +75,10 @@ paths:
         "403":
           description: >-
             Forbidden - The caller cannot create catalogs in the metalake, or the backend refuses
-            the credentials configured for the catalog when it is validated at creation
+            the credentials configured for the catalog at creation. When authorization is enabled,
+            a missing metalake also returns 403.
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "409":
@@ -162,6 +165,8 @@ paths:
                   $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -248,9 +253,10 @@ paths:
         "403":
           description: >-
             Forbidden - The caller cannot load the catalog, or tests proposed changes without
-            owning the metalake or the catalog
+            owning the metalake or the catalog. When authorization is enabled, a missing metalake
+            also returns 403.
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "5xx":
@@ -270,10 +276,14 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/CatalogResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "404":
-          description: Not Found - The specified catalog does not exist in the specified metalake
+          description: >-
+            Not Found - The specified catalog or its parent metalake does not exist. When
+            authorization is enabled, a missing metalake returns 403.
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
               examples:
@@ -298,10 +308,14 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/CatalogResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "404":
-          description: Not Found - The specified catalog does not exist in the specified metalake
+          description: >-
+            Not Found - The specified catalog or its parent metalake does not exist. When
+            authorization is enabled, a missing metalake returns 403.
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
               examples:
@@ -310,14 +324,23 @@ paths:
                 NoSuchCatalogException:
                   $ref: "#/components/examples/NoSuchCatalogException"
         "409":
-            description: Conflict - The target catalog already exists in the specified metalake
-            content:
-              application/vnd.gravitino.v1+json:
-                schema:
-                  $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-                examples:
-                  CatalogAlreadyExistsException:
-                    $ref: "#/components/examples/CatalogAlreadyExistsException"
+          description: >-
+            Conflict - The rename target already exists, or the catalog is disabled
+            (CatalogNotInUseException).
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                CatalogAlreadyExistsException:
+                  $ref: "#/components/examples/CatalogAlreadyExistsException"
+                CatalogNotInUseException:
+                  value:
+                    code: 1009
+                    type: CatalogNotInUseException
+                    message: >-
+                      Failed to operate catalog(s) [my_catalog] operation [ALTER] under metalake
+                      [my_metalake], reason [The catalog my_catalog is not in use]
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -335,14 +358,18 @@ paths:
       responses:
         "200":
           $ref: "./openapi.yaml#/components/responses/BaseResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "404":
-          description: Not Found - The metalake does not exist
+          description: >-
+            Not Found - The specified catalog or its parent metalake does not exist. When
+            authorization is enabled, a missing metalake returns 403.
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
               examples:
-                NoSuchMetalakeException:
+                NoSuchCatalogException:
                   $ref: "#/components/examples/NoSuchCatalogException"
         "500":
           description:
@@ -367,6 +394,26 @@ paths:
           $ref: "./openapi.yaml#/components/responses/DropResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
+        "409":
+          description: >-
+            Conflict - With force omitted or false, an active catalog raises CatalogInUseException.
+            Disable it before dropping it. If the disabled catalog still contains user-created
+            schemas, a non-forced drop raises NonEmptyCatalogException.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                CatalogInUseException:
+                  value:
+                    code: 1010
+                    type: CatalogInUseException
+                    message: >-
+                      Failed to operate catalog(s) [my_catalog] operation [DROP] under metalake
+                      [my_metalake], reason [Catalog my_metalake.my_catalog is in use, please
+                      disable it first or use force option]
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 

@@ -36,12 +36,13 @@ import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
-import org.apache.gravitino.semantic.OssieDocument;
 import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelRevision;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 
 /** Normalizes Semantic Model parents while retaining Gravitino-owned model naming rules. */
@@ -105,6 +106,17 @@ public class SemanticModelNormalizeDispatcher implements SemanticModelDispatcher
   }
 
   @Override
+  public SemanticModel loadSemanticModelRevision(
+      NameIdentifier ident, SemanticModelRevisionSelector selector) {
+    return dispatcher.loadSemanticModelRevision(normalizeForLookup(ident), selector);
+  }
+
+  @Override
+  public SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident) {
+    return dispatcher.listSemanticModelRevisions(normalizeForLookup(ident));
+  }
+
+  @Override
   public SemanticModel createSemanticModel(
       NameIdentifier ident,
       @Nullable String comment,
@@ -129,13 +141,17 @@ public class SemanticModelNormalizeDispatcher implements SemanticModelDispatcher
   }
 
   @Override
-  public OssieDocument exportOssieDocument(NameIdentifier ident, OssieFormat format) {
-    return dispatcher.exportOssieDocument(normalizeForLookup(ident), format);
+  public SemanticModelExport exportSemanticModel(
+      NameIdentifier ident, SemanticModelRevisionSelector selector, OssieFormat format) {
+    return dispatcher.exportSemanticModel(normalizeForLookup(ident), selector, format);
   }
 
   @Override
   public SemanticModel alterSemanticModel(
-      NameIdentifier ident, SemanticModelSourceUpdate sourceUpdate, SemanticModelChange... changes)
+      NameIdentifier ident,
+      @Nullable Integer expectedRevision,
+      SemanticModelSourceUpdate sourceUpdate,
+      SemanticModelChange... changes)
       throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
     Preconditions.checkArgument(
@@ -143,7 +159,7 @@ public class SemanticModelNormalizeDispatcher implements SemanticModelDispatcher
     SemanticModelChange[] normalizedChanges =
         Arrays.stream(changes).map(this::normalizeChange).toArray(SemanticModelChange[]::new);
     return dispatcher.alterSemanticModel(
-        normalizeForLookup(ident), sourceUpdate, normalizedChanges);
+        normalizeForLookup(ident), expectedRevision, sourceUpdate, normalizedChanges);
   }
 
   @Override

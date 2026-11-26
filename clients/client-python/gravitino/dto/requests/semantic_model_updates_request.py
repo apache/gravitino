@@ -16,13 +16,16 @@
 # under the License.
 
 from dataclasses import dataclass, field
+from typing import Optional
 
 from dataclasses_json import config
 
 from gravitino.dto.requests.semantic_model_update_request import (
+    SemanticModelUpdateRequest,
     SemanticModelUpdateRequestBase,
 )
 from gravitino.dto.semantic.json_serdes.semantic_json_mixin import SemanticJsonMixin
+from gravitino.dto.semantic.semantic_dto_utils import is_none
 from gravitino.rest.rest_message import RESTRequest
 from gravitino.utils.precondition import Precondition
 
@@ -35,9 +38,37 @@ class SemanticModelUpdatesRequest(SemanticJsonMixin, RESTRequest):
         metadata=config(field_name="updates")
     )
 
+    _expected_revision: Optional[int] = field(
+        default=None, metadata=config(field_name="expectedRevision", exclude=is_none)
+    )
+
     def validate(self):
         Precondition.check_argument(self._updates is not None, "updates cannot be null")
         Precondition.check_argument(len(self._updates) > 0, "updates cannot be empty")
+        Precondition.check_argument(
+            self._expected_revision is None
+            or (
+                isinstance(self._expected_revision, int)
+                and not isinstance(self._expected_revision, bool)
+                and self._expected_revision > 0
+            ),
+            "expected_revision must be a positive integer",
+        )
         for update in self._updates:
             Precondition.check_argument(update is not None, "update cannot be null")
+            Precondition.check_argument(
+                not isinstance(
+                    update,
+                    SemanticModelUpdateRequest.ReplaceSemanticModelDefinitionRequest,
+                )
+                or self._expected_revision is not None,
+                "expected_revision is required when replacing the definition",
+            )
+            Precondition.check_argument(
+                not isinstance(
+                    update, SemanticModelUpdateRequest.RenameSemanticModelRequest
+                )
+                or len(self._updates) == 1,
+                "Rename must be the only Semantic Model change",
+            )
             update.validate()

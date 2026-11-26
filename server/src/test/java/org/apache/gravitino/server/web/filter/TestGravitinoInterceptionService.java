@@ -23,13 +23,12 @@ import static org.apache.gravitino.server.authorization.expression.Authorization
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.TEST_CATALOG_CONNECTION_WITH_CHANGES_AUTHORIZATION_EXPRESSION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -58,6 +57,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
@@ -89,15 +89,19 @@ import org.apache.gravitino.dto.requests.TagsAssociateRequest;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
-import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.NamespacedEntityId;
+import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metalake.MetalakeManager;
+import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
@@ -114,7 +118,6 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationFullNa
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
-import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.ServerHealth;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizationExecutor;
@@ -135,8 +138,11 @@ import org.apache.gravitino.server.web.rest.SecretsProviderOperations;
 import org.apache.gravitino.server.web.rest.SemanticModelMetricOperations;
 import org.apache.gravitino.server.web.rest.SemanticModelOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
+import org.apache.gravitino.server.web.rest.TagOperations;
 import org.apache.gravitino.server.web.rest.ViewOperations;
+import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.tag.TagDispatcher;
+import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.RequestContext;
 import org.apache.gravitino.utils.ThrowableFunction;
@@ -219,20 +225,22 @@ public class TestGravitinoInterceptionService {
   }
 
   /**
-   * Checks that a catalog containing any static provider requires both secret privileges.
+   * Catalog {@code getCredentials} interception only requires metadata access. Static vs token
+   * filtering is applied inside the REST method (soft filter), not as a secondary 403 gate.
    *
    * @param providers the configured providers
-   * @param useSecrets whether the caller may use secrets
-   * @param includeSecrets whether the caller may receive static credential secrets
+   * @param useSecrets whether the caller may use secrets (ignored at interception)
+   * @param includeSecrets whether the caller may receive static credential secrets (ignored here)
    */
   @ParameterizedTest
   @CsvSource({
     "custom-stored,false,false", "custom-stored,false,true",
     "custom-stored,true,false", "custom-stored,true,true",
     "'custom-session,custom-stored',false,false", "'custom-session,custom-stored',false,true",
-    "'custom-session,custom-stored',true,false", "'custom-session,custom-stored',true,true"
+    "'custom-session,custom-stored',true,false", "'custom-session,custom-stored',true,true",
+    "'',false,false", "custom-session,false,false"
   })
-  public void testCatalogCredentialExecutor(
+  public void testCatalogCredentialInterceptionAllowsMetadataAccess(
       String providers, boolean useSecrets, boolean includeSecrets) throws Throwable {
     MethodInvocation invocation = credentialInvocation("catalog");
     GravitinoAuthorizer authorizer = credentialAuthorizer(useSecrets, includeSecrets);
@@ -240,49 +248,17 @@ public class TestGravitinoInterceptionService {
     try (Response response =
         invokeWithAuthorizer(
             authorizer, mock(EventBus.class), invocation, credentialCatalogManager(providers))) {
-      assertEquals(useSecrets && includeSecrets ? 200 : 403, response.getStatus());
-    }
-    verify(invocation, times(useSecrets && includeSecrets ? 1 : 0)).proceed();
-    ArgumentCaptor<AuthorizationRequestContext> contexts =
-        ArgumentCaptor.forClass(AuthorizationRequestContext.class);
-    verify(authorizer, atLeastOnce()).authorize(any(), any(), any(), any(), contexts.capture());
-    for (AuthorizationRequestContext context : contexts.getAllValues()) {
-      Assertions.assertSame(contexts.getValue(), context);
-    }
-  }
-
-  /**
-   * Checks that dynamic-only and empty catalogs retain metadata-only access.
-   *
-   * @param providers the configured providers
-   */
-  @ParameterizedTest
-  @ValueSource(strings = {"", "custom-session"})
-  public void testCatalogProbeWithoutStaticProviders(String providers) throws Throwable {
-    MethodInvocation invocation = credentialInvocation("catalog");
-    when(invocation.proceed()).thenReturn(Utils.ok("ok"));
-    try (Response response =
-        invokeWithAuthorizer(
-            credentialAuthorizer(false, false),
-            mock(EventBus.class),
-            invocation,
-            credentialCatalogManager(providers))) {
       assertEquals(200, response.getStatus());
-      verify(invocation).proceed();
     }
+    verify(invocation).proceed();
   }
 
   /**
-   * Checks that a custom provider loaded through the unchanged SPI retains secret protection.
-   *
-   * @param useSecrets whether the caller may use secrets
-   * @param includeSecrets whether the caller may receive credential secrets
-   * @throws Throwable if the intercepted invocation fails unexpectedly
+   * Legacy static providers still load through the SPI; interception lets metadata access through
+   * so the REST soft filter can omit static credentials without forbidding the call.
    */
-  @ParameterizedTest
-  @CsvSource({"false,false", "false,true", "true,false", "true,true"})
-  public void testLegacyStaticProviderRequiresBothSecretPrivileges(
-      boolean useSecrets, boolean includeSecrets) throws Throwable {
+  @Test
+  public void testLegacyStaticProviderProceedsWithMetadataAccess() throws Throwable {
     Map<String, String> properties =
         Map.of(
             "credential-providers",
@@ -316,40 +292,36 @@ public class TestGravitinoInterceptionService {
                 Assertions.assertEquals("legacy-password", credential.jdbcPassword());
                 return Utils.ok("ok");
               });
-      boolean authorized = useSecrets && includeSecrets;
       try (Response response =
           invokeWithAuthorizer(
-              credentialAuthorizer(useSecrets, includeSecrets),
+              credentialAuthorizer(false, false),
               mock(EventBus.class),
               invocation,
               credentialCatalogManager(credentials))) {
-        assertEquals(authorized ? 200 : 403, response.getStatus());
+        assertEquals(200, response.getStatus());
       }
-      verify(invocation, times(authorized ? 1 : 0)).proceed();
-      verify(credentials, times(authorized ? 1 : 0)).getCredential(any(), any());
+      verify(invocation).proceed();
+      verify(credentials).getCredential(any(), any());
     }
   }
 
-  /** Checks standard denial and audit handling for static-only credential requests. */
+  /**
+   * Static catalog credentials are not denied at the interception layer without secret privileges.
+   */
   @Test
-  public void testStaticCredentialsDeniedBeforeInvocation() throws Throwable {
+  public void testStaticCredentialsNotDeniedBeforeInvocationWithoutSecretPrivileges()
+      throws Throwable {
     MethodInvocation invocation = credentialInvocation("catalog");
-    EventBus eventBus = mock(EventBus.class);
+    when(invocation.proceed()).thenReturn(Utils.ok("ok"));
     try (Response response =
         invokeWithAuthorizer(
             credentialAuthorizer(false, false),
-            eventBus,
+            mock(EventBus.class),
             invocation,
             credentialCatalogManager("custom-stored"))) {
-      assertEquals(403, response.getStatus());
-      verify(invocation, never()).proceed();
+      assertEquals(200, response.getStatus());
+      verify(invocation).proceed();
     }
-    ArgumentCaptor<AuthorizationDenialFailureEvent> denial =
-        ArgumentCaptor.forClass(AuthorizationDenialFailureEvent.class);
-    verify(eventBus).dispatchEvent(denial.capture());
-    assertEquals(
-        AuthorizationExpressionConstants.CATALOG_STATIC_CREDENTIALS_AUTHORIZATION_EXPRESSION,
-        denial.getValue().expression());
   }
 
   /** Checks that metalake ownership remains sufficient for static credentials. */
@@ -370,30 +342,6 @@ public class TestGravitinoInterceptionService {
       assertEquals(200, response.getStatus());
     }
     verify(manager, never()).doWithCatalog(any(), any());
-  }
-
-  /**
-   * Checks existing deny policies for the secondary secret privilege expression.
-   *
-   * @param privilege the denied secret privilege
-   */
-  @ParameterizedTest
-  @ValueSource(strings = {"USE_SECRETS", "INCLUDE_CREDENTIAL_SECRETS"})
-  public void testStaticCredentialDenyPolicy(String privilege) throws Throwable {
-    GravitinoAuthorizer authorizer = credentialAuthorizer(true, true);
-    when(authorizer.deny(
-            any(), any(), any(), ArgumentMatchers.eq(Privilege.Name.valueOf(privilege)), any()))
-        .thenReturn(true);
-    MethodInvocation invocation = credentialInvocation("catalog");
-    try (Response response =
-        invokeWithAuthorizer(
-            authorizer,
-            mock(EventBus.class),
-            invocation,
-            credentialCatalogManager("custom-stored"))) {
-      assertEquals(403, response.getStatus());
-      verify(invocation, never()).proceed();
-    }
   }
 
   /**
@@ -425,21 +373,6 @@ public class TestGravitinoInterceptionService {
               credentialCatalogManager("custom-session"))) {
         Assertions.assertSame(original, response);
       }
-    }
-  }
-
-  /** Checks that a catalog disappearing during authorization is still reported as not found. */
-  @Test
-  public void testMissingCredentialCatalogReturnsNotFound() throws Throwable {
-    CatalogManager manager = mock(CatalogManager.class);
-    when(manager.doWithCatalog(any(), any()))
-        .thenThrow(new NoSuchCatalogException("Catalog missing"));
-    MethodInvocation invocation = credentialInvocation("catalog");
-    try (Response response =
-        invokeWithAuthorizer(
-            credentialAuthorizer(false, false), mock(EventBus.class), invocation, manager)) {
-      assertEquals(404, response.getStatus());
-      verify(invocation, never()).proceed();
     }
   }
 
@@ -1662,6 +1595,108 @@ public class TestGravitinoInterceptionService {
   }
 
   @Test
+  void testMixedTagBatchesAreRejectedBeforeMutation() throws Throwable {
+    try (TesterRequestMocks mocks = new TesterRequestMocks();
+        MockedStatic<EntityIdService> ids = mockStatic(EntityIdService.class)) {
+      ids.when(() -> EntityIdService.getEntityIds(any(), any()))
+          .thenReturn(new NamespacedEntityId(2L, 1L));
+      when(mocks.authorizer.authorize(any(), any(), any(), any(), any())).thenReturn(true);
+      TagDispatcher dispatcher = mock(TagDispatcher.class);
+      when(mocks.env.tagDispatcher()).thenReturn(dispatcher);
+      when(mocks.env.internalTagDispatcher()).thenReturn(dispatcher);
+      TagEntity descriptiveTag = mock(TagEntity.class);
+      TagEntity accessTag = mock(TagEntity.class);
+      when(descriptiveTag.id()).thenReturn(1L);
+      when(accessTag.id()).thenReturn(2L);
+      when(dispatcher.getTag("testMetalake", "descriptive")).thenReturn(descriptiveTag);
+      when(dispatcher.getTag("testMetalake", "access")).thenReturn(accessTag);
+      RelationalEntity<?> relation = mock(RelationalEntity.class);
+      PolicyEntity policy = mock(PolicyEntity.class);
+      doReturn(policy).when(relation).targetEntity();
+      when(policy.policyType()).thenReturn(Policy.BuiltInType.ACCESS_CONTROL);
+      when(dispatcher.listPolicyAssociationsForTag("testMetalake", "descriptive"))
+          .thenReturn(new RelationalEntity<?>[0]);
+      when(dispatcher.listPolicyAssociationsForTag("testMetalake", "access"))
+          .thenReturn(new RelationalEntity<?>[] {relation});
+      Object[] requests = {
+        new TagsAssociateRequest(new String[] {"descriptive", "access"}, null),
+        new TagValuesAssociateRequest(
+            new TagValue[] {TagValue.noValue("descriptive"), TagValue.of("access", "finance")},
+            null),
+        new TagsAssociateRequest(new String[] {"descriptive", "access"}, null)
+      };
+      for (int i = 0; i < requests.length; i++) {
+        Object request = requests[i];
+        String methodName =
+            request instanceof TagsAssociateRequest
+                ? "associateTagsForObject"
+                : "associateTagValuesForObject";
+        Class<?> resource = i == 2 ? TagOperations.class : MetadataObjectTagOperations.class;
+        Method method =
+            resource.getMethod(
+                methodName, String.class, String.class, String.class, request.getClass());
+        MethodInvocation invocation = mock(MethodInvocation.class);
+        when(invocation.getMethod()).thenReturn(method);
+        when(invocation.getArguments())
+            .thenReturn(new Object[] {"testMetalake", "catalog", "object1", request});
+        Response response =
+            (Response)
+                new GravitinoInterceptionService()
+                    .getMethodInterceptors(method)
+                    .get(0)
+                    .invoke(invocation);
+        assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
+        verify(invocation, never()).proceed();
+      }
+    }
+  }
+
+  @Test
+  void testHiddenTagNamesCannotBeProbed() throws Throwable {
+    try (TesterRequestMocks mocks = new TesterRequestMocks()) {
+      TagDispatcher dispatcher = mock(TagDispatcher.class);
+      when(mocks.env.tagDispatcher()).thenReturn(dispatcher);
+      when(dispatcher.listPolicyAssociationsForTag("testMetalake", "gravitino_hidden_123"))
+          .thenReturn(new RelationalEntity<?>[0]);
+      when(dispatcher.listPolicyAssociationsForTag("testMetalake", "gravitino_hidden_999"))
+          .thenThrow(new NoSuchTagException("missing"));
+      Method method =
+          MetadataObjectTagOperations.class.getMethod(
+              "associateTagsForObject",
+              String.class,
+              String.class,
+              String.class,
+              TagsAssociateRequest.class);
+      MethodInterceptor interceptor =
+          new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
+      MethodInvocation existing = mock(MethodInvocation.class);
+      when(existing.getMethod()).thenReturn(method);
+      when(existing.getArguments())
+          .thenReturn(
+              new Object[] {
+                "testMetalake",
+                "catalog",
+                "object1",
+                new TagsAssociateRequest(new String[] {"gravitino_hidden_123"}, null)
+              });
+      MethodInvocation missing = mock(MethodInvocation.class);
+      when(missing.getMethod()).thenReturn(method);
+      when(missing.getArguments())
+          .thenReturn(
+              new Object[] {
+                "testMetalake",
+                "catalog",
+                "object1",
+                new TagsAssociateRequest(new String[] {"gravitino_hidden_999"}, null)
+              });
+      Response existingResponse = (Response) interceptor.invoke(existing);
+      Response missingResponse = (Response) interceptor.invoke(missing);
+      assertEquals(Response.Status.NOT_FOUND.getStatusCode(), existingResponse.getStatus());
+      assertEquals(missingResponse.getStatus(), existingResponse.getStatus());
+    }
+  }
+
+  @Test
   public void testInvalidV2TagAssociationBodyReturnsBadRequestAfterAuthorization()
       throws Throwable {
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
@@ -2613,6 +2648,38 @@ public class TestGravitinoInterceptionService {
             ArgumentMatchers.any()))
         .thenReturn(owner);
     return authorizer;
+  }
+
+  private static class TesterRequestMocks implements AutoCloseable {
+    private final MockedStatic<PrincipalUtils> principals = mockStatic(PrincipalUtils.class);
+    private final MockedStatic<GravitinoAuthorizerProvider> providers =
+        mockStatic(GravitinoAuthorizerProvider.class);
+    private final MockedStatic<AuthorizationUtils> authorizationUtils =
+        mockStatic(AuthorizationUtils.class);
+    private final MockedStatic<GravitinoEnv> environments = mockStatic(GravitinoEnv.class);
+    private final GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    private final GravitinoEnv env = mock(GravitinoEnv.class);
+
+    private TesterRequestMocks() {
+      principals.when(PrincipalUtils::getCurrentPrincipal).thenReturn(new UserPrincipal("tester"));
+      principals.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+      GravitinoAuthorizerProvider provider = mock(GravitinoAuthorizerProvider.class);
+      providers.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
+      when(provider.getGravitinoAuthorizer()).thenReturn(authorizer);
+      authorizationUtils
+          .when(() -> AuthorizationUtils.checkCurrentUser(any(), any(), any()))
+          .thenAnswer(invocation -> null);
+      environments.when(GravitinoEnv::getInstance).thenReturn(env);
+      when(env.eventBus()).thenReturn(mock(EventBus.class));
+    }
+
+    @Override
+    public void close() {
+      environments.close();
+      authorizationUtils.close();
+      providers.close();
+      principals.close();
+    }
   }
 
   private static class MockGravitinoAuthorizer implements GravitinoAuthorizer {

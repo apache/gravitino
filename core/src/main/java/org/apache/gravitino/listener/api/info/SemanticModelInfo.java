@@ -38,6 +38,8 @@ public final class SemanticModelInfo {
   private final SemanticModelDefinition definition;
   private final Map<String, String> properties;
   @Nullable private final Audit auditInfo;
+  private final int revision;
+  @Nullable private final SemanticModel.Status status;
 
   /**
    * Constructs a SemanticModelInfo from a {@link SemanticModel}.
@@ -50,7 +52,9 @@ public final class SemanticModelInfo {
         semanticModel.comment(),
         semanticModel.definition(),
         semanticModel.properties(),
-        semanticModel.auditInfo());
+        semanticModel.auditInfo(),
+        semanticModel.revision(),
+        semanticModel.status());
   }
 
   /**
@@ -68,11 +72,24 @@ public final class SemanticModelInfo {
       SemanticModelDefinition definition,
       @Nullable Map<String, String> properties,
       @Nullable Audit auditInfo) {
+    this(name, comment, definition, properties, auditInfo, 0, null);
+  }
+
+  private SemanticModelInfo(
+      String name,
+      @Nullable String comment,
+      SemanticModelDefinition definition,
+      @Nullable Map<String, String> properties,
+      @Nullable Audit auditInfo,
+      int revision,
+      @Nullable SemanticModel.Status status) {
     this.name = name;
     this.comment = comment;
     this.definition = definition;
     this.properties = properties == null ? ImmutableMap.of() : ImmutableMap.copyOf(properties);
     this.auditInfo = auditInfo;
+    this.revision = revision;
+    this.status = status;
   }
 
   /**
@@ -120,5 +137,16 @@ public final class SemanticModelInfo {
   @Nullable
   public Audit auditInfo() {
     return auditInfo;
+  }
+
+  /** Returns the returned revision number, or zero before a save. */
+  public int revision() {
+    return revision;
+  }
+
+  /** Returns the publication status, or null before a save. */
+  @Nullable
+  public SemanticModel.Status status() {
+    return status;
   }
 }

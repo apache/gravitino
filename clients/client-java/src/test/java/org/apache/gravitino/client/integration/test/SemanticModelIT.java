@@ -95,6 +95,7 @@ import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelRevision;
 import org.apache.gravitino.semantic.SupportsSemanticModels;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
@@ -231,16 +232,18 @@ public class SemanticModelIT extends BaseIT {
           source.name(),
           semanticModelCatalog.loadSemanticModel(model).definition().datasets()[0].source().name());
       semanticModelCatalog.alterSemanticModel(
-          model,
-          SemanticModelChange.rename(renamedModel.name()),
-          SemanticModelChange.updateComment("source name drift is preserved"));
+          model, SemanticModelChange.rename(renamedModel.name()));
+      semanticModelCatalog.alterSemanticModel(
+          renamedModel, SemanticModelChange.updateComment("source name drift is preserved"));
       assertArrayEquals(
           sourceDatasetIds(renamedModel.name(), "employee.raw", "manager"),
           lookup.listSemanticModelDatasets());
 
       SemanticModelDefinition replacement = sourceDefinition(renamedSource.name(), "orders");
       semanticModelCatalog.alterSemanticModel(
-          renamedModel, SemanticModelChange.replaceDefinition(replacement));
+          renamedModel,
+          semanticModelCatalog.loadSemanticModel(renamedModel).revision(),
+          SemanticModelChange.replaceDefinition(replacement));
       assertArrayEquals(
           sourceDatasetIds(renamedModel.name(), "orders"), lookup.listSemanticModelDatasets());
       assertThrows(
@@ -248,6 +251,7 @@ public class SemanticModelIT extends BaseIT {
           () ->
               semanticModelCatalog.alterSemanticModel(
                   renamedModel,
+                  semanticModelCatalog.loadSemanticModel(renamedModel).revision(),
                   SemanticModelChange.replaceDefinition(
                       sourceDefinition("missing_lookup_source", "invalid"))));
       assertArrayEquals(
@@ -260,7 +264,9 @@ public class SemanticModelIT extends BaseIT {
           renamedModel, SemanticModelChange.setProperty("reviewed", "true"));
       assertArrayEquals(new NameIdentifier[0], lookup.listSemanticModelDatasets());
       semanticModelCatalog.alterSemanticModel(
-          renamedModel, SemanticModelChange.replaceDefinition(replacement));
+          renamedModel,
+          semanticModelCatalog.loadSemanticModel(renamedModel).revision(),
+          SemanticModelChange.replaceDefinition(replacement));
       assertArrayEquals(
           sourceDatasetIds(renamedModel.name(), "orders"), lookup.listSemanticModelDatasets());
       semanticModelCatalog.dropSemanticModel(renamedModel);
@@ -394,14 +400,23 @@ public class SemanticModelIT extends BaseIT {
         MODEL_NAME, "Governed sales metrics", definition, expectedProperties, loaded);
 
     SemanticModelDefinition replacement = replacementDefinition();
-    SemanticModel altered =
+    SemanticModel changed =
         semanticModelCatalog.alterSemanticModel(
             modelIdent,
-            SemanticModelChange.rename(RENAMED_MODEL_NAME),
+            loaded.revision(),
             SemanticModelChange.updateComment(""),
             SemanticModelChange.setProperty("owner", "analytics"),
             SemanticModelChange.removeProperty("deprecated"),
             SemanticModelChange.replaceDefinition(replacement));
+    SemanticModel altered =
+        semanticModelCatalog.alterSemanticModel(
+            modelIdent, changed.revision(), SemanticModelChange.rename(RENAMED_MODEL_NAME));
+    assertEquals(2, altered.revision());
+    assertEquals(
+        1,
+        semanticModelCatalog
+            .loadSemanticModel(NameIdentifier.of(SCHEMA_NAME, RENAMED_MODEL_NAME), 1)
+            .revision());
     Map<String, String> alteredProperties =
         Map.of("certified", "true", "owner", "analytics", PROPERTY_OSSIE_VERSION, DEFAULT_VERSION);
     assertSemanticModel(RENAMED_MODEL_NAME, "", replacement, alteredProperties, altered);
@@ -417,6 +432,16 @@ public class SemanticModelIT extends BaseIT {
     NameIdentifier renamedIdent = NameIdentifier.of(SCHEMA_NAME, RENAMED_MODEL_NAME);
     SemanticModel reloaded = semanticModelCatalog.loadSemanticModel(renamedIdent);
     assertSemanticModel(RENAMED_MODEL_NAME, "", replacement, alteredProperties, reloaded);
+    assertEquals(
+        2,
+        semanticModelCatalog
+            .loadSemanticModel(renamedIdent, SemanticModelCatalog.LATEST_REVISION)
+            .revision());
+    SemanticModelRevision[] history = semanticModelCatalog.listSemanticModelRevisions(renamedIdent);
+    assertArrayEquals(
+        new int[] {2, 1},
+        Arrays.stream(history).mapToInt(SemanticModelRevision::revision).toArray());
+    assertEquals(SemanticModel.Status.PUBLISHED, history[0].status());
 
     assertTrue(semanticModelCatalog.dropSemanticModel(renamedIdent));
     assertFalse(semanticModelCatalog.dropSemanticModel(renamedIdent));
@@ -475,7 +500,9 @@ public class SemanticModelIT extends BaseIT {
     Metric added =
         Metric.builder().withName("收入.total").withExpression(original.expression()).build();
     semanticModelCatalog.alterSemanticModel(
-        model, SemanticModelChange.replaceDefinition(metricDefinition(replacement, added)));
+        model,
+        semanticModelCatalog.loadSemanticModel(model).revision(),
+        SemanticModelChange.replaceDefinition(metricDefinition(replacement, added)));
     assertMetricDiscovery(
         new NameIdentifier[] {
           NameIdentifier.of(SCHEMA_NAME, MODEL_NAME, replacement.name()),
@@ -493,7 +520,9 @@ public class SemanticModelIT extends BaseIT {
         replacement,
         added);
     semanticModelCatalog.alterSemanticModel(
-        renamed, SemanticModelChange.replaceDefinition(metricDefinition(added)));
+        renamed,
+        semanticModelCatalog.loadSemanticModel(renamed).revision(),
+        SemanticModelChange.replaceDefinition(metricDefinition(added)));
     assertMetricDiscovery(
         new NameIdentifier[] {NameIdentifier.of(SCHEMA_NAME, RENAMED_MODEL_NAME, added.name())},
         added);
@@ -599,6 +628,7 @@ public class SemanticModelIT extends BaseIT {
             () ->
                 semanticModelCatalog.alterSemanticModel(
                     ident,
+                    created.revision(),
                     SemanticModelChange.updateComment("Must not be persisted"),
                     SemanticModelChange.setProperty("owner", "another-team"),
                     SemanticModelChange.replaceDefinition(definition),
@@ -880,6 +910,7 @@ public class SemanticModelIT extends BaseIT {
         () ->
             semanticModelCatalog.alterSemanticModel(
                 ident,
+                original.revision(),
                 SemanticModelChange.updateComment("Must not persist"),
                 SemanticModelChange.setProperty("owner", "another-team"),
                 SemanticModelChange.replaceDefinition(reserved)));
@@ -914,6 +945,7 @@ public class SemanticModelIT extends BaseIT {
         () ->
             semanticModelCatalog.alterSemanticModel(
                 ident,
+                original.revision(),
                 SemanticModelChange.updateComment("Must not persist"),
                 SemanticModelChange.setProperty(PROPERTY_OSSIE_VERSION, " ")));
     assertSemanticModel(

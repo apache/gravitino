@@ -107,6 +107,26 @@ COMMENT ON COLUMN policy_tag_relation_meta.current_version IS 'policy tag relati
 COMMENT ON COLUMN policy_tag_relation_meta.last_version IS 'policy tag relation last version';
 COMMENT ON COLUMN policy_tag_relation_meta.deleted_at IS 'policy tag relation deleted at';
 
+CREATE TABLE IF NOT EXISTS policy_role_relation_meta (
+    id BIGSERIAL NOT NULL,
+    policy_id BIGINT NOT NULL,
+    role_name VARCHAR(128) NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE (policy_id, role_name, deleted_at)
+);
+
+CREATE INDEX IF NOT EXISTS policy_role_relation_meta_idx_role_name ON policy_role_relation_meta (role_name);
+COMMENT ON TABLE policy_role_relation_meta IS 'policy role relation';
+COMMENT ON COLUMN policy_role_relation_meta.id IS 'auto increment id';
+COMMENT ON COLUMN policy_role_relation_meta.policy_id IS 'policy id';
+COMMENT ON COLUMN policy_role_relation_meta.role_name IS 'role name referenced by the policy content';
+COMMENT ON COLUMN policy_role_relation_meta.current_version IS 'policy role relation current version';
+COMMENT ON COLUMN policy_role_relation_meta.last_version IS 'policy role relation last version';
+COMMENT ON COLUMN policy_role_relation_meta.deleted_at IS 'policy role relation deleted at';
+
 ALTER TABLE job_run_meta ADD COLUMN IF NOT EXISTS runtime_job_template TEXT DEFAULT NULL;
 COMMENT ON COLUMN job_run_meta.runtime_job_template IS 'job run runtime job template';
 
@@ -118,6 +138,7 @@ CREATE TABLE IF NOT EXISTS semantic_model_meta (
     schema_id BIGINT NOT NULL,
     audit_info TEXT NOT NULL,
     current_version INT NOT NULL DEFAULT 1,
+    active_version INT NOT NULL DEFAULT 0,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (semantic_model_id),
@@ -135,6 +156,7 @@ COMMENT ON COLUMN semantic_model_meta.catalog_id IS 'catalog id';
 COMMENT ON COLUMN semantic_model_meta.schema_id IS 'schema id';
 COMMENT ON COLUMN semantic_model_meta.audit_info IS 'semantic model identity audit info';
 COMMENT ON COLUMN semantic_model_meta.current_version IS 'current version';
+COMMENT ON COLUMN semantic_model_meta.active_version IS 'published revision, 0 if none';
 COMMENT ON COLUMN semantic_model_meta.last_version IS 'last allocated version';
 COMMENT ON COLUMN semantic_model_meta.deleted_at IS 'semantic model deleted at';
 
@@ -145,7 +167,9 @@ CREATE TABLE IF NOT EXISTS semantic_model_version_info (
     schema_id BIGINT NOT NULL,
     semantic_model_id BIGINT NOT NULL,
     version INT NOT NULL,
-    semantic_model_name VARCHAR(128) NOT NULL,
+    publication_status VARCHAR(32) NOT NULL DEFAULT 'DRAFT',
+    published_by VARCHAR(128) NOT NULL DEFAULT '',
+    published_at BIGINT NOT NULL DEFAULT 0,
     semantic_model_comment TEXT DEFAULT NULL,
     datasets TEXT NOT NULL,
     relationships TEXT DEFAULT NULL,
@@ -170,7 +194,9 @@ COMMENT ON COLUMN semantic_model_version_info.catalog_id IS 'catalog id';
 COMMENT ON COLUMN semantic_model_version_info.schema_id IS 'schema id';
 COMMENT ON COLUMN semantic_model_version_info.semantic_model_id IS 'semantic model id';
 COMMENT ON COLUMN semantic_model_version_info.version IS 'semantic model version';
-COMMENT ON COLUMN semantic_model_version_info.semantic_model_name IS 'semantic model name snapshot';
+COMMENT ON COLUMN semantic_model_version_info.publication_status IS 'publication status of the revision';
+COMMENT ON COLUMN semantic_model_version_info.published_by IS 'publishing principal, empty for a draft';
+COMMENT ON COLUMN semantic_model_version_info.published_at IS 'publication time in epoch millis, 0 for a draft';
 COMMENT ON COLUMN semantic_model_version_info.semantic_model_comment IS 'semantic model comment snapshot';
 COMMENT ON COLUMN semantic_model_version_info.datasets IS 'dataset definitions snapshot (JSON)';
 COMMENT ON COLUMN semantic_model_version_info.relationships IS 'relationship definitions snapshot (JSON)';
@@ -371,18 +397,22 @@ CREATE TABLE IF NOT EXISTS semantic_model_source_rel (
     dataset_name TEXT NOT NULL,
     source_type VARCHAR(64) NOT NULL,
     source_id BIGINT NOT NULL,
+    from_version INT NOT NULL,
+    to_version INT NOT NULL DEFAULT 0,
     deleted_at BIGINT NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_smsr_model ON semantic_model_source_rel (semantic_model_id, deleted_at);
 CREATE INDEX IF NOT EXISTS idx_smsr_source ON semantic_model_source_rel (metalake_id, source_type, source_id, deleted_at);
 CREATE INDEX IF NOT EXISTS idx_smsr_deleted_at ON semantic_model_source_rel (deleted_at);
-COMMENT ON TABLE semantic_model_source_rel IS 'current semantic model dataset source associations';
+COMMENT ON TABLE semantic_model_source_rel IS 'versioned semantic model dataset source associations';
 COMMENT ON COLUMN semantic_model_source_rel.id IS 'auto increment id';
 COMMENT ON COLUMN semantic_model_source_rel.metalake_id IS 'containing metalake id';
 COMMENT ON COLUMN semantic_model_source_rel.semantic_model_id IS 'containing semantic model id';
-COMMENT ON COLUMN semantic_model_source_rel.dataset_name IS 'exact dataset name in the current definition';
+COMMENT ON COLUMN semantic_model_source_rel.dataset_name IS 'exact dataset name in the associated revisions';
 COMMENT ON COLUMN semantic_model_source_rel.source_type IS 'TABLE or VIEW';
 COMMENT ON COLUMN semantic_model_source_rel.source_id IS 'resolved source object id';
+COMMENT ON COLUMN semantic_model_source_rel.from_version IS 'first revision containing this association';
+COMMENT ON COLUMN semantic_model_source_rel.to_version IS 'first revision without it, 0 if open';
 COMMENT ON COLUMN semantic_model_source_rel.deleted_at IS 'association retired at';
 
 -- Clear governance attached to retired external registrations before their IDs can be reused.

@@ -51,6 +51,7 @@ import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.lineage.source.rest.LineageOperations;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
@@ -270,6 +271,12 @@ public class GravitinoInterceptionService implements InterceptionService {
             boolean authorizeResult;
             try {
               authorizeResult = executor.execute(authorizationRequestContext);
+            } catch (NoSuchTagException exception) {
+              return ExceptionHandlers.handleTagException(
+                  OperationType.ASSOCIATE,
+                  "",
+                  metalakeIdent == null ? "" : metalakeIdent.name(),
+                  exception);
             } catch (NoSuchTableException exception) {
               NameIdentifier tableIdent = metadataContext.get(Entity.EntityType.TABLE);
               if (tableIdent == null) {

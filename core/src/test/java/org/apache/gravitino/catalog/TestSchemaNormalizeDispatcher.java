@@ -155,5 +155,15 @@ public class TestSchemaNormalizeDispatcher extends TestOperationDispatcher {
             () -> schemaNormalizeDispatcher.createSchema(schemaIdent2, null, null));
     Assertions.assertEquals(
         "The SCHEMA name 'a?' is illegal. Illegal name: a?", exception.getMessage());
+
+    String longName = "s".repeat(65);
+    NameIdentifier longIdent = NameIdentifier.of(metalake, catalog, longName);
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> schemaNormalizeDispatcher.createSchema(longIdent, null, null));
+    Assertions.assertEquals(
+        "The SCHEMA name must not exceed 64 characters. Illegal name: " + longName,
+        exception.getMessage());
   }
 }

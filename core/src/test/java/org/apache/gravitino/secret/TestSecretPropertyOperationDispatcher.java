@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.secret;
 
+import static org.apache.gravitino.TestBasePropertiesMetadata.TEST_REQUIRED_KEY;
+import static org.apache.gravitino.TestCatalog.PROPERTY_KEY1;
+import static org.apache.gravitino.TestCatalog.PROPERTY_KEY2;
+import static org.apache.gravitino.TestCatalog.PROPERTY_KEY5_PREFIX;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -28,6 +32,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.function.Supplier;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -51,6 +56,7 @@ import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.storage.S3Properties;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -103,6 +109,73 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
         NameIdentifier.of(metalake, catalog, SCHEMA), "comment", ImmutableMap.of("k1", "v1"));
   }
 
+  /**
+   * Catalog getSecrets with {@code includeStaticCredentials=false} omits S3 keys inferred from the
+   * catalog property map while keeping other secrets.
+   */
+  @Test
+  public void testGetCatalogSecretsOmitsStaticCredentialsWithoutInclude() {
+    NameIdentifier catalogIdent = NameIdentifier.of(metalake, "secret_omit_catalog");
+    Map<String, String> props =
+        ImmutableMap.<String, String>builder()
+            .put(PROPERTY_KEY1, "value1")
+            .put(PROPERTY_KEY2, "value2")
+            .put(PROPERTY_KEY5_PREFIX + "1", "value3")
+            .put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, "AKIA")
+            .put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, "secret")
+            .put("custom-token", "keep-me")
+            .build();
+    catalogManager.createCatalog(catalogIdent, Catalog.Type.RELATIONAL, "test", "comment", props);
+    try {
+      Map<String, String> withInclude =
+          secretDispatcher.getSecrets(catalogIdent, Entity.EntityType.CATALOG, true);
+      Assertions.assertEquals("AKIA", withInclude.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+      Assertions.assertEquals(
+          "secret", withInclude.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+      Assertions.assertEquals("keep-me", withInclude.get("custom-token"));
+
+      Map<String, String> withoutInclude =
+          secretDispatcher.getSecrets(catalogIdent, Entity.EntityType.CATALOG, false);
+      Assertions.assertFalse(withoutInclude.containsKey(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+      Assertions.assertFalse(
+          withoutInclude.containsKey(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+      Assertions.assertEquals("keep-me", withoutInclude.get("custom-token"));
+    } finally {
+      catalogManager.dropCatalog(catalogIdent, true);
+    }
+  }
+
+  /**
+   * Non-catalog objects omit canonical static credential keys present on their own property map
+   * when {@code includeStaticCredentials=false}, without relying on catalog-inferred providers.
+   */
+  @Test
+  public void testGetSchemaSecretsOmitStaticKeysWithoutInclude() {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "secret_omit_schema");
+    Map<String, String> staticAndCustom =
+        ImmutableMap.of(
+            TEST_REQUIRED_KEY,
+            "v1",
+            S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+            "AKIA",
+            S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
+            "secret",
+            "custom-token",
+            "keep-me");
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", staticAndCustom);
+
+    Map<String, String> withInclude =
+        secretDispatcher.getSecrets(schemaIdent, Entity.EntityType.SCHEMA, true);
+    Assertions.assertEquals("AKIA", withInclude.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    Assertions.assertEquals("keep-me", withInclude.get("custom-token"));
+
+    Map<String, String> withoutInclude =
+        secretDispatcher.getSecrets(schemaIdent, Entity.EntityType.SCHEMA, false);
+    Assertions.assertFalse(withoutInclude.containsKey(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    Assertions.assertFalse(withoutInclude.containsKey(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+    Assertions.assertEquals("keep-me", withoutInclude.get("custom-token"));
+  }
+
   @Test
   public void testGetSecretsForMetalake() throws IOException {
     BaseMetalake stored =
@@ -121,7 +194,7 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
     entityStore.put(updated, true);
 
     Map<String, String> secrets =
-        secretDispatcher.getSecrets(NameIdentifier.of(metalake), Entity.EntityType.METALAKE);
+        secretDispatcher.getSecrets(NameIdentifier.of(metalake), Entity.EntityType.METALAKE, true);
     Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
@@ -133,7 +206,8 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
     tableOperationDispatcher.createTable(
         tableIdent, columns, "comment", SECRET_PROPS, new Transform[0]);
 
-    Map<String, String> secrets = secretDispatcher.getSecrets(tableIdent, Entity.EntityType.TABLE);
+    Map<String, String> secrets =
+        secretDispatcher.getSecrets(tableIdent, Entity.EntityType.TABLE, true);
     Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
@@ -143,7 +217,8 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
     NameIdentifier topicIdent = NameIdentifier.of(metalake, catalog, SCHEMA, "secret_topic");
     topicOperationDispatcher.createTopic(topicIdent, "comment", null, SECRET_PROPS);
 
-    Map<String, String> secrets = secretDispatcher.getSecrets(topicIdent, Entity.EntityType.TOPIC);
+    Map<String, String> secrets =
+        secretDispatcher.getSecrets(topicIdent, Entity.EntityType.TOPIC, true);
     Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
@@ -158,7 +233,8 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
     viewOperationDispatcher.createView(
         viewIdent, "comment", new Column[0], representations, null, null, SECRET_PROPS);
 
-    Map<String, String> secrets = secretDispatcher.getSecrets(viewIdent, Entity.EntityType.VIEW);
+    Map<String, String> secrets =
+        secretDispatcher.getSecrets(viewIdent, Entity.EntityType.VIEW, true);
     Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
@@ -169,7 +245,8 @@ public class TestSecretPropertyOperationDispatcher extends TestOperationDispatch
         NameIdentifierUtil.ofModel(metalake, catalog, SCHEMA, "secret_model");
     modelOperationDispatcher.registerModel(modelIdent, "comment", SECRET_PROPS);
 
-    Map<String, String> secrets = secretDispatcher.getSecrets(modelIdent, Entity.EntityType.MODEL);
+    Map<String, String> secrets =
+        secretDispatcher.getSecrets(modelIdent, Entity.EntityType.MODEL, true);
     Assertions.assertEquals("s3cr3t", secrets.get("custom-token"));
     Assertions.assertFalse(secrets.containsKey("visible"));
   }
