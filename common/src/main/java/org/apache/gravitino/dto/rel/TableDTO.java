@@ -18,15 +18,20 @@
  */
 package org.apache.gravitino.dto.rel;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
+import java.util.Arrays;
 import java.util.Map;
+import java.util.TreeMap;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.rel.indexes.IndexDTO;
 import org.apache.gravitino.dto.rel.partitioning.Partitioning;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.SupportsPartitionSpecs;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -35,7 +40,7 @@ import org.apache.gravitino.rel.indexes.Index;
 
 /** Represents a Table DTO (Data Transfer Object). */
 @EqualsAndHashCode
-public class TableDTO implements Table {
+public class TableDTO implements Table, SupportsPartitionSpecs {
 
   @JsonProperty("name")
   private String name;
@@ -66,6 +71,24 @@ public class TableDTO implements Table {
   @JsonProperty("indexes")
   private IndexDTO[] indexes;
 
+  /**
+   * Optional Iceberg-style default partition spec id. Present only when the source table supports
+   * {@link SupportsPartitionSpecs}.
+   */
+  @Nullable
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @JsonProperty("defaultPartitionSpecId")
+  private Integer defaultPartitionSpecId;
+
+  /**
+   * Optional map of partition specs keyed by {@code spec-id}. Present only when the source table
+   * supports {@link SupportsPartitionSpecs}.
+   */
+  @Nullable
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @JsonProperty("partitionSpecs")
+  private Map<Integer, Partitioning[]> partitionSpecs;
+
   private TableDTO() {}
 
   /**
@@ -78,6 +101,8 @@ public class TableDTO implements Table {
    * @param audit The audit information for the table.
    * @param partitioning The partitioning of the table.
    * @param indexes The indexes of the table.
+   * @param defaultPartitionSpecId Optional default partition spec id.
+   * @param partitionSpecs Optional historical partition specs keyed by spec id.
    */
   private TableDTO(
       String name,
@@ -88,7 +113,9 @@ public class TableDTO implements Table {
       Partitioning[] partitioning,
       DistributionDTO distribution,
       SortOrderDTO[] sortOrderDTOs,
-      IndexDTO[] indexes) {
+      IndexDTO[] indexes,
+      Integer defaultPartitionSpecId,
+      Map<Integer, Partitioning[]> partitionSpecs) {
     this.name = name;
     this.comment = comment;
     this.columns = columns;
@@ -98,6 +125,8 @@ public class TableDTO implements Table {
     this.sortOrders = sortOrderDTOs;
     this.partitioning = partitioning;
     this.indexes = indexes;
+    this.defaultPartitionSpecId = defaultPartitionSpecId;
+    this.partitionSpecs = partitionSpecs;
   }
 
   /**
@@ -175,6 +204,37 @@ public class TableDTO implements Table {
     return indexes;
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public SupportsPartitionSpecs supportsPartitionSpecs() {
+    if (partitionSpecs == null || defaultPartitionSpecId == null) {
+      throw new UnsupportedOperationException("Table does not support partition specs.");
+    }
+    return this;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int defaultPartitionSpecId() {
+    Preconditions.checkState(
+        defaultPartitionSpecId != null, "Table does not carry a default partition spec id");
+    return defaultPartitionSpecId;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Map<Integer, Transform[]> partitionSpecs() {
+    Preconditions.checkState(partitionSpecs != null, "Table does not carry partition specs");
+    Map<Integer, Transform[]> copied = new TreeMap<>();
+    for (Map.Entry<Integer, Partitioning[]> entry : partitionSpecs.entrySet()) {
+      Partitioning[] value = entry.getValue();
+      copied.put(
+          entry.getKey(),
+          value == null ? new Transform[0] : Arrays.copyOf(value, value.length, Transform[].class));
+    }
+    return ImmutableMap.copyOf(copied);
+  }
+
   /**
    * Creates a new Builder to build a Table DTO.
    *
@@ -208,6 +268,10 @@ public class TableDTO implements Table {
     protected Partitioning[] Partitioning;
     /** The indexes of the table. */
     protected IndexDTO[] indexes;
+    /** Optional default partition spec id. */
+    @Nullable protected Integer defaultPartitionSpecId;
+    /** Optional historical partition specs keyed by spec id. */
+    @Nullable protected Map<Integer, Partitioning[]> partitionSpecs;
 
     /** Default constructor. */
     private Builder() {}
@@ -313,6 +377,28 @@ public class TableDTO implements Table {
     }
 
     /**
+     * Sets the optional default partition spec id.
+     *
+     * @param defaultPartitionSpecId The default partition spec id.
+     * @return The Builder instance.
+     */
+    public S withDefaultPartitionSpecId(@Nullable Integer defaultPartitionSpecId) {
+      this.defaultPartitionSpecId = defaultPartitionSpecId;
+      return (S) this;
+    }
+
+    /**
+     * Sets the optional historical partition specs.
+     *
+     * @param partitionSpecs Partition specs keyed by spec id.
+     * @return The Builder instance.
+     */
+    public S withPartitionSpecs(@Nullable Map<Integer, Partitioning[]> partitionSpecs) {
+      this.partitionSpecs = partitionSpecs;
+      return (S) this;
+    }
+
+    /**
      * Builds a Table DTO based on the provided builder parameters.
      *
      * @return A new TableDTO instance.
@@ -331,7 +417,9 @@ public class TableDTO implements Table {
           Partitioning,
           distributionDTO,
           sortOrderDTOs,
-          indexes);
+          indexes,
+          defaultPartitionSpecId,
+          partitionSpecs);
     }
 
     /**

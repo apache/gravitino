@@ -324,6 +324,23 @@ components:
           default: [ ]
           items:
             $ref: "./partitioning.yaml#/components/schemas/PartitioningSpec"
+        defaultPartitionSpecId:
+          type: integer
+          format: int32
+          description: >
+            Optional default partition spec id when the table retains historical partition specs
+            (for example Iceberg). Omitted when unsupported.
+          nullable: true
+        partitionSpecs:
+          type: object
+          description: >
+            Optional map of partition specs keyed by spec-id when the table retains historical
+            partition specs (for example Iceberg). Omitted when unsupported.
+          nullable: true
+          additionalProperties:
+            type: array
+            items:
+              $ref: "./partitioning.yaml#/components/schemas/PartitioningSpec"
         indexes:
           type: array
           description: Indexes of the table

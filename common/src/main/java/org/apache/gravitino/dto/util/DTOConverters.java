@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
@@ -121,6 +122,7 @@ import org.apache.gravitino.policy.RowFilterContent;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
+import org.apache.gravitino.rel.SupportsPartitionSpecs;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -313,24 +315,40 @@ public class DTOConverters {
    * @return The table DTO.
    */
   public static TableDTO toDTO(Table table) {
-    return TableDTO.builder()
-        .withName(table.name())
-        .withComment(table.comment())
-        // Connector results are snapshotted through here before the table dispatcher rejects a
-        // missing column list with a clear error, so a null list must not throw here.
-        .withColumns(
-            table.columns() == null
-                ? null
-                : Arrays.stream(table.columns())
-                    .map(DTOConverters::toDTO)
-                    .toArray(ColumnDTO[]::new))
-        .withProperties(table.properties())
-        .withSortOrders(toDTOs(table.sortOrder()))
-        .withDistribution(toDTO(table.distribution()))
-        .withAudit(toDTO(table.auditInfo()))
-        .withPartitioning(toDTOs(table.partitioning()))
-        .withIndex(toDTOs(table.index()))
-        .build();
+    TableDTO.Builder<?> builder =
+        TableDTO.builder()
+            .withName(table.name())
+            .withComment(table.comment())
+            // Connector results are snapshotted through here before the table dispatcher rejects a
+            // missing column list with a clear error, so a null list must not throw here.
+            .withColumns(
+                table.columns() == null
+                    ? null
+                    : Arrays.stream(table.columns())
+                        .map(DTOConverters::toDTO)
+                        .toArray(ColumnDTO[]::new))
+            .withProperties(table.properties())
+            .withSortOrders(toDTOs(table.sortOrder()))
+            .withDistribution(toDTO(table.distribution()))
+            .withAudit(toDTO(table.auditInfo()))
+            .withPartitioning(toDTOs(table.partitioning()))
+            .withIndex(toDTOs(table.index()));
+    SupportsPartitionSpecs partitionSpecs = null;
+    try {
+      partitionSpecs = table.supportsPartitionSpecs();
+    } catch (UnsupportedOperationException ignored) {
+      // Table does not expose historical partition specs.
+    }
+    if (partitionSpecs != null) {
+      Map<Integer, Partitioning[]> dtoSpecs = new TreeMap<>();
+      for (Map.Entry<Integer, Transform[]> entry : partitionSpecs.partitionSpecs().entrySet()) {
+        dtoSpecs.put(entry.getKey(), toDTOs(entry.getValue()));
+      }
+      builder
+          .withDefaultPartitionSpecId(partitionSpecs.defaultPartitionSpecId())
+          .withPartitionSpecs(dtoSpecs);
+    }
+    return builder.build();
   }
 
   /**

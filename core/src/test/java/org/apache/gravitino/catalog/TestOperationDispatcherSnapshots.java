@@ -36,6 +36,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.dto.rel.TableDTO;
+import org.apache.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
 import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.function.Function;
@@ -44,11 +45,13 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.SupportsPartitionSpecs;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.secret.SecretManager;
@@ -105,6 +108,69 @@ class TestOperationDispatcherSnapshots {
     Assertions.assertInstanceOf(TableDTO.class, result);
     Assertions.assertEquals("table", result.name());
     Assertions.assertEquals("comment", result.comment());
+    Assertions.assertThrows(UnsupportedOperationException.class, result::supportsPartitionSpecs);
+  }
+
+  @Test
+  void testConnectorTablePartitionSpecsSurviveDetach() throws Exception {
+    AtomicBoolean callbackActive = new AtomicBoolean(false);
+    CatalogManager catalogManager = mock(CatalogManager.class);
+    CatalogManager.CatalogWrapper wrapper = mock(CatalogManager.CatalogWrapper.class);
+    doAnswer(
+            invocation -> {
+              ThrowableFunction<CatalogManager.CatalogWrapper, Object> operation =
+                  invocation.getArgument(1);
+              callbackActive.set(true);
+              try {
+                return operation.apply(wrapper);
+              } finally {
+                callbackActive.set(false);
+              }
+            })
+        .when(catalogManager)
+        .doWithCatalogWrapper(any(), any());
+
+    CatalogTestUtils.mockDetachConnectorResult(wrapper);
+
+    SupportsPartitionSpecs specs = mock(SupportsPartitionSpecs.class);
+    when(specs.defaultPartitionSpecId()).thenReturn(1);
+    when(specs.partitionSpecs())
+        .thenReturn(
+            Map.of(0, Transforms.EMPTY_TRANSFORM, 1, new Transform[] {Transforms.identity("id")}));
+
+    Table connectorTable = mock(Table.class);
+    when(connectorTable.name()).thenAnswer(requireActive(callbackActive, "events"));
+    when(connectorTable.comment()).thenAnswer(requireActive(callbackActive, "comment"));
+    when(connectorTable.columns()).thenAnswer(requireActive(callbackActive, new Column[0]));
+    when(connectorTable.properties())
+        .thenAnswer(requireActive(callbackActive, Collections.emptyMap()));
+    when(connectorTable.sortOrder()).thenAnswer(requireActive(callbackActive, new SortOrder[0]));
+    when(connectorTable.distribution())
+        .thenAnswer(requireActive(callbackActive, Distributions.NONE));
+    when(connectorTable.partitioning())
+        .thenAnswer(requireActive(callbackActive, new Transform[] {Transforms.identity("id")}));
+    when(connectorTable.index()).thenAnswer(requireActive(callbackActive, new Index[0]));
+    when(connectorTable.auditInfo())
+        .thenAnswer(
+            requireActive(
+                callbackActive,
+                AuditInfo.builder().withCreator("user").withCreateTime(Instant.EPOCH).build()));
+    when(connectorTable.supportsPartitionSpecs()).thenAnswer(requireActive(callbackActive, specs));
+
+    SnapshotDispatcher dispatcher = new SnapshotDispatcher(catalogManager);
+    Table result = dispatcher.returnTable(connectorTable);
+
+    Assertions.assertFalse(callbackActive.get());
+    Assertions.assertInstanceOf(TableDTO.class, result);
+    SupportsPartitionSpecs detached = result.supportsPartitionSpecs();
+    Assertions.assertEquals(1, detached.defaultPartitionSpecId());
+    Assertions.assertEquals(2, detached.partitionSpecs().size());
+    Assertions.assertArrayEquals(Transforms.EMPTY_TRANSFORM, detached.partitionSpecs().get(0));
+    Transform[] defaultSpec = detached.partitionSpecs().get(1);
+    Assertions.assertEquals(1, defaultSpec.length);
+    Assertions.assertInstanceOf(IdentityPartitioningDTO.class, defaultSpec[0]);
+    Assertions.assertArrayEquals(
+        new String[] {"id"}, ((IdentityPartitioningDTO) defaultSpec[0]).fieldName());
   }
 
   @Test
