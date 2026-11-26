@@ -21,8 +21,12 @@ package org.apache.gravitino.listener.api.event;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.audit.JsonAuditFormatter;
+import org.apache.gravitino.audit.v2.SimpleFormatterV2;
+import org.apache.gravitino.listener.api.event.server.HttpRequestFailureEvent;
 import org.apache.gravitino.utils.RequestContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -98,5 +102,37 @@ public class TestEvent {
 
     Assertions.assertEquals("true", event.customInfo().get("details"));
     Assertions.assertEquals("200", event.customInfo().get("http.status"));
+  }
+
+  @Test
+  void testHeadersSurviveContextCleanupAndAsyncFormatting() throws Exception {
+    RequestContext.setRequestHeaders(ImmutableMap.of("x-job-id", "job-123"));
+    RequestContext.setRequestQueryParams(ImmutableMap.of("request.header.x-job-id", "query-value"));
+    Event success = new ListCatalogEvent("user", Namespace.of("metalake"), 3);
+    Event failure =
+        new HttpRequestFailureEvent(
+            "unknown", "127.0.0.1", "GET", "/api/metalakes", 401, EventSource.GRAVITINO_SERVER);
+    RequestContext.clear();
+    CompletableFuture<Void> formatting =
+        CompletableFuture.runAsync(
+            () -> {
+              for (Event event : new Event[] {success, failure}) {
+                Assertions.assertEquals(
+                    "job-123", event.customInfo().get("request.header.x-job-id"));
+                Assertions.assertTrue(
+                    new JsonAuditFormatter().format(event).toString().contains("job-123"));
+                Assertions.assertTrue(
+                    new SimpleFormatterV2().format(event).toString().contains("job-123"));
+              }
+            });
+    formatting.get();
+  }
+
+  @Test
+  void testQueryCannotImpersonateCapturedHeaders() {
+    RequestContext.setRequestQueryParams(
+        ImmutableMap.of("request.header.x-job-id", "forged", "details", "true"));
+    Event event = new ListCatalogEvent("user", Namespace.of("metalake"), 3);
+    Assertions.assertEquals(ImmutableMap.of("details", "true"), event.customInfo());
   }
 }

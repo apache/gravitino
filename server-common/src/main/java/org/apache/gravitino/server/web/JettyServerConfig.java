@@ -332,6 +332,17 @@ public final class JettyServerConfig {
           .toSequence()
           .createWithDefault(Collections.emptyList());
 
+  /** Explicit request headers to include in logging context and audit events; empty by default. */
+  public static final ConfigEntry<List<String>> REQUEST_HEADER_ALLOWLIST =
+      new ConfigBuilder("requestHeaderAllowlist")
+          .doc(
+              "Comma separated HTTP header names to capture in request logging context and audit events. "
+                  + "Empty disables capture. Authentication and cookie headers are prohibited")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .toSequence()
+          .createWithDefault(Collections.emptyList());
+
   private final String host;
 
   private final int httpPort;
@@ -377,6 +388,7 @@ public final class JettyServerConfig {
   private final List<String> trustedProxies;
   private final ClientAddressResolver clientAddressResolver;
 
+  private final RequestHeaderCapture requestHeaderCapture;
   private final Config internalConfig;
 
   private JettyServerConfig(Map<String, String> configs, String keyPrefix) {
@@ -455,6 +467,13 @@ public final class JettyServerConfig {
     this.exposedHeaders = internalConfig.get(EXPOSED_HEADERS);
     this.chainPreflight = internalConfig.get(CHAIN_PREFLIGHT);
 
+    try {
+      this.requestHeaderCapture =
+          new RequestHeaderCapture(internalConfig.get(REQUEST_HEADER_ALLOWLIST));
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          keyPrefix + REQUEST_HEADER_ALLOWLIST.getKey() + ": " + e.getMessage(), e);
+    }
     this.trustedProxies = Collections.unmodifiableList(internalConfig.get(TRUSTED_PROXIES));
     try {
       this.clientAddressResolver = new ClientAddressResolver(trustedProxies);
@@ -635,6 +654,15 @@ public final class JettyServerConfig {
    */
   public List<String> getTrustedProxies() {
     return trustedProxies;
+  }
+
+  /**
+   * Returns the validated policy for capturing request headers.
+   *
+   * @return the request header capture policy
+   */
+  public RequestHeaderCapture getRequestHeaderCapture() {
+    return requestHeaderCapture;
   }
 
   /**

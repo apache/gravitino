@@ -238,7 +238,11 @@ public class GravitinoServer extends ResourceConfig {
     // part of the Jersey-managed REST surface, so it's the only one VersioningFilter applies to.
     ClientAddressResolver clientAddressResolver = jettyServerConfig.getClientAddressResolver();
     server.addFilter(
-        new RequestContextFilter(gravitinoEnv.eventBus(), clientAddressResolver), API_ANY_PATH);
+        new RequestContextFilter(
+            gravitinoEnv.eventBus(),
+            clientAddressResolver,
+            jettyServerConfig.getRequestHeaderCapture()),
+        API_ANY_PATH);
     server.addFilter(createHttpAuditFilter(clientAddressResolver), API_ANY_PATH);
     server.addFilter(
         new VersioningFilter(jettyServerConfig.isIncludeErrorStackTrace()), API_ANY_PATH);
@@ -253,7 +257,11 @@ public class GravitinoServer extends ResourceConfig {
     // (see RequestContextFilter's class doc) applies uniformly, not only to the REST API.
     for (String pathSpec : ROOT_MOUNTED_PATHS) {
       server.addFilter(
-          new RequestContextFilter(gravitinoEnv.eventBus(), clientAddressResolver), pathSpec);
+          new RequestContextFilter(
+              gravitinoEnv.eventBus(),
+              clientAddressResolver,
+              jettyServerConfig.getRequestHeaderCapture()),
+          pathSpec);
       server.addFilter(createHttpAuditFilter(clientAddressResolver), pathSpec);
     }
 

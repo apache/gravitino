@@ -183,6 +183,7 @@ empty string or list; `(none)` means it has no default at all.
 | `gravitino.server.webserver.responseHeaderSize`      | Maximum size in bytes of an HTTP response header.                                                                                                                                            | `131072`                                |
 | `gravitino.server.webserver.customFilters`           | Comma-separated list of servlet filter class names to apply to the API.                                                                                                                      | (empty)                                 |
 | `gravitino.server.webserver.trustedProxies`          | Comma-separated list of IP addresses or CIDR blocks (IPv4 or IPv6) of reverse proxies whose `X-Forwarded-For` header is trusted when recording the client address. Host names are not allowed.             | (empty)                                 |
+| `gravitino.server.webserver.requestHeaderAllowlist` | Comma-separated literal HTTP header names to capture in logging context and audit events. Sensitive names are rejected; see [Request correlation headers](#request-correlation-headers). | (empty) |
 | `gravitino.server.rest.extensionPackages`            | Comma-separated list of packages to scan for additional REST resources.                                                                                                                      | (empty)                                 |
 | `gravitino.server.visibleConfigs`                    | Comma-separated list of extra properties to expose on the unauthenticated `GET /configs` endpoint, on top of the fixed set it always returns. Additive, so each entry widens what is public. | (empty)                                 |
 | `gravitino.server.bulk.maxItems`                     | Maximum number of items allowed in a single bulk request.                                                                                                                                    | `100`                                   |
@@ -571,6 +572,47 @@ either exactly matches `authorization`, `cookie`, `x-amz-security-token`, `s3.ac
 fixed list of keys the server itself always uses (e.g. `http.method`, `http.status`, `auth.method`)
 is exempt from that substring check, since otherwise `auth.method` would be masked for merely
 containing "auth".
+
+#### Request correlation headers
+
+To correlate server requests with an external scheduler, explicitly allowlist the header names:
+
+```properties
+gravitino.server.webserver.requestHeaderAllowlist = X-Job-Id,X-Execution-Id
+```
+
+The default is empty (capture disabled). Names are case-insensitive and normalized to lowercase.
+Only the first value of each present allowlisted header is captured; absent headers are omitted.
+The allowlist supports at most 32 distinct literal names, each at most 128 characters. Invalid names
+and `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `WWW-Authenticate`, and
+`Proxy-Authenticate` and names matched by the audit formatter's sensitive-key rules are rejected at startup, even when
+explicitly configured. Do not allowlist
+other headers that carry credentials or personal data.
+
+Values are limited to 256 characters plus `...(truncated)` when truncated. Control characters are
+replaced with spaces. Captured values appear in audit `customInfo` as
+`request.header.x-job-id` and `request.header.x-execution-id`, including operation failures and
+HTTP failures such as authentication rejection. Auditing must be enabled to write audit events.
+The existing audit formatter redaction rules also apply to these fields. Events retain a snapshot
+for asynchronous listeners; no listener needs to read the request thread's context.
+
+The same keys are available in SLF4J MDC during request processing even when auditing is disabled.
+To include them in server logs, add explicit MDC fields to the applicable Log4j2 layout in
+`conf/log4j2.properties`, for example:
+
+```properties
+appender.rolling.layout.pattern = %d{yyyy-MM-dd HH:mm:ss.SSS} %level [%t] job=%X{request.header.x-job-id} execution=%X{request.header.x-execution-id} - %msg%n
+```
+
+Request MDC keys are restored and captured headers are cleared when processing exits, including
+when an exception escapes. MDC is scoped to the request thread; it is not automatically propagated
+to arbitrary background tasks. Header values are caller-supplied correlation hints, not verified
+identities and must not be used for authorization. The `request.header.` audit namespace is reserved;
+query parameters with that prefix are excluded so they cannot impersonate captured headers. Jetty-level rejections that occur before the
+servlet filter chain cannot be captured. The setting applies to the main server and, with their
+respective service prefixes, the Iceberg and Lance REST servers.
+
+#### HTTP audit coverage
 
 Every request that reaches the server produces at least one audit entry, even one whose operation
 has no dedicated `Event` subclass: `HttpAuditFilter` dispatches a generic fallback event (method,

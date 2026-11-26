@@ -21,12 +21,13 @@ package org.apache.gravitino.utils;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 
 /**
  * Holds per-request context data in a {@link ThreadLocal} so that event classes constructed on the
  * servlet thread can capture it without carrying a servlet dependency.
  *
- * <p>Currently tracks four pieces of state:
+ * <p>Currently tracks five pieces of state:
  *
  * <ul>
  *   <li><b>remoteAddress</b> — the client IP: {@link
@@ -53,6 +54,8 @@ import java.util.Map;
  *       redacted — see {@code AuditLogRedactor}) once per request by {@code RequestContextFilter}
  *       and read (non-destructively) by every {@link org.apache.gravitino.listener.api.event.Event}
  *       constructor.
+ *   <li><b>requestHeaders</b> — sanitized allowlisted HTTP headers, captured before authentication
+ *       and copied by event constructors for asynchronous audit listeners.
  * </ul>
  *
  * <p><b>Threading contract:</b> values must be set and cleared on the same (servlet) thread. Event
@@ -60,6 +63,9 @@ import java.util.Map;
  * threads never access this class.
  */
 public class RequestContext {
+
+  /** Namespace for captured HTTP headers in audit custom info and logging context. */
+  public static final String REQUEST_HEADER_PREFIX = "request.header.";
 
   /** The operation-layer event outcome recorded for the current request, if any. */
   private enum OperationOutcome {
@@ -71,6 +77,8 @@ public class RequestContext {
   private static final ThreadLocal<OperationOutcome> OPERATION_OUTCOME = new ThreadLocal<>();
   private static final ThreadLocal<Map<String, String>> AUDIT_EXTRAS = new ThreadLocal<>();
   private static final ThreadLocal<Map<String, String>> REQUEST_QUERY_PARAMS = new ThreadLocal<>();
+
+  private static final ThreadLocal<Map<String, String>> REQUEST_HEADERS = new ThreadLocal<>();
 
   private RequestContext() {}
 
@@ -224,6 +232,29 @@ public class RequestContext {
   }
 
   /**
+   * Sets a defensive snapshot of the allowlisted request headers for the current thread.
+   *
+   * @param headers sanitized headers with lowercase names, or {@code null} to clear
+   */
+  public static void setRequestHeaders(@Nullable Map<String, String> headers) {
+    if (headers == null || headers.isEmpty()) {
+      REQUEST_HEADERS.remove();
+    } else {
+      REQUEST_HEADERS.set(ImmutableMap.copyOf(headers));
+    }
+  }
+
+  /**
+   * Returns the captured request headers without consuming them.
+   *
+   * @return an immutable snapshot, or an empty map when capture is disabled or no headers matched
+   */
+  public static Map<String, String> getRequestHeaders() {
+    Map<String, String> headers = REQUEST_HEADERS.get();
+    return headers == null ? ImmutableMap.of() : headers;
+  }
+
+  /**
    * Removes all per-request bindings from the current thread. Must be called in a {@code finally}
    * block after the request completes to prevent thread-pool leaks.
    */
@@ -232,5 +263,6 @@ public class RequestContext {
     OPERATION_OUTCOME.remove();
     AUDIT_EXTRAS.remove();
     REQUEST_QUERY_PARAMS.remove();
+    REQUEST_HEADERS.remove();
   }
 }

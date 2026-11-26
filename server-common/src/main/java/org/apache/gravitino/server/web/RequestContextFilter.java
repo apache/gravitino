@@ -25,6 +25,8 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +43,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.audit.AuditLogRedactor;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.utils.RequestContext;
+import org.slf4j.MDC;
 
 /**
  * A servlet filter that captures the client remote address and (raw, unredacted) query parameters
@@ -73,6 +76,10 @@ import org.apache.gravitino.utils.RequestContext;
  * #TRUNCATED_SUFFIX}) — a caller cannot grow every event constructed during a request, and every
  * audit line written for it, by attaching an arbitrarily large query string.
  *
+ * <p>Allowlisted request headers are captured independently of the event bus, under {@code
+ * request.header.<lowercase-name>} in SLF4J MDC. Events snapshot the same sanitized values. Only
+ * this filter's MDC keys are restored after the request, preserving unrelated logging context.
+ *
  * <p>The stored values are always cleared in a {@code finally} block to prevent thread-pool leaks.
  */
 public class RequestContextFilter implements Filter {
@@ -88,6 +95,7 @@ public class RequestContextFilter implements Filter {
 
   private final Optional<EventBus> eventBus;
   private final ClientAddressResolver clientAddressResolver;
+  private final RequestHeaderCapture requestHeaderCapture;
 
   /**
    * Constructs a {@code RequestContextFilter} that never captures query parameters and trusts no
@@ -118,6 +126,22 @@ public class RequestContextFilter implements Filter {
    */
   public RequestContextFilter(
       @Nullable EventBus eventBus, ClientAddressResolver clientAddressResolver) {
+    this(eventBus, clientAddressResolver, new RequestHeaderCapture(Collections.emptyList()));
+  }
+
+  /**
+   * Constructs a filter that captures allowlisted headers before downstream authentication runs.
+   *
+   * @param eventBus the audit event bus, or {@code null} when auditing is disabled
+   * @param clientAddressResolver the client address resolver
+   * @param requestHeaderCapture validated policy for header capture, including when auditing is
+   *     disabled
+   */
+  public RequestContextFilter(
+      @Nullable EventBus eventBus,
+      ClientAddressResolver clientAddressResolver,
+      RequestHeaderCapture requestHeaderCapture) {
+    this.requestHeaderCapture = requestHeaderCapture;
     this.eventBus = Optional.ofNullable(eventBus);
     this.clientAddressResolver = clientAddressResolver;
   }
@@ -128,9 +152,21 @@ public class RequestContextFilter implements Filter {
   @Override
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
       throws IOException, ServletException {
+    Map<String, String> previousMdc = new HashMap<>();
     try {
       if (request instanceof HttpServletRequest) {
         HttpServletRequest httpRequest = (HttpServletRequest) request;
+        Map<String, String> headers = requestHeaderCapture.capture(httpRequest);
+        RequestContext.setRequestHeaders(headers);
+        for (String name : requestHeaderCapture.headerNames()) {
+          String key = RequestContext.REQUEST_HEADER_PREFIX + name;
+          previousMdc.put(key, MDC.get(key));
+          if (headers.containsKey(name)) {
+            MDC.put(key, headers.get(name));
+          } else {
+            MDC.remove(key);
+          }
+        }
         RequestContext.setRemoteAddress(clientAddressResolver.resolve(httpRequest));
         if (eventBus.isPresent()) {
           RequestContext.setRequestQueryParams(parseQueryString(httpRequest.getQueryString()));
@@ -139,6 +175,14 @@ public class RequestContextFilter implements Filter {
       chain.doFilter(request, response);
     } finally {
       RequestContext.clear();
+      previousMdc.forEach(
+          (key, value) -> {
+            if (value == null) {
+              MDC.remove(key);
+            } else {
+              MDC.put(key, value);
+            }
+          });
     }
   }
 

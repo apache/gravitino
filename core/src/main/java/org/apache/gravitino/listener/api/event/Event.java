@@ -43,6 +43,12 @@ import org.apache.gravitino.utils.RequestContext;
  * formatters — receives these parameters unredacted; a plugin that forwards {@code customInfo()}
  * elsewhere is responsible for its own redaction if that matters for its destination.
  *
+ * <p>Allowlisted HTTP headers are also snapshotted at construction time and included under {@code
+ * request.header.<lowercase-name>} in {@link #customInfo()}. Captured header values take precedence
+ * over query parameters with the same key. Query parameters in the reserved {@code request.header.}
+ * namespace are excluded even when no header was captured. These are caller-supplied correlation
+ * values, not trusted identities.
+ *
  * <p>{@link #customInfo()} itself is {@code final}: a subclass that wants to contribute its own
  * facts must override {@link #ownCustomInfo()} instead, never {@code customInfo()} directly. This
  * is deliberate — an earlier version of this class let subclasses override {@code customInfo()}
@@ -64,7 +70,17 @@ public abstract class Event extends BaseEvent {
     super(user, identifier);
     String addr = RequestContext.getRemoteAddress();
     this.remoteAddress = StringUtils.isNoneBlank(addr) ? addr : "unknown";
-    this.autoCustomInfo = RequestContext.getRequestQueryParams();
+    Map<String, String> context = new LinkedHashMap<>();
+    RequestContext.getRequestQueryParams()
+        .forEach(
+            (name, value) -> {
+              if (!name.startsWith(RequestContext.REQUEST_HEADER_PREFIX)) {
+                context.put(name, value);
+              }
+            });
+    RequestContext.getRequestHeaders()
+        .forEach((name, value) -> context.put(RequestContext.REQUEST_HEADER_PREFIX + name, value));
+    this.autoCustomInfo = ImmutableMap.copyOf(context);
   }
 
   /**
@@ -78,11 +94,12 @@ public abstract class Event extends BaseEvent {
   }
 
   /**
-   * Returns the current request's (raw) query parameters merged with this event's own facts (from
-   * {@link #ownCustomInfo()}); the subclass's own values win on a key collision. This method is
-   * {@code final} — override {@link #ownCustomInfo()} to contribute subclass-specific facts.
+   * Returns the current request's query parameters and captured HTTP headers merged with this
+   * event's own facts (from {@link #ownCustomInfo()}); the subclass's own values win on a key
+   * collision. This method is {@code final} — override {@link #ownCustomInfo()} to contribute
+   * subclass-specific facts.
    *
-   * @return the merged custom info, or just the automatically captured query parameters if the
+   * @return the merged custom info, or just the automatically captured request context if the
    *     subclass contributes nothing of its own.
    */
   @Override
@@ -98,8 +115,8 @@ public abstract class Event extends BaseEvent {
 
   /**
    * Returns this event's own explicit facts, to be merged with the automatically captured request
-   * query parameters by {@link #customInfo()}. Override this — not {@code customInfo()} — to
-   * contribute subclass-specific audit facts.
+   * context by {@link #customInfo()}. Override this — not {@code customInfo()} — to contribute
+   * subclass-specific audit facts.
    *
    * @return this event's own facts, or an empty map if it has none of its own.
    */
