@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.service;
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -29,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
@@ -56,6 +56,7 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 /** This class is an utilization class to retrieve owner relation. */
 public class OwnerMetaService {
 
+  private static final int OWNER_BATCH_SIZE = 500;
   private static final OwnerMetaService INSTANCE = new OwnerMetaService();
 
   private OwnerMetaService() {}
@@ -112,62 +113,25 @@ public class OwnerMetaService {
           Objects.equals(NameIdentifierUtil.getMetalake(identifier), metalake),
           "identifiers should in one metalake");
     }
-    List<RelationalEntity<?>> result = new ArrayList<>();
     Map<Long, NameIdentifier> nameIdentifierMap = new HashMap<>();
-    List<Long> entityIds =
-        identifiers.stream()
-            .map(
-                identifier -> {
-                  long entityId = EntityIdService.getEntityId(identifier, type);
-                  nameIdentifierMap.put(entityId, identifier);
-                  return entityId;
-                })
-            .collect(Collectors.toList());
-
-    // Get user owners
-    List<UserOwnerRelPO> userPOList =
-        SessionUtils.getWithoutCommit(
-            OwnerMetaMapper.class,
-            mapper ->
-                mapper.batchSelectUserOwnerMetaByMetadataObjectIdAndType(entityIds, type.name()));
-    if (CollectionUtils.isNotEmpty(userPOList)) {
-      userPOList.forEach(
-          userPO -> {
-            UserEntity userEntity =
-                POConverters.fromUserPO(
-                    userPO, Collections.emptyList(), AuthorizationUtils.ofUserNamespace(metalake));
-            result.add(
-                new RelationalEntity<>(
-                    SupportsRelationOperations.Type.OWNER_REL,
-                    nameIdentifierMap.get(userPO.getMetadataObjectId()),
-                    type,
-                    userEntity));
-          });
+    for (NameIdentifier identifier : identifiers) {
+      long id = EntityIdService.getEntityId(identifier, type);
+      nameIdentifierMap.put(id, identifier);
     }
+    return listOwnersByObjectIds(metalake, nameIdentifierMap, type);
+  }
 
-    // Get group owners
-    List<GroupOwnerRelPO> groupPOList =
-        SessionUtils.getWithoutCommit(
-            OwnerMetaMapper.class,
-            mapper ->
-                mapper.batchSelectGroupOwnerMetaByMetadataObjectIdAndType(entityIds, type.name()));
-    if (CollectionUtils.isNotEmpty(groupPOList)) {
-      groupPOList.forEach(
-          groupPO -> {
-            GroupEntity groupEntity =
-                POConverters.fromGroupPO(
-                    groupPO,
-                    Collections.emptyList(),
-                    AuthorizationUtils.ofGroupNamespace(metalake));
-            result.add(
-                new RelationalEntity<>(
-                    SupportsRelationOperations.Type.OWNER_REL,
-                    nameIdentifierMap.get(groupPO.getMetadataObjectId()),
-                    type,
-                    groupEntity));
-          });
+  /**
+   * Loads user and group owners for live objects of one type in a metalake. The caller must resolve
+   * each ID and its identifier in the same snapshot. Objects without an owner are omitted.
+   */
+  public List<RelationalEntity<?>> listOwnersByObjectIds(
+      String metalake, Map<Long, NameIdentifier> nameIdentifierMap, Entity.EntityType type) {
+    List<RelationalEntity<?>> result = new ArrayList<>();
+    for (List<Long> ids :
+        Lists.partition(List.copyOf(nameIdentifierMap.keySet()), OWNER_BATCH_SIZE)) {
+      collectOwnersByObjectIds(metalake, nameIdentifierMap, type, ids, result);
     }
-
     return result;
   }
 
@@ -265,6 +229,57 @@ public class OwnerMetaService {
         () ->
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class, mapper -> mapper.batchInsertOwnerRels(ownerRelPOs)));
+  }
+
+  private void collectOwnersByObjectIds(
+      String metalake,
+      Map<Long, NameIdentifier> nameIdentifierMap,
+      Entity.EntityType type,
+      List<Long> entityIds,
+      List<RelationalEntity<?>> result) {
+    // Get user owners
+    List<UserOwnerRelPO> userPOList =
+        SessionUtils.getWithoutCommit(
+            OwnerMetaMapper.class,
+            mapper ->
+                mapper.batchSelectUserOwnerMetaByMetadataObjectIdAndType(entityIds, type.name()));
+    if (CollectionUtils.isNotEmpty(userPOList)) {
+      userPOList.forEach(
+          userPO -> {
+            UserEntity userEntity =
+                POConverters.fromUserPO(
+                    userPO, Collections.emptyList(), AuthorizationUtils.ofUserNamespace(metalake));
+            result.add(
+                new RelationalEntity<>(
+                    SupportsRelationOperations.Type.OWNER_REL,
+                    nameIdentifierMap.get(userPO.getMetadataObjectId()),
+                    type,
+                    userEntity));
+          });
+    }
+
+    // Get group owners
+    List<GroupOwnerRelPO> groupPOList =
+        SessionUtils.getWithoutCommit(
+            OwnerMetaMapper.class,
+            mapper ->
+                mapper.batchSelectGroupOwnerMetaByMetadataObjectIdAndType(entityIds, type.name()));
+    if (CollectionUtils.isNotEmpty(groupPOList)) {
+      groupPOList.forEach(
+          groupPO -> {
+            GroupEntity groupEntity =
+                POConverters.fromGroupPO(
+                    groupPO,
+                    Collections.emptyList(),
+                    AuthorizationUtils.ofGroupNamespace(metalake));
+            result.add(
+                new RelationalEntity<>(
+                    SupportsRelationOperations.Type.OWNER_REL,
+                    nameIdentifierMap.get(groupPO.getMetadataObjectId()),
+                    type,
+                    groupEntity));
+          });
+    }
   }
 
   /**

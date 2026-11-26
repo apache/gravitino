@@ -103,10 +103,9 @@ public final class TermSpec {
   /**
    * Returns the status of the term.
    *
-   * @return The requested status, or empty to let the server choose its creation default. Step 1
-   *     defaults to {@link GlossaryTerm.Status#APPROVED} without review. Step 2 defaults to {@link
-   *     GlossaryTerm.Status#DRAFT} and rejects another initial status. Omission is preserved in
-   *     this value rather than replaced by a client-side default.
+   * @return The requested status, or empty to use the server publication policy. Omission publishes
+   *     an APPROVED term under the default policy and submits a private candidate when approval is
+   *     required. With approval enabled the only supported explicit initial status is DRAFT.
    */
   public Optional<GlossaryTerm.Status> status() {
     return Optional.ofNullable(status);

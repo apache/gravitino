@@ -69,6 +69,15 @@ paths:
     # escape the path name by replacing `{ }` with `%7B %7D`
     $ref: "./metalakes.yaml#/paths/~1metalakes~1%7Bname%7D"
 
+  /metalakes/{metalake}/terms:
+    $ref: "./terms.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1terms"
+
+  /metalakes/{metalake}/terms/{term}:
+    $ref: "./terms.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1terms~1%7Bterm%7D"
+
+  /metalakes/{metalake}/terms/{term}/hierarchy:
+    $ref: "./terms.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1terms~1%7Bterm%7D~1hierarchy"
+
   /metalakes/{metalake}/tags:
     $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags"
 
