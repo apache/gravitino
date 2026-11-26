@@ -255,6 +255,16 @@ public class MonitorIT {
             .put(
                 OptimizerConfig.OPTIMIZER_PREFIX
                     + GenericJdbcMetricsRepository.JDBC_METRICS_PREFIX
+                    + GenericJdbcMetricsRepository.JDBC_USER,
+                "sa")
+            .put(
+                OptimizerConfig.OPTIMIZER_PREFIX
+                    + GenericJdbcMetricsRepository.JDBC_METRICS_PREFIX
+                    + GenericJdbcMetricsRepository.JDBC_PASSWORD,
+                "")
+            .put(
+                OptimizerConfig.OPTIMIZER_PREFIX
+                    + GenericJdbcMetricsRepository.JDBC_METRICS_PREFIX
                     + GenericJdbcMetricsRepository.JDBC_DRIVER,
                 "org.h2.Driver")
             .build();
