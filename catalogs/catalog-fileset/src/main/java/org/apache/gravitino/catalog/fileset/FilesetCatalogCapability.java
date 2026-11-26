@@ -35,16 +35,11 @@ public class FilesetCatalogCapability implements Capability {
 
   @Override
   public CapabilityResult specificationOnName(Scope scope, String name) {
-    CapabilityResult capabilityResult = Capability.super.specificationOnName(scope, name);
-    if (!capabilityResult.supported()) {
-      return capabilityResult;
-    }
-
-    if (name.contains("/")) {
+    if (name.contains("/") && DefaultCapability.matchesNameSyntax(name)) {
       return CapabilityResult.unsupported(
           String.format("Fileset catalog does not support '/' in the name for %s.", scope));
     }
 
-    return CapabilityResult.SUPPORTED;
+    return Capability.super.specificationOnName(scope, name);
   }
 }
