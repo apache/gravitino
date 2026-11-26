@@ -24,6 +24,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
@@ -107,7 +108,7 @@ public class IcebergTable extends BaseTable implements SupportsPartitionSpecs {
   /** {@inheritDoc} */
   @Override
   public Map<Integer, Transform[]> partitionSpecs() {
-    return icebergPartitionSpecs;
+    return copyPartitionSpecs(icebergPartitionSpecs);
   }
 
   public static Map<String, String> rebuildCreateProperties(Map<String, String> createProperties) {
@@ -200,8 +201,14 @@ public class IcebergTable extends BaseTable implements SupportsPartitionSpecs {
         schema.columns().stream().map(ConvertUtil::fromNestedField).toArray(IcebergColumn[]::new);
     Map<Integer, Transform[]> allSpecs = new TreeMap<>();
     for (PartitionSpec spec : table.specsById().values()) {
-      allSpecs.put(spec.specId(), FromIcebergPartitionSpec.fromPartitionSpec(spec, schema));
+      allSpecs.put(
+          spec.specId(), copyTransforms(FromIcebergPartitionSpec.fromPartitionSpec(spec, schema)));
     }
+    Preconditions.checkState(
+        allSpecs.containsKey(table.defaultSpecId()),
+        "Iceberg default partition spec id %s is missing from specs %s",
+        table.defaultSpecId(),
+        allSpecs.keySet());
     IcebergTable icebergTable =
         IcebergTable.builder()
             .withComment(table.property(IcebergTablePropertiesMetadata.COMMENT, null))
@@ -261,9 +268,7 @@ public class IcebergTable extends BaseTable implements SupportsPartitionSpecs {
       icebergTable.sortOrders = sortOrders;
       // Iceberg always retains at least spec 0 (unpartitioned has empty fields). Hydrate a
       // matching default until fromIcebergTable replaces this with full metadata.
-      Transform[] currentPartitioning =
-          partitioning != null ? partitioning : Transforms.EMPTY_TRANSFORM;
-      icebergTable.icebergPartitionSpecs = ImmutableMap.of(0, currentPartitioning);
+      icebergTable.icebergPartitionSpecs = ImmutableMap.of(0, copyTransforms(partitioning));
       icebergTable.icebergDefaultSpecId = 0;
       if (null != comment) {
         icebergTable.properties.putIfAbsent(ICEBERG_COMMENT_FIELD_NAME, comment);
@@ -278,6 +283,22 @@ public class IcebergTable extends BaseTable implements SupportsPartitionSpecs {
    */
   public static Builder builder() {
     return new Builder();
+  }
+
+  private static Transform[] copyTransforms(Transform[] transforms) {
+    if (transforms == null || transforms.length == 0) {
+      return Transforms.EMPTY_TRANSFORM;
+    }
+    return Arrays.copyOf(transforms, transforms.length);
+  }
+
+  private static Map<Integer, Transform[]> copyPartitionSpecs(
+      Map<Integer, Transform[]> partitionSpecs) {
+    Map<Integer, Transform[]> copied = new TreeMap<>();
+    for (Map.Entry<Integer, Transform[]> entry : partitionSpecs.entrySet()) {
+      copied.put(entry.getKey(), copyTransforms(entry.getValue()));
+    }
+    return ImmutableMap.copyOf(copied);
   }
 
   private static Distribution getDistribution(Map<String, String> properties) {

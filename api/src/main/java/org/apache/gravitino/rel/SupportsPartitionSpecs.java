@@ -42,9 +42,10 @@ public interface SupportsPartitionSpecs {
   /**
    * Returns every partition spec registered on the table, keyed by {@code spec-id}.
    *
-   * <p>Each value is the Gravitino transform list for that spec. The map is never null. For formats
-   * that always retain a default unpartitioned spec (such as Iceberg), the map is also never empty
-   * for a loaded table.
+   * <p>Each value is a snapshot of the Gravitino transform list for that spec. The returned map is
+   * unmodifiable, but the {@link Transform} arrays are shallow copies (not deeply immutable). The
+   * map is never null. For formats that always retain a default unpartitioned spec (such as
+   * Iceberg), the map is also never empty for a loaded table.
    *
    * @return an unmodifiable map from spec ID to transforms
    */
