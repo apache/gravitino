@@ -75,11 +75,14 @@ import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.Uninterruptibles;
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Method;
 import java.net.ConnectException;
 import java.nio.channels.spi.AbstractInterruptibleChannel;
 import java.nio.charset.StandardCharsets;
@@ -2957,6 +2960,18 @@ public class TestFilesetCatalogOperations {
     }
   }
 
+  // The class loader cleaner interrupts and waits for, when the class loader of the catalog is
+  // released, each thread that it matches; here the catalog classes are those of the test.
+  private static void assertNotStoppedWithTheCatalog(Thread thread) throws Exception {
+    Method matches =
+        Class.forName("org.apache.gravitino.utils.ClassLoaderResourceCleanerUtils")
+            .getDeclaredMethod("runningWithClassLoader", Thread.class, ClassLoader.class);
+    matches.setAccessible(true);
+    Assertions.assertFalse(
+        (boolean) matches.invoke(null, thread, FilesetCatalogOperations.class.getClassLoader()),
+        thread + " runs with the class loader of the catalog");
+  }
+
   // Gives the current thread a context class loader that no other thread has, as the catalog's.
   private static void runWithALoaderOfItsOwn(
       AtomicReference<Thread> worker, AtomicReference<ClassLoader> loader) {
@@ -4067,16 +4082,15 @@ public class TestFilesetCatalogOperations {
               })
           .when(ops)
           .createFileSystem(any(), any(), any(), any(), any(), any());
-      // Holds the thread that runs CompletableFuture timeouts, so that only the lookup's own wait
+      // Holds the thread that times the tasks of the catalog, so that only the lookup's own wait
       // fails the creation, as when the creation ends right after the lookup gave up.
       CountDownLatch timerHeld = new CountDownLatch(1);
       CountDownLatch releaseTimer = new CountDownLatch(1);
-      CompletableFuture.delayedExecutor(0, TimeUnit.NANOSECONDS, Runnable::run)
-          .execute(
-              () -> {
-                timerHeld.countDown();
-                Uninterruptibles.awaitUninterruptibly(releaseTimer);
-              });
+      ops.scheduler.execute(
+          () -> {
+            timerHeld.countDown();
+            Uninterruptibles.awaitUninterruptibly(releaseTimer);
+          });
 
       try {
         Assertions.assertTrue(timerHeld.await(10, TimeUnit.SECONDS));
@@ -4258,6 +4272,7 @@ public class TestFilesetCatalogOperations {
       Assertions.assertTrue(channel.closing.await(10, TimeUnit.SECONDS));
       Assertions.assertEquals(
           "gravitino-fileset-close-interrupter", channel.closer.get().getName());
+      assertNotStoppedWithTheCatalog(channel.closer.get());
       ThreadPoolExecutor pool = creating ? ops.fileSystemExecutor : ops.loginSettingsExecutor;
       Assertions.assertDoesNotThrow(
           () -> CompletableFuture.supplyAsync(pool::getPoolSize).get(5, TimeUnit.SECONDS),
@@ -4280,22 +4295,70 @@ public class TestFilesetCatalogOperations {
     ReadingChannel channel = new ReadingChannel();
     ThreadPoolExecutor pool =
         new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
+    ScheduledThreadPoolExecutor timer = new ScheduledThreadPoolExecutor(1);
     // Started before the deadline is set, so that the task runs before it on a slow runner.
     pool.prestartAllCoreThreads();
     try {
-      // Nobody waits for the task, so the timer of orTimeout fails it.
+      // Nobody waits for the task, so the timer fails it.
       FilesetCatalogOperations.TimedTask.start(
-          pool, channel::read, System.nanoTime() + TimeUnit.SECONDS.toNanos(3));
+          pool, timer, channel::read, System.nanoTime() + TimeUnit.SECONDS.toNanos(3));
       Assertions.assertTrue(channel.reading.await(10, TimeUnit.SECONDS));
       Assertions.assertTrue(channel.closing.await(10, TimeUnit.SECONDS));
       Assertions.assertEquals("gravitino-fileset-task-canceller", channel.closer.get().getName());
+      assertNotStoppedWithTheCatalog(channel.closer.get());
       // The timer is not held by the interrupt.
-      CompletableFuture<Void> timer = new CompletableFuture<>();
-      CompletableFuture.delayedExecutor(10, TimeUnit.MILLISECONDS)
-          .execute(() -> timer.complete(null));
-      timer.get(10, TimeUnit.SECONDS);
+      timer.schedule(() -> null, 10, TimeUnit.MILLISECONDS).get(10, TimeUnit.SECONDS);
     } finally {
       channel.release.countDown();
+      pool.shutdownNow();
+      timer.shutdownNow();
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  @Timeout(60)
+  public void testTaskStartedAsTheCatalogClosesHasItsResultClosed(boolean returned)
+      throws Exception {
+    Closeable result = Mockito.mock(Closeable.class);
+    CountDownLatch started = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    // close() stops the timer before the pools, so a task may start without a timer.
+    ScheduledThreadPoolExecutor timer = new ScheduledThreadPoolExecutor(1);
+    timer.shutdownNow();
+    // The task either returns before it would be timed, or runs on until after. The pool returns
+    // once the task runs, so that failing it does not cancel it before it starts.
+    ExecutorService pool =
+        returned
+            ? MoreExecutors.newDirectExecutorService()
+            : new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, new LinkedBlockingQueue<>()) {
+              @Override
+              public void execute(Runnable command) {
+                super.execute(command);
+                Assertions.assertTrue(
+                    Uninterruptibles.awaitUninterruptibly(started, 10, TimeUnit.SECONDS));
+              }
+            };
+    try {
+      Assertions.assertThrows(
+          RejectedExecutionException.class,
+          () ->
+              FilesetCatalogOperations.TimedTask.start(
+                  pool,
+                  timer,
+                  () -> {
+                    started.countDown();
+                    // Like a login that ignores the interrupt.
+                    if (!returned) {
+                      Uninterruptibles.awaitUninterruptibly(release);
+                    }
+                    return result;
+                  },
+                  System.nanoTime() + TimeUnit.SECONDS.toNanos(30)));
+      release.countDown();
+      Mockito.verify(result, Mockito.timeout(10_000)).close();
+    } finally {
+      release.countDown();
       pool.shutdownNow();
     }
   }
@@ -5955,6 +6018,8 @@ public class TestFilesetCatalogOperations {
       fileSystemProviderMapOriginal.put("file", localFileSystemProvider);
       FieldUtils.writeField(
           filesetCatalogOperations, "fileSystemProvidersMap", fileSystemProviderMapOriginal, true);
+      // Which times the task, as initialize sets it together with the providers.
+      filesetCatalogOperations.scheduler = new ScheduledThreadPoolExecutor(1);
 
       FieldUtils.writeField(
           filesetCatalogOperations, "propertiesMetadata", FILESET_PROPERTIES_METADATA, true);

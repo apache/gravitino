@@ -63,7 +63,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -146,6 +149,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.util.ShutdownHookManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -449,8 +453,13 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
     // When the deadline passes first, the task leaves the queue or, if a thread can be started for
     // that, is interrupted, and a result that it returns later is closed. A login can ignore
-    // interrupts.
-    static <T> TimedTask<T> start(ExecutorService executor, Callable<T> task, long deadlineNanos) {
+    // interrupts. The timer is the catalog's, whose thread close() stops: the JVM-wide timer of
+    // orTimeout keeps the class loader of the catalog that first starts it.
+    static <T> TimedTask<T> start(
+        ExecutorService executor,
+        ScheduledExecutorService timer,
+        Callable<T> task,
+        long deadlineNanos) {
       TimedTask<T> timed = new TimedTask<>(deadlineNanos);
       long timeoutNanos = deadlineNanos - System.nanoTime();
       if (timeoutNanos <= 0) {
@@ -476,7 +485,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                   closeLater(result);
                 }
               });
-      timed.orTimeout(timeoutNanos, TimeUnit.NANOSECONDS);
       timed.whenComplete(
           (result, e) -> {
             if (e == null) {
@@ -488,15 +496,33 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               return;
             }
             // Interrupting a thread that reads a file through an interruptible channel waits until
-            // the read returns, so neither the caller nor the timer of orTimeout does it. Without a
-            // thread, the task is not interrupted, and its result is closed once it returns.
-            startThread("gravitino-fileset-task-canceller", () -> running.cancel(true));
+            // the read returns, so neither the caller nor the timer does it. Without a thread, the
+            // task is not interrupted, and its result is closed once it returns.
+            startInterrupter("gravitino-fileset-task-canceller", () -> running.cancel(true));
           });
+      ScheduledFuture<?> timeout;
+      try {
+        timeout =
+            timer.schedule(
+                () -> timed.completeExceptionally(new TimeoutException()),
+                timeoutNanos,
+                TimeUnit.NANOSECONDS);
+      } catch (RejectedExecutionException e) {
+        // The catalog is closed. Failing the task also closes a result that it returns later; one
+        // that it has returned already is closed here.
+        if (!timed.completeExceptionally(e)) {
+          closeLater(timed.getNow(null));
+        }
+        throw e;
+      }
+      timed.whenComplete((result, e) -> timeout.cancel(false));
       return timed;
     }
 
     // The interrupt that cancels the task that returned the result may still come, so the result is
-    // closed on another thread, or here if none starts.
+    // closed on another thread, or here if none starts. That thread runs catalog code, which may
+    // fail once the catalog class loader is closed, so it is left to the class loader cleaner to
+    // interrupt and wait for; it starts only once a task has a result.
     static void closeLater(@Nullable Object result) {
       if (result instanceof Closeable) {
         Runnable close = () -> closeQuietly(result);
@@ -506,10 +532,34 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       }
     }
 
+    // Releasing the catalog class loader interrupts, on the releasing thread, each thread whose
+    // context class loader is the catalog's, or whose class or Runnable is defined by it, and waits
+    // up to 500 ms for it. An interrupter may wait for the read it interrupts, so its Runnable is a
+    // JDK FutureTask and it has no context class loader.
+    static boolean startInterrupter(String name, Runnable interrupt) {
+      Runnable logged =
+          () -> {
+            try {
+              interrupt.run();
+            } catch (Throwable t) {
+              LOG.warn("Failed to interrupt in the thread {}", name, t);
+            }
+          };
+      return startThread(name, new FutureTask<>(logged, null), true);
+    }
+
     static boolean startThread(String name, Runnable action) {
+      return startThread(name, action, false);
+    }
+
+    private static boolean startThread(
+        String name, Runnable action, boolean withoutContextClassLoader) {
       try {
         Thread thread = new Thread(action, name);
         thread.setDaemon(true);
+        if (withoutContextClassLoader) {
+          thread.setContextClassLoader(null);
+        }
         thread.start();
         return true;
       } catch (Throwable t) {
@@ -644,6 +694,14 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     }
 
     if (!disableFSOps) {
+      // Hadoop adds its shutdown hook on the thread that first uses it, with that thread's context
+      // class loader, by which the class loader cleaner removes the hook when the catalog is
+      // released. close() gives the pool threads another one, so the hook is added here.
+      if (Thread.currentThread().getContextClassLoader()
+          == ShutdownHookManager.class.getClassLoader()) {
+        ShutdownHookManager.get();
+      }
+
       this.fileSystemProvidersMap =
           ImmutableMap.<String, FileSystemProvider>builder()
               .putAll(FileSystemUtils.getFileSystemProviders())
@@ -665,6 +723,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                   .setDaemon(true)
                   .setNameFormat("file-system-cache-for-fileset" + "-%d")
                   .build());
+      // It also times the tasks on the pools, whose timeouts are cancelled once they complete.
+      scheduler.setRemoveOnCancelPolicy(true);
 
       Caffeine<Object, Object> cacheBuilder =
           Caffeine.newBuilder()
@@ -1410,7 +1470,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     loginSettingsExecutor.getQueue().clear();
     for (Thread worker : runningWorkers) {
       releaseFromCatalog(worker);
-      TimedTask.startThread("gravitino-fileset-close-interrupter", worker::interrupt);
+      TimedTask.startInterrupter("gravitino-fileset-close-interrupter", worker::interrupt);
     }
 
     if (fileSystemCache != null) {
@@ -1954,6 +2014,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             // Create the file system for the user it is cached under.
             return TimedTask.start(
                 fileSystemExecutor,
+                scheduler,
                 () -> {
                   FileSystem fs =
                       getFileSystem(path, keptConf, cacheKey.currentUser, expectedSettings);
@@ -2028,7 +2089,10 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           key::copy,
           (keptKey, executor) ->
               TimedTask.start(
-                  loginSettingsExecutor, () -> resolve.apply(keptKey.conf), deadlineNanos),
+                  loginSettingsExecutor,
+                  scheduler,
+                  () -> resolve.apply(keptKey.conf),
+                  deadlineNanos),
           deadlineNanos);
     } catch (RejectedExecutionException e) {
       // The pool is full, or closed with the catalog.
@@ -2205,7 +2269,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   private <T> T executeFileSystemTask(ExecutorService executor, Callable<T> task, long timeoutNanos)
       throws InterruptedException, ExecutionException, TimeoutException {
     long deadlineNanos = System.nanoTime() + timeoutNanos;
-    TimedTask<T> timed = TimedTask.start(executor, task, deadlineNanos);
+    TimedTask<T> timed = TimedTask.start(executor, scheduler, task, deadlineNanos);
     try {
       return TimedTask.await(timed, deadlineNanos);
     } catch (TimeoutException | InterruptedException e) {
