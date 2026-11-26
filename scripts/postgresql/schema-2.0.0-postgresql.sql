@@ -1482,3 +1482,53 @@ CREATE TABLE IF NOT EXISTS iceberg_idempotency_generation_meta (
   stripe INT NOT NULL PRIMARY KEY,
   generation BIGINT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS ontology_meta (
+    ontology_id BIGINT NOT NULL,
+    ontology_name VARCHAR(128) NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    audit_info TEXT NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (ontology_id),
+    CONSTRAINT uk_onm_mid_name_del UNIQUE (metalake_id, ontology_name, deleted_at)
+);
+
+CREATE INDEX IF NOT EXISTS idx_onm_deleted ON ontology_meta (deleted_at);
+COMMENT ON TABLE ontology_meta IS 'ontology identity';
+COMMENT ON COLUMN ontology_meta.ontology_id IS 'ontology id';
+COMMENT ON COLUMN ontology_meta.ontology_name IS 'ontology name';
+COMMENT ON COLUMN ontology_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN ontology_meta.audit_info IS 'ontology identity audit info';
+COMMENT ON COLUMN ontology_meta.current_version IS 'current version';
+COMMENT ON COLUMN ontology_meta.last_version IS 'last allocated version';
+COMMENT ON COLUMN ontology_meta.deleted_at IS 'ontology deleted at';
+
+CREATE TABLE IF NOT EXISTS ontology_version_info (
+    id BIGSERIAL,
+    metalake_id BIGINT NOT NULL,
+    ontology_id BIGINT NOT NULL,
+    version INT NOT NULL,
+    ontology_comment TEXT DEFAULT NULL,
+    definition TEXT NOT NULL,
+    properties TEXT DEFAULT NULL,
+    audit_info TEXT NOT NULL,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_onvi_oid_ver_del UNIQUE (ontology_id, version, deleted_at)
+);
+
+CREATE INDEX IF NOT EXISTS idx_onvi_mid ON ontology_version_info (metalake_id) WHERE deleted_at = 0;
+
+CREATE INDEX IF NOT EXISTS idx_onvi_deleted ON ontology_version_info (deleted_at);
+COMMENT ON TABLE ontology_version_info IS 'ontology versions';
+COMMENT ON COLUMN ontology_version_info.id IS 'auto increment id';
+COMMENT ON COLUMN ontology_version_info.metalake_id IS 'metalake id';
+COMMENT ON COLUMN ontology_version_info.ontology_id IS 'ontology id';
+COMMENT ON COLUMN ontology_version_info.version IS 'version';
+COMMENT ON COLUMN ontology_version_info.ontology_comment IS 'comment snapshot';
+COMMENT ON COLUMN ontology_version_info.definition IS 'normalized OntologyDefinition (JSON)';
+COMMENT ON COLUMN ontology_version_info.properties IS 'properties snapshot (JSON)';
+COMMENT ON COLUMN ontology_version_info.audit_info IS 'version audit info';
+COMMENT ON COLUMN ontology_version_info.deleted_at IS 'version deleted at';
