@@ -119,6 +119,12 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     return true;
   }
 
+  /** The Hive catalog reports the metastore's rejection of the rename as an invalid argument. */
+  @Override
+  protected Class<? extends Exception> renameToExistingTableException() {
+    return IllegalArgumentException.class;
+  }
+
   @Override
   protected boolean supportsUpdateColumnPosition() {
     return true;
