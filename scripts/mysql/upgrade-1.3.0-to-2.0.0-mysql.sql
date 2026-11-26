@@ -571,6 +571,18 @@ CREATE TABLE IF NOT EXISTS `policy_tag_relation_meta` (
     KEY `policy_tag_relation_meta_idx_tag_id` (`tag_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy tag relation';
 
+CREATE TABLE IF NOT EXISTS `policy_role_relation_meta` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id',
+    `role_name` VARCHAR(128) NOT NULL COMMENT 'role name referenced by the policy content',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy role relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy role relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy role relation deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `policy_role_relation_meta_uk_pid_rn_del` (`policy_id`, `role_name`, `deleted_at`),
+    KEY `policy_role_relation_meta_idx_role_name` (`role_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy role relation';
+
 SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
     WHERE table_schema = DATABASE() AND table_name = 'job_run_meta' AND column_name = 'runtime_job_template'),
     'SELECT 1',
@@ -587,6 +599,7 @@ CREATE TABLE IF NOT EXISTS `semantic_model_meta` (
     `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'semantic model identity audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'current version',
+    `active_version` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'published revision, 0 if none',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'last allocated version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'semantic model deleted at',
     PRIMARY KEY (`semantic_model_id`),
@@ -602,7 +615,9 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
     `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'semantic model id',
     `version` INT UNSIGNED NOT NULL COMMENT 'semantic model version',
-    `semantic_model_name` VARCHAR(128) NOT NULL COMMENT 'semantic model name snapshot',
+    `publication_status` VARCHAR(32) NOT NULL DEFAULT 'DRAFT' COMMENT 'publication status of the revision',
+    `published_by` VARCHAR(128) NOT NULL DEFAULT '' COMMENT 'publishing principal, empty for a draft',
+    `published_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'publication time in epoch millis, 0 for a draft',
     `semantic_model_comment` TEXT DEFAULT NULL COMMENT 'semantic model comment snapshot',
     `datasets` MEDIUMTEXT NOT NULL COMMENT 'dataset definitions snapshot (JSON)',
     `relationships` MEDIUMTEXT DEFAULT NULL COMMENT 'relationship definitions snapshot (JSON)',
@@ -765,16 +780,18 @@ CREATE TABLE IF NOT EXISTS `semantic_model_source_rel` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'containing metalake id',
     `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'containing semantic model id',
-    `dataset_name` MEDIUMTEXT NOT NULL COMMENT 'exact dataset name in the current definition',
+    `dataset_name` MEDIUMTEXT NOT NULL COMMENT 'exact dataset name in the associated revisions',
     `source_type` VARCHAR(64) NOT NULL COMMENT 'TABLE or VIEW',
     `source_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'resolved source object id',
+    `from_version` INT UNSIGNED NOT NULL COMMENT 'first revision containing this association',
+    `to_version` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'first revision without it, 0 if open',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'association retired at',
     PRIMARY KEY (`id`),
     KEY `idx_smsr_model` (`semantic_model_id`, `deleted_at`),
     KEY `idx_smsr_source` (`metalake_id`, `source_type`, `source_id`, `deleted_at`),
     KEY `idx_smsr_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
-  COMMENT 'current semantic model dataset source associations';
+  COMMENT 'versioned semantic model dataset source associations';
 
 -- Clear governance attached to retired external registrations before their IDs can be reused.
 -- A retry must preserve relationships attached to a new active registration of the same ID.

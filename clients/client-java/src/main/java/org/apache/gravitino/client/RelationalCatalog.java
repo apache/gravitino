@@ -80,6 +80,7 @@ import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelRevision;
 import org.apache.gravitino.utils.TableLoadScope;
 
 /**
@@ -153,6 +154,24 @@ class RelationalCatalog extends BaseSchemaCatalog
 
   /** {@inheritDoc} */
   @Override
+  public SemanticModel loadSemanticModel(NameIdentifier ident, int revision) {
+    return semanticModelOperations.loadSemanticModel(ident, revision);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public SemanticModel loadSemanticModel(NameIdentifier ident, String alias) {
+    return semanticModelOperations.loadSemanticModel(ident, alias);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public SemanticModelRevision[] listSemanticModelRevisions(NameIdentifier ident) {
+    return semanticModelOperations.listSemanticModelRevisions(ident);
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public SemanticModel createSemanticModel(
       NameIdentifier ident,
       @Nullable String comment,
@@ -175,8 +194,27 @@ class RelationalCatalog extends BaseSchemaCatalog
 
   /** {@inheritDoc} */
   @Override
+  public OssieDocument exportOssieDocument(NameIdentifier ident, int revision, OssieFormat format) {
+    return semanticModelOperations.exportOssieDocument(ident, revision, format);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public OssieDocument exportOssieDocument(NameIdentifier ident, String alias, OssieFormat format) {
+    return semanticModelOperations.exportOssieDocument(ident, alias, format);
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public SemanticModel alterSemanticModel(NameIdentifier ident, SemanticModelChange... changes) {
     return semanticModelOperations.alterSemanticModel(ident, changes);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public SemanticModel alterSemanticModel(
+      NameIdentifier ident, int expectedRevision, SemanticModelChange... changes) {
+    return semanticModelOperations.alterSemanticModel(ident, expectedRevision, changes);
   }
 
   /** {@inheritDoc} */

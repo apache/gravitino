@@ -20,7 +20,6 @@ package org.apache.gravitino.catalog;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.model.Model;
@@ -53,13 +52,13 @@ public class TestModelNormalizeDispatcher extends TestOperationDispatcher {
     NameIdentifier modelIdent = NameIdentifierUtil.ofModel(metalake, catalog, schemaName, "model");
     modelNormalizeDispatcher.registerModel(modelIdent, "comment", ImmutableMap.of("k1", "v1"));
 
-    String tooLongName = StringUtils.repeat("m", 129);
+    String tooLongName = "m".repeat(65);
     Exception exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> modelNormalizeDispatcher.alterModel(modelIdent, ModelChange.rename(tooLongName)));
     Assertions.assertEquals(
-        String.format("The MODEL name '%s' is illegal. Illegal name: %s", tooLongName, tooLongName),
+        "The MODEL name must not exceed 64 characters. Illegal name: " + tooLongName,
         exception.getMessage());
 
     exception =

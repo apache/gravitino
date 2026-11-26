@@ -18,15 +18,15 @@
 from abc import abstractmethod
 from typing import Optional
 
-from gravitino.api.auditable import Auditable
 from gravitino.api.semantic.semantic_model_definition import SemanticModelDefinition
+from gravitino.api.semantic.semantic_model_revision import SemanticModelRevision
 from gravitino.api.domain.supports_domains import SupportsDomains
 from gravitino.api.policy.supports_policies import SupportsPolicies
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.exceptions.base import UnsupportedOperationException
 
 
-class SemanticModel(Auditable):
+class SemanticModel(SemanticModelRevision):
     """A schema-scoped analytical semantic model compatible with Apache Ossie Core.
 
     A Semantic Model is always managed by Gravitino and is never persisted in an

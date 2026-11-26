@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -45,7 +46,6 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SemanticModelEntity;
@@ -56,6 +56,7 @@ import org.apache.gravitino.semantic.DialectExpression;
 import org.apache.gravitino.semantic.Expression;
 import org.apache.gravitino.semantic.Metric;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -139,10 +140,12 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
             "overwritten comment",
             "overwritten");
     SemanticModelMetaService.getInstance().insertSemanticModel(overwritten, true);
-    assertEquals(
-        overwritten,
+    SemanticModelEntity loaded =
         SemanticModelMetaService.getInstance()
-            .getSemanticModelByIdentifier(overwritten.nameIdentifier()));
+            .getSemanticModelByIdentifier(overwritten.nameIdentifier());
+    assertEquals(overwritten.definition(), loaded.definition());
+    assertEquals(overwritten.comment(), loaded.comment());
+    assertEquals(2, loaded.revision());
     assertEquals(2, listSemanticModelVersions(original.id()).size());
 
     assertThrows(
@@ -153,7 +156,7 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testUpdateCreatesFullSnapshotAndRenameChangeLog() throws IOException {
+  public void testUpdateCreatesSnapshotAndRenameOnlyUpdatesIdentity() throws IOException {
     String oldName = GravitinoITUtils.genRandomName("sales_model_old");
     String newName = GravitinoITUtils.genRandomName("sales_model_new");
     SemanticModelEntity original =
@@ -163,21 +166,32 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
     long lastChangeId = maxEntityChangeId();
 
     SemanticModelEntity expected =
-        semanticModelEntity(original.id(), newName, "orders_v2", "v2 comment", "v2");
+        semanticModelEntity(original.id(), oldName, "orders_v2", "v2 comment", "v2");
     SemanticModelEntity updated =
         SemanticModelMetaService.getInstance()
             .updateSemanticModel(original.nameIdentifier(), ignored -> expected);
 
-    assertEquals(expected, updated);
+    assertEquals(expected.definition(), updated.definition());
+    assertEquals(2, updated.revision());
+    SemanticModelEntity renamed =
+        semanticModelEntity(original.id(), newName, "orders_v2", "v2 comment", "v2");
+    SemanticModelMetaService service = SemanticModelMetaService.getInstance();
+    assertEquals(
+        2, service.updateSemanticModel(original.nameIdentifier(), ignored -> renamed).revision());
+    assertEquals(
+        newName,
+        service
+            .getSemanticModelByIdentifier(
+                renamed.nameIdentifier(), SemanticModelRevisionSelector.numbered(1))
+            .name());
     assertThrows(
         NoSuchEntityException.class,
         () ->
             SemanticModelMetaService.getInstance()
                 .getSemanticModelByIdentifier(original.nameIdentifier()));
     assertEquals(
-        expected,
-        SemanticModelMetaService.getInstance()
-            .getSemanticModelByIdentifier(expected.nameIdentifier()));
+        updated.definition(),
+        service.getSemanticModelByIdentifier(renamed.nameIdentifier()).definition());
     assertEquals(
         original.id(),
         SemanticModelMetaService.getInstance()
@@ -185,10 +199,8 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
 
     Map<Integer, VersionState> versions = listSemanticModelVersions(original.id());
     assertEquals(2, versions.size());
-    assertEquals(oldName, versions.get(1).name);
     assertEquals("v1 comment", versions.get(1).comment);
     assertTrue(versions.get(1).datasets.contains("orders_v1"));
-    assertEquals(newName, versions.get(2).name);
     assertEquals("v2 comment", versions.get(2).comment);
     assertTrue(versions.get(2).datasets.contains("orders_v2"));
     assertEquals(0L, versions.get(1).deletedAt);
@@ -211,7 +223,7 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
     long lastChangeId = maxEntityChangeId();
 
     SemanticModelEntity renamed =
-        semanticModelEntity(original.id(), newName, "orders", "renamed", "v2");
+        semanticModelEntity(original.id(), newName, "orders", "original", "v1");
     SemanticModelMetaService.getInstance()
         .updateSemanticModel(original.nameIdentifier(), ignored -> renamed);
     assertEntityChange(lastChangeId, oldName, OperateType.ALTER);
@@ -411,7 +423,7 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testOptimisticDropRejectsStaleInternalVersion() throws IOException {
+  public void testDropUsesObservedNameAfterConcurrentSnapshotWrite() throws IOException {
     String semanticModelName = GravitinoITUtils.genRandomName("optimistic_drop_model");
     SemanticModelEntity original =
         semanticModelEntity(
@@ -429,20 +441,46 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
     SemanticModelMetaService.getInstance()
         .updateSemanticModel(original.nameIdentifier(), ignored -> updated);
 
-    assertThrows(
-        OptimisticLockException.class,
-        () ->
-            SemanticModelMetaService.getInstance()
-                .deleteSemanticModelWithVersion(original.nameIdentifier(), stalePO));
+    SemanticModelMetaService service = SemanticModelMetaService.getInstance();
+    service.deleteObservedSemanticModel(original.nameIdentifier(), stalePO);
 
-    assertEquals(
-        updated,
-        SemanticModelMetaService.getInstance()
-            .getSemanticModelByIdentifier(updated.nameIdentifier()));
+    assertThrows(
+        NoSuchEntityException.class,
+        () -> service.getSemanticModelByIdentifier(original.nameIdentifier()));
     Map<Integer, VersionState> versions = listSemanticModelVersions(original.id());
     assertEquals(2, versions.size());
-    assertEquals(0L, versions.get(1).deletedAt);
-    assertEquals(0L, versions.get(2).deletedAt);
+    assertTrue(versions.get(1).deletedAt > 0L);
+    assertTrue(versions.get(2).deletedAt > 0L);
+  }
+
+  @TestTemplate
+  public void testAlterAndDropGuardTheObservedName() throws IOException {
+    String name = GravitinoITUtils.genRandomName("observed_name");
+    SemanticModelEntity original =
+        semanticModelEntity(RandomIdGenerator.INSTANCE.nextId(), name, "orders", "original", "v1");
+    SemanticModelMetaService service = SemanticModelMetaService.getInstance();
+    service.insertSemanticModel(original, false);
+    SemanticModelPO observed = service.getSemanticModelPOByIdentifier(original.nameIdentifier());
+    SemanticModelEntity renamed =
+        semanticModelEntity(original.id(), name + "_renamed", "orders", "original", "v1");
+    SemanticModelEntity updated =
+        semanticModelEntity(original.id(), name, "orders", "changed", "v1");
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            service.updateSemanticModel(
+                original.nameIdentifier(),
+                ignored -> {
+                  renameObservedModel(service, original, renamed);
+                  return updated;
+                }));
+    assertThrows(
+        NoSuchEntityException.class,
+        () -> service.deleteObservedSemanticModel(original.nameIdentifier(), observed));
+    assertEquals(
+        "original", service.getSemanticModelByIdentifier(renamed.nameIdentifier()).comment());
+    assertEquals(1, listSemanticModelVersions(original.id()).size());
   }
 
   @TestTemplate
@@ -458,7 +496,7 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
     assertTrue(service.deleteSemanticModel(original.nameIdentifier()));
     assertThrows(
         NoSuchEntityException.class,
-        () -> service.deleteSemanticModelWithVersion(original.nameIdentifier(), stalePO));
+        () -> service.deleteObservedSemanticModel(original.nameIdentifier(), stalePO));
     assertEquals(1, listSemanticModelVersions(original.id()).size());
   }
 
@@ -486,6 +524,7 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
               .updateSemanticModel(current.nameIdentifier(), ignored -> next);
     }
 
+    assertTrue(isRetentionCandidate(current.id(), 1L));
     assertEquals(
         2,
         SemanticModelMetaService.getInstance()
@@ -494,6 +533,7 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
     assertTrue(retainedVersions.get(1).deletedAt > 0L);
     assertTrue(retainedVersions.get(2).deletedAt > 0L);
     assertEquals(0L, retainedVersions.get(3).deletedAt);
+    assertFalse(isRetentionCandidate(current.id(), 1L));
 
     SemanticModelEntity finalCurrent = current;
     long lastChangeId = maxEntityChangeId();
@@ -513,6 +553,14 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
     assertEquals(7, deleted);
     assertEquals(0, listSemanticModelVersions(finalCurrent.id()).size());
     assertEquals(0, countSemanticModelIdentities(finalCurrent.id()));
+  }
+
+  private boolean isRetentionCandidate(long modelId, long retentionCount) {
+    return SessionUtils.getWithoutCommit(
+        SemanticModelVersionInfoMapper.class,
+        mapper ->
+            mapper.selectSemanticModelVersionsByRetentionCount(retentionCount).stream()
+                .anyMatch(candidate -> candidate.semanticModelId() == modelId));
   }
 
   private SemanticModelEntity semanticModelEntity(
@@ -620,6 +668,15 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
         });
   }
 
+  private static void renameObservedModel(
+      SemanticModelMetaService service, SemanticModelEntity original, SemanticModelEntity renamed) {
+    try {
+      service.updateSemanticModel(original.nameIdentifier(), current -> renamed);
+    } catch (IOException e) {
+      throw new AssertionError(e);
+    }
+  }
+
   private Map<Integer, VersionState> listSemanticModelVersions(Long semanticModelId) {
     Map<Integer, VersionState> versions = new HashMap<>();
     try (SqlSession sqlSession =
@@ -629,7 +686,7 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
         ResultSet resultSet =
             statement.executeQuery(
                 String.format(
-                    "SELECT version, semantic_model_name, semantic_model_comment,"
+                    "SELECT version, semantic_model_comment,"
                         + " datasets, deleted_at"
                         + " FROM semantic_model_version_info WHERE semantic_model_id = %d",
                     semanticModelId))) {
@@ -637,7 +694,6 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
         versions.put(
             resultSet.getInt("version"),
             new VersionState(
-                resultSet.getString("semantic_model_name"),
                 resultSet.getString("semantic_model_comment"),
                 resultSet.getString("datasets"),
                 resultSet.getLong("deleted_at")));
@@ -708,13 +764,11 @@ public class TestSemanticModelMetaService extends TestJDBCBackend {
   }
 
   private static class VersionState {
-    private final String name;
     private final String comment;
     private final String datasets;
     private final long deletedAt;
 
-    private VersionState(String name, String comment, String datasets, long deletedAt) {
-      this.name = name;
+    private VersionState(String comment, String datasets, long deletedAt) {
       this.comment = comment;
       this.datasets = datasets;
       this.deletedAt = deletedAt;

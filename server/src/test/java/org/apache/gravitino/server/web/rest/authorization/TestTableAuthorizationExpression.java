@@ -141,7 +141,13 @@ public class TestTableAuthorizationExpression {
   public void testLoadTable() throws NoSuchMethodException, OgnlException {
     Method method =
         TableOperations.class.getMethod(
-            "loadTable", String.class, String.class, String.class, String.class, String.class);
+            "loadTable",
+            String.class,
+            String.class,
+            String.class,
+            String.class,
+            String.class,
+            boolean.class);
     AuthorizationExpression authorizationExpressionAnnotation =
         method.getAnnotation(AuthorizationExpression.class);
     String expression = authorizationExpressionAnnotation.expression();
@@ -186,7 +192,13 @@ public class TestTableAuthorizationExpression {
   public void testLoadTableExistenceProbe() throws NoSuchMethodException, OgnlException {
     Method method =
         TableOperations.class.getMethod(
-            "loadTable", String.class, String.class, String.class, String.class, String.class);
+            "loadTable",
+            String.class,
+            String.class,
+            String.class,
+            String.class,
+            String.class,
+            boolean.class);
     AuthorizationExpression authorizationExpressionAnnotation =
         method.getAnnotation(AuthorizationExpression.class);
     String expression = authorizationExpressionAnnotation.allowCheckExistence();

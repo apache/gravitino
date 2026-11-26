@@ -35,7 +35,13 @@ paths:
           $ref: "./openapi.yaml#/components/responses/EntityListResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
-        "5xx":
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
+        "501":
+          $ref: "#/components/responses/TableUnsupportedOperationErrorResponse"
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
     post:
@@ -62,6 +68,10 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/TableResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
         "409":
           description: Conflict - The target table already exists
           content:
@@ -71,7 +81,9 @@ paths:
               examples:
                 TableAlreadyExistsErrorResponse:
                   $ref: "#/components/examples/TableAlreadyExistsException"
-        "5xx":
+        "501":
+          $ref: "#/components/responses/TableUnsupportedOperationErrorResponse"
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 
@@ -95,10 +107,14 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/TableResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "404":
-          description: Not Found - The target table does not exist
+          description: >-
+            Not Found - The table or its parent resource does not exist. When authorization
+            is enabled, a missing metalake returns 403 instead.
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
               examples:
@@ -110,7 +126,11 @@ paths:
                   $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
                 NoSuchTableException:
                   $ref: "#/components/examples/NoSuchTableException"
-        "5xx":
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
+        "501":
+          $ref: "#/components/responses/TableUnsupportedOperationErrorResponse"
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
     put:
@@ -129,10 +149,14 @@ paths:
           $ref: "#/components/responses/TableResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "404":
-          description: Not Found - The target table does not exist
+          description: >-
+            Not Found - The table or its parent resource does not exist. When authorization
+            is enabled, a missing metalake returns 403 instead.
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
               examples:
@@ -144,6 +168,8 @@ paths:
                   $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
                 NoSuchTableException:
                   $ref: "#/components/examples/NoSuchTableException"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
         "409":
           description: Conflict - The target table already exists
           content:
@@ -153,7 +179,9 @@ paths:
               examples:
                 TableAlreadyExistsErrorResponse:
                   $ref: "#/components/examples/TableAlreadyExistsException"
-        "5xx":
+        "501":
+          $ref: "#/components/responses/TableUnsupportedOperationErrorResponse"
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
     delete:
@@ -168,7 +196,13 @@ paths:
           $ref: "./openapi.yaml#/components/responses/DropResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
-        "5xx":
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
+        "501":
+          $ref: "#/components/responses/TableUnsupportedOperationErrorResponse"
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 
@@ -837,6 +871,17 @@ components:
 
 
   responses:
+    TableUnsupportedOperationErrorResponse:
+      description: Not Implemented - The catalog does not support table operations or the requested table operation
+      content:
+        application/json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+          example:
+            code: 1006
+            type: UnsupportedOperationException
+            message: Catalog does not support table operations
+
     TableResponse:
       description: Returns include the table object
       content:

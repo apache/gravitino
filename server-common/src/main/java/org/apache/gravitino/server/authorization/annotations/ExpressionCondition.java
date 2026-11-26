@@ -22,5 +22,7 @@ public enum ExpressionCondition {
   NEVER,
   REQUIRED_MODIFY_PRIVILEGES,
   /** The request carries proposed changes that are not saved, for example in its request body. */
-  HAS_PROPOSED_CHANGES
+  HAS_PROPOSED_CHANGES,
+  /** The request retrieves catalog credentials, with extra privileges for static providers. */
+  CATALOG_CREDENTIALS
 }

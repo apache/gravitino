@@ -1048,7 +1048,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
       Assertions.assertTrue(failure.getMessage().contains("property k2"));
       Assertions.assertFalse(entityStore.exists(copy, SCHEMA));
       Assertions.assertThrows(
-          NoSuchSchemaException.class, () -> secretDispatcher.getSecrets(copy, SCHEMA));
+          NoSuchSchemaException.class, () -> secretDispatcher.getSecrets(copy, SCHEMA, true));
       Assertions.assertTrue(d.dropSchema(copy, false));
       Assertions.assertEquals("original-secret", secrets.readSecret(originalUrn));
       Assertions.assertEquals(

@@ -361,6 +361,7 @@ public class DTOConverters {
    */
   public static SemanticModelDTO toDTO(SemanticModel semanticModel) {
     return SemanticModelDTO.builder()
+        .withRevision(semanticModel)
         .withName(semanticModel.name())
         .withComment(semanticModel.comment())
         .withDefinition(SemanticModelDefinitionDTO.fromDefinition(semanticModel.definition()))

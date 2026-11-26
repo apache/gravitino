@@ -25,12 +25,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.util.Locale;
 import java.util.function.Consumer;
 import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.NameValidationUtils;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.junit.jupiter.api.parallel.Resources;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -84,6 +87,32 @@ class TestDomainNormalizeDispatcher {
         IllegalArgumentException.class,
         () -> dispatcher.listMembers("m", name, DomainMemberFilter.builder().build()));
     verifyNoInteractions(delegate);
+  }
+
+  @Test
+  @ResourceLock(Resources.LOCALE)
+  void reportsNameLengthLimitOnCreateAndRenameAcrossLocales() {
+    String name = "a".repeat(65);
+    String expected = "The domain name must not exceed 64 characters.";
+    Locale previous = Locale.getDefault(Locale.Category.FORMAT);
+    try {
+      Locale.setDefault(Locale.Category.FORMAT, Locale.forLanguageTag("ar-EG"));
+      assertEquals(
+          expected,
+          assertThrows(
+                  IllegalArgumentException.class,
+                  () -> dispatcher.createDomain("m", name, null, null, tag, false))
+              .getMessage());
+      assertEquals(
+          expected,
+          assertThrows(
+                  IllegalArgumentException.class,
+                  () -> dispatcher.alterDomain("m", "old", DomainChange.rename(name)))
+              .getMessage());
+      verifyNoInteractions(delegate);
+    } finally {
+      Locale.setDefault(Locale.Category.FORMAT, previous);
+    }
   }
 
   @Test
