@@ -84,7 +84,6 @@ public class IcebergViewRenameOperations {
           RenameTableRequest renameViewRequest,
       @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
       @Context UriInfo uriInfo) {
-    IcebergRESTUtils.validateRequest(renameViewRequest, "RenameTableRequest");
     return idempotencyManager.replayOrExecute(
         idempotencyKey,
         IcebergIdempotencyManager.operationBinding(HttpMethod.POST, uriInfo),
@@ -92,13 +91,14 @@ public class IcebergViewRenameOperations {
   }
 
   private Response doRenameView(String prefix, RenameTableRequest renameViewRequest) {
-    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    LOG.info(
-        "Rename Iceberg view, catalog: {}, source: {}, destination: {}.",
-        catalogName,
-        renameViewRequest.source(),
-        renameViewRequest.destination());
     try {
+      IcebergRESTUtils.validateRequest(renameViewRequest, "RenameTableRequest");
+      String catalogName = IcebergRESTUtils.getCatalogName(prefix);
+      LOG.info(
+          "Rename Iceberg view, catalog: {}, source: {}, destination: {}.",
+          catalogName,
+          renameViewRequest.source(),
+          renameViewRequest.destination());
       return Utils.doAs(
           httpRequest,
           () -> {
