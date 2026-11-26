@@ -155,6 +155,19 @@ public interface Table extends Auditable {
   }
 
   /**
+   * Returns Iceberg partition-spec listing when the table retains historical Iceberg specs.
+   *
+   * <p>{@link #partitioning()} only reflects the current default spec. Use this capability to list
+   * every registered {@code spec-id} after Iceberg partition evolution.
+   *
+   * @return The Iceberg partition-spec support for the table.
+   * @throws UnsupportedOperationException If the table does not expose Iceberg partition specs.
+   */
+  default SupportsIcebergPartitionSpecs supportsIcebergPartitionSpecs() {
+    throw new UnsupportedOperationException("Table does not support Iceberg partition specs.");
+  }
+
+  /**
    * @return The {@link SupportsTags} if the table supports tag operations.
    * @throws UnsupportedOperationException If the table does not support tag operations.
    */

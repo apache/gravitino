@@ -29,6 +29,7 @@ import org.apache.gravitino.connector.MaskAndOmitKeys;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.SupportsIcebergPartitionSpecs;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -145,6 +146,11 @@ public final class EntityCombinedTable implements Table {
   @Override
   public SupportsPartitions supportPartitions() throws UnsupportedOperationException {
     return table.supportPartitions();
+  }
+
+  @Override
+  public SupportsIcebergPartitionSpecs supportsIcebergPartitionSpecs() {
+    return table.supportsIcebergPartitionSpecs();
   }
 
   @Override
