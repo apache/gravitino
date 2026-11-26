@@ -52,6 +52,7 @@ import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
 import org.apache.gravitino.cache.BaseEntityCache;
+import org.apache.gravitino.domain.DefinitionMemberPage;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.kb.KnowledgeBaseArticleEntity;
@@ -885,6 +886,12 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   public List<DomainEntity> listDomainsByBackingTagIds(String metalake, List<Long> backingTagIds)
       throws IOException {
     return DomainMetaService.getInstance().listDomainsByBackingTagIds(metalake, backingTagIds);
+  }
+
+  @Override
+  public DefinitionMemberPage listDefinitionMembers(
+      NameIdentifier domain, int limit, int offset, Consumer<DomainEntity> authorize) {
+    return DomainMetaService.getInstance().listDefinitionMembers(domain, limit, offset, authorize);
   }
 
   @Override

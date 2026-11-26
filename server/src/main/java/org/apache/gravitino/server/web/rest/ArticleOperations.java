@@ -49,6 +49,7 @@ import org.apache.gravitino.dto.responses.ArticleAssetBindingsResponse;
 import org.apache.gravitino.dto.responses.ArticleContentResponse;
 import org.apache.gravitino.dto.responses.ArticleResponse;
 import org.apache.gravitino.dto.responses.ArticleTermBindingsResponse;
+import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
@@ -271,6 +272,33 @@ public class ArticleOperations {
         metalake,
         article,
         () -> Utils.ok(new DropResponse(manager.deleteArticle(metalake, article))));
+  }
+
+  /**
+   * Detaches an Article from a Domain using the caller's Domain management permissions.
+   *
+   * @param metalake the metalake name
+   * @param article the Article name
+   * @param domain the Domain name
+   * @return a successful response when the membership is removed or already absent
+   */
+  @DELETE
+  @Path("{article}/domains/{domain}")
+  @Timed(name = "detach-article-domain." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "detach-article-domain", absolute = true)
+  @AuthorizationExpression(expression = "")
+  public Response detachDomain(
+      @PathParam("metalake") @AuthorizationMetadata(type = EntityType.METALAKE) String metalake,
+      @PathParam("article") String article,
+      @PathParam("domain") String domain) {
+    return execute(
+        OperationType.ALTER,
+        metalake,
+        article,
+        () -> {
+          manager.detachDomain(metalake, article, domain);
+          return Utils.ok(new BaseResponse());
+        });
   }
 
   private static Response metadata(ArticleManager.Result result) {

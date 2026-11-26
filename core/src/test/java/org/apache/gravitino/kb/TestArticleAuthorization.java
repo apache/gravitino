@@ -36,6 +36,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -60,7 +61,10 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.domain.DefinitionMember;
+import org.apache.gravitino.domain.DefinitionMemberPage;
 import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.domain.DomainManager;
 import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
@@ -81,6 +85,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.policy.PolicyManager;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.server.authorization.DomainAuthzHelper;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
@@ -813,6 +818,71 @@ class TestArticleAuthorization extends TestJDBCBackend {
           assertEquals(Set.of(retail), renamed.article().domainIds());
           return null;
         });
+  }
+
+  @TestTemplate
+  void domainStewardListsOnlyDirectDefinitionsWithInheritedManage() throws Exception {
+    Mockito.when(env.config().get(Configs.ENABLE_AUTHORIZATION)).thenReturn(true);
+    insertDomain(LAKE, "Sales", Domain.Status.PUBLISHED, null, AUDIT_INFO);
+    insertDomain(LAKE, "Retail", Domain.Status.PUBLISHED, "Sales", AUDIT_INFO);
+    insertDomain(LAKE, "Secret", Domain.Status.DRAFT, null, AUDIT_INFO);
+    role(
+        "salesAdmin",
+        SecurableObjects.parse(
+            "Sales", MetadataObject.Type.DOMAIN, List.of(Privileges.allow("MANAGE_DOMAIN"))));
+    role(
+        "retailDeny",
+        SecurableObjects.parse(
+            "Retail", MetadataObject.Type.DOMAIN, List.of(Privileges.deny("MANAGE_DOMAIN"))));
+    role("domainReader", Privileges.allow("USE_DOMAIN"));
+    user("steward", "salesAdmin");
+    user("deniedSteward", "salesAdmin", "retailDeny");
+    user("reader", "domainReader");
+    var glossary = new GlossaryManager(ids::incrementAndGet, true);
+    as(
+        "lakeOwner",
+        () ->
+            glossary.createTerm(LAKE, TermSpec.builder("Customer").withDomains("Retail").build()));
+    as(
+        "lakeOwner",
+        () -> manager.createArticle(LAKE, article("draft", ArticleStatus.DRAFT, "Retail")));
+    DomainManager domains = new DomainManager(ids::incrementAndGet, env.entityStore());
+    Consumer<DomainEntity> authorize = domain -> DomainAuthzHelper.requireManage(LAKE, domain);
+    as(
+        "steward",
+        () -> {
+          assertThrows(
+              NoSuchKnowledgeBaseArticleException.class, () -> manager.loadArticle(LAKE, "draft"));
+          assertTrue(
+              domains.listDefinitionMembers(LAKE, "Sales", 10, 0, authorize).members().isEmpty());
+          DefinitionMemberPage first =
+              domains.listDefinitionMembers(LAKE, "Retail", 1, 0, authorize);
+          assertEquals(1, first.members().size());
+          assertEquals(DefinitionMember.Type.GLOSSARY_TERM, first.members().get(0).type());
+          assertEquals("Customer", first.members().get(0).name());
+          assertTrue(first.hasMore());
+          DefinitionMemberPage second =
+              domains.listDefinitionMembers(LAKE, "Retail", 1, 1, authorize);
+          assertEquals(1, second.members().size());
+          assertEquals(
+              DefinitionMember.Type.KNOWLEDGE_BASE_ARTICLE, second.members().get(0).type());
+          assertEquals("draft", second.members().get(0).name());
+          assertFalse(second.hasMore());
+          return null;
+        });
+    for (String caller : List.of("reader", "deniedSteward", "admin")) {
+      as(
+          caller,
+          () -> {
+            assertThrows(
+                ForbiddenException.class,
+                () -> domains.listDefinitionMembers(LAKE, "Retail", 10, 0, authorize));
+            assertThrows(
+                NoSuchDomainException.class,
+                () -> domains.listDefinitionMembers(LAKE, "Secret", 10, 0, authorize));
+            return null;
+          });
+    }
   }
 
   @TestTemplate

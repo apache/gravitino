@@ -218,6 +218,43 @@ paths:
         5XX:
           $ref: "#/components/responses/ServerError"
 
+  "/metalakes/{metalake}/kb-articles/{article}/domains/{domain}":
+    parameters:
+      - $ref: ./openapi.yaml#/components/parameters/metalake
+      - $ref: "#/components/parameters/article"
+      - $ref: ./domains.yaml#/components/parameters/domain
+    delete:
+      operationId: detachKnowledgeBaseArticleFromDomain
+      tags: [knowledge-base]
+      summary: Detach an Article from one domain
+      description: >-
+        Checks effective MANAGE_DOMAIN on the requested domain before looking up the Article.
+        A domain administrator can detach a hidden draft. Removing a membership advances the
+        Article revision once and preserves memberships in other domains.
+      responses:
+        "200":
+          description: The membership was removed, or the Article or membership was already absent.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [code]
+                properties:
+                  code: {type: integer, enum: [0]}
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "403":
+          $ref: ./openapi.yaml#/components/responses/ForbiddenErrorResponse
+        "404":
+          $ref: ./domains.yaml#/components/responses/MissingDomainResponse
+        "406":
+          $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
+        "409":
+          $ref: "#/components/responses/MetalakeNotInUse"
+        5XX:
+          $ref: "#/components/responses/ServerError"
+
 components:
   parameters:
     bindingLimit:

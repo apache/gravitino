@@ -24,7 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -53,6 +55,7 @@ import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.KnowledgeBaseArticleAlreadyExistsException;
+import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchKnowledgeBaseArticleException;
 import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.apache.gravitino.exceptions.UnapprovedTermException;
@@ -371,6 +374,34 @@ class TestArticleOperations extends BaseOperationsTest {
       }
     }
     verifyNoInteractions(manager);
+  }
+
+  @Test
+  void detachesDomainWithTheSameResponseForAnAbsentMembershipOrArticle() throws IOException {
+    var draft = target(BASE + "/draft/domains/Finance");
+    var absent = target(BASE + "/absent/domains/Finance");
+    try (Response first = draft.request(V1).delete();
+        Response repeat = draft.request().delete();
+        Response missing = absent.request().delete()) {
+      var ok = JsonUtils.objectMapper().readTree("{\"code\":0}");
+      assertEquals(ok, success(first));
+      assertEquals(ok, success(repeat));
+      assertEquals(ok, success(missing));
+    }
+    verify(manager, times(2)).detachDomain("test", "draft", "Finance");
+    verify(manager).detachDomain("test", "absent", "Finance");
+  }
+
+  @Test
+  void detachRequiresAuthorityOnTheNamedDomain() {
+    var path = target(BASE + "/missing/domains/Finance");
+    doThrow(
+            new ForbiddenException("Cannot manage Domain"),
+            new NoSuchDomainException("Hidden Domain"))
+        .when(manager)
+        .detachDomain("test", "missing", "Finance");
+    assertError(path.request().delete(), 403, "ForbiddenException");
+    assertError(path.request().delete(), 404, "NoSuchDomainException");
   }
 
   private static JsonNode success(Response r) throws IOException {

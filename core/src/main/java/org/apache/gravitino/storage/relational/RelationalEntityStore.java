@@ -60,6 +60,7 @@ import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.NoOpsCache;
+import org.apache.gravitino.domain.DefinitionMemberPage;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
@@ -585,6 +586,13 @@ public class RelationalEntityStore
   public List<DomainEntity> listDomainsByBackingTagIds(String metalake, List<Long> backingTagIds)
       throws IOException {
     return backend.listDomainsByBackingTagIds(metalake, backingTagIds);
+  }
+
+  @Override
+  public DefinitionMemberPage listDefinitionMembers(
+      NameIdentifier domain, int limit, int offset, Consumer<DomainEntity> authorize)
+      throws IOException {
+    return backend.listDefinitionMembers(domain, limit, offset, authorize);
   }
 
   @Override

@@ -22,6 +22,7 @@ package org.apache.gravitino.storage.relational.service;
 import static org.apache.gravitino.storage.relational.mapper.DomainMemberMapper.MemberType.GLOSSARY_TERM;
 import static org.apache.gravitino.storage.relational.mapper.DomainMemberMapper.MemberType.KNOWLEDGE_BASE_ARTICLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -38,6 +39,8 @@ import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.domain.DefinitionMember;
+import org.apache.gravitino.domain.DefinitionMemberPage;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyDomainException;
@@ -115,6 +118,62 @@ public class TestArticleDomainMembership extends TestJDBCBackend {
         0,
         SessionUtils.getWithoutCommit(DomainMemberMapper.class, m -> m.purge(Long.MAX_VALUE, 100))
             .intValue());
+  }
+
+  @TestTemplate
+  void testDefinitionMemberWindowUsesLiveTargetsInTheAuthorizedSnapshot() throws IOException {
+    long lake = createAndInsertMakeLake("lake").id();
+    createAndInsertMakeLake("other");
+    DomainEntity domain = domain("lake", 20);
+    KnowledgeBaseArticleEntity first = article(Set.of(domain.id()));
+    KnowledgeBaseArticleEntity second = first.toBuilder().withId(61L).withName("another").build();
+    ARTICLES.insert(first, false);
+    ARTICLES.insert(second, false);
+    ARTICLES.insert(
+        first.toBuilder()
+            .withNamespace(Namespace.of("other"))
+            .withDomainIds(Set.of())
+            .withId(59L)
+            .build(),
+        false);
+    SessionUtils.doWithCommit(
+        DomainMemberMapper.class,
+        mapper -> {
+          mapper.add(lake, GLOSSARY_TERM, first.id(), domain.id(), "{}");
+          mapper.add(lake, KNOWLEDGE_BASE_ARTICLE, 59, domain.id(), "{}");
+        });
+    DomainMetaService service = DomainMetaService.getInstance();
+    NameIdentifier ident = domain.nameIdentifier();
+    DefinitionMemberPage before =
+        service.listDefinitionMembers(
+            ident,
+            1,
+            0,
+            current -> {
+              assertEquals(domain.id(), current.id());
+              CompletableFuture.runAsync(() -> ARTICLES.delete(first.nameIdentifier()))
+                  .orTimeout(15, TimeUnit.SECONDS)
+                  .join();
+            });
+    assertEquals(List.of("guide"), before.members().stream().map(DefinitionMember::name).toList());
+    assertTrue(before.hasMore());
+    DefinitionMemberPage after = service.listDefinitionMembers(ident, 1, 0, ignored -> {});
+    assertEquals(List.of("another"), after.members().stream().map(DefinitionMember::name).toList());
+    assertFalse(after.hasMore());
+    assertTrue(
+        service
+            .listDefinitionMembers(ident, 1000, Integer.MAX_VALUE, ignored -> {})
+            .members()
+            .isEmpty());
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> service.listDefinitionMembers(ident, 0, 0, ignored -> {}));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> service.listDefinitionMembers(ident, Integer.MAX_VALUE, 0, ignored -> {}));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> service.listDefinitionMembers(ident, 10, -1, ignored -> {}));
   }
 
   @TestTemplate

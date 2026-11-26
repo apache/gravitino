@@ -454,6 +454,61 @@ paths:
         "5XX":
           $ref: "#/components/responses/ServerErrorResponse"
 
+  /metalakes/{metalake}/domains/{domain}/definition-members:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "#/components/parameters/domain"
+    get:
+      tags: [domain]
+      summary: List definitions directly assigned to a domain
+      operationId: listDomainDefinitionMembers
+      description: >-
+        Requires effective MANAGE_DOMAIN on the requested domain. Lists the current names and types
+        of directly assigned live Glossary Terms and Knowledge Base Articles, including drafts hidden
+        from the caller. Reading a definition's content requires the usual Term or Article permissions.
+        Entries are ordered by member type and stable member ID before pagination.
+      parameters:
+        - in: query
+          name: limit
+          description: Maximum number of members to return.
+          schema: {type: integer, format: int32, minimum: 1, maximum: 1000, default: 20}
+        - in: query
+          name: offset
+          description: Number of direct live members to skip.
+          schema: {type: integer, format: int32, minimum: 0, default: 0}
+      responses:
+        "200":
+          description: A page of direct definition members. An additional live member sets hasMore to true.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, members, hasMore]
+                properties:
+                  code: {type: integer, enum: [0]}
+                  members:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required: [type, name]
+                      properties:
+                        type: {type: string, enum: [GLOSSARY_TERM, KNOWLEDGE_BASE_ARTICLE]}
+                        name: {type: string}
+                  hasMore: {type: boolean}
+        "400":
+          $ref: "#/components/responses/BadRequestResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
+        "404":
+          $ref: "#/components/responses/MissingDomainResponse"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
+        "409":
+          $ref: "#/components/responses/MetalakeNotInUseResponse"
+        "5XX":
+          $ref: "#/components/responses/ServerErrorResponse"
+
   /metalakes/{metalake}/domains/{domain}/objects:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
@@ -600,6 +655,18 @@ paths:
 
 components:
   responses:
+    MissingDomainResponse:
+      description: The metalake or domain does not exist, or the requested domain is a hidden draft.
+      content:
+        application/json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+    MetalakeNotInUseResponse:
+      description: The metalake is disabled.
+      content:
+        application/json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
     UnsupportedMediaTypeResponse:
       description: The request Content-Type is not supported by this operation.
       content:
