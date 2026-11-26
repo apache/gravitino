@@ -88,21 +88,14 @@ public final class GlossaryTermViews {
         () -> manager.listTermNamesInSnapshot(metalake, domain, matchesName(nameContains), status));
   }
 
-  /**
-   * Lists a page of authorized bindings. An empty page may carry a continuation.
-   *
-   * @see GlossaryManager#listTermBindings(String, String, TermBinding.Kind, Set,
-   *     GlossaryTerm.Status, int, GlossaryManager.BindingCursor)
-   */
-  public GlossaryManager.BindingPage listTermBindings(
+  /** Lists all visible bindings of a term that match the requested filters. */
+  public List<TermBinding> listTermBindings(
       String metalake,
       String term,
       @Nullable TermBinding.Kind kind,
       @Nullable Set<MetadataObject.Type> types,
-      @Nullable GlossaryTerm.Status status,
-      int pageSize,
-      @Nullable GlossaryManager.BindingCursor cursor) {
-    return manager.listTermBindings(metalake, term, kind, types, status, pageSize, cursor);
+      @Nullable GlossaryTerm.Status status) {
+    return manager.listTermBindings(metalake, term, kind, types, status);
   }
 
   /**

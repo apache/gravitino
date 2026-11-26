@@ -63,7 +63,6 @@ import org.apache.gravitino.glossary.GlossaryManager;
 import org.apache.gravitino.glossary.GlossaryTerm;
 import org.apache.gravitino.glossary.GlossaryTermViews;
 import org.apache.gravitino.glossary.TermBinding;
-import org.apache.gravitino.glossary.TermBindingPage;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
@@ -90,14 +89,12 @@ public class TermOperations {
   static final String BINDING_V1_JSON = "application/vnd.gravitino.v1+json;qs=0.9";
 
   private final GlossaryTermViews views;
-  private final BindingPageTokens tokens;
   @Context private HttpServletRequest httpRequest;
 
   /** Creates a term resource using the server's glossary manager. */
   @Inject
-  public TermOperations(GlossaryTermViews views, BindingPageTokens tokens) {
+  public TermOperations(GlossaryTermViews views) {
     this.views = views;
-    this.tokens = tokens;
   }
 
   /**
@@ -275,7 +272,7 @@ public class TermOperations {
         });
   }
 
-  /** Lists one bounded page of visible objects or metrics bound to the requested term. */
+  /** Lists all visible objects or metrics bound to the requested term. */
   @GET
   @Path("{term}/objects")
   @Produces({"application/json", BINDING_V1_JSON})
@@ -287,34 +284,27 @@ public class TermOperations {
       @PathParam("term") String term,
       @QueryParam("kind") String kind,
       @QueryParam("types") List<String> types,
-      @QueryParam("status") String status,
-      @QueryParam("pageSize") @DefaultValue("" + TermBindingPage.DEFAULT_PAGE_SIZE) String size,
-      @QueryParam("pageToken") String token) {
+      @QueryParam("status") String status) {
     return execute(
         OperationType.LIST,
         metalake,
         term,
         () -> {
-          GlossaryManager.BindingPage page =
-              views.listTermBindings(
-                  metalake,
-                  term,
-                  parseBindingKind(kind),
-                  parseBindingTypes(types),
-                  parseStatus(status),
-                  parseBindingPageSize(size),
-                  token == null ? null : tokens.decode(token));
           TermBindingDTO[] bindings =
-              page.bindings().stream()
+              views
+                  .listTermBindings(
+                      metalake,
+                      term,
+                      parseBindingKind(kind),
+                      parseBindingTypes(types),
+                      parseStatus(status))
+                  .stream()
                   .map(
                       b ->
                           new TermBindingDTO(
                               b.kind(), DTOConverters.toDTO(b.object()), b.metric().orElse(null)))
                   .toArray(TermBindingDTO[]::new);
-          return Response.ok(
-                  new TermBindingListResponse(
-                      bindings, page.next() == null ? null : tokens.encode(page.next())))
-              .build();
+          return Response.ok(new TermBindingListResponse(bindings)).build();
         });
   }
 
@@ -343,15 +333,6 @@ public class TermOperations {
       }
     }
     return types;
-  }
-
-  private static int parseBindingPageSize(String value) {
-    try {
-      return Integer.parseInt(value);
-    } catch (NumberFormatException invalid) {
-      throw new IllegalArgumentException(
-          "pageSize must be an integer between 1 and " + TermBindingPage.MAX_PAGE_SIZE, invalid);
-    }
   }
 
   /** Optional query parameters for browsing glossary terms. Combine filters to narrow the list. */

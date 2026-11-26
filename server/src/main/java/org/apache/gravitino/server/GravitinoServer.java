@@ -77,7 +77,6 @@ import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
 import org.apache.gravitino.server.web.mapper.NotFoundExceptionMapper;
 import org.apache.gravitino.server.web.mapper.ParamExceptionMapper;
 import org.apache.gravitino.server.web.mapper.WebApplicationExceptionMapper;
-import org.apache.gravitino.server.web.rest.BindingPageTokens;
 import org.apache.gravitino.server.web.rest.SemanticModelSourceValidator;
 import org.apache.gravitino.server.web.ui.WebUIFilter;
 import org.apache.gravitino.stats.StatisticDispatcher;
@@ -182,9 +181,6 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.filesetDispatcher()).to(FilesetDispatcher.class).ranked(1);
             bind(gravitinoEnv.topicDispatcher()).to(TopicDispatcher.class).ranked(1);
             bind(gravitinoEnv.tagDispatcher()).to(TagDispatcher.class).ranked(1);
-            bind(new BindingPageTokens(
-                    serverConfig.get(Configs.GLOSSARY_BINDING_PAGE_TOKEN_SECRET)))
-                .to(BindingPageTokens.class);
             bind(new GlossaryTermViews(gravitinoEnv.glossaryManager()))
                 .to(GlossaryTermViews.class)
                 .ranked(1);

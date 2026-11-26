@@ -103,10 +103,6 @@ gravitino.fetchFile.blockUnsafeRemoteUri = true
 # THE CONFIGURATION FOR authorization
 # Whether Gravitino enable authorization or not
 gravitino.authorization.enable = false
-
-# Use the same base64-encoded, random 256-bit secret on each server to continue glossary
-# binding pages across nodes and restarts. Without it, page tokens use a process-local key.
-# gravitino.glossary.bindingPageTokenSecret =
 # The admins of Gravitino service, separated by commas.
 gravitino.authorization.serviceAdmins = anonymous
 

@@ -264,7 +264,7 @@ paths:
     get:
       operationId: listTermBindings
       tags: [glossary]
-      summary: List a bounded page of visible glossary bindings
+      summary: List all visible glossary bindings matching the filters
       parameters:
         - in: query
           name: kind
@@ -280,23 +280,6 @@ paths:
             type: array
             items:
               type: string
-        - in: query
-          name: pageSize
-          description: Maximum visible bindings to return.
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 100
-        - in: query
-          name: pageToken
-          description: >-
-            Continue with the same filters even after an empty page. Each request examines at
-            most 1,000 candidates. Changed filters or an invalid token return 400. A changed
-            visible term identity or revision returns 409. Restart without pageToken after a
-            conflict or after the server's token key changes.
-          schema:
-            type: string
         - in: query
           name: status
           description: Restrict term visibility to this status.
@@ -321,7 +304,7 @@ paths:
         "406":
           $ref: ./openapi.yaml#/components/responses/NotAcceptableErrorResponse
         "409":
-          $ref: "#/components/responses/Conflict"
+          $ref: "#/components/responses/MetalakeNotInUse"
         5XX:
           $ref: "#/components/responses/BindingServerError"
   "/metalakes/{metalake}/objects/{type}/{fullName}/terms":
@@ -556,14 +539,8 @@ components:
           enum: [0]
         bindings:
           type: array
-          maxItems: 100
           items:
             $ref: "#/components/schemas/TermBinding"
-        nextPageToken:
-          type: string
-          minLength: 1
-          pattern: '\S'
-          description: Present while more candidates remain. Bound to the term, its revision and the filters.
     TermBinding:
       type: object
       required: [kind, object]
@@ -1025,8 +1002,7 @@ components:
             $ref: ./openapi.yaml#/components/schemas/ErrorModel
     Conflict:
       description: The metalake is not in use, the name or source reference already exists,
-        the expected revision is stale, a binding continuation refers to a replaced or modified term,
-        or a concurrent modification prevented the write.
+        the expected revision is stale, or a concurrent modification prevented the write.
       content:
         application/json:
           schema:

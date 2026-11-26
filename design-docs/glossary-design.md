@@ -66,8 +66,7 @@ version comparisons and grants on domains. Implementation Steps lists what each 
 7. **Revisions**: every content change increases the revision number of the term, and is audited.
    Business versions separately identify immutable snapshots of published and proposed content.
 8. **APIs**: REST, Java and Python clients, read-only MCP tools, events and audit. A normal term
-   view or question lookup needs one or two REST calls. Larger binding lists use bounded pages,
-   and an agent can continue reading them without treating an incomplete list as complete.
+   view or question lookup needs one or two REST calls.
 
 ## Non-Goals
 
@@ -509,9 +508,7 @@ pending-content rules are specified separately below.
   contains hidden member terms (409). The last response discloses non-emptiness, not member names
   or counts; clearing the membership requires the authorized callers described in Domain membership.
   Lookup-work errors expose a coarse cost limit being reached, but return no exact candidate or
-  hidden counts. Binding-page continuation also reveals that a scan may have more work, not that
-  another authorized binding exists. This is not a claim that errors, cursors or timing reveal
-  nothing about query complexity.
+  hidden counts.
 - **Revision**: each change to the name, definition, synonyms, links, properties, relations,
   domains, bindings or status increases `current_version` by one, in the same transaction.
   Responses return it as `version`, so a client can see that a term changed after it read it.
@@ -747,7 +744,7 @@ All paths are under `/api/metalakes/{metalake}`. They follow the Tag, Policy and
 | Alter                  | `PUT /terms/{term}`                                                              | `TermUpdatesRequest` -> `TermResponse`                                   |
 | Drop                   | `DELETE /terms/{term}`                                                           | -> `DropResponse`                                                        |
 | Hierarchy              | `GET /terms/{term}/hierarchy?direction=BROADER\|NARROWER&status=`                | -> `TermTreeResponse`                                                    |
-| Bindings of a term     | `GET /terms/{term}/objects?kind=&types=&status=&pageSize=&pageToken=`            | -> `TermBindingListResponse`                                             |
+| Bindings of a term     | `GET /terms/{term}/objects?kind=&types=&status=`                                 | -> `TermBindingListResponse`                                             |
 | Terms of an object     | `GET /objects/{type}/{fullName}/terms?details=&children=&status=`                | -> `NameListResponse` / `ObjectTermsResponse`                            |
 | Bind / unbind          | `POST /objects/{type}/{fullName}/terms`                                          | `TermsAssociateRequest{termsToAdd, termsToRemove}` -> `NameListResponse` |
 | Terms of a metric      | `GET /objects/semantic_model/{fullName}/metrics/{metric}/terms?details=&status=` | -> `NameListResponse` / `TermListResponse`                               |
@@ -765,7 +762,7 @@ TermDTO               { name, definition, synonyms, status, domains, broader, na
                         links, owner, sourceRef, properties, version, revisionToken, audit,
                         matchedBy?: [{word, field: NAME | SYNONYM}],
                         bindings?: [TermBindingDTO], bindingsTruncated? }
-TermBindingListResponse { bindings: [TermBindingDTO], nextPageToken? }
+TermBindingListResponse { bindings: [TermBindingDTO] }
 TermBindingDTO        { kind: IMPLEMENTED_BY | USED_BY, object: MetadataObjectDTO, metric? }
 ObjectTermsResponse   { terms: [TermDTO], children: [{ name, terms: [TermDTO] }] }
 TermsAssociateRequest { termsToAdd: [name], termsToRemove: [name] }
@@ -816,35 +813,22 @@ TermsAssociateRequest { termsToAdd: [name], termsToRemove: [name] }
   authorization. It adds one entry to `children` for each table column or metric with terms
   passing the authorization and optional status filter. A semantic model itself has no terms;
   only its metrics do. A view supports its own terms, without `children=true`.
-- **Binding pages**: `GET /terms/{term}/objects` accepts `pageSize` (default 100, range 1–100)
-  and an optional `pageToken`. Each page examines at most 1,000 candidates after `kind`/`types`
-  filtering, returning at most `pageSize` authorized bindings. Use keyset order on
-  `(target_type, target_id)`, fetching bounded batches. Advance past examined hidden candidates,
-  so a page can have no bindings and still have `nextPageToken`. Omit that token only when the
-  scan is exhausted; a nonempty token means continue scanning, not that more visible bindings
-  exist. Thus even 1,001 bindings of the same kind/type remain readable without an unbounded call.
-  Recheck root status, term visibility and target access on every page; a cursor grants no access.
-  The opaque, tamper-resistant cursor binds the metalake/term identity, revision, `kind`/`types`/
-  `status` filters and scan position without exposing hidden target IDs or counts. Invalid
-  cursors or changed filters return 400; a changed term identity/revision returns 409
-  `TermVersionConflictException` after root authorization. Restart explicitly from the first page
-  after a conflict; do not merge revisions.
-  Each page uses the read snapshot described above. Target/credential changes can affect later
-  pages, so paging does not freeze authorization. UI, clients and MCP expose the continuation;
-  none silently drains all pages in a single unbounded call or labels a page as a complete list.
+- **Binding list**: `GET /terms/{term}/objects` returns all matching bindings visible to the
+  caller in one response. Check root visibility, status and target access in the same read
+  snapshot. An empty list means no visible bindings matched.
 - **Bind / unbind** use the same request format as tag association. The response is the object's
   terms after the change.
 - **Errors**:
   - 404: `NoSuchTermException` (missing, hidden, or a named root excluded by the status filter),
     `NoSuchMetadataObjectException`;
   - 409: `TermAlreadyExistsException` (same name or same source reference), `NonEmptyDomainException`,
-    `TermVersionConflictException` (an authorized conditional edit or binding cursor refers to
+    `TermVersionConflictException` (an authorized conditional edit refers to
     a different term identity/revision);
   - 400: a cycle, a term as its own parent, binding an unsupported object type, a synonym equal to
     another term's name, an object admin binding a visible non-`APPROVED` term without the
     term-editor path, invalid `status`, `children=true` on an unsupported type, or more than 20
-    `match` values, invalid links, exceeded input bounds, invalid page sizes/cursors or changed
-    cursor filters; `LookupTooBroadException` for the explicit lookup-work limits;
+    `match` values, invalid links, or exceeded input bounds. Lookup work limits return
+    `LookupTooBroadException`;
   - 403: `ForbiddenException`.
 - **Concurrency**: `expectedRevision` is an optional opaque token on `PUT /terms/{term}`,
   copied from the last read's `revisionToken`. Keep numeric `version` for display; it alone is
@@ -863,10 +847,8 @@ TermsAssociateRequest { termsToAdd: [name], termsToRemove: [name] }
   Python clients preserve the two new typed errors; MCP reports a lookup-work failure as a tool
   error, never as `unmatched` or an empty binding list. No client automatically retries the same
   expensive or conflicting request. Core/REST/client tasks add the exception mappings and tests.
-- **Paging scope**: term-binding reads use the bounded pages above because arbitrary binding
-  fanout must remain retrievable. Other list APIs retain the existing unpaged convention;
-  broader list/hierarchy paging is outside Step 1. Inline lookup expansion retains its separate
-  all-or-error work budget; a lookup error is not a binding-page continuation.
+- Pagination for glossary lists is deferred to a shared Gravitino list API design. Inline
+  binding previews in term lookup retain their separate size and work limits.
 - **Encoding**: a term name can contain `/`. In `{term}` it must be URL-encoded as `%2F`, the same
   as domain and tag names.
 - **Clients** (Java, Python):
@@ -875,9 +857,7 @@ TermsAssociateRequest { termsToAdd: [name], termsToRemove: [name] }
     `dropTerm`, and `matchTerms(words, domain)` with an optional `includeBindings` variant.
     Lookup returns approved terms with bindings by default; callers can request definitions
     without binding expansion. It is also usable by agents that do not use MCP.
-  - On a `Term`: `broader()`, `narrower()`, `listBindings(kind, pageSize, pageToken)` returning
-    a `TermBindingPage` containing bindings and continuation. A first-page convenience overload
-    must return the same page type, not a plain list that silently discards the continuation.
+  - On a `Term`: `broader()`, `narrower()`, and `listBindings(kind)` for all visible bindings.
   - `SupportsTerms` (`listTerms()`, `associateTerms(add, remove)`) on catalogs, schemas, tables,
     views, table columns, filesets, topics and models. Tables also have `listColumnTerms()`;
     views do not support column-term operations in Step 1.
@@ -887,18 +867,18 @@ TermsAssociateRequest { termsToAdd: [name], termsToRemove: [name] }
 
 The table shows the REST calls behind each part of the glossary page, and of the other pages that
 show terms. A term comes with its name, domains, status, version, owner, relations and links. So
-the term page does not need a call per field. Binding sections load bounded pages. Edit forms
-send the last read's `revisionToken` as `expectedRevision`; on conflict they reload and ask the
-user to reconcile instead of silently overwriting another edit.
+the term page does not need a call per field. Each binding section loads its matching visible
+objects in one request. Edit forms send the last read's `revisionToken` as `expectedRevision`.
+On conflict they reload and ask the user to reconcile the edit.
 
 | Page                         | Part                                                                            | Calls                                                                                                     |
 | ---------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | Glossary                     | Term tree (domain › subdomain › term, narrower terms nested, No visible domain) | `GET /terms?details=true` and `GET /domains?details=true`; the tree is built from `domains` and `broader` |
 | Glossary                     | Search terms                                                                    | `GET /terms?nameContains=`                                                                                |
 | Glossary, term               | Header, Definition, Details, Related terms                                      | `GET /terms/{term}`; the source label is the `sourceRef` system, or "Gravitino" if empty                  |
-| Glossary, term               | Implemented by, Used by                                                         | `GET /terms/{term}/objects?kind=IMPLEMENTED_BY`, `?kind=USED_BY`; follow page tokens                      |
+| Glossary, term               | Implemented by, Used by                                                         | `GET /terms/{term}/objects?kind=IMPLEMENTED_BY`, `?kind=USED_BY`                                          |
 | Glossary, term               | Set status (immediate in Step 1; no approval decision)                          | `PUT /terms/{term}` with `setStatus`                                                                      |
-| Glossary, term               | Delete term (counts only authorized relations and asset links)                  | `DELETE /terms/{term}`; binding counts require all pages, with no count shown while incomplete            |
+| Glossary, term               | Delete term (counts only authorized relations and asset links)                  | `DELETE /terms/{term}`; count bindings visible to the caller                                              |
 | Glossary, Add or Edit term   | Name, Definition, Synonyms, Domain, Broader, Related, Documentation             | `POST /terms` or `PUT /terms/{term}` with the changed fields; pickers use `/domains` and `/terms`         |
 | Glossary, Add term           | Owner other than the creator                                                    | `POST /terms`, then `PUT /owners/glossary_term/{term}` (allowed, because the creator is the owner)        |
 | Explore, table               | Terms N, Update terms drawer, column chips and the term filter                  | `GET /objects/table/{fullName}/terms?details=true&children=true`; `POST .../terms` per change             |
@@ -1061,14 +1041,10 @@ User question
 - The binding fields are the same arguments that `get_table_metadata_details` and
   `load_semantic_model` take. The agent can make the next call directly, with no parsing and no
   extra lookup.
-- If `bindings_truncated` is true, call `list_metadata_by_term`, which accepts optional
-  `kind`, `types`, `page_size` and `page_token` and returns `bindings` and `next_page_token`.
-  Continue with the same filters until the token is absent. An empty page with a token is not
-  an empty complete result. The tool returns one page per call; it does not drain an arbitrary
-  number of pages. If the agent stops early, it reports an incomplete list. A revision conflict
-  requires an explicit restart, without combining pages from different term revisions.
+- If `bindings_truncated` is true, call `list_metadata_by_term` with optional `kind` and
+  `types` filters to retrieve all matching visible bindings.
 - A lookup-work error is not a successful partial result or an unmatched word. The agent may
-  retry with `include_bindings=false` to identify terms, then use the paged binding read, optionally
+  retry with `include_bindings=false` to identify terms, then list all bindings, optionally
   filtering kind/types. With bindings disabled, omitted fields mean not requested, not that the
   term has no bindings. This reduces binding work but still enforces the overall lookup budget;
   if term/relation projection alone exceeds it, report the tool error and ask for a narrower
@@ -1093,7 +1069,7 @@ User question
 | `get_term`                | `GET /terms/{term}?status=APPROVED`                                                                                       | Definition, synonyms, authorized domains and approved relations  |
 | `list_terms`              | `GET /terms?details=true&status=APPROVED` (+ `domain`, `name_contains`)                                                   | Browse the terms of a domain                                     |
 | `get_term_hierarchy`      | `GET /terms/{term}/hierarchy?status=APPROVED`                                                                             | Find approved wider or narrower terms                            |
-| `list_metadata_by_term`   | `GET /terms/{term}/objects?status=APPROVED&kind=&types=&pageSize=&pageToken=`                                             | One bounded page of authorized bindings, with continuation       |
+| `list_metadata_by_term`   | `GET /terms/{term}/objects?status=APPROVED&kind=&types=`                                                                  | All matching authorized bindings                                 |
 | `list_terms_for_metadata` | `GET /objects/{type}/{fullName}/terms?details=true&status=APPROVED`; add `children=true` only for table or semantic model | Explain an authorized object, its table columns or model metrics |
 
 Every tool passes `status=APPROVED` to the server. The server applies the read contract in REST
@@ -1673,12 +1649,9 @@ The users for these cases:
 - T12.8 Exercise T7.8 through reverse object and metric reads, including table-column and
   metric children. Each nested term filters its domains, independently of target and term
   visibility; readable terms remain in the result when all their domains are hidden.
-- T12.9 Retrieve 1,001 authorized TABLE / IMPLEMENTED_BY bindings through bounded pages with
-  no duplicates or omissions. Put more than 1,000 hidden candidates before a visible one: an
-  empty first page has a continuation and later pages find the visible binding. Assert candidate
-  and visible page limits, exact boundaries and exhaustion. Cover invalid page sizes, tampered
-  cursors, changed filters, root status/visibility changes, revision conflicts and same-name root
-  replacement; no cursor bypasses authorization or mixes term identities/revisions. **(guard)**
+- T12.9 Retrieve 1,001 authorized TABLE / IMPLEMENTED_BY bindings in one request. Assert no
+  duplicates or omissions. With more than 1,000 hidden bindings before a visible metric,
+  return only that metric. Cover kind, target type and root status filters. **(guard)**
 
 **T13. Lookup**
 
@@ -1710,9 +1683,9 @@ The users for these cases:
   budget; neither errors nor logs returned to clients expose hidden/scanned counts or object
   identities. The same error type/message is used regardless of the triggering term. **(guard)**
 - T13.14 Repeat with `bindings=false`: matched definitions remain available without binding
-  expansion and the optional binding fields are absent. Then retrieve bindings using T12.9's
-  bounded pages. Separately exhaust the overall budget with term/relation projection alone:
-  disabling bindings still returns the typed work-limit error, never a false complete result.
+  expansion and the optional binding fields are absent. Retrieve all visible bindings as in T12.9.
+  Separately exhaust the overall budget with term/relation projection alone. Disabling bindings
+  still returns the typed work-limit error.
 - T13.15 List terms without a domain in a metalake with many unrelated terms and a draft hidden
   from the caller. Exercise both an unfiltered names-only list and a selective `nameContains`
   and `status` query. Assert the visible results and inspect storage reads. The names-only path
@@ -1728,8 +1701,7 @@ The users for these cases:
 - T14.4 / T15.4 View bindings use the view itself, without column operations or `children=true`.
   Table-column operations use the table parent; `listColumnTerms` is exposed for tables only.
 - T14.5 / T15.5 Preserve the revision token and conditional-alter parameter end to end. Binding
-  methods return one page with continuation, including empty pages with a token; convenience
-  methods neither discard it nor automatically drain every page.
+  reads return all matching visible bindings in one call.
 
 **T16. MCP tools**
 
@@ -1759,10 +1731,8 @@ The users for these cases:
   view's own terms without it. **(guard)**
 - T16.9 A lookup-work error is a tool error, not unmatched words or an empty binding list. Retry
   explicitly with `include_bindings=false`, retaining identity, domain and APPROVED filtering;
-  assert no binding expansion and absent binding fields. Pass kind/types and continuation to
-  paged metadata reads. Empty pages with continuation are not reported as no bindings; stopping
-  early reports incompleteness. A revision conflict is surfaced without automatic restart or
-  merging old/new pages. The tool performs one bounded page per call. **(guard)**
+  assert no binding expansion and absent binding fields. Pass kind/types to the binding list and return
+  all matching visible targets. **(guard)**
 - T16.10 With batched words, one REST batch succeeds and another fails its budget. The tool must
   not present the first batch as a complete successful lookup or classify unprocessed words as
   unmatched. Return the typed tool error; a later definition-only request is a new operation.
@@ -1873,8 +1843,7 @@ parallel once the tasks they depend on are merged.
       `GlossaryOperations` on the metalake, the relation and binding types, `GLOSSARY_TERM` in
       `MetadataObject.Type`, the three definition privileges (metalake only), and the exceptions,
       including `TermVersionConflictException` and `LookupTooBroadException`. Expose optional
-      identity-and-revision-token conditional alter, paged binding results and definition-only
-      lookup without silently ignoring conditions or dropping continuation.
+      identity-and-revision-token conditional alter, full binding lists and definition-only lookup.
       Depends on: none.
 - [ ] **T2. Add term entity and storage** (`core/`). `EntityType.GLOSSARY_TERM`,
       `GlossaryTermEntity`, and the tables `glossary_term_meta` and `glossary_term_synonym`
@@ -1931,10 +1900,9 @@ parallel once the tasks they depend on are merged.
       and #14279 limitation above; unconditional concurrent-rename preservation requires that
       platform fix, not a second glossary protocol. Depends on: T6, T10.
 - [ ] **T12. Add binding REST APIs and reads** (`server/`). Bind and unbind endpoints; objects of a
-      term with bounded cursor pages and root status guards in a consistent read snapshot;
-      cursor identity/revision/filter validation; target authorization for
-      terms of an object or metric; nested domain and status filtering; `children=true` for
-      tables and semantic models only; OpenAPI. Depends on: T8, T11.
+      term filtered by kind, type, root status and visibility in a consistent read snapshot;
+      target authorization for terms of an object or metric; nested domain and status filtering;
+      `children=true` for tables and semantic models only; OpenAPI. Depends on: T8, T11.
 - [ ] **T13. Add term lookup filters** (`core/`, `server/`). `domain`, `status`, `nameContains`
       and `match` on the list endpoint, `matchedBy` in the result, and `bindings=true` with the limit
       and truncation flag computed after authorization. Depends on: T12.
@@ -1946,7 +1914,7 @@ parallel once the tasks they depend on are merged.
 - [ ] **T16. Add Glossary MCP tools** (`mcp-server/`), with the agent rules in the tool
       descriptions, APPROVED filtering through every REST read, transport-specific effective
       identity and fallback behavior, and tests for nested filtering, direct unapproved roots,
-      unmatched and ambiguous words, bounded binding pages and continuation. Depends on: T15.
+      unmatched and ambiguous words, and complete visible binding lists. Depends on: T15.
 
 ### Group F: Release checks
 
@@ -1954,7 +1922,7 @@ parallel once the tasks they depend on are merged.
       user journeys, on H2, MySQL and PostgreSQL (Docker). Depends on: T14, T16.
 - [ ] **T18. Add a hierarchy performance test** and set the final depth limit from it. Depends on:
       T5.
-- [ ] **T19. Add Glossary user documentation** (`docs/`), including binding-page continuation,
+- [ ] **T19. Add Glossary user documentation** (`docs/`), including binding filters,
       external DDL cleanup/recovery limits and the inherited concurrent-column-rename limitation.
       Depends on: T14, T15.
 

@@ -131,7 +131,7 @@ public class TestTermValues {
     assertStableSnapshot(binding, expected, target);
   }
 
-  /** Used-by bindings and pages must also retain the model identity captured at construction. */
+  /** Used-by bindings retain the model identity captured at construction. */
   @Test
   public void testUsedBySnapshotsMutableTarget() {
     MutableMetadataObject target =
@@ -166,7 +166,6 @@ public class TestTermValues {
     int originalHash = binding.hashCode();
     Set<TermBinding> hashed = new HashSet<>();
     hashed.add(binding);
-    TermBindingPage page = TermBindingPage.of(new TermBinding[] {binding}, "next-page");
     target.parent = "dw.finance";
     target.name = "returns";
     target.type = MetadataObject.Type.GLOSSARY_TERM;
@@ -180,8 +179,6 @@ public class TestTermValues {
     Assertions.assertEquals(expected, binding);
     Assertions.assertTrue(hashed.contains(binding));
     Assertions.assertTrue(hashed.contains(expected));
-    Assertions.assertEquals(expected, page.bindings()[0]);
-    Assertions.assertEquals(originalHash, page.bindings()[0].hashCode());
   }
 
   private static MetadataObject objectOf(MetadataObject.Type type) {

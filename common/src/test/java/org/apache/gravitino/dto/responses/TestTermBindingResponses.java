@@ -19,7 +19,6 @@
 package org.apache.gravitino.dto.responses;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,7 +26,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import org.apache.gravitino.dto.glossary.TermBindingDTO;
 import org.apache.gravitino.dto.glossary.TermDTO;
-import org.apache.gravitino.glossary.TermBindingPage;
 import org.apache.gravitino.json.JsonUtils;
 import org.junit.jupiter.api.Test;
 
@@ -38,12 +36,11 @@ class TestTermBindingResponses {
       "{\"fullName\":\"dw.sales.sales\",\"type\":\"SEMANTIC_MODEL\"}";
 
   @Test
-  void testBindingKindsAndPageLimits() throws Exception {
+  void testBindingListValidation() throws Exception {
     String table = "{\"kind\":\"IMPLEMENTED_BY\",\"object\":" + TABLE + "}";
     String metric = "{\"kind\":\"USED_BY\",\"metric\":\"units\",\"object\":" + MODEL + "}";
-    TermBindingListResponse page = page(table + "," + metric);
-    page.validate();
-    assertNull(page.getNextPageToken());
+    TermBindingListResponse response = response(table + "," + metric);
+    response.validate();
     for (String invalid :
         Arrays.asList(
             "null",
@@ -53,16 +50,14 @@ class TestTermBindingResponses {
             "{\"kind\":\"IMPLEMENTED_BY\",\"metric\":\"units\",\"object\":" + TABLE + "}",
             "{\"kind\":\"USED_BY\",\"object\":" + MODEL + "}",
             "{\"kind\":\"USED_BY\",\"object\":" + TABLE + ",\"metric\":\"units\"}")) {
-      assertThrows(IllegalArgumentException.class, page(invalid)::validate, invalid);
+      assertThrows(IllegalArgumentException.class, response(invalid)::validate, invalid);
     }
-    TermBindingDTO[] items = new TermBindingDTO[TermBindingPage.MAX_PAGE_SIZE + 1];
-    Arrays.fill(items, page.getBindings()[0]);
-    assertThrows(
-        IllegalArgumentException.class, new TermBindingListResponse(items, null)::validate);
-    assertThrows(
-        IllegalArgumentException.class,
-        new TermBindingListResponse(new TermBindingDTO[0], " ")::validate);
-    new TermBindingListResponse(new TermBindingDTO[0], "continue").validate();
+    TermBindingDTO[] items = new TermBindingDTO[1001];
+    Arrays.fill(items, response.getBindings()[0]);
+    TermBindingListResponse large = new TermBindingListResponse(items);
+    large.validate();
+    assertEquals(1001, large.getBindings().length);
+    new TermBindingListResponse(new TermBindingDTO[0]).validate();
   }
 
   @Test
@@ -92,7 +87,7 @@ class TestTermBindingResponses {
     assertThrows(UnsupportedOperationException.class, () -> reply.getChildren().add(null));
   }
 
-  private static TermBindingListResponse page(String items) throws Exception {
+  private static TermBindingListResponse response(String items) throws Exception {
     return MAPPER.readValue("{\"bindings\":[" + items + "]}", TermBindingListResponse.class);
   }
 }
