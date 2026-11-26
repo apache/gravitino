@@ -338,7 +338,8 @@ The driver, user, and password properties are required whenever the URL is not `
 | `gravitino.entity.store.relational.maxWaitMillis`      | Maximum wait in milliseconds for a connection from the pool.                                                                                                                                                         | `1000`                        |
 | `gravitino.entity.store.maxTransactionSkewTimeMs`      | Maximum transaction skew in milliseconds.                                                                                                                                                                            | `2000`                        |
 | `gravitino.entity.store.deleteAfterTimeMs`             | How long in milliseconds deleted and superseded rows are kept. Accepts 10 minutes to 30 days.                                                                                                                        | `604800000` (7 days)          |
-| `gravitino.entity.store.versionRetentionCount`         | Number of entity versions kept, including the current one. Accepts 1 to 10.                                                                                                                                          | `1`                           |
+| `gravitino.entity.store.versionRetentionCount`         | Number of entity versions kept, including the current one. Accepts 1 to 10. Semantic Models use their own setting.                                                                                                                                          | `1`                           |
+| `gravitino.entity.store.semanticModel.versionRetentionCount` | Number of newest Semantic Model revisions kept per model. Accepts 1 to 1000. Active and explicitly published revisions are kept independently. | `100` |
 
 #### Caching
 

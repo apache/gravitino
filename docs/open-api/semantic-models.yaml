@@ -45,7 +45,7 @@ paths:
         database collation. Dataset names containing dots remain a single name component.
         An existing source with no visible matches returns an empty identifiers array; missing
         sources and storage failures fail the request. The response is unpaginated.
-        Associations refer to source IDs resolved at the latest definition write. Renaming a source
+        Associations refer to source IDs resolved for the active revision. Renaming a source
         while preserving its ID keeps its associations; reusing its name for a new source does not.
         This lookup neither rewrites nor revalidates model definitions and does not follow View
         dependencies. The source full name uses catalog.schema.name; literal dots in source name
@@ -77,7 +77,7 @@ paths:
         - semantic-model
       summary: List metrics across Semantic Models
       description: >-
-        Lists metrics in the current committed definitions of live Semantic Models in a schema.
+        Lists metrics in the active revisions of published Semantic Models in a schema.
         Supported only for relational catalogs. With details=false (the default), returns metric
         identifiers; with details=true, returns complete metric definitions and their namespaces.
         Namespaces contain [metalake, catalog, schema, semanticModel]. Both modes require schema
@@ -254,7 +254,7 @@ paths:
       tags:
         - semantic-model
       summary: Load a Semantic Model
-      description: Returns the specified Semantic Model with its nested definition and audit data.
+      description: Returns the active revision with its nested definition, publication metadata, and audit data.
       operationId: loadSemanticModel
       responses:
         "200":
@@ -280,7 +280,9 @@ paths:
         updates is applied. Each replaceDefinition revalidates the complete definition, source
         existence, and primary-key, unique-key, and relationship columns. When authorization is
         enabled, source lookups also require the caller's permission to access the source metadata.
-        Metadata-only updates do not revalidate sources.
+        Metadata-only updates do not revalidate sources. expectedRevision is required for a
+        definition replacement and otherwise optional. If provided, it must match the latest
+        saved revision. A rename must be the only update and does not create a new revision.
       operationId: alterSemanticModel
       requestBody:
         required: true
@@ -354,7 +356,7 @@ paths:
         - semantic-model
       summary: Export a Semantic Model as an Apache Ossie document
       description: >-
-        Exports the specified Semantic Model as a standalone Apache Ossie YAML or JSON document.
+        Exports the active revision as a standalone Apache Ossie YAML or JSON document.
         The response is downloadable document content rather than the native Gravitino response
         envelope. The format query parameter selects the representation independently of the
         Accept header.
@@ -384,7 +386,107 @@ paths:
         "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/{semanticModel}/revisions:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+      - $ref: "./openapi.yaml#/components/parameters/semanticModel"
+
+    get:
+      tags:
+        - semantic-model
+      summary: List retained Semantic Model revisions
+      description: Returns revision summaries newest first. Drafts require modify authority.
+      operationId: listSemanticModelRevisions
+      responses:
+        "200":
+          $ref: "#/components/responses/SemanticModelRevisionListResponse"
+        "400":
+          $ref: "#/components/responses/SemanticModelBadRequestResponse"
+        "403":
+          $ref: "#/components/responses/SemanticModelForbiddenResponse"
+        "404":
+          $ref: "#/components/responses/SemanticModelRevisionNotFoundResponse"
+        "501":
+          $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
+        "5XX":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/{semanticModel}/revisions/{revision}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+      - $ref: "./openapi.yaml#/components/parameters/semanticModel"
+      - $ref: "#/components/parameters/semanticModelRevision"
+
+    get:
+      tags:
+        - semantic-model
+      summary: Load a Semantic Model revision
+      description: Loads a positive revision number or latest. Drafts require modify authority.
+      operationId: loadSemanticModelRevision
+      responses:
+        "200":
+          $ref: "#/components/responses/SemanticModelResponse"
+        "400":
+          $ref: "#/components/responses/SemanticModelBadRequestResponse"
+        "403":
+          $ref: "#/components/responses/SemanticModelForbiddenResponse"
+        "404":
+          $ref: "#/components/responses/SemanticModelRevisionNotFoundResponse"
+        "501":
+          $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
+        "5XX":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/{semanticModel}/revisions/{revision}/ossie:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+      - $ref: "./openapi.yaml#/components/parameters/semanticModel"
+      - $ref: "#/components/parameters/semanticModelRevision"
+
+    get:
+      tags:
+        - semantic-model
+      summary: Export a Semantic Model revision
+      description: Exports the selected revision as an Ossie document. Drafts require modify authority.
+      operationId: exportSemanticModelRevision
+      parameters:
+        - name: format
+          in: query
+          description: The serialized document format
+          schema:
+            type: string
+            enum: [yaml, json]
+            default: yaml
+      responses:
+        "200":
+          $ref: "#/components/responses/OssieSemanticModelDocumentResponse"
+        "400":
+          $ref: "#/components/responses/SemanticModelBadRequestResponse"
+        "403":
+          $ref: "#/components/responses/SemanticModelForbiddenResponse"
+        "404":
+          $ref: "#/components/responses/SemanticModelRevisionNotFoundResponse"
+        "501":
+          $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
+        "5XX":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
 components:
+  parameters:
+    semanticModelRevision:
+      name: revision
+      in: path
+      required: true
+      description: A positive revision number or the alias latest
+      schema:
+        type: string
+        pattern: '^(latest|0*[1-9][0-9]*)$'
 
   schemas:
     SemanticModelMetric:
@@ -1041,10 +1143,28 @@ components:
       description: A schema-scoped analytical Semantic Model with a nested semantic definition
       required:
         - name
+        - revision
+        - status
         - definition
         - properties
         - audit
       properties:
+        revision:
+          type: integer
+          format: int32
+          minimum: 1
+          description: The saved revision number
+        status:
+          type: string
+          enum: [DRAFT, PUBLISHED]
+          description: Whether this revision has been published
+        publishedBy:
+          type: string
+          description: The publishing principal. Omitted for drafts.
+        publishedAt:
+          type: string
+          format: date-time
+          description: The publication time. Omitted for drafts.
         name:
           type: string
           minLength: 1
@@ -1060,6 +1180,31 @@ components:
           description: Gravitino-specific Semantic Model properties, including the Ossie version
           additionalProperties:
             type: string
+        audit:
+          $ref: "./openapi.yaml#/components/schemas/Audit"
+      additionalProperties: false
+
+    SemanticModelRevision:
+      type: object
+      description: Metadata of a retained revision
+      required: [revision, status, audit]
+      properties:
+        revision:
+          type: integer
+          format: int32
+          minimum: 1
+          description: The saved revision number
+        status:
+          type: string
+          enum: [DRAFT, PUBLISHED]
+          description: Whether this revision has been published
+        publishedBy:
+          type: string
+          description: The publishing principal. Omitted for drafts.
+        publishedAt:
+          type: string
+          format: date-time
+          description: The publication time. Omitted for drafts.
         audit:
           $ref: "./openapi.yaml#/components/schemas/Audit"
       additionalProperties: false
@@ -1097,6 +1242,11 @@ components:
       required:
         - updates
       properties:
+        expectedRevision:
+          type: integer
+          format: int32
+          minimum: 1
+          description: The expected latest revision. Required for replaceDefinition.
         updates:
           type: array
           minItems: 1
@@ -1366,6 +1516,31 @@ components:
             SemanticModelResponse:
               $ref: "#/components/examples/SemanticModelResponse"
 
+    SemanticModelRevisionListResponse:
+      description: Visible retained revision summaries, newest first
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            required: [code, revisions]
+            properties:
+              code:
+                type: integer
+                format: int32
+                enum: [0]
+              revisions:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SemanticModelRevision"
+            additionalProperties: false
+
+    SemanticModelRevisionNotFoundResponse:
+      description: The model or revision is missing, the revision was collected, or the draft is hidden
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+
     OssieSemanticModelDocumentResponse:
       description: Returns a standalone Apache Ossie document in the requested format
       headers:
@@ -1464,8 +1639,8 @@ components:
 
     SemanticModelAlterConflictResponse:
       description: >-
-        Conflict - A rename target already exists or the internal transaction lost an
-        optimistic-lock race
+        Conflict - The rename target already exists, expectedRevision differs from the latest
+        saved revision, or a concurrent change prevented the update from committing
       content:
         application/vnd.gravitino.v1+json:
           schema:
@@ -1715,11 +1890,8 @@ components:
 
     SemanticModelUpdatesRequest:
       value: {
+        "expectedRevision": 1,
         "updates": [
-          {
-            "@type": "rename",
-            "newName": "sales_model_v2"
-          },
           {
             "@type": "updateComment",
             "newComment": ""
@@ -1758,6 +1930,10 @@ components:
       value: {
         "code": 0,
         "semanticModel": {
+          "revision": 2,
+          "status": "PUBLISHED",
+          "publishedBy": "gravitino",
+          "publishedAt": "2026-01-02T00:00:00Z",
           "name": "sales_model",
           "comment": "Governed sales definitions",
           "definition": {
