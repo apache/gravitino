@@ -25,8 +25,10 @@ import static org.apache.gravitino.integration.test.web.ui.CatalogsPageTest.SORT
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import org.apache.gravitino.integration.test.web.ui.utils.BaseWebIT;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
@@ -165,7 +167,7 @@ public class CatalogsPage extends BaseWebIT {
   @FindBy(xpath = "//*[@data-refer='metalake-name-link']")
   public WebElement metalakeNameLink;
 
-  @FindBy(xpath = "//thead[contains(@class, 'ant-table-thead')]//tr")
+  @FindBy(css = "[data-refer='table-grid'] thead.ant-table-thead > tr")
   public WebElement columnHeaders;
 
   @FindBy(xpath = "//*[@data-refer='metalake-page-title']")
@@ -515,27 +517,45 @@ public class CatalogsPage extends BaseWebIT {
       String columnName = "//div[@data-refer='column-name-" + index + "']//input";
       WebElement keyInput = driver.findElement(By.xpath(columnName));
       keyInput.sendKeys(name);
-      // Set the indexed column type - Ant Design Select structure
-      String columnType = "//div[@data-refer='column-type-" + index + "']";
-      WebElement typeSelect = driver.findElement(By.xpath(columnType));
-      clickAndWait(typeSelect);
-      // Wait for dropdown to appear and click the option
-      // Ant Design Select dropdown - try multiple selectors for compatibility
-      Thread.sleep(500);
-      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
-      String optionXpath =
-          "//div[contains(@class, 'ant-select-dropdown')]"
-              + "//div[contains(@class, 'ant-select-item-option') and (@title='"
-              + type
-              + "' or .//div[text()='"
-              + capitalizeFirstLetter(type)
-              + "'])]";
-      WebElement typeItem =
-          wait.until(ExpectedConditions.elementToBeClickable(By.xpath(optionXpath)));
-      clickAndWait(typeItem);
+
+      selectTableColumnType(index, type);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
+  }
+
+  /**
+   * Selects the data type of a column in the table editor.
+   *
+   * @param index zero-based column index
+   * @param type the type to select
+   * @throws InterruptedException if interrupted while interacting with the editor
+   */
+  public void selectTableColumnType(int index, String type) throws InterruptedException {
+    String columnType = "[data-refer='column-type-" + index + "']";
+    clickAndWait(By.cssSelector(columnType + " .ant-select-selector"));
+    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+    WebElement combobox = driver.findElement(By.cssSelector(columnType + " [role='combobox']"));
+    wait.until(ExpectedConditions.attributeToBe(combobox, "aria-expanded", "true"));
+
+    // The dropdown renders only a window of options. Keyboard navigation brings each into view.
+    Set<String> visited = new HashSet<>();
+    String activeOption = wait.until(ignored -> combobox.getDomAttribute("aria-activedescendant"));
+    while (activeOption != null && visited.add(activeOption)) {
+      String activeType = driver.findElement(By.id(activeOption)).getDomProperty("textContent");
+      if (type.equalsIgnoreCase(activeType)) {
+        combobox.sendKeys(Keys.ENTER);
+        wait.until(ExpectedConditions.attributeToBe(combobox, "aria-expanded", "false"));
+        wait.until(
+            ExpectedConditions.textToBe(
+                By.cssSelector(columnType + " .ant-select-selection-item"),
+                capitalizeFirstLetter(type)));
+        return;
+      }
+      combobox.sendKeys(Keys.ARROW_DOWN);
+      activeOption = combobox.getDomAttribute("aria-activedescendant");
+    }
+    throw new IllegalStateException("Column type option is unavailable: " + type);
   }
 
   private String capitalizeFirstLetter(String str) {
@@ -1237,7 +1257,7 @@ public class CatalogsPage extends BaseWebIT {
   }
 
   /**
-   * Click the table overview link to open the popover.
+   * Click the table overview link to open the popover. 0
    *
    * @param linkType The type of link to click (properties, partitions, sortorders, distribution,
    *     indexes).
@@ -1392,56 +1412,68 @@ public class CatalogsPage extends BaseWebIT {
 
   public boolean verifyTableColumns() {
     try {
-      List<String> columns = Arrays.asList("Column Name", "Data Type", "Tags");
+      List<String> columns =
+          Arrays.asList(
+              "Column Name",
+              "Data Type",
+              "Tags",
+              "Policies",
+              "Nullable",
+              "AutoIncrement",
+              "Default Value",
+              "Comment");
 
-      // Ant Design Table structure: thead > tr > th
-      List<WebElement> columnHeadersRows =
-          columnHeaders.findElements(By.xpath("./th[contains(@class, 'ant-table-cell')]"));
-      // Filter out header cells that have no visible text (selection/expand columns)
-      List<String> headerTexts = new ArrayList<>();
-      for (WebElement th : columnHeadersRows) {
-        String txt = th.getText() == null ? "" : th.getText().trim();
-        boolean hasInteractiveChild = false;
-        try {
-          // if header contains inputs/icons/buttons and no text, treat as non-data header
-          List<WebElement> interactive =
-              th.findElements(By.xpath(".//input|.//button|.//svg|.//i"));
-          if (interactive != null && !interactive.isEmpty()) {
-            hasInteractiveChild = true;
-          }
-        } catch (Exception e) {
-          LOG.debug("Error checking interactive children of header: {}", e.getMessage());
-        }
-
-        if (!txt.isEmpty()) {
-          headerTexts.add(txt);
-        } else if (!hasInteractiveChild) {
-          // If there is no interactive child but text is empty, still skip it
-          // (some UIs render invisible helper headers)
-          continue;
-        }
-      }
-
-      if (headerTexts.size() != columns.size()) {
-        LOG.error(
-            "Column headers count does not match after filtering, expected: {}, actual: {} -> {}",
-            columns.size(),
-            headerTexts.size(),
-            headerTexts);
+      List<String> headerTexts = getTableColumnNames();
+      if (!columns.equals(headerTexts)) {
+        LOG.error("Column headers do not match, expected: {}, actual: {}", columns, headerTexts);
         return false;
-      }
-
-      for (int i = 0; i < columns.size(); i++) {
-        String headerText = headerTexts.get(i);
-        if (!headerText.equals(columns.get(i))) {
-          LOG.error("Column header '{}' does not match, expected '{}'", headerText, columns.get(i));
-          return false;
-        }
       }
 
       return true;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
+      return false;
+    }
+  }
+
+  public void clickColumnSettings() {
+    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+
+    WebElement settingsButton =
+        wait.until(
+            ExpectedConditions.elementToBeClickable(
+                By.xpath("//button[@aria-label='Column settings']")));
+
+    try {
+      clickAndWait(settingsButton);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Interrupted while opening column settings", e);
+    }
+  }
+
+  public void toggleMetadataColumn(String columnName) {
+    String xpath =
+        "//div[contains(@class, 'ant-popover') and not(contains(@class, 'ant-popover-hidden'))]"
+            + "//label[contains(@class, 'ant-checkbox-wrapper') and normalize-space(.)='"
+            + columnName
+            + "']";
+
+    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+
+    WebElement checkbox = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
+
+    checkbox.click();
+  }
+
+  public boolean verifyTableColumnVisibility(String columnName, boolean expectedVisible) {
+    try {
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+
+      return wait.ignoring(StaleElementReferenceException.class)
+          .until(currentDriver -> getTableColumnNames().contains(columnName) == expectedVisible);
+    } catch (Exception e) {
+      LOG.error("Failed to verify column visibility: {}", columnName, e);
       return false;
     }
   }
@@ -1676,5 +1708,17 @@ public class CatalogsPage extends BaseWebIT {
       return false;
     }
     return true;
+  }
+
+  private List<String> getTableColumnNames() {
+    List<String> names = new ArrayList<>();
+    for (WebElement header : columnHeaders.findElements(By.cssSelector("th.ant-table-cell"))) {
+      // getText() can omit headers clipped by the horizontal scroll container.
+      String name = Objects.toString(header.getDomProperty("textContent"), "").trim();
+      if (!name.isEmpty()) {
+        names.add(name);
+      }
+    }
+    return names;
   }
 }

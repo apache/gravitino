@@ -52,6 +52,7 @@ import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -176,14 +177,14 @@ public class TestSemanticModelNormalizeDispatcher {
     SemanticModel model = mock(SemanticModel.class);
     SemanticModelChange rename = SemanticModelChange.rename("RevenueModel");
     when(delegate.alterSemanticModel(
-            NORMALIZED_IDENT, SemanticModelSourceUpdate.preserve(), rename))
+            NORMALIZED_IDENT, null, SemanticModelSourceUpdate.preserve(), rename))
         .thenReturn(model);
 
     assertEquals(
         model,
         dispatcher.alterSemanticModel(INPUT_IDENT, SemanticModelSourceUpdate.preserve(), rename));
     verify(delegate)
-        .alterSemanticModel(NORMALIZED_IDENT, SemanticModelSourceUpdate.preserve(), rename);
+        .alterSemanticModel(NORMALIZED_IDENT, null, SemanticModelSourceUpdate.preserve(), rename);
 
     NameIdentifier invalidIdent = NameIdentifier.of(INPUT_NAMESPACE, "invalid model");
     assertThrows(
@@ -248,11 +249,15 @@ public class TestSemanticModelNormalizeDispatcher {
   @Test
   public void testOssieExportNormalizesAndForwardsWithoutLoading() {
     OssieDocument document = OssieDocument.json("{}");
-    when(delegate.exportOssieDocument(NORMALIZED_IDENT, OssieFormat.JSON)).thenReturn(document);
+    when(delegate.exportSemanticModel(
+            eq(NORMALIZED_IDENT), eq(SemanticModelRevisionSelector.ACTIVE), eq(OssieFormat.JSON)))
+        .thenReturn(new SemanticModelDispatcher.SemanticModelExport(document, 1));
 
     assertSame(document, dispatcher.exportOssieDocument(INPUT_IDENT, OssieFormat.JSON));
 
-    verify(delegate).exportOssieDocument(NORMALIZED_IDENT, OssieFormat.JSON);
+    verify(delegate)
+        .exportSemanticModel(
+            eq(NORMALIZED_IDENT), eq(SemanticModelRevisionSelector.ACTIVE), eq(OssieFormat.JSON));
     verifyNoMoreInteractions(delegate);
   }
 

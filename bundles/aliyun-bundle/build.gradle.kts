@@ -29,6 +29,9 @@ dependencies {
 
   implementation(libs.aliyun.credentials.sdk)
   implementation(libs.commons.collections3)
+  // hadoop-aliyun 3.4 uses Commons Collections 4 (getFileStatus and deleteObjects), which
+  // hadoop-client-runtime shades for its own use only.
+  implementation(libs.commons.collections4)
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
   implementation(libs.hadoop3.oss)
@@ -36,6 +39,8 @@ dependencies {
   // Aliyun oss SDK depends on this package, and JDK >= 9 requires manual add
   // https://www.alibabacloud.com/help/en/oss/developer-reference/java-installation?spm=a2c63.p38356.0.i1
   implementation(libs.sun.activation)
+  testImplementation(libs.junit.jupiter.api)
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks.withType(ShadowJar::class.java) {
@@ -83,4 +88,11 @@ tasks.jar {
 
 tasks.compileJava {
   dependsOn(":catalogs:catalog-fileset:runtimeJars")
+}
+
+tasks.test {
+  val bundle = tasks.named<ShadowJar>("shadowJar")
+  dependsOn(bundle)
+  inputs.file(bundle.flatMap { it.archiveFile })
+  doFirst { systemProperty("shadowJarPath", bundle.get().archiveFile.get().asFile.absolutePath) }
 }

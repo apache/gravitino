@@ -24,7 +24,10 @@ Spark configuration.
 - The Gravitino IRC endpoint is accessible from your Spark environment. The default port is `9001`.
 - The following JAR files available in your Spark environment:
   - `iceberg-spark-runtime-3.5_2.12-1.7.1.jar`
-  - `hadoop-aws-3.3.4.jar`
+  - `hadoop-aws-3.3.4.jar` and `aws-java-sdk-bundle-1.12.262.jar`, the S3A connector of the Hadoop
+    3.3.4 that Spark 3.5.3 ships, which uses the AWS SDK v1. With Spark 4.0 and later, which ship
+    Hadoop 3.4, use the `hadoop-aws` jar of that Hadoop version and the AWS SDK v2 `bundle-2.x.jar`
+    that it requires instead.
   - `aws-bundle-2.29.38.jar`
 
 This page uses **Spark 3.5.3** with **Iceberg 1.7.1**. For other versions, ensure compatibility

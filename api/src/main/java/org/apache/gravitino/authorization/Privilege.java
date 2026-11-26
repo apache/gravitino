@@ -161,17 +161,20 @@ public interface Privilege {
     /** The privilege to list configured secrets providers. */
     VIEW_SECRET_PROVIDERS(0L, 1L << 36),
     /**
-     * The privilege required to call {@code getSecrets}. Without {@link
-     * #INCLUDE_CREDENTIAL_SECRETS}, cloud access-key pairs are omitted from the result. Both
-     * privileges are also required for catalog {@code getCredentials}, unless the caller owns the
-     * metalake.
+     * Soft-authorizes {@code getSecrets}: without this privilege (and without metalake ownership)
+     * the API returns an empty map rather than {@code 403}. Without {@link
+     * #INCLUDE_CREDENTIAL_SECRETS}, canonical static credential keys are omitted from the result.
+     * For catalog and fileset {@code getCredentials}, metadata access is enough for token
+     * providers; static providers are omitted unless this privilege is held together with {@link
+     * #INCLUDE_CREDENTIAL_SECRETS} (or the caller owns the metalake).
      */
     USE_SECRETS(0L, 1L << 37),
     /**
-     * When held together with {@link #USE_SECRETS}, includes cloud access-key pairs and other
-     * credential secrets in the {@code getSecrets} result. Alone it does not authorize {@code
-     * getSecrets}. Both privileges are also required for catalog {@code getCredentials}, unless the
-     * caller owns the metalake.
+     * When held together with {@link #USE_SECRETS} (or metalake ownership), includes canonical
+     * static credential keys in the {@code getSecrets} result and allows static providers on
+     * catalog and fileset {@code getCredentials}. Alone it does not unlock {@code getSecrets}.
+     * Missing this privilege soft-filters static material (omit / dynamic-only); it does not return
+     * {@code 403} when metadata access is already granted.
      */
     INCLUDE_CREDENTIAL_SECRETS(0L, 1L << 38),
     /** The privilege to create a semantic model. */

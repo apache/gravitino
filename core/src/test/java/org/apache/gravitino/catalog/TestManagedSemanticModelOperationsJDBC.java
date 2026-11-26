@@ -32,9 +32,12 @@ import java.io.IOException;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -44,6 +47,8 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
+import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.meta.TableEntity;
@@ -54,12 +59,17 @@ import org.apache.gravitino.semantic.Relationship;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelRevision;
+import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 import org.apache.gravitino.semantic.SemanticModelSource;
 import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper;
+import org.apache.gravitino.storage.relational.po.SemanticModelMetricPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterEach;
@@ -75,6 +85,7 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
   private Config previousConfig;
   private NameIdentifier modelIdent;
   private ManagedSemanticModelOperations operations;
+  private RelationalEntityStore store;
 
   @BeforeAll
   public void captureEnvironmentConfig() {
@@ -97,7 +108,7 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
 
     Config config = new Config(false) {};
     config.set(Configs.CACHE_ENABLED, false);
-    RelationalEntityStore store = new RelationalEntityStore();
+    store = new RelationalEntityStore();
     FieldUtils.writeField(store, "backend", backend, true);
     FieldUtils.writeField(store, "cache", new NoOpsCache(config), true);
     operations =
@@ -153,11 +164,15 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
     NameIdentifier renamedIdent = NameIdentifier.of(modelIdent.namespace(), "renamed_sales_model");
     SemanticModelDefinition replacement = definition("invoices");
 
+    operations.alterSemanticModel(
+        modelIdent,
+        SemanticModelSourceUpdate.preserve(),
+        SemanticModelChange.rename(renamedIdent.name()));
     SemanticModel altered =
         operations.alterSemanticModel(
-            modelIdent,
+            renamedIdent,
             sources(replacement),
-            SemanticModelChange.rename(renamedIdent.name()),
+            1,
             SemanticModelChange.updateComment("Updated"),
             SemanticModelChange.removeProperty("domain"),
             SemanticModelChange.setProperty("tier", "gold"),
@@ -214,6 +229,7 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
             operations.alterSemanticModel(
                 modelIdent,
                 sources(duplicateDatasets),
+                1,
                 SemanticModelChange.updateComment("Must not persist"),
                 SemanticModelChange.setProperty("owner", "changed"),
                 SemanticModelChange.replaceDefinition(duplicateDatasets)));
@@ -268,7 +284,10 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
     operations.alterSemanticModel(
         modelIdent,
         SemanticModelSourceUpdate.preserve(),
-        SemanticModelChange.rename(renamedIdent.name()),
+        SemanticModelChange.rename(renamedIdent.name()));
+    operations.alterSemanticModel(
+        renamedIdent,
+        SemanticModelSourceUpdate.preserve(),
         SemanticModelChange.updateComment("updated after deletion"),
         SemanticModelChange.setProperty("owner", "analytics"));
     assertEquals(original, liveAssociations(created.id()));
@@ -284,6 +303,7 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
             operations.alterSemanticModel(
                 renamedIdent,
                 SemanticModelSourceUpdate.preserve(),
+                1,
                 SemanticModelChange.replaceDefinition(definition)));
     assertThrows(
         IllegalArgumentException.class,
@@ -294,7 +314,7 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
 
     // Explicit replacement rebinds the source even though the definition is unchanged.
     operations.alterSemanticModel(
-        renamedIdent, rebound, SemanticModelChange.replaceDefinition(definition));
+        renamedIdent, rebound, 2, SemanticModelChange.replaceDefinition(definition));
     assertEquals(
         rebound.sources(),
         liveAssociations(created.id()).stream().map(Association::source).toList());
@@ -338,13 +358,125 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
     assertNotEquals(source.id(), recreated.id());
 
     operations.alterSemanticModel(
-        modelIdent, resolvedUpdate, SemanticModelChange.replaceDefinition(replacementDefinition));
+        modelIdent,
+        resolvedUpdate,
+        1,
+        SemanticModelChange.replaceDefinition(replacementDefinition));
 
     assertEquals(replacementDefinition, operations.loadSemanticModel(modelIdent).definition());
     assertEquals(
         resolvedUpdate.sources(),
         liveAssociations(created.id()).stream().map(Association::source).toList());
     assertEquals(2, writeValidationCount.get());
+  }
+
+  @TestTemplate
+  void testRevisionHistoryAndConditionalAlter() {
+    SemanticModelDefinition original = definition("orders");
+    SemanticModel created =
+        operations.createSemanticModel(
+            modelIdent, "Original", original, Map.of(), sources(original));
+    assertEquals(1, created.revision());
+    assertEquals(SemanticModel.Status.PUBLISHED, created.status());
+    assertEquals(created.auditInfo().creator(), created.publishedBy());
+    assertEquals(created.auditInfo().createTime(), created.publishedAt());
+
+    SemanticModelDefinition replacement = definition("invoices");
+    SemanticModelChange change = SemanticModelChange.replaceDefinition(replacement);
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> operations.alterSemanticModel(modelIdent, sources(replacement), change));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> operations.alterSemanticModel(modelIdent, sources(replacement), 0, change));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            operations.alterSemanticModel(
+                modelIdent,
+                sources(replacement),
+                created.revision(),
+                change,
+                SemanticModelChange.rename("invalid")));
+    assertArrayEquals(new int[] {1}, revisionNumbers(operations, modelIdent));
+
+    SemanticModel saved =
+        operations.alterSemanticModel(modelIdent, sources(replacement), created.revision(), change);
+    assertEquals(2, saved.revision());
+    assertEquals(saved.auditInfo().lastModifiedTime(), saved.publishedAt());
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            operations.alterSemanticModel(
+                modelIdent, sources(replacement), created.revision(), change));
+    assertEquals(saved, operations.loadSemanticModel(modelIdent));
+    assertEquals(
+        saved,
+        operations.loadSemanticModelRevision(modelIdent, SemanticModelRevisionSelector.LATEST));
+    assertArrayEquals(new int[] {2, 1}, revisionNumbers(operations, modelIdent));
+
+    NameIdentifier renamed = NameIdentifier.of(modelIdent.namespace(), "renamed");
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            operations.alterSemanticModel(
+                modelIdent,
+                SemanticModelSourceUpdate.preserve(),
+                1,
+                SemanticModelChange.rename(renamed.name())));
+    assertEquals(
+        2,
+        operations
+            .alterSemanticModel(
+                modelIdent,
+                SemanticModelSourceUpdate.preserve(),
+                2,
+                SemanticModelChange.rename(renamed.name()))
+            .revision());
+    assertThrows(
+        NoSuchSemanticModelException.class, () -> operations.loadSemanticModel(modelIdent));
+    SemanticModel r1 =
+        operations.loadSemanticModelRevision(renamed, SemanticModelRevisionSelector.numbered(1));
+    assertEquals(renamed.name(), r1.name());
+    assertEquals(original, r1.definition());
+    assertArrayEquals(new int[] {2, 1}, revisionNumbers(operations, renamed));
+  }
+
+  private static int[] revisionNumbers(
+      ManagedSemanticModelOperations managed, NameIdentifier ident) {
+    return Arrays.stream(managed.listSemanticModelRevisions(ident))
+        .mapToInt(SemanticModelRevision::revision)
+        .toArray();
+  }
+
+  private static Set<String> metricIdentities(long modelId) {
+    return SessionUtils.getWithoutCommit(
+            SemanticModelMetricMapper.class,
+            mapper -> mapper.selectSemanticModelMetricsByModelIdForUpdate(modelId))
+        .stream()
+        .map(SemanticModelMetricPO::metricName)
+        .collect(Collectors.toSet());
+  }
+
+  private static SemanticModelSourceUpdate associations(TableEntity source) {
+    return SemanticModelSourceUpdate.replace(
+        List.of(new SemanticModelSource(source.name(), source.type(), source.id())));
+  }
+
+  private static int retainedSourceRangeCount(long modelId) throws Exception {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession();
+        PreparedStatement statement =
+            session
+                .getConnection()
+                .prepareStatement(
+                    "SELECT COUNT(*) FROM semantic_model_source_rel WHERE semantic_model_id = ? AND deleted_at = 0")) {
+      statement.setLong(1, modelId);
+      try (ResultSet result = statement.executeQuery()) {
+        assertTrue(result.next());
+        return result.getInt(1);
+      }
+    }
   }
 
   private List<Association> liveAssociations(long modelId) throws Exception {
@@ -355,7 +487,7 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
                 .getConnection()
                 .prepareStatement(
                     "SELECT id, dataset_name, source_type, source_id FROM semantic_model_source_rel"
-                        + " WHERE semantic_model_id = ? AND deleted_at = 0 ORDER BY id")) {
+                        + " WHERE semantic_model_id = ? AND deleted_at = 0 AND to_version = 0 ORDER BY id")) {
       statement.setLong(1, modelId);
       try (ResultSet result = statement.executeQuery()) {
         List<Association> rows = new ArrayList<>();

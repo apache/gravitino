@@ -30,9 +30,9 @@ public class SemanticModelMetaPostgreSQLProvider extends SemanticModelMetaBaseSQ
   @Override
   public String softDeleteSemanticModelMetasBySemanticModelId(
       @Param("semanticModelId") Long semanticModelId,
-      @Param("currentVersion") Integer currentVersion) {
+      @Param("semanticModelName") String semanticModelName) {
     return softDeleteBy(
-        "semantic_model_id = #{semanticModelId} AND current_version = #{currentVersion}");
+        "semantic_model_id = #{semanticModelId} AND semantic_model_name = #{semanticModelName}");
   }
 
   @Override

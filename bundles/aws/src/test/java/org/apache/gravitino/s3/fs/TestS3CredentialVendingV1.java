@@ -34,8 +34,8 @@ import org.apache.hadoop.fs.s3a.Constants;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-/** Tests the complete in-memory credential vending path for S3 credentials. */
-public class TestS3CredentialVending {
+/** Tests the complete in-memory credential vending path for S3 credentials with AWS SDK v1. */
+public class TestS3CredentialVendingV1 {
 
   private static final URI S3_URI = URI.create("s3a://test-bucket/");
   private static final long EXPIRATION_TIME = System.currentTimeMillis() + 60_000L;
@@ -77,7 +77,23 @@ public class TestS3CredentialVending {
     Assertions.assertEquals("session-token", ((AWSSessionCredentials) actual).getSessionToken());
   }
 
+  @Test
+  void testConfigurationOnlyConstructor() {
+    // The S3A connector of Hadoop 3.2 and earlier only looks up the (Configuration) constructor.
+    S3TokenCredential credential =
+        new S3TokenCredential("access-key", "secret-key", "session-token", EXPIRATION_TIME);
+    AWSCredentials actual = readCredential(credential, false);
+    Assertions.assertTrue(actual instanceof AWSSessionCredentials);
+    Assertions.assertEquals("access-key", actual.getAWSAccessKeyId());
+    Assertions.assertEquals("secret-key", actual.getAWSSecretKey());
+    Assertions.assertEquals("session-token", ((AWSSessionCredentials) actual).getSessionToken());
+  }
+
   private AWSCredentials readCredential(Credential credential) {
+    return readCredential(credential, true);
+  }
+
+  private AWSCredentials readCredential(Credential credential, boolean withUri) {
     Credential[] credentials = new Credential[] {credential};
     String handle = InMemoryFileSystemCredentialsProvider.register(credentials);
     try {
@@ -93,7 +109,9 @@ public class TestS3CredentialVending {
           S3CredentialsProvider.class.getCanonicalName(),
           conf.get(Constants.AWS_CREDENTIALS_PROVIDER));
 
-      return new S3CredentialsProvider(S3_URI, conf).getCredentials();
+      S3CredentialsProvider provider =
+          withUri ? new S3CredentialsProvider(S3_URI, conf) : new S3CredentialsProvider(conf);
+      return provider.getCredentials();
     } finally {
       InMemoryFileSystemCredentialsProvider.unregister(handle);
     }

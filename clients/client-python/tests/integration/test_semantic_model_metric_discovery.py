@@ -106,6 +106,7 @@ class TestSemanticModelMetricDiscovery(IntegrationTestEnv):
         self.models.alter_semantic_model(
             identifier,
             SemanticModelChange.replace_definition(self._definition([changed])),
+            expected_revision=self.models.load_semantic_model(identifier).revision(),
         )
         self._assert_discovery(
             [SemanticModelMetric(Namespace.of("semantic", "sales"), changed)]
@@ -119,12 +120,15 @@ class TestSemanticModelMetricDiscovery(IntegrationTestEnv):
             [SemanticModelMetric(Namespace.of("semantic", "renamed"), changed)]
         )
         self.models.alter_semantic_model(
-            identifier, SemanticModelChange.replace_definition(self._definition([]))
+            identifier,
+            SemanticModelChange.replace_definition(self._definition([])),
+            expected_revision=self.models.load_semantic_model(identifier).revision(),
         )
         self._assert_discovery([])
         self.models.alter_semantic_model(
             identifier,
             SemanticModelChange.replace_definition(self._definition([original])),
+            expected_revision=self.models.load_semantic_model(identifier).revision(),
         )
         self._assert_discovery(
             [SemanticModelMetric(Namespace.of("semantic", "renamed"), original)]

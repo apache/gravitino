@@ -21,7 +21,7 @@
 
 import { useMemo, useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
-import { Divider, Flex, Input, Popover, Space, Spin, Table, Tabs, Tag, Tooltip, Typography } from 'antd'
+import { Checkbox, Divider, Flex, Input, Popover, Space, Spin, Table, Tabs, Tag, Tooltip, Typography } from 'antd'
 import { useAntdColumnResize } from 'react-antd-column-resize'
 import useResizeObserver from 'use-resize-observer'
 import AssociatedTable from '@/components/AssociatedTable'
@@ -46,6 +46,42 @@ const SetOwnerDialog = dynamic(() => import('@/components/SetOwnerDialog'), {
 const { Title, Paragraph } = Typography
 const { Search } = Input
 
+const formatColumnDefaultValue = defaultValue => {
+  const formatExpression = expression => {
+    if (!expression || typeof expression !== 'object') return ''
+
+    switch (expression.type) {
+      case 'literal':
+        if (expression.dataType === 'null' || expression.value == null) return 'NULL'
+
+        return expression.value === '' ? "''" : String(expression.value)
+
+      case 'field': {
+        const fieldName = expression.fieldName
+
+        return Array.isArray(fieldName) ? fieldName.join('.') : String(fieldName || '')
+      }
+
+      case 'function': {
+        const functionName = expression.functionName || expression.funcName
+        const args = expression.functionArgs || expression.funcArgs || []
+
+        if (!functionName) return ''
+
+        return `${functionName}(${args.map(formatExpression).join(', ')})`
+      }
+
+      case 'unparsed':
+        return expression.unparsedExpression || ''
+
+      default:
+        return expression.value == null ? '' : String(expression.value)
+    }
+  }
+
+  return formatExpression(defaultValue) || '-'
+}
+
 export default function TableDetailsPage({ ...props }) {
   const [open, setOpen] = useState(false)
   const [openOwner, setOpenOwner] = useState(false)
@@ -58,6 +94,13 @@ export default function TableDetailsPage({ ...props }) {
   const currentMetalake = searchParams.get('metalake')
   const catalogType = searchParams.get('catalogType')
   const [search, setSearch] = useState('')
+
+  const [visibleMetadataColumns, setVisibleMetadataColumns] = useState([
+    'nullable',
+    'autoIncrement',
+    'defaultValue',
+    'comment'
+  ])
   const [tabKey, setTabKey] = useState('Columns')
   const { ref, width } = useResizeObserver()
   const store = useAppSelector(state => state.metalakes)
@@ -363,57 +406,99 @@ export default function TableDetailsPage({ ...props }) {
   }
 
   const columns = useMemo(
-    () => [
-      {
-        title: 'Column Name',
-        dataIndex: 'name',
-        key: 'name',
-        width: 300,
-        ellipsis: true,
-        sort: (a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()),
-        render: name => (
-          <Space>
-            <span>{name}</span>
-            {partitioning && renderColumnPopover('Partitioning', 'tabler:circle-letter-p', partitioning, name)}
-            {sortOrders && renderColumnPopover('SortOrders', 'mdi:letter-s-circle-outline', sortOrders, name)}
-            {distribution && renderColumnPopover('Distribution', 'tabler:circle-letter-d', distribution, name)}
-            {indexes && renderColumnPopover('Indexes', 'mdi:letter-i-circle-outline', indexes, name, true)}
-          </Space>
-        )
-      },
-      {
-        title: 'Data Type',
-        dataIndex: 'type',
-        key: 'type',
-        width: 200,
-        ellipsis: true,
-        filters: columnTypeFitlers,
-        onFilter: (value, record) =>
-          typeof record.type === 'string' ? record.type.indexOf(value) === 0 : record.type.type.indexOf(value) === 0,
-        render: type => {
-          const formattedType = formatColumnType(type)
-
-          return (
-            <Tag color={columnTypeColor(type)} title={formattedType}>
-              {formattedType}
-            </Tag>
+    () =>
+      [
+        {
+          title: 'Column Name',
+          dataIndex: 'name',
+          key: 'name',
+          width: 300,
+          ellipsis: true,
+          sort: (a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()),
+          render: name => (
+            <Space>
+              <span>{name}</span>
+              {partitioning && renderColumnPopover('Partitioning', 'tabler:circle-letter-p', partitioning, name)}
+              {sortOrders && renderColumnPopover('SortOrders', 'mdi:letter-s-circle-outline', sortOrders, name)}
+              {distribution && renderColumnPopover('Distribution', 'tabler:circle-letter-d', distribution, name)}
+              {indexes && renderColumnPopover('Indexes', 'mdi:letter-i-circle-outline', indexes, name, true)}
+            </Space>
           )
+        },
+        {
+          title: 'Data Type',
+          dataIndex: 'type',
+          key: 'type',
+          width: 200,
+          ellipsis: true,
+          filters: columnTypeFitlers,
+          onFilter: (value, record) =>
+            typeof record.type === 'string' ? record.type.indexOf(value) === 0 : record.type.type.indexOf(value) === 0,
+          render: type => {
+            const formattedType = formatColumnType(type)
+
+            return (
+              <Tag color={columnTypeColor(type)} title={formattedType}>
+                {formattedType}
+              </Tag>
+            )
+          }
+        },
+        {
+          title: 'Tags',
+          dataIndex: 'tags',
+          key: 'tags',
+          render: (_, record) =>
+            record?.node === 'tableColumn' ? (
+              <Tags
+                metadataObjectType={'column'}
+                metadataObjectFullName={`${catalog}.${schema}.${table}.${record.name}`}
+              />
+            ) : null
+        },
+        {
+          title: 'Policies',
+          dataIndex: 'policies',
+          key: 'policies',
+          render: (_, record) =>
+            record?.node === 'tableColumn' ? (
+              <Policies
+                metadataObjectType={'column'}
+                metadataObjectFullName={`${catalog}.${schema}.${table}.${record.name}`}
+              />
+            ) : null
+        },
+        {
+          title: 'Nullable',
+          dataIndex: 'nullable',
+          key: 'nullable',
+          metadataKey: 'nullable',
+          render: value => (value ? 'Yes' : 'No')
+        },
+        {
+          title: 'AutoIncrement',
+          dataIndex: 'autoIncrement',
+          key: 'autoIncrement',
+          metadataKey: 'autoIncrement',
+          render: value => (value ? 'Yes' : 'No')
+        },
+        {
+          title: 'Default Value',
+          dataIndex: 'defaultValue',
+          key: 'defaultValue',
+          metadataKey: 'defaultValue',
+          render: formatColumnDefaultValue
+        },
+        {
+          title: 'Comment',
+          dataIndex: 'comment',
+          key: 'comment',
+          metadataKey: 'comment',
+          ellipsis: true,
+          render: value => value || '-'
         }
-      },
-      {
-        title: 'Tags',
-        dataIndex: 'tags',
-        key: 'tags',
-        render: (_, record) =>
-          record?.node === 'tableColumn' ? (
-            <Tags
-              metadataObjectType={'column'}
-              metadataObjectFullName={`${catalog}.${schema}.${table}.${record.name}`}
-            />
-          ) : null
-      }
-    ],
-    [store.activatedDetails]
+      ].filter(column => !column.metadataKey || visibleMetadataColumns.includes(column.metadataKey)),
+    [store.activatedDetails, visibleMetadataColumns]
   )
 
   const { resizableColumns, components, tableWidth } = useAntdColumnResize(() => {
@@ -439,6 +524,7 @@ export default function TableDetailsPage({ ...props }) {
                 </span>
                 <Tooltip title='Edit'>
                   <Icons.Pencil
+                    data-refer='edit-table-btn'
                     className='relative size-4 hover:cursor-pointer hover:text-defaultPrimary'
                     onClick={handleEditTable}
                   />
@@ -591,10 +677,38 @@ export default function TableDetailsPage({ ...props }) {
       <Tabs data-refer='details-tabs' defaultActiveKey={tabKey} onChange={onChangeTab} items={tabOptions} />
       {tabKey === 'Columns' && (
         <>
-          <Flex justify='flex-end' className='mb-4'>
+          <Flex justify='flex-end' align='center' gap='middle' className='mb-4'>
             <div className='flex w-1/3 gap-4'>
               <Search name='searcColumnInput' placeholder='Search...' value={search} onChange={onSearchTable} />
             </div>
+
+            <Popover
+              trigger='click'
+              placement='bottomRight'
+              title='Column settings'
+              content={
+                <Checkbox.Group
+                  className='flex flex-col gap-2'
+                  options={[
+                    { label: 'Nullable', value: 'nullable' },
+                    { label: 'AutoIncrement', value: 'autoIncrement' },
+                    { label: 'Default Value', value: 'defaultValue' },
+                    { label: 'Comment', value: 'comment' }
+                  ]}
+                  value={visibleMetadataColumns}
+                  onChange={setVisibleMetadataColumns}
+                />
+              }
+            >
+              <button
+                type='button'
+                aria-label='Column settings'
+                title='Column settings'
+                className='cursor-pointer border-0 bg-transparent p-0 hover:text-defaultPrimary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2'
+              >
+                <Icons.Settings className='size-4' />
+              </button>
+            </Popover>
           </Flex>
           <Spin spinning={store.activatedDetailsLoading}>
             <Table

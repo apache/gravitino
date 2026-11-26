@@ -22,6 +22,7 @@ import static org.apache.gravitino.storage.relational.utils.POConverters.DEFAULT
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -37,13 +38,16 @@ import org.apache.gravitino.dto.semantic.DatasetDTO;
 import org.apache.gravitino.dto.semantic.MetricDTO;
 import org.apache.gravitino.dto.semantic.RelationshipDTO;
 import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
+import org.apache.gravitino.dto.semantic.SemanticModelRevisionDTO;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.SemanticModelEntity;
+import org.apache.gravitino.semantic.SemanticModel.Status;
+import org.apache.gravitino.storage.relational.po.SemanticModelVersionInfoPO.PublicationStatus;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 
-/** The persistent object for Semantic Model identity metadata and its current version snapshot. */
+/** The persistent object for Semantic Model identity metadata and a selected version snapshot. */
 @Getter
 @EqualsAndHashCode(exclude = "semanticModelVersionInfoPO")
 @ToString
@@ -59,6 +63,7 @@ public class SemanticModelPO {
   private Long schemaId;
   private String auditInfo;
   private Integer currentVersion;
+  private Integer activeVersion;
   private Integer lastVersion;
   private Long deletedAt;
   private SemanticModelVersionInfoPO semanticModelVersionInfoPO;
@@ -71,7 +76,7 @@ public class SemanticModelPO {
     // Lombok generates the builder methods.
   }
 
-  @lombok.Builder(setterPrefix = "with")
+  @lombok.Builder(setterPrefix = "with", toBuilder = true)
   private SemanticModelPO(
       Long semanticModelId,
       String semanticModelName,
@@ -80,6 +85,7 @@ public class SemanticModelPO {
       Long schemaId,
       String auditInfo,
       Integer currentVersion,
+      Integer activeVersion,
       Integer lastVersion,
       Long deletedAt,
       SemanticModelVersionInfoPO semanticModelVersionInfoPO) {
@@ -100,13 +106,14 @@ public class SemanticModelPO {
     this.schemaId = schemaId;
     this.auditInfo = auditInfo;
     this.currentVersion = currentVersion;
+    this.activeVersion = activeVersion;
     this.lastVersion = lastVersion;
     this.deletedAt = deletedAt;
     this.semanticModelVersionInfoPO = semanticModelVersionInfoPO;
   }
 
   /**
-   * Converts a persistent object and its current version snapshot to a Semantic Model entity.
+   * Converts a persistent object and its selected version snapshot to a Semantic Model entity.
    *
    * @param semanticModelPO The persistent object to convert.
    * @param namespace The Semantic Model namespace.
@@ -116,6 +123,7 @@ public class SemanticModelPO {
       SemanticModelPO semanticModelPO, Namespace namespace) {
     try {
       SemanticModelVersionInfoPO versionPO = semanticModelPO.getSemanticModelVersionInfoPO();
+      SemanticModelRevisionDTO revision = versionPO.revisionInfo();
       SemanticModelDefinitionDTO definitionDTO =
           SemanticModelDefinitionDTO.builder()
               .withDatasets(deserializeField(versionPO.datasets(), DatasetDTO[].class, "datasets"))
@@ -144,13 +152,17 @@ public class SemanticModelPO {
 
       return SemanticModelEntity.builder()
           .withId(semanticModelPO.getSemanticModelId())
-          .withName(versionPO.semanticModelName())
+          .withName(semanticModelPO.getSemanticModelName())
+          .withRevision(
+              revision.revision(),
+              revision.status(),
+              revision.publishedBy(),
+              revision.publishedAt())
           .withNamespace(namespace)
           .withComment(versionPO.semanticModelComment())
           .withDefinition(definitionDTO.toDefinition())
           .withProperties(properties)
-          .withAuditInfo(
-              JsonUtils.anyFieldMapper().readValue(semanticModelPO.getAuditInfo(), AuditInfo.class))
+          .withAuditInfo(versionPO.writerAudit())
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize Semantic Model JSON", e);
@@ -189,13 +201,21 @@ public class SemanticModelPO {
               ? null
               : JsonUtils.anyFieldMapper().writeValueAsString(semanticModelEntity.properties());
 
+      boolean published = semanticModelEntity.status() == Status.PUBLISHED;
+      AuditInfo audit = semanticModelEntity.auditInfo();
+      String writer = audit.lastModifier() == null ? audit.creator() : audit.lastModifier();
+      Instant saveTime =
+          audit.lastModifiedTime() == null ? audit.createTime() : audit.lastModifiedTime();
       return SemanticModelVersionInfoPO.builder()
           .withSemanticModelId(semanticModelEntity.id())
           .withMetalakeId(namespacedEntityId.namespaceIds()[0])
           .withCatalogId(namespacedEntityId.namespaceIds()[1])
           .withSchemaId(namespacedEntityId.entityId())
           .withVersion(version)
-          .withSemanticModelName(semanticModelEntity.name())
+          .withPublicationStatus(
+              published ? PublicationStatus.PUBLISHED_ON_SAVE : PublicationStatus.DRAFT)
+          .withPublishedBy(published ? writer : "")
+          .withPublishedAt(published ? saveTime.toEpochMilli() : 0L)
           .withSemanticModelComment(semanticModelEntity.comment())
           .withDatasets(JsonUtils.anyFieldMapper().writeValueAsString(definitionDTO.getDatasets()))
           .withRelationships(serializeOptionalField(definitionDTO.getRelationships()))
@@ -238,6 +258,7 @@ public class SemanticModelPO {
           .withAuditInfo(
               JsonUtils.anyFieldMapper().writeValueAsString(semanticModelEntity.auditInfo()))
           .withCurrentVersion(version)
+          .withActiveVersion(semanticModelEntity.status() == Status.PUBLISHED ? version : 0)
           .withLastVersion(version)
           .withSemanticModelVersionInfoPO(versionPO)
           .withDeletedAt(DEFAULT_DELETED_AT)

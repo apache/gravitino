@@ -320,18 +320,27 @@ class TestSemanticModelMetricDiscovery:
             },
             "aiContext": "Updated",
         }
+        sales_path = fixture.models_path + "/sales"
+        latest = fixture.request("GET", sales_path + "/revisions/latest")[
+            "semanticModel"
+        ]
         fixture.request(
             "PUT",
-            fixture.models_path + "/sales",
+            sales_path,
             {
+                "expectedRevision": latest["revision"],
                 "updates": [
                     {
                         "@type": "replaceDefinition",
                         "definition": fixture.definition([changed]),
-                    },
-                    {"@type": "rename", "newName": "renamed"},
-                ]
+                    }
+                ],
             },
+        )
+        fixture.request(
+            "PUT",
+            sales_path,
+            {"updates": [{"@type": "rename", "newName": "renamed"}]},
         )
         fixture.assert_discovery([fixture.info("renamed", changed)])
         fixture.request("DELETE", fixture.models_path + "/renamed")
