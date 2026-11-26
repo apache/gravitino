@@ -58,17 +58,29 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
@@ -89,9 +101,12 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
+import org.apache.gravitino.lock.TreeLock;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.junit.jupiter.api.AfterAll;
@@ -233,6 +248,96 @@ public class TestAccessControlManager {
     if (entityStore != null) {
       entityStore.close();
       entityStore = null;
+    }
+  }
+
+  /** Verifies a single-role grant waits for a committed batch revoke's plugin notification. */
+  @Test
+  public void testBatchRevokeOrdersSingleRoleNotification() throws Exception {
+    testBatchRevokeNotificationOrdering(false);
+  }
+
+  /** Verifies overlapping batches with reversed role order serialize their notifications. */
+  @Test
+  public void testBatchRevokeOrdersBatchNotification() throws Exception {
+    testBatchRevokeNotificationOrdering(true);
+  }
+
+  /** Verifies a failed plugin notification releases every role lock. */
+  @Test
+  public void testBatchNotificationFailureReleasesLocks() throws Exception {
+    String role = "batch_notification_failure";
+    MetadataObject object = MetadataObjects.of(null, "catalog", MetadataObject.Type.CATALOG);
+    Set<Privilege> privileges = Set.of(Privileges.UseCatalog.allow());
+    accessControlManager.createRole(
+        METALAKE,
+        role,
+        Map.of(),
+        List.of(SecurableObjects.ofCatalog("catalog", List.copyOf(privileges))));
+    Mockito.doThrow(new IllegalStateException("Plugin notification failed"))
+        .when(authorizationPlugin)
+        .onRoleUpdated(any(), any());
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      PrivilegeBatchResult result =
+          accessControlManager.batchChangePrivileges(
+              METALAKE, object, Map.of(role, privileges), false);
+      Assertions.assertTrue(result.committed().containsKey(role));
+      Assertions.assertInstanceOf(
+          PrivilegeNotificationException.class, result.failures().get(role));
+      reset(authorizationPlugin);
+      Role granted =
+          executor
+              .submit(
+                  () ->
+                      accessControlManager.grantPrivilegeToRole(METALAKE, role, object, privileges))
+              .get(10, TimeUnit.SECONDS);
+      Assertions.assertEquals(
+          List.copyOf(privileges), granted.securableObjects().get(0).privileges());
+    } finally {
+      executor.shutdownNow();
+      Assertions.assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+      reset(authorizationPlugin);
+    }
+  }
+
+  /** Verifies partial acquisition failure releases earlier locks in reverse order. */
+  @Test
+  public void testBatchLockAcquisitionFailure() throws Exception {
+    LockManager original = GravitinoEnv.getInstance().lockManager();
+    LockManager locks = mock(LockManager.class);
+    TreeLock first = mock(TreeLock.class);
+    TreeLock second = mock(TreeLock.class);
+    TreeLock third = mock(TreeLock.class);
+    when(locks.createTreeLock(AuthorizationUtils.ofRole(METALAKE, "a"))).thenReturn(first);
+    when(locks.createTreeLock(AuthorizationUtils.ofRole(METALAKE, "b"))).thenReturn(second);
+    when(locks.createTreeLock(AuthorizationUtils.ofRole(METALAKE, "c"))).thenReturn(third);
+    Mockito.doThrow(new IllegalStateException("Lock acquisition failed"))
+        .when(third)
+        .lock(LockType.WRITE);
+    Map<String, Set<Privilege>> changes = new LinkedHashMap<>();
+    changes.put("c", Set.of(Privileges.UseCatalog.allow()));
+    changes.put("b", Set.of(Privileges.UseCatalog.allow()));
+    changes.put("a", Set.of(Privileges.UseCatalog.allow()));
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", locks, true);
+    try {
+      Assertions.assertThrows(
+          IllegalStateException.class,
+          () ->
+              accessControlManager.batchChangePrivileges(
+                  METALAKE,
+                  MetadataObjects.of(null, "catalog", MetadataObject.Type.CATALOG),
+                  changes,
+                  true));
+      var order = Mockito.inOrder(first, second, third);
+      order.verify(first).lock(LockType.WRITE);
+      order.verify(second).lock(LockType.WRITE);
+      order.verify(third).lock(LockType.WRITE);
+      order.verify(second).unlock();
+      order.verify(first).unlock();
+      Mockito.verify(third, Mockito.never()).unlock();
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", original, true);
     }
   }
 
@@ -717,6 +822,100 @@ public class TestAccessControlManager {
     Assertions.assertThrows(
         NoSuchMetalakeException.class,
         () -> accessControlManager.listGroups("no_such_metalake", 0, 10));
+  }
+
+  private void testBatchRevokeNotificationOrdering(boolean batchGrant) throws Exception {
+    String prefix = batchGrant ? "batch_overlap_" : "single_overlap_";
+    String first = prefix + "a";
+    String second = prefix + "b";
+    String unrelated = prefix + "unrelated";
+    for (String role : List.of(first, second, unrelated)) {
+      createCatalogRole(role);
+    }
+    MetadataObject object = MetadataObjects.of(null, "catalog", MetadataObject.Type.CATALOG);
+    Set<Privilege> privileges = Set.of(Privileges.UseCatalog.allow());
+    Map<String, Set<Privilege>> revokes = new LinkedHashMap<>();
+    revokes.put(second, privileges);
+    revokes.put(first, privileges);
+    Map<String, Set<Privilege>> grants = new LinkedHashMap<>();
+    grants.put(first, privileges);
+    grants.put(second, privileges);
+    Map<String, Boolean> connectorGrants = new ConcurrentHashMap<>();
+    connectorGrants.put(first, true);
+    connectorGrants.put(second, true);
+    CountDownLatch callbackEntered = new CountDownLatch(1);
+    CountDownLatch releaseCallback = new CountDownLatch(1);
+    CountDownLatch grantStarted = new CountDownLatch(1);
+    Mockito.doAnswer(
+            invocation -> {
+              RoleChange change = invocation.getArgument(1);
+              if (change instanceof RoleChange.RemoveSecurableObject) {
+                String role = ((RoleChange.RemoveSecurableObject) change).getRoleName();
+                if (role.equals(second)) {
+                  callbackEntered.countDown();
+                  Assertions.assertTrue(releaseCallback.await(10, TimeUnit.SECONDS));
+                }
+                connectorGrants.put(role, false);
+              } else if (change instanceof RoleChange.AddSecurableObject) {
+                connectorGrants.put(((RoleChange.AddSecurableObject) change).getRoleName(), true);
+              }
+              return null;
+            })
+        .when(authorizationPlugin)
+        .onRoleUpdated(any(), any());
+    ExecutorService executor = Executors.newFixedThreadPool(3);
+    try {
+      Future<PrivilegeBatchResult> revoke =
+          executor.submit(
+              () -> accessControlManager.batchChangePrivileges(METALAKE, object, revokes, false));
+      Assertions.assertTrue(callbackEntered.await(10, TimeUnit.SECONDS));
+      for (String role : revokes.keySet()) {
+        // Read storage directly: getRole also takes the role lock held by the paused batch.
+        RoleEntity stored =
+            entityStore.get(
+                AuthorizationUtils.ofRole(METALAKE, role), EntityType.ROLE, RoleEntity.class);
+        Assertions.assertTrue(stored.securableObjects().isEmpty());
+      }
+      Future<?> grant =
+          executor.submit(
+              () -> {
+                grantStarted.countDown();
+                if (batchGrant) {
+                  PrivilegeBatchResult result =
+                      accessControlManager.batchChangePrivileges(METALAKE, object, grants, true);
+                  Assertions.assertTrue(result.failures().isEmpty());
+                } else {
+                  accessControlManager.grantPrivilegeToRole(METALAKE, second, object, privileges);
+                }
+              });
+      Assertions.assertTrue(grantStarted.await(10, TimeUnit.SECONDS));
+      Assertions.assertThrows(TimeoutException.class, () -> grant.get(200, TimeUnit.MILLISECONDS));
+      // A blocked callback must not serialize changes to unrelated roles.
+      executor
+          .submit(
+              () ->
+                  accessControlManager.revokePrivilegesFromRole(
+                      METALAKE, unrelated, object, privileges))
+          .get(10, TimeUnit.SECONDS);
+      releaseCallback.countDown();
+      Assertions.assertTrue(revoke.get(10, TimeUnit.SECONDS).failures().isEmpty());
+      grant.get(10, TimeUnit.SECONDS);
+      for (String role : revokes.keySet()) {
+        boolean expected = batchGrant || role.equals(second);
+        Assertions.assertEquals(expected, connectorGrants.get(role));
+        Role stored = accessControlManager.getRole(METALAKE, role);
+        Assertions.assertEquals(expected, !stored.securableObjects().isEmpty());
+        if (expected) {
+          Assertions.assertEquals(
+              List.copyOf(privileges), stored.securableObjects().get(0).privileges());
+        }
+      }
+    } finally {
+      releaseCallback.countDown();
+      executor.shutdownNow();
+      Assertions.assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+      reset(authorizationPlugin);
+    }
   }
 
   private void createCatalogRole(String role) {
