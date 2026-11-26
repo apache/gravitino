@@ -105,7 +105,11 @@ If Fork CI hits Maven Central's HTTP 429 rate limit, **Warm Gradle cache** can p
 
 Sync your fork's default branch to get the workflow. In your fork, open **Actions → Warm Gradle cache** and select **Enable workflow** if prompted. It checks daily and resolves Gradle dependencies across the repository only on a cache miss. To warm the cache immediately, select **Run workflow** on your fork's default branch. [GitHub's workflow enablement guide](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/disable-and-enable-workflows)
 
-If Fork CI still downloads missing dependencies after a cache hit, copy the Gradle cache key from the `actions/setup-java` step in the affected job. In your fork, open **Actions → Caches** and find the entry by key and branch.
+If Fork CI still downloads missing dependencies after a cache hit, compare the full Gradle cache key in the affected job's `actions/setup-java` log with the key in the latest successful **Warm Gradle cache** run.
+
+If the keys differ because upstream `main` changed its Gradle files, keep the existing entries. For a PR targeting `main`, use **Run workflow** on the PR branch or **Re-run all jobs** on its current commit so Fork CI picks up the latest upstream base. **Re-run failed jobs** reuses the base SHA from the successful eligibility job. Check the key again after the new run starts. A PR that changes the Gradle files used in the key may need its own cache.
+
+If the keys match, open **Actions → Caches** in your fork and find the entry by key and branch.
 
 1. If the **default branch** has a partial entry for that key, delete that entry, run **Warm Gradle cache** on the default branch, and wait for it to save the new cache. An exact hit skips dependency resolution.
 2. If the **PR branch** has a stale entry for the same key, delete that branch's entry before rerunning **Fork CI**. GitHub checks the current branch first, so a matching PR-branch entry takes precedence over the warmed default-branch entry. [GitHub's cache lookup order](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#cache-key-matching)
