@@ -391,14 +391,15 @@ public class RoleMetaService {
         SessionUtils.isInTransaction(), "Policy role locks require an active transaction");
     // A name lookup earlier in the caller's transaction may still be in MyBatis's session cache.
     SessionUtils.clearSessionCache();
-    // Two names can resolve to one role where the backend ignores trailing spaces, so key by ID.
     Map<Long, RolePO> resolved = new TreeMap<>();
     for (String roleName : roleNames) {
       RolePO role =
           SessionUtils.getWithoutCommit(
               RoleMetaMapper.class,
               mapper -> mapper.selectRoleMetaByMetalakeIdAndName(metalakeId, roleName));
-      if (role == null) {
+      // MySQL's collation ignores trailing spaces, so "analyst " finds the role "analyst". The
+      // policy keeps the name as written and matches roles by exact name, so require an exact one.
+      if (role == null || !roleName.equals(role.getRoleName())) {
         throw missingPolicyRole(policy, roleName);
       }
       resolved.putIfAbsent(role.getRoleId(), role);
@@ -466,6 +467,31 @@ public class RoleMetaService {
 
     deleteRoleWithVersion(identifier, rolePO);
     return true;
+  }
+
+  /**
+   * Deletes a role and returns it, securable objects included, as it was before the deletion. Run
+   * inside a caller's transaction, the role stays locked until that transaction ends, so the caller
+   * can act on the deleted role before committing.
+   *
+   * @param identifier the role identifier
+   * @return the deleted role
+   * @throws InUseException if an access control policy names the role
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteRoleAndGet")
+  public RoleEntity deleteRoleAndGet(NameIdentifier identifier) {
+    AuthorizationUtils.checkRole(identifier);
+
+    Long metalakeId =
+        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
+    RolePO rolePO = getRolePOByMetalakeIdAndName(metalakeId, identifier.name(), true);
+    RoleEntity role =
+        POConverters.fromRolePO(rolePO, listSecurableObjects(rolePO), identifier.namespace());
+
+    deleteRoleWithVersion(identifier, rolePO);
+    return role;
   }
 
   /**

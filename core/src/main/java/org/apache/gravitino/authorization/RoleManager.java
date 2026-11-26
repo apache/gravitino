@@ -30,7 +30,6 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
-import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
@@ -112,19 +111,16 @@ class RoleManager {
   boolean deleteRole(String metalake, String role) {
     try {
       NameIdentifier ident = AuthorizationUtils.ofRole(metalake, role);
-
-      try {
-        RoleEntity roleEntity = store.get(ident, Entity.EntityType.ROLE, RoleEntity.class);
-        // Refuse before the plugins drop the role. The plugins go first so that a failed plugin
-        // call leaves the role in Gravitino and a retry reaches the plugins again. The store
-        // checks again under a lock, for a policy that names the role after this check.
-        checkNoPolicyNamesRole(ident, metalake, role);
-        notifyRoleDeleted(metalake, roleEntity);
-      } catch (NoSuchEntityException nse) {
-        // ignore, because the role may have been deleted.
-      }
-
-      return store.delete(ident, Entity.EntityType.ROLE);
+      // The store refuses a role that an access control policy names, and holds the role locked
+      // until it commits, so the plugins run only for a deletion that goes ahead. A plugin failure
+      // rolls the deletion back, which leaves the role for a retry to reach the plugins again.
+      return store
+          .deleteAndGet(
+              ident,
+              Entity.EntityType.ROLE,
+              RoleEntity.class,
+              roleEntity -> notifyRoleDeleted(metalake, roleEntity))
+          .isPresent();
     } catch (IOException ioe) {
       LOG.error(
           "Deleting role {} in the metalake {} failed due to storage issues", role, metalake, ioe);
@@ -170,22 +166,6 @@ class RoleManager {
           object.type(),
           ioe);
       throw new RuntimeException(ioe);
-    }
-  }
-
-  private void checkNoPolicyNamesRole(NameIdentifier ident, String metalake, String role)
-      throws IOException {
-    boolean named =
-        !store
-            .relationOperations()
-            .listEntitiesByRelation(
-                SupportsRelationOperations.Type.POLICY_ROLE_REL,
-                ident,
-                Entity.EntityType.ROLE,
-                false /* allFields */)
-            .isEmpty();
-    if (named) {
-      throw new InUseException(AuthorizationUtils.ROLE_IN_USE_MSG, role, metalake);
     }
   }
 

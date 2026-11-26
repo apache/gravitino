@@ -26,6 +26,7 @@ import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -43,6 +44,7 @@ import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
@@ -124,6 +126,22 @@ public class TestReferencedRoleDeletion extends TestJDBCBackend {
     Assertions.assertEquals(0L, countAllPolicyRows("policy_meta", policy.id()));
     Assertions.assertEquals(0L, countAllPolicyRows("policy_version_info", policy.id()));
     Assertions.assertEquals(0L, countAllPolicyRows("policy_role_relation_meta", policy.id()));
+  }
+
+  @TestTemplate
+  public void testPolicyCannotNameRoleWithTrailingSpace() throws IOException, SQLException {
+    createAndInsertMakeLake(METALAKE);
+    createRoles("analyst");
+    // MySQL's collation finds "analyst" for "analyst "; every backend must still refuse it.
+    PolicyEntity padded = policy("padded", "analyst ");
+
+    Assertions.assertThrows(IllegalRoleException.class, () -> backend.insert(padded, false));
+    Assertions.assertEquals(0L, countAllPolicyRows("policy_meta", padded.id()));
+
+    PolicyEntity policy = policy("reader", "analyst");
+    backend.insert(policy, false);
+    Assertions.assertThrows(IllegalRoleException.class, () -> updateRoles(policy, "analyst "));
+    Assertions.assertEquals(Collections.singletonList("analyst"), rolesOf(policy.id()));
   }
 
   @TestTemplate
@@ -254,6 +272,60 @@ public class TestReferencedRoleDeletion extends TestJDBCBackend {
     Assertions.assertInstanceOf(InUseException.class, failure);
     Assertions.assertTrue(roleExists("analyst"));
     Assertions.assertEquals(Arrays.asList("analyst", "auditor"), rolesOf(policy.id()));
+  }
+
+  @TestTemplate
+  public void testDeletionRefusedAfterWaitingNeverRunsItsCleanup() throws Exception {
+    createAndInsertMakeLake(METALAKE);
+    createRoles("analyst");
+    PolicyEntity policy = policy("reader", "analyst");
+    // Stands in for the authorization plugins, which RoleManager runs as this cleanup.
+    List<String> cleanedUp = new CopyOnWriteArrayList<>();
+
+    Throwable failure =
+        whileHeld(
+            () -> backend.insert(policy, false),
+            () ->
+                backend.deleteAndGet(
+                    AuthorizationUtils.ofRole(METALAKE, "analyst"),
+                    Entity.EntityType.ROLE,
+                    RoleEntity.class,
+                    role -> cleanedUp.add(role.name())));
+
+    Assertions.assertInstanceOf(InUseException.class, failure);
+    Assertions.assertEquals(Collections.emptyList(), cleanedUp);
+    Assertions.assertTrue(roleExists("analyst"));
+  }
+
+  @TestTemplate
+  public void testFailedCleanupKeepsTheRole() throws IOException {
+    createAndInsertMakeLake(METALAKE);
+    createRoles("analyst");
+    NameIdentifier analyst = AuthorizationUtils.ofRole(METALAKE, "analyst");
+
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () ->
+            backend.deleteAndGet(
+                analyst,
+                Entity.EntityType.ROLE,
+                RoleEntity.class,
+                role -> {
+                  throw new IllegalStateException("plugin unavailable");
+                }));
+    Assertions.assertTrue(roleExists("analyst"));
+
+    List<String> cleanedUp = new CopyOnWriteArrayList<>();
+    Assertions.assertTrue(
+        backend
+            .deleteAndGet(
+                analyst,
+                Entity.EntityType.ROLE,
+                RoleEntity.class,
+                role -> cleanedUp.add(role.name()))
+            .isPresent());
+    Assertions.assertEquals(Collections.singletonList("analyst"), cleanedUp);
+    Assertions.assertFalse(roleExists("analyst"));
   }
 
   @TestTemplate

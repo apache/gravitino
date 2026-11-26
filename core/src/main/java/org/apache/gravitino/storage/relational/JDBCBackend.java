@@ -489,14 +489,22 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       Class<E> clazz,
       Consumer<E> postDeleteAction)
       throws IOException {
-    if (entityType != Entity.EntityType.FILESET) {
-      return RelationalBackend.super.deleteAndGet(ident, entityType, clazz, postDeleteAction);
+    switch (entityType) {
+      case FILESET:
+        return deleteWithCallback(
+            ident,
+            entityType,
+            () -> clazz.cast(FilesetMetaService.getInstance().deleteFilesetAndGet(ident)),
+            postDeleteAction);
+      case ROLE:
+        return deleteWithCallback(
+            ident,
+            entityType,
+            () -> clazz.cast(RoleMetaService.getInstance().deleteRoleAndGet(ident)),
+            postDeleteAction);
+      default:
+        return RelationalBackend.super.deleteAndGet(ident, entityType, clazz, postDeleteAction);
     }
-    return deleteWithCallback(
-        ident,
-        entityType,
-        () -> clazz.cast(FilesetMetaService.getInstance().deleteFilesetAndGet(ident)),
-        postDeleteAction);
   }
 
   @Override
@@ -793,11 +801,6 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
                 .stream()
                 .map(RelationalEntity::targetEntity)
                 .collect(Collectors.toList());
-      case POLICY_ROLE_REL:
-        Preconditions.checkArgument(
-            identType == Entity.EntityType.ROLE,
-            "POLICY_ROLE_REL only supports listing the policies that name a role");
-        return (List<E>) PolicyMetaService.getInstance().listPoliciesByRoleIdent(nameIdentifier);
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));

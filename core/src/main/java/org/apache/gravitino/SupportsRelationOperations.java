@@ -43,8 +43,6 @@ public interface SupportsRelationOperations {
     TAG_METADATA_OBJECT_REL,
     /** Policy to tag relationship */
     POLICY_TAG_REL,
-    /** Access control policy to the roles its content names; listed by role only. */
-    POLICY_ROLE_REL,
     /** Semantic Model dataset to source relationship. */
     SEMANTIC_MODEL_SOURCE_REL,
   }
