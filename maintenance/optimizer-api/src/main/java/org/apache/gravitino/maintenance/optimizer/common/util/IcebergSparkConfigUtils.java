@@ -19,8 +19,10 @@
 
 package org.apache.gravitino.maintenance.optimizer.common.util;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
@@ -31,12 +33,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import org.apache.commons.lang3.StringUtils;
 
 /** Shared utilities for Iceberg Spark template configs and config validation. */
 public final class IcebergSparkConfigUtils {
 
-  private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final ObjectMapper MAPPER =
+      new ObjectMapper().configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
 
   private static final String SPARK_SQL_EXTENSIONS_KEY = "spark.sql.extensions";
   private static final String SPARK_SQL_DEFAULT_CATALOG_KEY = "spark.sql.defaultCatalog";
@@ -86,6 +90,40 @@ public final class IcebergSparkConfigUtils {
           PLACEHOLDER_SPARK_DRIVER_MEMORY);
 
   private IcebergSparkConfigUtils() {}
+
+  /**
+   * Builds the shared Iceberg template keys that adapters must submit for {@code runJob}.
+   *
+   * <p>Copies {@code catalog_name}, expands flat {@code spark_*} / catalog connection placeholders
+   * for {@code withConfigs(buildTemplateSparkConfigs())}, overlays those flats onto nested {@code
+   * spark_conf}, and emits {@code spark_conf} JSON. Callers should put only template parameters on
+   * top of this map and must not forward the raw submitter config wholesale.
+   *
+   * @param catalogName Spark catalog alias for this job
+   * @param submitterConfigs optimizer {@code jobSubmitterConfig.*} map (may be null/empty)
+   * @return mutable map with {@code catalog_name}, resource/catalog placeholders, and {@code
+   *     spark_conf} when non-empty
+   */
+  public static Map<String, String> buildIcebergTemplateSubmitterParams(
+      String catalogName, Map<String, String> submitterConfigs) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(catalogName), "catalogName is blank");
+    Map<String, String> flat = submitterConfigs == null ? Collections.emptyMap() : submitterConfigs;
+    Map<String, String> sparkConf =
+        new LinkedHashMap<>(parseFlatJsonMap(flat.get("spark_conf"), "spark-conf"));
+    overlayFlatResourceAndCatalogKeys(sparkConf, flat, catalogName);
+
+    Map<String, String> params = new LinkedHashMap<>();
+    params.put("catalog_name", catalogName);
+    params.putAll(resolveTemplateSparkPlaceholders(catalogName, sparkConf, flat));
+    if (!sparkConf.isEmpty()) {
+      try {
+        params.put("spark_conf", MAPPER.writeValueAsString(new TreeMap<>(sparkConf)));
+      } catch (JsonProcessingException e) {
+        throw new IllegalArgumentException("Failed to serialize spark_conf", e);
+      }
+    }
+    return params;
+  }
 
   /**
    * Resolves flat SparkJobTemplate placeholders. Priority: {@code flatSubmitterConfigs}, then

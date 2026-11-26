@@ -151,8 +151,9 @@ default value.
   rejected when the template is registered or updated.
 - If any required parameter has no value, the run request fails with an error that lists all the
   missing parameters. No job is created and no file is downloaded.
-- Keys in the job configuration that the template does not use are ignored, and the server logs a
-  warning.
+- Keys in the job configuration that the template does not use are rejected, with an error that
+  names the unknown keys and the template's parameters. No job is created and no file is
+  downloaded.
 - A placeholder name can contain ASCII letters, digits, `_`, `.`, and `-`. Text such as
   `{{ name }}`, with spaces, is not a placeholder and is passed through as is.
 - Only `{{` needs escaping. A placeholder always starts with `{{`, so `}}` on its own is plain
