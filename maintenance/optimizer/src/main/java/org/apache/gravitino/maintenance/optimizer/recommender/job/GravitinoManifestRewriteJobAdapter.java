@@ -20,7 +20,6 @@ package org.apache.gravitino.maintenance.optimizer.recommender.job;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionContext;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
@@ -41,13 +40,8 @@ public final class GravitinoManifestRewriteJobAdapter implements GravitinoJobAda
     if (submitterConfigs == null) {
       submitterConfigs = Collections.emptyMap();
     }
-    Map<String, String> config = new LinkedHashMap<>();
-    config.putAll(
-        IcebergSparkConfigUtils.resolveTemplateSparkPlaceholders(
-            catalogName,
-            IcebergSparkConfigUtils.parseFlatJsonMap(
-                submitterConfigs.get("spark_conf"), "spark-conf"),
-            submitterConfigs));
+    Map<String, String> config =
+        IcebergSparkConfigUtils.buildIcebergTemplateSubmitterParams(catalogName, submitterConfigs);
     config.putAll(rewrite.jobOptions());
     config.put("catalog_name", catalogName);
     config.put(

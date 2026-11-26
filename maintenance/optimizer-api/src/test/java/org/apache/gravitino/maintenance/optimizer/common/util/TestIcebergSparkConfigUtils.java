@@ -84,6 +84,33 @@ public class TestIcebergSparkConfigUtils {
   }
 
   @Test
+  public void testBuildIcebergTemplateSubmitterParamsEmitsCatalogAndSparkConf() {
+    Map<String, String> submitter = new HashMap<>();
+    submitter.put(IcebergSparkConfigUtils.PLACEHOLDER_SPARK_MASTER, "local[2]");
+    submitter.put(IcebergSparkConfigUtils.PLACEHOLDER_CATALOG_TYPE, "rest");
+    submitter.put(IcebergSparkConfigUtils.PLACEHOLDER_CATALOG_URI, "http://localhost:9001/iceberg");
+    submitter.put("spark_conf", "{\"spark.executor.memory\":\"4g\"}");
+    submitter.put("custom_unused", "should-not-appear");
+
+    Map<String, String> params =
+        IcebergSparkConfigUtils.buildIcebergTemplateSubmitterParams("iceberg", submitter);
+
+    assertEquals("iceberg", params.get("catalog_name"));
+    assertEquals("local[2]", params.get(IcebergSparkConfigUtils.PLACEHOLDER_SPARK_MASTER));
+    assertEquals("rest", params.get(IcebergSparkConfigUtils.PLACEHOLDER_CATALOG_TYPE));
+    assertEquals(
+        "http://localhost:9001/iceberg",
+        params.get(IcebergSparkConfigUtils.PLACEHOLDER_CATALOG_URI));
+    assertTrue(!params.containsKey("custom_unused"));
+    String sparkConf = params.get("spark_conf");
+    assertTrue(sparkConf.contains("\"spark.executor.memory\":\"4g\""));
+    assertTrue(sparkConf.contains("\"spark.sql.catalog.iceberg.type\":\"rest\""));
+    assertTrue(
+        sparkConf.contains("\"spark.sql.catalog.iceberg.uri\":\"http://localhost:9001/iceberg\""));
+    assertTrue(sparkConf.contains("\"spark.master\":\"local[2]\""));
+  }
+
+  @Test
   public void testResolveAndOverlayFlatWinsWithoutInjectingDefaults() {
     Map<String, String> spark = new HashMap<>();
     spark.put(IcebergSparkConfigUtils.SPARK_EXECUTOR_MEMORY_KEY, "4g");
