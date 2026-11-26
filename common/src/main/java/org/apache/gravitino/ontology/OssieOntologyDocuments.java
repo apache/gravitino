@@ -204,8 +204,8 @@ public final class OssieOntologyDocuments {
     }
     ObjectNode definition = (ObjectNode) remap(JSON.valueToTree(fields), false, "$");
     definition
-        .fields()
-        .forEachRemaining(
+        .properties()
+        .forEach(
             entry -> {
               if (!kind.definitionFields.contains(entry.getKey())) {
                 throw invalid("$." + entry.getKey() + " is not a definition field");
@@ -279,8 +279,8 @@ public final class OssieOntologyDocuments {
       return node;
     }
     ObjectNode result = JSON.createObjectNode();
-    node.fields()
-        .forEachRemaining(
+    node.properties()
+        .forEach(
             entry -> {
               String name = entry.getKey();
               String childPath = path + "." + name;
@@ -326,8 +326,8 @@ public final class OssieOntologyDocuments {
         throw invalid(path + " must be an object of string properties");
       }
       stored
-          .fields()
-          .forEachRemaining(
+          .properties()
+          .forEach(
               entry -> {
                 if (!entry.getValue().isTextual()) {
                   throw invalid(path + "." + entry.getKey() + " must be a string");
