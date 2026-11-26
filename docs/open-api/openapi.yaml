@@ -78,6 +78,15 @@ paths:
   /metalakes/{metalake}/terms/{term}/hierarchy:
     $ref: "./terms.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1terms~1%7Bterm%7D~1hierarchy"
 
+  /metalakes/{metalake}/kb-articles:
+    $ref: "./kb-articles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1kb-articles"
+
+  /metalakes/{metalake}/kb-articles/{article}:
+    $ref: "./kb-articles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1kb-articles~1%7Barticle%7D"
+
+  /metalakes/{metalake}/kb-articles/{article}/content:
+    $ref: "./kb-articles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1kb-articles~1%7Barticle%7D~1content"
+
   /metalakes/{metalake}/tags:
     $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags"
 

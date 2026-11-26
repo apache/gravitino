@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -38,6 +39,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
 import org.apache.gravitino.exceptions.KnowledgeBaseArticleAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
@@ -206,7 +208,8 @@ public final class ArticleManager {
                   new ArticleDomains(metalake, authorizationEnabled).visible(current.article());
               var withTerms = terms.preview(lake, article, limit, offset);
               var assets = new ArticleAssets(metalake, authorizationEnabled);
-              return new ScopedArticle(lake, assets.preview(lake, withTerms, limit, offset));
+              return new ScopedArticle(
+                  lake, withOwner(assets.preview(lake, withTerms, limit, offset)));
             });
     return Result.from(state);
   }
@@ -492,9 +495,27 @@ public final class ArticleManager {
       ArticleTerms terms,
       ArticleAssets assets) {
     var projected = terms.visible(domains.visible(article), ArticleListFilter.DEFAULT_LIMIT, 0);
-    return article.bindings().stream().anyMatch(b -> !"GLOSSARY_TERM".equals(b.targetType()))
-        ? assets.preview(terms.lake(), projected, ArticleListFilter.DEFAULT_LIMIT, 0)
-        : projected;
+    if (article.bindings().stream().anyMatch(b -> !"GLOSSARY_TERM".equals(b.targetType()))) {
+      projected = assets.preview(terms.lake(), projected, ArticleListFilter.DEFAULT_LIMIT, 0);
+    }
+    return withOwner(projected);
+  }
+
+  private static KnowledgeBaseArticleEntity withOwner(KnowledgeBaseArticleEntity article) {
+    var relations =
+        OwnerMetaService.getInstance()
+            .listOwnersByObjectIds(
+                article.namespace().level(0),
+                Map.of(article.id(), article.nameIdentifier()),
+                article.type());
+    if (relations.isEmpty()) {
+      return article;
+    }
+    var owner = relations.get(0).targetEntity();
+    return article.toBuilder()
+        .withOwner(
+            new ArticleTerms.DirectOwner(owner.name(), Owner.Type.valueOf(owner.type().name())))
+        .build();
   }
 
   private void requireEdit(String metalake, KnowledgeBaseArticleEntity article) {

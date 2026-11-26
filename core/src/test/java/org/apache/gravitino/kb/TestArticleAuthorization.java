@@ -256,6 +256,48 @@ class TestArticleAuthorization extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void metadataProjectsTheCurrentOwnerOnCreateLoadAndEdit() throws Exception {
+    var created =
+        as("writer", () -> manager.createArticle(LAKE, article("guide", ArticleStatus.PUBLISHED)));
+    assertEquals("writer", created.article().owner().name());
+    assertEquals(Owner.Type.USER, created.article().owner().type());
+    backend.insert(
+        createGroupEntity(
+            ids.incrementAndGet(),
+            AuthorizationUtils.ofGroupNamespace(LAKE),
+            "editors",
+            AUDIT_INFO,
+            List.of(),
+            List.of()),
+        false);
+    as(
+        "writer",
+        () -> {
+          owners.setOwner(
+              LAKE,
+              MetadataObjects.of(null, "guide", MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE),
+              "editors",
+              Owner.Type.GROUP);
+          return null;
+        });
+    var loaded = as("viewer", () -> manager.loadArticle(LAKE, "guide"));
+    assertEquals("editors", loaded.article().owner().name());
+    assertEquals(Owner.Type.GROUP, loaded.article().owner().type());
+    assertEquals(created.revisionToken(), loaded.revisionToken());
+    var edited =
+        as(
+            "admin",
+            () ->
+                manager.alterArticle(
+                    LAKE,
+                    "guide",
+                    loaded.revisionToken(),
+                    KnowledgeBaseArticleChange.updateTitle("Updated guide")));
+    assertEquals("editors", edited.article().owner().name());
+    assertEquals(Owner.Type.GROUP, edited.article().owner().type());
+  }
+
+  @TestTemplate
   void transferUsesCurrentUserOrGroupAndPreservesRevision() throws Exception {
     var draft =
         as("writer", () -> manager.createArticle(LAKE, article("draft", ArticleStatus.DRAFT)));

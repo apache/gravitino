@@ -34,6 +34,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.meta.AuditInfo;
 
 /**
@@ -46,6 +47,7 @@ import org.apache.gravitino.meta.AuditInfo;
     exclude = {
       "auditInfo",
       "bodyUpdate",
+      "owner",
       "domains",
       "terms",
       "termsHasMore",
@@ -110,6 +112,9 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
   @Nullable private final String sourceReference;
   private final Map<String, String> properties;
   private final long revision;
+  /** Direct owner resolved in the same snapshot as the Article metadata. */
+  @Nullable private final Owner owner;
+
   private final Set<Long> domainIds;
   /** Current Domain names visible to the caller in manager results. */
   private final List<String> domains;
@@ -140,6 +145,7 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
       @Nullable String sourceReference,
       Map<String, String> properties,
       long revision,
+      @Nullable Owner owner,
       Set<Long> domainIds,
       List<String> domains,
       List<ArticleTermBinding> terms,
@@ -167,6 +173,7 @@ public final class KnowledgeBaseArticleEntity implements Entity, HasIdentifier, 
     this.properties = properties == null ? Map.of() : Map.copyOf(properties);
     Preconditions.checkArgument(revision >= 0, "Negative revision");
     this.revision = revision == 0 ? 1 : revision;
+    this.owner = owner;
     this.domainIds = domainIds == null ? Set.of() : Set.copyOf(domainIds);
     this.domains = domains == null ? List.of() : List.copyOf(domains);
     this.terms = terms == null ? List.of() : List.copyOf(terms);

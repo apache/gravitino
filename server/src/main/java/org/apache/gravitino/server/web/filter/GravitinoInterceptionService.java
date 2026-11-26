@@ -61,6 +61,7 @@ import org.apache.gravitino.server.authorization.annotations.ExpressionCondition
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizationExecutor;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutorFactory;
+import org.apache.gravitino.server.web.rest.ArticleOperations;
 import org.apache.gravitino.server.web.rest.BulkOperations;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.apache.gravitino.server.web.rest.DomainMembershipOperations;
@@ -139,6 +140,7 @@ public class GravitinoInterceptionService implements InterceptionService {
             TagOperations.class.getName(),
             DomainOperations.class.getName(),
             TermOperations.class.getName(),
+            ArticleOperations.class.getName(),
             DomainMembershipOperations.class.getName(),
             MetadataObjectDomainOperations.class.getName(),
             PolicyOperations.class.getName(),
