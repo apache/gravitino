@@ -41,7 +41,13 @@ public final class TermBindingDTO {
   @Nullable
   private final String metric;
 
-  /** Creates the wire representation of a metadata object or metric binding. */
+  /**
+   * Creates the wire representation of a metadata object or metric binding.
+   *
+   * @param kind The relationship between the term and its target.
+   * @param object The bound metadata object, or the containing semantic model for a metric.
+   * @param metric The metric name for a metric binding, or {@code null} for an object binding.
+   */
   @JsonCreator
   public TermBindingDTO(
       @JsonProperty("kind") TermBinding.Kind kind,
@@ -52,17 +58,23 @@ public final class TermBindingDTO {
     this.metric = metric;
   }
 
-  /** Returns the relationship of the term to the object. */
+  /**
+   * @return The relationship between the term and its target.
+   */
   public TermBinding.Kind getKind() {
     return kind;
   }
 
-  /** Returns the bound object, or the containing semantic model for a metric. */
+  /**
+   * @return The bound metadata object, or the containing semantic model for a metric.
+   */
   public MetadataObjectDTO getObject() {
     return object;
   }
 
-  /** Returns the metric name for a metric binding. */
+  /**
+   * @return The metric name for a metric binding, or {@code null} for an object binding.
+   */
   @Nullable
   public String getMetric() {
     return metric;

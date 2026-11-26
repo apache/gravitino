@@ -59,13 +59,17 @@ public class TermsAssociateRequest implements RESTRequest {
     this(null, null);
   }
 
-  /** Returns the supplied term names to bind, if present. */
+  /**
+   * @return The term names to bind, or {@code null} if omitted.
+   */
   @Nullable
   public String[] getTermsToAdd() {
     return termsToAdd == null ? null : termsToAdd.clone();
   }
 
-  /** Returns the supplied term names to unbind, if present. */
+  /**
+   * @return The term names to unbind, or {@code null} if omitted.
+   */
   @Nullable
   public String[] getTermsToRemove() {
     return termsToRemove == null ? null : termsToRemove.clone();

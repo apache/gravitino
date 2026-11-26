@@ -30,14 +30,20 @@ public class TermBindingListResponse extends BaseResponse {
   /** Creates an empty response for deserialization. */
   public TermBindingListResponse() {}
 
-  /** Creates a response containing all matching bindings. */
+  /**
+   * Creates a response containing all matching bindings.
+   *
+   * @param bindings The visible bindings in target order.
+   */
   public TermBindingListResponse(TermBindingDTO[] bindings) {
     super(0);
     Preconditions.checkArgument(bindings != null, "bindings must not be null");
     this.bindings = bindings.clone();
   }
 
-  /** Returns the authorized bindings. */
+  /**
+   * @return A copy of the visible bindings, or {@code null} if unset.
+   */
   public TermBindingDTO[] getBindings() {
     return bindings == null ? null : bindings.clone();
   }

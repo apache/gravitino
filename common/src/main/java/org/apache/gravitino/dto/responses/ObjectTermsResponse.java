@@ -34,7 +34,12 @@ public class ObjectTermsResponse extends TermListResponse {
     private final String name;
     private final List<TermDTO> terms;
 
-    /** Creates a named child with its visible terms. */
+    /**
+     * Creates a named child with its visible terms.
+     *
+     * @param name The column or metric name.
+     * @param terms The non-empty list of visible terms bound to this child.
+     */
     @JsonCreator
     public Child(@JsonProperty("name") String name, @JsonProperty("terms") List<TermDTO> terms) {
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "Child name must not be blank");
@@ -44,12 +49,16 @@ public class ObjectTermsResponse extends TermListResponse {
       this.terms = ImmutableList.copyOf(terms);
     }
 
-    /** Returns the column or metric name. */
+    /**
+     * @return The column or metric name.
+     */
     public String getName() {
       return name;
     }
 
-    /** Returns the visible terms bound to this child. */
+    /**
+     * @return The visible terms bound to this child.
+     */
     public List<TermDTO> getTerms() {
       return terms;
     }
@@ -61,13 +70,20 @@ public class ObjectTermsResponse extends TermListResponse {
   /** Creates an empty response for deserialization. */
   public ObjectTermsResponse() {}
 
-  /** Creates the direct and child term response. */
+  /**
+   * Creates the direct and child term response.
+   *
+   * @param terms The visible terms bound directly to the object.
+   * @param children The requested children with visible matching terms.
+   */
   public ObjectTermsResponse(TermDTO[] terms, List<Child> children) {
     super(terms);
     this.children = ImmutableList.copyOf(children);
   }
 
-  /** Returns only children with visible matching terms. */
+  /**
+   * @return The children with visible matching terms, or {@code null} if unset.
+   */
   public List<Child> getChildren() {
     return children == null ? null : Collections.unmodifiableList(children);
   }
