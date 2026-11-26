@@ -1202,9 +1202,9 @@ public class TestKnowledgeBaseArticleMetaService extends TestJDBCBackend {
         KnowledgeBaseArticleMapper.class,
         mapper -> {
           mapper.deleteBindings(newer.id(), 20);
-          mapper.delete(newer.id(), 20);
+          mapper.delete(newer.id(), newer.revision(), 20);
           mapper.deleteBindings(older.id(), 10);
-          mapper.delete(older.id(), 10);
+          mapper.delete(older.id(), older.revision(), 10);
 
           assertEquals(1, mapper.purgeBindings(21, 1));
           assertEquals(0, mapper.purgeBindings(20, 1));

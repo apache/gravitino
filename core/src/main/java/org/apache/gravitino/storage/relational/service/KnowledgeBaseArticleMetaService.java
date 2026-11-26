@@ -388,9 +388,11 @@ public final class KnowledgeBaseArticleMetaService {
           }
           hook.beforeChange(old, null);
           long now = System.currentTimeMillis();
+          if (mapper.delete(row.getArticleId(), old.revision(), now) != 1) {
+            throw new ArticleRevisionConflictException("Article %s has changed", ident);
+          }
           mapper.deleteBindings(row.getArticleId(), now);
           changeMemberships(row, old.domainIds(), Set.of());
-          mapper.delete(row.getArticleId(), now);
           hook.onChange(old, null);
           return Optional.of(old);
         });

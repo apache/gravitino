@@ -195,9 +195,13 @@ public interface KnowledgeBaseArticleMapper {
       """)
   void unbind(@Param("id") long id, @Param("b") Binding binding, @Param("now") long now);
 
-  /** Retires the locked Article. */
-  @Update("UPDATE kb_article_meta SET deleted_at=#{now} WHERE article_id=#{id} AND deleted_at=0")
-  void delete(@Param("id") long id, @Param("now") long now);
+  /** Retires the live Article at the given revision and returns the number of rows updated. */
+  @Update(
+      """
+      UPDATE kb_article_meta SET deleted_at=#{now}
+      WHERE article_id=#{id} AND revision=#{revision} AND deleted_at=0
+      """)
+  int delete(@Param("id") long id, @Param("revision") long revision, @Param("now") long now);
 
   /** Retires all live bindings owned by an Article. */
   @Update(

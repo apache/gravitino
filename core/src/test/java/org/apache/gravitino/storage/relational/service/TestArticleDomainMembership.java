@@ -24,6 +24,7 @@ import static org.apache.gravitino.storage.relational.mapper.DomainMemberMapper.
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.sql.PreparedStatement;
@@ -43,6 +44,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyDomainException;
 import org.apache.gravitino.json.JsonUtils;
@@ -56,6 +58,7 @@ import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper;
 import org.apache.gravitino.storage.relational.mapper.DomainMemberMapper.Membership;
 import org.apache.gravitino.storage.relational.mapper.KnowledgeBaseArticleMapper;
 import org.apache.gravitino.storage.relational.po.KnowledgeBaseArticlePO;
+import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.TransactionHook;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -166,6 +169,38 @@ public class TestArticleDomainMembership extends TestJDBCBackend {
         0,
         SessionUtils.getWithoutCommit(DomainMemberMapper.class, m -> m.purge(Long.MAX_VALUE, 100))
             .intValue());
+  }
+
+  @TestTemplate
+  void testDeleteConflictsWhenBeforeChangeAddsDomain() throws IOException {
+    long lake = createAndInsertMakeLake("lake").id();
+    var domain = domain("lake", 20);
+    var original = article(Set.of());
+    var ident = original.nameIdentifier();
+    ARTICLES.insert(original, false);
+    TransactionHook hook =
+        new TransactionHook() {
+          @Override
+          public void beforeChange(
+              KnowledgeBaseArticleEntity before, KnowledgeBaseArticleEntity after) {
+            ARTICLES.update(
+                ident,
+                (KnowledgeBaseArticleEntity a) ->
+                    a.toBuilder().withDomainIds(Set.of(domain.id())).build());
+          }
+
+          @Override
+          public void onChange(
+              KnowledgeBaseArticleEntity before, KnowledgeBaseArticleEntity after) {
+            fail("Deletion continued after the Article revision changed");
+          }
+        };
+
+    assertThrows(ArticleRevisionConflictException.class, () -> ARTICLES.delete(ident, hook));
+    assertThrows(ArticleRevisionConflictException.class, () -> ARTICLES.deleteAndGet(ident, hook));
+    assertEquals(original, ARTICLES.get(ident));
+    assertTrue(members(lake, domain.id()).isEmpty());
+    assertTrue(DomainMetaService.getInstance().deleteDomain(domain.nameIdentifier()));
   }
 
   @TestTemplate
