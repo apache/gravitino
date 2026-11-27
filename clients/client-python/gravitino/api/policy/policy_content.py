@@ -357,6 +357,7 @@ class AccessControlContent(PolicyContent):
             Privilege.Name.USE_MODEL,
             Privilege.Name.EXECUTE_FUNCTION,
             Privilege.Name.USE_SEMANTIC_MODEL,
+            Privilege.Name.USE_ONTOLOGY,
         }
     )
 
@@ -370,6 +371,7 @@ class AccessControlContent(PolicyContent):
         MetadataObject.Type.MODEL,
         MetadataObject.Type.FUNCTION,
         MetadataObject.Type.SEMANTIC_MODEL,
+        MetadataObject.Type.ONTOLOGY,
     }
 
     def __init__(

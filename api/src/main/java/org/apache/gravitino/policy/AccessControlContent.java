@@ -72,7 +72,8 @@ public final class AccessControlContent implements PolicyContent {
           Privilege.Name.PRODUCE_TOPIC,
           Privilege.Name.USE_MODEL,
           Privilege.Name.EXECUTE_FUNCTION,
-          Privilege.Name.USE_SEMANTIC_MODEL);
+          Privilege.Name.USE_SEMANTIC_MODEL,
+          Privilege.Name.USE_ONTOLOGY);
 
   // The object types a tag can be applied to, minus COLUMN, which no permitted privilege can be
   // scoped to. METALAKE is absent because a tag cannot be applied to a metalake.
@@ -86,7 +87,8 @@ public final class AccessControlContent implements PolicyContent {
           MetadataObject.Type.TOPIC,
           MetadataObject.Type.MODEL,
           MetadataObject.Type.FUNCTION,
-          MetadataObject.Type.SEMANTIC_MODEL);
+          MetadataObject.Type.SEMANTIC_MODEL,
+          MetadataObject.Type.ONTOLOGY);
 
   private final List<Privilege.Name> privileges;
   private final List<String> applicableRoles;

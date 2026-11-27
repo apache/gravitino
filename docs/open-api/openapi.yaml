@@ -168,6 +168,33 @@ paths:
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/{view}:
     $ref: "./views.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1views~1%7Bview%7D"
 
+  /metalakes/{metalake}/ontologies:
+    $ref: "./ontologies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1ontologies"
+
+  /metalakes/{metalake}/ontologies/ossie:
+    $ref: "./ontologies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1ontologies~1ossie"
+
+  /metalakes/{metalake}/ontologies/{ontology}:
+    $ref: "./ontologies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1ontologies~1%7Bontology%7D"
+
+  /metalakes/{metalake}/ontologies/{ontology}/ossie:
+    $ref: "./ontologies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1ontologies~1%7Bontology%7D~1ossie"
+
+  /metalakes/{metalake}/ontologies/{ontology}/mappings:
+    $ref: "./ontologies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1ontologies~1%7Bontology%7D~1mappings"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/{semanticModel}/ontology-mappings:
+    $ref: "./ontologies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1semantic-models~1%7BsemanticModel%7D~1ontology-mappings"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/{semanticModel}/ontology-mappings/ossie:
+    $ref: "./ontologies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1semantic-models~1%7BsemanticModel%7D~1ontology-mappings~1ossie"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/{semanticModel}/ontology-mappings/{mapping}:
+    $ref: "./ontologies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1semantic-models~1%7BsemanticModel%7D~1ontology-mappings~1%7Bmapping%7D"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/{semanticModel}/ontology-mappings/{mapping}/ossie:
+    $ref: "./ontologies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1semantic-models~1%7BsemanticModel%7D~1ontology-mappings~1%7Bmapping%7D~1ossie"
+
   /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/semantic-model-datasets:
     $ref: "./semantic-models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1semantic-model-datasets"
 
@@ -731,6 +758,7 @@ components:
           - "TABLE"
           - "VIEW"
           - "SEMANTIC_MODEL"
+          - "ONTOLOGY"
           - "COLUMN"
           - "FILESET"
           - "TOPIC"

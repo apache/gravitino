@@ -34,6 +34,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsDomainOperations;
+import org.apache.gravitino.SupportsOntologyIdLookup;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.SupportsTableIdLookup;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -45,7 +46,11 @@ import org.apache.gravitino.semantic.SemanticModelRevisionSelector;
 
 /** Interface defining the operations for a Relation Backend. */
 public interface RelationalBackend
-    extends Closeable, SupportsRelationOperations, SupportsDomainOperations, SupportsTableIdLookup {
+    extends Closeable,
+        SupportsRelationOperations,
+        SupportsDomainOperations,
+        SupportsTableIdLookup,
+        SupportsOntologyIdLookup {
 
   /**
    * Resolves a table ID, retaining full reads for backends without a lightweight implementation.
@@ -110,6 +115,20 @@ public interface RelationalBackend
       Function<SemanticModelEntity, SemanticModelEntity> updater)
       throws IOException {
     return update(ident, Entity.EntityType.SEMANTIC_MODEL, updater);
+  }
+
+  /**
+   * Resolves an ontology ID, retaining full reads for backends without a lightweight
+   * implementation.
+   *
+   * @param identifier the ontology identifier
+   * @return the active ontology ID
+   * @throws NoSuchEntityException if the ontology does not exist
+   * @throws IOException if the lookup fails
+   */
+  @Override
+  default long getOntologyId(NameIdentifier identifier) throws IOException {
+    return get(identifier, Entity.EntityType.ONTOLOGY).id();
   }
 
   /**

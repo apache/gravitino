@@ -26,9 +26,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsCatalogs;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
@@ -64,6 +66,10 @@ import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.SupportsJobs;
+import org.apache.gravitino.ontology.Ontology;
+import org.apache.gravitino.ontology.OntologyChange;
+import org.apache.gravitino.ontology.OntologyDefinition;
+import org.apache.gravitino.ontology.SupportsOntologies;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.policy.PolicyChange;
@@ -72,6 +78,8 @@ import org.apache.gravitino.policy.PolicyOperations;
 import org.apache.gravitino.policy.PolicyTagAssociation;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretReference;
+import org.apache.gravitino.semantic.OssieDocument;
+import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagOperations;
@@ -85,7 +93,7 @@ import org.apache.gravitino.tag.TagValueConstraint;
  * API.
  */
 public class GravitinoClient extends GravitinoClientBase
-    implements SupportsCatalogs, TagOperations, SupportsJobs, PolicyOperations {
+    implements SupportsCatalogs, TagOperations, SupportsJobs, PolicyOperations, SupportsOntologies {
 
   private final String metalakeName;
 
@@ -608,6 +616,58 @@ public class GravitinoClient extends GravitinoClientBase
   @Override
   public void testConnection(String catalogName, CatalogChange... changes) throws Exception {
     getMetalake().testConnection(catalogName, changes);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String[] listOntologies() {
+    return getMetalake().listOntologies();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Ontology loadOntology(String name) {
+    return getMetalake().loadOntology(name);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Ontology createOntology(
+      String name,
+      @Nullable String comment,
+      OntologyDefinition definition,
+      Map<String, String> properties) {
+    return getMetalake().createOntology(name, comment, definition, properties);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Ontology importOntology(OssieDocument document) {
+    return getMetalake().importOntology(document);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public OssieDocument exportOntology(String name, OssieFormat format) {
+    return getMetalake().exportOntology(name, format);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Ontology alterOntology(String name, OntologyChange... changes) {
+    return getMetalake().alterOntology(name, changes);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public boolean dropOntology(String name) {
+    return getMetalake().dropOntology(name);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public NameIdentifier[] listOntologyMappings(String name) {
+    return getMetalake().listOntologyMappings(name);
   }
 
   @Override

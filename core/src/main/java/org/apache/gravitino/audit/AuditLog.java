@@ -113,6 +113,7 @@ import org.apache.gravitino.listener.api.event.TestConnectionEvent;
 import org.apache.gravitino.listener.api.event.TestConnectionFailureEvent;
 import org.apache.gravitino.listener.api.event.domain.DomainEvent;
 import org.apache.gravitino.listener.api.event.domain.DomainFailureEvent;
+import org.apache.gravitino.listener.api.event.ontology.OntologyEvents;
 import org.apache.gravitino.listener.api.event.semantic.AlterSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.AlterSemanticModelFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.CreateSemanticModelEvent;
@@ -604,6 +605,36 @@ public interface AuditLog {
     EXPORT_SEMANTIC_MODEL,
     /** Publish a saved Semantic Model revision. */
     PUBLISH_SEMANTIC_MODEL_REVISION,
+    /** Create an ontology. */
+    CREATE_ONTOLOGY,
+    /** Load an ontology. */
+    LOAD_ONTOLOGY,
+    /** Alter an ontology. */
+    ALTER_ONTOLOGY,
+    /** Drop an ontology. */
+    DROP_ONTOLOGY,
+    /** List ontologies. */
+    LIST_ONTOLOGY,
+    /** Import an ontology. */
+    IMPORT_ONTOLOGY,
+    /** Export an ontology. */
+    EXPORT_ONTOLOGY,
+    /** Create a mapping. */
+    CREATE_ONTOLOGY_MAPPING,
+    /** Load a mapping. */
+    LOAD_ONTOLOGY_MAPPING,
+    /** Alter a mapping. */
+    ALTER_ONTOLOGY_MAPPING,
+    /** Drop a mapping. */
+    DROP_ONTOLOGY_MAPPING,
+    /** List mappings. */
+    LIST_ONTOLOGY_MAPPING,
+    /** Import a mapping. */
+    IMPORT_ONTOLOGY_MAPPING,
+    /** Export a mapping. */
+    EXPORT_ONTOLOGY_MAPPING,
+    /** List mappings of an ontology. */
+    LIST_MAPPINGS_BY_ONTOLOGY,
 
     REGISTER_FUNCTION,
 
@@ -622,7 +653,10 @@ public interface AuditLog {
     UNKNOWN_OPERATION;
 
     public static Operation fromEvent(Event event) {
-      if (event instanceof DomainEvent || event instanceof DomainFailureEvent) {
+      if (event instanceof DomainEvent
+          || event instanceof DomainFailureEvent
+          || event instanceof OntologyEvents.Success
+          || event instanceof OntologyEvents.Failure) {
         try {
           return Operation.valueOf(event.operationType().name());
         } catch (IllegalArgumentException e) {

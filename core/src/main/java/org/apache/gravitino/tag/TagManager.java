@@ -85,7 +85,8 @@ public class TagManager implements TagDispatcher {
           MetadataObject.Type.COLUMN,
           MetadataObject.Type.MODEL,
           MetadataObject.Type.FUNCTION,
-          MetadataObject.Type.SEMANTIC_MODEL);
+          MetadataObject.Type.SEMANTIC_MODEL,
+          MetadataObject.Type.ONTOLOGY);
 
   private final IdGenerator idGenerator;
 
@@ -490,7 +491,8 @@ public class TagManager implements TagDispatcher {
     // normalization first would fold quoted names again after their quotes have been removed.
     MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
     if (!SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS.contains(metadataObject.type())
-        || metadataObject.type() == MetadataObject.Type.CATALOG) {
+        || metadataObject.type() == MetadataObject.Type.CATALOG
+        || metadataObject.type() == MetadataObject.Type.ONTOLOGY) {
       return ident;
     }
 

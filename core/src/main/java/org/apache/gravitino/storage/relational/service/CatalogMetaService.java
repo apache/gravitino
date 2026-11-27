@@ -357,6 +357,7 @@ public class CatalogMetaService {
               SessionUtils.doWithoutCommit(
                   SemanticModelVersionInfoMapper.class,
                   mapper -> mapper.softDeleteSemanticModelVersionsByCatalogId(catalogId)),
+          () -> OntologyMetaService.getInstance().cascadeCatalog(catalogId),
           () ->
               SessionUtils.doWithoutCommit(
                   SemanticModelMetricMapper.class,

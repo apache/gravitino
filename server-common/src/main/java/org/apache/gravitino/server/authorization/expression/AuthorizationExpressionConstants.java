@@ -403,6 +403,22 @@ public class AuthorizationExpressionConstants {
   public static final String LOAD_GROUP_AUTHORIZATION_EXPRESSION =
       "METALAKE::OWNER || METALAKE::MANAGE_GROUPS || GROUP::SELF";
 
+  /** Permits the metalake owner or a principal granted ontology creation. */
+  public static final String CREATE_ONTOLOGY_AUTHORIZATION_EXPRESSION =
+      "METALAKE::OWNER || (METALAKE::CREATE_ONTOLOGY && !METALAKE::DENY_CREATE_ONTOLOGY)";
+
+  /** Permits ontology owners and principals with use or modify privileges. */
+  public static final String LOAD_ONTOLOGY_AUTHORIZATION_EXPRESSION =
+      "METALAKE::OWNER || ONTOLOGY::OWNER || ANY_USE_ONTOLOGY || ANY_MODIFY_ONTOLOGY";
+
+  /** Permits ontology owners and principals with modify privileges. */
+  public static final String MODIFY_ONTOLOGY_AUTHORIZATION_EXPRESSION =
+      "METALAKE::OWNER || ONTOLOGY::OWNER || ANY_MODIFY_ONTOLOGY";
+
+  /** Permits owners to drop an ontology. */
+  public static final String DROP_ONTOLOGY_AUTHORIZATION_EXPRESSION =
+      "METALAKE::OWNER || ONTOLOGY::OWNER";
+
   public static final String LOAD_TAG_AUTHORIZATION_EXPRESSION =
       "METALAKE::OWNER || TAG::OWNER || ANY_VIEW_TAG || ANY_APPLY_TAG";
 

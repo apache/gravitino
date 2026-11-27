@@ -231,6 +231,15 @@ class Privilege(ABC):
         USE_DOMAIN = (0, 1 << 43)
         """The privilege to discover published domains and their accessible members."""
 
+        CREATE_ONTOLOGY = (0, 1 << 44)
+        """The privilege to create ontologies in a metalake."""
+
+        USE_ONTOLOGY = (0, 1 << 45)
+        """The privilege to load and export ontologies and reference them from mappings."""
+
+        MODIFY_ONTOLOGY = (0, 1 << 46)
+        """The privilege to rename an ontology or alter its definition and metadata."""
+
         def __init__(self, high_bits: int, low_bits: int) -> None:
             """
             Initialize the Name with the high and low bits.
@@ -1945,6 +1954,90 @@ class UseDomain(GenericPrivilege):
         return obj_type in Privileges.DOMAIN_SUPPORTED_TYPES
 
 
+class CreateOntology(GenericPrivilege):
+    """The privilege to create ontologies."""
+
+    _ALLOW_INSTANCE: Optional[CreateOntology] = None
+    _DENY_INSTANCE: Optional[CreateOntology] = None
+
+    @staticmethod
+    def allow() -> CreateOntology:
+        """Return the privilege with the allow condition."""
+        if CreateOntology._ALLOW_INSTANCE is None:
+            CreateOntology._ALLOW_INSTANCE = CreateOntology(
+                Privilege.Condition.ALLOW, Privilege.Name.CREATE_ONTOLOGY
+            )
+        return CreateOntology._ALLOW_INSTANCE
+
+    @staticmethod
+    def deny() -> CreateOntology:
+        """Return the privilege with the deny condition."""
+        if CreateOntology._DENY_INSTANCE is None:
+            CreateOntology._DENY_INSTANCE = CreateOntology(
+                Privilege.Condition.DENY, Privilege.Name.CREATE_ONTOLOGY
+            )
+        return CreateOntology._DENY_INSTANCE
+
+    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
+        return obj_type is MetadataObject.Type.METALAKE
+
+
+class UseOntology(GenericPrivilege):
+    """The privilege to use ontologies."""
+
+    _ALLOW_INSTANCE: Optional[UseOntology] = None
+    _DENY_INSTANCE: Optional[UseOntology] = None
+
+    @staticmethod
+    def allow() -> UseOntology:
+        """Return the privilege with the allow condition."""
+        if UseOntology._ALLOW_INSTANCE is None:
+            UseOntology._ALLOW_INSTANCE = UseOntology(
+                Privilege.Condition.ALLOW, Privilege.Name.USE_ONTOLOGY
+            )
+        return UseOntology._ALLOW_INSTANCE
+
+    @staticmethod
+    def deny() -> UseOntology:
+        """Return the privilege with the deny condition."""
+        if UseOntology._DENY_INSTANCE is None:
+            UseOntology._DENY_INSTANCE = UseOntology(
+                Privilege.Condition.DENY, Privilege.Name.USE_ONTOLOGY
+            )
+        return UseOntology._DENY_INSTANCE
+
+    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
+        return obj_type in (MetadataObject.Type.METALAKE, MetadataObject.Type.ONTOLOGY)
+
+
+class ModifyOntology(GenericPrivilege):
+    """The privilege to modify ontologies."""
+
+    _ALLOW_INSTANCE: Optional[ModifyOntology] = None
+    _DENY_INSTANCE: Optional[ModifyOntology] = None
+
+    @staticmethod
+    def allow() -> ModifyOntology:
+        """Return the privilege with the allow condition."""
+        if ModifyOntology._ALLOW_INSTANCE is None:
+            ModifyOntology._ALLOW_INSTANCE = ModifyOntology(
+                Privilege.Condition.ALLOW, Privilege.Name.MODIFY_ONTOLOGY
+            )
+        return ModifyOntology._ALLOW_INSTANCE
+
+    @staticmethod
+    def deny() -> ModifyOntology:
+        """Return the privilege with the deny condition."""
+        if ModifyOntology._DENY_INSTANCE is None:
+            ModifyOntology._DENY_INSTANCE = ModifyOntology(
+                Privilege.Condition.DENY, Privilege.Name.MODIFY_ONTOLOGY
+            )
+        return ModifyOntology._DENY_INSTANCE
+
+    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
+        return obj_type in (MetadataObject.Type.METALAKE, MetadataObject.Type.ONTOLOGY)
+
+
 class Privileges:
     _PRIVILEGE_TYPES = {
         Privilege.Name.CREATE_CATALOG: CreateCatalog,
@@ -1988,6 +2081,9 @@ class Privileges:
         Privilege.Name.MODIFY_SEMANTIC_MODEL: ModifySemanticModel,
         Privilege.Name.MANAGE_DOMAIN: ManageDomain,
         Privilege.Name.USE_DOMAIN: UseDomain,
+        Privilege.Name.CREATE_ONTOLOGY: CreateOntology,
+        Privilege.Name.USE_ONTOLOGY: UseOntology,
+        Privilege.Name.MODIFY_ONTOLOGY: ModifyOntology,
         Privilege.Name.USE_SECRETS: UseSecrets,
         Privilege.Name.INCLUDE_CREDENTIAL_SECRETS: IncludeCredentialSecrets,
     }

@@ -39,6 +39,8 @@ import org.apache.gravitino.exceptions.FunctionAlreadyExistsException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalJobTemplateOperationException;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
+import org.apache.gravitino.exceptions.IllegalOntologyException;
+import org.apache.gravitino.exceptions.IllegalOntologyMappingException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
@@ -63,6 +65,8 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
+import org.apache.gravitino.exceptions.NoSuchOntologyException;
+import org.apache.gravitino.exceptions.NoSuchOntologyMappingException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
@@ -80,6 +84,9 @@ import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
+import org.apache.gravitino.exceptions.OntologyAlreadyExistsException;
+import org.apache.gravitino.exceptions.OntologyInUseException;
+import org.apache.gravitino.exceptions.OntologyMappingAlreadyExistsException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
@@ -327,6 +334,13 @@ public class ErrorHandlers {
    */
   public static Consumer<ErrorResponse> semanticModelErrorHandler() {
     return SemanticModelErrorHandler.INSTANCE;
+  }
+
+  /**
+   * @return A handler for ontology and mapping errors.
+   */
+  public static Consumer<ErrorResponse> ontologyErrorHandler() {
+    return OntologyErrorHandler.INSTANCE;
   }
 
   private ErrorHandlers() {}
@@ -1641,6 +1655,54 @@ public class ErrorHandlers {
 
         default:
           super.accept(errorResponse);
+      }
+    }
+  }
+
+  private static final class OntologyErrorHandler extends RestErrorHandler {
+    private static final OntologyErrorHandler INSTANCE = new OntologyErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse response) {
+      String message = formatErrorMessage(response);
+      switch (response.getType()) {
+        case "IllegalOntologyException":
+          throw new IllegalOntologyException("%s", message);
+        case "IllegalOntologyMappingException":
+          throw new IllegalOntologyMappingException("%s", message);
+        case "NoSuchOntologyException":
+          throw new NoSuchOntologyException("%s", message);
+        case "NoSuchOntologyMappingException":
+          throw new NoSuchOntologyMappingException("%s", message);
+        case "OntologyAlreadyExistsException":
+          throw new OntologyAlreadyExistsException("%s", message);
+        case "OntologyInUseException":
+          throw new OntologyInUseException("%s", message);
+        case "OntologyMappingAlreadyExistsException":
+          throw new OntologyMappingAlreadyExistsException("%s", message);
+        case "CatalogNotInUseException":
+          throw new CatalogNotInUseException("%s", message);
+        case "MetalakeNotInUseException":
+          throw new MetalakeNotInUseException("%s", message);
+        case "NoSuchSemanticModelException":
+          throw new NoSuchSemanticModelException("%s", message);
+        case "NoSuchMetalakeException":
+          throw new NoSuchMetalakeException("%s", message);
+        case "NoSuchCatalogException":
+          throw new NoSuchCatalogException("%s", message);
+        case "NoSuchSchemaException":
+          throw new NoSuchSchemaException("%s", message);
+        default:
+          switch (response.getCode()) {
+            case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+              throw new IllegalArgumentException(message);
+            case ErrorConstants.ALREADY_EXISTS_CODE:
+              throw new AlreadyExistsException("%s", message);
+            case ErrorConstants.NOT_FOUND_CODE:
+              throw new NotFoundException("%s", message);
+            default:
+              super.accept(response);
+          }
       }
     }
   }

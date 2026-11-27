@@ -306,7 +306,8 @@ public class TestPolicyContents {
             MetadataObject.Type.TOPIC,
             MetadataObject.Type.MODEL,
             MetadataObject.Type.FUNCTION,
-            MetadataObject.Type.SEMANTIC_MODEL),
+            MetadataObject.Type.SEMANTIC_MODEL,
+            MetadataObject.Type.ONTOLOGY),
         PolicyContents.accessControl(
                 Collections.singletonList(Privilege.Name.SELECT_TABLE),
                 Collections.singletonList("analyst"))

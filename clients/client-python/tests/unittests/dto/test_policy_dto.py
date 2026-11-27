@@ -110,14 +110,18 @@ class TestPolicyDTO(unittest.TestCase):
 
     def test_access_control_domain_conversion(self) -> None:
         dto = AccessControlContentDTO.from_dict(
-            {"privileges": ["select_table"], "applicableRoles": ["r1"]},
+            {"privileges": ["select_table", "use_ontology"], "applicableRoles": ["r1"]},
             infer_missing=True,
         )
         domain = dto.to_domain_content()
         self.assertEqual(
-            PolicyContents.access_control([Privilege.Name.SELECT_TABLE], ["r1"]),
+            PolicyContents.access_control(
+                [Privilege.Name.SELECT_TABLE, Privilege.Name.USE_ONTOLOGY], ["r1"]
+            ),
             domain,
         )
+        self.assertIn(MetadataObject.Type.ONTOLOGY, domain.supported_object_types())
+        self.assertEqual(domain.supported_object_types(), dto.supported_object_types())
         dto.validate()
         with self.assertRaises(IllegalArgumentException):
             AccessControlContentDTO.from_dict({}, infer_missing=True).validate()

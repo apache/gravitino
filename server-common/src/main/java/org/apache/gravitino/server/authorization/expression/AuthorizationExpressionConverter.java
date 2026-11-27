@@ -24,6 +24,7 @@ import static org.apache.gravitino.server.authorization.expression.Authorization
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_METALAKE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_MODEL_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_ONTOLOGY_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_ROLE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_SCHEMA_AUTHORIZATION_EXPRESSION;
@@ -191,6 +192,7 @@ public class AuthorizationExpressionConverter {
               ( entityType == 'COLUMN' && (%s)) ||
               ( entityType == 'FUNCTION' && (%s)) ||
               ( entityType == 'SEMANTIC_MODEL' && (%s)) ||
+              ( entityType == 'ONTOLOGY' && (%s)) ||
               ( entityType == 'DOMAIN' && (authorizer.canAccessDomain(principal,METALAKE_NAME,DOMAIN,authorizationContext))))
               """
             .formatted(
@@ -209,7 +211,8 @@ public class AuthorizationExpressionConverter {
                 LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION,
                 LOAD_TABLE_AUTHORIZATION_EXPRESSION,
                 LOAD_FUNCTION_AUTHORIZATION_EXPRESSION,
-                LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION));
+                LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION,
+                LOAD_ONTOLOGY_AUTHORIZATION_EXPRESSION));
   }
 
   /**
@@ -378,6 +381,16 @@ public class AuthorizationExpressionConverter {
                 + "&& !(ANY(DENY_WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET)))");
     expression =
         expression.replaceAll(
+            "ANY_MODIFY_ONTOLOGY",
+            "((ANY(MODIFY_ONTOLOGY, METALAKE, ONTOLOGY))"
+                + " && !(ANY(DENY_MODIFY_ONTOLOGY, METALAKE, ONTOLOGY)))");
+    expression =
+        expression.replaceAll(
+            "ANY_USE_ONTOLOGY",
+            "((ANY(USE_ONTOLOGY, METALAKE, ONTOLOGY))"
+                + " && !(ANY(DENY_USE_ONTOLOGY, METALAKE, ONTOLOGY)))");
+    expression =
+        expression.replaceAll(
             "ANY_VIEW_TAG",
             "((ANY(VIEW_TAG, METALAKE, TAG))" + " && !(ANY(DENY_VIEW_TAG, METALAKE, TAG)))");
     expression =
@@ -417,25 +430,27 @@ public class AuthorizationExpressionConverter {
    * @return the expression with supported privilege checks routed through the adapter
    */
   private static String replaceTagPrivilegeChecks(String expression) {
+    String schemaScopes = "METALAKE,CATALOG,SCHEMA,";
     for (Privilege.Name privilege : AccessControlContent.PERMITTED_PRIVILEGES) {
-      String target =
+      String scopes =
           switch (privilege) {
-            case SELECT_TABLE, MODIFY_TABLE -> "TABLE";
-            case PROBE_TABLE_LIKE -> "(TABLE != null ? TABLE : VIEW)";
-            case SELECT_VIEW -> "VIEW";
-            case READ_FILESET, WRITE_FILESET -> "FILESET";
-            case CONSUME_TOPIC, PRODUCE_TOPIC -> "TOPIC";
-            case USE_MODEL -> "MODEL";
-            case EXECUTE_FUNCTION -> "FUNCTION";
-            case USE_SEMANTIC_MODEL -> "SEMANTIC_MODEL";
+            case SELECT_TABLE, MODIFY_TABLE -> schemaScopes + "TABLE";
+            case PROBE_TABLE_LIKE -> schemaScopes + "(TABLE != null ? TABLE : VIEW)";
+            case SELECT_VIEW -> schemaScopes + "VIEW";
+            case READ_FILESET, WRITE_FILESET -> schemaScopes + "FILESET";
+            case CONSUME_TOPIC, PRODUCE_TOPIC -> schemaScopes + "TOPIC";
+            case USE_MODEL -> schemaScopes + "MODEL";
+            case EXECUTE_FUNCTION -> schemaScopes + "FUNCTION";
+            case USE_SEMANTIC_MODEL -> schemaScopes + "SEMANTIC_MODEL";
+            case USE_ONTOLOGY -> "METALAKE,ONTOLOGY";
             default -> throw new IllegalArgumentException(
                 "Missing tag privilege scope: " + privilege);
           };
       expression =
           expression.replace(
               "ANY_" + privilege.name(),
-              "tagAuthorization.authorize(principal,METALAKE_NAME,{METALAKE,CATALOG,SCHEMA,"
-                  + target
+              "tagAuthorization.authorize(principal,METALAKE_NAME,{"
+                  + scopes
                   + "},@org.apache.gravitino.authorization.Privilege$Name@"
                   + privilege.name()
                   + ",authorizationContext)");

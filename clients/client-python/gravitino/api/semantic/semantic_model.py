@@ -50,6 +50,12 @@ class SemanticModel(SemanticModelRevision):
         """Returns the Gravitino-specific Semantic Model properties."""
         return {}
 
+    def supports_ontology_mappings(self):
+        """Returns the mapping operations for this semantic model."""
+        raise UnsupportedOperationException(
+            "Semantic model does not support ontology mappings"
+        )
+
     def supports_tags(self) -> SupportsTags:
         """Return tag operations if the Semantic Model supports tags.
 

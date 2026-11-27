@@ -70,6 +70,7 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
       ImmutableSet.of(
           MetadataObject.Type.TAG,
           MetadataObject.Type.DOMAIN,
+          MetadataObject.Type.ONTOLOGY,
           MetadataObject.Type.POLICY,
           MetadataObject.Type.JOB,
           MetadataObject.Type.JOB_TEMPLATE);

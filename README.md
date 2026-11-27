@@ -113,28 +113,28 @@ See: [Using Trino with Gravitino](https://gravitino.apache.org/docs/latest/trino
 
 Gravitino uses Gradle. Windows is not currently supported.
 
-Clean build without tests:
+To build artifacts without running the Gradle test and check tasks, run
 
 ```bash
-./gradlew clean build -x test
+./gradlew clean build -x test -x check
 ```
 
 Build a distribution:
 
 ```bash
-./gradlew compileDistribution -x test
+./gradlew compileDistribution -x test -x check
 ```
 
 Skip building and packaging both Web UIs:
 
 ```bash
-./gradlew compileDistribution -PskipWebBuild=true -x test
+./gradlew compileDistribution -PskipWeb=true -x test -x check
 ```
 
 Or compressed package:
 
 ```bash
-./gradlew assembleDistribution -x test
+./gradlew assembleDistribution -x test -x check
 ```
 
 Artifacts are output to the `distribution/` directory.

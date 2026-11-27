@@ -24,6 +24,7 @@ from mcp_server.tools.job import load_job_tool
 from mcp_server.tools.metadata import load_metadata_tool
 from mcp_server.tools.metalake import load_metalake_tools
 from mcp_server.tools.model import load_model_tools
+from mcp_server.tools.ontology import load_ontology_tools
 from mcp_server.tools.partition import load_partition_tools
 from mcp_server.tools.policy import load_policy_tools
 from mcp_server.tools.schema import load_schema_tools
@@ -43,6 +44,7 @@ SUPPORTED_TOOL_TAGS = frozenset(
         "job",
         "metalake",
         "model",
+        "ontology",
         "partition",
         "policy",
         "schema",
@@ -64,6 +66,7 @@ def load_tools(mcp: FastMCP):
     load_table_tools(mcp)
     load_topic_tools(mcp)
     load_model_tools(mcp)
+    load_ontology_tools(mcp)
     load_fileset_tools(mcp)
     load_tag_tool(mcp)
     load_metadata_tool(mcp)

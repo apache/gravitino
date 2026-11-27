@@ -35,6 +35,7 @@ import org.apache.gravitino.storage.relational.service.GroupMetaService;
 import org.apache.gravitino.storage.relational.service.JobTemplateMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.ModelMetaService;
+import org.apache.gravitino.storage.relational.service.OntologyMetaService;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
@@ -58,7 +59,8 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
           Entity.EntityType.POLICY,
           Entity.EntityType.JOB,
           Entity.EntityType.JOB_TEMPLATE,
-          Entity.EntityType.DOMAIN);
+          Entity.EntityType.DOMAIN,
+          Entity.EntityType.ONTOLOGY);
 
   private static final Set<Entity.EntityType> ENTITY_TYPES_REQUIRING_CATALOG_IDS =
       ImmutableSet.of(Entity.EntityType.CATALOG);
@@ -160,6 +162,10 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
             JobTemplateMetaService.getInstance()
                 .getJobTemplateIdByMetalakeIdAndName(metalakeId, nameIdentifier.name());
         return new NamespacedEntityId(jobTemplateId, metalakeId);
+
+      case ONTOLOGY:
+        return new NamespacedEntityId(
+            OntologyMetaService.getInstance().getId(metalakeId, nameIdentifier.name()), metalakeId);
 
       case DOMAIN:
         long domainId =
