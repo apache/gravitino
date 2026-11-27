@@ -302,7 +302,8 @@ class TestArticleManager extends TestJDBCBackend {
     createAndInsertMakeLake(LAKE);
     var sibling = manager.createArticle(LAKE, request().withName("sibling").build());
     var duplicate =
-        new ArticleEdits(1024).create(LAKE, ids.incrementAndGet(), "sibling", request().build());
+        new ArticleEdits(1024)
+            .create(LAKE, ids.incrementAndGet(), "sibling", request().build(), Set.of());
     AtomicLong calls = new AtomicLong();
     var guarded =
         new ArticleManager(
