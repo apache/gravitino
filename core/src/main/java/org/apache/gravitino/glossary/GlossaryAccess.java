@@ -113,6 +113,19 @@ public final class GlossaryAccess {
     return !unrestricted;
   }
 
+  /**
+   * Refreshes the domain scopes while retaining ownership already checked under this term's lock.
+   */
+  GlossaryAccess forLockedTerm(long termId) {
+    GlossaryAccess fresh =
+        new GlossaryAccess(authorizer, principal, metalake, new AuthorizationRequestContext());
+    Boolean owner = ownedTerms.get(termId);
+    if (owner != null) {
+      fresh.ownedTerms.put(termId, owner);
+    }
+    return fresh;
+  }
+
   GlossaryTermEntity publishedTerm(long id, Supplier<GlossaryTermEntity> load) {
     return publishedTerms.computeIfAbsent(id, ignored -> load.get());
   }

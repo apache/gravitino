@@ -1445,6 +1445,42 @@ class TestGlossaryDomains extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testEditRechecksInheritedGrantWhenTheMemberDomainMoves() throws Exception {
+    domainRole("salesCreate", "Sales", Privileges.CreateDefinition.allow());
+    user("salesAuthor", "salesCreate", "useSales");
+    GlossaryTermEntity term =
+        as(
+            "salesAuthor",
+            () ->
+                manager.createTerm(
+                    LAKE,
+                    TermSpec.builder("Regional")
+                        .withDomains("Retail")
+                        .withDefinition("original")
+                        .build()));
+    GravitinoAuthorizer observed =
+        Mockito.mock(GravitinoAuthorizer.class, AdditionalAnswers.delegatesTo(authorizer));
+    env.setGravitinoAuthorizer(observed);
+    // Move the member domain after the initial edit check resolves its parent, before its row lock.
+    Mockito.doAnswer(
+            call -> {
+              env.internalDomainDispatcher().attachDomain(LAKE, "Retail", "Finance");
+              return AdditionalAnswers.delegatesTo(authorizer).answer(call);
+            })
+        .when(observed)
+        .isGlossaryTermOwner(Mockito.any(), Mockito.eq(LAKE), Mockito.eq(term.id()), Mockito.any());
+    assertThrows(
+        NoSuchTermException.class,
+        () ->
+            as(
+                "salesAuthor",
+                () ->
+                    manager.alterTerm(LAKE, term.name(), TermChange.updateDefinition("changed"))));
+    assertEquals(
+        "original", as("lakeOwner", () -> manager.getTerm(LAKE, term.name())).definition());
+  }
+
+  @TestTemplate
   void testAlterResponseFollowsRenamedMemberWhenOldNameIsReused() throws Exception {
     GlossaryTermEntity before =
         as(

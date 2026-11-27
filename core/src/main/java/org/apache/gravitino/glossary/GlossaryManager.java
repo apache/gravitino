@@ -389,7 +389,7 @@ public final class GlossaryManager {
               true,
               ignored -> {},
               (fresh, plan) -> {
-                TermDomains domains = planDomains(lake, term, domainEdits, true);
+                TermDomains domains = planDomains(lake, term, domainEdits, access);
                 GlossaryTermEntity created =
                     domains.changed() ? TermEdits.withDomains(term, domains.names()) : term;
                 if (state == State.PUBLISHED && spec.status().isPresent()) {
@@ -1557,7 +1557,7 @@ public final class GlossaryManager {
                             locked,
                             content.toArray(new TermChange[0]),
                             plan,
-                            planDomains(lake, locked, domainEdits, false)),
+                            planDomains(lake, locked, domainEdits, access)),
                         access));
           },
           missing -> {
@@ -1576,7 +1576,7 @@ public final class GlossaryManager {
           TermDomains domains =
               domainEdits.isEmpty() && before.domains().length == 0
                   ? null
-                  : planDomains(lakeOf(ident), before, domainEdits, false);
+                  : planDomains(lakeOf(ident), before, domainEdits, access);
           return visibleDomains(
               applyChanges(
                   approval, ident, before, content.toArray(new TermChange[0]), null, domains),
@@ -2200,7 +2200,7 @@ public final class GlossaryManager {
    * locked. A missing domain and a hidden draft domain report the same error.
    */
   private TermDomains planDomains(
-      long lake, GlossaryTermEntity term, List<TermDomains.Edit> edits, boolean creating) {
+      long lake, GlossaryTermEntity term, List<TermDomains.Edit> edits, GlossaryAccess termAccess) {
     long termId = term.id();
     Set<Long> members = term.domains().length == 0 ? Set.of() : DOMAINS.domainIds(lake, termId);
     Set<String> requested = new HashSet<>();
@@ -2211,8 +2211,7 @@ public final class GlossaryManager {
       return new TermDomains(lake, termId, Map.of());
     }
     // Parent changes take the domain row lock. Recheck against the parents observed after locking.
-    GlossaryAccess access =
-        GlossaryAccess.forRequest(term.namespace().level(0), authorizationEnabled);
+    GlossaryAccess access = termAccess.forLockedTerm(termId);
     Map<String, DomainPO> targets = new HashMap<>();
     Map<Long, DomainPO> locked =
         DOMAINS.lockDomains(
@@ -2229,7 +2228,7 @@ public final class GlossaryManager {
       current.put(id, locked.get(id).domainName());
     }
     TermDomains plan = new TermDomains(lake, termId, current);
-    if (!creating && !members.isEmpty()) {
+    if (!members.isEmpty()) {
       requireEdit(access, term.nameIdentifier(), TermEdits.withDomains(term, plan.originalNames()));
     }
     for (TermDomains.Edit edit : edits) {
