@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-"""Opt-in wire checks for the glossary REST API. See the adjacent README."""
+"""Check glossary request types, successful response headers and missing-metalake errors."""
 
 import os
 from contextlib import contextmanager
@@ -27,11 +27,13 @@ import pytest
 V1_JSON = "application/vnd.gravitino.v1+json"
 
 
-@pytest.fixture(scope="module")
-def api():
+@pytest.fixture(scope="module", name="api")
+def rest_api():
     uri = os.environ.get("GRAVITINO_URI")
     if not uri:
-        pytest.fail("Set GRAVITINO_URI to a Gravitino test server with simple auth.")
+        pytest.skip(
+            "Set GRAVITINO_URI to a Gravitino test server with simple auth."
+        )
     with httpx.Client(
         base_url=uri.rstrip("/") + "/api/",
         auth=(os.environ.get("GRAVITINO_USER", "admin"), "dummy"),
@@ -43,7 +45,9 @@ def api():
 @contextmanager
 def temporary_metalake(api):
     name = "glossary_contract_" + uuid4().hex
-    api.post("metalakes", json={"name": name, "properties": {}}).raise_for_status()
+    api.post(
+        "metalakes", json={"name": name, "properties": {}}
+    ).raise_for_status()
     path = f"metalakes/{name}"
     try:
         yield path
@@ -53,8 +57,8 @@ def temporary_metalake(api):
         assert response.json()["dropped"] is True
 
 
-@pytest.fixture(scope="module")
-def lake(api):
+@pytest.fixture(scope="module", name="metalake_path")
+def existing_metalake(api):
     with temporary_metalake(api) as path:
         yield path
 
@@ -70,9 +74,11 @@ def lake(api):
     ],
     ids=["name", "definition", "synonyms", "properties", "source-ref"],
 )
-def test_create_rejects_non_string_fields(api, lake, fields, lookup_name):
-    response = api.post(f"{lake}/terms", json=fields)
-    lookup = api.get(f"{lake}/terms/{lookup_name}")
+def test_create_rejects_non_string_fields(
+    api, metalake_path, fields, lookup_name
+):
+    response = api.post(f"{metalake_path}/terms", json=fields)
+    lookup = api.get(f"{metalake_path}/terms/{lookup_name}")
     assert (response.status_code, lookup.status_code) == (400, 404)
 
 
@@ -85,12 +91,14 @@ def test_create_rejects_non_string_fields(api, lake, fields, lookup_name):
     ],
     ids=["definition", "synonym", "property"],
 )
-def test_alter_rejects_non_string_fields_without_writing(api, lake, edit):
+def test_alter_rejects_non_string_fields_without_writing(
+    api, metalake_path, edit
+):
     name = edit["@type"]
     api.post(
-        f"{lake}/terms", json={"name": name, "definition": "original"}
+        f"{metalake_path}/terms", json={"name": name, "definition": "original"}
     ).raise_for_status()
-    path = f"{lake}/terms/{name}"
+    path = f"{metalake_path}/terms/{name}"
     before = api.get(path).raise_for_status().json()["term"]
     response = api.put(path, json={"updates": [edit]})
     after = api.get(path).raise_for_status().json()["term"]
@@ -104,7 +112,11 @@ TERM_OPERATIONS = [
     pytest.param(
         "PUT",
         "terms/Wire",
-        {"updates": [{"@type": "updateDefinition", "newDefinition": "updated"}]},
+        {
+            "updates": [
+                {"@type": "updateDefinition", "newDefinition": "updated"}
+            ]
+        },
         id="alter",
     ),
     pytest.param("GET", "terms/Wire/hierarchy", None, id="hierarchy"),
@@ -121,11 +133,14 @@ def test_negotiates_v1_success_response(api, method, suffix, body):
             method, f"{path}/{suffix}", json=body, headers={"Accept": V1_JSON}
         )
         assert response.status_code == 200, response.text
-        assert response.headers["content-type"].split(";")[0].strip().lower() == V1_JSON
+        assert (
+            response.headers["content-type"].split(";")[0].strip().lower()
+            == V1_JSON
+        )
 
 
-@pytest.fixture(scope="module")
-def removed_metalake(api):
+@pytest.fixture(scope="module", name="removed_metalake")
+def former_metalake_path(api):
     with temporary_metalake(api) as path:
         api.post(f"{path}/terms", json={"name": "Wire"}).raise_for_status()
         missing_term = api.delete(f"{path}/terms/Absent")
@@ -138,7 +153,9 @@ def removed_metalake(api):
     "method,suffix,body",
     [
         *TERM_OPERATIONS,
-        pytest.param("GET", "objects/table/c.s.t/terms", None, id="object-list"),
+        pytest.param(
+            "GET", "objects/table/c.s.t/terms", None, id="object-list"
+        ),
         pytest.param(
             "POST",
             "objects/table/c.s.t/terms",
@@ -165,6 +182,8 @@ def test_removed_metalake_response(api, removed_metalake, method, suffix, body):
         "true": (403, "ForbiddenException"),
         "false": (404, "NoSuchMetalakeException"),
     }
-    assert mode in expected, "GRAVITINO_AUTHORIZATION_ENABLED must be true or false"
+    assert (
+        mode in expected
+    ), "GRAVITINO_AUTHORIZATION_ENABLED must be true or false"
     response = api.request(method, f"{removed_metalake}/{suffix}", json=body)
     assert (response.status_code, response.json().get("type")) == expected[mode]
