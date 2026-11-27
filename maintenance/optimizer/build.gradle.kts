@@ -125,7 +125,6 @@ tasks {
         "commons-cli-*.jar",
         "qlexpress4-*.jar"
       )
-      exclude("*-javadoc.jar", "*-sources.jar", "*-empty.jar", "*-tests.jar")
     }
     into("$rootDir/distribution/package/optimizer/libs")
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
