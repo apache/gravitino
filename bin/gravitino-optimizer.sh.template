@@ -126,20 +126,9 @@ add_jars_by_prefix "${GRAVITINO_HOME}/libs" \
   qlexpress4- \
   slf4j-api-
 
-# CLI-owned jars in optimizer/libs.
-add_jars_by_prefix "${GRAVITINO_HOME}/optimizer/libs" \
-  gravitino-optimizer-api- \
-  gravitino-updaters- \
-  commons-cli-
-# gravitino-optimizer-*.jar but not gravitino-optimizer-api-*.jar
+# All jars under optimizer/libs (the four CLI jars, plus any extension jars).
 if [ -d "${GRAVITINO_HOME}/optimizer/libs" ]; then
-  for jar in "${GRAVITINO_HOME}/optimizer/libs"/gravitino-optimizer-*.jar; do
-    [[ -f "${jar}" ]] || continue
-    case "$(basename "${jar}")" in
-      gravitino-optimizer-api-*) continue ;;
-    esac
-    GRAVITINO_CLASSPATH="${jar}:${GRAVITINO_CLASSPATH}"
-  done
+  addJarInDir "${GRAVITINO_HOME}/optimizer/libs"
   addDirToClasspath "${GRAVITINO_HOME}/optimizer/conf"
 fi
 
