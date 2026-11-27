@@ -171,4 +171,32 @@ public interface RoleMetaMapper {
   List<RolePO> listRolesWithPrivilegesByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType);
+  /**
+   * Reads roles and their direct privileges on a single resource in one statement.
+   *
+   * @param metadataObjectId the resource ID
+   * @param metadataObjectType the resource type
+   * @return the scoped role snapshots
+   */
+  @ResultMap("roleWithPrivileges")
+  @SelectProvider(
+      type = RoleMetaSQLProviderFactory.class,
+      method = "listRolesWithResourcePrivileges")
+  List<RolePO> listRolesWithResourcePrivileges(
+      @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType);
+  /**
+   * Advances the version and audit metadata of roles with matching observed versions.
+   *
+   * @param roles role snapshots containing the new audit metadata and observed versions
+   * @return the number of matching live roles
+   */
+  @UpdateProvider(type = RoleMetaSQLProviderFactory.class, method = "batchCompareAndSetPrivileges")
+  int batchCompareAndSetPrivileges(@Param("roles") List<RolePO> roles);
+
+  /** Reads complete role snapshots for the requested names in one statement. */
+  @ResultMap("roleWithPrivileges")
+  @SelectProvider(type = RoleMetaSQLProviderFactory.class, method = "listRolePrivilegeSnapshots")
+  List<RolePO> listRolePrivilegeSnapshots(
+      @Param("metalakeId") long metalakeId, @Param("names") List<String> names);
 }

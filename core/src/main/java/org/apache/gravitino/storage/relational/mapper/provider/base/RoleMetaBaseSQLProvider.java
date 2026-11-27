@@ -260,6 +260,19 @@ public class RoleMetaBaseSQLProvider {
     return withPrivileges(listRolesByMetadataObjectIdAndType(metadataObjectId, metadataObjectType));
   }
 
+  /**
+   * Returns role snapshots containing only direct privileges on the requested resource.
+   *
+   * @param metadataObjectId the resource ID
+   * @param metadataObjectType the resource type
+   * @return the scoped snapshot query
+   */
+  public String listRolesWithResourcePrivileges(Long metadataObjectId, String metadataObjectType) {
+    return withPrivileges(listRolesByMetadataObjectIdAndType(metadataObjectId, metadataObjectType))
+        + " AND p.metadata_object_id = #{metadataObjectId}"
+        + " AND p.type = #{metadataObjectType}";
+  }
+
   private String withPrivileges(String roleSql) {
     // Role overwrites replace their privilege rows. Resolve both from one statement snapshot,
     // including empty roles, rather than combining a root read with a later privilege read.
@@ -273,5 +286,51 @@ public class RoleMetaBaseSQLProvider {
         + SecurableObjectMapper.SECURABLE_OBJECT_TABLE_NAME
         + " p"
         + " ON r.roleId = p.role_id AND p.deleted_at = 0";
+  }
+  /**
+   * Builds a batch compare-and-set for role privilege changes. Callers must roll back if any role
+   * fails the version check.
+   *
+   * @param roles the observed role snapshots with updated audit information
+   * @return the batch update
+   */
+  public String batchCompareAndSetPrivileges(@Param("roles") List<RolePO> roles) {
+    return batchCompareAndSetPrivilegesSql(DatabaseTimeSQL.MYSQL);
+  }
+
+  /**
+   * Builds a batch update using the storage dialect's timestamp expression.
+   *
+   * @param databaseTime the SQL expression for the current database time
+   * @return the batch update
+   */
+  protected String batchCompareAndSetPrivilegesSql(String databaseTime) {
+    return "<script>UPDATE "
+        + ROLE_TABLE_NAME
+        + " SET audit_info = CASE role_id"
+        + " <foreach collection='roles' item='role'>"
+        + " WHEN #{role.roleId} THEN #{role.auditInfo}"
+        + " </foreach> END,"
+        + " last_version = current_version + 1, current_version = current_version + 1,"
+        + " updated_at = "
+        + databaseTime
+        + " WHERE deleted_at = 0 AND "
+        + " <foreach collection='roles' item='role' open='(' close=')' separator=' OR '>"
+        + " (role_id = #{role.roleId} AND current_version = #{role.currentVersion})"
+        + " </foreach></script>";
+  }
+
+  /** Returns SQL for reading the specified roles and their privileges. */
+  public String listRolePrivilegeSnapshots(long metalakeId, List<String> names) {
+    return "<script>"
+        + withPrivileges(
+            "SELECT role_id AS roleId, role_name AS roleName, metalake_id AS metalakeId,"
+                + " properties, audit_info AS auditInfo, current_version AS currentVersion,"
+                + " last_version AS lastVersion, deleted_at AS deletedAt FROM "
+                + ROLE_TABLE_NAME
+                + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0 AND role_name IN "
+                + "<foreach collection='names' item='name' open='(' close=')' separator=','>"
+                + "#{name}</foreach>")
+        + "</script>";
   }
 }

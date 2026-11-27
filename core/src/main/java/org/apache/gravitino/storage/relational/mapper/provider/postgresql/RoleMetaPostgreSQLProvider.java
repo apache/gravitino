@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE_TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.RoleMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.RolePO;
@@ -99,5 +100,10 @@ public class RoleMetaPostgreSQLProvider extends RoleMetaBaseSQLProvider {
         + " SET updated_at = "
         + DatabaseTimeSQL.POSTGRESQL
         + " WHERE role_id = #{roleId} AND deleted_at = 0";
+  }
+
+  @Override
+  public String batchCompareAndSetPrivileges(List<RolePO> roles) {
+    return batchCompareAndSetPrivilegesSql(DatabaseTimeSQL.POSTGRESQL);
   }
 }

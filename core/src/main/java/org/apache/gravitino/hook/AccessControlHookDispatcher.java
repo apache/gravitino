@@ -34,6 +34,7 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.PagedResult;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.PrivilegeBatchResult;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
@@ -306,6 +307,18 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   public String[] listRoleNamesByObject(String metalake, MetadataObject object)
       throws NoSuchMetalakeException, NoSuchMetadataObjectException {
     return dispatcher.listRoleNamesByObject(metalake, object);
+  }
+
+  @Override
+  public PrivilegeBatchResult batchChangePrivileges(
+      String metalake,
+      MetadataObject object,
+      Map<String, Set<Privilege>> privileges,
+      boolean grant) {
+    PrivilegeBatchResult result =
+        dispatcher.batchChangePrivileges(metalake, object, privileges, grant);
+    result.committed().keySet().forEach(role -> notifyRoleUserRelChange(metalake, role));
+    return result;
   }
 
   @Override

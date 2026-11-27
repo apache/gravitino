@@ -29,6 +29,7 @@ import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.PagedResult;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.PrivilegeBatchResult;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
@@ -711,6 +712,59 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   }
 
   /** {@inheritDoc} */
+  @Override
+  public PrivilegeBatchResult batchChangePrivileges(
+      String metalake,
+      MetadataObject object,
+      Map<String, Set<Privilege>> privileges,
+      boolean grant) {
+    String initiator = PrincipalUtils.getCurrentUserName();
+    privileges.forEach(
+        (role, requested) -> {
+          if (grant) {
+            eventBus.dispatchEvent(
+                new GrantPrivilegesPreEvent(initiator, metalake, role, object, requested));
+          } else {
+            eventBus.dispatchEvent(
+                new RevokePrivilegesPreEvent(initiator, metalake, role, object, requested));
+          }
+        });
+    PrivilegeBatchResult result =
+        dispatcher.batchChangePrivileges(metalake, object, privileges, grant);
+    result
+        .committed()
+        .forEach(
+            (role, state) -> {
+              if (grant) {
+                eventBus.dispatchEvent(
+                    new GrantPrivilegesEvent(
+                        initiator, metalake, new RoleInfo(state), privileges.get(role), object));
+              } else {
+                eventBus.dispatchEvent(
+                    new RevokePrivilegesEvent(
+                        initiator, metalake, new RoleInfo(state), object, privileges.get(role)));
+              }
+            });
+    result
+        .failures()
+        .forEach(
+            (role, error) -> {
+              if (result.committed().containsKey(role)) {
+                return;
+              }
+              if (grant) {
+                eventBus.dispatchEvent(
+                    new GrantPrivilegesFailureEvent(
+                        initiator, metalake, error, role, object, privileges.get(role)));
+              } else {
+                eventBus.dispatchEvent(
+                    new RevokePrivilegesFailureEvent(
+                        initiator, metalake, error, role, object, privileges.get(role)));
+              }
+            });
+    return result;
+  }
+
   @Override
   public Role grantPrivilegeToRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)

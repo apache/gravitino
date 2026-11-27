@@ -26,6 +26,7 @@ import java.util.Set;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.bulk.BulkItemResult;
@@ -42,6 +43,7 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
+import org.apache.gravitino.lock.TreeLock;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -416,6 +418,42 @@ public class AccessControlManager implements AccessControlDispatcher {
     NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
     return TreeLockUtils.doWithTreeLock(
         identifier, LockType.READ, () -> roleManager.listRoleNamesByObject(metalake, object));
+  }
+
+  /**
+   * Applies a resource privilege batch via relational storage.
+   *
+   * @param metalake the metalake
+   * @param object the affected resource
+   * @param privileges requested privileges by role
+   * @param grant whether to grant rather than revoke
+   * @return failures by role name
+   */
+  @Override
+  public PrivilegeBatchResult batchChangePrivileges(
+      String metalake,
+      MetadataObject object,
+      Map<String, Set<Privilege>> privileges,
+      boolean grant) {
+    List<String> roles = Lists.newArrayList(privileges.keySet());
+    roles.sort(String::compareTo);
+    List<TreeLock> locks = Lists.newArrayListWithCapacity(roles.size());
+    try {
+      // Use the single-role locks in a consistent order, including through plugin notification.
+      for (String role : roles) {
+        TreeLock lock =
+            GravitinoEnv.getInstance()
+                .lockManager()
+                .createTreeLock(AuthorizationUtils.ofRole(metalake, role));
+        lock.lock(LockType.WRITE);
+        locks.add(lock);
+      }
+      return PermissionManager.batchChangePrivileges(metalake, object, privileges, grant);
+    } finally {
+      for (int index = locks.size() - 1; index >= 0; index--) {
+        locks.get(index).unlock();
+      }
+    }
   }
 
   @Override

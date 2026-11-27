@@ -36,6 +36,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.ConcurrentModificationException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -84,6 +85,7 @@ import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.RolePO;
+import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -100,6 +102,70 @@ import org.mockito.Mockito;
 class TestRoleMetaService extends TestJDBCBackend {
 
   private static final String METALAKE_NAME = "metalake_for_role_test";
+
+  /** Verifies a stale role rolls back the complete batch and a fresh batch removes both grants. */
+  @TestTemplate
+  public void testResourcePrivilegeBatchRollsBackOnStaleRole() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "batch_privilege_catalog");
+    RoleMetaService service = RoleMetaService.getInstance();
+    for (String name : List.of("batch_role_one", "batch_role_two")) {
+      service.insertRole(
+          createRoleEntity(
+              RandomIdGenerator.INSTANCE.nextId(),
+              AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+              name,
+              AUDIT_INFO,
+              catalog.name()),
+          false);
+    }
+    NameIdentifier resource = catalog.nameIdentifier();
+    Entity.EntityType type = Entity.EntityType.CATALOG;
+    var identity = EntityIdService.getEntityIds(resource, type);
+    List<RolePO> snapshots =
+        SessionUtils.getWithoutCommitFresh(
+            RoleMetaMapper.class,
+            mapper -> mapper.listRolesWithResourcePrivileges(identity.entityId(), "CATALOG"));
+    assertEquals(2, snapshots.size());
+    List<SecurableObjectPO> removed = new ArrayList<>();
+    snapshots.forEach(role -> removed.addAll(role.requireSecurableObjectPOs()));
+    RolePO one = snapshots.get(0);
+    RolePO two = snapshots.get(1);
+    service.writeResourcePrivilegeBatch(
+        resource, type, identity, List.of(two), List.of(), List.of());
+    Assertions.assertThrows(
+        ConcurrentModificationException.class,
+        () ->
+            service.writeResourcePrivilegeBatch(
+                resource, type, identity, snapshots, removed, List.of()));
+    assertEquals(one.getCurrentVersion(), getRolePO(one.getRoleName()).getCurrentVersion());
+    assertEquals(2, service.listRolesWithResourcePrivileges(resource, type).size());
+
+    service.writeResourcePrivilegeBatch(
+        resource,
+        type,
+        identity,
+        List.of(getRolePO(one.getRoleName()), getRolePO(two.getRoleName())),
+        removed,
+        List.of());
+    assertTrue(service.listRolesWithResourcePrivileges(resource, type).isEmpty());
+    assertTrue(
+        service
+            .updateResourcePrivileges(
+                resource,
+                type,
+                Map.of(
+                    one.getRoleName(),
+                    role ->
+                        createRoleEntity(
+                            role.id(), role.namespace(), role.name(), AUDIT_INFO, catalog.name()),
+                    two.getRoleName(),
+                    role ->
+                        createRoleEntity(
+                            role.id(), role.namespace(), role.name(), AUDIT_INFO, catalog.name())))
+            .isEmpty());
+    assertEquals(2, service.listRolesWithResourcePrivileges(resource, type).size());
+  }
 
   /** Verifies privilege replacement locks its endpoint before deleting the old relation. */
   @TestTemplate

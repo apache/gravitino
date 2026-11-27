@@ -44,6 +44,21 @@ import org.apache.gravitino.exceptions.UserAlreadyExistsException;
  */
 public interface AccessControlDispatcher {
   /**
+   * Updates privileges for multiple roles on a metadata object.
+   *
+   * @param metalake the metalake name
+   * @param object the metadata object
+   * @param privileges the requested privileges by role
+   * @param grant true for grants, false for revocations
+   * @return committed role states and failures by role
+   */
+  PrivilegeBatchResult batchChangePrivileges(
+      String metalake,
+      MetadataObject object,
+      Map<String, Set<Privilege>> privileges,
+      boolean grant);
+
+  /**
    * Adds a new User.
    *
    * @param metalake The Metalake of the User.
