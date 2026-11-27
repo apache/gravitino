@@ -76,6 +76,12 @@ if [[ "$JVM_VERSION" -eq 17 ]]; then
   JAVA_OPTS+=" --add-opens java.security.jgss/sun.security.krb5=ALL-UNNAMED"
 fi
 
+# Shared server jars first, then optimizer-specific jars (prepended last so they
+# win on the classpath). optimizer/libs only ships the CLI module jars plus
+# commons-cli; everything else comes from ${GRAVITINO_HOME}/libs.
+if [ -d "${GRAVITINO_HOME}/libs" ]; then
+  addJarInDir "${GRAVITINO_HOME}/libs"
+fi
 if [ -d "${GRAVITINO_HOME}/optimizer/libs" ]; then
   addJarInDir "${GRAVITINO_HOME}/optimizer/libs"
   addDirToClasspath "${GRAVITINO_HOME}/optimizer/conf"

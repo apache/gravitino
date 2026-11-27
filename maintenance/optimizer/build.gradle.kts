@@ -112,9 +112,25 @@ tasks {
     finalizedBy(copyDepends)
   }
 
+  // Keep optimizer/libs lean: only CLI-owned jars. Shared deps (jackson, guava,
+  // gravitino-api/common/core/client, …) are loaded from ${GRAVITINO_HOME}/libs
+  // by bin/gravitino-optimizer.sh.
   register("copyLibs", Copy::class) {
     dependsOn(copyDepends, "build")
-    from("build/libs")
+    from("build/libs") {
+      include(
+        "gravitino-optimizer-*.jar",
+        "gravitino-optimizer-api-*.jar",
+        "gravitino-updaters-*.jar",
+        "commons-cli-*.jar"
+      )
+      exclude(
+        "*-tests.jar",
+        "*-sources.jar",
+        "*-javadoc.jar",
+        "*-empty.jar"
+      )
+    }
     into("$rootDir/distribution/package/optimizer/libs")
   }
 

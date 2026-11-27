@@ -112,6 +112,8 @@ Notes:
 
 - Build a JAR containing your classes and `META-INF/services` files.
 - Put the JAR on the runtime classpath, for example `${GRAVITINO_HOME}/optimizer/libs/`.
+  That directory holds optimizer-owned jars; `gravitino-optimizer.sh` also loads
+  shared dependencies from `${GRAVITINO_HOME}/libs/`.
 - Restart the process before testing.
 
 If you also extend Gravitino server job execution, see [Manage jobs in Gravitino](../manage-jobs-in-gravitino.md).
