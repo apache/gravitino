@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.junit.jupiter.api.Assertions;
@@ -32,6 +33,26 @@ import org.junit.jupiter.api.Test;
 
 /** Tests REST error handling for cross-cutting error codes. */
 public class TestErrorHandlers {
+
+  @Test
+  public void testPolicyErrorHandlerKeepsIllegalRoleException() {
+    Consumer<ErrorResponse> handler = ErrorHandlers.policyErrorHandler();
+
+    IllegalRoleException missingRole =
+        Assertions.assertThrows(
+            IllegalRoleException.class,
+            () ->
+                handler.accept(
+                    ErrorResponse.illegalArguments(
+                        IllegalRoleException.class.getSimpleName(), "no role analyst", null)));
+    Assertions.assertTrue(missingRole.getMessage().contains("no role analyst"));
+
+    IllegalArgumentException other =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> handler.accept(ErrorResponse.illegalArguments("bad content")));
+    Assertions.assertEquals(IllegalArgumentException.class, other.getClass());
+  }
 
   @Test
   @SuppressWarnings("unchecked")

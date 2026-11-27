@@ -17,7 +17,7 @@
 
 from gravitino.constants.error import ErrorConstants
 from gravitino.exceptions.base import (
-    IllegalArgumentException,
+    IllegalRoleException,
     MetalakeNotInUseException,
     NoSuchMetalakeException,
     NoSuchPolicyException,
@@ -31,7 +31,11 @@ class PolicyErrorHandler(CodeMappingErrorHandler):
     """Error handler specific to Policy operations."""
 
     _code_exception_map = {
-        ErrorConstants.ILLEGAL_ARGUMENTS_CODE: IllegalArgumentException,
+        # A policy naming a role that does not exist. Other types fall back to the
+        # generic IllegalArgumentException.
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE: {
+            IllegalRoleException.__name__: IllegalRoleException,
+        },
         ErrorConstants.NOT_FOUND_CODE: {
             NoSuchMetalakeException.__name__: NoSuchMetalakeException,
             NoSuchPolicyException.__name__: NoSuchPolicyException,
