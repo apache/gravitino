@@ -25,16 +25,21 @@ import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropert
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyPrefixEntry;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SCHEMA_REFRESH_MODE;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SESSION_INDEX_CACHE_SIZE_BYTES;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SESSION_METADATA_CACHE_SIZE_BYTES;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.lance.LanceTableOperations;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.lance.Session;
 
 public class GenericCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
 
@@ -44,6 +49,9 @@ public class GenericCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
    * once the catalog is created.
    */
   public static final String TABLE_LOCATION_PROVIDER = "table-location-provider";
+
+  /** Default index cache size in bytes for the catalog-scoped Lance session (128 MiB). */
+  public static final long DEFAULT_LANCE_SESSION_INDEX_CACHE_SIZE_BYTES = 128L * 1024 * 1024;
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
@@ -89,7 +97,19 @@ public class GenericCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 LanceTableOperations.SchemaRefreshMode.class,
                 LanceTableOperations.SchemaRefreshMode.DECLARED_AND_EMPTY,
                 false /* hidden */,
-                false /* reserved */));
+                false /* reserved */),
+            nonNegativeLongOptionalPropertyEntry(
+                LANCE_SESSION_METADATA_CACHE_SIZE_BYTES,
+                "The metadata cache size in bytes for the Lance session.",
+                false /* immutable */,
+                Session.DEFAULT_METADATA_CACHE_SIZE_BYTES,
+                false /* hidden */),
+            nonNegativeLongOptionalPropertyEntry(
+                LANCE_SESSION_INDEX_CACHE_SIZE_BYTES,
+                "The index cache size in bytes for the Lance session.",
+                false /* immutable */,
+                DEFAULT_LANCE_SESSION_INDEX_CACHE_SIZE_BYTES,
+                false /* hidden */));
 
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
   }
@@ -97,5 +117,45 @@ public class GenericCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
     return PROPERTIES_METADATA;
+  }
+
+  /**
+   * Parses a string property value as a non-negative {@code long}.
+   *
+   * @param propertyKey the property name, used in error messages
+   * @param propValue the raw string value
+   * @return the parsed non-negative value
+   * @throws IllegalArgumentException if {@code propValue} is blank, not a valid {@code long}, or
+   *     less than 0
+   */
+  public static long parseNonNegativeLong(String propertyKey, String propValue) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(propValue), "Property %s must not be null or blank", propertyKey);
+    try {
+      long parsed = Long.parseLong(propValue.trim());
+      Preconditions.checkArgument(
+          parsed >= 0,
+          "Property %s must be greater than or equal to 0, got %s",
+          propertyKey,
+          parsed);
+      return parsed;
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          String.format("Invalid long value '%s' for property %s", propValue, propertyKey), e);
+    }
+  }
+
+  private static PropertyEntry<Long> nonNegativeLongOptionalPropertyEntry(
+      String name, String description, boolean immutable, long defaultValue, boolean hidden) {
+    return new PropertyEntry.Builder<Long>()
+        .withName(name)
+        .withDescription(description)
+        .withImmutable(immutable)
+        .withJavaType(Long.class)
+        .withDefaultValue(defaultValue)
+        .withHidden(hidden)
+        .withDecoder(value -> parseNonNegativeLong(name, value))
+        .withEncoder(String::valueOf)
+        .build();
   }
 }

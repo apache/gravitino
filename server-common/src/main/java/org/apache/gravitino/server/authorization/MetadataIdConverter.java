@@ -166,6 +166,9 @@ public class MetadataIdConverter {
       if (entityType == Entity.EntityType.TABLE && entityStore instanceof SupportsTableIdLookup) {
         return Optional.of(((SupportsTableIdLookup) entityStore).getTableId(ident));
       }
+      if (entityType == Entity.EntityType.SEMANTIC_MODEL) {
+        return Optional.of(entityStore.getSemanticModelId(ident));
+      }
       entity = entityStore.get(ident, entityType, EntityClassMapper.getEntityClass(entityType));
     } catch (NoSuchEntityException e) {
       return Optional.empty();

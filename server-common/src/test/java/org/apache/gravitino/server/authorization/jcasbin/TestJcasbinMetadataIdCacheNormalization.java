@@ -137,6 +137,7 @@ public class TestJcasbinMetadataIdCacheNormalization {
               }
               return entity;
             });
+    when(store.getSemanticModelId(any())).thenCallRealMethod();
     env = mock(GravitinoEnv.class);
     when(env.entityStore()).thenReturn(store);
     when(env.catalogManager()).thenReturn(catalogs);

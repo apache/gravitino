@@ -173,6 +173,22 @@ public class TestRelationalEntityStore {
   }
 
   @Test
+  void testSemanticModelIdLookupUsesBackendIdentityLookup() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "model");
+    NameIdentifier missing = NameIdentifier.of("metalake", "catalog", "schema", "missing");
+    Mockito.when(backend.getSemanticModelId(ident)).thenReturn(7L);
+    Mockito.when(backend.getSemanticModelId(missing))
+        .thenThrow(new NoSuchEntityException("Missing Semantic Model"));
+
+    Assertions.assertEquals(7L, store.getSemanticModelId(ident));
+    Assertions.assertThrows(NoSuchEntityException.class, () -> store.getSemanticModelId(missing));
+    // A content read would miss a model with only drafts, so the lookup must not fall back to it.
+    Mockito.verify(backend).getSemanticModelId(ident);
+    Mockito.verify(backend).getSemanticModelId(missing);
+    Mockito.verifyNoMoreInteractions(backend);
+  }
+
+  @Test
   void testTableIdLookupAfterInvalidationReadsReplacementId() throws Exception {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
     TableEntity table = Mockito.mock(TableEntity.class);
