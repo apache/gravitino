@@ -44,6 +44,8 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.hive.HiveConstants;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
@@ -51,8 +53,10 @@ import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -276,6 +280,102 @@ public class AuthorizationUtils {
     }
   }
 
+  public static void callAuthorizationPluginForMetalake(
+      String metalake, Consumer<AuthorizationPlugin> consumer) {
+    CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
+    if (catalogManager == null) {
+      return;
+    }
+    NameIdentifier[] catalogIdents = catalogManager.listCatalogs(Namespace.of(metalake));
+    if (catalogIdents == null) {
+      return;
+    }
+    org.apache.gravitino.EntityStore store = GravitinoEnv.getInstance().entityStore();
+    for (NameIdentifier catalogIdent : catalogIdents) {
+      if (store != null && !isCatalogInUseInStore(store, catalogIdent)) {
+        continue;
+      }
+      catalogManager.doWithCatalog(
+          catalogIdent,
+          catalog -> {
+            if (catalog.entity() != null && (!catalog.metalakeInUse() || !catalog.catalogInUse())) {
+              return null;
+            }
+            AuthorizationPlugin authorizationPlugin = catalog.getAuthorizationPlugin();
+            if (authorizationPlugin != null) {
+              consumer.accept(authorizationPlugin);
+            }
+            return null;
+          });
+    }
+  }
+
+  public static boolean isMetalakeInUse(NameIdentifier catalogIdent) {
+    org.apache.gravitino.EntityStore store = GravitinoEnv.getInstance().entityStore();
+    if (store == null) {
+      return true;
+    }
+    try {
+      CatalogEntity catalogEntity =
+          store.get(catalogIdent, Entity.EntityType.CATALOG, CatalogEntity.class);
+      if (catalogEntity.getProperties() == null) {
+        return true;
+      }
+      return Boolean.parseBoolean(
+          catalogEntity
+              .getProperties()
+              .getOrDefault(BaseCatalogPropertiesMetadata.PROPERTY_METALAKE_IN_USE, "true"));
+    } catch (NoSuchEntityException e) {
+      return true;
+    } catch (Exception e) {
+      LOG.warn("Failed to inspect metalake in-use state for {}", catalogIdent, e);
+      return true;
+    }
+  }
+
+  public static boolean isCatalogInUse(NameIdentifier catalogIdent) {
+    org.apache.gravitino.EntityStore store = GravitinoEnv.getInstance().entityStore();
+    if (store == null) {
+      return false;
+    }
+    try {
+      CatalogEntity catalogEntity =
+          store.get(catalogIdent, Entity.EntityType.CATALOG, CatalogEntity.class);
+      if (catalogEntity.getProperties() == null) {
+        return true;
+      }
+      return Boolean.parseBoolean(
+          catalogEntity.getProperties().getOrDefault(Catalog.PROPERTY_IN_USE, "true"));
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private static boolean isCatalogInUseInStore(
+      org.apache.gravitino.EntityStore store, NameIdentifier catalogIdent) {
+    try {
+      CatalogEntity catalogEntity =
+          store.get(catalogIdent, Entity.EntityType.CATALOG, CatalogEntity.class);
+      if (catalogEntity.getProperties() == null) {
+        return true;
+      }
+      boolean catalogInUse =
+          Boolean.parseBoolean(
+              catalogEntity.getProperties().getOrDefault(Catalog.PROPERTY_IN_USE, "true"));
+      boolean metalakeInUse =
+          Boolean.parseBoolean(
+              catalogEntity
+                  .getProperties()
+                  .getOrDefault(BaseCatalogPropertiesMetadata.PROPERTY_METALAKE_IN_USE, "true"));
+      return catalogInUse && metalakeInUse;
+    } catch (NoSuchEntityException e) {
+      return true;
+    } catch (Exception e) {
+      LOG.warn("Failed to inspect catalog in-use state for {}", catalogIdent, e);
+      return true;
+    }
+  }
+
   public static boolean needApplyAuthorizationPluginAllCatalogs(SecurableObject securableObject) {
     if (securableObject.type() == MetadataObject.Type.METALAKE) {
       List<Privilege> privileges = securableObject.privileges();
@@ -400,14 +500,33 @@ public class AuthorizationUtils {
    */
   public static void removeCatalogPrivileges(NameIdentifier catalogIdent, List<String> locations) {
     callAuthorizationPluginImpl(
-        (authorizationPlugin, catalogName) -> {
-          MetadataObject metadataObject =
-              MetadataObjects.of(null, catalogName, MetadataObject.Type.CATALOG);
-          authorizationPlugin.onMetadataUpdated(
-              MetadataObjectChange.remove(metadataObject, locations));
-        },
+        (authorizationPlugin, catalogName) ->
+            removeCatalogPrivileges(authorizationPlugin, catalogName, locations),
         GravitinoEnv.getInstance().catalogManager(),
         catalogIdent);
+  }
+
+  /**
+   * Removes catalog privileges directly from an already-leased live {@link BaseCatalog} instance.
+   *
+   * @param catalog the leased catalog whose authorization plugin should be notified
+   * @param locations the catalog storage locations
+   */
+  public static void removeCatalogPrivileges(BaseCatalog<?> catalog, List<String> locations) {
+    if (catalog == null) {
+      return;
+    }
+    AuthorizationPlugin authorizationPlugin = catalog.getAuthorizationPlugin();
+    if (authorizationPlugin != null) {
+      removeCatalogPrivileges(authorizationPlugin, catalog.name(), locations);
+    }
+  }
+
+  private static void removeCatalogPrivileges(
+      AuthorizationPlugin authorizationPlugin, String catalogName, List<String> locations) {
+    MetadataObject metadataObject =
+        MetadataObjects.of(null, catalogName, MetadataObject.Type.CATALOG);
+    authorizationPlugin.onMetadataUpdated(MetadataObjectChange.remove(metadataObject, locations));
   }
 
   public static void authorizationPluginRenamePrivileges(

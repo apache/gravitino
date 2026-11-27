@@ -2070,8 +2070,12 @@ public class TestCatalogManager {
             .build());
 
     manager.disableCatalog(ident);
+    AtomicBoolean beforeDropCalled = new AtomicBoolean(false);
     Assertions.assertThrows(
-        NonEmptyCatalogException.class, () -> manager.dropCatalog(ident, false));
+        NonEmptyCatalogException.class,
+        () -> manager.dropCatalog(ident, false, catalog -> beforeDropCalled.set(true)));
+    Assertions.assertFalse(
+        beforeDropCalled.get(), "beforeDropHook must not run when dropCatalog preconditions fail");
 
     // The operations built while checking schemas for the refused drop must not be reused by
     // later calls on the disabled catalog.

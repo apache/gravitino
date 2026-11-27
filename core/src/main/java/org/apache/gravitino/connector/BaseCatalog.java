@@ -356,6 +356,57 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     return Boolean.parseBoolean(catalogInUseStr);
   }
 
+  public boolean metalakeInUse() {
+    Map<String, String> catalogProperties = entity().getProperties();
+    if (catalogProperties == null) {
+      return true;
+    }
+    return Boolean.parseBoolean(catalogProperties.getOrDefault(PROPERTY_METALAKE_IN_USE, "true"));
+  }
+
+  /**
+   * Validates the catalog's configured authorization provider properties using the supplied
+   * isolated classloader without instantiating external client connections.
+   *
+   * @param classLoader the catalog isolated classloader
+   * @param configuration the proposed complete catalog configuration
+   * @throws IllegalArgumentException if any authorization configuration property is invalid
+   */
+  public void validateAuthorizationConfiguration(
+      IsolatedClassLoader classLoader, @Nullable Map<String, String> configuration) {
+    if (configuration == null || classLoader == null) {
+      return;
+    }
+    String authorizationProvider =
+        (String) catalogPropertiesMetadata().getOrDefault(configuration, AUTHORIZATION_PROVIDER);
+    if (authorizationProvider == null) {
+      return;
+    }
+
+    Map<String, String> authorizationConfig = Maps.newHashMap(configuration);
+    if (entity != null && entity.id() != null) {
+      authorizationConfig.put(BaseAuthorization.CATALOG_ID, String.valueOf(entity.id()));
+    }
+    String metalake =
+        entity != null && entity.namespace() != null && entity.namespace().length() > 0
+            ? entity.namespace().level(0)
+            : null;
+    try (BaseAuthorization<?> authorization =
+        BaseAuthorization.createAuthorization(classLoader, authorizationProvider)) {
+      classLoader.withClassLoader(
+          cl -> {
+            authorization.validateProperties(metalake, provider(), authorizationConfig);
+            return null;
+          },
+          IllegalArgumentException.class);
+    } catch (IllegalArgumentException e) {
+      throw e;
+    } catch (Exception e) {
+      LOG.error("Failed to validate authorization configuration for catalog", e);
+      throw new RuntimeException(e);
+    }
+  }
+
   /**
    * Returns the authorization plugin configured for this catalog.
    *
@@ -408,6 +459,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
                         authorization.newPlugin(
                             entity.namespace().level(0), provider(), authorizationConfig));
 
+          } catch (IllegalArgumentException e) {
+            throw e;
           } catch (Exception e) {
             LOG.error("Failed to load authorization with class loader", e);
             throw new RuntimeException(e);

@@ -64,6 +64,18 @@ public abstract class BaseAuthorization<T extends BaseAuthorization>
   public abstract AuthorizationPlugin newPlugin(
       String metalake, String catalogProvider, Map<String, String> config);
 
+  /**
+   * Validates authorization configuration before catalog creation or alteration is persisted,
+   * without opening external service connections.
+   *
+   * @param metalake the identifier of the metalake environment
+   * @param catalogProvider the identifier of the catalog provider
+   * @param config a map of configuration properties to validate
+   * @throws IllegalArgumentException if any authorization configuration property is invalid
+   */
+  public void validateProperties(
+      String metalake, String catalogProvider, Map<String, String> config) {}
+
   @Override
   public void close() throws IOException {}
 
@@ -90,10 +102,13 @@ public abstract class BaseAuthorization<T extends BaseAuthorization>
                 }
                 return (BaseAuthorization<?>)
                     Iterables.getOnlyElement(providers).getDeclaredConstructor().newInstance();
+              } catch (IllegalArgumentException e) {
+                throw e;
               } catch (Exception e) {
                 throw new RuntimeException(e);
               }
-            });
+            },
+            IllegalArgumentException.class);
     return authorization;
   }
 
