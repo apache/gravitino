@@ -71,6 +71,7 @@ import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
+import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -631,6 +632,21 @@ public class TestRoleOperations extends BaseOperationsTest {
     ErrorResponse errorResponse = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+
+    // A role that an access control policy names is in use.
+    doThrow(new InUseException("Role role1 is referenced by access control policies"))
+        .when(manager)
+        .deleteRole(any(), any());
+    Response resp4 =
+        target("/metalakes/metalake1/roles/role1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete();
+
+    Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), resp4.getStatus());
+    ErrorResponse inUseResponse = resp4.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.IN_USE_CODE, inUseResponse.getCode());
+    Assertions.assertEquals(InUseException.class.getSimpleName(), inUseResponse.getType());
   }
 
   @Test
