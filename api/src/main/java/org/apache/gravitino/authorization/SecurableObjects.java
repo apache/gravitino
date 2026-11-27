@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.authorization;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -220,12 +221,24 @@ public class SecurableObjects {
     return of(MetadataObject.Type.JOB_TEMPLATE, Lists.newArrayList(jobTemplate), privileges);
   }
 
+  /**
+   * Checks whether the object type can be used as a grant scope.
+   *
+   * @param type the metadata object type
+   */
+  public static void checkGrantScope(MetadataObject.Type type) {
+    Preconditions.checkArgument(
+        type != MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE,
+        "Article privileges must be granted on the metalake");
+  }
+
   private static class SecurableObjectImpl extends MetadataObjectImpl implements SecurableObject {
 
     private List<Privilege> privileges;
 
     SecurableObjectImpl(String parent, String name, Type type, List<Privilege> privileges) {
       super(parent, name, type);
+      checkGrantScope(type);
       // Remove duplicated privileges
       this.privileges = ImmutableList.copyOf(Sets.newHashSet(privileges));
     }

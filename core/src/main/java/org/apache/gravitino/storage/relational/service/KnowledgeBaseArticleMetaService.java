@@ -40,7 +40,9 @@ import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
@@ -139,7 +141,10 @@ public final class KnowledgeBaseArticleMetaService {
   }
 
   /** Body and stable revision identity read from the same live row. */
-  public record StoredContent(ArticleBody body, ExpectedRevision revision) {}
+  public record StoredContent(ArticleBody body, ExpectedRevision revision, ArticleStatus status) {}
+
+  /** Live Article identity and visibility status read from one row. */
+  public record ArticleIdentityAndStatus(long articleId, long metalakeId, ArticleStatus status) {}
 
   private KnowledgeBaseArticleMetaService() {}
 
@@ -206,11 +211,23 @@ public final class KnowledgeBaseArticleMetaService {
     }
     return new StoredContent(
         ArticleBody.of(ArticleBody.Format.valueOf(row.getBodyFormat()), row.getBodyContent()),
-        new ExpectedRevision(row.getMetalakeId(), row.getArticleId(), row.getRevision()));
+        new ExpectedRevision(row.getMetalakeId(), row.getArticleId(), row.getRevision()),
+        ArticleStatus.valueOf(row.getStatus()));
   }
 
   /** Resolves the stable ID without fetching the Article body. */
   public NamespacedEntityId getIds(NameIdentifier ident) {
+    ArticleIdentityAndStatus article = getIdentityAndStatus(ident);
+    return new NamespacedEntityId(article.articleId(), article.metalakeId());
+  }
+
+  /**
+   * Reads the live Article identity and status in the caller's transaction.
+   *
+   * @param ident the Article identifier
+   * @return the identity and status used for visibility checks
+   */
+  public ArticleIdentityAndStatus getIdentityAndStatus(NameIdentifier ident) {
     String metalake = metalakeName(ident.namespace());
     String name = KnowledgeBaseArticle.normalizeName(ident.name());
     KnowledgeBaseArticlePO ids =
@@ -219,7 +236,8 @@ public final class KnowledgeBaseArticleMetaService {
     if (ids == null) {
       throw missing(ident);
     }
-    return new NamespacedEntityId(ids.getArticleId(), ids.getMetalakeId());
+    return new ArticleIdentityAndStatus(
+        ids.getArticleId(), ids.getMetalakeId(), ArticleStatus.valueOf(ids.getStatus()));
   }
 
   /**
@@ -272,7 +290,8 @@ public final class KnowledgeBaseArticleMetaService {
       KnowledgeBaseArticleEntity entity, boolean overwrite, TransactionHook hook)
       throws IOException {
     return insertScoped(
-        entity,
+        entity.nameIdentifier(),
+        () -> entity,
         overwrite,
         hook,
         () -> lockMetalake(entity.namespace()),
@@ -296,15 +315,28 @@ public final class KnowledgeBaseArticleMetaService {
       TransactionHook hook,
       BiFunction<Long, NameConflictException, RuntimeException> onNameConflict)
       throws IOException {
+    return createScoped(
+        entity.nameIdentifier(), () -> entity, expectedMetalakeId, hook, onNameConflict);
+  }
+
+  /** Prepares the new Article under the metalake lock on each name allocation attempt. */
+  public ScopedArticle createScoped(
+      NameIdentifier ident,
+      Supplier<KnowledgeBaseArticleEntity> prepare,
+      @Nullable Long expectedMetalakeId,
+      TransactionHook hook,
+      BiFunction<Long, NameConflictException, RuntimeException> onNameConflict)
+      throws IOException {
     return insertScoped(
-        entity,
+        ident,
+        prepare,
         false,
         hook,
         () -> {
-          String name = metalakeName(entity.namespace());
+          String name = metalakeName(ident.namespace());
           long id;
           try {
-            id = lockMetalake(entity.namespace());
+            id = lockMetalake(ident.namespace());
           } catch (NoSuchEntityException missing) {
             throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", name);
           }
@@ -317,7 +349,8 @@ public final class KnowledgeBaseArticleMetaService {
   }
 
   private ScopedArticle insertScoped(
-      KnowledgeBaseArticleEntity entity,
+      NameIdentifier ident,
+      Supplier<KnowledgeBaseArticleEntity> prepare,
       boolean overwrite,
       TransactionHook hook,
       LongSupplier lockParent,
@@ -330,7 +363,10 @@ public final class KnowledgeBaseArticleMetaService {
       return write(
           mapper -> {
             long metalakeId = lockParent.getAsLong();
-            KnowledgeBaseArticleEntity before = overwrite ? observe(entity.nameIdentifier()) : null;
+            KnowledgeBaseArticleEntity entity = prepare.get();
+            Preconditions.checkArgument(
+                ident.equals(entity.nameIdentifier()), "Expected Article %s", ident);
+            KnowledgeBaseArticleEntity before = overwrite ? observe(ident) : null;
             InsertConflict conflict = insertConflict.get();
             if (conflict != null
                 && (conflict.metalakeId() != metalakeId
@@ -374,7 +410,8 @@ public final class KnowledgeBaseArticleMetaService {
     } catch (RuntimeException e) {
       // A duplicate from a binding or extension belongs to that write.
       if (!ExceptionUtils.isDuplicateKey(e)) {
-        ExceptionUtils.checkSQLException(e, entity.type(), entity.nameIdentifier().toString());
+        ExceptionUtils.checkSQLException(
+            e, Entity.EntityType.KNOWLEDGE_BASE_ARTICLE, ident.toString());
       }
       throw e;
     }
@@ -456,6 +493,41 @@ public final class KnowledgeBaseArticleMetaService {
         });
   }
 
+  /** Checks and applies a content or metadata edit to the locked Article. */
+  public ScopedArticle editMetadata(
+      NameIdentifier ident,
+      Function<ScopedArticle, KnowledgeBaseArticleEntity> edit,
+      TransactionHook hook,
+      Function<NoSuchEntityException, RuntimeException> onMissingTarget) {
+    return withLockedRow(
+        ident,
+        onMissingTarget,
+        (mapper, row) -> {
+          long lake = row.getMetalakeId();
+          KnowledgeBaseArticleEntity before = materialize(ident.namespace(), row, mapper);
+          KnowledgeBaseArticleEntity after = edit.apply(new ScopedArticle(lake, before));
+          Preconditions.checkArgument(
+              before.domainIds().equals(after.domainIds())
+                  && before.bindings().equals(after.bindings()),
+              "Relation changes require endpoint lock planning");
+          return new ScopedArticle(lake, replace(mapper, row, before, after, hook));
+        });
+  }
+
+  /** Runs an owner transfer under the parent fence and the current Article's row lock. */
+  public <T> T withLockedArticleId(NameIdentifier ident, LongFunction<T> operation) {
+    String name = KnowledgeBaseArticle.normalizeName(ident.name());
+    return write(
+        mapper -> {
+          long lake = lockMetalake(ident.namespace());
+          Long id = mapper.lockArticleId(lake, name);
+          if (id == null) {
+            throw missing(ident);
+          }
+          return operation.apply(id);
+        });
+  }
+
   /** Retires a live Article and its bindings atomically. */
   public boolean delete(NameIdentifier ident) {
     return delete(ident, NO_HOOK);
@@ -463,7 +535,7 @@ public final class KnowledgeBaseArticleMetaService {
 
   /** Retires an Article and invokes its storage extension with the former state. */
   public boolean delete(NameIdentifier ident, TransactionHook hook) {
-    return deleteSnapshot(ident, hook, false).isPresent();
+    return deleteSnapshot(ident, article -> true, hook, false).isPresent();
   }
 
   /**
@@ -476,7 +548,13 @@ public final class KnowledgeBaseArticleMetaService {
    */
   public Optional<KnowledgeBaseArticleEntity> deleteAndGet(
       NameIdentifier ident, TransactionHook hook) {
-    return deleteSnapshot(ident, hook, true);
+    return deleteAndGet(ident, article -> true, hook);
+  }
+
+  /** Checks deletion authority under the Article lock, returning empty for a hidden Article. */
+  public Optional<KnowledgeBaseArticleEntity> deleteAndGet(
+      NameIdentifier ident, Predicate<KnowledgeBaseArticleEntity> canDelete, TransactionHook hook) {
+    return deleteSnapshot(ident, canDelete, hook, true);
   }
 
   /** Retires all Article rows in the enclosing metalake deletion transaction. */
@@ -500,8 +578,32 @@ public final class KnowledgeBaseArticleMetaService {
         });
   }
 
+  private <T> T withLockedRow(
+      NameIdentifier ident,
+      Function<NoSuchEntityException, RuntimeException> onMissingTarget,
+      BiFunction<KnowledgeBaseArticleMapper, KnowledgeBaseArticlePO, T> operation) {
+    String name = KnowledgeBaseArticle.normalizeName(ident.name());
+    return write(
+        mapper -> {
+          long lake;
+          try {
+            lake = lockMetalake(ident.namespace());
+          } catch (NoSuchEntityException missing) {
+            throw onMissingTarget.apply(missing);
+          }
+          KnowledgeBaseArticlePO row = mapper.lock(lake, name);
+          if (row == null) {
+            throw onMissingTarget.apply(missing(ident));
+          }
+          return operation.apply(mapper, row);
+        });
+  }
+
   private Optional<KnowledgeBaseArticleEntity> deleteSnapshot(
-      NameIdentifier ident, TransactionHook hook, boolean allowMissingMetalake) {
+      NameIdentifier ident,
+      Predicate<KnowledgeBaseArticleEntity> canDelete,
+      TransactionHook hook,
+      boolean allowMissingMetalake) {
     // A revision change can retry the plan. Keep the first identity across those attempts.
     AtomicReference<Long> targetId = new AtomicReference<>();
     return write(
@@ -524,7 +626,7 @@ public final class KnowledgeBaseArticleMetaService {
             return Optional.empty();
           }
           KnowledgeBaseArticlePO row = lockObservedArticle(mapper, metalakeId, old, Set.of(), null);
-          if (row == null) {
+          if (row == null || !canDelete.test(old)) {
             return Optional.empty();
           }
           hook.beforeChange(old, null);

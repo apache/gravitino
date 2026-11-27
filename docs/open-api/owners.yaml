@@ -35,6 +35,9 @@ paths:
         owner to transfer ownership. A term owner can transfer even after an explicit deny of
         VIEW_DEFINITION or loss of CREATE_DEFINITION. Reading and editing the definition require
         the corresponding glossary privileges.
+        For a Knowledge Base Article, the current Article owner or the metalake owner can
+        transfer ownership. The Article owner retains this permission after losing
+        CREATE_DEFINITION. MANAGE_DEFINITIONS alone does not grant transfer permission.
       requestBody:
         content:
           application/json:
@@ -71,7 +74,8 @@ paths:
       operationId: getOwner
       description: >-
         Returns the owner of a visible object, or a null owner if none is assigned.
-        The default authorizer returns 403 for both a missing glossary term and one hidden from the caller.
+        For glossary terms and Knowledge Base Articles, the default authorizer returns 403
+        when the object is missing or hidden from the caller.
       responses:
         "200":
           description: Returns the owner object
@@ -85,7 +89,9 @@ paths:
         "403":
           $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "404":
-          description: Not Found - The specified metadata object does not exist in the specified metalake
+          description: >-
+            The specified metadata object does not exist in the metalake. With the default
+            authorizer, a missing glossary term or Knowledge Base Article returns 403.
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -197,6 +203,7 @@ components:
           - "METALAKE"
           - "DOMAIN"
           - "GLOSSARY_TERM"
+          - "KNOWLEDGE_BASE_ARTICLE"
           - "CATALOG"
           - "SCHEMA"
           - "TABLE"

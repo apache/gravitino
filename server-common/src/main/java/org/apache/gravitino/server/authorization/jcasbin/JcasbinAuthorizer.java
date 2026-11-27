@@ -68,6 +68,7 @@ import org.apache.gravitino.cache.GravitinoCache;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.glossary.GlossaryAccess;
+import org.apache.gravitino.kb.ArticleAccess;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.server.authorization.DomainAuthzHelper;
@@ -82,6 +83,7 @@ import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
+import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -415,6 +417,47 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
+  public boolean canAccessArticle(
+      Principal principal,
+      String metalake,
+      MetadataObject object,
+      AuthorizationRequestContext context) {
+    return ArticleAccess.canRead(this, principal, metalake, object, context);
+  }
+
+  @Override
+  public boolean isArticleOwner(
+      Principal principal, String metalake, long articleId, AuthorizationRequestContext context) {
+    return ownerMatchesUserOrGroups(
+        lookups.currentDefinitionOwner(articleId, MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE),
+        principal,
+        metalake,
+        context);
+  }
+
+  @Override
+  public Set<Long> ownedArticleIds(
+      Principal principal,
+      String metalake,
+      List<Long> articleIds,
+      AuthorizationRequestContext context) {
+    // Subclasses may implement different ownership rules in their single-Article check.
+    if (getClass() != JcasbinAuthorizer.class) {
+      return GravitinoAuthorizer.super.ownedArticleIds(principal, metalake, articleIds, context);
+    }
+    return lookups
+        .currentDefinitionOwners(articleIds, MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE)
+        .entrySet()
+        .stream()
+        .filter(
+            entry ->
+                ownerMatchesUserOrGroups(
+                    Optional.of(entry.getValue()), principal, metalake, context))
+        .map(Map.Entry::getKey)
+        .collect(Collectors.toSet());
+  }
+
+  @Override
   public boolean canAccessGlossaryTerm(
       Principal principal,
       String metalake,
@@ -496,6 +539,17 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       return false;
     }
 
+    if (metadataObject.type() == MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE) {
+      try {
+        long id =
+            KnowledgeBaseArticleMetaService.getInstance()
+                .getIds(NameIdentifier.of(metalake, metadataObject.name()))
+                .entityId();
+        return isArticleOwner(principal, metalake, id, requestContext);
+      } catch (NoSuchEntityException missing) {
+        return false;
+      }
+    }
     if (metadataObject.type() == MetadataObject.Type.GLOSSARY_TERM) {
       return ownerMatchesUserOrGroups(
           lookups.currentGlossaryTermOwner(metalake, metadataObject.name()),
@@ -553,7 +607,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   public boolean isGlossaryTermOwner(
       Principal principal, String metalake, long termId, AuthorizationRequestContext context) {
     return ownerMatchesUserOrGroups(
-        lookups.currentGlossaryTermOwner(termId), principal, metalake, context);
+        lookups.currentDefinitionOwner(termId, MetadataObject.Type.GLOSSARY_TERM),
+        principal,
+        metalake,
+        context);
   }
 
   @Override
@@ -924,6 +981,18 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     } catch (RuntimeException e) {
       LOG.warn("Failed to resolve metadata id for owner cache invalidation: {}", metadataObject, e);
     }
+  }
+
+  @Override
+  public void handleMetadataOwnerChange(
+      String metalake,
+      Long oldOwnerId,
+      NameIdentifier nameIdentifier,
+      Entity.EntityType type,
+      long metadataId) {
+    MetadataObject object = NameIdentifierUtil.toMetadataObjectForRead(nameIdentifier, type);
+    metadataIdCache.invalidate(JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, object));
+    ownerRelCache.invalidate(metadataId);
   }
 
   @Override
@@ -2274,7 +2343,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
               roleId, type.name(), String.valueOf(metadataId), action, AuthConstants.ALLOW
             });
       }
-      // Expand only allowed glossary grants, before Casbin combines policies from all roles.
+      // Expand allowed definition grants before Casbin combines policies from all roles.
       // A deny on MANAGE must not discard the same grant's independent CREATE and VIEW allows.
       if (type == MetadataObject.Type.METALAKE
           && privilege.condition() == Privilege.Condition.ALLOW) {

@@ -187,6 +187,38 @@ class TestOwnerOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testArticleOwnerRoutes() throws IOException {
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata properties = mock(PropertiesMetadata.class);
+    when(properties.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(properties);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+
+    MetadataObject article =
+        MetadataObjects.of(null, "café", MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE);
+    WebTarget route =
+        target("/metalakes/metalake1/owners/knowledge_base_article/{name}")
+            .resolveTemplate("name", "cafe\u0301");
+    Owner group = mock(Owner.class);
+    when(group.name()).thenReturn("authors");
+    when(group.type()).thenReturn(Owner.Type.GROUP);
+    Mockito.doNothing().when(manager).setOwner("metalake1", article, "authors", Owner.Type.GROUP);
+    Mockito.doReturn(Optional.of(group)).when(manager).getOwner("metalake1", article);
+    try (Response set =
+            route.request().put(Entity.json(new OwnerSetRequest("authors", Owner.Type.GROUP)));
+        Response get = route.request().get()) {
+      Assertions.assertEquals(200, set.getStatus());
+      Assertions.assertTrue(set.readEntity(SetResponse.class).set());
+      Assertions.assertEquals(200, get.getStatus());
+      OwnerDTO owner = get.readEntity(OwnerResponse.class).getOwner();
+      Assertions.assertEquals("authors", owner.name());
+      Assertions.assertEquals(Owner.Type.GROUP, owner.type());
+    }
+    Mockito.verify(manager).setOwner("metalake1", article, "authors", Owner.Type.GROUP);
+    Mockito.verify(manager).getOwner("metalake1", article);
+  }
+
+  @Test
   void testGetOwnerForObject() throws IOException {
     Owner owner =
         new Owner() {

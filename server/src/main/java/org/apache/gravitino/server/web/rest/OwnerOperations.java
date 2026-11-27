@@ -148,8 +148,9 @@ public class OwnerOperations {
   }
 
   private static void checkOwnerTarget(String metalake, MetadataObject object) {
-    // The owner manager resolves glossary terms in the same transaction as its access check.
-    if (object.type() != MetadataObject.Type.GLOSSARY_TERM) {
+    // Resolve definition identity and access together in the owner manager.
+    if (object.type() != MetadataObject.Type.GLOSSARY_TERM
+        && object.type() != MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE) {
       TagOperations.checkVisibleTag(metalake, object);
       MetadataObjectUtil.checkMetadataObject(metalake, object);
     }

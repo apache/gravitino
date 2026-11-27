@@ -32,6 +32,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.utils.CollectionUtils;
 
 public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
@@ -229,6 +230,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
      * @return The builder instance.
      */
     public Builder withSecurableObjects(List<SecurableObject> securableObjects) {
+      securableObjects.forEach(object -> SecurableObjects.checkGrantScope(object.type()));
       roleEntity.securableObjects = ImmutableList.copyOf(securableObjects);
       return this;
     }

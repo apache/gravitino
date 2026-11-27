@@ -26,6 +26,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.kb.KnowledgeBaseArticle;
 import org.apache.gravitino.meta.GlossaryTermNames;
 
 /** Dispatcher interface for managing owners of metadata objects. */
@@ -47,10 +48,10 @@ public interface OwnerDispatcher {
    * {@link #setOwner} calls; relational {@link org.apache.gravitino.EntityStore} implementations
    * may persist using {@link org.apache.gravitino.SupportsRelationOperations#batchInsertRelations}.
    * The default implementation delegates per object so implementations that wrap {@code setOwner}
-   * (e.g. for events) apply consistently. Equivalent glossary term names refer to one transfer,
-   * using the first spelling supplied. For top-level calls, earlier term transfers remain committed
-   * if a later transfer fails. In a caller-owned transaction, individual calls can return and
-   * dispatch events before the caller commits or rolls back.
+   * (e.g. for events) apply consistently. Equivalent names of a glossary term or Article refer to
+   * one transfer, using the first spelling supplied. For top-level calls, earlier definition
+   * transfers remain committed if a later transfer fails. In a caller-owned transaction, individual
+   * calls can return and dispatch events before the caller commits or rolls back.
    *
    * <p>Note: implementations that persist via {@code batchInsertRelations} (such as {@link
    * OwnerManager}) require all {@code metadataObjects} to share the same {@link
@@ -71,9 +72,14 @@ public interface OwnerDispatcher {
       Owner.Type ownerType) {
     Preconditions.checkArgument(metadataObjects != null, "metadataObjects must not be null");
     Set<String> glossaryNames = new HashSet<>();
+    Set<String> articleNames = new HashSet<>();
     for (MetadataObject metadataObject : metadataObjects) {
       if (metadataObject.type() == MetadataObject.Type.GLOSSARY_TERM
           && !glossaryNames.add(GlossaryTermNames.key(metadataObject.name()))) {
+        continue;
+      }
+      if (metadataObject.type() == MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE
+          && !articleNames.add(KnowledgeBaseArticle.normalizeName(metadataObject.name()))) {
         continue;
       }
       setOwner(metalake, metadataObject, ownerName, ownerType);
@@ -81,14 +87,15 @@ public interface OwnerDispatcher {
   }
 
   /**
-   * Retrieves the owner of a metadata object. For glossary terms, the relational implementation
-   * checks visibility and reads ownership in one snapshot, started outside a caller transaction.
+   * Retrieves the owner of a metadata object. For glossary terms and Articles, the relational
+   * implementation checks visibility and reads ownership in one snapshot, started outside a caller
+   * transaction.
    *
    * @param metalake the name of the metalake
    * @param metadataObject the metadata object for which the owner is being retrieved
    * @return an Optional containing the owner if it exists, otherwise an empty Optional
-   * @throws ForbiddenException if a glossary term is hidden from the caller or does not exist;
-   *     reads do not distinguish the two
+   * @throws ForbiddenException when the caller lacks visibility of the requested glossary term or
+   *     Article, including when it is missing
    */
   Optional<Owner> getOwner(String metalake, MetadataObject metadataObject);
 }

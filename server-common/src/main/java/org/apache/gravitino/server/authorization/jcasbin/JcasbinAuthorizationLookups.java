@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.server.authorization.jcasbin;
 
+import com.google.common.collect.Lists;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import org.apache.gravitino.MetadataObject;
@@ -53,6 +57,7 @@ import org.slf4j.LoggerFactory;
 public class JcasbinAuthorizationLookups {
 
   private static final Logger LOG = LoggerFactory.getLogger(JcasbinAuthorizationLookups.class);
+  private static final int OWNER_BATCH_SIZE = 500;
 
   private final GravitinoCache<String, Long> metadataIdCache;
   private final GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache;
@@ -191,13 +196,26 @@ public class JcasbinAuthorizationLookups {
             mapper -> mapper.selectGlossaryTermOwner(metalake, GlossaryTermNames.key(name))));
   }
 
-  Optional<OwnerInfo> currentGlossaryTermOwner(long termId) {
+  Optional<OwnerInfo> currentDefinitionOwner(long id, MetadataObject.Type type) {
     return Optional.ofNullable(
         SessionUtils.getWithoutCommitFresh(
             OwnerMetaMapper.class,
-            mapper ->
-                mapper.selectOwnerByMetadataObjectIdAndType(
-                    termId, MetadataObject.Type.GLOSSARY_TERM.name())));
+            mapper -> mapper.selectOwnerByMetadataObjectIdAndType(id, type.name())));
+  }
+
+  Map<Long, OwnerInfo> currentDefinitionOwners(List<Long> ids, MetadataObject.Type type) {
+    Map<Long, OwnerInfo> owners = new HashMap<>();
+    for (List<Long> batch : Lists.partition(ids, OWNER_BATCH_SIZE)) {
+      var assignments =
+          SessionUtils.getWithoutCommitFresh(
+              OwnerMetaMapper.class,
+              mapper -> mapper.listCurrentOwnerAssignments(batch, type.name()));
+      for (var row : assignments) {
+        owners.putIfAbsent(
+            row.getMetadataObjectId(), new OwnerInfo(row.getOwnerId(), row.getOwnerType()));
+      }
+    }
+    return owners;
   }
 
   private static Long loadMetadataId(MetadataObject metadataObject, String metalake) {

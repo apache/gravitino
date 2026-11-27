@@ -1,0 +1,983 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+package org.apache.gravitino.kb;
+
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.UserGroup;
+import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
+import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.authorization.OwnerManager;
+import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchKnowledgeBaseArticleException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.policy.PolicyManager;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
+import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
+import org.apache.gravitino.storage.relational.RelationalEntityStore;
+import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService;
+import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.TransactionHook;
+import org.apache.gravitino.storage.relational.service.OwnerMetaService;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
+import org.apache.gravitino.storage.relational.utils.POConverters;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.tag.TagManager;
+import org.apache.gravitino.utils.MetadataObjectUtil;
+import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.ibatis.executor.Executor;
+import org.apache.ibatis.mapping.MappedStatement;
+import org.apache.ibatis.plugin.Interceptor;
+import org.apache.ibatis.plugin.Intercepts;
+import org.apache.ibatis.plugin.Invocation;
+import org.apache.ibatis.plugin.Signature;
+import org.apache.ibatis.session.ResultHandler;
+import org.apache.ibatis.session.RowBounds;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.TestTemplate;
+import org.mockito.AdditionalAnswers;
+import org.mockito.Mockito;
+
+/** Exercises Article operations against real role, principal and owner rows. */
+class TestArticleAuthorization extends TestJDBCBackend {
+  private static final String LAKE = "articles";
+  private final AtomicLong ids = new AtomicLong(100);
+  private final ArticleManager manager = new ArticleManager(ids::incrementAndGet, 1024, true);
+  private final GravitinoEnv env = GravitinoEnv.getInstance();
+  private GravitinoAuthorizer previous;
+  private EntityStore previousStore;
+  private CatalogManager previousCatalogs;
+  private final CatalogManager catalogs = Mockito.mock(CatalogManager.class);
+  private JcasbinAuthorizer nodeA;
+  private OwnerManager owners;
+
+  @BeforeEach
+  void setUpAuthorization() throws Exception {
+    previous = env.gravitinoAuthorizer();
+    previousStore = (EntityStore) FieldUtils.readField(env, "entityStore", true);
+    previousCatalogs = (CatalogManager) FieldUtils.readField(env, "catalogManager", true);
+    FieldUtils.writeField(env, "catalogManager", catalogs, true);
+    Config config = env.config();
+    Mockito.when(config.get(Configs.GRAVITINO_AUTHORIZATION_CACHE_EXPIRATION_SECS))
+        .thenReturn(3600L);
+    Mockito.when(config.get(Configs.GRAVITINO_AUTHORIZATION_ROLE_CACHE_SIZE)).thenReturn(1000L);
+    Mockito.when(config.get(Configs.GRAVITINO_AUTHORIZATION_OWNER_CACHE_SIZE)).thenReturn(1000L);
+    Mockito.when(config.get(Configs.GRAVITINO_AUTHORIZATION_METADATA_ID_CACHE_SIZE))
+        .thenReturn(1000L);
+    Mockito.when(config.get(Configs.GRAVITINO_AUTHORIZATION_CHANGE_POLL_INTERVAL_SECS))
+        .thenReturn(3600L);
+    RelationalEntityStore store = RelationalEntityStore.forOfflineMigration(backend, config);
+    // The fixture owns the database lifecycle. Expose only EntityStore to avoid registering an
+    // entity-change listener on the offline store, which has no background workers.
+    FieldUtils.writeField(
+        env,
+        "entityStore",
+        Mockito.mock(EntityStore.class, AdditionalAnswers.delegatesTo(store)),
+        true);
+    owners = new OwnerManager(store);
+    createAndInsertMakeLake(LAKE);
+    role("view", Privileges.allow("VIEW_DEFINITION"));
+    role("create", Privileges.allow("CREATE_DEFINITION"));
+    role("manage", Privileges.allow("MANAGE_DEFINITIONS"));
+    role("denyView", Privileges.deny("VIEW_DEFINITION"));
+    role("denyCreate", Privileges.deny("CREATE_DEFINITION"));
+    role("denyManage", Privileges.deny("MANAGE_DEFINITIONS"));
+    user("viewer", "view");
+    user("writer", "create");
+    user("writer2", "create");
+    user("admin", "manage");
+    user("denied", "manage", "denyView");
+    user("noCreate", "manage", "denyCreate");
+    user("noManage", "manage", "denyManage");
+    user("outsider");
+    user("lakeOwner");
+    OwnerMetaService.getInstance()
+        .setOwner(
+            NameIdentifier.of(LAKE),
+            Entity.EntityType.METALAKE,
+            NameIdentifierUtil.ofUser(LAKE, "lakeOwner"),
+            Entity.EntityType.USER);
+    nodeA = new JcasbinAuthorizer();
+    nodeA.initialize();
+    env.setGravitinoAuthorizer(nodeA);
+  }
+
+  @AfterEach
+  void tearDownAuthorization() throws Exception {
+    try {
+      if (nodeA != null) {
+        nodeA.close();
+      }
+    } finally {
+      env.setGravitinoAuthorizer(previous);
+      FieldUtils.writeField(env, "entityStore", previousStore, true);
+      FieldUtils.writeField(env, "catalogManager", previousCatalogs, true);
+      Mockito.verifyNoInteractions(catalogs);
+    }
+  }
+
+  @TestTemplate
+  void testReadEditAndDelete() throws Exception {
+    var draft =
+        as("writer", () -> manager.createArticle(LAKE, article("draft", ArticleStatus.DRAFT)));
+    as("writer", () -> manager.createArticle(LAKE, article("published", ArticleStatus.PUBLISHED)));
+    as(
+        "writer",
+        () -> manager.createArticle(LAKE, article("deprecated", ArticleStatus.DEPRECATED)));
+    for (String viewer : List.of("viewer", "writer2", "noManage", "denied", "outsider")) {
+      as(
+          viewer,
+          () -> {
+            assertThrows(
+                NoSuchKnowledgeBaseArticleException.class,
+                () -> manager.loadArticle(LAKE, "draft"));
+            assertThrows(
+                NoSuchKnowledgeBaseArticleException.class,
+                () -> manager.getArticleContent(LAKE, "draft"));
+            assertThrows(
+                NoSuchKnowledgeBaseArticleException.class,
+                () -> manager.alterArticle(LAKE, "draft", "malformed"));
+            assertFalse(manager.deleteArticle(LAKE, "draft"));
+            return null;
+          });
+    }
+    assertEquals(
+        List.of("published", "deprecated"),
+        as(
+            "viewer",
+            () ->
+                manager.listArticles(LAKE).stream()
+                    .map(KnowledgeBaseArticleEntity::name)
+                    .toList()));
+    assertTrue(as("denied", () -> manager.listArticles(LAKE)).isEmpty());
+    assertEquals(
+        "body", as("viewer", () -> manager.getArticleContent(LAKE, "deprecated")).body().content());
+    for (String actor : List.of("viewer", "writer2", "noManage")) {
+      as(
+          actor,
+          () -> {
+            assertThrows(
+                ForbiddenException.class,
+                () -> manager.alterArticle(LAKE, "published", "malformed"));
+            assertThrows(ForbiddenException.class, () -> manager.deleteArticle(LAKE, "published"));
+            return null;
+          });
+    }
+    for (String actor : List.of("writer", "admin", "noCreate")) {
+      assertEquals(draft, as(actor, () -> manager.loadArticle(LAKE, "draft")));
+    }
+    for (String actor : List.of("viewer", "denied", "noCreate")) {
+      assertThrows(
+          ForbiddenException.class,
+          () ->
+              as(
+                  actor,
+                  () -> manager.createArticle(LAKE, article(actor, ArticleStatus.PUBLISHED))));
+    }
+    assertEquals(
+        2,
+        as(
+                "admin",
+                () ->
+                    manager.alterArticle(
+                        LAKE,
+                        "draft",
+                        draft.revisionToken(),
+                        KnowledgeBaseArticleChange.updateComment("ok")))
+            .article()
+            .revision());
+    assertTrue(as("writer", () -> manager.deleteArticle(LAKE, "draft")));
+    assertTrue(as("admin", () -> manager.deleteArticle(LAKE, "published")));
+  }
+
+  @TestTemplate
+  void listsMixedDraftOwnersWithOneBatchLookup() throws Exception {
+    var published =
+        as(
+            "writer2",
+            () -> manager.createArticle(LAKE, article("public", ArticleStatus.PUBLISHED)));
+    var mine =
+        as("writer", () -> manager.createArticle(LAKE, article("mine", ArticleStatus.DRAFT)));
+    var theirs =
+        as("writer", () -> manager.createArticle(LAKE, article("theirs", ArticleStatus.DRAFT)));
+    var shared =
+        as("writer2", () -> manager.createArticle(LAKE, article("shared", ArticleStatus.DRAFT)));
+    backend.insert(
+        createGroupEntity(
+            ids.incrementAndGet(),
+            AuthorizationUtils.ofGroupNamespace(LAKE),
+            "authors",
+            AUDIT_INFO,
+            List.of(),
+            List.of()),
+        false);
+    as(
+        "writer2",
+        () -> {
+          owners.setOwner(
+              LAKE,
+              MetadataObjects.of(null, "shared", MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE),
+              "authors",
+              Owner.Type.GROUP);
+          return null;
+        });
+    // A second live assignment must supersede the earlier one just as it does on a single read.
+    var newer =
+        POConverters.initializeOwnerRelPOsWithVersion(
+            backend.get(NameIdentifier.of(LAKE), Entity.EntityType.METALAKE).id(),
+            "USER",
+            backend.get(NameIdentifierUtil.ofUser(LAKE, "writer2"), Entity.EntityType.USER).id(),
+            "KNOWLEDGE_BASE_ARTICLE",
+            theirs.article().id());
+    SessionUtils.doWithCommit(OwnerMetaMapper.class, m -> m.insertOwnerRel(newer));
+    var member = new UserPrincipal("writer", List.of(new UserGroup(Optional.empty(), "authors")));
+    PrincipalUtils.doAs(
+        member,
+        () -> {
+          assertThrows(
+              NoSuchKnowledgeBaseArticleException.class, () -> manager.loadArticle(LAKE, "theirs"));
+          try (var queries = ArticleQueries.record()) {
+            assertEquals(
+                List.of(published.article().id(), mine.article().id(), shared.article().id()),
+                manager.listArticles(LAKE).stream().map(KnowledgeBaseArticleEntity::id).toList());
+            assertEquals(1, queries.count("listCurrentOwnerAssignments"));
+            assertEquals(
+                0, queries.count("selectOwnerByMetadataObjectIdAndType.KNOWLEDGE_BASE_ARTICLE"));
+          }
+          return null;
+        });
+  }
+
+  @TestTemplate
+  void getAndTransferUseNewestLiveAssignment() throws Exception {
+    long groupId = ids.incrementAndGet();
+    backend.insert(
+        createGroupEntity(
+            groupId,
+            AuthorizationUtils.ofGroupNamespace(LAKE),
+            "authors",
+            AUDIT_INFO,
+            List.of(),
+            List.of()),
+        false);
+    long writer2 =
+        backend.get(NameIdentifierUtil.ofUser(LAKE, "writer2"), Entity.EntityType.USER).id();
+    for (Owner.Type ownerType : List.of(Owner.Type.USER, Owner.Type.GROUP)) {
+      String name = ownerType == Owner.Type.USER ? "two-users" : "user-and-group";
+      long id =
+          as("writer", () -> manager.createArticle(LAKE, article(name, ArticleStatus.PUBLISHED)))
+              .article()
+              .id();
+      MetadataObject object =
+          MetadataObjects.of(null, name, MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE);
+      // The two user assignments share a timestamp, so the later row ID decides the owner.
+      try (var session =
+              SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+          var insert =
+              session
+                  .getConnection()
+                  .prepareStatement(
+                      """
+              INSERT INTO owner_meta (metalake_id, metadata_object_id, metadata_object_type, owner_id,
+                  owner_type, audit_info, current_version, last_version, deleted_at, updated_at)
+              SELECT metalake_id, metadata_object_id, metadata_object_type, ?, ?, audit_info,
+                  current_version, last_version, deleted_at, updated_at + ?
+              FROM owner_meta WHERE metadata_object_id = ? AND metadata_object_type = 'KNOWLEDGE_BASE_ARTICLE'
+                  AND deleted_at = 0
+              """)) {
+        insert.setLong(1, ownerType == Owner.Type.USER ? writer2 : groupId);
+        insert.setString(2, ownerType.name());
+        insert.setLong(3, ownerType == Owner.Type.USER ? 0 : 1);
+        insert.setLong(4, id);
+        assertEquals(1, insert.executeUpdate());
+      }
+      as(
+          "lakeOwner",
+          () -> {
+            Owner current = owners.getOwner(LAKE, object).orElseThrow();
+            assertEquals(ownerType, current.type());
+            assertEquals(ownerType == Owner.Type.USER ? "writer2" : "authors", current.name());
+            try (var queries = ArticleQueries.record()) {
+              owners.setOwner(LAKE, object, "viewer", Owner.Type.USER);
+              assertEquals(1, queries.count("lockArticleId"));
+              assertEquals(0, queries.count("lock"));
+              assertEquals(0, queries.count("joined"));
+            }
+            assertEquals("viewer", owners.getOwner(LAKE, object).orElseThrow().name());
+            return null;
+          });
+    }
+  }
+
+  @TestTemplate
+  void preparesHtmlOnceAcrossAuthorizedNameRetries() throws Exception {
+    as("writer", () -> manager.createArticle(LAKE, article("guide", ArticleStatus.PUBLISHED)));
+    ArticleCreate request =
+        Mockito.spy(
+            ArticleCreate.builder()
+                .withTitle("Guide")
+                .withBody(
+                    ArticleBody.of(ArticleBody.Format.HTML, "<p onclick='ignored()'>hello</p>"))
+                .build());
+    assertThrows(
+        ForbiddenException.class, () -> as("viewer", () -> manager.createArticle(LAKE, request)));
+    Mockito.verify(request, Mockito.never()).body();
+    var result = as("writer", () -> manager.createArticle(LAKE, request));
+    assertEquals("guide-2", result.article().name());
+    Mockito.verify(request).body();
+    assertEquals(
+        "<p>hello</p>",
+        as("writer", () -> manager.getArticleContent(LAKE, "guide-2")).body().content());
+  }
+
+  @TestTemplate
+  void ownerReadsCheckVisibilityWithoutMaterializingRelations() throws Exception {
+    as("writer", () -> manager.createArticle(LAKE, article("published", ArticleStatus.PUBLISHED)));
+    MetadataObject object =
+        MetadataObjects.of(null, "published", MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE);
+    var names =
+        NameIdentifierUtil.splitNameIdentifier(
+            LAKE,
+            Entity.EntityType.KNOWLEDGE_BASE_ARTICLE,
+            MetadataObjectUtil.toEntityIdent(LAKE, object));
+    as(
+        "viewer",
+        () -> {
+          var evaluator =
+              new AuthorizationExpressionEvaluator(
+                  AuthorizationExpressionConstants.CAN_ACCESS_METADATA, nodeA);
+          try (var queries = ArticleQueries.record()) {
+            assertTrue(
+                evaluator.evaluate(
+                    names,
+                    new AuthorizationRequestContext(),
+                    PrincipalUtils.getCurrentPrincipal(),
+                    Optional.of(object.type().name())));
+            assertEquals(1, queries.count("ids"));
+            assertEquals("writer", owners.getOwner(LAKE, object).orElseThrow().name());
+            assertTrue(queries.count("ids") >= 2);
+            assertEquals(0, queries.count("joined"));
+          }
+          return null;
+        });
+  }
+
+  @TestTemplate
+  void customProviderDefaultsDenyArticleAccessAndHonorSingleOwnerOverride() throws Exception {
+    var provider = Mockito.mock(GravitinoAuthorizer.class, Mockito.CALLS_REAL_METHODS);
+    for (var privilege :
+        List.of(Privilege.Name.VIEW_DEFINITION, Privilege.Name.CREATE_DEFINITION)) {
+      Mockito.when(
+              provider.authorize(
+                  Mockito.any(),
+                  Mockito.eq(LAKE),
+                  Mockito.any(),
+                  Mockito.eq(privilege),
+                  Mockito.any()))
+          .thenReturn(true);
+    }
+    env.setGravitinoAuthorizer(provider);
+    as(
+        "writer",
+        () -> {
+          var draft = manager.createArticle(LAKE, article("draft", ArticleStatus.DRAFT));
+          var published =
+              manager.createArticle(LAKE, article("published", ArticleStatus.PUBLISHED));
+          assertThrows(
+              NoSuchKnowledgeBaseArticleException.class, () -> manager.loadArticle(LAKE, "draft"));
+          assertEquals(List.of(published.article()), manager.listArticles(LAKE));
+          assertThrows(
+              ForbiddenException.class,
+              () ->
+                  owners.getOwner(
+                      LAKE,
+                      MetadataObjects.of(
+                          null, "published", MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE)));
+          Mockito.when(
+                  provider.isArticleOwner(
+                      Mockito.any(),
+                      Mockito.eq(LAKE),
+                      Mockito.eq(draft.article().id()),
+                      Mockito.any()))
+              .thenReturn(true);
+          assertEquals(draft, manager.loadArticle(LAKE, "draft"));
+          assertEquals(List.of(draft.article(), published.article()), manager.listArticles(LAKE));
+          owners.setOwner(
+              LAKE,
+              MetadataObjects.of(null, "draft", MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE),
+              "writer2",
+              Owner.Type.USER);
+          long writerId =
+              backend.get(NameIdentifierUtil.ofUser(LAKE, "writer"), Entity.EntityType.USER).id();
+          Mockito.verify(provider)
+              .handleMetadataOwnerChange(
+                  LAKE,
+                  writerId,
+                  draft.article().nameIdentifier(),
+                  Entity.EntityType.KNOWLEDGE_BASE_ARTICLE);
+          return null;
+        });
+  }
+
+  @TestTemplate
+  void transferUsesCurrentUserOrGroupAndPreservesRevision() throws Exception {
+    var draft =
+        as("writer", () -> manager.createArticle(LAKE, article("draft", ArticleStatus.DRAFT)));
+    MetadataObject object =
+        MetadataObjects.of(null, "draft", MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE);
+    backend.insert(
+        createGroupEntity(
+            ids.incrementAndGet(),
+            AuthorizationUtils.ofGroupNamespace(LAKE),
+            "authors",
+            AUDIT_INFO,
+            List.of(),
+            List.of()),
+        false);
+    as(
+        "writer",
+        () -> {
+          assertEquals("writer", owners.getOwner(LAKE, object).orElseThrow().name());
+          assertTrue(
+              nodeA.hasSetOwnerPermission(
+                  LAKE, object.type().name(), object.name(), new AuthorizationRequestContext()));
+          owners.setOwners(LAKE, List.of(object, object), "authors", Owner.Type.GROUP);
+          return null;
+        });
+    as(
+        "admin",
+        () -> {
+          assertFalse(
+              nodeA.hasSetOwnerPermission(
+                  LAKE, object.type().name(), object.name(), new AuthorizationRequestContext()));
+          assertThrows(
+              ForbiddenException.class,
+              () -> owners.setOwner(LAKE, object, "writer", Owner.Type.USER));
+          return null;
+        });
+    assertThrows(
+        NoSuchKnowledgeBaseArticleException.class,
+        () -> as("writer", () -> manager.loadArticle(LAKE, "draft")));
+    assertThrows(ForbiddenException.class, () -> as("writer", () -> owners.getOwner(LAKE, object)));
+    UserPrincipal member =
+        new UserPrincipal("writer2", List.of(new UserGroup(Optional.empty(), "authors")));
+    PrincipalUtils.doAs(
+        member,
+        () -> {
+          assertEquals(
+              draft.revisionToken(), manager.getArticleContent(LAKE, "draft").revisionToken());
+          assertEquals("authors", owners.getOwner(LAKE, object).orElseThrow().name());
+          var evaluator =
+              new AuthorizationExpressionEvaluator(
+                  AuthorizationExpressionConstants.CAN_ACCESS_METADATA, nodeA);
+          var names =
+              NameIdentifierUtil.splitNameIdentifier(
+                  LAKE,
+                  Entity.EntityType.KNOWLEDGE_BASE_ARTICLE,
+                  MetadataObjectUtil.toEntityIdent(LAKE, object));
+          assertTrue(
+              evaluator.evaluate(
+                  names,
+                  new AuthorizationRequestContext(),
+                  member,
+                  Optional.of(object.type().name())));
+          assertTrue(
+              nodeA.hasSetOwnerPermission(
+                  LAKE, object.type().name(), object.name(), new AuthorizationRequestContext()));
+          owners.setOwner(LAKE, object, "viewer", Owner.Type.USER);
+          return null;
+        });
+    assertThrows(
+        NoSuchKnowledgeBaseArticleException.class,
+        () -> as("viewer", () -> manager.loadArticle(LAKE, "draft")));
+    as(
+        "lakeOwner",
+        () -> {
+          owners.setOwner(LAKE, object, "writer", Owner.Type.USER);
+          return null;
+        });
+    assertEquals(
+        draft.revisionToken(),
+        as("writer", () -> manager.getArticleContent(LAKE, "draft")).revisionToken());
+  }
+
+  @TestTemplate
+  void explicitViewDenyAlsoAppliesToTheMetalakeOwner() throws Exception {
+    OwnerMetaService.getInstance()
+        .setOwner(
+            NameIdentifier.of(LAKE),
+            Entity.EntityType.METALAKE,
+            NameIdentifierUtil.ofUser(LAKE, "denied"),
+            Entity.EntityType.USER);
+    as("writer", () -> manager.createArticle(LAKE, article("public", ArticleStatus.PUBLISHED)));
+    assertTrue(
+        as(
+            "denied",
+            () ->
+                nodeA.isOwner(
+                    PrincipalUtils.getCurrentPrincipal(),
+                    LAKE,
+                    MetadataObjects.of(null, LAKE, MetadataObject.Type.METALAKE),
+                    new AuthorizationRequestContext())));
+    assertThrows(
+        NoSuchKnowledgeBaseArticleException.class,
+        () -> as("denied", () -> manager.loadArticle(LAKE, "public")));
+    assertFalse(as("denied", () -> manager.deleteArticle(LAKE, "public")));
+  }
+
+  @TestTemplate
+  void disabledAuthorizationAllowsAnUnregisteredCreatorAndSkipsOwnership() throws Exception {
+    ArticleManager unrestricted = new ArticleManager(ids::incrementAndGet, 1024, false);
+    var draft =
+        as(
+            "unregistered",
+            () -> unrestricted.createArticle(LAKE, article("draft", ArticleStatus.DRAFT)));
+    assertEquals(draft, as("outsider", () -> unrestricted.loadArticle(LAKE, "draft")));
+    assertTrue(
+        OwnerMetaService.getInstance()
+            .getOwner(draft.article().nameIdentifier(), Entity.EntityType.KNOWLEDGE_BASE_ARTICLE)
+            .isEmpty());
+  }
+
+  @TestTemplate
+  void authorizationAndWritePolicyApplyTogether() throws Exception {
+    TransactionHook policy = Mockito.mock(TransactionHook.class);
+    ArticleManager guarded = new ArticleManager(ids::incrementAndGet, 1024, true, policy);
+    var request = article("draft", ArticleStatus.DRAFT);
+    assertThrows(
+        ForbiddenException.class, () -> as("viewer", () -> guarded.createArticle(LAKE, request)));
+    var draft = as("writer", () -> guarded.createArticle(LAKE, request));
+    Mockito.verify(policy).onChange(null, draft.article());
+    var object = MetadataObjects.of(null, "draft", MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE);
+    assertEquals("writer", as("writer", () -> owners.getOwner(LAKE, object)).orElseThrow().name());
+    assertThrows(
+        NoSuchKnowledgeBaseArticleException.class,
+        () -> as("viewer", () -> guarded.loadArticle(LAKE, "draft")));
+    Mockito.verifyNoMoreInteractions(policy);
+  }
+
+  @TestTemplate
+  void authorizedReadsShareTheCallersSnapshot() throws Exception {
+    var published =
+        as("writer", () -> manager.createArticle(LAKE, article("guide", ArticleStatus.PUBLISHED)));
+    Callable<ArticleManager.Result> unpublish =
+        () ->
+            as(
+                "writer",
+                () ->
+                    manager.alterArticle(
+                        LAKE,
+                        "guide",
+                        published.revisionToken(),
+                        KnowledgeBaseArticleChange.updateStatus(ArticleStatus.DRAFT)));
+    ExecutorService writer = Executors.newSingleThreadExecutor();
+    try {
+      as(
+          "viewer",
+          () ->
+              SqlSessions.readSnapshot(
+                  () -> {
+                    assertEquals(published, manager.loadArticle(LAKE, "guide"));
+                    assertDoesNotThrow(() -> writer.submit(unpublish).get(30, TimeUnit.SECONDS));
+                    assertEquals(
+                        published.revisionToken(),
+                        manager.getArticleContent(LAKE, "guide").revisionToken());
+                    assertEquals(List.of(published.article()), manager.listArticles(LAKE));
+                    return null;
+                  }));
+    } finally {
+      writer.shutdownNow();
+    }
+    assertTrue(as("viewer", () -> manager.listArticles(LAKE)).isEmpty());
+  }
+
+  @TestTemplate
+  void authorizedReadsRejectAnOrdinaryTransaction() throws Exception {
+    as(
+        "writer",
+        () -> {
+          SqlSessions.getSqlSession();
+          try {
+            assertThrows(IllegalStateException.class, () -> manager.loadArticle(LAKE, "guide"));
+            assertThrows(
+                IllegalStateException.class, () -> manager.getArticleContent(LAKE, "guide"));
+            assertThrows(IllegalStateException.class, () -> manager.listArticles(LAKE));
+            assertTrue(SqlSessions.hasActiveSession());
+          } finally {
+            SqlSessions.closeSqlSession();
+          }
+          return null;
+        });
+  }
+
+  @TestTemplate
+  void contentVisibilityUsesTheSameSnapshotAsTheBody() throws Exception {
+    var draft =
+        as("writer", () -> manager.createArticle(LAKE, article("draft", ArticleStatus.DRAFT)));
+    MetadataObject object =
+        MetadataObjects.of(null, "draft", MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE);
+    GravitinoAuthorizer observed =
+        Mockito.mock(GravitinoAuthorizer.class, AdditionalAnswers.delegatesTo(nodeA));
+    ExecutorService worker = Executors.newSingleThreadExecutor();
+    try {
+      // Redact the body and transfer the draft between the content read and its owner check.
+      Mockito.doAnswer(
+              invocation -> {
+                worker
+                    .submit(
+                        () ->
+                            as(
+                                "writer",
+                                () -> {
+                                  manager.alterArticle(
+                                      LAKE,
+                                      "draft",
+                                      draft.revisionToken(),
+                                      KnowledgeBaseArticleChange.updateBody(
+                                          ArticleBody.of(ArticleBody.Format.MARKDOWN, "revised")));
+                                  owners.setOwner(LAKE, object, "writer2", Owner.Type.USER);
+                                  return null;
+                                }))
+                    .get(30, TimeUnit.SECONDS);
+                return nodeA.isArticleOwner(
+                    invocation.getArgument(0),
+                    LAKE,
+                    draft.article().id(),
+                    invocation.getArgument(3));
+              })
+          .when(observed)
+          .isArticleOwner(
+              Mockito.argThat(principal -> principal.getName().equals("writer2")),
+              Mockito.eq(LAKE),
+              Mockito.eq(draft.article().id()),
+              Mockito.any());
+      env.setGravitinoAuthorizer(observed);
+      assertThrows(
+          NoSuchKnowledgeBaseArticleException.class,
+          () -> as("writer2", () -> manager.getArticleContent(LAKE, "draft")));
+    } finally {
+      env.setGravitinoAuthorizer(nodeA);
+      worker.shutdownNow();
+    }
+    assertEquals(
+        "revised", as("writer2", () -> manager.getArticleContent(LAKE, "draft")).body().content());
+  }
+
+  @TestTemplate
+  void genericGrantsAndAssociationsRejectArticleTargets() {
+    MetadataObject.Type type = MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE;
+    MetadataObject object = MetadataObjects.of(null, "draft", type);
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            SecurableObjects.parse(
+                object.name(), type, List.of(Privileges.allow("VIEW_DEFINITION"))));
+    SecurableObject supplied = Mockito.mock(SecurableObject.class);
+    Mockito.when(supplied.type()).thenReturn(type);
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> RoleEntity.builder().withSecurableObjects(List.of(supplied)));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new TagManager(ids::incrementAndGet, owners.getStore())
+                .associateTagsForMetadataObject(LAKE, object, new String[] {"tag"}, new String[0]));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new PolicyManager(ids::incrementAndGet, owners.getStore())
+                .addPolicyToObject(LAKE, "policy", object, AUDIT_INFO));
+  }
+
+  @TestTemplate
+  void createChecksTheMetalakeAndReauthorizesNameRetries() throws Exception {
+    as("writer", () -> manager.createArticle(LAKE, article("guide", ArticleStatus.PUBLISHED)));
+    GravitinoAuthorizer grants = Mockito.mock(GravitinoAuthorizer.class);
+    env.setGravitinoAuthorizer(grants);
+    assertThrows(
+        NoSuchMetalakeException.class,
+        () ->
+            as(
+                "writer",
+                () -> manager.createArticle("absent", article("guide", ArticleStatus.DRAFT))));
+    assertThrows(
+        NoSuchMetalakeException.class, () -> as("writer", () -> manager.listArticles("absent")));
+    Mockito.verifyNoInteractions(grants);
+
+    Mockito.when(
+            grants.authorize(
+                Mockito.any(),
+                Mockito.eq(LAKE),
+                Mockito.any(),
+                Mockito.eq(Privilege.Name.VIEW_DEFINITION),
+                Mockito.any()))
+        .thenReturn(true);
+    AtomicLong checks = new AtomicLong();
+    Mockito.when(
+            grants.authorize(
+                Mockito.any(),
+                Mockito.eq(LAKE),
+                Mockito.any(),
+                Mockito.eq(Privilege.Name.CREATE_DEFINITION),
+                Mockito.any()))
+        .thenAnswer(
+            invocation -> {
+              assertTrue(SqlSessions.hasActiveSession());
+              return checks.incrementAndGet() == 1;
+            });
+    ArticleCreate generated =
+        ArticleCreate.builder()
+            .withTitle("guide")
+            .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "body"))
+            .build();
+    assertThrows(
+        ForbiddenException.class, () -> as("writer", () -> manager.createArticle(LAKE, generated)));
+    assertEquals(2, checks.get());
+    env.setGravitinoAuthorizer(nodeA);
+    assertEquals(
+        List.of("guide"),
+        as("writer", () -> manager.listArticles(LAKE)).stream()
+            .map(KnowledgeBaseArticleEntity::name)
+            .toList());
+  }
+
+  @TestTemplate
+  void readChecksViewBeforeFetchingAndPreservesAuthorizationFailures() throws Exception {
+    var storage = Mockito.mock(KnowledgeBaseArticleMetaService.class);
+    ArticleManager reader;
+    try (var services = Mockito.mockStatic(KnowledgeBaseArticleMetaService.class)) {
+      services.when(KnowledgeBaseArticleMetaService::getInstance).thenReturn(storage);
+      reader = new ArticleManager(ids::incrementAndGet, 1024, true);
+    }
+    assertThrows(
+        NoSuchKnowledgeBaseArticleException.class,
+        () -> as("outsider", () -> reader.loadArticle(LAKE, "guide")));
+    assertThrows(
+        NoSuchKnowledgeBaseArticleException.class,
+        () -> as("outsider", () -> reader.getArticleContent(LAKE, "guide")));
+    assertTrue(as("outsider", () -> reader.listArticles(LAKE)).isEmpty());
+    Mockito.verifyNoInteractions(storage);
+
+    NoSuchEntityException failure = new NoSuchEntityException("Owner lookup failed");
+    var unavailable = Mockito.mock(GravitinoAuthorizer.class);
+    Mockito.when(unavailable.isOwner(Mockito.any(), Mockito.eq(LAKE), Mockito.any(), Mockito.any()))
+        .thenThrow(failure);
+    env.setGravitinoAuthorizer(unavailable);
+    assertSame(failure, assertThrows(NoSuchEntityException.class, () -> reader.listArticles(LAKE)));
+    assertSame(
+        failure,
+        assertThrows(NoSuchEntityException.class, () -> reader.loadArticle(LAKE, "guide")));
+    assertSame(
+        failure,
+        assertThrows(NoSuchEntityException.class, () -> reader.getArticleContent(LAKE, "guide")));
+    Mockito.verifyNoInteractions(storage);
+  }
+
+  @TestTemplate
+  void ownerCanTransferAfterCreateIsRevoked() throws Exception {
+    var draft =
+        as("writer", () -> manager.createArticle(LAKE, article("draft", ArticleStatus.DRAFT)));
+    List<String> remainingRoles = List.of("view");
+    List<Long> remainingIds = roleIds(remainingRoles);
+    backend.update(
+        NameIdentifierUtil.ofUser(LAKE, "writer"),
+        Entity.EntityType.USER,
+        (UserEntity old) ->
+            createUserEntity(
+                old.id(),
+                old.namespace(),
+                old.name(),
+                old.auditInfo(),
+                remainingRoles,
+                remainingIds));
+    nodeA.handleUserRoleRelChange(LAKE, "writer");
+
+    MetadataObject object =
+        MetadataObjects.of(null, "draft", MetadataObject.Type.KNOWLEDGE_BASE_ARTICLE);
+    as(
+        "writer",
+        () -> {
+          assertThrows(
+              NoSuchKnowledgeBaseArticleException.class, () -> manager.loadArticle(LAKE, "draft"));
+          assertTrue(
+              nodeA.hasSetOwnerPermission(
+                  LAKE, object.type().name(), object.name(), new AuthorizationRequestContext()));
+          owners.setOwner(LAKE, object, "writer2", Owner.Type.USER);
+          return null;
+        });
+    assertEquals(draft, as("writer2", () -> manager.loadArticle(LAKE, "draft")));
+    assertEquals(
+        "writer2", as("writer2", () -> owners.getOwner(LAKE, object)).orElseThrow().name());
+  }
+
+  @TestTemplate
+  void creationRollsBackIfOwnerAssignmentFails() throws Exception {
+    // A grant through a group can allow creation before the user has been registered locally.
+    GravitinoAuthorizer allowed = Mockito.mock(GravitinoAuthorizer.class);
+    Mockito.when(
+            allowed.authorize(
+                Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+        .thenReturn(true);
+    env.setGravitinoAuthorizer(allowed);
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            as(
+                "unregistered",
+                () -> manager.createArticle(LAKE, article("retry", ArticleStatus.DRAFT))));
+    env.setGravitinoAuthorizer(nodeA);
+    assertThrows(
+        NoSuchKnowledgeBaseArticleException.class,
+        () -> as("admin", () -> manager.loadArticle(LAKE, "retry")));
+    assertEquals(
+        "retry",
+        as("writer", () -> manager.createArticle(LAKE, article("retry", ArticleStatus.DRAFT)))
+            .article()
+            .name());
+  }
+
+  private static ArticleCreate article(String name, ArticleStatus status) {
+    return ArticleCreate.builder()
+        .withName(name)
+        .withTitle(name)
+        .withStatus(status)
+        .withBody(ArticleBody.of(ArticleBody.Format.MARKDOWN, "body"))
+        .build();
+  }
+
+  /** Counts mapper reads on the test thread while a recording is open. */
+  @Intercepts(
+      @Signature(
+          type = Executor.class,
+          method = "query",
+          args = {MappedStatement.class, Object.class, RowBounds.class, ResultHandler.class}))
+  public static final class ArticleQueries implements Interceptor, AutoCloseable {
+    private static final ThreadLocal<List<String>> READS = new ThreadLocal<>();
+
+    private static ArticleQueries record() {
+      var config = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().getConfiguration();
+      var recorder = new ArticleQueries();
+      if (config.getInterceptors().stream().noneMatch(ArticleQueries.class::isInstance)) {
+        config.addInterceptor(recorder);
+      }
+      READS.set(new ArrayList<>());
+      return recorder;
+    }
+
+    private long count(String name) {
+      return READS.get().stream().filter(name::equals).count();
+    }
+
+    @Override
+    public Object intercept(Invocation invocation) throws Throwable {
+      if (READS.get() != null) {
+        String id = ((MappedStatement) invocation.getArgs()[0]).getId();
+        String method = id.substring(id.lastIndexOf('.') + 1);
+        if (method.equals("selectOwnerByMetadataObjectIdAndType")) {
+          method += "." + ((Map<?, ?>) invocation.getArgs()[1]).get("metadataObjectType");
+        }
+        READS.get().add(method);
+      }
+      return invocation.proceed();
+    }
+
+    @Override
+    public void close() {
+      READS.remove();
+    }
+  }
+
+  private void role(String name, Privilege privilege) throws Exception {
+    backend.insert(
+        createRoleEntity(
+            ids.incrementAndGet(),
+            AuthorizationUtils.ofRoleNamespace(LAKE),
+            name,
+            AUDIT_INFO,
+            List.of(SecurableObjects.ofMetalake(LAKE, List.of(privilege))),
+            null),
+        false);
+  }
+
+  private void user(String name, String... roles) throws Exception {
+    List<String> roleNames = List.of(roles);
+    backend.insert(
+        createUserEntity(
+            ids.incrementAndGet(),
+            AuthorizationUtils.ofUserNamespace(LAKE),
+            name,
+            AUDIT_INFO,
+            roleNames,
+            roleIds(roleNames)),
+        false);
+  }
+
+  private List<Long> roleIds(List<String> roles) throws Exception {
+    List<Long> ids = new ArrayList<>();
+    for (String role : roles) {
+      ids.add(backend.get(NameIdentifierUtil.ofRole(LAKE, role), Entity.EntityType.ROLE).id());
+    }
+    return ids;
+  }
+
+  private static <T> T as(String user, PrivilegedExceptionAction<T> work) throws Exception {
+    return PrincipalUtils.doAs(new UserPrincipal(user), work);
+  }
+}

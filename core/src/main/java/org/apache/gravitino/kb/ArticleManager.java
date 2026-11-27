@@ -20,6 +20,7 @@
 package org.apache.gravitino.kb;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Suppliers;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
@@ -27,9 +28,13 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.exceptions.ArticleRevisionConflictException;
 import org.apache.gravitino.exceptions.KnowledgeBaseArticleAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchKnowledgeBaseArticleException;
@@ -42,8 +47,10 @@ import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaS
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.ScopedArticle;
 import org.apache.gravitino.storage.relational.service.KnowledgeBaseArticleMetaService.TransactionHook;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
+import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Manages current Knowledge Base Articles in a metalake. */
 public final class ArticleManager {
@@ -54,16 +61,29 @@ public final class ArticleManager {
   private final IdGenerator ids;
   private final ArticleEdits edits;
   private final TransactionHook policy;
+  private final boolean authorizationEnabled;
   private final KnowledgeBaseArticleMetaService articles =
       KnowledgeBaseArticleMetaService.getInstance();
 
   /** Creates a manager that applies changes directly. */
   public ArticleManager(IdGenerator ids, int maxBodyBytes) {
-    this(ids, maxBodyBytes, (before, after) -> {});
+    this(ids, maxBodyBytes, false);
   }
 
-  /** Creates a manager whose write policy participates in each effective write transaction. */
+  /** Creates the server manager with the configured Article authorization mode. */
+  public ArticleManager(IdGenerator ids, int maxBodyBytes, boolean authorizationEnabled) {
+    this(ids, maxBodyBytes, authorizationEnabled, (before, after) -> {});
+  }
+
+  /** Creates a manager with a transactional write policy and authorization disabled. */
   public ArticleManager(IdGenerator ids, int maxBodyBytes, TransactionHook policy) {
+    this(ids, maxBodyBytes, false, policy);
+  }
+
+  /** Creates a manager with the configured authorization mode and transactional write policy. */
+  public ArticleManager(
+      IdGenerator ids, int maxBodyBytes, boolean authorizationEnabled, TransactionHook policy) {
+    this.authorizationEnabled = authorizationEnabled;
     this.ids = Preconditions.checkNotNull(ids, "ids");
     this.edits = new ArticleEdits(maxBodyBytes);
     this.policy = Preconditions.checkNotNull(policy, "policy");
@@ -100,33 +120,47 @@ public final class ArticleManager {
     } else if (generated) {
       name = ArticleEdits.generatedName(request.title(), 0);
     }
-    KnowledgeBaseArticleEntity article = edits.create(metalake, ids.nextId(), name, request);
+    Supplier<ArticleBody> body = Suppliers.memoize(() -> edits.storedBody(request.body()));
     for (int attempt = 0; ; attempt++) {
+      NameIdentifier ident = ident(metalake, name);
+      long articleId = ids.nextId();
       try {
         return Result.from(
-            articles.createScoped(article, expectedMetalakeId, policy, TargetNameConflict::new));
+            articles.createScoped(
+                ident,
+                () -> {
+                  if (authorizationEnabled) {
+                    ArticleAccess.forRequest(metalake).requireCreate();
+                  }
+                  return edits.create(metalake, articleId, ident.name(), request, body);
+                },
+                expectedMetalakeId,
+                (before, created) -> {
+                  if (authorizationEnabled) {
+                    OwnerMetaService.getInstance()
+                        .setOwner(
+                            created.nameIdentifier(),
+                            EntityType.KNOWLEDGE_BASE_ARTICLE,
+                            NameIdentifierUtil.ofUser(metalake, created.auditInfo().creator()),
+                            EntityType.USER);
+                  }
+                  policy.onChange(before, created);
+                },
+                TargetNameConflict::new));
       } catch (TargetNameConflict conflict) {
         if (allocateInCallerTransaction) {
           throw new OptimisticLockException(
               conflict.getCause(),
               "Article name %s was claimed in %s; retry the transaction",
-              article.name(),
+              name,
               metalake);
         }
         if (!generated || attempt == MAX_NAME_RETRIES) {
           throw new KnowledgeBaseArticleAlreadyExistsException(
-              conflict.getCause(),
-              "Article name %s already exists in %s",
-              article.name(),
-              metalake);
+              conflict.getCause(), "Article name %s already exists in %s", name, metalake);
         }
         expectedMetalakeId = conflict.metalakeId;
-        article =
-            article.toBuilder()
-                .withName(
-                    SqlSessions.readSnapshot(() -> nextAvailableName(metalake, request.title(), 1)))
-                .withId(ids.nextId())
-                .build();
+        name = SqlSessions.readSnapshot(() -> nextAvailableName(metalake, request.title(), 1));
       } catch (IOException failure) {
         throw new UncheckedIOException(failure);
       }
@@ -136,33 +170,52 @@ public final class ArticleManager {
   /** Reads one Article and its token from a single database snapshot. */
   public Result loadArticle(String metalake, String name) {
     NameIdentifier ident = ident(metalake, name);
-    try {
-      return Result.from(articles.getScoped(ident));
-    } catch (NoSuchEntityException missing) {
-      throw new NoSuchKnowledgeBaseArticleException(missing, "Article %s does not exist", ident);
-    }
+    ScopedArticle state =
+        readArticle(
+            ident,
+            () -> articles.getScoped(ident),
+            (access, current) ->
+                access.requireRead(ident, current.article().id(), current.article().status()));
+    return Result.from(state);
   }
 
   /** Reads the stored body and its token from the same row. */
   public ArticleContent getArticleContent(String metalake, String name) {
     NameIdentifier ident = ident(metalake, name);
-    try {
-      var content = articles.getContent(ident);
-      var revision = content.revision();
-      return new ArticleContent(
-          content.body(), encode(revision.metalakeId(), revision.articleId(), revision.revision()));
-    } catch (NoSuchEntityException missing) {
-      throw new NoSuchKnowledgeBaseArticleException(missing, "Article %s does not exist", ident);
-    }
+    var content =
+        readArticle(
+            ident,
+            () -> articles.getContent(ident),
+            (access, current) ->
+                access.requireRead(ident, current.revision().articleId(), current.status()));
+    var revision = content.revision();
+    return new ArticleContent(
+        content.body(), encode(revision.metalakeId(), revision.articleId(), revision.revision()));
   }
 
   /** Lists the current stored Articles in stable ID order. */
   public List<KnowledgeBaseArticleEntity> listArticles(String metalake) {
-    try {
-      return articles.list(Namespace.of(metalake));
-    } catch (NoSuchEntityException missing) {
-      throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", metalake);
+    Namespace namespace = Namespace.of(metalake);
+    if (!authorizationEnabled) {
+      try {
+        return articles.list(namespace);
+      } catch (NoSuchEntityException missing) {
+        throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", metalake);
+      }
     }
+    return SqlSessions.readSnapshotOrJoin(
+        () -> {
+          try {
+            MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+          } catch (NoSuchEntityException missing) {
+            throw new NoSuchMetalakeException(missing, "Metalake %s does not exist", metalake);
+          }
+          ArticleAccess access = ArticleAccess.forRequest(metalake);
+          if (!access.canView()) {
+            return List.of();
+          }
+          return access.visibleArticles(articles.list(namespace));
+        });
   }
 
   /** Applies the changes atomically, optionally checking the editing token before any change. */
@@ -172,13 +225,25 @@ public final class ArticleManager {
       @Nullable String expectedRevision,
       KnowledgeBaseArticleChange... changes) {
     NameIdentifier ident = ident(metalake, name);
-    ExpectedRevision expected = expectedRevision == null ? null : decode(expectedRevision);
+
     Preconditions.checkNotNull(changes, "changes");
     return Result.from(
-        articles.updateScoped(
+        articles.editMetadata(
             ident,
-            expected,
-            before -> edits.apply(before, changes),
+            state -> {
+              KnowledgeBaseArticleEntity before = state.article();
+              if (authorizationEnabled) {
+                ArticleAccess.forRequest(metalake).requireEdit(before);
+              }
+              if (expectedRevision != null
+                  && !decode(expectedRevision)
+                      .equals(
+                          new ExpectedRevision(
+                              state.metalakeId(), before.id(), before.revision()))) {
+                throw new ArticleRevisionConflictException("Article %s has changed", ident);
+              }
+              return edits.apply(before, changes);
+            },
             policy,
             missing ->
                 new NoSuchKnowledgeBaseArticleException(
@@ -187,7 +252,14 @@ public final class ArticleManager {
 
   /** Deletes the Article and its relations, returning false when the Article is absent. */
   public boolean deleteArticle(String metalake, String name) {
-    return articles.deleteAndGet(ident(metalake, name), policy).isPresent();
+    return articles
+        .deleteAndGet(
+            ident(metalake, name),
+            article ->
+                !authorizationEnabled
+                    || ArticleAccess.forRequest(metalake).authorizeMutation(article),
+            policy)
+        .isPresent();
   }
 
   private static final class TargetNameConflict extends RuntimeException {
@@ -196,6 +268,31 @@ public final class ArticleManager {
     private TargetNameConflict(long metalakeId, NameConflictException cause) {
       super(cause);
       this.metalakeId = metalakeId;
+    }
+  }
+
+  private <T> T readArticle(
+      NameIdentifier ident, Supplier<T> fetch, BiConsumer<ArticleAccess, T> checkVisibility) {
+    if (!authorizationEnabled) {
+      return loadStored(ident, fetch);
+    }
+    return SqlSessions.readSnapshotOrJoin(
+        () -> {
+          ArticleAccess access = ArticleAccess.forRequest(NameIdentifierUtil.getMetalake(ident));
+          if (!access.canView()) {
+            throw new NoSuchKnowledgeBaseArticleException("Article %s does not exist", ident);
+          }
+          T result = loadStored(ident, fetch);
+          checkVisibility.accept(access, result);
+          return result;
+        });
+  }
+
+  private static <T> T loadStored(NameIdentifier ident, Supplier<T> fetch) {
+    try {
+      return fetch.get();
+    } catch (NoSuchEntityException missing) {
+      throw new NoSuchKnowledgeBaseArticleException(missing, "Article %s does not exist", ident);
     }
   }
 

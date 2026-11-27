@@ -105,6 +105,10 @@ public class OwnerMetaSQLProviderFactory {
         table = RoleMetaMapper.ROLE_TABLE_NAME;
         idColumn = "role_id";
         break;
+      case KNOWLEDGE_BASE_ARTICLE:
+        table = KnowledgeBaseArticleMapper.TABLE_NAME;
+        idColumn = "article_id";
+        break;
       case GLOSSARY_TERM:
         table = "glossary_term_meta";
         idColumn = "term_id";

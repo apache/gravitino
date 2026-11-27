@@ -122,6 +122,10 @@ class TestArticleEdits {
 
   private static KnowledgeBaseArticleEntity create(ArticleEdits edits, ArticleBody body) {
     return edits.create(
-        "lake", 1, "guide", ArticleCreate.builder().withTitle("Guide").withBody(body).build());
+        "lake",
+        1,
+        "guide",
+        ArticleCreate.builder().withTitle("Guide").withBody(body).build(),
+        () -> edits.storedBody(body));
   }
 }
